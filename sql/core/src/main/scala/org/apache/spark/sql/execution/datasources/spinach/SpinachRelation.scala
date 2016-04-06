@@ -115,7 +115,8 @@ private[spinach] class SpinachRelation(
       filters: Array[Filter],
       inputPaths: Array[FileStatus],
       broadcastedConf: Broadcast[SerializableConfiguration]): RDD[InternalRow] = {
-    val output = StructType(requiredColumns.map(dataSchema(_))).toAttributes
+    // TODO this probably used by column pruning
+    // val output = StructType(requiredColumns.map(dataSchema(_))).toAttributes
     // get the data path from the given paths
     // TODO get the index file from the given paths
 
