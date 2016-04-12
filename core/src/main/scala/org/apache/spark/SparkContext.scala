@@ -231,6 +231,7 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
   private var _schedulerBackend: SchedulerBackend = _
   private var _taskScheduler: TaskScheduler = _
   private var _heartbeatReceiver: RpcEndpointRef = _
+  private var _fiberUpdateReceiver: RpcEndpointRef = _
   @volatile private var _dagScheduler: DAGScheduler = _
   private var _applicationId: String = _
   private var _applicationAttemptId: Option[String] = None
@@ -517,6 +518,9 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     // retrieve "HeartbeatReceiver" in the constructor. (SPARK-6640)
     _heartbeatReceiver = env.rpcEnv.setupEndpoint(
       HeartbeatReceiver.ENDPOINT_NAME, new HeartbeatReceiver(this))
+
+    _fiberUpdateReceiver = env.rpcEnv.setupEndpoint(
+      FiberUpdateReceiver.ENDPOINT_NAME, new FiberUpdateReceiver(this))
 
     // Create and start the scheduler
     val (sched, ts) = SparkContext.createTaskScheduler(this, master)

@@ -107,14 +107,25 @@ private[spark] class Executor(
   // Maintains the list of running tasks.
   private val runningTasks = new ConcurrentHashMap[Long, TaskRunner]
 
+  // Fiber related object.
+  private val fiberInfo = "can be a map maintains Fiber information "
+
   // Executor for the heartbeat task.
   private val heartbeater = ThreadUtils.newDaemonSingleThreadScheduledExecutor("driver-heartbeater")
+
+  // Executor for the fiber update task.
+  private val fiberUpdater = ThreadUtils.newDaemonSingleThreadScheduledExecutor("driver-fiberUpdate")
 
   // must be initialized before running startDriverHeartbeat()
   private val heartbeatReceiverRef =
     RpcUtils.makeDriverRef(HeartbeatReceiver.ENDPOINT_NAME, conf, env.rpcEnv)
 
+  // has the same functionality with executor heartbeat, but specifically for FiberManager.
+  private val fiberUpdateReceiverRef =
+    RpcUtils.makeDriverRef(FiberUpdateReceiver.ENDPOINT_NAME, conf, env.rpcEnv)
+
   startDriverHeartbeater()
+  startDriverFiberUpdate()
 
   def launchTask(
       context: ExecutorBackend,
@@ -457,6 +468,25 @@ private[spark] class Executor(
     }
   }
 
+  /* Reports fiber update info to the driver. */
+  private def reportFiberUpdate(): Unit = {
+
+    val fiberInfoData: String = fiberInfo + System.currentTimeMillis().toString +
+      " from executor " + executorId
+
+    val message = FiberUpdateHeartBeat(executorId, fiberInfoData, env.blockManager.blockManagerId)
+    try {
+      val response = fiberUpdateReceiverRef.askWithRetry[FiberUpdateResponse](
+        message, RpcTimeout(conf, "spark.executor.FiberUpdateInterval", "10s"))
+      if (response.reregisterBlockManager) {
+        logInfo("Told to re-register on FiberUpdate")
+        env.blockManager.reregister()
+      }
+    } catch {
+      case NonFatal(e) => logWarning("Issue communicating with driver in FiberUpdate", e)
+    }
+  }
+
   /**
    * Schedules a task to report heartbeat and partial metrics for active tasks to driver.
    */
@@ -470,5 +500,20 @@ private[spark] class Executor(
       override def run(): Unit = Utils.logUncaughtExceptions(reportHeartBeat())
     }
     heartbeater.scheduleAtFixedRate(heartbeatTask, initialDelay, intervalMs, TimeUnit.MILLISECONDS)
+  }
+
+  /**
+   * Schedules a task to report Fiber Update info to driver.
+   */
+  private def startDriverFiberUpdate(): Unit = {
+    val intervalMs = conf.getTimeAsMs("spark.executor.FiberUpdateInterval", "10s")
+
+    // Wait a random interval so the fiberUpdate don't end up in sync
+    val initialDelay = intervalMs + (math.random * intervalMs).asInstanceOf[Int]
+
+    val fiberUpdateTask = new Runnable() {
+      override def run(): Unit = Utils.logUncaughtExceptions(reportFiberUpdate())
+    }
+    fiberUpdater.scheduleAtFixedRate(fiberUpdateTask, initialDelay, intervalMs, TimeUnit.MILLISECONDS)
   }
 }
