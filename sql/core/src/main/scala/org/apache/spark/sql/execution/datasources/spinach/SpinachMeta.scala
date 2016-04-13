@@ -20,10 +20,15 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.io.DataInputStream
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FSDataInputStream, FileSystem, Path}
+import org.apache.hadoop.util.StringUtils
 import org.apache.spark.sql.types.StructType
 
-case class SpinachMeta(val schema: StructType)
+case class SpinachMeta(schema: StructType) {
+  def open(path: String): DataMeta = {
+    throw new NotImplementedError("")
+  }
+}
 
 private[spinach] object SpinachMeta {
   def initialize(path: Path, jobConf: Configuration): SpinachMeta = {
