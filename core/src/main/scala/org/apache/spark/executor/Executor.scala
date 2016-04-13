@@ -114,7 +114,8 @@ private[spark] class Executor(
   private val heartbeater = ThreadUtils.newDaemonSingleThreadScheduledExecutor("driver-heartbeater")
 
   // Executor for the fiber update task.
-  private val fiberUpdater = ThreadUtils.newDaemonSingleThreadScheduledExecutor("driver-fiberUpdate")
+  private val fiberUpdater =
+    ThreadUtils.newDaemonSingleThreadScheduledExecutor("driver-fiberUpdate")
 
   // must be initialized before running startDriverHeartbeat()
   private val heartbeatReceiverRef =
@@ -514,6 +515,7 @@ private[spark] class Executor(
     val fiberUpdateTask = new Runnable() {
       override def run(): Unit = Utils.logUncaughtExceptions(reportFiberUpdate())
     }
-    fiberUpdater.scheduleAtFixedRate(fiberUpdateTask, initialDelay, intervalMs, TimeUnit.MILLISECONDS)
+    fiberUpdater.scheduleAtFixedRate(
+      fiberUpdateTask, initialDelay, intervalMs, TimeUnit.MILLISECONDS)
   }
 }
