@@ -96,6 +96,8 @@ private[spark] object JsonProtocol {
         executorMetricsUpdateToJson(metricsUpdate)
       case blockUpdated: SparkListenerBlockUpdated =>
         throw new MatchError(blockUpdated)  // TODO(ekl) implement this
+      case fiberUpdate: SparkListenerExecutorFiberUpdate =>
+        throw new MatchError(fiberUpdate)   // TODO(ekl) implement this
     }
   }
 

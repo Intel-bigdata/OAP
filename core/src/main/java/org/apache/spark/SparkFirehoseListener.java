@@ -118,4 +118,7 @@ public class SparkFirehoseListener implements SparkListener {
         onEvent(blockUpdated);
     }
 
+    @Override
+    public void onFiberUpdate(SparkListenerExecutorFiberUpdate fiberUpdate) { onEvent(fiberUpdate); }
+
 }
