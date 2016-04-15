@@ -537,8 +537,9 @@ abstract class HadoopFsRelation private[sql](
       new DefaultWriterContainer(this, job, isAppend)
     } else {
       val output = df.queryExecution.executedPlan.output
+      val partitionNames = partitionColumns.fieldNames
       val (partitionOutput, dataOutput) =
-        output.partition(a => partitionColumns.contains(a.name))
+        output.partition(a => partitionNames.contains(a.name))
 
       new DynamicPartitionWriterContainer(
         this,
