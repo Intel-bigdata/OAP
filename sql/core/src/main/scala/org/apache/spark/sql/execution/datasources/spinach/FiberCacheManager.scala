@@ -37,7 +37,7 @@ object FiberCacheManager extends Logging {
       .weigher(new Weigher[Fiber, FiberByteData] {
         override def weigh(key: Fiber, value: FiberByteData): Int = value.buf.length
       })
-      .maximumSize(MemoryManager.SPINACH_FIBER_CACHE_SIZE_IN_BYTES)
+      .maximumWeight(MemoryManager.SPINACH_FIBER_CACHE_SIZE_IN_BYTES)
       .removalListener(new RemovalListener[Fiber, FiberByteData] {
         override def onRemoval(n: RemovalNotification[Fiber, FiberByteData]): Unit = {
           MemoryManager.instance.free(n.getValue)
