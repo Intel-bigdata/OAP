@@ -35,7 +35,7 @@ class SpinachSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
     path = Utils.createTempDir()
     path.delete()
 
-    val df = sparkContext.parallelize(1 to 100)
+    val df = sparkContext.parallelize(1 to 100, 3)
       .map(i => (i, i + 100, s"this is row $i"))
       .toDF("a", "b", "c")
 
@@ -61,7 +61,7 @@ class SpinachSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
       .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
 
     // verify content
-    val data = df.collect()
+    val data = df.collect().sortBy(_.getInt(0)) // sort locally
     assert(data.length == 100)
     assert(data(0) == Row(1, 101, "this is row 1"))
     assert(data(1) == Row(2, 102, "this is row 2"))
