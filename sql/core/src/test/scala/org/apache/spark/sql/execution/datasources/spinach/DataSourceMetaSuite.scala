@@ -28,7 +28,7 @@ import org.scalatest.BeforeAndAfter
 
 import scala.collection.immutable.BitSet
 
-class SpinachMetaSuite extends SharedSQLContext with BeforeAndAfter {
+class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
   private var tmpDir: File = null
 
@@ -55,9 +55,9 @@ class SpinachMetaSuite extends SharedSQLContext with BeforeAndAfter {
       IndexMeta("index2", 1, BitSet.empty + 1 + 2))
     val schema = new StructType()
       .add("a", IntegerType).add("b", IntegerType).add("c", StringType)
-    val spinachMeta = SpinachMeta(fileMetas, indexMetas, schema, fileHeader)
+    val spinachMeta = DataSourceMeta(fileMetas, indexMetas, schema, fileHeader)
 
-    SpinachMeta.write(path, new Configuration(), spinachMeta)
+    DataSourceMeta.write(path, new Configuration(), spinachMeta)
   }
 
   test("read Spinach Meta") {
@@ -65,7 +65,7 @@ class SpinachMetaSuite extends SharedSQLContext with BeforeAndAfter {
       new File(tmpDir.getAbsolutePath, "spinach.meta").getAbsolutePath)
     writeMetaFile(path)
 
-    val spinachMeta = SpinachMeta.initialize(path, new Configuration())
+    val spinachMeta = DataSourceMeta.initialize(path, new Configuration())
     val fileHeader = spinachMeta.fileHeader
     assert(fileHeader.recordCount === 100)
     assert(fileHeader.dataFileCount === 2)
@@ -98,14 +98,14 @@ class SpinachMetaSuite extends SharedSQLContext with BeforeAndAfter {
       .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
   }
 
-  test("Empty Spinach Meta") {
+  test("read empty Spinach Meta") {
     val path = new Path(
       new File(tmpDir.getAbsolutePath, "emptySpinach.meta").getAbsolutePath)
     val fileHeaderToWrite = FileHeader(0, 0, 0, Version(1, 0, 0), "FIBER")
-    val spinachMetaToWrite = SpinachMeta(Array.empty, Array.empty, new StructType(), fileHeaderToWrite)
-    SpinachMeta.write(path, new Configuration(), spinachMetaToWrite)
+    val spinachMetaToWrite = DataSourceMeta(Array.empty, Array.empty, new StructType(), fileHeaderToWrite)
+    DataSourceMeta.write(path, new Configuration(), spinachMetaToWrite)
 
-    val spinachMeta = SpinachMeta.initialize(path, new Configuration())
+    val spinachMeta = DataSourceMeta.initialize(path, new Configuration())
     val fileHeader = spinachMeta.fileHeader
     assert(fileHeader.recordCount === 0)
     assert(fileHeader.dataFileCount === 0)

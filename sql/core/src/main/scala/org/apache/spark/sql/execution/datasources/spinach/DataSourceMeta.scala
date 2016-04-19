@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets
 import scala.collection.immutable.BitSet
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs._
+import org.apache.hadoop.fs.{FSDataInputStream, FileAlreadyExistsException, FileStatus, Path}
 import org.apache.hadoop.mapreduce.TaskAttemptContext
 import org.apache.spark.sql.types.StructType
 
@@ -41,7 +41,7 @@ import org.apache.spark.sql.types.StructType
  * IndexMeta 1      -- 512 bytes
  *     Name         -- 255 bytes -- The index name.
  *     indexType    --   1 bytes -- The index type. Sort(0)/ Bitmap Mask(1).
- *     key          -- 256 bytes -- The bit mask for keys.
+ *     key          -- 256 bytes -- The bit mask for the index key.
  * IndexMeta 2
  *    .
  *    .
@@ -251,10 +251,10 @@ private[spinach] object DataSourceMeta {
       path: Path,
       jobConf: Configuration,
       meta: DataSourceMeta,
-      deleteIfExit: Boolean = true): Unit = {
+      deleteIfExits: Boolean = true): Unit = {
     val fs = path.getFileSystem(jobConf)
     if (fs.exists(path)) {
-      if (deleteIfExit) {
+      if (deleteIfExits) {
         fs.delete(path, true)
       } else {
         throw new FileAlreadyExistsException(s"File $path already exists.")
