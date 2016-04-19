@@ -36,7 +36,7 @@ class SpinachFileInputFormat extends FileInputFormat[NullWritable, InternalRow] 
 
   def createRecordReader(split: InputSplit, context: TaskAttemptContext)
   : RecordReader[NullWritable, InternalRow] = {
-    val s = split.asInstanceOf[FiberSplit]
+    val s = split.asInstanceOf[SpinachSplit]
     val conf = SparkHadoopUtil.get.getConfigurationFromJobContext(context)
     val schema = StructType.fromString(conf.get(SpinachFileFormat.SPINACH_META_SCHEMA))
 
@@ -58,7 +58,7 @@ class SpinachFileInputFormat extends FileInputFormat[NullWritable, InternalRow] 
         if (path.getName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION)) {
           val fs = path.getFileSystem(jobConf)
           val blkLocations = fs.getFileBlockLocations(file, 0, length)
-          splits.add(new FiberSplit(length, file.getPath, blkLocations(0).getHosts))
+          splits.add(new SpinachSplit(length, file.getPath, blkLocations(0).getHosts))
         } else if (path.getName.endsWith(SpinachFileFormat.SPINACH_META_EXTENSION)) {
           // ignore it, as we will get the schema from the configuration
         }
@@ -80,56 +80,67 @@ class SpinachFileInputFormat extends FileInputFormat[NullWritable, InternalRow] 
 private[spinach] class SpinachRecordReader(
     path: Path,
     schema: StructType) extends RecordReader[NullWritable, InternalRow] {
-  private val readers: Array[DataReaderWriter] =
-    DataReaderWriter.initialDataReaderWriterFromSchema(schema)
 
-  private var recordCount = -1
-  private var currentIdx = 0
-  private var in: FSDataInputStream = _
-  private val row: GenericMutableRow = new GenericMutableRow(schema.fields.length)
+  private var rowCount = -1
+  private var rowGroupId: Int = -1
+  private var currentRowIdx: Int = 0
+  private var currentRowIter: Iterator[InternalRow] = _
+
+  private var splitMeta: SpinachSplitMeta = _
+  private var dataFile: DataFile = _
 
   override def initialize(split: InputSplit, context: TaskAttemptContext): Unit = {
-    val job: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(context)
-    val file = path.getFileSystem(job)
-    val len = file.getFileStatus(path).getLen
-    this.in = path.getFileSystem(job).open(path)
-
-    // seek to the end of the file, to get the record count of this file
-    in.seek(len - 4)
-    recordCount = in.readInt()
-
-    // seek to the start of the file
-    in.seek(0)
+    dataFile = DataFile(path.toString, context)
+    splitMeta = FiberDataFileHandler(dataFile).splitMeta
+    rowCount = splitMeta.rowGroupMeta.length * splitMeta.rowGroupSize._1 +
+      splitMeta.rowGroupSize._2
+    currentRowIter = getRowIterator()
   }
 
-  override def getProgress: Float = if (recordCount > 0) {
-    currentIdx * 1.0f / recordCount
+  override def getProgress: Float = if (rowCount > 0) {
+    (splitMeta.rowGroupSize._1 * rowGroupId + currentRowIdx) * 1.0f / rowCount
   } else {
     1.0f
   }
 
   override def nextKeyValue(): Boolean = {
-    // TODO compressed
-    //    var codec: CompressionCodec = null
-    //    if (isCompressed) {
-    //      val codecClass: Class[_ <: CompressionCodec] =
-    //        FileOutputFormat.getOutputCompressorClass(job, classOf[GzipCodec])
-    //      codec = ReflectionUtils.newInstance(codecClass, conf).asInstanceOf[CompressionCodec]
-    //    }
-    var i = 0
-    while (i < readers.length) {
-      readers(i).read(in, row)
-      i += 1
+    if (currentRowIter.hasNext) {
+      true
+    } else {
+      getNextRowIterator() != null
     }
-    currentIdx += 1
-    currentIdx <= recordCount
   }
 
-  override def getCurrentValue: InternalRow = row
+  private def getNextRowIterator(): Iterator[InternalRow] = {
+    rowGroupId += 1
+    getRowIterator()
+  }
+
+  private def getRowIterator(): Iterator[InternalRow] = {
+    var rowCount: Int = 0
+    if (rowGroupId < splitMeta.rowGroupMeta.length - 1) {
+      rowCount = splitMeta.rowGroupSize._1
+    } else if (rowGroupId == splitMeta.rowGroupMeta.length - 1) {
+      rowCount = splitMeta.rowGroupSize._2
+    } else {
+      return null
+    }
+
+    val columnValues = (0 until splitMeta.colNum).map { idx =>
+      val fiberData = FiberCacheManager(Fiber(dataFile, idx, rowGroupId))
+      new ColumnValues(schema.fields(idx).dataType, fiberData)
+    }.toArray
+
+    ColumnarBatch(rowCount, columnValues, schema).rowIterator()
+  }
+
+  override def getCurrentValue: InternalRow = {
+    currentRowIdx += 1
+    currentRowIter.next()
+  }
 
   override def getCurrentKey: NullWritable = NullWritable.get()
 
   override def close() {
-    in.close
   }
 }

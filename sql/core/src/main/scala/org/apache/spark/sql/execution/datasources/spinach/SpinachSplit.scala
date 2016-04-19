@@ -32,7 +32,7 @@ import scala.beans.BeanProperty
   * @param file the file name
   * @param hosts the list of hosts containing the block, possibly null
   */
-class FiberSplit(@BeanProperty var length: Long,
+class SpinachSplit(@BeanProperty var length: Long,
                  @BeanProperty var file: Path,
                  @BeanProperty var hosts: Array[String]) extends InputSplit with Writable {
   def this() {

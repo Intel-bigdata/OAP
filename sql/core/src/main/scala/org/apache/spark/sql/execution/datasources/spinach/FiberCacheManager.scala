@@ -44,10 +44,26 @@ object FiberCacheManager extends Logging {
         }
       }).build(new CacheLoader[Fiber, FiberByteData] {
       override def load(key: Fiber): FiberByteData = {
-        val in: FSDataInputStream = FiberDataFileHandler(key.file)
-
+        val handler: FiberDataFileHandler = FiberDataFileHandler(key.file)
         // TODO load the data fiber
-        throw new NotImplementedError("")
+        val splitMeta = handler.splitMeta
+        val rowGroupStartPos = splitMeta.rowGroupMeta(key.rowGroupId)._1
+        val fiberLen = splitMeta.rowGroupMeta(key.rowGroupId)._2
+
+        var offset: Int = 0
+        var idx: Int = 0
+        while(idx < key.columnIndex - 1) {
+          offset += fiberLen(idx)
+          idx += 1
+        }
+
+        val oldPos = handler.is.getPos
+        handler.is.seek(rowGroupStartPos + offset)
+        val buf = new Array[Byte](fiberLen(idx))
+        handler.is.read(buf, 0, fiberLen(idx))
+        handler.is.seek(oldPos)
+
+        return FiberByteData(buf)
       }
     })
 
@@ -60,6 +76,9 @@ object FiberCacheManager extends Logging {
   def update(status: String): Unit = throw new NotImplementedError()
 }
 
+private[spinach] case class FiberDataFileHandler(is: FSDataInputStream,
+                                                 splitMeta: SpinachSplitMeta)
+
 private[spinach] object FiberDataFileHandler extends Logging {
   @transient private val cache =
     CacheBuilder
@@ -67,20 +86,25 @@ private[spinach] object FiberDataFileHandler extends Logging {
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
       .maximumSize(MemoryManager.SPINACH_FIBER_CACHE_SIZE_IN_BYTES)
       .expireAfterAccess(100, TimeUnit.SECONDS) // auto expire after 100 seconds.
-      .removalListener(new RemovalListener[DataFile, FSDataInputStream] {
-        override def onRemoval(n: RemovalNotification[DataFile, FSDataInputStream])
+      .removalListener(new RemovalListener[DataFile, FiberDataFileHandler] {
+        override def onRemoval(n: RemovalNotification[DataFile, FiberDataFileHandler])
         : Unit = {
-          n.getValue.close()
+          n.getValue.is.close()
         }
-      }).build(new CacheLoader[DataFile, FSDataInputStream] {
-      override def load(key: DataFile): FSDataInputStream = {
+      }).build(new CacheLoader[DataFile, FiberDataFileHandler] {
+      override def load(key: DataFile): FiberDataFileHandler = {
         // TODO make the ctx also cached?
         val ctx = SparkHadoopUtil.get.getConfigurationFromJobContext(key.context)
-        FileSystem.get(ctx).open(new Path(StringUtils.unEscapeString(key.path)))
+        val fs = FileSystem.get(ctx)
+        val path = new Path(StringUtils.unEscapeString(key.path))
+        val status = fs.getFileStatus(path)
+        val is = fs.open(path)
+        val fileLen = status.getLen
+        FiberDataFileHandler(is, SpinachSplitMetaBuilder(is, fileLen))
       }
     })
 
-  def apply(fiberCache: DataFile): FSDataInputStream = {
+  def apply(fiberCache: DataFile): FiberDataFileHandler = {
     cache(fiberCache)
   }
 }
