@@ -28,10 +28,17 @@ private[spinach] class SpinachRecordWriter(
     isCompressed: Boolean,
     out: DataOutputStream,
     schema: StructType) extends RecordWriter[NullWritable, InternalRow] {
-  private val writers: Array[DataReaderWriter] =
-    DataReaderWriter.initialDataReaderWriterFromSchema(schema)
+  // TODO: make the fiber size configurable
+  private final val DEFAULT_ROW_GROUP_SIZE = 1024
+  private var rowCount: Int = 0
+  private var fileLen: Long = 0L
 
-  private var count = 0
+  private val rowGroup: Array[FiberBuilder] =
+    FiberBuilder.initializeFromSchema(schema, DEFAULT_ROW_GROUP_SIZE)
+  private val metaBuilder = new SpinachSplitMetaBuilder()
+
+  metaBuilder.setColumnNumber(rowGroup.length)
+  metaBuilder.setDefaultRowGroupSize(DEFAULT_ROW_GROUP_SIZE)
 
   override def write(ignore: NullWritable, row: InternalRow) {
     // TODO compressed
@@ -41,16 +48,45 @@ private[spinach] class SpinachRecordWriter(
 //         FileOutputFormat.getOutputCompressorClass(job, classOf[GzipCodec])
 //      codec = ReflectionUtils.newInstance(codecClass, conf).asInstanceOf[CompressionCodec]
 //    }
-    var i = 0
-    while (i < writers.length) {
-      writers(i).write(out, row)
-      i += 1
+    var idx = 0
+    while (idx < rowGroup.length) {
+      rowGroup(idx).append(row, idx)
+      idx += 1
     }
-    count += 1
+    rowCount += 1
+    if (rowGroup(0).records == DEFAULT_ROW_GROUP_SIZE) {
+      writeRowGroup()
+    }
+  }
+
+  private def writeRowGroup(): Unit = {
+    val startPos: Long = fileLen
+    val fiberLen = new Array[Int](rowGroup.length)
+    var idx: Int = 0
+    while (idx < rowGroup.length) {
+      val fiberData = rowGroup(idx).build()
+      for (bitVal <- rowGroup(idx).bitStream.toLongArray()) {
+        out.writeLong(bitVal)
+        fileLen += 8
+      }
+      var len: Int = 0
+      for (data <- fiberData) {
+        out.write(data._1, 0, data._2)
+        fileLen += data._2
+        len += data._2
+      }
+      fiberLen(idx) = len
+      rowGroup(idx).clear()
+      idx += 1
+    }
+    metaBuilder.addRowGroupMeta((startPos, fiberLen))
   }
 
   override def close(context: TaskAttemptContext) {
-    out.writeInt(count) // write the record count in this partition
+
+    metaBuilder.setLastRowGroupSize(rowGroup(0).records)
+    writeRowGroup()
+    metaBuilder.build().write(out)
     out.close
   }
 }
