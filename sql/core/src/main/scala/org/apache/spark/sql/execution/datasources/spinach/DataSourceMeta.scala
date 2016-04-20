@@ -20,12 +20,13 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.io.{DataOutputStream, IOException}
 import java.nio.charset.StandardCharsets
 
-import scala.collection.immutable.BitSet
+import scala.collection.mutable.{ArrayBuffer, BitSet}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, FileAlreadyExistsException, FileStatus, Path}
 import org.apache.hadoop.mapreduce.TaskAttemptContext
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.catalyst.expressions.{Ascending, Descending, SortDirection}
 
 /**
  * The Spinach meta file is organized in the following format.
@@ -38,10 +39,12 @@ import org.apache.spark.sql.types.StructType
  *    .
  *    .
  * FileMeta N
- * IndexMeta 1      -- 512 bytes
+ * IndexMeta 1      -- 768 bytes
  *     Name         -- 255 bytes -- The index name.
  *     indexType    --   1 bytes -- The index type. Sort(0)/ Bitmap Mask(1).
- *     key          -- 256 bytes -- The bit mask for the index key.
+ *     keyOrdinal   -- 256 bytes -- The bit mask for the index key. Maximum support 256 fields
+ *     keySortDir   -- 256 bytes -- The bit mask for the key's sort direction. This is only used by
+ *                                  BTreeIndex. The bit is set if the sort direction is Descending.
  * IndexMeta 2
  *    .
  *    .
@@ -56,18 +59,160 @@ import org.apache.spark.sql.types.StructType
  *
  */
 
-private[spinach] case class FileMeta(fingerprint: String, recordCount: Long, dataFileName: String)
+private[spinach] trait IndexType
 
-private[spinach] case class IndexMeta(name: String, indexType: Byte, key: BitSet)
+private[spinach] case class BTreeIndexEntry(ordinal: Int, dir: SortDirection)
+
+private[spinach] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends IndexType {
+  def appendEntry(entry: BTreeIndexEntry): BTreeIndex = BTreeIndex(entries :+ entry)
+}
+
+private[spinach] case class BitMapIndex(entries: Seq[Int] = Nil) extends IndexType {
+  def appendEntry(entry: Int): BitMapIndex = BitMapIndex(entries :+ entry)
+}
+
+private[spinach] case class HashIndex(entries: Seq[Int] = Nil) extends IndexType {
+  def appendEntry(entry: Int): HashIndex = HashIndex(entries :+ entry)
+}
+
+import DataSourceMeta._
+
+private[spinach] case class FileMeta(
+    fingerprint: String,
+    recordCount: Long,
+    dataFileName: String) {
+  def write(out: DataOutputStream): Unit = {
+    writeString(fingerprint, FILE_META_FINGERPRINT_LENGTH, out)
+    out.writeLong(recordCount)
+    writeString(dataFileName, FILE_META_DATA_FILE_NAME_LENGTH, out)
+  }
+}
+
+private[spinach] object FileMeta {
+  def read(offset: Int, in: FSDataInputStream): FileMeta = {
+    var readPos = offset
+    in.seek(readPos)
+    val fingerprint = in.readUTF()
+    readPos += FILE_META_FINGERPRINT_LENGTH
+
+    in.seek(readPos)
+    val recordCount = in.readLong()
+    val dataFileName = in.readUTF()
+    FileMeta(fingerprint, recordCount, dataFileName)
+  }
+}
+
+private[spinach] case class IndexMeta(name: String, indexType: IndexType) {
+  private def writeBitSet(value: BitSet, totalSizeToWrite: Int, out: DataOutputStream): Unit = {
+    val sizeBefore = out.size
+    value.toBitMask.foreach(out.writeLong)
+    val sizeWritten = out.size - sizeBefore
+    val remaining = totalSizeToWrite - sizeWritten
+    assert(remaining >= 0,
+      s"Failed to write $value as it exceeds the max allowed $totalSizeToWrite bytes.")
+    for (i <- 0 until remaining) {
+      out.writeByte(0)
+    }
+  }
+
+  def write(out: DataOutputStream): Unit = {
+    import IndexMeta._
+    writeString(name, INDEX_META_NAME_LENGTH, out)
+    val keyBits = BitSet.empty
+    val dirBits = BitSet.empty
+    indexType match {
+      case BTreeIndex(entries) => {
+        out.writeByte(BTREE_INDEX_TYPE)
+        entries.foreach { entry =>
+          keyBits += entry.ordinal
+          if (entry.dir == Descending) dirBits += entry.ordinal
+        }
+      }
+      case BitMapIndex(entries) => {
+        out.writeByte(BITMAP_INDEX_TYPE)
+        entries.foreach(keyBits += _)
+      }
+      case HashIndex(entries) => {
+        out.writeByte(HASH_INDEX_TYPE)
+        entries.foreach(keyBits += _)
+      }
+    }
+    writeBitSet(keyBits, INDEX_META_KEY_LENGTH, out)
+    writeBitSet(dirBits, INDEX_META_KEY_LENGTH, out)
+  }
+}
+
+private[spinach] object IndexMeta {
+  final val BTREE_INDEX_TYPE = 0
+  final val BITMAP_INDEX_TYPE = 1
+  final val HASH_INDEX_TYPE = 2
+
+  def read(offset: Int, in: FSDataInputStream): IndexMeta = {
+    var readPos = offset
+    in.seek(readPos)
+    val name = in.readUTF()
+    readPos += INDEX_META_NAME_LENGTH
+
+    in.seek(readPos)
+    val indexTypeFlag = in.readByte()
+    val bitMask = new Array[Long](INDEX_META_KEY_LENGTH / 8)
+    val keyBits = {
+      for (j <- 0 until INDEX_META_KEY_LENGTH / 8) {
+        bitMask(j) = in.readLong()
+      }
+      BitSet.fromBitMask(bitMask)
+    }
+    val dirBits = if (indexTypeFlag == BTREE_INDEX_TYPE) {
+      for (j <- 0 until INDEX_META_KEY_LENGTH / 8) {
+        bitMask(j) = in.readLong()
+      }
+      BitSet.fromBitMask(bitMask)
+    } else {
+      BitSet.empty
+    }
+
+    val indexType = indexTypeFlag match {
+      case BTREE_INDEX_TYPE => BTreeIndex(keyBits.toSeq.map(o =>
+        BTreeIndexEntry(o, if (dirBits(o)) Descending else Ascending)))
+      case BITMAP_INDEX_TYPE => BitMapIndex(keyBits.toSeq)
+      case HASH_INDEX_TYPE => HashIndex(keyBits.toSeq)
+    }
+    IndexMeta(name, indexType)
+  }
+}
 
 private[spinach] case class Version(major: Byte, minor: Byte, revision: Byte)
 
-private[spinach] case class FileHeader(
-    recordCount: Long,
-    dataFileCount: Long,
-    indexCount: Long,
-    version: Version,
-    magicNumber: String)
+private[spinach] case class FileHeader(recordCount: Long, dataFileCount: Long, indexCount: Long) {
+  def write(out: DataOutputStream): Unit = {
+    out.writeLong(recordCount)
+    out.writeLong(dataFileCount)
+    out.writeLong(indexCount)
+    out.writeByte(VERSION.major)
+    out.writeByte(VERSION.minor)
+    out.writeByte(VERSION.revision)
+    out.write(MAGIC_NUMBER.getBytes(StandardCharsets.UTF_8))
+  }
+}
+
+private[spinach] object FileHeader {
+  def read(in: FSDataInputStream): FileHeader = {
+    val recordCount = in.readLong()
+    val dataFileCount = in.readLong()
+    val indexCount = in.readLong()
+    val version = Version(in.readByte(), in.readByte(), in.readByte())
+    if (version != VERSION) {
+      throw new IOException("The Spinach meta file version is not compatible.")
+    }
+    val buffer = new Array[Byte](MAGIC_NUMBER.length)
+    in.readFully(buffer)
+    val magicNumber = new String(buffer, StandardCharsets.UTF_8)
+    if (magicNumber != MAGIC_NUMBER) {
+      throw new IOException("Not a valid Spinach meta file.")
+    }
+    FileHeader(recordCount, dataFileCount, indexCount)
+  }
+}
 
 private[spinach] case class DataSourceMeta(
     fileMetas: Array[FileMeta],
@@ -81,17 +226,43 @@ private[spinach] case class DataSourceMeta(
   }
 }
 
-private[spinach] object DataSourceMeta {
+private[spinach] class DataSourceMetaBuilder {
+  val fileMetas = ArrayBuffer.empty[FileMeta]
+  val indexMetas = ArrayBuffer.empty[IndexMeta]
+  var schema: StructType = new StructType()
 
+  def addFileMeta(fileMeta: FileMeta): this.type = {
+    fileMetas += fileMeta
+    this
+  }
+
+  def addIndexMeta(indexMeta: IndexMeta): this.type = {
+    indexMetas += indexMeta
+    this
+  }
+
+  def setSchema(schema: StructType): this.type = {
+    this.schema = schema
+    this
+  }
+
+  def build(): DataSourceMeta = {
+    val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size, indexMetas.size)
+    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, fileHeader)
+  }
+}
+
+private[spinach] object DataSourceMeta {
   final val MAGIC_NUMBER = "FIBER"
+  final val VERSION = Version(1, 0, 0)
   final val FILE_HEAD_LEN = 32
 
   final val FILE_META_START_OFFSET = 0
   final val FILE_META_LENGTH = 512
   final val FILE_META_FINGERPRINT_LENGTH = 248
-  final val FILE_META_DATA_FILE_NAME_LENGTH =256
+  final val FILE_META_DATA_FILE_NAME_LENGTH = 256
 
-  final val INDEX_META_LENGTH = 512
+  final val INDEX_META_LENGTH = 768
   final val INDEX_META_NAME_LENGTH = 255
   final val INDEX_META_TYPE_LENGTH = 1
   final val INDEX_META_KEY_LENGTH = 256
@@ -100,30 +271,8 @@ private[spinach] object DataSourceMeta {
     if (file.getLen < FILE_HEAD_LEN) {
       throw new IOException(s" ${file.getPath} is not a valid Spinach meta file.")
     }
-
     in.seek(file.getLen - FILE_HEAD_LEN)
-    val recordCount = in.readLong()
-    val dataFileCount = in.readLong()
-    val indexCount = in.readLong()
-    val version = Version(in.readByte(), in.readByte(), in.readByte())
-    val buffer = new Array[Byte](MAGIC_NUMBER.length)
-    in.readFully(buffer)
-    val magicNumber = new String(buffer, StandardCharsets.UTF_8)
-    if (magicNumber != MAGIC_NUMBER) {
-      throw new IOException(s" ${file.getPath} is not a valid Spinach meta file.")
-    }
-
-    FileHeader(recordCount, dataFileCount, indexCount, version, magicNumber)
-  }
-
-  private def writeFileHeader(fileHeader: FileHeader, out: DataOutputStream): Unit = {
-    out.writeLong(fileHeader.recordCount)
-    out.writeLong(fileHeader.dataFileCount)
-    out.writeLong(fileHeader.indexCount)
-    out.writeByte(fileHeader.version.major)
-    out.writeByte(fileHeader.version.minor)
-    out.writeByte(fileHeader.version.revision)
-    out.write(MAGIC_NUMBER.getBytes(StandardCharsets.UTF_8))
+    FileHeader.read(in)
   }
 
   private def readFileMetas(fileHeader: FileHeader, in: FSDataInputStream): Array[FileMeta] = {
@@ -132,72 +281,22 @@ private[spinach] object DataSourceMeta {
     var readPos = FILE_META_START_OFFSET
 
     for (i <- 0 until dataFileCount) {
-      in.seek(readPos)
-      val fingerprint = in.readUTF()
-      readPos += FILE_META_FINGERPRINT_LENGTH
-
-      in.seek(readPos)
-      val recordCount = in.readLong()
-      readPos += 8
-
-      val dataFileName = in.readUTF()
-      readPos += FILE_META_DATA_FILE_NAME_LENGTH
-
-      fileMetas(i) = FileMeta(fingerprint, recordCount, dataFileName)
+      val readPos = FILE_META_START_OFFSET + FILE_META_LENGTH * i
+      fileMetas(i) = FileMeta.read(readPos, in)
     }
     fileMetas
-  }
-
-  private def writeFileMetas(fileMetas: Array[FileMeta], out: DataOutputStream): Unit = {
-    for (fileMeta <- fileMetas) {
-      // Write the fingerprint
-      writeString(fileMeta.fingerprint, FILE_META_FINGERPRINT_LENGTH, out)
-
-      // Write the record count
-      out.writeLong(fileMeta.recordCount)
-
-      // Write the associated data file name
-      writeString(fileMeta.dataFileName, FILE_META_DATA_FILE_NAME_LENGTH, out)
-    }
   }
 
   private def readIndexMetas(fileHeader: FileHeader, in: FSDataInputStream): Array[IndexMeta] = {
     val indexCount = fileHeader.indexCount.toInt
     val indexMetas = new Array[IndexMeta](indexCount)
-    var readPos = FILE_META_START_OFFSET + FILE_META_LENGTH * fileHeader.dataFileCount
 
     for (i <- 0 until indexCount) {
-      in.seek(readPos)
-      val name = in.readUTF()
-      readPos += INDEX_META_NAME_LENGTH
-
-      in.seek(readPos)
-      val indexType = in.readByte()
-      readPos += 1
-
-      val bitMask = new Array[Long](INDEX_META_KEY_LENGTH / 8)
-      for (j <- 0 until INDEX_META_KEY_LENGTH / 8) {
-        bitMask(j) = in.readLong()
-      }
-      val keyBits = BitSet.fromBitMask(bitMask)
-      readPos += INDEX_META_KEY_LENGTH
-
-      indexMetas(i) = IndexMeta(name, indexType, keyBits)
+      val readPos = FILE_META_START_OFFSET + FILE_META_LENGTH * fileHeader.dataFileCount +
+        INDEX_META_LENGTH * i
+      indexMetas(i) = IndexMeta.read(readPos.toInt, in)
     }
     indexMetas
-  }
-
-  private def writeIndexMetas(indexMetas: Array[IndexMeta], out: DataOutputStream): Unit = {
-    for (indexMeta <- indexMetas) {
-      // Write the index name
-      writeString(indexMeta.name, INDEX_META_NAME_LENGTH, out)
-
-      // Write the index type
-      out.writeByte(indexMeta.indexType)
-
-      // Write the bit mask of keys
-      writeBitset(indexMeta.key, INDEX_META_KEY_LENGTH, out)
-    }
   }
 
   private def readSchema(fileHeader: FileHeader, in: FSDataInputStream) : StructType = {
@@ -210,21 +309,9 @@ private[spinach] object DataSourceMeta {
     out.writeUTF(schema.json)
   }
 
-  private def writeString(value: String, totalSizeToWrite: Int, out: DataOutputStream): Unit = {
+  def writeString(value: String, totalSizeToWrite: Int, out: DataOutputStream): Unit = {
     val sizeBefore = out.size
     out.writeUTF(value)
-    val sizeWritten = out.size - sizeBefore
-    val remaining = totalSizeToWrite - sizeWritten
-    assert(remaining >= 0,
-      s"Failed to write $value as it exceeds the max allowed $totalSizeToWrite bytes.")
-    for (i <- 0 until remaining) {
-      out.writeByte(0)
-    }
-  }
-
-  private def writeBitset(value: BitSet, totalSizeToWrite: Int, out: DataOutputStream): Unit = {
-    val sizeBefore = out.size
-    value.toBitMask.foreach(out.writeLong)
     val sizeWritten = out.size - sizeBefore
     val remaining = totalSizeToWrite - sizeWritten
     assert(remaining >= 0,
@@ -261,10 +348,14 @@ private[spinach] object DataSourceMeta {
       }
     }
     val out = fs.create(path)
-    writeFileMetas(meta.fileMetas, out)
-    writeIndexMetas(meta.indexMetas, out)
+    meta.fileMetas.foreach(_.write(out))
+    meta.indexMetas.foreach(_.write(out))
     writeSchema(meta.schema, out)
-    writeFileHeader(meta.fileHeader, out)
+    meta.fileHeader.write(out)
     out.close()
+  }
+
+  def newBuilder() : DataSourceMetaBuilder = {
+    new DataSourceMetaBuilder
   }
 }
