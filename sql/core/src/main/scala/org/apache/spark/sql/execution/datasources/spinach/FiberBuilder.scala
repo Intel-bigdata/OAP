@@ -72,7 +72,7 @@ private[spinach] case class IntFiberBuilder(defaultRowGroupSize: Int, ordinal: I
   //  BitStream   defaultRowGroupSize / 8   To represent if the value is null
   //  value #1    4
   //  value #2    4
-  //  …
+  //  …          4
   //  value #N    4
   def build(): FiberByteData = {
     fillBitStream(bytes)

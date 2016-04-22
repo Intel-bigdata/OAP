@@ -184,11 +184,11 @@ private[spinach] class SpinachOutputWriterFactory extends OutputWriterFactory {
 }
 
 private[spinach] case class SpinachTableScan(
-                                              meta: DataSourceMeta,
-                                              @transient relation: SpinachRelation,
-                                              filters: Array[Filter],
-                                              @transient inputPaths: Array[FileStatus],
-                                              bc: Broadcast[SerializableConfiguration])
+    meta: DataSourceMeta,
+    @transient relation: SpinachRelation,
+    filters: Array[Filter],
+    @transient inputPaths: Array[FileStatus],
+    bc: Broadcast[SerializableConfiguration])
   extends Logging {
   @transient private val sqlContext = relation.sqlContext
 
