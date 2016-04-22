@@ -111,7 +111,7 @@ case class StringFiberBuilder(defaultRowGroupSize: Int, ordinal: Int) extends Fi
   //  value #N offset       4                 (0 - based to the start of this Fiber Group)
   //  value #1              value #1 length
   //  value #2              value #2 length
-  //  …
+  //  ...
   //  value #N              value #N length
   override def build(): FiberByteData = {
     val fiberDataLength =
