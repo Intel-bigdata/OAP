@@ -72,7 +72,7 @@ private[spinach] case class IntFiberBuilder(defaultRowGroupSize: Int, ordinal: I
   //  BitStream   defaultRowGroupSize / 8   To represent if the value is null
   //  value #1    4
   //  value #2    4
-  //  …          4
+  //  ...
   //  value #N    4
   def build(): FiberByteData = {
     fillBitStream(bytes)
@@ -106,8 +106,7 @@ case class StringFiberBuilder(defaultRowGroupSize: Int, ordinal: Int) extends Fi
   //  value #1 offset       4                 (0 - based to the start of this Fiber Group)
   //  value #2 length       4
   //  value #2 offset       4                 (0 - based to the start of this Fiber Group)
-  //  …
-  //  …
+  //  ...
   //  value #N length       4
   //  value #N offset       4                 (0 - based to the start of this Fiber Group)
   //  value #1              value #1 length
