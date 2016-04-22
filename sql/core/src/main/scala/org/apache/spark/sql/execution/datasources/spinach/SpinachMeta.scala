@@ -21,11 +21,12 @@ import java.io.DataInputStream
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, FileSystem, Path}
+import org.apache.hadoop.mapreduce.TaskAttemptContext
 import org.apache.hadoop.util.StringUtils
 import org.apache.spark.sql.types.StructType
 
 case class SpinachMeta(schema: StructType) {
-  def open(path: String): DataMeta = {
+  def open(path: String, context: TaskAttemptContext, requiredIds: Array[Int]): FiberReader = {
     throw new NotImplementedError("")
   }
 }
