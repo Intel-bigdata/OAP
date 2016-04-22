@@ -79,12 +79,12 @@ private[spinach] class SpinachRelation(
     status.getPath.getName.endsWith(SpinachFileFormat.SPINACH_META_FILE)
   }.toArray
 
-  private lazy val meta: SpinachMeta = {
+  private lazy val meta: DataSourceMeta = {
     assert(_metaPaths.length > 0,
       """At least one spinach metadata will be found, normally it's named "spinach.meta".""")
 
     // TODO verify all of the schema from the meta data
-    SpinachMeta.initialize(
+    DataSourceMeta.initialize(
       _metaPaths(0).getPath,
       sqlContext.sparkContext.hadoopConfiguration)
   }
@@ -184,11 +184,11 @@ private[spinach] class SpinachOutputWriterFactory extends OutputWriterFactory {
 }
 
 private[spinach] case class SpinachTableScan(
-    meta: SpinachMeta,
-    @transient relation: SpinachRelation,
-    filters: Array[Filter],
-    @transient inputPaths: Array[FileStatus],
-    bc: Broadcast[SerializableConfiguration])
+                                              meta: DataSourceMeta,
+                                              @transient relation: SpinachRelation,
+                                              filters: Array[Filter],
+                                              @transient inputPaths: Array[FileStatus],
+                                              bc: Broadcast[SerializableConfiguration])
   extends Logging {
   @transient private val sqlContext = relation.sqlContext
 

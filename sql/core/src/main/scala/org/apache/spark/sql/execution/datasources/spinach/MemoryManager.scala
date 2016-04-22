@@ -60,6 +60,7 @@ private[spinach] class OffHeapMemoryManager(var maxMemoryInByte: Long) extends M
 private[spinach] object MemoryManager {
   // TODO make it configurable
   val SPINACH_FIBER_CACHE_SIZE_IN_BYTES: Long = 1024 * 1024 * 1024L // 1GB
+  val SPINACH_DATA_META_CACHE_SIZE: Int = 1024
   val MEMORY_MODE: MemoryMode = OnHeap
 
   val instance: MemoryManager = MEMORY_MODE match {

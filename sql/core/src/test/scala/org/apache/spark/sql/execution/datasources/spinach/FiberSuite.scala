@@ -15,22 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach.fiber
+package org.apache.spark.sql.execution.datasources.spinach
 
 import java.io.File
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.mapreduce.{JobID, TaskAttemptID, TaskID}
 import org.apache.hadoop.mapreduce.lib.input.FileSplit
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
+import org.apache.hadoop.mapreduce.{JobID, TaskAttemptID, TaskID}
 import org.apache.hadoop.util.StringUtils
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.unsafe.types.UTF8String
-import org.apache.spark.{Logging, SparkFunSuite}
 import org.apache.spark.util.Utils
+import org.apache.spark.{Logging, SparkFunSuite}
 import org.scalatest.BeforeAndAfterAll
 
 class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
@@ -55,7 +55,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     val out = FileSystem.get(ctx).create(path, true)
 
     val schema = new StructType().add("a", IntegerType).add("b", StringType).add("c", IntegerType)
-    val writer = new FiberDataWriter(false, out, schema)
+    val writer = new SpinachDataWriter2(false, out, schema)
     val row = new GenericMutableRow(3)
     for(i <- 0 until 1026) {
       row.setInt(0, i)
@@ -65,7 +65,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     }
     writer.close(null)
 
-    val reader = new FiberDataReader(path, schema, Array(0, 1, 2))
+    val reader = new SpinachDataReader2(path, schema, Array(0, 1, 2))
     val split = new FileSplit(
       path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
     reader.initialize(split, attemptContext)

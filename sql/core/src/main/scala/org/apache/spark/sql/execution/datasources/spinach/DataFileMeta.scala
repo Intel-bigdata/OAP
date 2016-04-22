@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach.fiber
+package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 
@@ -88,7 +88,7 @@ private[spinach] class RowGroupMeta {
   }
 }
 
-private[spinach] class SpinachSplitMeta(
+private[spinach] class DataFileMeta(
    var rowGroupsMeta: ArrayBuffer[RowGroupMeta] = new ArrayBuffer[RowGroupMeta](),
    var rowCountInEachGroup: Int = 0,
    var rowCountInLastGroup: Int = 0,
@@ -103,17 +103,17 @@ private[spinach] class SpinachSplitMeta(
       }
   }
 
-  def appendRowGroupMeta(meta: RowGroupMeta): SpinachSplitMeta = {
+  def appendRowGroupMeta(meta: RowGroupMeta): DataFileMeta = {
     this.rowGroupsMeta.append(meta)
     this
   }
 
-  def withRowCountInLastGroup(count: Int): SpinachSplitMeta = {
+  def withRowCountInLastGroup(count: Int): DataFileMeta = {
     this.rowCountInLastGroup = count
     this
   }
 
-  def withGroupCount(count: Int): SpinachSplitMeta = {
+  def withGroupCount(count: Int): DataFileMeta = {
     this.groupCount = count
     this
   }
@@ -138,7 +138,7 @@ private[spinach] class SpinachSplitMeta(
     os.writeInt(this.fieldCount)
   }
 
-  def read(is: FSDataInputStream, fileLen: Long): SpinachSplitMeta = is.synchronized {
+  def read(is: FSDataInputStream, fileLen: Long): DataFileMeta = is.synchronized {
     // seek to the end of the end position of Meta
     is.seek(fileLen - 16L)
     this.rowCountInEachGroup = is.readInt()

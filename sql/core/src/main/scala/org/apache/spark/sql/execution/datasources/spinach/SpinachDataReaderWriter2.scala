@@ -15,16 +15,15 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach.fiber
+package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.hadoop.io.NullWritable
 import org.apache.hadoop.mapreduce.{InputSplit, RecordReader, RecordWriter, TaskAttemptContext}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.spinach._
 import org.apache.spark.sql.types.StructType
 
-private[spinach] class FiberDataWriter(
+private[spinach] class SpinachDataWriter2(
     isCompressed: Boolean,
     out: FSDataOutputStream,
     schema: StructType) extends RecordWriter[NullWritable, InternalRow] {
@@ -36,7 +35,7 @@ private[spinach] class FiberDataWriter(
   private val rowGroup: Array[FiberBuilder] =
     FiberBuilder.initializeFromSchema(schema, DEFAULT_ROW_GROUP_SIZE)
 
-  private val fiberMeta = new SpinachSplitMeta(
+  private val fiberMeta = new DataFileMeta(
     rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE, fieldCount = schema.length)
 
   override def write(ignore: NullWritable, row: InternalRow) {
@@ -87,7 +86,7 @@ private[spinach] class FiberDataWriter(
   }
 }
 
-private[spinach] class FiberDataReader(
+private[spinach] class SpinachDataReader2(
     path: Path,
     schema: StructType,
     requiredIds: Array[Int]) extends RecordReader[NullWritable, InternalRow] {
@@ -98,12 +97,12 @@ private[spinach] class FiberDataReader(
   private var currentRow: InternalRow = _
 
   override def initialize(split: InputSplit, context: TaskAttemptContext): Unit = {
-    val tmpDF = DataFile(path.toString, context)
-    val in = FiberDataFileHandler(tmpDF)
-    val meta = new SpinachSplitMeta().read(in, split.getLength)
+    // TODO how to save the additional FS operation to get the Split size
+    val scanner = DataFileScanner(path.toString, schema, context)
+    val meta = DataMetaCacheManager(scanner)
 
     totalRowCount = meta.totalRowCount()
-    currentRowIter = new FiberReader(tmpDF.withMeta(meta), schema, requiredIds).iterator()
+    currentRowIter = scanner.iterator(requiredIds)
   }
 
   override def getProgress: Float = if (totalRowCount > 0) {

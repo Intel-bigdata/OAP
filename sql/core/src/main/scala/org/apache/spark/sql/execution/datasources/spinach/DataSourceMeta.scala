@@ -20,22 +20,22 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.io.DataInputStream
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataInputStream, FileSystem, Path}
+import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.TaskAttemptContext
-import org.apache.hadoop.util.StringUtils
 import org.apache.spark.sql.types.StructType
 
-case class SpinachMeta(schema: StructType) {
-  def open(path: String, context: TaskAttemptContext, requiredIds: Array[Int]): FiberReader = {
+case class DataSourceMeta(schema: StructType) {
+  def open(path: String, context: TaskAttemptContext, requiredIds: Array[Int]): DataFileScanner = {
+    // TODO this will be used for integration with SpinachDataReader2
     throw new NotImplementedError("")
   }
 }
 
-private[spinach] object SpinachMeta {
-  def initialize(path: Path, jobConf: Configuration): SpinachMeta = {
-    // TODO
+private[spinach] object DataSourceMeta {
+  def initialize(path: Path, jobConf: Configuration): DataSourceMeta = {
+    // TODO This is for Continues Integration, will replaced by SpinachData2
     // the meta file is simple as only save the schema in json string.
     val fileIn = new DataInputStream(path.getFileSystem(jobConf).open(path))
-    new SpinachMeta(StructType.fromString(fileIn.readUTF()))
+    new DataSourceMeta(StructType.fromString(fileIn.readUTF()))
   }
 }
