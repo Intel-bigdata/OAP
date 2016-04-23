@@ -33,16 +33,17 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberByteData)
 
   // TODO get the bitset from the FiberByteData
   val bitset: BitSet = {
-    val longs = new Array[Long](defaultSize / 8)
+    val bs = new BitSet(defaultSize)
+    val longs = bs.toLongArray()
     Platform.copyMemory(raw.buf, Platform.BYTE_ARRAY_OFFSET,
-      longs, Platform.LONG_ARRAY_OFFSET, defaultSize / 8)
-    new BitSet(longs)
+      longs, Platform.LONG_ARRAY_OFFSET, longs.length * 8)
+    bs
   }
 
   // TODO should be in FiberByteData
   private val baseOffset = Platform.BYTE_ARRAY_OFFSET + defaultSize / 8
 
-  def isNullAt(idx: Int): Boolean = bitset.get(idx)
+  def isNullAt(idx: Int): Boolean = !bitset.get(idx)
 
   def get(idx: Int): AnyRef = dataType match {
     case IntegerType => new Integer(getInt(idx))

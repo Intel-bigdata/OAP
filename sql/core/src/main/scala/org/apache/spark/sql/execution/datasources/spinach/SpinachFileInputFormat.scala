@@ -40,7 +40,7 @@ class SpinachFileInputFormat extends FileInputFormat[NullWritable, InternalRow] 
     val conf = SparkHadoopUtil.get.getConfigurationFromJobContext(context)
     val schema = StructType.fromString(conf.get(SpinachFileFormat.SPINACH_META_SCHEMA))
 
-    return new SpinachRecordReader(s.getFile, schema)
+    return new SpinachDataReader2(s.getFile, schema, SpinachFileFormat.getRequiredColumnIds(conf))
   }
 
   override def getSplits(job: JobContext): JList[InputSplit] = {
@@ -75,61 +75,4 @@ class SpinachFileInputFormat extends FileInputFormat[NullWritable, InternalRow] 
   }
 
   protected override def isSplitable(context: JobContext, file: Path): Boolean = false
-}
-
-private[spinach] class SpinachRecordReader(
-    path: Path,
-    schema: StructType) extends RecordReader[NullWritable, InternalRow] {
-  private val readers: Array[DataReaderWriter] =
-    DataReaderWriter.initialDataReaderWriterFromSchema(schema)
-
-  private var recordCount = -1
-  private var currentIdx = 0
-  private var in: FSDataInputStream = _
-  private val row: GenericMutableRow = new GenericMutableRow(schema.fields.length)
-
-  override def initialize(split: InputSplit, context: TaskAttemptContext): Unit = {
-    val job: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(context)
-    val file = path.getFileSystem(job)
-    val len = file.getFileStatus(path).getLen
-    this.in = path.getFileSystem(job).open(path)
-
-    // seek to the end of the file, to get the record count of this file
-    in.seek(len - 4)
-    recordCount = in.readInt()
-
-    // seek to the start of the file
-    in.seek(0)
-  }
-
-  override def getProgress: Float = if (recordCount > 0) {
-    currentIdx * 1.0f / recordCount
-  } else {
-    1.0f
-  }
-
-  override def nextKeyValue(): Boolean = {
-    // TODO compressed
-    //    var codec: CompressionCodec = null
-    //    if (isCompressed) {
-    //      val codecClass: Class[_ <: CompressionCodec] =
-    //        FileOutputFormat.getOutputCompressorClass(job, classOf[GzipCodec])
-    //      codec = ReflectionUtils.newInstance(codecClass, conf).asInstanceOf[CompressionCodec]
-    //    }
-    var i = 0
-    while (i < readers.length) {
-      readers(i).read(in, row)
-      i += 1
-    }
-    currentIdx += 1
-    currentIdx <= recordCount
-  }
-
-  override def getCurrentValue: InternalRow = row
-
-  override def getCurrentKey: NullWritable = NullWritable.get()
-
-  override def close() {
-    in.close
-  }
 }

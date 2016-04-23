@@ -17,9 +17,25 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.spark.sql.types.StructType
+
 private[spinach] object SpinachFileFormat {
   val SPINACH_DATA_EXTENSION = ".data"
   val SPINACH_META_EXTENSION = ".meta"
   val SPINACH_META_FILE = "spinach.meta"
   val SPINACH_META_SCHEMA = "spinach.schema"
+  val SPINACH_REQUIRED_IDS = "spinach.required.columnids"
+
+  def setRequiredColumnIds(
+    conf: Configuration, schema: StructType, requiredColumns: Array[String]): Unit = {
+    val requiredColumnIds = requiredColumns.map { name =>
+      schema.fieldIndex(name)
+    }.mkString(",")
+    conf.set(SPINACH_REQUIRED_IDS, requiredColumnIds)
+  }
+
+  def getRequiredColumnIds(conf: Configuration): Array[Int] = {
+    conf.get(SPINACH_REQUIRED_IDS).split(",").map(_.toInt)
+  }
 }

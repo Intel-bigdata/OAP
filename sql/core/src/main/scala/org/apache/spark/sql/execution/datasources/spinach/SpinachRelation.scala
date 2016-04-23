@@ -120,7 +120,7 @@ private[spinach] class SpinachRelation(
     // get the data path from the given paths
     // TODO get the index file from the given paths
 
-    SpinachTableScan(meta, this, filters, inputPaths, broadcastedConf).execute()
+    SpinachTableScan(meta, this, filters, requiredColumns, inputPaths, broadcastedConf).execute()
   }
 
   // currently we don't support any filtering.
@@ -170,7 +170,7 @@ private[spinach] class SpinachOutputWriterFactory extends OutputWriterFactory {
           val file: Path = getDefaultWorkFile(context, SpinachFileFormat.SPINACH_DATA_EXTENSION)
           val fs: FileSystem = file.getFileSystem(conf)
           val fileOut: FSDataOutputStream = fs.create(file, false)
-          new SpinachRecordWriter(isCompressed, fileOut, dataSchema)
+          new SpinachDataWriter2(isCompressed, fileOut, dataSchema)
         }
       }.getRecordWriter(context)
 
@@ -187,6 +187,7 @@ private[spinach] case class SpinachTableScan(
     meta: DataSourceMeta,
     @transient relation: SpinachRelation,
     filters: Array[Filter],
+    requiredColumns: Array[String],
     @transient inputPaths: Array[FileStatus],
     bc: Broadcast[SerializableConfiguration])
   extends Logging {
@@ -206,6 +207,8 @@ private[spinach] case class SpinachTableScan(
 
     FileInputFormat.setInputPaths(job, inputPaths.map(_.getPath): _*)
     conf.set(SpinachFileFormat.SPINACH_META_SCHEMA, meta.schema.json)
+
+    SpinachFileFormat.setRequiredColumnIds(conf, meta.schema, requiredColumns)
 
     sqlContext.sparkContext.newAPIHadoopRDD(
       conf, classOf[SpinachFileInputFormat], classOf[NullWritable], classOf[InternalRow]).map(_._2)

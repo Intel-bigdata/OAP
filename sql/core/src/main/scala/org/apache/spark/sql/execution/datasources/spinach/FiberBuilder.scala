@@ -36,12 +36,16 @@ private[spinach] trait FiberBuilder {
     require(currentRowId < defaultRowGroupSize, "fiber data overflow")
     if (!row.isNullAt(ordinal)) {
       bitStream.set(currentRowId)
+      appendInternal(row)
+    } else {
+      appendNull()
     }
-    appendInternal(row)
+
     currentRowId += 1
   }
 
   protected def appendInternal(row: InternalRow)
+  protected def appendNull(): Unit = { }
   protected def fillBitStream(bytes: Array[Byte]): Unit = {
     val bitmasks = bitStream.toLongArray()
     Platform.copyMemory(bitmasks, Platform.LONG_ARRAY_OFFSET,
@@ -62,10 +66,8 @@ private[spinach] case class IntFiberBuilder(defaultRowGroupSize: Int, ordinal: I
   // TODO use the memory pool?
   private val bytes = new Array[Byte](bitStream.toLongArray().length * 8 + defaultRowGroupSize * 4)
 
-  protected def appendInternal(row: InternalRow): Unit = {
-    if (!row.isNullAt(ordinal)) {
-      Platform.putInt(bytes, baseOffset + 4 * currentRowId, row.getInt(ordinal))
-    }
+  override protected def appendInternal(row: InternalRow): Unit = {
+    Platform.putInt(bytes, baseOffset + 4 * currentRowId, row.getInt(ordinal))
   }
 
   //  Field       Length in Byte            Description
@@ -92,12 +94,15 @@ case class StringFiberBuilder(defaultRowGroupSize: Int, ordinal: Int) extends Fi
   private val strings: ArrayBuffer[UTF8String] = new ArrayBuffer[UTF8String](defaultRowGroupSize)
   private var totalStringDataLengthInByte: Int = 0
 
-  override def appendInternal(row: InternalRow): Unit = {
-    val s = row.getUTF8String(ordinal)
-    if (null != s) {
-      totalStringDataLengthInByte += s.numBytes()
-    }
-    strings.append(row.getUTF8String(ordinal))
+  override protected def appendInternal(row: InternalRow): Unit = {
+    val s = row.getUTF8String(ordinal).clone()  // TODO to eliminate the copy
+    totalStringDataLengthInByte += s.numBytes()
+    strings.append(s)
+  }
+
+  override protected def appendNull(): Unit = {
+    // fill the dummy value
+    strings.append(null)
   }
 
   //  Field                 Size In Byte      Description
