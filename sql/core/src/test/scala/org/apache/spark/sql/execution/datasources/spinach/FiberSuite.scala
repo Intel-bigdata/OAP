@@ -102,22 +102,22 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       split: FileSplit,
       attemptContext: TaskAttemptContext,
       count: Int): Unit = {
-    val reader = new SpinachDataReader2(path, schema, Array(0, 1, 2))
+    val reader = new SpinachDataReader2(path, schema, requiredIds)
     reader.initialize(split, attemptContext)
 
     var idx = 0
     while (reader.nextKeyValue()) {
       val row = reader.getCurrentValue
       assert(row.numFields === requiredIds.length)
-      requiredIds.foreach { fid =>
+      requiredIds.zipWithIndex.foreach { case (fid, outputId) =>
         if (shouldBeNull(idx, fid)) {
-          assert(row.isNullAt(fid))
+          assert(row.isNullAt(outputId))
         } else {
           schema(fid) match {
             case StructField(name, IntegerType, true, _) =>
-              assert(idx === row.getInt(fid))
+              assert(idx === row.getInt(outputId))
             case StructField(name, StringType, true, _) =>
-              assert(s"$name Row $idx" === row.getString(fid))
+              assert(s"$name Row $idx" === row.getString(outputId))
             case _ => throw new NotImplementedError("TODO")
           }
         }

@@ -144,15 +144,15 @@ private[spinach] case class DataFileScanner(
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     (0 until meta.groupCount).iterator.flatMap { groupId =>
-      val fibers: Array[Fiber] = requiredIds.map(i => Fiber(this, requiredIds(i), groupId))
       var i = 0
       while (i < columns.length) {
         columns(i) = new ColumnValues(
           meta.rowCountInEachGroup,
           schema(requiredIds(i)).dataType,
-          FiberCacheManager(fibers(i)))
+          FiberCacheManager(Fiber(this, requiredIds(i), groupId)))
         i += 1
       }
+
       if (groupId < meta.groupCount - 1) {
         // not the last row group
         row.reset(meta.rowCountInEachGroup, columns).toIterator
