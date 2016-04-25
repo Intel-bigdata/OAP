@@ -214,7 +214,15 @@ private[spinach] object FileHeader {
   }
 }
 
-private[spinach] case class DataSourceMeta(
+// TODO remove this and use DataSourceMeta2
+private[spinach] case class DataSourceMeta(schema: StructType) {
+  def open(path: String, context: TaskAttemptContext, requiredIds: Array[Int]): DataFileScanner = {
+    // TODO this will be used for integration with SpinachDataReader2
+    throw new NotImplementedError("")
+  }
+}
+
+private[spinach] case class DataSourceMeta2(
     fileMetas: Array[FileMeta],
     indexMetas: Array[IndexMeta],
     schema: StructType,
@@ -246,9 +254,9 @@ private[spinach] class DataSourceMetaBuilder {
     this
   }
 
-  def build(): DataSourceMeta = {
+  def build(): DataSourceMeta2 = {
     val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size, indexMetas.size)
-    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, fileHeader)
+    DataSourceMeta2(fileMetas.toArray, indexMetas.toArray, schema, fileHeader)
   }
 }
 
@@ -321,7 +329,13 @@ private[spinach] object DataSourceMeta {
     }
   }
 
+  // TODO remove this and use initialize2
   def initialize(path: Path, jobConf: Configuration): DataSourceMeta = {
+    val fileIn = path.getFileSystem(jobConf).open(path)
+    DataSourceMeta(StructType.fromString(fileIn.readUTF()))
+  }
+
+  def initialize2(path: Path, jobConf: Configuration): DataSourceMeta2 = {
     val fs = path.getFileSystem(jobConf)
     val file = fs.getFileStatus(path)
     val in = fs.open(path)
@@ -331,13 +345,13 @@ private[spinach] object DataSourceMeta {
     val indexMetas = readIndexMetas(fileHeader, in)
     val schema = readSchema(fileHeader, in)
     in.close()
-    DataSourceMeta(fileMetas, indexMetas, schema, fileHeader)
+    DataSourceMeta2(fileMetas, indexMetas, schema, fileHeader)
   }
 
   def write(
       path: Path,
       jobConf: Configuration,
-      meta: DataSourceMeta,
+      meta: DataSourceMeta2,
       deleteIfExits: Boolean = true): Unit = {
     val fs = path.getFileSystem(jobConf)
     if (fs.exists(path)) {

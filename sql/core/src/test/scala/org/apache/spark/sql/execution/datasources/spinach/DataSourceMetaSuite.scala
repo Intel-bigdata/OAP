@@ -66,7 +66,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       new File(tmpDir.getAbsolutePath, "spinach.meta").getAbsolutePath)
     writeMetaFile(path)
 
-    val spinachMeta = DataSourceMeta.initialize(path, new Configuration())
+    val spinachMeta = DataSourceMeta.initialize2(path, new Configuration())
     val fileHeader = spinachMeta.fileHeader
     assert(fileHeader.recordCount === 100)
     assert(fileHeader.dataFileCount === 2)
@@ -108,7 +108,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       new File(tmpDir.getAbsolutePath, "emptySpinach.meta").getAbsolutePath)
     DataSourceMeta.write(path, new Configuration(), DataSourceMeta.newBuilder().build())
 
-    val spinachMeta = DataSourceMeta.initialize(path, new Configuration())
+    val spinachMeta = DataSourceMeta.initialize2(path, new Configuration())
     val fileHeader = spinachMeta.fileHeader
     assert(fileHeader.recordCount === 0)
     assert(fileHeader.dataFileCount === 0)
