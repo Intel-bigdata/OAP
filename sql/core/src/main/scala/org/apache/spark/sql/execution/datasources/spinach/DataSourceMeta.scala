@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.io.{DataOutputStream, IOException}
+import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.{ArrayBuffer, BitSet}
@@ -116,7 +116,7 @@ private[spinach] class IndexMeta {
   var name: String = _
   var indexType: IndexType = _
 
-  private def writeBitSet(value: BitSet, totalSizeToWrite: Int, out: DataOutputStream): Unit = {
+  private def writeBitSet(value: BitSet, totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {
     val sizeBefore = out.size
     value.toBitMask.foreach(out.writeLong)
     val sizeWritten = out.size - sizeBefore
@@ -203,7 +203,7 @@ private[spinach] class FileHeader {
   var dataFileCount: Long = _
   var indexCount: Long = _
 
-  def write(out: DataOutputStream): Unit = {
+  def write(out: FSDataOutputStream): Unit = {
     out.writeLong(recordCount)
     out.writeLong(dataFileCount)
     out.writeLong(indexCount)
@@ -346,11 +346,11 @@ private[spinach] object DataSourceMeta {
     StructType.fromString(in.readUTF())
   }
 
-  private def writeSchema(schema: StructType, out: DataOutputStream): Unit = {
+  private def writeSchema(schema: StructType, out: FSDataOutputStream): Unit = {
     out.writeUTF(schema.json)
   }
 
-  def writeString(value: String, totalSizeToWrite: Int, out: DataOutputStream): Unit = {
+  def writeString(value: String, totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {
     val sizeBefore = out.size
     out.writeUTF(value)
     val sizeWritten = out.size - sizeBefore
