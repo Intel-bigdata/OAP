@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.util.concurrent.TimeUnit
 
 
-import org.apache.spark.sql.execution.datasources.spinach.utils.JsonSerDe
+import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, Buffer, HashMap}
@@ -50,7 +50,7 @@ class FiberCacheManager extends CustomManager with Logging {
   * Fiber Cache Manager
   */
 object FiberCacheManager extends Logging {
-  @transient private val cache =
+  @transient val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
@@ -80,7 +80,7 @@ object FiberCacheManager extends Logging {
         fiberFileToFiberMap.getOrElse(fiber.file.path, new ArrayBuffer[Fiber]) += fiber
     }
     val statusRawData = new ArrayBuffer[(String, BitSet, DataFileMeta)]
-    val dataFileScanners = FiberDataFileHandler.getCache.asMap().asScala
+    val dataFileScanners = FiberDataFileHandler.cache.asMap().asScala
     dataFileScanners.foreach { case (dataFileScanner, _) =>
       val fileMeta = dataFileScanner.meta
       val fiberBitSet = new BitSet(fileMeta.groupCount * fileMeta.fieldCount)
@@ -91,7 +91,8 @@ object FiberCacheManager extends Logging {
       }
       statusRawData += ((dataFileScanner.path, fiberBitSet, fileMeta))
     }
-    val retStatus = compact(JsonSerDe.statusRawDataArrayToJson(statusRawData.toArray))
+    val retStatus = compact(
+      render(CacheStatusSerDe.statusRawDataArrayToJson(statusRawData.toArray)))
     retStatus
   }
 
@@ -100,7 +101,7 @@ object FiberCacheManager extends Logging {
 private[spinach] case class InputDataFileDescriptor(fin: FSDataInputStream, len: Long)
 
 private[spinach] object DataMetaCacheManager extends Logging {
-  @transient private val cache =
+  @transient val cache =
     CacheBuilder
       .newBuilder()
       .maximumSize(MemoryManager.SPINACH_DATA_META_CACHE_SIZE)
@@ -118,7 +119,7 @@ private[spinach] object DataMetaCacheManager extends Logging {
 }
 
 private[spinach] object FiberDataFileHandler extends Logging {
-  @transient private val cache =
+  @transient val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
@@ -143,7 +144,6 @@ private[spinach] object FiberDataFileHandler extends Logging {
     cache(fiberCache)
   }
 
-  def getCache: LoadingCache[DataFileScanner, InputDataFileDescriptor] = cache
 }
 
 case class FiberByteData(buf: Array[Byte]) // TODO add FiberDirectByteData

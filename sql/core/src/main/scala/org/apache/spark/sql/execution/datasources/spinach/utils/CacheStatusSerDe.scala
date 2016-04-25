@@ -43,7 +43,7 @@ import org.json4s.JsonAST._
  *     []...[]}
  */
 
-object JsonSerDe {
+object CacheStatusSerDe {
   private implicit val format = DefaultFormats
 
   def bitSetToJson(bitSet: BitSet): JValue = {

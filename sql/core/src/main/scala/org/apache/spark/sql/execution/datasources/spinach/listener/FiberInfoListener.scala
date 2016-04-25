@@ -21,7 +21,7 @@ import org.apache.spark.scheduler.{SparkListener, SparkListenerCustomInfoUpdate}
 
 class FiberInfoListener extends SparkListener {
   override def onCustomInfoUpdate(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
-    FiberCacheManagerMaster.update(fiberInfo)
+    FiberSensor.update(fiberInfo)
   }
 
   // TODO: implements other events like `onExecutorAdded`, `onExecutorRemoved`, etc. to maintain

@@ -17,7 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.util.{ArrayList => JArrayList, Iterator => JIterator, List => JList}
+import java.util.{ArrayList => JArrayList, Iterator => JIterator, LinkedHashSet => JLinkedHashSet, List => JList}
+
+import scala.collection.JavaConverters._
 
 import com.google.common.base.Stopwatch
 import org.apache.commons.logging.{Log, LogFactory}
@@ -58,9 +60,10 @@ class SpinachFileInputFormat extends FileInputFormat[NullWritable, InternalRow] 
         if (path.getName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION)) {
           val fs = path.getFileSystem(jobConf)
           val blkLocations = fs.getFileBlockLocations(file, 0, length)
-          val cachedHosts = FiberCacheManagerMaster.getHosts(file.getPath.toString)
-          val hosts = if (cachedHosts.isEmpty) blkLocations(0).getHosts else cachedHosts
-          splits.add(new FiberSplit(length, file.getPath, hosts))
+          val cachedHosts = FiberSensor.getHosts(file.getPath.toString)
+          val hosts = new JLinkedHashSet(
+            (cachedHosts.toBuffer ++ blkLocations(0).getHosts).asJavaCollection)
+          splits.add(new FiberSplit(length, file.getPath, hosts.asScala.toArray))
         } else if (path.getName.endsWith(SpinachFileFormat.SPINACH_META_EXTENSION)) {
           // ignore it, as we will get the schema from the configuration
         }
