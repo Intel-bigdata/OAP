@@ -58,7 +58,9 @@ class SpinachFileInputFormat extends FileInputFormat[NullWritable, InternalRow] 
         if (path.getName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION)) {
           val fs = path.getFileSystem(jobConf)
           val blkLocations = fs.getFileBlockLocations(file, 0, length)
-          splits.add(new FiberSplit(length, file.getPath, blkLocations(0).getHosts))
+          val cachedHosts = FiberCacheManagerMaster.getHosts(file.getPath.toString)
+          val hosts = if (cachedHosts.isEmpty) blkLocations(0).getHosts else cachedHosts
+          splits.add(new FiberSplit(length, file.getPath, hosts))
         } else if (path.getName.endsWith(SpinachFileFormat.SPINACH_META_EXTENSION)) {
           // ignore it, as we will get the schema from the configuration
         }

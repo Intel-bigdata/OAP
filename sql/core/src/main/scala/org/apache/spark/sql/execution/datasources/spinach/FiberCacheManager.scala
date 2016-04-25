@@ -19,14 +19,32 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.util.concurrent.TimeUnit
 
+
+import org.apache.spark.sql.execution.datasources.spinach.utils.JsonSerDe
+
+import scala.collection.JavaConverters._
+import scala.collection.mutable
+import scala.collection.mutable.{ArrayBuffer, Buffer, HashMap}
+
 import com.google.common.cache._
 import org.apache.hadoop.fs.{FSDataInputStream, FileSystem, Path}
 import org.apache.hadoop.mapreduce.TaskAttemptContext
+import org.apache.spark.util.collection.BitSet
 import org.apache.hadoop.util.StringUtils
-import org.apache.spark.Logging
+import org.apache.spark.{SparkConf, Logging}
 import org.apache.spark.deploy.SparkHadoopUtil
+import org.apache.spark.executor.CustomManager
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.StructType
+
+import org.json4s.jackson.JsonMethods._
+
+
+class FiberCacheManager extends CustomManager with Logging {
+  override def status(conf: SparkConf): String = {
+    FiberCacheManager.status
+  }
+}
 
 /**
   * Fiber Cache Manager
@@ -54,9 +72,29 @@ object FiberCacheManager extends Logging {
     cache(fiberCache)
   }
 
-  // TODO this will be called via heartbeat
-  def status: String = throw new NotImplementedError()
-  def update(status: String): Unit = throw new NotImplementedError()
+
+  def status: String = {
+    val fiberFileToFiberMap = new HashMap[String, Buffer[Fiber]]()
+    val fiberCacheMap = cache.asMap().asScala
+    fiberCacheMap.foreach { case (fiber, _) =>
+        fiberFileToFiberMap.getOrElse(fiber.file.path, new ArrayBuffer[Fiber]) += fiber
+    }
+    val statusRawData = new ArrayBuffer[(String, BitSet, DataFileMeta)]
+    val dataFileScanners = FiberDataFileHandler.getCache.asMap().asScala
+    dataFileScanners.foreach { case (dataFileScanner, _) =>
+      val fileMeta = dataFileScanner.meta
+      val fiberBitSet = new BitSet(fileMeta.groupCount * fileMeta.fieldCount)
+      val fiberCachedList: Seq[Fiber] = fiberFileToFiberMap
+        .getOrElse(dataFileScanner.path, Seq.empty)
+      fiberCachedList.foreach { fiber =>
+        fiberBitSet.set(fiber.columnIndex + fileMeta.fieldCount * fiber.rowGroupId)
+      }
+      statusRawData += ((dataFileScanner.path, fiberBitSet, fileMeta))
+    }
+    val retStatus = compact(JsonSerDe.statusRawDataArrayToJson(statusRawData.toArray))
+    retStatus
+  }
+
 }
 
 private[spinach] case class InputDataFileDescriptor(fin: FSDataInputStream, len: Long)
@@ -104,6 +142,8 @@ private[spinach] object FiberDataFileHandler extends Logging {
   def apply(fiberCache: DataFileScanner): InputDataFileDescriptor = {
     cache(fiberCache)
   }
+
+  def getCache: LoadingCache[DataFileScanner, InputDataFileDescriptor] = cache
 }
 
 case class FiberByteData(buf: Array[Byte]) // TODO add FiberDirectByteData

@@ -37,7 +37,7 @@ private[spark] case class Heartbeat(
     executorId: String,
     taskMetrics: Array[(Long, TaskMetrics)], // taskId -> TaskMetrics
     blockManagerId: BlockManagerId,
-    custimizedInfo: Option[(String, String)] = None)
+    custimizedInfo: Option[String] = None)
 
 /**
  * An event that SparkContext uses to notify HeartbeatReceiver that SparkContext.taskScheduler is
