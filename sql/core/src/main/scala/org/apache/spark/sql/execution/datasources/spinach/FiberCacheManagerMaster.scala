@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, HashMap, Map}
 
 import org.apache.spark.Logging
@@ -30,8 +29,8 @@ import org.json4s.jackson.JsonMethods._
 object FiberCacheManagerMaster extends Logging {
   // maps that maintain the relations of "executor id, fiber file path, fiber cached bitSet of
   // the fiber files, and fibers file meta", 4 items in total
-  val fileToExecBitSetMap = new HashMap[String, HashMap[String, BitSet]]()
-  val fileToDataFileMeta = new HashMap[String, DataFileMeta]()
+  val fileToExecBitSetMap = new HashMap[String, Map[String, BitSet]]()
+  val fileToDataFileMetaMap = new HashMap[String, DataFileMeta]()
 
   // need to synchronized when updating
   def update(fiberInfo: SparkListenerCustomInfoUpdate): Unit = this.synchronized {
@@ -40,7 +39,7 @@ object FiberCacheManagerMaster extends Logging {
     status.foreach { case (fiberFilePath, fiberCacheBitSet, dataFileMeta) =>
       fileToExecBitSetMap.getOrElseUpdate(
         execId, new HashMap[String, BitSet]())(fiberFilePath) = fiberCacheBitSet
-      fileToDataFileMeta(fiberFilePath) = dataFileMeta
+      fileToDataFileMetaMap(fiberFilePath) = dataFileMeta
     }
   }
 
