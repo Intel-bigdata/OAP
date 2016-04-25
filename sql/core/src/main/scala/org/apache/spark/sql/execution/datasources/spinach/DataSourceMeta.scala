@@ -241,7 +241,7 @@ private[spinach] class DataSourceMetaBuilder {
     this
   }
 
-  def setSchema(schema: StructType): this.type = {
+  def withNewSchema(schema: StructType): this.type = {
     this.schema = schema
     this
   }

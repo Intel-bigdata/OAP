@@ -54,7 +54,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       .addIndexMeta(IndexMeta("index2", BitMapIndex()
         .appendEntry(1)
         .appendEntry(2)))
-      .setSchema(new StructType()
+      .withNewSchema(new StructType()
         .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
       .build()
 
