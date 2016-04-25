@@ -52,8 +52,8 @@ object FiberSensor extends Logging {
       execToBitSet.toArray.sortWith {
         (left, right) => left._2.cardinality() > right._2.cardinality()
       }.foreach { case (executor, bitSet) =>
-          if (bitSet.nextSetBit(0) != -1) hosts += executor
-        }
+        if (bitSet.nextSetBit(0) != -1) hosts += executor
+      }
     }
     hosts.toArray
   }
