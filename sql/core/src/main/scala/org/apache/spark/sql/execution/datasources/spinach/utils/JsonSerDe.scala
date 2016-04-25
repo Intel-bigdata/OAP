@@ -24,6 +24,25 @@ import org.json4s.DefaultFormats
 import org.json4s.JsonDSL._
 import org.json4s.JsonAST._
 
+/**
+ * This is user defined Json protocol for SerDe, here the format of Json output should like
+ * following:
+ *   {"statusRawDataArray" :
+ *     ["fiberFilePath" : ""
+ *      "bitSetJValue" :
+ *        {"bitSet" :
+ *          ["word" : Long,
+ *           "word" : Long,
+ *           "word" : Long, ...]}
+ *      "dataFileMetaJValue" : {
+ *        "rowCountInEachGroup" : Int
+ *        "rowCountInLastGroup" : Int
+ *        "groupCount" : Int
+ *        "fieldCount" : Int
+ *      }]
+ *     []...[]}
+ */
+
 object JsonSerDe {
   private implicit val format = DefaultFormats
 

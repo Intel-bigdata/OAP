@@ -23,19 +23,19 @@ import java.util.concurrent.TimeUnit
 import org.apache.spark.sql.execution.datasources.spinach.utils.JsonSerDe
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, Buffer, HashMap}
 
 import com.google.common.cache._
+
 import org.apache.hadoop.fs.{FSDataInputStream, FileSystem, Path}
 import org.apache.hadoop.mapreduce.TaskAttemptContext
-import org.apache.spark.util.collection.BitSet
 import org.apache.hadoop.util.StringUtils
 import org.apache.spark.{SparkConf, Logging}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.executor.CustomManager
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.util.collection.BitSet
 
 import org.json4s.jackson.JsonMethods._
 
