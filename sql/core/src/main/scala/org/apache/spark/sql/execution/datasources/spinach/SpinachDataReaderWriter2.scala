@@ -71,7 +71,8 @@ private[spinach] class SpinachDataWriter2(
   }
 
   override def close(context: TaskAttemptContext) {
-    if (rowCount % DEFAULT_ROW_GROUP_SIZE != 0) {
+    val remainingRowCount = rowCount % DEFAULT_ROW_GROUP_SIZE
+    if (remainingRowCount != 0) {
       // should be end of the insertion, put the row groups into the last row group
       writeRowGroup()
     }
@@ -79,7 +80,8 @@ private[spinach] class SpinachDataWriter2(
     // and update the group count and row count in the last group
     fiberMeta
       .withGroupCount(rowGroupCount)
-      .withRowCountInLastGroup(rowCount % DEFAULT_ROW_GROUP_SIZE)
+      .withRowCountInLastGroup(
+        if (remainingRowCount != 0) remainingRowCount else DEFAULT_ROW_GROUP_SIZE)
 
     fiberMeta.write(out)
     out.close()
