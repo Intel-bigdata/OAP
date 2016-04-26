@@ -72,7 +72,6 @@ object FiberCacheManager extends Logging {
     cache(fiberCache)
   }
 
-
   def status: String = {
     val fiberFileToFiberMap = new HashMap[String, Buffer[Fiber]]()
     val fiberCacheMap = cache.asMap().asScala
