@@ -98,7 +98,7 @@ private[spinach] class SpinachDataReader2(
 
   override def initialize(split: InputSplit, context: TaskAttemptContext): Unit = {
     // TODO how to save the additional FS operation to get the Split size
-    val scanner = DataFileScanner(path.toString, schema, context)
+    val scanner = DataFileScannerCls(path.toString, schema, context)
     val meta = DataMetaCacheManager(scanner)
 
     totalRowCount = meta.totalRowCount()

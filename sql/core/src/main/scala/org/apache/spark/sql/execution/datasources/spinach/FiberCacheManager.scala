@@ -76,7 +76,8 @@ object FiberCacheManager extends Logging {
     val fiberFileToFiberMap = new HashMap[String, Buffer[Fiber]]()
     val fiberCacheMap = cache.asMap().asScala
     fiberCacheMap.foreach { case (fiber, _) =>
-        fiberFileToFiberMap.getOrElse(fiber.file.path, new ArrayBuffer[Fiber]) += fiber
+      fiberFileToFiberMap.getOrElseUpdate(fiber.file.path, new ArrayBuffer[Fiber]) += fiber
+      System.out.println("fiber column and group are : " + fiber.columnIndex + fiber.rowGroupId)
     }
     val statusRawData = new ArrayBuffer[(String, BitSet, DataFileMeta)]
     val dataFileScanners = FiberDataFileHandler.cache.asMap().asScala
@@ -87,6 +88,7 @@ object FiberCacheManager extends Logging {
         .getOrElse(dataFileScanner.path, Seq.empty)
       fiberCachedList.foreach { fiber =>
         fiberBitSet.set(fiber.columnIndex + fileMeta.fieldCount * fiber.rowGroupId)
+        System.out.println("fiber column and group are : " + fiber.columnIndex + fiber.rowGroupId)
       }
       statusRawData += ((dataFileScanner.path, fiberBitSet, fileMeta))
     }
@@ -149,13 +151,25 @@ case class FiberByteData(buf: Array[Byte]) // TODO add FiberDirectByteData
 
 private[spinach] case class Fiber(file: DataFileScanner, columnIndex: Int, rowGroupId: Int)
 
-private[spinach] case class DataFileScanner(
-    path: String, schema: StructType, context: TaskAttemptContext) {
+/**
+ * this trait is used for test purpose
+ */
+private[spinach] trait DataFileScanner {
+  val path: String
+  val schema: StructType
+  val context: TaskAttemptContext
+
+  val meta: DataFileMeta
+  def getFiberData(groupId: Int, fiberId: Int): FiberByteData
+}
+
+private[spinach] case class DataFileScannerCls(
+    path: String, schema: StructType, context: TaskAttemptContext) extends DataFileScanner {
   val meta: DataFileMeta = DataMetaCacheManager(this)
 
   override def hashCode(): Int = path.hashCode
   override def equals(that: Any): Boolean = that match {
-    case DataFileScanner(thatPath, _, _) => path == thatPath
+    case DataFileScannerCls(thatPath, _, _) => path == thatPath
     case _ => false
   }
 
