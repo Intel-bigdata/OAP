@@ -65,7 +65,7 @@ private[spinach] case class FixedSizeTypeFiberBuilder(
     ordinal: Int,
     dataType: DataType)
   extends FiberBuilder {
-  val typeDefaultSize = dataType match {
+  private val typeDefaultSize = dataType match {
     case BooleanType => BooleanType.defaultSize
     case ByteType => ByteType.defaultSize
     case DoubleType => DoubleType.defaultSize
@@ -130,7 +130,8 @@ private[spinach] case class FixedSizeTypeFiberBuilder(
 }
 
 case class StringFiberBuilder(defaultRowGroupRowCount: Int, ordinal: Int) extends FiberBuilder {
-  private val strings: ArrayBuffer[UTF8String] = new ArrayBuffer[UTF8String](defaultRowGroupRowCount)
+  private val strings: ArrayBuffer[UTF8String] =
+    new ArrayBuffer[UTF8String](defaultRowGroupRowCount)
   private var totalStringDataLengthInByte: Int = 0
 
   override protected def appendInternal(row: InternalRow): Unit = {

@@ -99,7 +99,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     writeData(ctx, path, schema, recordCount, attemptContext)
     val split = new FileSplit(
       path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
-    assertData(path, schema, Array(0, 1, 2, 3,4 ,5 ,6, 7), split, attemptContext, recordCount)
+    assertData(path, schema, Array(0, 1, 2, 3, 4, 5, 6, 7), split, attemptContext, recordCount)
 
   }
 
