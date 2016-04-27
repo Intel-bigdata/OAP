@@ -57,6 +57,7 @@ class FiberCacheManagerSuite extends SparkFunSuite with Logging with BeforeAndAf
   test("test getting right status") {
     FiberCacheManager.cache.cleanUp()
     DataMetaCacheManager.cache.cleanUp()
+    FiberDataFileHandler.cache.cleanUp()
     val path = new Path(StringUtils.unEscapeString(file.toURI.toString))
     val out = FileSystem.get(ctx).create(path, true)
     val rowGroupsMeta = new Array[RowGroupMeta](30)

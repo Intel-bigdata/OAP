@@ -77,7 +77,6 @@ object FiberCacheManager extends Logging {
     val fiberCacheMap = cache.asMap().asScala
     fiberCacheMap.foreach { case (fiber, _) =>
       fiberFileToFiberMap.getOrElseUpdate(fiber.file.path, new ArrayBuffer[Fiber]) += fiber
-      System.out.println("fiber column and group are : " + fiber.columnIndex + fiber.rowGroupId)
     }
     val statusRawData = new ArrayBuffer[(String, BitSet, DataFileMeta)]
     val dataFileScanners = FiberDataFileHandler.cache.asMap().asScala
@@ -88,7 +87,6 @@ object FiberCacheManager extends Logging {
         .getOrElse(dataFileScanner.path, Seq.empty)
       fiberCachedList.foreach { fiber =>
         fiberBitSet.set(fiber.columnIndex + fileMeta.fieldCount * fiber.rowGroupId)
-        System.out.println("fiber column and group are : " + fiber.columnIndex + fiber.rowGroupId)
       }
       statusRawData += ((dataFileScanner.path, fiberBitSet, fileMeta))
     }
