@@ -78,30 +78,23 @@ class FiberCacheManagerSuite extends SparkFunSuite with Logging with BeforeAndAf
       rowCountInEachGroup, rowCountInLastGroup, groupCount, fieldCount)
     dataMeta.write(out)
     out.close()
-    val fileScanner = TestDataFileScanner(
-      path.toUri.toString,
-      new StructType(),
-      attemptContext,
-      dataMeta)
-    val columnIndex = 1
-    val rowGroupId = 1
-    val fiber = Fiber(fileScanner, columnIndex, rowGroupId)
-    FiberCacheManager(fiber)
-    assert(FiberCacheManager.cache.asMap().containsKey(fiber))
-
-    // since we use TestDataFileScanner here, so meta will not be cached
-    assert(DataMetaCacheManager.cache.asMap.isEmpty)
-    DataMetaCacheManager(fileScanner)
+    // DataFileScanner will read file back and get dataMeta and cache it
+    val fileScanner = DataFileScanner(path.toUri.toString, new StructType(), attemptContext)
     assert(DataMetaCacheManager.cache.asMap.containsKey(fileScanner))
-    // FiberDataFileHandler will cache fileSacnner after DataMeta is cached
-    assert(FiberDataFileHandler.cache.asMap.containsKey(fileScanner))
-
     // meta data that read back from files should be the same with the original
     val dataMetaReadBack = DataMetaCacheManager.cache.asMap.get(fileScanner)
     assert(dataMetaReadBack.rowCountInEachGroup === rowCountInEachGroup)
     assert(dataMetaReadBack.rowCountInLastGroup === rowCountInLastGroup)
     assert(dataMetaReadBack.groupCount === groupCount)
     assert(dataMetaReadBack.fieldCount === fieldCount)
+    // FiberDataFileHandler will cache fileSacnner after DataMeta is cached
+    assert(FiberDataFileHandler.cache.asMap.containsKey(fileScanner))
+
+    val columnIndex = 1
+    val rowGroupId = 1
+    val fiber = Fiber(fileScanner, columnIndex, rowGroupId)
+    FiberCacheManager(fiber)
+    assert(FiberCacheManager.cache.asMap().containsKey(fiber))
 
     val fiberBitSet = new BitSet(groupCount * fieldCount)
     fiberBitSet.set(columnIndex + fieldCount * rowGroupId)
@@ -110,11 +103,4 @@ class FiberCacheManagerSuite extends SparkFunSuite with Logging with BeforeAndAf
       render(CacheStatusSerDe.statusRawDataArrayToJson(statusRawDataArr))))
   }
 
-  private[spinach] case class TestDataFileScanner(
-    path: String,
-    schema: StructType,
-    context: TaskAttemptContext,
-    meta: DataFileMeta) extends DataFileScanner {
-    def getFiberData(groupId: Int, fiberId: Int): FiberByteData = {FiberByteData(Array.empty[Byte])}
-  }
 }

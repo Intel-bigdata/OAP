@@ -149,25 +149,13 @@ case class FiberByteData(buf: Array[Byte]) // TODO add FiberDirectByteData
 
 private[spinach] case class Fiber(file: DataFileScanner, columnIndex: Int, rowGroupId: Int)
 
-/**
- * this trait is used for test purpose
- */
-private[spinach] trait DataFileScanner {
-  val path: String
-  val schema: StructType
-  val context: TaskAttemptContext
-
-  val meta: DataFileMeta
-  def getFiberData(groupId: Int, fiberId: Int): FiberByteData
-}
-
-private[spinach] case class DataFileScannerCls(
-    path: String, schema: StructType, context: TaskAttemptContext) extends DataFileScanner {
+private[spinach] case class DataFileScanner(
+    path: String, schema: StructType, context: TaskAttemptContext) {
   val meta: DataFileMeta = DataMetaCacheManager(this)
 
   override def hashCode(): Int = path.hashCode
   override def equals(that: Any): Boolean = that match {
-    case DataFileScannerCls(thatPath, _, _) => path == thatPath
+    case DataFileScanner(thatPath, _, _) => path == thatPath
     case _ => false
   }
 
