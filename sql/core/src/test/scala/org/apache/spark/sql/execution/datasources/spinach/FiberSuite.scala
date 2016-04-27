@@ -35,24 +35,27 @@ import org.scalatest.BeforeAndAfterAll
 
 class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   private var file: File = null
-  val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
-    new Configuration(),
-    new TaskAttemptID(new TaskID(new JobID(), true, 0), 0))
-  val ctx: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(attemptContext)
-
   var path: Path = _
 
   override def beforeAll(): Unit = {
     file = Utils.createTempDir()
     file.delete()
-    path = new Path(StringUtils.unEscapeString(file.toURI.toString))
   }
 
   override def afterAll(): Unit = {
     Utils.deleteRecursively(file)
+    FiberCacheManager.cache.cleanUp()
+    FiberDataFileHandler.cache.cleanUp()
+    DataMetaCacheManager.cache.cleanUp()
   }
 
   test("test reading / writing spinach file") {
+    path = new Path(StringUtils.unEscapeString(file.toURI.toString))
+    val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
+      new Configuration(),
+      new TaskAttemptID(new TaskID(new JobID(), true, 0), 0))
+    val ctx: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(attemptContext)
+
     val recordCount = 3
     val schema = (new StructType)
       .add("a", IntegerType)
@@ -68,11 +71,23 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   }
 
   test("test different data types") {
-    val recordCount = 10
+    Utils.deleteRecursively(file)
+    path = new Path(StringUtils.unEscapeString(file.toURI.toString) + "1")
+    file.delete()
+    FiberCacheManager.cache.cleanUp()
+    FiberDataFileHandler.cache.cleanUp()
+    DataMetaCacheManager.cache.cleanUp()
+
+    val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
+      new Configuration(),
+      new TaskAttemptID(new TaskID(), 1))
+    val ctx: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(attemptContext)
+
+    val recordCount = 100
     // TODO, add more data types when other data types implemented. e.g. ArrayType,
     // CalendarIntervalType, DateType, DecimalType, MapType, StructType, TimestampType, etc.
     val schema = (new StructType)
-      .add("a", BinaryType)
+//      .add("a", BinaryType)
       .add("b", BooleanType)
       .add("c", ByteType)
       .add("d", DoubleType)
@@ -84,7 +99,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     writeData(ctx, path, schema, recordCount, attemptContext)
     val split = new FileSplit(
       path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
-    assertData(path, schema, Array(0, 1, 2, 3, 4, 5, 6, 7, 8), split, attemptContext, recordCount)
+    assertData(path, schema, Array(0, 1, 2, 3,4 ,5 ,6, 7), split, attemptContext, recordCount)
 
   }
 
@@ -108,7 +123,8 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
         } else {
           entry match {
             case (StructField(name, BooleanType, true, _), idx) =>
-              row.setBoolean(idx, if (idx % 2 == 0) true else false)
+              val bool = false
+              row.setBoolean(idx, bool)
             case (StructField(name, ByteType, true, _), idx) =>
               row.setByte(idx, i.toByte)
             case (StructField(name, DoubleType, true, _), idx) =>
@@ -152,7 +168,8 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
         } else {
           schema(fid) match {
             case StructField(name, BooleanType, true, _) =>
-              assert(if (idx % 2 == 0) true else false === row.getBoolean(outputId))
+              val bool = false
+              assert( bool === row.getBoolean(outputId))
             case StructField(name, ByteType, true, _) =>
               assert(idx.toByte === row.getByte(outputId))
             case StructField(name, DoubleType, true, _) =>

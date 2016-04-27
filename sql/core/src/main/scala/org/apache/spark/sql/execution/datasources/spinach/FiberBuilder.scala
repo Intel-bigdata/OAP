@@ -26,14 +26,14 @@ import org.apache.spark.util.collection.BitSet
 import scala.collection.mutable.ArrayBuffer
 
 private[spinach] trait FiberBuilder {
-  def defaultRowGroupSize: Int
+  def defaultRowGroupRowCount: Int
   def ordinal: Int
 
-  protected val bitStream: BitSet = new BitSet(defaultRowGroupSize)
+  protected val bitStream: BitSet = new BitSet(defaultRowGroupRowCount)
   protected var currentRowId: Int = 0
 
   def append(row: InternalRow): Unit = {
-    require(currentRowId < defaultRowGroupSize, "fiber data overflow")
+    require(currentRowId < defaultRowGroupRowCount, "fiber data overflow")
     if (!row.isNullAt(ordinal)) {
       bitStream.set(currentRowId)
       appendInternal(row)
@@ -60,29 +60,68 @@ private[spinach] trait FiberBuilder {
   }
 }
 
-private[spinach] case class IntFiberBuilder(defaultRowGroupSize: Int, ordinal: Int)
-    extends FiberBuilder {
+private[spinach] case class FixedSizeTypeFiberBuilder(
+    defaultRowGroupRowCount: Int,
+    ordinal: Int,
+    dataType: DataType)
+  extends FiberBuilder {
+  val typeDefaultSize = dataType match {
+    case BooleanType => BooleanType.defaultSize
+    case ByteType => ByteType.defaultSize
+    case DoubleType => DoubleType.defaultSize
+    case FloatType => FloatType.defaultSize
+    case IntegerType => IntegerType.defaultSize
+    case LongType => LongType.defaultSize
+    case ShortType => ShortType.defaultSize
+    case _ => throw new NotImplementedError("unknown data type default size")
+  }
   private val baseOffset = bitStream.toLongArray().length * 8 + Platform.BYTE_ARRAY_OFFSET
   // TODO use the memory pool?
-  private val bytes = new Array[Byte](bitStream.toLongArray().length * 8 + defaultRowGroupSize * 4)
+  private val bytes =
+    new Array[Byte](bitStream.toLongArray().length * 8 +
+      defaultRowGroupRowCount * typeDefaultSize)
 
   override protected def appendInternal(row: InternalRow): Unit = {
-    Platform.putInt(bytes, baseOffset + 4 * currentRowId, row.getInt(ordinal))
+    dataType match {
+      case BooleanType =>
+        Platform.putBoolean(bytes, baseOffset + currentRowId * typeDefaultSize,
+          row.getBoolean(ordinal))
+      case ByteType =>
+        Platform.putByte(bytes, baseOffset + currentRowId * typeDefaultSize,
+          row.getByte(ordinal))
+      case DoubleType =>
+        Platform.putDouble(bytes, baseOffset + currentRowId * typeDefaultSize,
+          row.getDouble(ordinal))
+      case FloatType =>
+        Platform.putFloat(bytes, baseOffset + currentRowId * typeDefaultSize,
+          row.getFloat(ordinal))
+      case IntegerType =>
+        Platform.putInt(bytes, baseOffset + currentRowId * typeDefaultSize,
+          row.getInt(ordinal))
+      case LongType =>
+        Platform.putLong(bytes, baseOffset + currentRowId * typeDefaultSize,
+          row.getLong(ordinal))
+      case ShortType =>
+        Platform.putShort(bytes, baseOffset + currentRowId * typeDefaultSize,
+          row.getShort(ordinal))
+      case _ => throw new NotImplementedError("not implemented Data Type")
+    }
   }
 
   //  Field       Length in Byte            Description
-  //  BitStream   defaultRowGroupSize / 8   To represent if the value is null
-  //  value #1    4
-  //  value #2    4
+  //  BitStream   defaultRowGroupRowCount / 8   To represent if the value is null
+  //  value #1    typeDefaultSize
+  //  value #2    typeDefaultSize
   //  ...
-  //  value #N    4
+  //  value #N    typeDefaultSize
   def build(): FiberByteData = {
     fillBitStream(bytes)
-    if (currentRowId == defaultRowGroupSize) {
+    if (currentRowId == defaultRowGroupRowCount) {
       FiberByteData(bytes)
     } else {
       // shrink memory
-      val newBytes = new Array[Byte](bitStream.toLongArray().length * 8 + currentRowId * 4)
+      val newBytes = new Array[Byte](bitStream.toLongArray().length * 8 +
+        currentRowId * typeDefaultSize)
       Platform.copyMemory(bytes, Platform.BYTE_ARRAY_OFFSET,
         newBytes, Platform.BYTE_ARRAY_OFFSET, newBytes.length)
       FiberByteData(newBytes)
@@ -90,8 +129,8 @@ private[spinach] case class IntFiberBuilder(defaultRowGroupSize: Int, ordinal: I
   }
 }
 
-case class StringFiberBuilder(defaultRowGroupSize: Int, ordinal: Int) extends FiberBuilder {
-  private val strings: ArrayBuffer[UTF8String] = new ArrayBuffer[UTF8String](defaultRowGroupSize)
+case class StringFiberBuilder(defaultRowGroupRowCount: Int, ordinal: Int) extends FiberBuilder {
+  private val strings: ArrayBuffer[UTF8String] = new ArrayBuffer[UTF8String](defaultRowGroupRowCount)
   private var totalStringDataLengthInByte: Int = 0
 
   override protected def appendInternal(row: InternalRow): Unit = {
@@ -106,7 +145,7 @@ case class StringFiberBuilder(defaultRowGroupSize: Int, ordinal: Int) extends Fi
   }
 
   //  Field                 Size In Byte      Description
-  //  BitStream             (defaultRowGroupSize / 8)  TODO to improve the memory usage
+  //  BitStream             (defaultRowGroupRowCount / 8)  TODO to improve the memory usage
   //  value #1 length       4                 number of bytes for this string
   //  value #1 offset       4                 (0 - based to the start of this Fiber Group)
   //  value #2 length       4
@@ -135,7 +174,8 @@ case class StringFiberBuilder(defaultRowGroupSize: Int, ordinal: Int) extends Fi
         // length of value #i
         Platform.putInt(bytes, basePointerOffset + i * 8, valueLengthInByte)
         // offset of value #i
-        Platform.putInt(bytes, basePointerOffset + i * 8 + 4, startValueOffset)
+        Platform.putInt(bytes, basePointerOffset + i * 8 + IntegerType.defaultSize,
+          startValueOffset)
         // copy the string bytes
         Platform.copyMemory(s.getBaseObject, s.getBaseOffset, bytes,
           Platform.BYTE_ARRAY_OFFSET + startValueOffset, valueLengthInByte)
@@ -156,16 +196,33 @@ case class StringFiberBuilder(defaultRowGroupSize: Int, ordinal: Int) extends Fi
 }
 
 object FiberBuilder {
-  def apply(dataType: DataType, ordinal: Int, defaultRowGroupSize: Int): FiberBuilder = {
+  def apply(dataType: DataType, ordinal: Int, defaultRowGroupRowCount: Int): FiberBuilder = {
     dataType match {
-      case IntegerType => new IntFiberBuilder(defaultRowGroupSize, ordinal)
-      case StringType => new StringFiberBuilder(defaultRowGroupSize, ordinal)
+      case BooleanType =>
+        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, BooleanType)
+      case ByteType => new
+          FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ByteType)
+      case DoubleType =>
+        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, DoubleType)
+      case FloatType =>
+        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, FloatType)
+      case IntegerType =>
+        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, IntegerType)
+      case LongType =>
+        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, LongType)
+      case ShortType =>
+        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ShortType)
+      case StringType =>
+        new StringFiberBuilder(defaultRowGroupRowCount, ordinal)
+      case _ => throw new NotImplementedError("not implemented type for fiber builder")
     }
   }
 
-  def initializeFromSchema(schema: StructType, defaultRowGroupSize: Int): Array[FiberBuilder] = {
+  def initializeFromSchema(
+      schema: StructType,
+      defaultRowGroupRowCount: Int): Array[FiberBuilder] = {
     schema.fields.zipWithIndex.map {
-      case (field, oridinal) => FiberBuilder(field.dataType, oridinal, defaultRowGroupSize)
+      case (field, oridinal) => FiberBuilder(field.dataType, oridinal, defaultRowGroupRowCount)
     }
   }
 }

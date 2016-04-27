@@ -32,7 +32,7 @@ import org.apache.spark.sql.types.StructType
   * Fiber Cache Manager
   */
 object FiberCacheManager extends Logging {
-  @transient private val cache =
+  @transient val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
@@ -62,7 +62,7 @@ object FiberCacheManager extends Logging {
 private[spinach] case class InputDataFileDescriptor(fin: FSDataInputStream, len: Long)
 
 private[spinach] object DataMetaCacheManager extends Logging {
-  @transient private val cache =
+  @transient val cache =
     CacheBuilder
       .newBuilder()
       .maximumSize(MemoryManager.SPINACH_DATA_META_CACHE_SIZE)
@@ -80,7 +80,7 @@ private[spinach] object DataMetaCacheManager extends Logging {
 }
 
 private[spinach] object FiberDataFileHandler extends Logging {
-  @transient private val cache =
+  @transient val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
