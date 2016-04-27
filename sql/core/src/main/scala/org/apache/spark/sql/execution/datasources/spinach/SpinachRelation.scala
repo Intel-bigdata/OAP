@@ -144,42 +144,52 @@ private[spinach] class SpinachRelation(
   }
 }
 
+private[spinach] class SpinachOutputWriter(
+    path: String,
+    dataSchema: StructType,
+    context: TaskAttemptContext) extends OutputWriter {
+  private val writer = new FileOutputFormat[NullWritable, InternalRow] {
+    override def getDefaultWorkFile(context: TaskAttemptContext, extension: String): Path = {
+      new Path(path, getFileName(extension))
+    }
+
+    override def getRecordWriter(context: TaskAttemptContext)
+    : RecordWriter[NullWritable, InternalRow] = {
+      val conf: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(context)
+      val isCompressed: Boolean = FileOutputFormat.getCompressOutput(context)
+
+      val file: Path = getDefaultWorkFile(context, SpinachFileFormat.SPINACH_DATA_EXTENSION)
+      val fs: FileSystem = file.getFileSystem(conf)
+      val fileOut: FSDataOutputStream = fs.create(file, false)
+      new SpinachDataWriter2(isCompressed, fileOut, dataSchema)
+    }
+  }.getRecordWriter(context)
+
+  override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
+  override protected[sql] def writeInternal(row: InternalRow): Unit = {
+    writer.write(NullWritable.get(), row)
+  }
+  override def close(): Unit = writer.close(context)
+
+  def getFileName(extension: String): String = {
+    val configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(context)
+    // this is the way how we pass down the uuid
+    val uniqueWriteJobId = configuration.get("spark.sql.sources.writeJobUUID")
+    val taskAttemptId = SparkHadoopUtil.get.getTaskAttemptIDFromTaskAttemptContext(context)
+    val split = taskAttemptId.getTaskID.getId
+    f"part-r-$split%05d-${uniqueWriteJobId}$extension"
+  }
+
+  def getFileName(): String = getFileName(SpinachFileFormat.SPINACH_DATA_EXTENSION)
+}
+
 private[spinach] class SpinachOutputWriterFactory extends OutputWriterFactory {
   override def newInstance(
-                            path: String,
-                            dataSchema: StructType,
-                            context: TaskAttemptContext): OutputWriter = {
+      path: String,
+      dataSchema: StructType,
+      context: TaskAttemptContext): OutputWriter = {
     // TODO possible to do some setup on executor side initialization
-    new OutputWriter() {
-      private val writer = new FileOutputFormat[NullWritable, InternalRow] {
-        override def getDefaultWorkFile(context: TaskAttemptContext, extension: String): Path = {
-          val configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(context)
-          // this is the way how we pass down the uuid
-          val uniqueWriteJobId = configuration.get("spark.sql.sources.writeJobUUID")
-          val taskAttemptId = SparkHadoopUtil.get.getTaskAttemptIDFromTaskAttemptContext(context)
-          val split = taskAttemptId.getTaskID.getId
-          new Path(path,
-            f"part-r-$split%05d-${uniqueWriteJobId}$extension")
-        }
-
-        override def getRecordWriter(context: TaskAttemptContext)
-        : RecordWriter[NullWritable, InternalRow] = {
-          val conf: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(context)
-          val isCompressed: Boolean = FileOutputFormat.getCompressOutput(context)
-
-          val file: Path = getDefaultWorkFile(context, SpinachFileFormat.SPINACH_DATA_EXTENSION)
-          val fs: FileSystem = file.getFileSystem(conf)
-          val fileOut: FSDataOutputStream = fs.create(file, false)
-          new SpinachDataWriter2(isCompressed, fileOut, dataSchema)
-        }
-      }.getRecordWriter(context)
-
-      override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
-      override protected[sql] def writeInternal(row: InternalRow): Unit = {
-        writer.write(NullWritable.get(), row)
-      }
-      override def close(): Unit = writer.close(context)
-    }
+    new SpinachOutputWriter(path, dataSchema, context)
   }
 }
 

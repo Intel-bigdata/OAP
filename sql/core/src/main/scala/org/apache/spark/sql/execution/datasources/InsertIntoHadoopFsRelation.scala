@@ -131,8 +131,9 @@ private[sql] case class InsertIntoHadoopFsRelation(
         writerContainer.driverSideSetup()
 
         try {
-          sqlContext.sparkContext.runJob(df.queryExecution.toRdd, writerContainer.writeRows _)
-          writerContainer.commitJob()
+          val results = sqlContext.sparkContext.runJob(
+            df.queryExecution.toRdd, writerContainer.writeRows _)
+          writerContainer.commitJob(results)
           relation.refresh()
         } catch { case cause: Throwable =>
           logError("Aborting job.", cause)
