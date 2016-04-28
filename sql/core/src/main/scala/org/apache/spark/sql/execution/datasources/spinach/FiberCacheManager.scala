@@ -19,44 +19,38 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.util.concurrent.TimeUnit
 
-
-import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
-
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, Buffer, HashMap}
-
 import com.google.common.cache._
-
 import org.apache.hadoop.fs.{FSDataInputStream, FileSystem, Path}
 import org.apache.hadoop.mapreduce.TaskAttemptContext
 import org.apache.hadoop.util.StringUtils
-import org.apache.spark.{SparkConf, Logging}
+import org.apache.spark.{Logging, SparkConf}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.executor.CustomManager
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.spinach.utils.{CacheStatusSerDe, FiberCacheStatus}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.collection.BitSet
 
-import org.json4s.jackson.JsonMethods._
 
-
-class FiberCacheManager extends CustomManager with Logging {
+// TODO need to register within the SparkContext
+class SpinachHeartBeatMessager extends CustomManager with Logging {
   override def status(conf: SparkConf): String = {
     FiberCacheManager.status
   }
 }
 
-/**
-  * Fiber Cache Manager
-  */
-object FiberCacheManager extends Logging {
-  @transient val cache =
+private[spinach] trait AbstractFiberCacheManger extends Logging {
+  protected def fiber2Data(key: Fiber): FiberByteData
+
+  @transient protected val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
       .weigher(new Weigher[Fiber, FiberByteData] {
-        override def weigh(key: Fiber, value: FiberByteData): Int = value.buf.length
-      })
+      override def weigh(key: Fiber, value: FiberByteData): Int = value.buf.length
+    })
       .maximumWeight(MemoryManager.SPINACH_FIBER_CACHE_SIZE_IN_BYTES)
       .removalListener(new RemovalListener[Fiber, FiberByteData] {
         override def onRemoval(n: RemovalNotification[Fiber, FiberByteData]): Unit = {
@@ -64,7 +58,7 @@ object FiberCacheManager extends Logging {
         }
       }).build(new CacheLoader[Fiber, FiberByteData] {
       override def load(key: Fiber): FiberByteData = {
-        key.file.getFiberData(key.rowGroupId, key.columnIndex)
+        fiber2Data(key)
       }
     })
 
@@ -78,9 +72,10 @@ object FiberCacheManager extends Logging {
     fiberCacheMap.foreach { case (fiber, _) =>
       fiberFileToFiberMap.getOrElseUpdate(fiber.file.path, new ArrayBuffer[Fiber]) += fiber
     }
-    val statusRawData = new ArrayBuffer[(String, BitSet, DataFileMeta)]
-    val dataFileScanners = FiberDataFileHandler.cache.asMap().asScala
-    dataFileScanners.foreach { case (dataFileScanner, _) =>
+
+    val fibers = this.cache.asMap().keySet().asScala
+    val statusRawData = fibers.map { fiber =>
+      val dataFileScanner = fiber.file
       val fileMeta = dataFileScanner.meta
       val fiberBitSet = new BitSet(fileMeta.groupCount * fileMeta.fieldCount)
       val fiberCachedList: Seq[Fiber] = fiberFileToFiberMap
@@ -88,13 +83,21 @@ object FiberCacheManager extends Logging {
       fiberCachedList.foreach { fiber =>
         fiberBitSet.set(fiber.columnIndex + fileMeta.fieldCount * fiber.rowGroupId)
       }
-      statusRawData += ((dataFileScanner.path, fiberBitSet, fileMeta))
-    }
-    val retStatus = compact(
-      render(CacheStatusSerDe.statusRawDataArrayToJson(statusRawData.toArray)))
+      FiberCacheStatus(dataFileScanner.path, fiberBitSet, fileMeta)
+    }.toSeq
+
+    val retStatus = CacheStatusSerDe.serialize(statusRawData)
     retStatus
   }
+}
 
+/**
+  * Fiber Cache Manager
+  */
+object FiberCacheManager extends AbstractFiberCacheManger {
+  override def fiber2Data(key: Fiber): FiberByteData = {
+    key.file.getFiberData(key.rowGroupId, key.columnIndex)
+  }
 }
 
 private[spinach] case class InputDataFileDescriptor(fin: FSDataInputStream, len: Long)
@@ -145,13 +148,13 @@ private[spinach] object FiberDataFileHandler extends Logging {
 
 }
 
-case class FiberByteData(buf: Array[Byte]) // TODO add FiberDirectByteData
+private[spinach] case class FiberByteData(buf: Array[Byte]) // TODO add FiberDirectByteData
 
 private[spinach] case class Fiber(file: DataFileScanner, columnIndex: Int, rowGroupId: Int)
 
 private[spinach] case class DataFileScanner(
     path: String, schema: StructType, context: TaskAttemptContext) {
-  val meta: DataFileMeta = DataMetaCacheManager(this)
+  lazy val meta: DataFileMeta = DataMetaCacheManager(this)
 
   override def hashCode(): Int = path.hashCode
   override def equals(that: Any): Boolean = that match {

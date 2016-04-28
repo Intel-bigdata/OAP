@@ -21,40 +21,41 @@ import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, HashMap, Map}
-
 import org.apache.spark.Logging
 import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
-import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
+import org.apache.spark.sql.execution.datasources.spinach.FiberSensor.HostFiberCache
+import org.apache.spark.sql.execution.datasources.spinach.utils.{CacheStatusSerDe, FiberCacheStatus}
 import org.apache.spark.util.collection.BitSet
-
 import org.json4s.jackson.JsonMethods._
 
-object FiberSensor extends Logging {
-  // maps that maintain the relations of "executor id, fiber file path, fiber cached bitSet of
-  // the fiber files, and fibers file meta", 4 items in total
-  val fileToExecBitSetMap = new ConcurrentHashMap[String, Map[String, BitSet]]().asScala
-  // TODO this map currently not used, will be used in future implementation
-  val fileToDataFileMetaMap = new ConcurrentHashMap[String, DataFileMeta]().asScala
+// TODO FiberSensor doesn't consider the fiber cache, but only the number of cached
+// fiber count
+private[spinach] trait AbstractFiberSensor extends Logging {
+  case class HostFiberCache(host: String, status: FiberCacheStatus)
+
+  private val fileToHost = new ConcurrentHashMap[String, HostFiberCache]
 
   def update(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
     val execId = fiberInfo.executorId
-    val status = CacheStatusSerDe.statusRawDataArrayFromJson(parse(fiberInfo.customizedInfo))
-    status.foreach { case (fiberFilePath, fiberCacheBitSet, dataFileMeta) =>
-      fileToExecBitSetMap.getOrElseUpdate(
-        fiberFilePath, new HashMap[String, BitSet]())(execId) = fiberCacheBitSet
-      fileToDataFileMetaMap(fiberFilePath) = dataFileMeta
+    val fibersOnExecutor = CacheStatusSerDe.deserialize(fiberInfo.customizedInfo)
+    fibersOnExecutor.foreach { case status =>
+      fileToHost.get(status.file) match {
+        case null => fileToHost.put(status.file, HostFiberCache(execId, status))
+        case HostFiberCache(_, fcs) if (status.moreCacheThan(fcs)) =>
+          // only cache a single executor ID, TODO need to considered the fiber id requried
+          // replace the old HostFiberCache as the new one has more data cached
+          fileToHost.put(status.file, HostFiberCache(execId, status))
+        case _ =>
+      }
     }
   }
 
-  def getHosts(filePath: String): Array[String] = {
-    val hosts = new ArrayBuffer[String]()
-    fileToExecBitSetMap.get(filePath).map { execToBitSet =>
-      execToBitSet.toArray.sortWith {
-        (left, right) => left._2.cardinality() > right._2.cardinality()
-      }.foreach { case (executor, bitSet) =>
-        if (bitSet.nextSetBit(0) != -1) hosts += executor
-      }
+  def getHosts(filePath: String): Option[String] = {
+    fileToHost.get(filePath) match {
+      case HostFiberCache(host, status) => Some(host)
+      case null => None
     }
-    hosts.toArray
   }
 }
+
+object FiberSensor extends AbstractFiberSensor

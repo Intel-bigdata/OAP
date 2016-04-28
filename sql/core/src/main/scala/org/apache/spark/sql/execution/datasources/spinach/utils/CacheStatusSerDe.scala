@@ -19,10 +19,11 @@ package org.apache.spark.sql.execution.datasources.spinach.utils
 
 import org.apache.spark.sql.execution.datasources.spinach.DataFileMeta
 import org.apache.spark.util.collection.BitSet
-
 import org.json4s.DefaultFormats
 import org.json4s.JsonDSL._
 import org.json4s.JsonAST._
+
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * This is user defined Json protocol for SerDe, here the format of Json output should like
@@ -43,16 +44,29 @@ import org.json4s.JsonAST._
  *     []...[]}
  */
 
-object CacheStatusSerDe {
+private[spinach] case class FiberCacheStatus(file: String, bitmask: BitSet, meta: DataFileMeta) {
+  val cachedFiberCount = bitmask.cardinality()
+
+  def moreCacheThan(other: FiberCacheStatus): Boolean = {
+    if (cachedFiberCount >= other.cachedFiberCount) {
+      true
+    } else {
+      false
+    }
+  }
+}
+
+private[spinach] object CacheStatusSerDe {
+  import org.json4s.jackson.JsonMethods._
   private implicit val format = DefaultFormats
 
-  def bitSetToJson(bitSet: BitSet): JValue = {
+  private[spinach] def bitSetToJson(bitSet: BitSet): JValue = {
     val words: Array[Long] = bitSet.toLongArray()
     val bitSetJson = JArray(words.map(word => ("word" -> word): JValue).toList)
     ("bitSet" -> bitSetJson)
   }
 
-  def bitSetFromJson(json: JValue): BitSet = {
+  private[spinach] def bitSetFromJson(json: JValue): BitSet = {
     val words: Array[Long] = (json \ "bitSet").extract[List[JValue]].map { word =>
       (word \ "word").extract[Long]
     }.toArray[Long]
@@ -61,14 +75,14 @@ object CacheStatusSerDe {
 
   // we only transfer 4 items in DataFileMeta to driver, ther are rowCountInEachGroup,
   // rowCountInLastGroup, groupCount, fieldCount respectively
-  def dataFileMetaToJson(dataFileMeta: DataFileMeta): JValue = {
+  private[spinach] def dataFileMetaToJson(dataFileMeta: DataFileMeta): JValue = {
     ("rowCountInEachGroup" -> dataFileMeta.rowCountInEachGroup)~
     ("rowCountInLastGroup" -> dataFileMeta.rowCountInLastGroup)~
     ("groupCount" -> dataFileMeta.groupCount)~
     ("fieldCount" -> dataFileMeta.fieldCount)
   }
 
-  def dataFileMetaFromJson(json: JValue): DataFileMeta = {
+  private[spinach] def dataFileMetaFromJson(json: JValue): DataFileMeta = {
     val rowCountInEachGroup = (json \ "rowCountInEachGroup").extract[Int]
     val rowCountInLastGroup = (json \ "rowCountInLastGroup").extract[Int]
     val groupCount = (json \ "groupCount").extract[Int]
@@ -80,31 +94,25 @@ object CacheStatusSerDe {
       fieldCount = fieldCount)
   }
 
-  def statusRawDataArrayToJson(
-      statusRawDataArray: Array[(String, BitSet, DataFileMeta)]): JValue = {
+  def serialize(statusRawDataArray: Seq[FiberCacheStatus]): String = {
     val statusJArray = JArray(statusRawDataArray.map(statusRawDataToJson).toList)
-    ("statusRawDataArray" -> statusJArray)
+    compact(render("statusRawDataArray" -> statusJArray))
   }
 
-  def statusRawDataToJson(statusRawData: (String, BitSet, DataFileMeta)): JValue = {
-    val fiberFilePath = statusRawData._1
-    val bitSetJValue = bitSetToJson(statusRawData._2)
-    val dataFileMetaJValue = dataFileMetaToJson(statusRawData._3)
-    ("fiberFilePath" -> fiberFilePath)~
-    ("bitSetJValue" -> bitSetJValue)~
-    ("dataFileMetaJValue" -> dataFileMetaJValue)
+  def deserialize(json: String): Seq[FiberCacheStatus] = {
+    (parse(json) \ "statusRawDataArray").extract[List[JValue]].map(statusRawDataFromJson)
   }
 
-  def statusRawDataArrayFromJson(json: JValue): Array[(String, BitSet, DataFileMeta)] = {
-    val statusRawDataArray: Array[(String, BitSet, DataFileMeta)] =
-      (json \ "statusRawDataArray").extract[List[JValue]].map(statusRawDataFromJson).toArray
-    statusRawDataArray
+  private[spinach] def statusRawDataToJson(statusRawData: FiberCacheStatus): JValue = {
+    ("fiberFilePath" -> statusRawData.file)~
+    ("bitSetJValue" -> bitSetToJson(statusRawData.bitmask))~
+    ("dataFileMetaJValue" -> dataFileMetaToJson(statusRawData.meta))
   }
 
-  def statusRawDataFromJson(json: JValue): (String, BitSet, DataFileMeta) = {
+  private[spinach] def statusRawDataFromJson(json: JValue): FiberCacheStatus = {
     val path = (json \ "fiberFilePath").extract[String]
     val bitSet = bitSetFromJson(json \ "bitSetJValue")
     val dataFileMeta = dataFileMetaFromJson(json \ "dataFileMetaJValue")
-    (path, bitSet, dataFileMeta)
+    FiberCacheStatus(path, bitSet, dataFileMeta)
   }
 }

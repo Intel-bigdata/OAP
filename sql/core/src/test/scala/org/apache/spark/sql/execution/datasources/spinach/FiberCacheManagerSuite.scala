@@ -19,13 +19,12 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.io.File
 
-import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
+import org.apache.spark.sql.execution.datasources.spinach.utils.{CacheStatusSerDe, FiberCacheStatus}
 
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.mapreduce.{JobID, TaskID, TaskAttemptID, TaskAttemptContext}
+import org.apache.hadoop.mapreduce.{JobID, TaskAttemptContext, TaskAttemptID, TaskID}
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
 import org.apache.hadoop.util.StringUtils
 import org.apache.spark.deploy.SparkHadoopUtil
@@ -33,12 +32,11 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
 import org.apache.spark.{Logging, SparkFunSuite}
-
 import org.scalatest.BeforeAndAfterAll
-
 import org.json4s.jackson.JsonMethods._
 
-class FiberCacheManagerSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
+class FiberCacheManagerSuite extends SparkFunSuite with AbstractFiberCacheManger
+    with Logging with BeforeAndAfterAll {
   private var file: File = null
   val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
     new Configuration(),
@@ -54,53 +52,41 @@ class FiberCacheManagerSuite extends SparkFunSuite with Logging with BeforeAndAf
     Utils.deleteRecursively(file)
   }
 
+  // for unit test
+  override def fiber2Data(key: Fiber): FiberByteData = FiberByteData(new Array[Byte](100))
+
   test("test getting right status") {
-    FiberCacheManager.cache.cleanUp()
-    DataMetaCacheManager.cache.cleanUp()
-    FiberDataFileHandler.cache.cleanUp()
-    val path = new Path(StringUtils.unEscapeString(file.toURI.toString))
-    val out = FileSystem.get(ctx).create(path, true)
-    val rowGroupsMeta = new Array[RowGroupMeta](30)
+    val rowGroupsMeta = new ArrayBuffer[RowGroupMeta](30)
     val fieldCount = 3
     val groupCount = 30
     val rowCountInEachGroup = 10
     val rowCountInLastGroup = 3
     var i = 0
     while (i < rowGroupsMeta.length) {
-      rowGroupsMeta(i) =
+      rowGroupsMeta.append(
         new RowGroupMeta()
           .withNewStart(i * 4 * fieldCount)
           .withNewEnd(i * 4 * fieldCount + 4 * fieldCount)
-          .withNewFiberLens(Array(1, 2, 3))
+          .withNewFiberLens(Array(1, 2, 3)))
       i += 1
     }
-    val dataMeta = new DataFileMeta(rowGroupsMeta.toBuffer.asInstanceOf[ArrayBuffer[RowGroupMeta]],
-      rowCountInEachGroup, rowCountInLastGroup, groupCount, fieldCount)
-    dataMeta.write(out)
-    out.close()
+
+    val filePath = "file1.data"
+    val dataMeta = new DataFileMeta(
+      rowGroupsMeta, rowCountInEachGroup, rowCountInLastGroup, groupCount, fieldCount)
+
     // DataFileScanner will read file back and get dataMeta and cache it
-    val fileScanner = DataFileScanner(path.toUri.toString, new StructType(), attemptContext)
-    assert(DataMetaCacheManager.cache.asMap.containsKey(fileScanner))
-    // meta data that read back from files should be the same with the original
-    val dataMetaReadBack = DataMetaCacheManager.cache.asMap.get(fileScanner)
-    assert(dataMetaReadBack.rowCountInEachGroup === rowCountInEachGroup)
-    assert(dataMetaReadBack.rowCountInLastGroup === rowCountInLastGroup)
-    assert(dataMetaReadBack.groupCount === groupCount)
-    assert(dataMetaReadBack.fieldCount === fieldCount)
-    // FiberDataFileHandler will cache fileSacnner after DataMeta is cached
-    assert(FiberDataFileHandler.cache.asMap.containsKey(fileScanner))
+    val fileScanner = new DataFileScanner(filePath, new StructType(), attemptContext){
+      override lazy val meta: DataFileMeta = dataMeta
+    }
 
     val columnIndex = 1
     val rowGroupId = 1
-    val fiber = Fiber(fileScanner, columnIndex, rowGroupId)
-    FiberCacheManager(fiber)
-    assert(FiberCacheManager.cache.asMap().containsKey(fiber))
+    this.apply(Fiber(fileScanner, columnIndex, rowGroupId))
 
     val fiberBitSet = new BitSet(groupCount * fieldCount)
     fiberBitSet.set(columnIndex + fieldCount * rowGroupId)
-    val statusRawDataArr = Array((path.toUri.toString, fiberBitSet, dataMeta))
-    assert(FiberCacheManager.status === compact(
-      render(CacheStatusSerDe.statusRawDataArrayToJson(statusRawDataArr))))
+    val statusRawDataArr = Seq(FiberCacheStatus(filePath, fiberBitSet, dataMeta))
+    assert(this.status === CacheStatusSerDe.serialize(statusRawDataArr))
   }
-
 }

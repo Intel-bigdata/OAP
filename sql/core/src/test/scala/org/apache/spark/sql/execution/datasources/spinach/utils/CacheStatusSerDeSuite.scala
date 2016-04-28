@@ -55,16 +55,16 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
     bitSet.set(3)
     bitSet.set(8)
     val dataFileMeta = new DataFileMeta(new ArrayBuffer[RowGroupMeta](), 3, 2, 30, 3)
-    val rawData = (path, bitSet, dataFileMeta)
+    val rawData = FiberCacheStatus(path, bitSet, dataFileMeta)
     val newRawData =
       CacheStatusSerDe.statusRawDataFromJson(CacheStatusSerDe.statusRawDataToJson(rawData))
-    assert(rawData._1 === newRawData._1)
-    assertBitSetEquals(rawData._2, newRawData._2)
-    assertDataFileMetaEquals(rawData._3, newRawData._3)
+    assert(rawData.file === newRawData.file)
+    assertBitSetEquals(rawData.bitmask, newRawData.bitmask)
+    assertDataFileMetaEquals(rawData.meta, newRawData.meta)
   }
 
   test("test status raw data array") {
-    val rawDataArray = new ArrayBuffer[(String, BitSet, DataFileMeta)]()
+    val rawDataArray = new ArrayBuffer[FiberCacheStatus]()
     val path1 = "file1"
     val path2 = "file2"
     val bitSet1 = new BitSet(90)
@@ -75,10 +75,9 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
     bitSet2.set(6)
     val dataFileMeta1 = new DataFileMeta(new ArrayBuffer[RowGroupMeta](), 3, 2, 30, 3)
     val dataFileMeta2 = new DataFileMeta(new ArrayBuffer[RowGroupMeta](), 3, 1, 50, 3)
-    rawDataArray += ((path1, bitSet1, dataFileMeta1))
-    rawDataArray += ((path2, bitSet2, dataFileMeta2))
-    val statusRawDataArrayStr =
-      compact(render(CacheStatusSerDe.statusRawDataArrayToJson(rawDataArray.toArray)))
+    rawDataArray += FiberCacheStatus(path1, bitSet1, dataFileMeta1)
+    rawDataArray += FiberCacheStatus(path2, bitSet2, dataFileMeta2)
+    val statusRawDataArrayStr = CacheStatusSerDe.serialize(rawDataArray)
     assertStringEquals(statusRawDataArrayStr, CacheStatusSerDeTestStrs.statusRawDataArrayString)
   }
 

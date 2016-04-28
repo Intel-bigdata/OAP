@@ -18,20 +18,15 @@
 package org.apache.spark.sql.execution.datasources.spinach
 
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.spark.{Logging, SparkFunSuite}
 import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
-import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
+import org.apache.spark.sql.execution.datasources.spinach.utils.{CacheStatusSerDe, FiberCacheStatus}
 import org.apache.spark.util.collection.BitSet
-
 import org.json4s.jackson.JsonMethods._
 
-class FiberSensorSuite extends SparkFunSuite with Logging {
+class FiberSensorSuite extends SparkFunSuite with AbstractFiberSensor with Logging {
 
   test("test get hosts from FiberSensor") {
-    // clear the map first
-    FiberSensor.fileToExecBitSetMap.clear()
-
     val filePath = "file1"
     val dataFileMeta = new DataFileMeta(new ArrayBuffer[RowGroupMeta](), 10, 2, 30, 3)
 
@@ -40,14 +35,10 @@ class FiberSensorSuite extends SparkFunSuite with Logging {
     val bitSet1 = new BitSet(90)
     bitSet1.set(1)
     bitSet1.set(2)
-    val statusRawDataArray1 = new ArrayBuffer[(String, BitSet, DataFileMeta)]
-    statusRawDataArray1 += ((filePath, bitSet1, dataFileMeta))
-    val fiberInfo1 = SparkListenerCustomInfoUpdate(execId1, compact(render(CacheStatusSerDe
-      .statusRawDataArrayToJson(statusRawDataArray1.toArray))))
-    FiberSensor.update(fiberInfo1)
-    assert(FiberSensor.fileToExecBitSetMap.size === 1)
-    assert(FiberSensor.fileToExecBitSetMap.contains(filePath))
-    assert(FiberSensor.fileToExecBitSetMap.get(filePath).size === 1)
+    val fcs = Seq(FiberCacheStatus(filePath, bitSet1, dataFileMeta))
+    val fiberInfo = SparkListenerCustomInfoUpdate(execId1, CacheStatusSerDe.serialize(fcs))
+    this.update(fiberInfo)
+    assert(this.getHosts(filePath) == Option(execId1))
 
     // executor2 update
     val execId2 = "executor2"
@@ -58,14 +49,11 @@ class FiberSensorSuite extends SparkFunSuite with Logging {
     bitSet2.set(6)
     bitSet2.set(7)
     bitSet2.set(8)
-    val statusRawDataArray2 = new ArrayBuffer[(String, BitSet, DataFileMeta)]
-    statusRawDataArray2 += ((filePath, bitSet2, dataFileMeta))
-    val fiberInfo2 = SparkListenerCustomInfoUpdate(execId2, compact(render(CacheStatusSerDe
-      .statusRawDataArrayToJson(statusRawDataArray2.toArray))))
-    FiberSensor.update(fiberInfo2)
-    assert(FiberSensor.fileToExecBitSetMap.size === 1)
-    FiberSensor.fileToExecBitSetMap.get(filePath).foreach(m => assert(m.contains(execId2)))
-    assert(FiberSensor.fileToExecBitSetMap.get(filePath).get.size === 2)
+
+    val fiberInfo2 = SparkListenerCustomInfoUpdate(execId2, CacheStatusSerDe
+      .serialize(Seq(FiberCacheStatus(filePath, bitSet2, dataFileMeta))))
+    this.update(fiberInfo2)
+    assert(this.getHosts(filePath) == Some(execId2))
 
     // executor3 update
     val execId3 = "executor3"
@@ -74,16 +62,9 @@ class FiberSensorSuite extends SparkFunSuite with Logging {
     bitSet3.set(8)
     bitSet3.set(9)
     bitSet3.set(10)
-    val statusRawDataArray3 = new ArrayBuffer[(String, BitSet, DataFileMeta)]
-    statusRawDataArray3 += ((filePath, bitSet3, dataFileMeta))
-    val fiberInfo3 = SparkListenerCustomInfoUpdate(execId3, compact(render(CacheStatusSerDe
-      .statusRawDataArrayToJson(statusRawDataArray3.toArray))))
-    FiberSensor.update(fiberInfo3)
-    assert(FiberSensor.fileToExecBitSetMap.size === 1)
-    assert(FiberSensor.fileToExecBitSetMap.get(filePath).get.size === 3)
-
-    val hosts = FiberSensor.getHosts(filePath)
-    // executor2 have more fibers cached, then executor3, and then executor1
-    assert(hosts === Array(execId2, execId3, execId1))
+    val fiberInfo3 = SparkListenerCustomInfoUpdate(execId3, CacheStatusSerDe
+      .serialize(Seq(FiberCacheStatus(filePath, bitSet3, dataFileMeta))))
+    this.update(fiberInfo3)
+    assert(this.getHosts(filePath) === Some(execId2))
   }
 }
