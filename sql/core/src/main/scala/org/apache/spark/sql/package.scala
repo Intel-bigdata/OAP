@@ -48,4 +48,10 @@ package object sql {
    */
   @deprecated("use DataFrame", "1.3.0")
   type SchemaRDD = DataFrame
+
+  /**
+   * The return type of the writesRows method in
+   * [[org.apache.spark.sql.execution.datasources.BaseWriterContainer]]
+   */
+  type WriteResult = Any
 }

@@ -22,9 +22,12 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.deploy.SparkHadoopUtil
+import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.{DefaultWriterContainer, WriteResult}
+import org.apache.spark.sql.execution.datasources.{DefaultWriterContainer}
 import org.apache.spark.sql.types.StructType
+
+private[sql] case class SpinachWriteResult(fileName: String, rowsWritten: Int)
 
 private[spinach] class NonDynamicPartitionWriteContainer(
   relation: SpinachRelation,
@@ -33,7 +36,7 @@ private[spinach] class NonDynamicPartitionWriteContainer(
   schema: StructType) extends DefaultWriterContainer(relation, job, isAppend) {
   override def writeRows(
       taskContext: TaskContext,
-      iterator: Iterator[InternalRow]): WriteResult = {
+      iterator: Iterator[InternalRow]): SpinachWriteResult = {
     // TODO if we need to wrap the row group
     executorSideSetup(taskContext)
     val configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(taskAttemptContext)
@@ -47,7 +50,7 @@ private[spinach] class NonDynamicPartitionWriteContainer(
 
     val outputFileName = writer match {
       case s: SpinachOutputWriter => s.getFileName()
-      case _ => ""
+      case _ => throw new SparkException("Incorrect Spinach output writer.")
     }
 
     // If anything below fails, we should abort the task.
@@ -92,7 +95,7 @@ private[spinach] class NonDynamicPartitionWriteContainer(
       }
     }
 
-    WriteResult(outputFileName, rowsWritten)
+    SpinachWriteResult(outputFileName, rowsWritten)
   }
 
   override def commitJob(writeResults: Array[WriteResult]): Unit = {
@@ -102,8 +105,11 @@ private[spinach] class NonDynamicPartitionWriteContainer(
     val fileOut: FSDataOutputStream = outputRoot.getFileSystem(conf).create(path, false)
 
     val builder = DataSourceMeta.newBuilder()
-    // The file fingerprint is not used at the moment.
-    writeResults.foreach(r => builder.addFileMeta(FileMeta("", r.rowsWritten, r.fileName)))
+    writeResults.foreach {
+      // The file fingerprint is not used at the moment.
+      case s: SpinachWriteResult => builder.addFileMeta(FileMeta("", s.rowsWritten, s.fileName))
+      case _ => throw new SparkException("Unexpected Spinach write result.")
+    }
 
     val spinachMeta = builder.withNewSchema(schema).build()
     DataSourceMeta.write(path, relation.sqlContext.sparkContext.hadoopConfiguration, spinachMeta)

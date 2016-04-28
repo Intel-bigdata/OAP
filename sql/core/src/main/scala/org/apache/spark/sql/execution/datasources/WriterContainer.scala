@@ -36,8 +36,6 @@ import org.apache.spark.sql.sources.{HadoopFsRelation, OutputWriter, OutputWrite
 import org.apache.spark.sql.types.{StructType, StringType}
 import org.apache.spark.util.SerializableConfiguration
 
-private[sql] case class WriteResult(fileName: String, rowsWritten: Int)
-
 private[sql] abstract class BaseWriterContainer(
     @transient val relation: HadoopFsRelation,
     @transient private val job: Job,
@@ -256,7 +254,6 @@ private[sql] class DefaultWriterContainer(
     val writer = newOutputWriter(getWorkPath)
     writer.initConverter(dataSchema)
 
-    var rowsWritten = 0
     var writerClosed = false
 
     // If anything below fails, we should abort the task.
@@ -264,7 +261,6 @@ private[sql] class DefaultWriterContainer(
       while (iterator.hasNext) {
         val internalRow = iterator.next()
         writer.writeInternal(internalRow)
-        rowsWritten += 1
       }
 
       commitTask()
@@ -301,9 +297,6 @@ private[sql] class DefaultWriterContainer(
         super.abortTask()
       }
     }
-
-    // file name is not used
-    WriteResult("", rowsWritten)
   }
 }
 
@@ -348,7 +341,6 @@ private[sql] class DynamicPartitionWriterContainer(
     val getPartitionString =
       UnsafeProjection.create(Concat(partitionStringExpression) :: Nil, partitionColumns)
 
-    var rowsWritten = 0
     // If anything below fails, we should abort the task.
     try {
       // This will be filled in if we have to fall back on sorting.
@@ -375,7 +367,6 @@ private[sql] class DynamicPartitionWriterContainer(
         } else {
           currentWriter.writeInternal(getOutputRow(inputRow))
         }
-        rowsWritten += 1
       }
 
       // If the sorter is not null that means that we reached the maxFiles above and need to finish
@@ -459,8 +450,5 @@ private[sql] class DynamicPartitionWriterContainer(
         super.abortTask()
       }
     }
-
-    // file name is not used
-    WriteResult("", rowsWritten)
   }
 }
