@@ -27,7 +27,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.{DefaultWriterContainer}
 import org.apache.spark.sql.types.StructType
 
-private[sql] case class SpinachWriteResult(fileName: String, rowsWritten: Int)
+private[spinach] case class SpinachWriteResult(fileName: String, rowsWritten: Int)
 
 private[spinach] class NonDynamicPartitionWriteContainer(
   relation: SpinachRelation,
