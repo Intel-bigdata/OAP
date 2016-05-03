@@ -58,9 +58,7 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
     val rawData = FiberCacheStatus(path, bitSet, dataFileMeta)
     val newRawData =
       CacheStatusSerDe.statusRawDataFromJson(CacheStatusSerDe.statusRawDataToJson(rawData))
-    assert(rawData.file === newRawData.file)
-    assertBitSetEquals(rawData.bitmask, newRawData.bitmask)
-    assertDataFileMetaEquals(rawData.meta, newRawData.meta)
+    assertStatusRawDataEquals(rawData, newRawData)
   }
 
   test("test ser and deser") {
