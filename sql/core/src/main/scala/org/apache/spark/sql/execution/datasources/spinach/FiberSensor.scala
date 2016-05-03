@@ -19,14 +19,10 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.util.concurrent.ConcurrentHashMap
 
-import scala.collection.JavaConverters._
-import scala.collection.mutable.{ArrayBuffer, HashMap, Map}
 import org.apache.spark.Logging
 import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
-import org.apache.spark.sql.execution.datasources.spinach.FiberSensor.HostFiberCache
-import org.apache.spark.sql.execution.datasources.spinach.utils.{CacheStatusSerDe, FiberCacheStatus}
+import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
-import org.json4s.jackson.JsonMethods._
 
 // TODO FiberSensor doesn't consider the fiber cache, but only the number of cached
 // fiber count
@@ -50,6 +46,12 @@ private[spinach] trait AbstractFiberSensor extends Logging {
     }
   }
 
+  /**
+   * get hosts that has fiber cached for fiber file.
+   * Current implementation only returns one host, but still using API name with [[getHosts]]
+   * @param filePath fiber file's path
+   * @return
+   */
   def getHosts(filePath: String): Option[String] = {
     fileToHost.get(filePath) match {
       case HostFiberCache(host, status) => Some(host)
@@ -59,3 +61,16 @@ private[spinach] trait AbstractFiberSensor extends Logging {
 }
 
 object FiberSensor extends AbstractFiberSensor
+
+
+private[spinach] case class FiberCacheStatus(file: String, bitmask: BitSet, meta: DataFileMeta) {
+  val cachedFiberCount = bitmask.cardinality()
+
+  def moreCacheThan(other: FiberCacheStatus): Boolean = {
+    if (cachedFiberCount >= other.cachedFiberCount) {
+      true
+    } else {
+      false
+    }
+  }
+}

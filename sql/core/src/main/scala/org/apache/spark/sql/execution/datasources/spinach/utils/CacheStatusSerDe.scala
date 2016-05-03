@@ -17,13 +17,11 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.utils
 
-import org.apache.spark.sql.execution.datasources.spinach.DataFileMeta
+import org.apache.spark.sql.execution.datasources.spinach.{DataFileMeta, FiberCacheStatus}
 import org.apache.spark.util.collection.BitSet
 import org.json4s.DefaultFormats
 import org.json4s.JsonDSL._
 import org.json4s.JsonAST._
-
-import scala.collection.mutable.ArrayBuffer
 
 /**
  * This is user defined Json protocol for SerDe, here the format of Json output should like
@@ -44,20 +42,18 @@ import scala.collection.mutable.ArrayBuffer
  *     []...[]}
  */
 
-private[spinach] case class FiberCacheStatus(file: String, bitmask: BitSet, meta: DataFileMeta) {
-  val cachedFiberCount = bitmask.cardinality()
-
-  def moreCacheThan(other: FiberCacheStatus): Boolean = {
-    if (cachedFiberCount >= other.cachedFiberCount) {
-      true
-    } else {
-      false
-    }
-  }
-}
-
-private[spinach] object CacheStatusSerDe {
+private[spinach] object CacheStatusSerDe extends SerDe[String, Seq[FiberCacheStatus]] {
   import org.json4s.jackson.JsonMethods._
+
+  override def serialize(statusRawDataArray: Seq[FiberCacheStatus]): String = {
+    val statusJArray = JArray(statusRawDataArray.map(statusRawDataToJson).toList)
+    compact(render("statusRawDataArray" -> statusJArray))
+  }
+
+  override def deserialize(json: String): Seq[FiberCacheStatus] = {
+    (parse(json) \ "statusRawDataArray").extract[List[JValue]].map(statusRawDataFromJson)
+  }
+
   private implicit val format = DefaultFormats
 
   private[spinach] def bitSetToJson(bitSet: BitSet): JValue = {
@@ -92,15 +88,6 @@ private[spinach] object CacheStatusSerDe {
       rowCountInLastGroup = rowCountInLastGroup,
       groupCount = groupCount,
       fieldCount = fieldCount)
-  }
-
-  def serialize(statusRawDataArray: Seq[FiberCacheStatus]): String = {
-    val statusJArray = JArray(statusRawDataArray.map(statusRawDataToJson).toList)
-    compact(render("statusRawDataArray" -> statusJArray))
-  }
-
-  def deserialize(json: String): Seq[FiberCacheStatus] = {
-    (parse(json) \ "statusRawDataArray").extract[List[JValue]].map(statusRawDataFromJson)
   }
 
   private[spinach] def statusRawDataToJson(statusRawData: FiberCacheStatus): JValue = {

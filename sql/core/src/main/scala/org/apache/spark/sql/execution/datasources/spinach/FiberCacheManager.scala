@@ -29,10 +29,9 @@ import org.apache.spark.{Logging, SparkConf}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.executor.CustomManager
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.spinach.utils.{CacheStatusSerDe, FiberCacheStatus}
+import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.collection.BitSet
-
 
 // TODO need to register within the SparkContext
 class SpinachHeartBeatMessager extends CustomManager with Logging {
@@ -49,18 +48,19 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
       .weigher(new Weigher[Fiber, FiberByteData] {
-      override def weigh(key: Fiber, value: FiberByteData): Int = value.buf.length
-    })
+        override def weigh(key: Fiber, value: FiberByteData): Int = value.buf.length
+      })
       .maximumWeight(MemoryManager.SPINACH_FIBER_CACHE_SIZE_IN_BYTES)
       .removalListener(new RemovalListener[Fiber, FiberByteData] {
         override def onRemoval(n: RemovalNotification[Fiber, FiberByteData]): Unit = {
           MemoryManager.instance.free(n.getValue)
         }
-      }).build(new CacheLoader[Fiber, FiberByteData] {
-      override def load(key: Fiber): FiberByteData = {
-        fiber2Data(key)
-      }
-    })
+      })
+      .build(new CacheLoader[Fiber, FiberByteData] {
+        override def load(key: Fiber): FiberByteData = {
+          fiber2Data(key)
+        }
+      })
 
   def apply(fiberCache: Fiber): FiberByteData = {
     cache(fiberCache)
@@ -103,13 +103,12 @@ object FiberCacheManager extends AbstractFiberCacheManger {
 private[spinach] case class InputDataFileDescriptor(fin: FSDataInputStream, len: Long)
 
 private[spinach] object DataMetaCacheManager extends Logging {
-  @transient val cache =
+  @transient private val cache =
     CacheBuilder
       .newBuilder()
       .maximumSize(MemoryManager.SPINACH_DATA_META_CACHE_SIZE)
       .build(new CacheLoader[DataFileScanner, DataFileMeta] {
       override def load(key: DataFileScanner): DataFileMeta = {
-        val meta = new DataFileMeta()
         val fd = FiberDataFileHandler(key)
         new DataFileMeta().read(fd.fin, fd.len)
       }
@@ -121,7 +120,7 @@ private[spinach] object DataMetaCacheManager extends Logging {
 }
 
 private[spinach] object FiberDataFileHandler extends Logging {
-  @transient val cache =
+  @transient private val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works

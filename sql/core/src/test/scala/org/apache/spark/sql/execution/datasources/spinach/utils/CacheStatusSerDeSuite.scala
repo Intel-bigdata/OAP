@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.spinach.utils
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.execution.datasources.spinach.{RowGroupMeta, DataFileMeta}
+import org.apache.spark.sql.execution.datasources.spinach.{DataFileMeta, FiberCacheStatus, RowGroupMeta}
 import org.apache.spark.util.collection.BitSet
 
 import org.json4s.jackson.JsonMethods._
@@ -63,7 +63,7 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
     assertDataFileMetaEquals(rawData.meta, newRawData.meta)
   }
 
-  test("test status raw data array") {
+  test("test ser and deser") {
     val rawDataArray = new ArrayBuffer[FiberCacheStatus]()
     val path1 = "file1"
     val path2 = "file2"
@@ -79,6 +79,13 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
     rawDataArray += FiberCacheStatus(path2, bitSet2, dataFileMeta2)
     val statusRawDataArrayStr = CacheStatusSerDe.serialize(rawDataArray)
     assertStringEquals(statusRawDataArrayStr, CacheStatusSerDeTestStrs.statusRawDataArrayString)
+    val deserRawDataArr = CacheStatusSerDe.deserialize(statusRawDataArrayStr)
+    assert(deserRawDataArr.length === rawDataArray.length)
+    var i = 0
+    while (i < deserRawDataArr.length) {
+      assertStatusRawDataEquals(deserRawDataArr(i), rawDataArray(i))
+      i += 1
+    }
   }
 
   private def assertBitSetEquals(bitSet1: BitSet, bitSet2: BitSet) {
@@ -100,6 +107,12 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
     assert(dataFileMeta1.rowCountInLastGroup === dataFileMeta2.rowCountInLastGroup)
     assert(dataFileMeta1.groupCount === dataFileMeta2.groupCount)
     assert(dataFileMeta1.fieldCount === dataFileMeta2.fieldCount)
+  }
+
+  private def assertStatusRawDataEquals(data1: FiberCacheStatus, data2: FiberCacheStatus): Unit = {
+    assert(data1.file === data2.file)
+    assertBitSetEquals(data1.bitmask, data2.bitmask)
+    assertDataFileMetaEquals(data1.meta, data2.meta)
   }
 
 }

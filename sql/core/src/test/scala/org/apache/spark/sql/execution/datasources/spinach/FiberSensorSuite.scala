@@ -20,9 +20,8 @@ package org.apache.spark.sql.execution.datasources.spinach
 import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.{Logging, SparkFunSuite}
 import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
-import org.apache.spark.sql.execution.datasources.spinach.utils.{CacheStatusSerDe, FiberCacheStatus}
+import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
-import org.json4s.jackson.JsonMethods._
 
 class FiberSensorSuite extends SparkFunSuite with AbstractFiberSensor with Logging {
 
