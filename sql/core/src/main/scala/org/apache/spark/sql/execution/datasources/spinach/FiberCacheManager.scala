@@ -103,7 +103,7 @@ object FiberCacheManager extends AbstractFiberCacheManger {
 private[spinach] case class InputDataFileDescriptor(fin: FSDataInputStream, len: Long)
 
 private[spinach] object DataMetaCacheManager extends Logging {
-  @transient val cache =
+  @transient private val cache =
     CacheBuilder
       .newBuilder()
       .maximumSize(MemoryManager.SPINACH_DATA_META_CACHE_SIZE)
@@ -120,7 +120,7 @@ private[spinach] object DataMetaCacheManager extends Logging {
 }
 
 private[spinach] object FiberDataFileHandler extends Logging {
-  @transient val cache =
+  @transient private val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works

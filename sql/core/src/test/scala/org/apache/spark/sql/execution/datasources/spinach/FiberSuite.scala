@@ -27,6 +27,7 @@ import org.apache.hadoop.mapreduce.{JobID, TaskAttemptContext, TaskAttemptID, Ta
 import org.apache.hadoop.util.StringUtils
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
+import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
@@ -50,7 +51,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   }
 
   test("test reading / writing spinach file") {
-    val schema = new StructType()
+    val schema = (new StructType)
       .add("a", IntegerType)
       .add("b", StringType)
       .add("c", IntegerType)
@@ -75,16 +76,17 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       .add("a", BinaryType)
       .add("b", BooleanType)
       .add("c", ByteType)
-      .add("d", DoubleType)
-      .add("e", FloatType)
-      .add("f", IntegerType)
-      .add("g", LongType)
-      .add("h", ShortType)
-      .add("i", StringType)
+      .add("d", DateType)
+      .add("e", DoubleType)
+      .add("f", FloatType)
+      .add("g", IntegerType)
+      .add("h", LongType)
+      .add("i", ShortType)
+      .add("j", StringType)
     writeData(ctx, childPath, schema, recordCount, attemptContext)
     val split = new FileSplit(
       childPath, 0, FileSystem.get(ctx).getFileStatus(childPath).getLen(), Array.empty[String])
-    assertData(childPath, schema, Array(0, 1, 2, 3, 4, 5, 6, 7, 8), split, attemptContext,
+    assertData(childPath, schema, Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), split, attemptContext,
       recordCount)
 
   }
@@ -137,6 +139,8 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
               row.setBoolean(idx, bool)
             case (StructField(name, ByteType, true, _), idx) =>
               row.setByte(idx, i.toByte)
+            case (StructField(name, DateType, true, _), idx) =>
+              row.setInt(idx, i)  // use setInt because we get Date as Int
             case (StructField(name, DoubleType, true, _), idx) =>
               row.setDouble(idx, i.toDouble / 3)
             case (StructField(name, FloatType, true, _), idx) =>
@@ -184,6 +188,8 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
               assert( bool === row.getBoolean(outputId))
             case StructField(name, ByteType, true, _) =>
               assert(idx.toByte === row.getByte(outputId))
+            case StructField(name, DateType, true, _) =>
+              assert(idx === row.getInt(outputId))
             case StructField(name, DoubleType, true, _) =>
               assert(idx.toDouble / 3 === row.getDouble(outputId))
             case StructField(name, FloatType, true, _) =>

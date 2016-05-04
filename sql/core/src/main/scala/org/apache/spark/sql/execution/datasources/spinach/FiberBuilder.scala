@@ -63,11 +63,11 @@ private[spinach] trait FiberBuilder {
 private[spinach] case class FixedSizeTypeFiberBuilder(
     defaultRowGroupRowCount: Int,
     ordinal: Int,
-    dataType: DataType)
-  extends FiberBuilder {
+    dataType: DataType) extends FiberBuilder {
   private val typeDefaultSize = dataType match {
     case BooleanType => BooleanType.defaultSize
     case ByteType => ByteType.defaultSize
+    case DateType => IntegerType.defaultSize  // use IntegerType instead of using DateType
     case DoubleType => DoubleType.defaultSize
     case FloatType => FloatType.defaultSize
     case IntegerType => IntegerType.defaultSize
@@ -89,6 +89,9 @@ private[spinach] case class FixedSizeTypeFiberBuilder(
       case ByteType =>
         Platform.putByte(bytes, baseOffset + currentRowId * typeDefaultSize,
           row.getByte(ordinal))
+      case DateType =>
+        Platform.putInt(bytes, baseOffset + currentRowId * typeDefaultSize,
+          row.getInt(ordinal))  // treat DateType as an Int
       case DoubleType =>
         Platform.putDouble(bytes, baseOffset + currentRowId * typeDefaultSize,
           row.getDouble(ordinal))
@@ -273,8 +276,10 @@ object FiberBuilder {
         new BinaryFiberBuilder(defaultRowGroupRowCount, ordinal)
       case BooleanType =>
         new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, BooleanType)
-      case ByteType => new
-          FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ByteType)
+      case ByteType =>
+        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ByteType)
+      case DateType =>
+        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, DateType)
       case DoubleType =>
         new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, DoubleType)
       case FloatType =>

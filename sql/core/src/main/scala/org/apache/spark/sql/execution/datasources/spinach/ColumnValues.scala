@@ -17,9 +17,11 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import java.sql.Date
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
-import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
+import org.apache.spark.sql.catalyst.util.{ArrayData, DateTimeUtils, MapData}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
@@ -49,6 +51,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberByteData)
     case BinaryType => getBinaryValue(idx)
     case BooleanType => new java.lang.Boolean(getBooleanValue(idx))
     case ByteType => new java.lang.Byte(getByteValue(idx))
+    case DateType => getDateValue(idx)
     case DoubleType => new java.lang.Double(getDoubleValue(idx))
     case FloatType => new java.lang.Float(getFloatValue(idx))
     case IntegerType => new Integer(getIntValue(idx))
@@ -57,7 +60,6 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberByteData)
     case StringType => getStringValue(idx)
     case _: ArrayType => throw new NotImplementedError(s"Array")
     case CalendarIntervalType => throw new NotImplementedError(s"CalendarInterval")
-    case DateType => throw new NotImplementedError(s"Date")
     case _: DecimalType => throw new NotImplementedError(s"Decimal")
     case _: MapType => throw new NotImplementedError(s"Map")
     case _: StructType => throw new NotImplementedError(s"Struct")
@@ -71,21 +73,26 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberByteData)
   def getByteValue(idx: Int): Byte = {
     Platform.getByte(raw.buf, baseOffset + idx * ByteType.defaultSize)
   }
+  def getDateValue(idx: Int): Date = {
+    val date = Platform.getInt(raw.buf, baseOffset + idx * IntegerType.defaultSize)
+    DateTimeUtils.toJavaDate(date)
+  }
+  def getDoubleValue(idx: Int): Double = {
+    Platform.getDouble(raw.buf, baseOffset + idx * DoubleType.defaultSize)
+  }
+  def getIntValue(idx: Int): Int = {
+    Platform.getInt(raw.buf, baseOffset + idx * IntegerType.defaultSize)
+  }
+  def getLongValue(idx: Int): Long = {
+    Platform.getLong(raw.buf, baseOffset + idx * LongType.defaultSize)
+  }
   def getShortValue(idx: Int): Short = {
     Platform.getShort(raw.buf, baseOffset + idx * ShortType.defaultSize)
   }
   def getFloatValue(idx: Int): Float = {
     Platform.getFloat(raw.buf, baseOffset + idx * FloatType.defaultSize)
   }
-  def getIntValue(idx: Int): Int = {
-    Platform.getInt(raw.buf, baseOffset + idx * IntegerType.defaultSize)
-  }
-  def getDoubleValue(idx: Int): Double = {
-    Platform.getDouble(raw.buf, baseOffset + idx * DoubleType.defaultSize)
-  }
-  def getLongValue(idx: Int): Long = {
-    Platform.getLong(raw.buf, baseOffset + idx * LongType.defaultSize)
-  }
+
   def getStringValue(idx: Int): UTF8String = {
     //  The byte data format like:
     //    value #1 length (int)
@@ -177,36 +184,36 @@ class BatchColumn {
 
     override def get(ordinal: Int, dataType: DataType): AnyRef = values(ordinal).get(currentIndex)
 
-    override def getBinary(ordinal: Int): Array[Byte] = values(ordinal).getBinaryValue(currentIndex)
-
-    override def getDouble(ordinal: Int): Double = values(ordinal).getDoubleValue(currentIndex)
-
     override def getArray(ordinal: Int): ArrayData =
       throw new NotImplementedError("")
 
-    override def getInterval(ordinal: Int): CalendarInterval =
-      throw new NotImplementedError("")
+    override def getBinary(ordinal: Int): Array[Byte] = values(ordinal).getBinaryValue(currentIndex)
 
-    override def getFloat(ordinal: Int): Float = values(ordinal).getFloatValue(currentIndex)
-
-    override def getLong(ordinal: Int): Long = values(ordinal).getLongValue(currentIndex)
-
-    override def getMap(ordinal: Int): MapData =
-      throw new NotImplementedError("")
+    override def getBoolean(ordinal: Int): Boolean = values(ordinal).getBooleanValue(currentIndex)
 
     override def getByte(ordinal: Int): Byte = values(ordinal).getByteValue(currentIndex)
 
     override def getDecimal(ordinal: Int, precision: Int, scale: Int): Decimal =
       throw new NotImplementedError("")
 
-    override def getBoolean(ordinal: Int): Boolean = values(ordinal).getBooleanValue(currentIndex)
+    override def getDouble(ordinal: Int): Double = values(ordinal).getDoubleValue(currentIndex)
+
+    override def getFloat(ordinal: Int): Float = values(ordinal).getFloatValue(currentIndex)
+
+    override def getInt(ordinal: Int): Int = values(ordinal).getIntValue(currentIndex)
+
+    override def getInterval(ordinal: Int): CalendarInterval =
+      throw new NotImplementedError("")
+
+    override def getLong(ordinal: Int): Long = values(ordinal).getLongValue(currentIndex)
+
+    override def getMap(ordinal: Int): MapData =
+      throw new NotImplementedError("")
 
     override def getShort(ordinal: Int): Short = values(ordinal).getShortValue(currentIndex)
 
     override def getStruct(ordinal: Int, numFields: Int): InternalRow =
       throw new NotImplementedError("")
-
-    override def getInt(ordinal: Int): Int = values(ordinal).getIntValue(currentIndex)
 
     override def isNullAt(ordinal: Int): Boolean = values(ordinal).isNullAt(currentIndex)
   }
