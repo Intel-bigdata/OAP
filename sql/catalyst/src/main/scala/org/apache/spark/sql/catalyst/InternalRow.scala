@@ -20,7 +20,6 @@ package org.apache.spark.sql.catalyst
 import java.sql.Date
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.types.{DateType, DataType, StructType}
 
 /**
