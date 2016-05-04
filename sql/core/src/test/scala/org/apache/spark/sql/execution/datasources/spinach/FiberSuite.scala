@@ -39,7 +39,6 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     new Configuration(),
     new TaskAttemptID(new TaskID(new JobID(), true, 0), 0))
   val ctx: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(attemptContext)
-  val schema = new StructType().add("a", IntegerType).add("b", StringType).add("c", IntegerType)
 
   override def beforeAll(): Unit = {
     file = Utils.createTempDir()
@@ -51,10 +50,10 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   }
 
   test("test reading / writing spinach file") {
-    val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
-      new Configuration(),
-      new TaskAttemptID(new TaskID(new JobID(), true, 0), 0))
-    val ctx: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(attemptContext)
+    val schema = new StructType()
+      .add("a", IntegerType)
+      .add("b", StringType)
+      .add("c", IntegerType)
 
     val recordCount = 3
     val path = new Path(file.getAbsolutePath, "test1")
@@ -68,15 +67,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   }
 
   test("test different data types") {
-    Utils.deleteRecursively(file)
-    path = new Path(StringUtils.unEscapeString(file.toURI.toString) + "1")
-    file.delete()
-
-    val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
-      new Configuration(),
-      new TaskAttemptID(new TaskID(), 1))
-    val ctx: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(attemptContext)
-
+    val childPath = new Path(StringUtils.unEscapeString(file.toURI.toString) + "child1")
     val recordCount = 100
     // TODO, add more data types when other data types implemented. e.g. ArrayType,
     // CalendarIntervalType, DateType, DecimalType, MapType, StructType, TimestampType, etc.
@@ -90,19 +81,19 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       .add("g", LongType)
       .add("h", ShortType)
       .add("i", StringType)
-    writeData(ctx, path, schema, recordCount, attemptContext)
+    writeData(ctx, childPath, schema, recordCount, attemptContext)
     val split = new FileSplit(
-      path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
-    assertData(path, schema, Array(0, 1, 2, 3, 4, 5, 6, 7, 8), split, attemptContext, recordCount)
+      childPath, 0, FileSystem.get(ctx).getFileStatus(childPath).getLen(), Array.empty[String])
+    assertData(childPath, schema, Array(0, 1, 2, 3, 4, 5, 6, 7, 8), split, attemptContext,
+      recordCount)
 
-  }
-
-  // a simple algorithm to check if it's should be null
-  private def shouldBeNull(rowId: Int, fieldId: Int): Boolean = {
-    rowId % (fieldId + 3) == 0
   }
 
   test("test data file meta") {
+    val schema = new StructType()
+      .add("a", IntegerType)
+      .add("b", StringType)
+      .add("c", IntegerType)
     val rowCounts = Array(0, 1023, 1024, 1025)
     val rowCountInLastGroups = Array(0, 1023, 1024, 1)
     val rowGroupCounts = Array(0, 1, 1, 2)
@@ -118,6 +109,11 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       assert(meta.rowCountInLastGroup === rowCountInLastGroups(i))
       assert(meta.rowGroupsMeta.length === rowGroupCounts(i))
     }
+  }
+
+  // a simple algorithm to check if it's should be null
+  private def shouldBeNull(rowId: Int, fieldId: Int): Boolean = {
+    rowId % (fieldId + 3) == 0
   }
 
   def writeData(
