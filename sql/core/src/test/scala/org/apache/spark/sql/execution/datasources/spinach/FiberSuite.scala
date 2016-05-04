@@ -135,7 +135,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
             case (StructField(name, BinaryType, true, _), idx) =>
               row.update(idx, Array[Byte](i.toByte, i.toByte))
             case (StructField(name, BooleanType, true, _), idx) =>
-              val bool = false
+              val bool = if (i % 2 == 0) true else false
               row.setBoolean(idx, bool)
             case (StructField(name, ByteType, true, _), idx) =>
               row.setByte(idx, i.toByte)
@@ -184,8 +184,8 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
             case StructField(name, BinaryType, true, _) =>
               assert(Array[Byte](idx.toByte, idx.toByte) === row.getBinary(outputId))
             case StructField(name, BooleanType, true, _) =>
-              val bool = false
-              assert( bool === row.getBoolean(outputId))
+              val bool = if (idx % 2 == 0) true else false
+              assert(bool === row.getBoolean(outputId))
             case StructField(name, ByteType, true, _) =>
               assert(idx.toByte === row.getByte(outputId))
             case StructField(name, DateType, true, _) =>
