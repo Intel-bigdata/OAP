@@ -129,6 +129,76 @@ private[spinach] case class FixedSizeTypeFiberBuilder(
   }
 }
 
+case class BinaryFiberBuilder(defaultRowGroupRowCount: Int, ordinal: Int) extends FiberBuilder {
+  private val binaryArrs: ArrayBuffer[Array[Byte]] =
+    new ArrayBuffer[Array[Byte]](defaultRowGroupRowCount)
+  private var totalLengthInByte: Int = 0
+
+  override protected def appendInternal(row: InternalRow): Unit = {
+    val binaryData = row.getBinary(ordinal)
+    val copiedBinaryData = new Array[Byte](binaryData.length)
+    binaryData.copyToArray(copiedBinaryData)  // TODO to eliminate the copy
+    totalLengthInByte += copiedBinaryData.length
+    binaryArrs.append(copiedBinaryData)
+  }
+
+  override protected def appendNull(): Unit = {
+    // fill the dummy value
+    binaryArrs.append(null)
+  }
+
+  //  Field                 Size In Byte      Description
+  //  BitStream             (defaultRowGroupRowCount / 8)  TODO to improve the memory usage
+  //  value #1 length       4                 number of bytes for this binary
+  //  value #1 offset       4                 (0 - based to the start of this Fiber Group)
+  //  value #2 length       4
+  //  value #2 offset       4                 (0 - based to the start of this Fiber Group)
+  //  ...
+  //  value #N length       4
+  //  value #N offset       4                 (0 - based to the start of this Fiber Group)
+  //  value #1              value #1 length
+  //  value #2              value #2 length
+  //  ...
+  //  value #N              value #N length
+  override def build(): FiberByteData = {
+    val fiberDataLength =
+      bitStream.toLongArray().length * 8 +  // bit mask length
+        currentRowId * 8 +                  // bit
+        totalLengthInByte
+    val bytes = new Array[Byte](fiberDataLength)
+    fillBitStream(bytes)
+    val basePointerOffset = bitStream.toLongArray().length * 8 + Platform.BYTE_ARRAY_OFFSET
+    var startValueOffset = bitStream.toLongArray().length * 8 + currentRowId * 8
+    var i = 0
+    while (i < binaryArrs.length) {
+      val b = binaryArrs(i)
+      if (b != null) {
+        val valueLengthInByte = b.length
+        // length of value #i
+        Platform.putInt(bytes, basePointerOffset + i * 8, valueLengthInByte)
+        // offset of value #i
+        Platform.putInt(bytes, basePointerOffset + i * 8 + IntegerType.defaultSize,
+          startValueOffset)
+        // copy the string bytes
+        Platform.copyMemory(b, Platform.BYTE_ARRAY_OFFSET, bytes,
+          Platform.BYTE_ARRAY_OFFSET + startValueOffset, valueLengthInByte)
+
+        startValueOffset += valueLengthInByte
+      }
+      i += 1
+    }
+
+    FiberByteData(bytes)
+  }
+
+  override def clear(): Unit = {
+    super.clear()
+    this.binaryArrs.clear()
+    this.totalLengthInByte = 0
+  }
+}
+
+
 case class StringFiberBuilder(defaultRowGroupRowCount: Int, ordinal: Int) extends FiberBuilder {
   private val strings: ArrayBuffer[UTF8String] =
     new ArrayBuffer[UTF8String](defaultRowGroupRowCount)
@@ -199,6 +269,8 @@ case class StringFiberBuilder(defaultRowGroupRowCount: Int, ordinal: Int) extend
 object FiberBuilder {
   def apply(dataType: DataType, ordinal: Int, defaultRowGroupRowCount: Int): FiberBuilder = {
     dataType match {
+      case BinaryType =>
+        new BinaryFiberBuilder(defaultRowGroupRowCount, ordinal)
       case BooleanType =>
         new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, BooleanType)
       case ByteType => new

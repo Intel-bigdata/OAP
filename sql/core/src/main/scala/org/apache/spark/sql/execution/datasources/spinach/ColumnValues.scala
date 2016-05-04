@@ -104,6 +104,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberByteData)
     val offset = getIntValue(idx * 2 + 1)
     UTF8String.fromAddress(raw.buf, Platform.BYTE_ARRAY_OFFSET + offset, length)
   }
+
   def getBinaryValue(idx: Int): Array[Byte] = {
     //  The byte data format like:
     //    value #1 length (int)

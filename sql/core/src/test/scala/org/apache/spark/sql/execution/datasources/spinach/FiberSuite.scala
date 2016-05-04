@@ -81,7 +81,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     // TODO, add more data types when other data types implemented. e.g. ArrayType,
     // CalendarIntervalType, DateType, DecimalType, MapType, StructType, TimestampType, etc.
     val schema = (new StructType)
-//      .add("a", BinaryType)
+      .add("a", BinaryType)
       .add("b", BooleanType)
       .add("c", ByteType)
       .add("d", DoubleType)
@@ -93,7 +93,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     writeData(ctx, path, schema, recordCount, attemptContext)
     val split = new FileSplit(
       path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
-    assertData(path, schema, Array(0, 1, 2, 3, 4, 5, 6, 7), split, attemptContext, recordCount)
+    assertData(path, schema, Array(0, 1, 2, 3, 4, 5, 6, 7, 8), split, attemptContext, recordCount)
 
   }
 
@@ -116,6 +116,8 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
           row.setNullAt(entry._2)
         } else {
           entry match {
+            case (StructField(name, BinaryType, true, _), idx) =>
+              row.update(idx, Array[Byte](i.toByte, i.toByte))
             case (StructField(name, BooleanType, true, _), idx) =>
               val bool = false
               row.setBoolean(idx, bool)
@@ -161,6 +163,8 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
           assert(row.isNullAt(outputId))
         } else {
           schema(fid) match {
+            case StructField(name, BinaryType, true, _) =>
+              assert(Array[Byte](idx.toByte, idx.toByte) === row.getBinary(outputId))
             case StructField(name, BooleanType, true, _) =>
               val bool = false
               assert( bool === row.getBoolean(outputId))
