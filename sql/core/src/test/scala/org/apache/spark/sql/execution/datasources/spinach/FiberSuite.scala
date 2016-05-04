@@ -35,7 +35,11 @@ import org.scalatest.BeforeAndAfterAll
 
 class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   private var file: File = null
-  var path: Path = _
+  val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
+    new Configuration(),
+    new TaskAttemptID(new TaskID(new JobID(), true, 0), 0))
+  val ctx: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(attemptContext)
+  val schema = new StructType().add("a", IntegerType).add("b", StringType).add("c", IntegerType)
 
   override def beforeAll(): Unit = {
     file = Utils.createTempDir()
@@ -47,17 +51,13 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   }
 
   test("test reading / writing spinach file") {
-    path = new Path(StringUtils.unEscapeString(file.toURI.toString))
     val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
       new Configuration(),
       new TaskAttemptID(new TaskID(new JobID(), true, 0), 0))
     val ctx: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(attemptContext)
 
     val recordCount = 3
-    val schema = (new StructType)
-      .add("a", IntegerType)
-      .add("b", StringType)
-      .add("c", IntegerType)
+    val path = new Path(file.getAbsolutePath, "test1")
     writeData(ctx, path, schema, recordCount, attemptContext)
     val split = new FileSplit(
       path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
@@ -100,6 +100,24 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   // a simple algorithm to check if it's should be null
   private def shouldBeNull(rowId: Int, fieldId: Int): Boolean = {
     rowId % (fieldId + 3) == 0
+  }
+
+  test("test data file meta") {
+    val rowCounts = Array(0, 1023, 1024, 1025)
+    val rowCountInLastGroups = Array(0, 1023, 1024, 1)
+    val rowGroupCounts = Array(0, 1, 1, 2)
+    for (i <- 0 until rowCounts.length) {
+      val path = new Path(file.getAbsolutePath, rowCounts(i).toString)
+      writeData(ctx, path, schema, rowCounts(i), attemptContext)
+      val reader = new SpinachDataReader2(path, schema, Array(0, 1))
+      val split = new FileSplit(
+        path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
+      reader.initialize(split, attemptContext)
+      val meta = reader.dataFileMeta
+      assert(meta.totalRowCount() === rowCounts(i))
+      assert(meta.rowCountInLastGroup === rowCountInLastGroups(i))
+      assert(meta.rowGroupsMeta.length === rowGroupCounts(i))
+    }
   }
 
   def writeData(

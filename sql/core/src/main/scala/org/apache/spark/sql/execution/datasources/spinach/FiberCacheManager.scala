@@ -176,7 +176,7 @@ private[spinach] case class DataFileScanner(
 
     is.synchronized {
       is.seek(fiberStart)
-      is.read(bytes)
+      is.readFully(bytes)
     }
     new FiberByteData(bytes)
   }
