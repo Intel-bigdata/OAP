@@ -81,7 +81,7 @@ private[spinach] class SpinachDataWriter2(
     fiberMeta
       .withGroupCount(rowGroupCount)
       .withRowCountInLastGroup(
-        if (remainingRowCount != 0) remainingRowCount else DEFAULT_ROW_GROUP_SIZE)
+        if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else DEFAULT_ROW_GROUP_SIZE)
 
     fiberMeta.write(out)
     out.close()
@@ -97,13 +97,14 @@ private[spinach] class SpinachDataReader2(
   private var currentRowId: Int = 0
   private var currentRowIter: Iterator[InternalRow] = _
   private var currentRow: InternalRow = _
+  var dataFileMeta: DataFileMeta = _
 
   override def initialize(split: InputSplit, context: TaskAttemptContext): Unit = {
     // TODO how to save the additional FS operation to get the Split size
     val scanner = DataFileScanner(path.toString, schema, context)
-    val meta = DataMetaCacheManager(scanner)
+    dataFileMeta = DataMetaCacheManager(scanner)
 
-    totalRowCount = meta.totalRowCount()
+    totalRowCount = dataFileMeta.totalRowCount()
     currentRowIter = scanner.iterator(requiredIds)
   }
 
