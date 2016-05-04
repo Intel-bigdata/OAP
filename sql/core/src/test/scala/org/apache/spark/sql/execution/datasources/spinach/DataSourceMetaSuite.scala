@@ -21,6 +21,7 @@ import java.io.File
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Descending}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.sql.test.SharedSQLContext
@@ -28,7 +29,7 @@ import org.apache.spark.util.Utils
 import org.scalatest.BeforeAndAfter
 
 class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
-
+  import testImplicits._
   private var tmpDir: File = null
 
   override def beforeAll(): Unit = {
@@ -63,10 +64,10 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
   test("read Spinach Meta") {
     val path = new Path(
-      new File(tmpDir.getAbsolutePath, "spinach.meta").getAbsolutePath)
+      new File(tmpDir.getAbsolutePath, "testSpinach.meta").getAbsolutePath)
     writeMetaFile(path)
 
-    val spinachMeta = DataSourceMeta.initialize2(path, new Configuration())
+    val spinachMeta = DataSourceMeta.initialize(path, new Configuration())
     val fileHeader = spinachMeta.fileHeader
     assert(fileHeader.recordCount === 100)
     assert(fileHeader.dataFileCount === 2)
@@ -108,7 +109,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       new File(tmpDir.getAbsolutePath, "emptySpinach.meta").getAbsolutePath)
     DataSourceMeta.write(path, new Configuration(), DataSourceMeta.newBuilder().build())
 
-    val spinachMeta = DataSourceMeta.initialize2(path, new Configuration())
+    val spinachMeta = DataSourceMeta.initialize(path, new Configuration())
     val fileHeader = spinachMeta.fileHeader
     assert(fileHeader.recordCount === 0)
     assert(fileHeader.dataFileCount === 0)
@@ -117,5 +118,29 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(spinachMeta.fileMetas.length === 0)
     assert(spinachMeta.indexMetas.length === 0)
     assert(spinachMeta.schema.length === 0)
+  }
+
+  test("Spinach Meta integration test") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i + 100, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("spn").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+
+    val path = new Path(
+      new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)
+    val spinachMeta = DataSourceMeta.initialize(path, new Configuration())
+
+    val fileHeader = spinachMeta.fileHeader
+    assert(fileHeader.recordCount === 100)
+    assert(fileHeader.dataFileCount === 3)
+    assert(fileHeader.indexCount === 0)
+
+    val fileMetas = spinachMeta.fileMetas
+    assert(fileMetas.length === 3)
+    assert(fileMetas.map(_.recordCount).sum === 100)
+    assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+
+    assert(spinachMeta.schema === new StructType()
+      .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
   }
 }

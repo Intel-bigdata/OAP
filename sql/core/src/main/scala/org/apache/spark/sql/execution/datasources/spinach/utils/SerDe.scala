@@ -15,20 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.spark.executor
+package org.apache.spark.sql.execution.datasources.spinach.utils
 
-import org.apache.spark._
-
-/**
- * User can extends the Trait to implement method `status`, after that, user can add a
- * configuration of `spark.executor.customInfoClass` to identify the class that user defined.
- */
-trait CustomManager {
-  /**
-   * get the status for users long run service, the status' format is a string which includes
-   * all infos. The string can be a Json string.
-   * @param conf take SparkConf as input for user to handle
-   * @return
-   */
-  def status(conf: SparkConf): String
+private[spinach] trait SerDe[S, D] {
+  def serialize(obj: D): S
+  def deserialize(obj: S): D
 }

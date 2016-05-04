@@ -36,7 +36,6 @@ import org.apache.spark.sql.sources.{HadoopFsRelation, OutputWriter, OutputWrite
 import org.apache.spark.sql.types.{StructType, StringType}
 import org.apache.spark.util.SerializableConfiguration
 
-
 private[sql] abstract class BaseWriterContainer(
     @transient val relation: HadoopFsRelation,
     @transient private val job: Job,
@@ -81,7 +80,7 @@ private[sql] abstract class BaseWriterContainer(
 
   private var outputFormatClass: Class[_ <: OutputFormat[_, _]] = _
 
-  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): Unit
+  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): WriteResult
 
   def driverSideSetup(): Unit = {
     setupIDs(0, 0, 0)
@@ -226,7 +225,7 @@ private[sql] abstract class BaseWriterContainer(
     logError(s"Task attempt $taskAttemptId aborted.")
   }
 
-  def commitJob(): Unit = {
+  def commitJob(writeResults: Array[WriteResult]): Unit = {
     outputCommitter.commitJob(jobContext)
     logInfo(s"Job $jobId committed.")
   }
@@ -248,7 +247,7 @@ private[sql] class DefaultWriterContainer(
     isAppend: Boolean)
   extends BaseWriterContainer(relation, job, isAppend) {
 
-  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): Unit = {
+  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): WriteResult = {
     executorSideSetup(taskContext)
     val configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(taskAttemptContext)
     configuration.set("spark.sql.sources.output.path", outputPath)
@@ -317,7 +316,7 @@ private[sql] class DynamicPartitionWriterContainer(
     isAppend: Boolean)
   extends BaseWriterContainer(relation, job, isAppend) {
 
-  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): Unit = {
+  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): WriteResult = {
     val outputWriters = new java.util.HashMap[InternalRow, OutputWriter]
     executorSideSetup(taskContext)
 

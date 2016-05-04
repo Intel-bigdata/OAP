@@ -20,42 +20,106 @@ package org.apache.spark.sql.execution.datasources.spinach
 import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.mapreduce.Job
-import org.apache.spark.TaskContext
+import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.deploy.SparkHadoopUtil
+import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.DefaultWriterContainer
+import org.apache.spark.sql.execution.datasources.{DefaultWriterContainer}
 import org.apache.spark.sql.types.StructType
+
+private[spinach] case class SpinachWriteResult(fileName: String, rowsWritten: Int)
 
 private[spinach] class NonDynamicPartitionWriteContainer(
   relation: SpinachRelation,
   @transient job: Job,
   isAppend: Boolean,
   schema: StructType) extends DefaultWriterContainer(relation, job, isAppend) {
-  override def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): Unit = {
+  override def writeRows(
+      taskContext: TaskContext,
+      iterator: Iterator[InternalRow]): SpinachWriteResult = {
     // TODO if we need to wrap the row group
-    super.writeRows(taskContext, iterator)
+    executorSideSetup(taskContext)
+    val configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(taskAttemptContext)
+    configuration.set("spark.sql.sources.output.path", outputPath)
+    val writer = newOutputWriter(getWorkPath)
+
+    writer.initConverter(dataSchema)
+
+    var rowsWritten = 0
+    var writerClosed = false
+
+    val outputFileName = writer match {
+      case s: SpinachOutputWriter => s.getFileName()
+      case _ => throw new SparkException("Incorrect Spinach output writer.")
+    }
+
+    // If anything below fails, we should abort the task.
+    try {
+      while (iterator.hasNext) {
+        val internalRow = iterator.next()
+        writer.writeInternal(internalRow)
+        rowsWritten += 1
+      }
+      commitTask()
+    } catch {
+      case cause: Throwable =>
+        logError("Aborting task.", cause)
+        abortTask()
+        throw new SparkException("Task failed while writing rows.", cause)
+    }
+
+    def commitTask(): Unit = {
+      try {
+        assert(writer != null, "OutputWriter instance should have been initialized")
+        if (!writerClosed) {
+          writer.close()
+          writerClosed = true
+        }
+        super.commitTask()
+      } catch {
+        case cause: Throwable =>
+          // This exception will be handled in `InsertIntoHadoopFsRelation.insert$writeRows`, and
+          // will cause `abortTask()` to be invoked.
+          throw new RuntimeException("Failed to commit task", cause)
+      }
+    }
+
+    def abortTask(): Unit = {
+      try {
+        if (!writerClosed) {
+          writer.close()
+          writerClosed = true
+        }
+      } finally {
+        super.abortTask()
+      }
+    }
+
+    SpinachWriteResult(outputFileName, rowsWritten)
   }
 
-  override def commitJob(): Unit = {
+  override def commitJob(writeResults: Array[WriteResult]): Unit = {
     val conf = SparkHadoopUtil.get.getConfigurationFromJobContext(job)
     val outputRoot = FileOutputFormat.getOutputPath(job)
-    val fileOut: FSDataOutputStream =
-      outputRoot.getFileSystem(conf).create(
-        new Path(outputRoot, SpinachFileFormat.SPINACH_META_FILE), false)
+    val path = new Path(outputRoot, SpinachFileFormat.SPINACH_META_FILE)
+    val fileOut: FSDataOutputStream = outputRoot.getFileSystem(conf).create(path, false)
 
-    writeMeta(fileOut) // write the meta data
+    val builder = DataSourceMeta.newBuilder()
+    writeResults.foreach {
+      // The file fingerprint is not used at the moment.
+      case s: SpinachWriteResult => builder.addFileMeta(FileMeta("", s.rowsWritten, s.fileName))
+      case _ => throw new SparkException("Unexpected Spinach write result.")
+    }
+
+    val spinachMeta = builder.withNewSchema(schema).build()
+    DataSourceMeta.write(path, relation.sqlContext.sparkContext.hadoopConfiguration, spinachMeta)
 
     fileOut.close()
-    // TODO write the meta data
-    super.commitJob()
+    super.commitJob(writeResults)
   }
 
   override def abortJob(): Unit = {
     // TODO do some clean up.
     super.abortJob()
-  }
-
-  private def writeMeta(metaFSOut: FSDataOutputStream): Unit = {
-    metaFSOut.writeUTF(schema.json)
   }
 }

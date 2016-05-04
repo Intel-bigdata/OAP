@@ -44,9 +44,6 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
 
   override def afterAll(): Unit = {
     Utils.deleteRecursively(file)
-    FiberCacheManager.cache.cleanUp()
-    FiberDataFileHandler.cache.cleanUp()
-    DataMetaCacheManager.cache.cleanUp()
   }
 
   test("test reading / writing spinach file") {
@@ -74,9 +71,6 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     Utils.deleteRecursively(file)
     path = new Path(StringUtils.unEscapeString(file.toURI.toString) + "1")
     file.delete()
-    FiberCacheManager.cache.cleanUp()
-    FiberDataFileHandler.cache.cleanUp()
-    DataMetaCacheManager.cache.cleanUp()
 
     val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
       new Configuration(),
