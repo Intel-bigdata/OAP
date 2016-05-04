@@ -140,7 +140,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
             case (StructField(name, ByteType, true, _), idx) =>
               row.setByte(idx, i.toByte)
             case (StructField(name, DateType, true, _), idx) =>
-              row.setInt(idx, i)  // use setInt because we get Date as Int
+              row.setInt(idx, i)
             case (StructField(name, DoubleType, true, _), idx) =>
               row.setDouble(idx, i.toDouble / 3)
             case (StructField(name, FloatType, true, _), idx) =>
@@ -189,7 +189,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
             case StructField(name, ByteType, true, _) =>
               assert(idx.toByte === row.getByte(outputId))
             case StructField(name, DateType, true, _) =>
-              assert(idx === row.getInt(outputId))
+              assert(DateTimeUtils.toJavaDate(idx) === row.getDate(outputId))
             case StructField(name, DoubleType, true, _) =>
               assert(idx.toDouble / 3 === row.getDouble(outputId))
             case StructField(name, FloatType, true, _) =>

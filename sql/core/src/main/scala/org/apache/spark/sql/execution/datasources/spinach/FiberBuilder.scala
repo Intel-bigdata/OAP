@@ -91,7 +91,7 @@ private[spinach] case class FixedSizeTypeFiberBuilder(
           row.getByte(ordinal))
       case DateType =>
         Platform.putInt(bytes, baseOffset + currentRowId * typeDefaultSize,
-          row.getInt(ordinal))  // treat DateType as an Int
+          row.get(ordinal, DateType).asInstanceOf[Int])
       case DoubleType =>
         Platform.putDouble(bytes, baseOffset + currentRowId * typeDefaultSize,
           row.getDouble(ordinal))
@@ -132,7 +132,9 @@ private[spinach] case class FixedSizeTypeFiberBuilder(
   }
 }
 
-case class BinaryFiberBuilder(defaultRowGroupRowCount: Int, ordinal: Int) extends FiberBuilder {
+private[spinach] case class BinaryFiberBuilder(
+    defaultRowGroupRowCount: Int,
+    ordinal: Int) extends FiberBuilder {
   private val binaryArrs: ArrayBuffer[Array[Byte]] =
     new ArrayBuffer[Array[Byte]](defaultRowGroupRowCount)
   private var totalLengthInByte: Int = 0
@@ -202,7 +204,9 @@ case class BinaryFiberBuilder(defaultRowGroupRowCount: Int, ordinal: Int) extend
 }
 
 
-case class StringFiberBuilder(defaultRowGroupRowCount: Int, ordinal: Int) extends FiberBuilder {
+private[spinach] case class StringFiberBuilder(
+    defaultRowGroupRowCount: Int,
+    ordinal: Int) extends FiberBuilder {
   private val strings: ArrayBuffer[UTF8String] =
     new ArrayBuffer[UTF8String](defaultRowGroupRowCount)
   private var totalStringDataLengthInByte: Int = 0
