@@ -17,10 +17,8 @@
 
 package org.apache.spark.sql.catalyst
 
-import java.sql.Date
-
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.types.{DateType, DataType, StructType}
+import org.apache.spark.sql.types.{DataType, StructType}
 
 /**
  * An abstract class for row used internal in Spark SQL, which only contain the columns as
@@ -32,8 +30,6 @@ abstract class InternalRow extends SpecializedGetters with Serializable {
 
   // This is only use for test and will throw a null pointer exception if the position is null.
   def getString(ordinal: Int): String = getUTF8String(ordinal).toString
-
-  def getDate(ordinal: Int): Date = get(ordinal, DateType).asInstanceOf[Date]
 
   /**
    * Make a copy of the current [[InternalRow]] object.

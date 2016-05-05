@@ -30,13 +30,12 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   override def beforeEach(): Unit = {
     val path = Utils.createTempDir().getAbsolutePath
-    val path1 = Utils.createTempDir().getAbsolutePath + "test1"
     sql(s"""CREATE TEMPORARY TABLE spinach_test (a INT, b STRING)
            | USING org.apache.spark.sql.execution.datasources.spinach
            | OPTIONS (path '$path')""".stripMargin)
     sql(s"""CREATE TEMPORARY TABLE spinach_test_date (a INT, b DATE)
            | USING org.apache.spark.sql.execution.datasources.spinach
-           | OPTIONS (path '$path1')""".stripMargin)
+           | OPTIONS (path '$path')""".stripMargin)
   }
 
   override def afterEach(): Unit = {

@@ -52,7 +52,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberCacheData
     case BinaryType => getBinaryValue(idx)
     case BooleanType => new java.lang.Boolean(getBooleanValue(idx))
     case ByteType => new java.lang.Byte(getByteValue(idx))
-    case DateType => getDateValue(idx)
+    case DateType => new Integer(getDateValue(idx))
     case DoubleType => new java.lang.Double(getDoubleValue(idx))
     case FloatType => new java.lang.Float(getFloatValue(idx))
     case IntegerType => new Integer(getIntValue(idx))
@@ -74,9 +74,8 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberCacheData
   def getByteValue(idx: Int): Byte = {
     Platform.getByte(baseObject, baseOffset + idx * ByteType.defaultSize)
   }
-  def getDateValue(idx: Int): Date = {
-    val date = Platform.getInt(baseObject, baseOffset + idx * IntegerType.defaultSize)
-    DateTimeUtils.toJavaDate(date)
+  def getDateValue(idx: Int): Int = {
+    Platform.getInt(baseObject, baseOffset + idx * IntegerType.defaultSize)
   }
   def getDoubleValue(idx: Int): Double = {
     Platform.getDouble(baseObject, baseOffset + idx * DoubleType.defaultSize)

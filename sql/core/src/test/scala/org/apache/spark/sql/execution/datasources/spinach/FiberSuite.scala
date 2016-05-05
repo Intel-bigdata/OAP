@@ -71,7 +71,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     val childPath = new Path(file.getAbsolutePath + "test2")
     val recordCount = 100
     // TODO, add more data types when other data types implemented. e.g. ArrayType,
-    // CalendarIntervalType, DateType, DecimalType, MapType, StructType, TimestampType, etc.
+    // CalendarIntervalType, DecimalType, MapType, StructType, TimestampType, etc.
     val schema = (new StructType)
       .add("a", BinaryType)
       .add("b", BooleanType)
@@ -189,7 +189,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
             case StructField(name, ByteType, true, _) =>
               assert(idx.toByte === row.getByte(outputId))
             case StructField(name, DateType, true, _) =>
-              assert(DateTimeUtils.toJavaDate(idx) === row.getDate(outputId))
+              assert(idx === row.getInt(outputId))
             case StructField(name, DoubleType, true, _) =>
               assert(idx.toDouble / 3 === row.getDouble(outputId))
             case StructField(name, FloatType, true, _) =>
