@@ -17,11 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.sql.Date
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
-import org.apache.spark.sql.catalyst.util.{DateTimeUtils, ArrayData, MapData}
+import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
@@ -48,16 +46,16 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberCacheData
 
   def isNullAt(idx: Int): Boolean = !bitset.get(idx)
 
-  def get(idx: Int): AnyRef = dataType match {
+  def genericGet(idx: Int): Any = dataType match {
     case BinaryType => getBinaryValue(idx)
-    case BooleanType => new java.lang.Boolean(getBooleanValue(idx))
-    case ByteType => new java.lang.Byte(getByteValue(idx))
-    case DateType => new Integer(getDateValue(idx))
-    case DoubleType => new java.lang.Double(getDoubleValue(idx))
-    case FloatType => new java.lang.Float(getFloatValue(idx))
-    case IntegerType => new Integer(getIntValue(idx))
-    case LongType => new java.lang.Long(getLongValue(idx))
-    case ShortType => new java.lang.Short(getShortValue(idx))
+    case BooleanType => getBooleanValue(idx)
+    case ByteType => getByteValue(idx)
+    case DateType => getDateValue(idx)
+    case DoubleType => getDoubleValue(idx)
+    case FloatType => getFloatValue(idx)
+    case IntegerType => getIntValue(idx)
+    case LongType => getLongValue(idx)
+    case ShortType => getShortValue(idx)
     case StringType => getStringValue(idx)
     case _: ArrayType => throw new NotImplementedError(s"Array")
     case CalendarIntervalType => throw new NotImplementedError(s"CalendarInterval")
@@ -67,6 +65,9 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberCacheData
     case TimestampType => throw new NotImplementedError(s"Timestamp")
     case other => throw new NotImplementedError(s"other")
   }
+
+  def getAs[T](idx: Int): T = genericGet(idx).asInstanceOf[T]
+  def get(idx: Int): AnyRef = getAs(idx)
 
   def getBooleanValue(idx: Int): Boolean = {
     Platform.getBoolean(baseObject, baseOffset + idx * BooleanType.defaultSize)
