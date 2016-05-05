@@ -68,7 +68,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   }
 
   test("test different data types") {
-    val childPath = new Path(StringUtils.unEscapeString(file.toURI.toString) + "child1")
+    val childPath = new Path(file.getAbsolutePath + "test2")
     val recordCount = 100
     // TODO, add more data types when other data types implemented. e.g. ArrayType,
     // CalendarIntervalType, DateType, DecimalType, MapType, StructType, TimestampType, etc.
