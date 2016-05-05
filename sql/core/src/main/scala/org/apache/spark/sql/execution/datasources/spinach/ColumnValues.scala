@@ -46,7 +46,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberCacheData
 
   def isNullAt(idx: Int): Boolean = !bitset.get(idx)
 
-  def genericGet(idx: Int): Any = dataType match {
+  private def genericGet(idx: Int): Any = dataType match {
     case BinaryType => getBinaryValue(idx)
     case BooleanType => getBooleanValue(idx)
     case ByteType => getByteValue(idx)
@@ -66,7 +66,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberCacheData
     case other => throw new NotImplementedError(s"other")
   }
 
-  def getAs[T](idx: Int): T = genericGet(idx).asInstanceOf[T]
+  private def getAs[T](idx: Int): T = genericGet(idx).asInstanceOf[T]
   def get(idx: Int): AnyRef = getAs(idx)
 
   def getBooleanValue(idx: Int): Boolean = {
