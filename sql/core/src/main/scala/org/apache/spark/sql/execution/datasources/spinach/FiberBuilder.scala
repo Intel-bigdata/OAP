@@ -25,6 +25,11 @@ import org.apache.spark.util.collection.BitSet
 
 import scala.collection.mutable.ArrayBuffer
 
+/**
+  * Used to build fiber on-heap
+  */
+case class FiberByteData(fiberData: Array[Byte])
+
 private[spinach] trait FiberBuilder {
   def defaultRowGroupRowCount: Int
   def ordinal: Int

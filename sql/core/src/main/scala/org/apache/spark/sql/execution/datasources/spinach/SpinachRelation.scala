@@ -79,17 +79,21 @@ private[spinach] class SpinachRelation(
     status.getPath.getName.endsWith(SpinachFileFormat.SPINACH_META_FILE)
   }.toArray
 
-  private lazy val meta: DataSourceMeta = {
-    assert(_metaPaths.length > 0,
-      """At least one spinach metadata will be found, normally it's named "spinach.meta".""")
-
-    // TODO verify all of the schema from the meta data
-    DataSourceMeta.initialize(
-      _metaPaths(0).getPath,
-      sqlContext.sparkContext.hadoopConfiguration)
+  private lazy val meta: Option[DataSourceMeta] = {
+    if (_metaPaths.isEmpty) {
+      None
+    } else {
+      // TODO verify all of the schema from the meta data
+      Some(DataSourceMeta.initialize(
+        _metaPaths(0).getPath,
+        sqlContext.sparkContext.hadoopConfiguration))
+    }
   }
 
-  override val dataSchema: StructType = maybeDataSchema.getOrElse(meta.schema)
+  override val dataSchema: StructType = maybeDataSchema.getOrElse(
+    meta.map(_.schema)
+      .getOrElse(
+        throw new IllegalStateException("Cannot get the meta info from file spinach.meta")))
 
   override def needConversion: Boolean = false
 
@@ -120,7 +124,12 @@ private[spinach] class SpinachRelation(
     // get the data path from the given paths
     // TODO get the index file from the given paths
 
-    SpinachTableScan(meta, this, filters, requiredColumns, inputPaths, broadcastedConf).execute()
+    meta match {
+      case Some(mt) =>
+        SpinachTableScan(mt, this, filters, requiredColumns, inputPaths, broadcastedConf).execute()
+      case None =>
+        sqlContext.sparkContext.emptyRDD[InternalRow]
+    }
   }
 
   // currently we don't support any filtering.

@@ -59,10 +59,10 @@ private[spinach] class SpinachDataWriter2(
 
     rowGroupMeta.withNewStart(out.getPos).withNewFiberLens(fiberLens)
     while (idx < rowGroup.length) {
-      val fiberData = rowGroup(idx).build()
-      totalDataSize += fiberData.buf.length
-      fiberLens(idx) = fiberData.buf.length
-      out.write(fiberData.buf)
+      val fiberByteData = rowGroup(idx).build()
+      totalDataSize += fiberByteData.fiberData.length
+      fiberLens(idx) = fiberByteData.fiberData.length
+      out.write(fiberByteData.fiberData)
       rowGroup(idx).clear()
       idx += 1
     }

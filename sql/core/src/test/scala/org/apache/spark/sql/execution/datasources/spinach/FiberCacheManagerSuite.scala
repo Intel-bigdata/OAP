@@ -31,7 +31,7 @@ class FiberCacheManagerSuite extends SparkFunSuite with Logging {
 
   test("test getting right status") {
     object testFiberManager extends AbstractFiberCacheManger {
-      override def fiber2Data(key: Fiber): FiberByteData = FiberByteData(new Array[Byte](100))
+      override def fiber2Data(key: Fiber): FiberCacheData = MemoryManager.allocate(100)
     }
     val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
       new Configuration(),
