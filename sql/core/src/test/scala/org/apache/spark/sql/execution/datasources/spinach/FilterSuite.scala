@@ -17,6 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import java.sql.Date
+
+import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
@@ -27,13 +30,18 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   override def beforeEach(): Unit = {
     val path = Utils.createTempDir().getAbsolutePath
+    val path1 = Utils.createTempDir().getAbsolutePath + "test1"
     sql(s"""CREATE TEMPORARY TABLE spinach_test (a INT, b STRING)
            | USING org.apache.spark.sql.execution.datasources.spinach
            | OPTIONS (path '$path')""".stripMargin)
+    sql(s"""CREATE TEMPORARY TABLE spinach_test_date (a INT, b DATE)
+           | USING org.apache.spark.sql.execution.datasources.spinach
+           | OPTIONS (path '$path1')""".stripMargin)
   }
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("spinach_test")
+    sqlContext.dropTempTable("spinach_test_date")
   }
 
   test("empty table") {
@@ -45,5 +53,12 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test as select * from t")
     checkAnswer(sql("SELECT * FROM spinach_test"), data.map { row => Row(row._1, row._2) })
+  }
+
+  test("test date type") {
+    val data: Seq[(Int, Date)] = (1 to 3000).map { i => (i, DateTimeUtils.toJavaDate(i)) }
+    data.toDF("key", "value").registerTempTable("d")
+    sql("insert overwrite table spinach_test_date as select * from d")
+    checkAnswer(sql("SELECT * FROM spinach_test_date"), data.map {row => Row(row._1, row._2)})
   }
 }
