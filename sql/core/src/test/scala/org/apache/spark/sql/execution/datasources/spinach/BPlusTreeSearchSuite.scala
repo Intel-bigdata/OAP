@@ -112,84 +112,86 @@ private[spinach] class BPlusTreeSearchSuite
 
   test("equal 11") {
     val filters: Array[Filter] = Array(EqualTo("test", 11))
-    assertScanner(meta, filters, None, Set.empty[Int])
+    assertScanner(meta, filters, Array(), Set.empty[Int])
   }
 
   test("equal 10") {
     val filters: Array[Filter] = Array(EqualTo("test", 10))
-    assertScanner(meta, filters, None, Set(100))
+    assertScanner(meta, filters, Array(), Set(100))
   }
 
   test("> 15") {
     val filters: Array[Filter] = Array(GreaterThan("test", 15))
-    assertScanner(meta, filters, None, Set(160, 161, 162, 170, 171, 180))
+    assertScanner(meta, filters, Array(), Set(160, 161, 162, 170, 171, 180))
   }
 
   test(">= 15") {
     val filters: Array[Filter] = Array(GreaterThanOrEqual("test", 15))
-    assertScanner(meta, filters, None, Set(150, 160, 161, 162, 170, 171, 180))
+    assertScanner(meta, filters, Array(), Set(150, 160, 161, 162, 170, 171, 180))
   }
 
   test("< 5") {
     val filters: Array[Filter] = Array(LessThan("test", 5))
-    assertScanner(meta, filters, None, Set(30, 31, 32, 40, 41))
+    assertScanner(meta, filters, Array(), Set(30, 31, 32, 40, 41))
   }
 
   test("<= 5") {
     val filters: Array[Filter] = Array(LessThanOrEqual("test", 5))
-    assertScanner(meta, filters, None, Set(30, 31, 32, 40, 41, 50))
+    assertScanner(meta, filters, Array(), Set(30, 31, 32, 40, 41, 50))
   }
 
   test("< 10 & > 5") {
     val filters: Array[Filter] = Array(LessThan("test", 10), GreaterThan("test", 5))
-    assertScanner(meta, filters, None, Set(80, 81, 82, 90, 91))
+    assertScanner(meta, filters, Array(), Set(80, 81, 82, 90, 91))
   }
 
   test("> 5 & < 10") {
     val filters: Array[Filter] = Array(GreaterThan("test", 5), LessThan("test", 10))
-    assertScanner(meta, filters, None, Set(80, 81, 82, 90, 91))
+    assertScanner(meta, filters, Array(), Set(80, 81, 82, 90, 91))
   }
 
   test("< 10 & >= 5") {
     val filters: Array[Filter] = Array(LessThan("test", 10), GreaterThanOrEqual("test", 5))
-    assertScanner(meta, filters, None, Set(50, 80, 81, 82, 90, 91))
+    assertScanner(meta, filters, Array(), Set(50, 80, 81, 82, 90, 91))
   }
 
   test(">= 5 & < 10") {
     val filters: Array[Filter] = Array(GreaterThanOrEqual("test", 5), LessThan("test", 10))
-    assertScanner(meta, filters, None, Set(50, 80, 81, 82, 90, 91))
+    assertScanner(meta, filters, Array(), Set(50, 80, 81, 82, 90, 91))
   }
 
   test("<= 10 & >= 5") {
     val filters: Array[Filter] = Array(LessThanOrEqual("test", 10), GreaterThanOrEqual("test", 5))
-    assertScanner(meta, filters, None, Set(50, 80, 81, 82, 90, 91, 100))
+    assertScanner(meta, filters, Array(), Set(50, 80, 81, 82, 90, 91, 100))
   }
 
   test(">= 5 & <= 10") {
     val filters: Array[Filter] = Array(GreaterThanOrEqual("test", 5), LessThanOrEqual("test", 10))
-    assertScanner(meta, filters, None, Set(50, 80, 81, 82, 90, 91, 100))
+    assertScanner(meta, filters, Array(), Set(50, 80, 81, 82, 90, 91, 100))
   }
 
-  test("test fake") {
+  test("fake > 'abc' & >= 10 & <= 5") {
+    val fake = GreaterThan("fake", "abc")
     val filters: Array[Filter] = Array(
       LessThanOrEqual("test", 10),
-      GreaterThanOrEqual("test", 5),
-      GreaterThan("fake", "abc"))
+      fake,
+      GreaterThanOrEqual("test", 5))
+    assertScanner(meta, filters, Array(fake), Set(50, 80, 81, 82, 90, 91, 100))
   }
 
   test(">= 10 & <= 5") {
     val filters: Array[Filter] = Array(LessThanOrEqual("test", 5), GreaterThanOrEqual("test", 10))
-    assertScanner(meta, filters, None, Set())
+    assertScanner(meta, filters, Array(), Set())
   }
 
   private def assertScanner(
       meta: DataSourceMeta,
       filters: Array[Filter],
-      expectedUnHandleredFilter: Option[Filter],
+      expectedUnHandleredFilter: Array[Filter],
       expectedIds: Set[Int]): Unit = {
     val ic = new IndexContext(meta)
     val unHandledFilters = new BPlusTreeSearch(filters).unHandledFilter(ic)
-    assert(unHandledFilters === expectedUnHandleredFilter)
+    assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
     ic.getScannerBuilder match {
       case Some(scanner) =>
         assert(scanner.build.initialize(attemptContext).toSet === expectedIds, "")

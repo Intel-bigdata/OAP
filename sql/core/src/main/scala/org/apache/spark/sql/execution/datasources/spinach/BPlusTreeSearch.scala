@@ -20,8 +20,7 @@ package org.apache.spark.sql.execution.datasources.spinach
 import org.apache.hadoop.mapreduce.TaskAttemptContext
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Ascending, SortDirection, SortOrder}
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.catalyst.expressions.{Ascending, InterpretedOrdering, SortDirection}
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
 
@@ -478,7 +477,8 @@ private[spinach] object ScannerBuilder {
   def apply(fields: Seq[StructField], meta: IndexMeta, dirs: Seq[SortDirection])
   : ScannerBuilder = {
     // TODO default we use the Ascending order
-    val ordering = GenerateOrdering.create(StructType(fields))
+    // val ordering = GenerateOrdering.create(StructType(fields))
+    val ordering: Ordering[Key] = InterpretedOrdering.forSchema(fields.map(_.dataType))
 
     new ScannerBuilder(meta, ordering)
   }
@@ -498,19 +498,26 @@ private[spinach] object ScannerBuilder {
 
 // TODO currently only a single attribute index supported.
 private[spinach] class IndexContext(meta: DataSourceMeta) {
-  private val map = new mutable.HashMap[String, Option[ScannerBuilder]]()
+  private val map = new mutable.HashMap[String, ScannerBuilder]()
   def getScannerBuilder: Option[ScannerBuilder] = {
     if (map.size == 0) {
       None
     } else if (map.size == 1) {
-      map.iterator.next()._2
+      Some(map.iterator.next()._2)
     } else {
       throw new UnsupportedOperationException("currently only a single index supported")
     }
   }
 
-  def unapply(attribute: String): Option[ScannerBuilder] =
-    map.getOrElseUpdate(attribute, findIndexer(attribute))
+  def unapply(attribute: String): Option[ScannerBuilder] = {
+    if (!map.contains(attribute)) {
+      findIndexer(attribute) match {
+        case Some(scanner) => map.update(attribute, scanner)
+        case None =>
+      }
+    }
+    map.get(attribute)
+  }
 
   def unapply(value: Any): Option[Key] = Some(InternalRow(value))
 
@@ -524,10 +531,10 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
           assert(dir == Ascending, "we assume the data are sorted in ascending")
           return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx), dir))
         case BTreeIndex(entries) => entries.map { entry =>
-          throw new UnsupportedOperationException(s"Unsupported multi-keys $entries")
+          // TODO support multiple key in the index
         }
         case other => // we don't support other types of index
-          throw new UnsupportedOperationException(s"Unsupported Index Type $other")
+          // TODO support the other types of index
       }
 
       idx += 1
@@ -537,39 +544,34 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
   }
 }
 
+private[spinach] class DummyIndexContext extends IndexContext(null) {
+  override def getScannerBuilder: Option[ScannerBuilder] = None
+  override def unapply(attribute: String): Option[ScannerBuilder] = None
+  override def unapply(value: Any): Option[Key] = None
+}
+
 // The build the BPlushTree Search Scanner according to the filter and indices,
 private[spinach] class BPlusTreeSearch(filters: Array[Filter])
   extends Logging {
-
-  private def extract(filter: Filter, ic: IndexContext): Option[Filter] = {
-    filter match {
+  // TODO support multiple scanner & And / Or
+  def unHandledFilter(ic: IndexContext): Array[Filter] = {
+    filters.filter(_ match {
       case EqualTo(ic(indexer), ic(key)) =>
         indexer.withStart(key, true).withEnd(key, true)
-        None
+        false
       case GreaterThanOrEqual(ic(indexer), ic(key)) =>
         indexer.withStart(key, true)
-        None
+        false
       case GreaterThan(ic(indexer), ic(key)) =>
         indexer.withStart(key, false)
-        None
+        false
       case LessThanOrEqual(ic(indexer), ic(key)) =>
         indexer.withEnd(key, true)
-        None
+        false
       case LessThan(ic(indexer), ic(key)) =>
         indexer.withEnd(key, false)
-        None
-      case And(left, right) => (extract(left, ic), extract(right, ic)) match {
-        case (None, Some(opt)) => Some(opt)
-        case (Some(opt), None) => Some(opt)
-        case (Some(opt1), Some(opt2)) => Some(And(opt1, opt2))
-        case (None, None) => None
-      }
-      case Or(left, right) => Some(filter) // ignore OR for now TODO
-      case _ => Some(filter) // TODO add more filter support
-    }
-  }
-
-  def unHandledFilter(ic: IndexContext): Option[Filter] = {
-    extract(filters.reduceLeft(And), ic)
+        false
+      case _ => true
+    })
   }
 }

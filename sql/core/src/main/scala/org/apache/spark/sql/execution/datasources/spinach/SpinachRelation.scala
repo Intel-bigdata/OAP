@@ -89,6 +89,8 @@ private[spinach] class SpinachRelation(
     }
   }
 
+  private lazy val indexContext: Option[IndexContext] = meta.map(new IndexContext(_))
+
   override val dataSchema: StructType = maybeDataSchema.getOrElse(
     meta.map(_.schema)
       .getOrElse(
