@@ -116,6 +116,8 @@ private[spinach] class IndexMeta {
   var name: String = _
   var indexType: IndexType = _
 
+  def open(context: TaskAttemptContext): IndexNode = throw new NotImplementedError("TBD")
+
   private def writeBitSet(value: BitSet, totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {
     val sizeBefore = out.size
     value.toBitMask.foreach(out.writeLong)
