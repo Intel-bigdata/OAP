@@ -111,11 +111,8 @@ private[spinach] object FileMeta {
   }
 }
 
-private[spinach] class IndexMeta {
+private[spinach] class IndexMeta(var name: String = null, var indexType: IndexType = null) {
   import IndexMeta._
-  var name: String = _
-  var indexType: IndexType = _
-
   def open(context: TaskAttemptContext): IndexNode = throw new NotImplementedError("TBD")
 
   private def writeBitSet(value: BitSet, totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {

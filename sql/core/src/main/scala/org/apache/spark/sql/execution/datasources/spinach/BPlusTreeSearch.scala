@@ -26,11 +26,34 @@ import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
 
 import scala.collection.mutable
-import scala.tools.nsc.doc.doclet.Indexer
 
 private[spinach] object RangeScanner {
   val DUMMY_KEY_START: Key = InternalRow(Array[Any](): _*) // we compare the ref not the value
   val DUMMY_KEY_END: Key = InternalRow(Array[Any](): _*) // we compare the ref not the value
+}
+
+private[spinach] object CurrentKey {
+  val INVALID_KEY_INDEX = -1
+}
+
+
+// B+ tree values in the leaf node, in long term, a single value should be associated
+// with a single key, however, in order to eleminate the duplicated key in the B+ tree,
+// we simply take out the values for the identical keys, and keep only a single key in the
+// B+ tree leaf node
+private[spinach] trait IndexNodeValue {
+  def length: Int
+  def apply(idx: Int): Int
+}
+
+// B+ Tree Node
+private[spinach] trait IndexNode {
+  def length: Int
+  def keyAt(idx: Int): Key
+  def childAt(idx: Int): IndexNode
+  def valueAt(idx: Int): IndexNodeValue
+  def next: IndexNode
+  def isLeaf: Boolean
 }
 
 private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
@@ -38,16 +61,21 @@ private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
 
   private var currentNode: IndexNode = node
   // currentKeyIdx is the flag that we check if we are in the end of the tree traversal
-  private var currentKeyIdx: Int = if (node.length > keyIdx) keyIdx else -1
+  private var currentKeyIdx: Int = if (node.length > keyIdx) {
+    keyIdx
+  } else {
+    CurrentKey.INVALID_KEY_INDEX
+  }
+
   private var currentValueIdx: Int = valueIdx
 
-  private var currentValues: IndexNodeValue = if (currentKeyIdx != -1) {
+  private var currentValues: IndexNodeValue = if (currentKeyIdx != CurrentKey.INVALID_KEY_INDEX) {
     currentNode.valueAt(currentKeyIdx)
   } else {
     null
   }
 
-  def currentKey: Key = if (currentKeyIdx == -1) {
+  def currentKey: Key = if (currentKeyIdx == CurrentKey.INVALID_KEY_INDEX) {
     RangeScanner.DUMMY_KEY_END
   } else {
     currentNode.keyAt(currentKeyIdx)
@@ -55,10 +83,16 @@ private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
 
   def currentRowId: Int = currentValues(currentValueIdx)
 
-  def moveNext: Unit = {
-    if (currentValueIdx < currentValues.length ) {
+  def moveNextValue: Unit = {
+    if (currentValueIdx < currentValues.length - 1) {
       currentValueIdx += 1
-    } else if (currentKeyIdx < currentNode.length) {
+    } else {
+      moveNextKey
+    }
+  }
+
+  def moveNextKey: Unit = {
+    if (currentKeyIdx < currentNode.length - 1) {
       currentKeyIdx += 1
       currentValueIdx = 0
       currentValues = currentNode.valueAt(currentKeyIdx)
@@ -68,6 +102,8 @@ private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
         currentKeyIdx = 0
         currentValueIdx = 0
         currentValues = currentNode.valueAt(currentKeyIdx)
+      } else {
+        currentKeyIdx = CurrentKey.INVALID_KEY_INDEX
       }
     }
   }
@@ -75,17 +111,22 @@ private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
   def isEnd: Boolean = (currentNode == null || (currentKey eq RangeScanner.DUMMY_KEY_END))
 }
 
-// we scan the index from the smallest to the greatest
+// we scan the index from the smallest to the greatest, this is the root class
+// of scanner, which will scan the B+ Tree (index) leaf node.
 private[spinach] trait RangeScanner extends Iterator[Int] {
   protected var currentKey: CurrentKey = _
   protected var ordering: Ordering[Key] = _
 
   def meta: IndexMeta
-  def start: Key
+  def start: Key // the start node
 
-  def initialize(context: TaskAttemptContext): Unit = {
+  def withOrdering(newOrdering: Ordering[Key]): RangeScanner = {
+    this.ordering = newOrdering
+    this
+  }
+
+  def initialize(context: TaskAttemptContext): RangeScanner = {
     val root = meta.open(context)
-    this.ordering = root.ordering
 
     if (start eq RangeScanner.DUMMY_KEY_START) {
       // find the first key in the left-most leaf node
@@ -96,9 +137,10 @@ private[spinach] trait RangeScanner extends Iterator[Int] {
       // find the identical key or the first key right greater than the specified one
       moveTo(root, start)
     }
+    this
   }
 
-  def shouldStop(key: CurrentKey): Boolean
+  def shouldStop(key: CurrentKey): Boolean // detect if we need to stop scanning
 
   protected def moveTo(node: IndexNode, candidate: Key): Unit = {
     var s = 0
@@ -130,38 +172,44 @@ private[spinach] trait RangeScanner extends Iterator[Int] {
     }
   }
 
-  override def hasNext: Boolean = {
-    currentKey.isEnd
-  }
+  override def hasNext: Boolean = !(currentKey.isEnd || shouldStop(currentKey))
 
   override def next(): Int = {
     val rowId = currentKey.currentRowId
-    currentKey.moveNext
+    currentKey.moveNextValue
     rowId
   }
 
-  def withNewStart(key: Key, include: Boolean): RangeScanner
-  def withNewEnd(key: Key, include: Boolean): RangeScanner
+  def withNewStart(key: Key, include: Boolean): RangeScanner = {
+    withNewStart1(key, include).withOrdering(ordering)
+  }
+  def withNewEnd(key: Key, include: Boolean): RangeScanner = {
+    withNewEnd1(key, include).withOrdering(ordering)
+  }
+  protected def withNewStart1(key: Key, include: Boolean): RangeScanner
+  protected def withNewEnd1(key: Key, include: Boolean): RangeScanner
 }
 
+// A dummy scanner will actually not do any scanning
 private[spinach] object DUMMY_SCANNER extends RangeScanner {
   override def shouldStop(key: CurrentKey): Boolean = true
-  override def initialize(context: TaskAttemptContext): Unit = {}
+  override def initialize(context: TaskAttemptContext): RangeScanner = { this }
   override def hasNext: Boolean = false
   override def next(): Int = throw new NoSuchElementException("end of iterating.")
-  override def withNewStart(key: Key, include: Boolean): RangeScanner = this
-  override def withNewEnd(key: Key, include: Boolean): RangeScanner = this
+  override def withNewStart1(key: Key, include: Boolean): RangeScanner = this
+  override def withNewEnd1(key: Key, include: Boolean): RangeScanner = this
   override def meta: IndexMeta = throw new NotImplementedError()
   override def start: Key = throw new NotImplementedError()
 }
 
 private[spinach] trait LeftOpenInitialize extends RangeScanner {
-  override def initialize(context: TaskAttemptContext): Unit = {
+  override def initialize(context: TaskAttemptContext): RangeScanner = {
     super.initialize(context)
     if (ordering.compare(start, currentKey.currentKey) == 0) {
       // find the exactly the key, since it's LeftOpen, skip the first key
-      currentKey.moveNext
+      currentKey.moveNextKey
     }
+    this
   }
 }
 
@@ -183,9 +231,10 @@ private[spinach] trait RightCloseShouldStop extends RangeScanner {
   def shouldStop(key: CurrentKey): Boolean = ordering.compare(key.currentKey, end) > 0
 }
 
+// scan range (start, -), start key will be ignored
 private[spinach] case class LeftOpenRangeSearch(meta: IndexMeta, start: Key)
   extends LeftOpenInitialize with LeftShouldStop {
-  override def withNewStart(key: Key, include: Boolean): RangeScanner = {
+  override def withNewStart1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, start) >= 0) {
       if (include) {
         LeftCloseRangeSearch(meta, key)
@@ -196,7 +245,7 @@ private[spinach] case class LeftOpenRangeSearch(meta: IndexMeta, start: Key)
       this
     }
   }
-  override def withNewEnd(key: Key, include: Boolean): RangeScanner = {
+  override def withNewEnd1(key: Key, include: Boolean): RangeScanner = {
     if (include) {
       LeftOpenRightCloseRangeSearch(meta, start, key)
     } else {
@@ -205,16 +254,17 @@ private[spinach] case class LeftOpenRangeSearch(meta: IndexMeta, start: Key)
   }
 }
 
+// scan range [start, -), start key will be included
 private[spinach] case class LeftCloseRangeSearch(meta: IndexMeta, start: Key)
   extends RangeScanner with LeftShouldStop {
-  override def withNewStart(key: Key, include: Boolean): RangeScanner = {
+  override def withNewStart1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, start) > 0) {
       if (include) LeftCloseRangeSearch(meta, key) else LeftOpenRangeSearch(meta, key)
     } else {
       this
     }
   }
-  override def withNewEnd(key: Key, include: Boolean): RangeScanner = {
+  override def withNewEnd1(key: Key, include: Boolean): RangeScanner = {
     if (include) {
       LeftCloseRightCloseRangeSearch(meta, start, key)
     } else {
@@ -223,16 +273,17 @@ private[spinach] case class LeftCloseRangeSearch(meta: IndexMeta, start: Key)
   }
 }
 
+// scan range (-, end), end key will be ignored
 private[spinach] case class RightOpenRangeSearch(meta: IndexMeta, end: Key)
   extends RightInitialize with RightOpenShouldStop {
-  override def withNewStart(key: Key, include: Boolean): RangeScanner = {
+  override def withNewStart1(key: Key, include: Boolean): RangeScanner = {
     if (include) {
       LeftCloseRightOpenRangeSearch(meta, key, end)
     } else {
       LeftOpenRightOpenRangeSearch(meta, key, end)
     }
   }
-  override def withNewEnd(key: Key, include: Boolean): RangeScanner = {
+  override def withNewEnd1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, end) <= 0) {
       if (include) {
         RightCloseRangeSearch(meta, key)
@@ -245,16 +296,17 @@ private[spinach] case class RightOpenRangeSearch(meta: IndexMeta, end: Key)
   }
 }
 
+// scan range (-, end], end key will be included
 private[spinach] case class RightCloseRangeSearch(meta: IndexMeta, end: Key)
   extends RightInitialize with RightCloseShouldStop {
-  override def withNewStart(key: Key, include: Boolean): RangeScanner = {
+  override def withNewStart1(key: Key, include: Boolean): RangeScanner = {
     if (include) {
       LeftCloseRightCloseRangeSearch(meta, key, end)
     } else {
       LeftOpenRightOpenRangeSearch(meta, key, end)
     }
   }
-  override def withNewEnd(key: Key, include: Boolean): RangeScanner = {
+  override def withNewEnd1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, end) < 0) {
       if (include) {
         RightCloseRangeSearch(meta, key)
@@ -267,9 +319,10 @@ private[spinach] case class RightCloseRangeSearch(meta: IndexMeta, end: Key)
   }
 }
 
+// scan range (start, end), both start & end key will be ignored
 private[spinach] case class LeftOpenRightOpenRangeSearch(meta: IndexMeta, start: Key, end: Key)
   extends LeftOpenInitialize with RightOpenShouldStop {
-  override def withNewStart(key: Key, include: Boolean): RangeScanner = {
+  override def withNewStart1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, start) >= 0) {
       if (include) {
         LeftCloseRightOpenRangeSearch(meta, key, end)
@@ -280,7 +333,7 @@ private[spinach] case class LeftOpenRightOpenRangeSearch(meta: IndexMeta, start:
       this
     }
   }
-  override def withNewEnd(key: Key, include: Boolean): RangeScanner = {
+  override def withNewEnd1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, end) <= 0) {
       if (include) {
         LeftOpenRightCloseRangeSearch(meta, key, end)
@@ -293,9 +346,10 @@ private[spinach] case class LeftOpenRightOpenRangeSearch(meta: IndexMeta, start:
   }
 }
 
+// scan range [start, end), start key will be included, but end key will be ignored
 private[spinach] case class LeftCloseRightOpenRangeSearch(meta: IndexMeta, start: Key, end: Key)
   extends RangeScanner with RightOpenShouldStop {
-  override def withNewStart(key: Key, include: Boolean): RangeScanner = {
+  override def withNewStart1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, start) > 0) {
       if (include) {
         LeftCloseRightOpenRangeSearch(meta, key, end)
@@ -306,7 +360,7 @@ private[spinach] case class LeftCloseRightOpenRangeSearch(meta: IndexMeta, start
       this
     }
   }
-  override def withNewEnd(key: Key, include: Boolean): RangeScanner = {
+  override def withNewEnd1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, end) <= 0) {
       if (include) {
         LeftCloseRightCloseRangeSearch(meta, key, end)
@@ -319,9 +373,10 @@ private[spinach] case class LeftCloseRightOpenRangeSearch(meta: IndexMeta, start
   }
 }
 
+// scan range (start, end], start key will be ignored, but end key will be included
 private[spinach] case class LeftOpenRightCloseRangeSearch(meta: IndexMeta, start: Key, end: Key)
   extends LeftOpenInitialize with RightCloseShouldStop {
-  override def withNewStart(key: Key, include: Boolean): RangeScanner = {
+  override def withNewStart1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, start) >= 0) {
       if (include) {
         LeftCloseRightCloseRangeSearch(meta, key, end)
@@ -332,7 +387,7 @@ private[spinach] case class LeftOpenRightCloseRangeSearch(meta: IndexMeta, start
       this
     }
   }
-  override def withNewEnd(key: Key, include: Boolean): RangeScanner = {
+  override def withNewEnd1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, end) < 0) {
       if (include) {
         LeftOpenRightCloseRangeSearch(meta, key, end)
@@ -345,9 +400,10 @@ private[spinach] case class LeftOpenRightCloseRangeSearch(meta: IndexMeta, start
   }
 }
 
+// scan range [start, end], both start & end key will be included
 private[spinach] case class LeftCloseRightCloseRangeSearch(meta: IndexMeta, start: Key, end: Key)
   extends RangeScanner with RightCloseShouldStop {
-  override def withNewStart(key: Key, include: Boolean): RangeScanner = {
+  override def withNewStart1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, start) > 0) {
       if (include) {
         LeftCloseRightCloseRangeSearch(meta, key, end)
@@ -358,7 +414,7 @@ private[spinach] case class LeftCloseRightCloseRangeSearch(meta: IndexMeta, star
       this
     }
   }
-  override def withNewEnd(key: Key, include: Boolean): RangeScanner = {
+  override def withNewEnd1(key: Key, include: Boolean): RangeScanner = {
     if (ordering.compare(key, end) < 0) {
       if (include) {
         LeftCloseRightCloseRangeSearch(meta, key, end)
@@ -369,21 +425,6 @@ private[spinach] case class LeftCloseRightCloseRangeSearch(meta: IndexMeta, star
       this
     }
   }
-}
-
-private[spinach] trait IndexNodeValue {
-  def length: Int
-  def apply(idx: Int): Int
-}
-
-private[spinach] trait IndexNode {
-  def length: Int
-  def keyAt(idx: Int): Key
-  def childAt(idx: Int): IndexNode
-  def valueAt(idx: Int): IndexNodeValue
-  def next: IndexNode
-  def isLeaf: Boolean
-  def ordering: Ordering[Key]
 }
 
 private[spinach] class ScannerBuilder(meta: IndexMeta, ordering: Ordering[Key]) {
@@ -396,6 +437,7 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, ordering: Ordering[Key]) 
       } else {
         scanner = LeftOpenRangeSearch(meta, s)
       }
+      scanner.withOrdering(ordering)
     } else {
       scanner = scanner.withNewStart(s, include)
     }
@@ -410,6 +452,7 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, ordering: Ordering[Key]) 
       } else {
         scanner = RightOpenRangeSearch(meta, e)
       }
+      scanner.withOrdering(ordering)
     } else {
       scanner = scanner.withNewEnd(e, include)
     }
@@ -453,9 +496,19 @@ private[spinach] object ScannerBuilder {
   }
 }
 
+// TODO currently only a single attribute index supported.
 private[spinach] class IndexContext(meta: DataSourceMeta2) {
-  // TODO currently only a single attribute index supported.
   private val map = new mutable.HashMap[String, Option[ScannerBuilder]]()
+  def getScannerBuilder: Option[ScannerBuilder] = {
+    if (map.size == 0) {
+      None
+    } else if (map.size == 1) {
+      map.iterator.next()._2
+    } else {
+      throw new UnsupportedOperationException("currently only a single index supported")
+    }
+  }
+
   def unapply(attribute: String): Option[ScannerBuilder] =
     map.getOrElseUpdate(attribute, findIndexer(attribute))
 
@@ -466,7 +519,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta2) {
 
     var idx = 0
     while (idx < meta.indexMetas.length) {
-      meta.indexMetas(idx) match {
+      meta.indexMetas(idx).indexType match {
         case BTreeIndex(BTreeIndexEntry(ord, dir) :: Nil) if ord == ordinal =>
           assert(dir == Ascending, "we assume the data are sorted in ascending")
           return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx), dir))
@@ -484,18 +537,14 @@ private[spinach] class IndexContext(meta: DataSourceMeta2) {
   }
 }
 
-private[spinach] object Indexer {
-  def apply(attribute: String, meta: DataSourceMeta2, dir: SortDirection): Indexer =
-    throw new NotImplementedError()
-}
-
-private[spinach] class SpinachSearch(filters: Array[Filter], meta: DataSourceMeta2)
+// The build the BPlushTree Search Scanner according to the filter and indices,
+private[spinach] class BPlusTreeSearch(filters: Array[Filter])
   extends Logging {
 
-  def extract(filter: Filter, ic: IndexContext): Option[Filter] = {
+  private def extract(filter: Filter, ic: IndexContext): Option[Filter] = {
     filter match {
       case EqualTo(ic(indexer), ic(key)) =>
-        indexer.withStart(key, true).withEnd(key, false)
+        indexer.withStart(key, true).withEnd(key, true)
         None
       case GreaterThanOrEqual(ic(indexer), ic(key)) =>
         indexer.withStart(key, true)
@@ -520,5 +569,7 @@ private[spinach] class SpinachSearch(filters: Array[Filter], meta: DataSourceMet
     }
   }
 
-  val unHandledFilter = extract(filters.reduceLeft(And), new IndexContext(meta))
+  def unHandledFilter(ic: IndexContext): Option[Filter] = {
+    extract(filters.reduceLeft(And), ic)
+  }
 }
