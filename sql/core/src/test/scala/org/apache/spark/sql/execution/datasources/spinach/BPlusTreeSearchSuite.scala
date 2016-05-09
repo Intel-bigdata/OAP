@@ -100,11 +100,11 @@ private[spinach] class BPlusTreeSearchSuite
 
   val root = new NonLeafNode(Array(5, 10, 15), Array(i11, i12, i13, i14))
 
-  val indexMeta = new IndexMeta("test", BTreeIndex(BTreeIndexEntry(1, Ascending) :: Nil)) {
+  val indexMeta: IndexMeta = new IndexMeta("test", BTreeIndex(BTreeIndexEntry(1) :: Nil)) {
     override def open(context: TaskAttemptContext): IndexNode = root
   }
 
-  val meta = new DataSourceMeta2(
+  val meta = new DataSourceMeta(
     null,
     Array(indexMeta),
     new StructType().add("fake", StringType, true).add("test", IntegerType, true),
@@ -183,7 +183,7 @@ private[spinach] class BPlusTreeSearchSuite
   }
 
   private def assertScanner(
-      meta: DataSourceMeta2,
+      meta: DataSourceMeta,
       filters: Array[Filter],
       expectedUnHandleredFilter: Option[Filter],
       expectedIds: Set[Int]): Unit = {

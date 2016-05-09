@@ -497,7 +497,7 @@ private[spinach] object ScannerBuilder {
 }
 
 // TODO currently only a single attribute index supported.
-private[spinach] class IndexContext(meta: DataSourceMeta2) {
+private[spinach] class IndexContext(meta: DataSourceMeta) {
   private val map = new mutable.HashMap[String, Option[ScannerBuilder]]()
   def getScannerBuilder: Option[ScannerBuilder] = {
     if (map.size == 0) {

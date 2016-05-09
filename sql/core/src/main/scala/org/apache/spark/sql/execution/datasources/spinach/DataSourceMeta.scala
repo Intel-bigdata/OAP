@@ -61,7 +61,7 @@ import org.apache.spark.sql.catalyst.expressions.{Ascending, Descending, SortDir
 
 private[spinach] trait IndexType
 
-private[spinach] case class BTreeIndexEntry(ordinal: Int, dir: SortDirection)
+private[spinach] case class BTreeIndexEntry(ordinal: Int, dir: SortDirection = Ascending)
 
 private[spinach] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends IndexType {
   def appendEntry(entry: BTreeIndexEntry): BTreeIndex = BTreeIndex(entries :+ entry)
