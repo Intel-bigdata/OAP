@@ -35,7 +35,7 @@ private[spinach] class IntValues(values: Array[Int]) extends IndexNodeValue {
 private[spinach] class NonLeafNode(
     keys: Array[Key],
     children: Array[IndexNode]) extends IndexNode {
-  assert(keys.length + 1 == children.length)
+  assert(keys.length == children.length)
   override def length: Int = keys.length
   override def next: IndexNode = throw new NotImplementedError("")
   override def childAt(idx: Int): IndexNode = children(idx)
@@ -59,8 +59,8 @@ private[spinach] object BPlusTreeSearchSuite extends Serializable {
 
   val indexMeta: IndexMeta = new IndexMeta("test", BTreeIndex(BTreeIndexEntry(1) :: Nil)) {
     // The data looks like:
-    //                      5             10             15     <-----Root Key
-    //                      |              |              |
+    //              3            8            13              16 <-----Root Key
+    //             |            |             |               |
     //            (3, 4, 5) -> (8, 9, 10) -> (13, 14, 15) -> (16, 17, 18)    <--- Second Level Key
     //             |  |  |     |  |  |        |   |   |       |   |   |
     //            30 40  50   80 90  100     130 140 150     160  170 180    <--- Values
@@ -95,7 +95,7 @@ private[spinach] object BPlusTreeSearchSuite extends Serializable {
         new IntValues(Array(50))),
       i12)
 
-    def root = new NonLeafNode(Array(5, 10, 15), Array(i11, i12, i13, i14))
+    def root = new NonLeafNode(Array(3, 8, 13, 16), Array(i11, i12, i13, i14))
     override def open(context: TaskAttemptContext): IndexNode = root
   }
 }
