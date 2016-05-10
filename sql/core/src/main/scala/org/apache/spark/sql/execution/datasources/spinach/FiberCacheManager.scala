@@ -61,6 +61,8 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
       })
       .build(new CacheLoader[Fiber, FiberCacheData] {
         override def load(key: Fiber): FiberCacheData = {
+          logInfo("Load fiber into cache! file:" + key.file.path + " columnIndex:" +
+            key.columnIndex + " rowGroupId:" + key.rowGroupId)
           fiber2Data(key)
         }
       })
@@ -107,7 +109,7 @@ private[spinach] case class InputDataFileDescriptor(fin: FSDataInputStream, len:
 
 private[spinach] object DataMetaCacheManager extends Logging {
   // TODO: make it configurable
-  val spinachDataMetaCacheSize = 1024
+  val spinachDataMetaCacheSize = 1024 * 8 // cache 8K file by default
 
   @transient private val cache =
     CacheBuilder
@@ -131,7 +133,8 @@ private[spinach] object FiberDataFileHandler extends Logging {
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
       .maximumSize(MemoryManager.getCapacity())
-      .expireAfterAccess(1000, TimeUnit.SECONDS) // auto expire after 1000 seconds.
+      // TODO: make it configurable
+      .expireAfterAccess(Int.MaxValue, TimeUnit.SECONDS) // not expire by default
       .removalListener(new RemovalListener[DataFileScanner, InputDataFileDescriptor] {
         override def onRemoval(n: RemovalNotification[DataFileScanner, InputDataFileDescriptor])
         : Unit = {
