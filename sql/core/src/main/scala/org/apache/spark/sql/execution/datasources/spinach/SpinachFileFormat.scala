@@ -17,7 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import java.io.IOException
+
 import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.hadoop.util.SerializationUtil
 import org.apache.spark.sql.types.StructType
 
 private[spinach] object SpinachFileFormat {
@@ -26,6 +29,7 @@ private[spinach] object SpinachFileFormat {
   val SPINACH_META_FILE = "spinach.meta"
   val SPINACH_META_SCHEMA = "spinach.schema"
   val SPINACH_REQUIRED_IDS = "spinach.required.columnids"
+  val SPINACH_FILTER_SCANNER = "spinach.filter.scanner"
 
   def setRequiredColumnIds(
     conf: Configuration, schema: StructType, requiredColumns: Array[String]): Unit = {
@@ -37,5 +41,13 @@ private[spinach] object SpinachFileFormat {
 
   def getRequiredColumnIds(conf: Configuration): Array[Int] = {
     conf.get(SPINACH_REQUIRED_IDS).split(",").map(_.toInt)
+  }
+
+  def serializeFilterScanner(conf: Configuration, scanner: RangeScanner): Unit = {
+    SerializationUtil.writeObjectToConfAsBase64(SPINACH_FILTER_SCANNER, scanner, conf)
+  }
+
+  def deserialzeFilterScanner(conf: Configuration): Option[RangeScanner] = {
+    Option(SerializationUtil.readObjectFromConfAsBase64(SPINACH_FILTER_SCANNER, conf))
   }
 }

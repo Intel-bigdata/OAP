@@ -89,7 +89,9 @@ private[spinach] class SpinachRelation(
     }
   }
 
-  private lazy val indexContext: Option[IndexContext] = meta.map(new IndexContext(_))
+  @transient private lazy val indexContext: IndexContext = {
+    meta.map(new IndexContext(_)).getOrElse(DummyIndexContext)
+  }
 
   override val dataSchema: StructType = maybeDataSchema.getOrElse(
     meta.map(_.schema)
@@ -127,14 +129,18 @@ private[spinach] class SpinachRelation(
 
     meta match {
       case Some(mt) =>
-        SpinachTableScan(mt, this, filters, requiredColumns, inputPaths, broadcastedConf).execute()
+        unhandledFilters(filters) // to get the scanner builder
+        SpinachTableScan(mt, this, indexContext.getScannerBuilder.map(_.build),
+          requiredColumns, inputPaths, broadcastedConf).execute()
       case None =>
         sqlContext.sparkContext.emptyRDD[InternalRow]
     }
   }
 
   // currently we don't support any filtering.
-  override def unhandledFilters(filters: Array[Filter]): Array[Filter] = filters
+  override def unhandledFilters(filters: Array[Filter]): Array[Filter] = {
+    BPlusTreeSearch.build(filters, indexContext.clear())
+  }
 
   override def prepareJobForWrite(job: Job): OutputWriterFactory = {
     new SpinachOutputWriterFactory
@@ -206,7 +212,7 @@ private[spinach] class SpinachOutputWriterFactory extends OutputWriterFactory {
 private[spinach] case class SpinachTableScan(
     meta: DataSourceMeta,
     @transient relation: SpinachRelation,
-    filters: Array[Filter],
+    scanner: Option[RangeScanner],
     requiredColumns: Array[String],
     @transient inputPaths: Array[FileStatus],
     bc: Broadcast[SerializableConfiguration])
@@ -224,10 +230,14 @@ private[spinach] case class SpinachTableScan(
       return sqlContext.sparkContext.emptyRDD[InternalRow]
     }
     // TODO write our own RDD, so we can pass down the info via closure instead
-
     FileInputFormat.setInputPaths(job, inputPaths.map(_.getPath): _*)
     conf.set(SpinachFileFormat.SPINACH_META_SCHEMA, meta.schema.json)
 
+    if (scanner.nonEmpty) {
+      // serialize the scanner
+      SpinachFileFormat.serializeFilterScanner(conf, scanner.get)
+    }
+    // serialize the required column
     SpinachFileFormat.setRequiredColumnIds(conf, meta.schema, requiredColumns)
 
     sqlContext.sparkContext.newAPIHadoopRDD(

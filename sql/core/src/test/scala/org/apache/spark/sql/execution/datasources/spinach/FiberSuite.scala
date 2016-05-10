@@ -102,7 +102,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     for (i <- 0 until rowCounts.length) {
       val path = new Path(file.getAbsolutePath, rowCounts(i).toString)
       writeData(ctx, path, schema, rowCounts(i), attemptContext)
-      val reader = new SpinachDataReader2(path, schema, Array(0, 1))
+      val reader = new SpinachDataReader2(path, schema, None, Array(0, 1))
       val split = new FileSplit(
         path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
       reader.initialize(split, attemptContext)
@@ -169,7 +169,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       split: FileSplit,
       attemptContext: TaskAttemptContext,
       count: Int): Unit = {
-    val reader = new SpinachDataReader2(path, schema, requiredIds)
+    val reader = new SpinachDataReader2(path, schema, None, requiredIds)
     reader.initialize(split, attemptContext)
 
     var idx = 0

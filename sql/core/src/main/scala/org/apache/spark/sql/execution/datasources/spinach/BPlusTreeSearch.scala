@@ -113,7 +113,7 @@ private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
 // we scan the index from the smallest to the greatest, this is the root class
 // of scanner, which will scan the B+ Tree (index) leaf node.
 private[spinach] trait RangeScanner extends Iterator[Int] {
-  protected var currentKey: CurrentKey = _
+  @transient protected var currentKey: CurrentKey = _
   protected var ordering: Ordering[Key] = _
 
   def meta: IndexMeta
@@ -499,6 +499,12 @@ private[spinach] object ScannerBuilder {
 // TODO currently only a single attribute index supported.
 private[spinach] class IndexContext(meta: DataSourceMeta) {
   private val map = new mutable.HashMap[String, ScannerBuilder]()
+
+  def clear(): IndexContext = {
+    map.clear()
+    this
+  }
+
   def getScannerBuilder: Option[ScannerBuilder] = {
     if (map.size == 0) {
       None
@@ -544,17 +550,17 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
   }
 }
 
-private[spinach] class DummyIndexContext extends IndexContext(null) {
+private[spinach] object DummyIndexContext extends IndexContext(null) {
   override def getScannerBuilder: Option[ScannerBuilder] = None
   override def unapply(attribute: String): Option[ScannerBuilder] = None
   override def unapply(value: Any): Option[Key] = None
 }
 
 // The build the BPlushTree Search Scanner according to the filter and indices,
-private[spinach] class BPlusTreeSearch(filters: Array[Filter])
+private[spinach] object BPlusTreeSearch
   extends Logging {
   // TODO support multiple scanner & And / Or
-  def unHandledFilter(ic: IndexContext): Array[Filter] = {
+  def build(filters: Array[Filter], ic: IndexContext): Array[Filter] = {
     filters.filter(_ match {
       case EqualTo(ic(indexer), ic(key)) =>
         indexer.withStart(key, true).withEnd(key, true)

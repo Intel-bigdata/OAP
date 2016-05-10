@@ -54,59 +54,62 @@ private[spinach] class LeafNode(keys: Array[Key], values: Array[IntValues], sibl
   override def valueAt(idx: Int): IndexNodeValue = values(idx)
 }
 
-private[spinach] class BPlusTreeSearchSuite
-    extends SparkFunSuite with Logging with BeforeAndAfterAll {
+private[spinach] object BPlusTreeSearchSuite extends Serializable {
   implicit def int2internalRow(keys: Array[Int]): Array[Key] = keys.map(InternalRow(_))
-  val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
-    new Configuration(),
-    new TaskAttemptID(new TaskID(new JobID(), true, 0), 0))
-
-  // The data looks like:
-  //                      5             10             15     <-----Root Key
-  //                      |              |              |
-  //            (3, 4, 5) -> (8, 9, 10) -> (13, 14, 15) -> (16, 17, 18)    <--- Second Level Key
-  //             |  |  |     |  |  |        |   |   |       |   |   |
-  //            30 40  50   80 90  100     130 140 150     160  170 180    <--- Values
-  //            31 41       81 91          131 141         161  171
-  //            32          82             132             162
-  //
-  val i14 = new LeafNode(
-    Array(16, 17, 18),
-    Array(new IntValues(Array(160, 161, 162)),
-          new IntValues(Array(170, 171)),
-          new IntValues(Array(180))),
-    null)
-
-  val i13 = new LeafNode(
-    Array(13, 14, 15),
-    Array(new IntValues(Array(130, 131, 132)),
-      new IntValues(Array(140, 141)),
-      new IntValues(Array(150))),
-    i14)
-
-  val i12 = new LeafNode(
-    Array(8, 9, 10),
-    Array(new IntValues(Array(80, 81, 82)),
-      new IntValues(Array(90, 91)),
-      new IntValues(Array(100))),
-    i13)
-
-  val i11 = new LeafNode(
-    Array(3, 4, 5),
-    Array(new IntValues(Array(30, 31, 32)),
-      new IntValues(Array(40, 41)),
-      new IntValues(Array(50))),
-    i12)
-
-  val root = new NonLeafNode(Array(5, 10, 15), Array(i11, i12, i13, i14))
 
   val indexMeta: IndexMeta = new IndexMeta("test", BTreeIndex(BTreeIndexEntry(1) :: Nil)) {
+    // The data looks like:
+    //                      5             10             15     <-----Root Key
+    //                      |              |              |
+    //            (3, 4, 5) -> (8, 9, 10) -> (13, 14, 15) -> (16, 17, 18)    <--- Second Level Key
+    //             |  |  |     |  |  |        |   |   |       |   |   |
+    //            30 40  50   80 90  100     130 140 150     160  170 180    <--- Values
+    //            31 41       81 91          131 141         161  171
+    //            32          82             132             162
+    //
+    def i14 = new LeafNode(
+      Array(16, 17, 18),
+      Array(new IntValues(Array(160, 161, 162)),
+        new IntValues(Array(170, 171)),
+        new IntValues(Array(180))),
+      null)
+
+    def i13 = new LeafNode(
+      Array(13, 14, 15),
+      Array(new IntValues(Array(130, 131, 132)),
+        new IntValues(Array(140, 141)),
+        new IntValues(Array(150))),
+      i14)
+
+    def i12 = new LeafNode(
+      Array(8, 9, 10),
+      Array(new IntValues(Array(80, 81, 82)),
+        new IntValues(Array(90, 91)),
+        new IntValues(Array(100))),
+      i13)
+
+    def i11 = new LeafNode(
+      Array(3, 4, 5),
+      Array(new IntValues(Array(30, 31, 32)),
+        new IntValues(Array(40, 41)),
+        new IntValues(Array(50))),
+      i12)
+
+    def root = new NonLeafNode(Array(5, 10, 15), Array(i11, i12, i13, i14))
     override def open(context: TaskAttemptContext): IndexNode = root
   }
+}
+
+private[spinach] class BPlusTreeSearchSuite
+    extends SparkFunSuite with Logging with BeforeAndAfterAll {
+  val conf: Configuration = new Configuration()
+  val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
+    conf,
+    new TaskAttemptID(new TaskID(new JobID(), true, 0), 0))
 
   val meta = new DataSourceMeta(
     null,
-    Array(indexMeta),
+    Array(BPlusTreeSearchSuite.indexMeta),
     new StructType().add("fake", StringType, true).add("test", IntegerType, true),
     null)
 
@@ -190,11 +193,15 @@ private[spinach] class BPlusTreeSearchSuite
       expectedUnHandleredFilter: Array[Filter],
       expectedIds: Set[Int]): Unit = {
     val ic = new IndexContext(meta)
-    val unHandledFilters = new BPlusTreeSearch(filters).unHandledFilter(ic)
+    val unHandledFilters = BPlusTreeSearch.build(filters, ic)
     assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
     ic.getScannerBuilder match {
-      case Some(scanner) =>
-        assert(scanner.build.initialize(attemptContext).toSet === expectedIds, "")
+      case Some(builder) =>
+        val scanner = builder.build
+        assert(scanner.initialize(attemptContext).toSet === expectedIds, "")
+        SpinachFileFormat.serializeFilterScanner(conf, scanner)
+        val deserialized = SpinachFileFormat.deserialzeFilterScanner(conf).get
+        assert(deserialized.initialize(attemptContext).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")
     }
   }

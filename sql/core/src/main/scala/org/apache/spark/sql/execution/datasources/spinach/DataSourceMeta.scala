@@ -111,7 +111,8 @@ private[spinach] object FileMeta {
   }
 }
 
-private[spinach] class IndexMeta(var name: String = null, var indexType: IndexType = null) {
+private[spinach] class IndexMeta(var name: String = null, var indexType: IndexType = null)
+    extends Serializable {
   import IndexMeta._
   def open(context: TaskAttemptContext): IndexNode = throw new NotImplementedError("TBD")
 

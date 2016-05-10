@@ -158,6 +158,11 @@ class BatchColumn {
     }
   }
 
+  def moveToRow(idx: Int): InternalRow = {
+    currentIndex = idx
+    internalRow
+  }
+
   object internalRow extends InternalRow {
     override def numFields: Int = values.length
 

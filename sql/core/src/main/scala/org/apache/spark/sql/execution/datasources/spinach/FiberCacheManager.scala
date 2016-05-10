@@ -202,6 +202,7 @@ private[spinach] case class DataFileScanner(
     fiberCacheData
   }
 
+  // full file scan
   def iterator(requiredIds: Array[Int]): Iterator[InternalRow] = {
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
@@ -221,6 +222,32 @@ private[spinach] case class DataFileScanner(
       } else {
         row.reset(meta.rowCountInLastGroup, columns).toIterator
       }
+    }
+  }
+
+  // scan by given row ids
+  def iterator(requiredIds: Array[Int], rowIds: Array[Int]): Iterator[InternalRow] = {
+    val row = new BatchColumn()
+    val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
+    var lastGroupId = -1
+    (0 until rowIds.length).iterator.map { idx =>
+      val rowId = rowIds(idx)
+      val groupId = (rowId + 1) / meta.rowCountInEachGroup
+      val rowIdxInGroup = rowId % meta.rowCountInEachGroup
+
+      if (lastGroupId != groupId) {
+        // if we didn't move to another row group
+        var i = 0
+        while (i < columns.length) {
+          columns(i) = new ColumnValues(
+            meta.rowCountInEachGroup,
+            schema(requiredIds(i)).dataType,
+            FiberCacheManager(Fiber(this, requiredIds(i), groupId)))
+          i += 1
+        }
+      }
+
+      row.moveToRow(rowIdxInGroup)
     }
   }
 }

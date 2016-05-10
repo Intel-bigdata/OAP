@@ -41,8 +41,10 @@ class SpinachFileInputFormat extends FileInputFormat[NullWritable, InternalRow] 
     val s = split.asInstanceOf[FiberSplit]
     val conf = SparkHadoopUtil.get.getConfigurationFromJobContext(context)
     val schema = StructType.fromString(conf.get(SpinachFileFormat.SPINACH_META_SCHEMA))
+    val filterScanner = SpinachFileFormat.deserialzeFilterScanner(conf)
+    val requiredIds = SpinachFileFormat.getRequiredColumnIds(conf)
 
-    return new SpinachDataReader2(s.getFile, schema, SpinachFileFormat.getRequiredColumnIds(conf))
+    return new SpinachDataReader2(s.getFile, schema, filterScanner, requiredIds)
   }
 
   override def getSplits(job: JobContext): JList[InputSplit] = {
