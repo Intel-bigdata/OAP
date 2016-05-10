@@ -30,7 +30,9 @@ private[spinach] class SpinachDataWriter2(
     out: FSDataOutputStream,
     schema: StructType) extends RecordWriter[NullWritable, InternalRow] {
   // TODO: make the fiber size configurable
-  private final val DEFAULT_ROW_GROUP_SIZE = 1024 * 4  // 4K fiber by default
+
+  private final val DEFAULT_ROW_GROUP_SIZE = System.getProperty("spark.sql.spinach.rowgroup.size",
+    "1024").toInt
   private var rowCount: Int = 0
   private var rowGroupCount: Int = 0
 
