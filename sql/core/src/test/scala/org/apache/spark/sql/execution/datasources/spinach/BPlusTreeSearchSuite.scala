@@ -118,6 +118,31 @@ private[spinach] class BPlusTreeSearchSuite
     assertScanner(meta, filters, Array(), Set.empty[Int])
   }
 
+  test("equal 2") {
+    val filters: Array[Filter] = Array(EqualTo("test", 2))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
+  test("equal 3") {
+    val filters: Array[Filter] = Array(EqualTo("test", 3))
+    assertScanner(meta, filters, Array(), Set(30, 31, 32))
+  }
+
+  test("equal 18") {
+    val filters: Array[Filter] = Array(EqualTo("test", 18))
+    assertScanner(meta, filters, Array(), Set(180))
+  }
+
+  test("equal 19") {
+    val filters: Array[Filter] = Array(EqualTo("test", 19))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
+  test("equal 16") {
+    val filters: Array[Filter] = Array(EqualTo("test", 16))
+    assertScanner(meta, filters, Array(), Set(160, 161, 162))
+  }
+
   test("equal 10") {
     val filters: Array[Filter] = Array(EqualTo("test", 10))
     assertScanner(meta, filters, Array(), Set(100))
