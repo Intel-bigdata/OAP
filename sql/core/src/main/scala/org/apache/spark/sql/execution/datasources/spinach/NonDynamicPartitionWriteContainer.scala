@@ -99,10 +99,8 @@ private[spinach] class NonDynamicPartitionWriteContainer(
   }
 
   override def commitJob(writeResults: Array[WriteResult]): Unit = {
-    val conf = SparkHadoopUtil.get.getConfigurationFromJobContext(job)
     val outputRoot = FileOutputFormat.getOutputPath(job)
     val path = new Path(outputRoot, SpinachFileFormat.SPINACH_META_FILE)
-    val fileOut: FSDataOutputStream = outputRoot.getFileSystem(conf).create(path, false)
 
     val builder = DataSourceMeta.newBuilder()
     writeResults.foreach {
@@ -114,7 +112,6 @@ private[spinach] class NonDynamicPartitionWriteContainer(
     val spinachMeta = builder.withNewSchema(schema).build()
     DataSourceMeta.write(path, relation.sqlContext.sparkContext.hadoopConfiguration, spinachMeta)
 
-    fileOut.close()
     super.commitJob(writeResults)
   }
 
