@@ -33,7 +33,7 @@ private[spinach] object MemoryManager {
   // TODO make it configurable
   val capacity: Long = 1024 * 1024 * 1024L // 1GB
   var maxMemoryInByte: Long = capacity
-  var memoryMode: MemoryMode = OnHeap
+  var memoryMode: MemoryMode = OffHeap
 
   def getMemoryMode: MemoryMode = memoryMode
 
