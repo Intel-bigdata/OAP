@@ -110,7 +110,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberCacheData
     //    value #N
     val length = getIntValue(idx * 2)
     val offset = getIntValue(idx * 2 + 1)
-    UTF8String.fromAddress(baseObject, Platform.BYTE_ARRAY_OFFSET + offset, length)
+    UTF8String.fromAddress(baseObject, raw.fiberData.getBaseOffset + offset, length)
   }
 
   def getBinaryValue(idx: Int): Array[Byte] = {
@@ -130,7 +130,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberCacheData
     val length = getIntValue(idx * 2)
     val offset = getIntValue(idx * 2 + 1)
     val result = new Array[Byte](length)
-    Platform.copyMemory(baseObject, Platform.BYTE_ARRAY_OFFSET + offset, result,
+    Platform.copyMemory(baseObject, raw.fiberData.getBaseOffset + offset, result,
       Platform.BYTE_ARRAY_OFFSET, length)
 
     result

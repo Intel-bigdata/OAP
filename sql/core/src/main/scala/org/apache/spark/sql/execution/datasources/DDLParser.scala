@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.{IndexColumn, TableIdentifier, AbstractSpar
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.DataTypeParser
+import org.apache.spark.sql.execution.datasources.spinach.{CreateIndex, DropIndex}
 import org.apache.spark.sql.types._
 
 
@@ -68,15 +69,16 @@ class DDLParser(parseQuery: String => LogicalPlan)
   protected val DESC = Keyword("DESC")
   protected val BTREE = Keyword("BTREE")
 
-  protected lazy val ddl: Parser[LogicalPlan] = createTable | describeTable | refreshTable
+  protected lazy val ddl: Parser[LogicalPlan] =
+    createTable | describeTable | refreshTable | createIndex | dropIndex
 
   protected def start: Parser[LogicalPlan] = ddl
 
   /**
-   * CREATE INDEX [IF NOT EXISTS] indexName ON tableName (col1, col2, ...)
+   * CREATE INDEX [IF NOT EXISTS] indexName ON tableName (col1 [ASC | DESC], col2, ...)
+   * [USING BTREE]
    */
   protected lazy val createIndex: Parser[LogicalPlan] = {
-    // TODO: Support database.table.
     (CREATE ~ INDEX) ~> (IF ~> NOT <~ EXISTS).? ~ ident ~ (ON ~> tableIdentifier) ~
       indexCols ~ indexOpts.? ^^ {
       case allowExisting ~ indexIdent ~ tableIdent ~ indexColumns ~ maybeOpts =>
@@ -85,20 +87,20 @@ class DDLParser(parseQuery: String => LogicalPlan)
   }
 
   /**
-   * DROP INDEX [IF NOT EXISTS] indexName
+   * DROP INDEX [IF EXISTS] indexName
    */
   protected lazy val dropIndex: Parser[LogicalPlan] = {
-    // TODO: Support database.table.
-    (DROP ~ INDEX) ~> (IF ~> NOT <~ EXISTS).? ~ ident ^^ {
-      case allowExisting ~ indexIdent =>
-        DropIndex(indexIdent, allowExisting.isDefined)
+    (DROP ~ INDEX) ~> (IF ~> EXISTS).? ~ ident ^^ {
+      case allowNotExisting ~ indexIdent =>
+        DropIndex(indexIdent, allowNotExisting.isDefined)
     }
   }
 
   protected lazy val indexCols: Parser[Seq[IndexColumn]] = "(" ~> repsep(indexCol, ",") <~ ")"
 
   protected lazy val indexCol: Parser[IndexColumn] = ident ~ (ASC | DESC).? ^^ {
-    case id ~ maybeOrder => IndexColumn.apply(id, maybeOrder.getOrElse("ASC"))
+    case id ~ Some(str) => IndexColumn.apply(id, str.toUpperCase)
+    case id ~ None => IndexColumn.apply(id, "ASC")
   }
 
   protected lazy val indexOpts: Parser[String] = USING ~> BTREE

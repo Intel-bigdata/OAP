@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources
 
-import org.apache.spark.sql.catalyst.{IndexColumn, TableIdentifier}
+import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.RunnableCommand
@@ -160,32 +160,6 @@ class CaseInsensitiveMap(map: Map[String, String]) extends Map[String, String]
   override def iterator: Iterator[(String, String)] = baseMap.iterator
 
   override def -(key: String): Map[String, String] = baseMap - key.toLowerCase
-}
-
-/**
- * Creates an index for table on indexColumns
- */
-case class CreateIndex(
-    indexIdent: String,
-    table: TableIdentifier,
-    indexColumns: Array[IndexColumn],
-    ifNotExists: Boolean) extends LogicalPlan with Command {
-
-  override def children: Seq[LogicalPlan] = Seq.empty
-
-  override val output: Seq[Attribute] = Seq.empty
-}
-
-/**
- * Drops an index
- */
-case class DropIndex(
-    indexIdent: String,
-    ifNotExists: Boolean) extends LogicalPlan with Command {
-
-  override def children: Seq[LogicalPlan] = Seq.empty
-
-  override val output: Seq[Attribute] = Seq.empty
 }
 
 /**

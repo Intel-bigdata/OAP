@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.io.File
 
+import org.apache.spark.sql.catalyst.{IndexColumn, TableIdentifier}
+import org.apache.spark.sql.execution.datasources.DDLParser
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.sql._
 import org.apache.spark.sql.test.SharedSQLContext
@@ -52,6 +54,14 @@ class SpinachSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
 
   test("reading spinach file") {
     verifyFrame(sqlContext.read.format("spn").load(path.getAbsolutePath))
+  }
+
+  test("create index and drop index") {
+    val df = sqlContext.read.format("spn").load(path.getAbsolutePath)
+    df.registerTempTable("spntable1")
+    sqlContext.executePlan(CreateIndex("index1", TableIdentifier(
+      "spntable1"), Seq(IndexColumn("a", isAscending = true)).toArray, ifNotExists = false)).toRdd
+    sqlContext.executePlan(DropIndex("index1", ifExists = false))
   }
 
   /** Verifies data and schema. */

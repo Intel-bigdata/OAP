@@ -35,7 +35,7 @@ private[spinach] class IntValues(values: Array[Int]) extends IndexNodeValue {
 private[spinach] class NonLeafNode(
     keys: Array[Key],
     children: Array[IndexNode]) extends IndexNode {
-  assert(keys.length + 1 == children.length)
+  assert(keys.length == children.length)
   override def length: Int = keys.length
   override def next: IndexNode = throw new NotImplementedError("")
   override def childAt(idx: Int): IndexNode = children(idx)
@@ -59,8 +59,8 @@ private[spinach] object BPlusTreeSearchSuite extends Serializable {
 
   val indexMeta: IndexMeta = new IndexMeta("test", BTreeIndex(BTreeIndexEntry(1) :: Nil)) {
     // The data looks like:
-    //                      5             10             15     <-----Root Key
-    //                      |              |              |
+    //              3            8            13              16 <-----Root Key
+    //             |            |             |               |
     //            (3, 4, 5) -> (8, 9, 10) -> (13, 14, 15) -> (16, 17, 18)    <--- Second Level Key
     //             |  |  |     |  |  |        |   |   |       |   |   |
     //            30 40  50   80 90  100     130 140 150     160  170 180    <--- Values
@@ -95,8 +95,9 @@ private[spinach] object BPlusTreeSearchSuite extends Serializable {
         new IntValues(Array(50))),
       i12)
 
-    def root = new NonLeafNode(Array(5, 10, 15), Array(i11, i12, i13, i14))
-    override def open(context: TaskAttemptContext): IndexNode = root
+    def root = new NonLeafNode(Array(3, 8, 13, 16), Array(i11, i12, i13, i14))
+    override def open(path: String, schema: StructType, context: TaskAttemptContext): IndexNode =
+      root
   }
 }
 
@@ -116,6 +117,31 @@ private[spinach] class BPlusTreeSearchSuite
   test("equal 11") {
     val filters: Array[Filter] = Array(EqualTo("test", 11))
     assertScanner(meta, filters, Array(), Set.empty[Int])
+  }
+
+  test("equal 2") {
+    val filters: Array[Filter] = Array(EqualTo("test", 2))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
+  test("equal 3") {
+    val filters: Array[Filter] = Array(EqualTo("test", 3))
+    assertScanner(meta, filters, Array(), Set(30, 31, 32))
+  }
+
+  test("equal 18") {
+    val filters: Array[Filter] = Array(EqualTo("test", 18))
+    assertScanner(meta, filters, Array(), Set(180))
+  }
+
+  test("equal 19") {
+    val filters: Array[Filter] = Array(EqualTo("test", 19))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
+  test("equal 16") {
+    val filters: Array[Filter] = Array(EqualTo("test", 16))
+    assertScanner(meta, filters, Array(), Set(160, 161, 162))
   }
 
   test("equal 10") {
@@ -198,10 +224,10 @@ private[spinach] class BPlusTreeSearchSuite
     ic.getScannerBuilder match {
       case Some(builder) =>
         val scanner = builder.build
-        assert(scanner.initialize(attemptContext).toSet === expectedIds, "")
+        assert(scanner.initialize(null, attemptContext).toSet === expectedIds, "")
         SpinachFileFormat.serializeFilterScanner(conf, scanner)
         val deserialized = SpinachFileFormat.deserialzeFilterScanner(conf).get
-        assert(deserialized.initialize(attemptContext).toSet === expectedIds, "")
+        assert(deserialized.initialize(null, attemptContext).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")
     }
   }

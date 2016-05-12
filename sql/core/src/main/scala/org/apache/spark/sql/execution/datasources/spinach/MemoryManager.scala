@@ -34,7 +34,7 @@ private[spinach] object MemoryManager {
   // TODO temporarily using Long.MaxValue
   val capacity: Long = Long.MaxValue
   var maxMemoryInByte: Long = capacity
-  var memoryMode: MemoryMode = OnHeap
+  var memoryMode: MemoryMode = OffHeap
 
   def getMemoryMode: MemoryMode = memoryMode
 

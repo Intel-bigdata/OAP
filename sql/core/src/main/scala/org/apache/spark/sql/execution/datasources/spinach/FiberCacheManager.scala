@@ -248,6 +248,12 @@ private[spinach] case class DataFileScanner(
             FiberCacheManager(Fiber(this, requiredIds(i), groupId)))
           i += 1
         }
+        if (groupId < meta.groupCount - 1) {
+          // not the last row group
+          row.reset(meta.rowCountInEachGroup, columns)
+        } else {
+          row.reset(meta.rowCountInLastGroup, columns)
+        }
       }
 
       row.moveToRow(rowIdxInGroup)

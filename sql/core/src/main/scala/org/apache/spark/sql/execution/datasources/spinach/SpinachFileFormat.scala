@@ -25,6 +25,7 @@ import org.apache.spark.sql.types.StructType
 
 private[spinach] object SpinachFileFormat {
   val SPINACH_DATA_EXTENSION = ".data"
+  val SPINACH_INDEX_EXTENSION = ".index"
   val SPINACH_META_EXTENSION = ".meta"
   val SPINACH_META_FILE = "spinach.meta"
   val SPINACH_META_SCHEMA = "spinach.schema"

@@ -125,6 +125,8 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       .map(i => (i, i + 100, s"this is row $i"))
       .toDF("a", "b", "c")
     df.write.format("spn").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val spnDf = sqlContext.read.format("spn").load(tmpDir.getAbsolutePath)
+    spnDf.registerTempTable("spnt1")
 
     val path = new Path(
       new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)
@@ -142,5 +144,25 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
     assert(spinachMeta.schema === new StructType()
       .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
+
+    sql("create index index1 on spnt1 (a) using btree")
+    sql("create index index2 on spnt1 (a asc)") // dup as index1, still creating
+    sql("create index index3 on spnt1 (a desc)")
+    sql("create index if not exists index3 on spnt1 (a desc)") // not creating
+    sql("drop index index2") // dropping
+    sql("drop index if exists index5") // not dropping
+    sql("drop index if exists index2") // not dropping
+
+    val spinachMeta2 = DataSourceMeta.initialize(path, new Configuration())
+    val fileHeader2 = spinachMeta2.fileHeader
+    assert(fileHeader2.recordCount === 100)
+    assert(fileHeader2.dataFileCount === 3)
+    assert(fileHeader2.indexCount === 2)
+    // other should keep the same
+    val fileMetas2 = spinachMeta2.fileMetas
+    assert(fileMetas2.length === 3)
+    assert(fileMetas2.map(_.recordCount).sum === 100)
+    assert(fileMetas2(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+    assert(spinachMeta2.schema === spinachMeta.schema)
   }
 }

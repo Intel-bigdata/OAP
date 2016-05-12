@@ -25,8 +25,12 @@ import scala.collection.mutable.{ArrayBuffer, BitSet}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 import org.apache.hadoop.mapreduce.TaskAttemptContext
-import org.apache.spark.sql.types.StructType
+
+import org.apache.spark.deploy.SparkHadoopUtil
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Descending, SortDirection}
+import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.Platform
 
 /**
  * The Spinach meta file is organized in the following format.
@@ -114,7 +118,100 @@ private[spinach] object FileMeta {
 private[spinach] class IndexMeta(var name: String = null, var indexType: IndexType = null)
     extends Serializable {
   import IndexMeta._
-  def open(context: TaskAttemptContext): IndexNode = throw new NotImplementedError("TBD")
+  def open(dataPath: String, schema: StructType, context: TaskAttemptContext): IndexNode = {
+    val file = new Path(indexFileNameFromDataFileName(dataPath))
+    val fs = file.getFileSystem(SparkHadoopUtil.get.getConfigurationFromJobContext(context))
+    val fin = fs.open(file)
+    // wind to end of file to get tree root
+    // TODO check if enough to fit in Int
+    fin.seek(fs.getContentSummary(file).getLength - 8)
+    val dataEnd = fin.readInt()
+    val rootOffset = fin.readInt()
+    constructBTreeFromFile(fin, schema, rootOffset, dataEnd)
+  }
+
+  private def constructBTreeFromFile(
+      fin: FSDataInputStream, schema: StructType, rootOffset: Int, dataEnd: Int): IndexNode = {
+    constructBTreeFromFileWithFirstLeaf(fin, schema, rootOffset, dataEnd, null)._1
+  }
+
+  private def constructBTreeFromFileWithFirstLeaf(
+      fin: FSDataInputStream,
+      schema: StructType,
+      rootOffset: Int,
+      dataEnd: Int,
+      next: IndexNode): (IndexNode, IndexNode) = {
+    fin.seek(rootOffset)
+    val nodeLen = fin.readInt()
+    if (nodeLen == 0) return (null, null)
+    assert(nodeLen > 0)
+    var iter = 0
+    val types = schema.map(_.dataType)
+    val rows = new Array[InternalRow](nodeLen)
+    val childOffsets = new Array[Int](nodeLen)
+    val signLengths = new Array[Int](nodeLen)
+    while (iter < nodeLen) {
+      val signOffset = fin.readInt()
+      signLengths(iter) = signOffset - 8
+      val buffer = new Array[Byte](signOffset - 8)
+      fin.read(buffer)
+      rows(iter) = readInternalRowFromFileWithSchema(buffer, types)
+      childOffsets(iter) = fin.readInt()
+      iter = iter + 1
+    }
+    assert(childOffsets.forall(_ < dataEnd) || childOffsets.forall(_ >= dataEnd))
+    if (childOffsets.forall(_ < dataEnd)) {
+      // Leaf node, next for outer is same as root
+      val values = childOffsets.map(constructIndexNodeValue(fin, _)).toSeq
+      val leaf = InMemoryIndexNode(rows.toSeq, null, values, next, isLeaf = true)
+      (leaf, leaf)
+    } else {
+      iter = nodeLen - 1
+      val childrenCollector = ArrayBuffer.newBuilder[IndexNode]
+      val result =
+        constructBTreeFromFileWithFirstLeaf(fin, schema, childOffsets(iter), dataEnd, next)
+      var first = result._2
+      childrenCollector += result._1
+      while (iter > 0) {
+        iter = iter - 1
+        val iterResult =
+          constructBTreeFromFileWithFirstLeaf(fin, schema, childOffsets(iter), dataEnd, first)
+        first = iterResult._2
+        childrenCollector += iterResult._1
+      }
+      val children = childrenCollector.result().toSeq.reverse
+      (InMemoryIndexNode(rows.toSeq, children, null, null, isLeaf = false), first)
+    }
+  }
+
+  private def constructIndexNodeValue(fin: FSDataInputStream, offset: Int): IndexNodeValue = {
+    fin.seek(offset)
+    val length = fin.readInt()
+    var iter = 0
+    val data = new Array[Int](length)
+    while (iter < length) {
+      data(iter) = fin.readInt()
+      iter = iter + 1
+    }
+    InMemoryIndexNodeValue(data.toSeq)
+  }
+
+  private def readInternalRowFromFileWithSchema(
+      bytes: Array[Byte], types: Seq[DataType]): InternalRow = {
+    var offset = Platform.BYTE_ARRAY_OFFSET
+    var i = 0
+    val arr = new Array[Any](types.length)
+    while (i < types.length) {
+      arr(i) = types(i) match {
+        case IntegerType => Platform.getInt(bytes, offset)
+        // TODO more types
+        case _ => sys.error("not implemented types")
+      }
+      offset = offset + types(i).defaultSize
+      i = i + 1
+    }
+    InternalRow.fromSeq(arr.toSeq)
+  }
 
   private def writeBitSet(value: BitSet, totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {
     val sizeBefore = out.size
@@ -126,6 +223,13 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
     for (i <- 0 until remaining) {
       out.writeByte(0)
     }
+  }
+
+  private def indexFileNameFromDataFileName(dataFile: String): String = {
+    import SpinachFileFormat._
+    assert(dataFile.endsWith(SPINACH_DATA_EXTENSION))
+    val prefix = dataFile.substring(0, dataFile.length - SPINACH_DATA_EXTENSION.length)
+    prefix + "." + name + SPINACH_INDEX_EXTENSION
   }
 
   def write(out: FSDataOutputStream): Unit = {
