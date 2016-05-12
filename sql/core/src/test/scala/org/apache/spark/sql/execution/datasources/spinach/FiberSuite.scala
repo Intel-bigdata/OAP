@@ -42,7 +42,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   val ctx: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(attemptContext)
 
   override def beforeAll(): Unit = {
-    System.getProperty("spinach.rowgroup.size", "1024")
+    System.setProperty("spinach.rowgroup.size", "1024")
     file = Utils.createTempDir()
     file.delete()
   }

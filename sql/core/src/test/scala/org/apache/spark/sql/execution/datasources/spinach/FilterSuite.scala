@@ -58,6 +58,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("test spinach row group size change") {
     val defaultRowGroupSize = System.getProperty("spinach.rowgroup.size")
+    assert(defaultRowGroupSize != null)
     // change default row group size
     System.setProperty("spinach.rowgroup.size", "1025")
     val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
