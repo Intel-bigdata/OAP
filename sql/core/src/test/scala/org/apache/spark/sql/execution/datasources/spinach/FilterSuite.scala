@@ -55,6 +55,16 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM spinach_test"), data.map { row => Row(row._1, row._2) })
   }
 
+  test("test spinach row group size change") {
+    System.setProperty("spinach.rowgroup.size", "1025")
+    val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    checkAnswer(sql("SELECT * FROM spinach_test"), Seq.empty[Row])
+    sql("insert overwrite table spinach_test as select * from t")
+    checkAnswer(sql("SELECT * FROM spinach_test"), data.map { row => Row(row._1, row._2) })
+    System.setProperty("spinach.rowgroup.size", "1024")
+  }
+
   test("test date type") {
     val data: Seq[(Int, Date)] = (1 to 3000).map { i => (i, DateTimeUtils.toJavaDate(i)) }
     data.toDF("key", "value").registerTempTable("d")
