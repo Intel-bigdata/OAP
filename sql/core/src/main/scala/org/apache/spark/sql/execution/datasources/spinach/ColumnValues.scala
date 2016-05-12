@@ -42,7 +42,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberCacheData
   }
 
   // TODO should be in FiberByteData
-  private val baseOffset = raw.fiberData.getBaseOffset + defaultSize / 8
+  private val baseOffset = raw.fiberData.getBaseOffset + bitset.toLongArray().length * 8
 
   def isNullAt(idx: Int): Boolean = !bitset.get(idx)
 

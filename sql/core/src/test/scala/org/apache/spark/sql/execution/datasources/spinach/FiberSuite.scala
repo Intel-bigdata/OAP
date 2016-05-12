@@ -113,6 +113,29 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     }
   }
 
+  test("test spinach row group configuration") {
+    // change default row group size
+    System.setProperty("spinach.rowgroup.size", "12345")
+    val schema = new StructType()
+      .add("a", IntegerType)
+      .add("b", StringType)
+      .add("c", IntegerType)
+
+    val path = new Path(file.getAbsolutePath, 10.toString)
+    writeData(ctx, path, schema, 10, attemptContext)
+    val reader = new SpinachDataReader2(path, schema, None, Array(0, 1))
+    val split = new FileSplit(
+      path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
+    reader.initialize(split, attemptContext)
+    val meta = reader.dataFileMeta
+    assert(meta.totalRowCount() === 10)
+    assert(meta.rowCountInEachGroup === 12345)
+    assert(meta.rowCountInLastGroup === 10)
+    assert(meta.rowGroupsMeta.length === 1)
+    // set back to 1024
+    System.setProperty("spinach.rowgroup.size", "1024")
+  }
+
   // a simple algorithm to check if it's should be null
   private def shouldBeNull(rowId: Int, fieldId: Int): Boolean = {
     rowId % (fieldId + 3) == 0

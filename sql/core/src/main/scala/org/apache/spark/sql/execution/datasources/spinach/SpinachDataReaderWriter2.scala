@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.spinach
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.hadoop.io.NullWritable
 import org.apache.hadoop.mapreduce.{InputSplit, RecordReader, RecordWriter, TaskAttemptContext}
-import org.apache.spark.SparkConf
+import org.apache.spark.{Logging, SparkConf}
 import org.apache.spark.io.SnappyCompressionCodec
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.StructType
@@ -28,9 +28,14 @@ import org.apache.spark.sql.types.StructType
 private[spinach] class SpinachDataWriter2(
     isCompressed: Boolean,
     out: FSDataOutputStream,
-    schema: StructType) extends RecordWriter[NullWritable, InternalRow] {
+    schema: StructType) extends RecordWriter[NullWritable, InternalRow] with Logging {
   // TODO: make the fiber size configurable
-  private final val DEFAULT_ROW_GROUP_SIZE = 1024
+  // Temporarily solve this TODO with java options
+  // NOTE: java options should not start with spark (e.g. "spark.xxx.xxx"), or it cannot pass
+  // the config validation of SparkConf
+  private def DEFAULT_ROW_GROUP_SIZE = System.getProperty("spinach.rowgroup.size",
+    "1024").toInt
+  logDebug(s"spinach.rowgroup.size setting to ${DEFAULT_ROW_GROUP_SIZE}")
   private var rowCount: Int = 0
   private var rowGroupCount: Int = 0
 
@@ -64,7 +69,8 @@ private[spinach] class SpinachDataWriter2(
     rowGroupMeta.withNewStart(out.getPos).withNewFiberLens(fiberLens)
     while (idx < rowGroup.length) {
       val fiberByteData = rowGroup(idx).build()
-      val newFiberData = if (true) {
+      // TODO: disable compression temporarily, because there's some issue to solve for compression
+      val newFiberData = if (false) {
         compCodec.compressedOutputBuffer(fiberByteData.fiberData)
       } else {
         fiberByteData.fiberData

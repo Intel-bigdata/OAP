@@ -31,7 +31,8 @@ private[spinach] case object OnHeap extends MemoryMode
 
 private[spinach] object MemoryManager {
   // TODO make it configurable
-  val capacity: Long = 1024 * 1024 * 1024L // 1GB
+  // TODO temporarily using Long.MaxValue
+  val capacity: Long = Long.MaxValue
   var maxMemoryInByte: Long = capacity
   var memoryMode: MemoryMode = OnHeap
 
