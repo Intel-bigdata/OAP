@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 import scala.collection.JavaConverters._
@@ -106,8 +105,7 @@ object FiberCacheManager extends AbstractFiberCacheManger {
 private[spinach] case class InputDataFileDescriptor(fin: FSDataInputStream, len: Long)
 
 private[spinach] object DataMetaCacheManager extends Logging {
-  // TODO: make it configurable
-  // temporarily using java options to config.
+  // Using java options to config.
   val spinachDataMetaCacheSize = System.getProperty("spinach.datametacache.size",
     "262144").toLong  // default size is 256k
 

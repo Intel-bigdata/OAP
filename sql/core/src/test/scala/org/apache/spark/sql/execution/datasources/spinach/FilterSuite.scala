@@ -29,6 +29,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   import testImplicits._
 
   override def beforeEach(): Unit = {
+    System.setProperty("spinach.rowgroup.size", "1024")
     val path = Utils.createTempDir().getAbsolutePath
     sql(s"""CREATE TEMPORARY TABLE spinach_test (a INT, b STRING)
            | USING org.apache.spark.sql.execution.datasources.spinach
@@ -56,13 +57,16 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   }
 
   test("test spinach row group size change") {
+    val defaultRowGroupSize = System.getProperty("spinach.rowgroup.size")
+    // change default row group size
     System.setProperty("spinach.rowgroup.size", "1025")
     val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     checkAnswer(sql("SELECT * FROM spinach_test"), Seq.empty[Row])
     sql("insert overwrite table spinach_test as select * from t")
     checkAnswer(sql("SELECT * FROM spinach_test"), data.map { row => Row(row._1, row._2) })
-    System.setProperty("spinach.rowgroup.size", "1024")
+    // set back to default value
+    System.setProperty("spinach.rowgroup.size", defaultRowGroupSize)
   }
 
   test("test date type") {

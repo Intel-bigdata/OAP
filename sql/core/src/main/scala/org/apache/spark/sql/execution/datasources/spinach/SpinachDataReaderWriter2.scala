@@ -29,8 +29,7 @@ private[spinach] class SpinachDataWriter2(
     isCompressed: Boolean,
     out: FSDataOutputStream,
     schema: StructType) extends RecordWriter[NullWritable, InternalRow] with Logging {
-  // TODO: make the fiber size configurable
-  // Temporarily solve this TODO with java options
+  // Using java options to config
   // NOTE: java options should not start with spark (e.g. "spark.xxx.xxx"), or it cannot pass
   // the config validation of SparkConf
   private def DEFAULT_ROW_GROUP_SIZE = System.getProperty("spinach.rowgroup.size",
