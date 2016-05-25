@@ -33,11 +33,11 @@ import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions.{BoundReference, Descending, Ascending, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.catalyst.{IndexColumn, InternalRow, TableIdentifier}
-import org.apache.spark.sql.execution.datasources.{BaseWriterContainer, PartitionSpec}
+import org.apache.spark.sql.catalyst.{IndexColumn, InternalRow}
+import org.apache.spark.sql.execution.datasources.{BaseWriterContainer, PartitionSpec, PartitioningUtils}
 import org.apache.spark.sql.sources.{DataSourceRegister, Filter, HadoopFsRelation, HadoopFsRelationProvider, OutputWriter, OutputWriterFactory}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLConf, SQLContext}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.SerializableConfiguration
 
@@ -162,8 +162,21 @@ private[spinach] class SpinachRelation(
     if (partitionColumns.isEmpty) {
       new NonDynamicPartitionWriteContainer(this, job, isAppend, df.schema)
     } else {
-      // too many small files generated in the dynamic partition, we don't want to cache that
-      throw new UnsupportedOperationException("We don't support dynamic partition yet.")
+      val output = df.queryExecution.executedPlan.output
+      val partitionNames = partitionColumns.fieldNames
+      val (partitionOutput, dataOutput) =
+        output.partition(a => partitionNames.contains(a.name))
+
+      new DynamicPartitionWriterContainer(
+        this,
+        job,
+        partitionOutput,
+        dataOutput,
+        output,
+        PartitioningUtils.DEFAULT_PARTITION_NAME,
+        sqlContext.conf.getConf(SQLConf.PARTITION_MAX_FILES),
+        isAppend,
+        df.schema)
     }
   }
 

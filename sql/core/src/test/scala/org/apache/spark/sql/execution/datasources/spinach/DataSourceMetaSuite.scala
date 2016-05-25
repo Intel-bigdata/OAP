@@ -165,4 +165,26 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(fileMetas2(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
     assert(spinachMeta2.schema === spinachMeta.schema)
   }
+
+  test("Spinach meta for partitioned table") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i % 2, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("spn").partitionBy("b").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+
+    val path = new Path(
+      new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)
+    val spinachMeta = DataSourceMeta.initialize(path, new Configuration())
+
+    val fileHeader = spinachMeta.fileHeader
+    assert(fileHeader.recordCount === 100)
+    assert(fileHeader.dataFileCount === 6)
+    assert(fileHeader.indexCount === 0)
+
+    val fileMetas = spinachMeta.fileMetas
+    assert(fileMetas.length === 6)
+    assert(fileMetas.map(_.recordCount).sum === 100)
+    assert(fileMetas(0).dataFileName.startsWith("b="))
+    assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+  }
 }
