@@ -38,7 +38,8 @@ class FiberSensorSuite extends SparkFunSuite with AbstractFiberSensor with Loggi
     val fcs = Seq(FiberCacheStatus(filePath, bitSet1, dataFileMeta))
     val fiberInfo = SparkListenerCustomInfoUpdate(host1, execId1, CacheStatusSerDe.serialize(fcs))
     this.update(fiberInfo)
-    assert(this.getHosts(filePath) == Option(execId1))
+    assert(this.getHosts(filePath) == Some(FiberSensor.SPINACH_CACHE_HOST_PREFIX + host1 +
+      FiberSensor.SPINACH_CACHE_EXECUTOR_PREFIX + execId1))
 
     // executor2 update
     val host2 = "host2"
@@ -54,7 +55,8 @@ class FiberSensorSuite extends SparkFunSuite with AbstractFiberSensor with Loggi
     val fiberInfo2 = SparkListenerCustomInfoUpdate(host2, execId2, CacheStatusSerDe
       .serialize(Seq(FiberCacheStatus(filePath, bitSet2, dataFileMeta))))
     this.update(fiberInfo2)
-    assert(this.getHosts(filePath) == Some(execId2))
+    assert(this.getHosts(filePath) == Some(FiberSensor.SPINACH_CACHE_HOST_PREFIX + host2 +
+      FiberSensor.SPINACH_CACHE_EXECUTOR_PREFIX + execId2))
 
     // executor3 update
     val host3 = "host3"
@@ -67,6 +69,7 @@ class FiberSensorSuite extends SparkFunSuite with AbstractFiberSensor with Loggi
     val fiberInfo3 = SparkListenerCustomInfoUpdate(host3, execId3, CacheStatusSerDe
       .serialize(Seq(FiberCacheStatus(filePath, bitSet3, dataFileMeta))))
     this.update(fiberInfo3)
-    assert(this.getHosts(filePath) === Some(execId2))
+    assert(this.getHosts(filePath) === Some(FiberSensor.SPINACH_CACHE_HOST_PREFIX + host2 +
+      FiberSensor.SPINACH_CACHE_EXECUTOR_PREFIX + execId2))
   }
 }
