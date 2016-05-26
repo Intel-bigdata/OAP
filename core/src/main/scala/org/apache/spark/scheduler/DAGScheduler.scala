@@ -1542,11 +1542,13 @@ class DAGScheduler(
       return cached
     }
     // If the RDD has some placement preferences (as is the case for input RDDs), get those
-    val locations =  rdd.preferredLocations(rdd.partitions(partition))
+    val locations = rdd.preferredLocations(rdd.partitions(partition))
     if (locations.nonEmpty) {
-      val rddPrefs = Array(rdd.preferredLocations(rdd.partitions(partition)).head)
+      val cacheLocs = locations.filter(_.startsWith("SPINACH"))
+      val rddPrefs = cacheLocs.map { x =>
+        x.split("_SPINACH_EXECUTOR_")(0).stripPrefix("SPINACH_HOST_")}
       if (rddPrefs.nonEmpty) {
-        logInfo(s"^^^^^^^^ ^^^^^^^^ rddPrefs is ${rddPrefs.toString} ^^^^^^^^^^^^^^")
+        logInfo(s"^^^^^^^^ ^^^^^^^^ rddPrefs is ${rddPrefs} ^^^^^^^^^^^^^^")
         return rddPrefs.map(TaskLocation(_))
       }
     }

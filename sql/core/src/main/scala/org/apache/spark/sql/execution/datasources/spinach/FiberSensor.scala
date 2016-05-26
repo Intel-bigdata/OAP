@@ -27,23 +27,27 @@ import org.apache.spark.util.collection.BitSet
 // TODO FiberSensor doesn't consider the fiber cache, but only the number of cached
 // fiber count
 private[spinach] trait AbstractFiberSensor extends Logging {
+  val SPINACH_CACHE_HOST_PREFIX = "SPINACH_HOST_"
+  val SPINACH_CACHE_EXECUTOR_PREFIX = "_SPINACH_EXECUTOR_"
   case class HostFiberCache(host: String, status: FiberCacheStatus)
 
   private val fileToHost = new ConcurrentHashMap[String, HostFiberCache]
 
   def update(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
-    val execId = fiberInfo.executorId
-    val hostName = fiberInfo.hostName
+    val updateExecId = fiberInfo.executorId
+    val updateHostName = fiberInfo.hostName
+    val host = SPINACH_CACHE_HOST_PREFIX + updateHostName +
+      SPINACH_CACHE_EXECUTOR_PREFIX + updateExecId
     val fibersOnExecutor = CacheStatusSerDe.deserialize(fiberInfo.customizedInfo)
-    logInfo(s"======== ======== host: $hostName, executorId: $execId," +
-      s"info len is ${fibersOnExecutor.size}")
+    logInfo(s"======== ======== host: $updateHostName, executorId: $updateExecId," +
+      s"host is $host, info len is ${fibersOnExecutor.size}")
     fibersOnExecutor.foreach { case status =>
       fileToHost.get(status.file) match {
-        case null => fileToHost.put(status.file, HostFiberCache(hostName, status))
+        case null => fileToHost.put(status.file, HostFiberCache(host, status))
         case HostFiberCache(_, fcs) if (status.moreCacheThan(fcs)) =>
           // only cache a single executor ID, TODO need to considered the fiber id requried
           // replace the old HostFiberCache as the new one has more data cached
-          fileToHost.put(status.file, HostFiberCache(hostName, status))
+          fileToHost.put(status.file, HostFiberCache(host, status))
         case _ =>
       }
     }
