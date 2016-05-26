@@ -35,6 +35,8 @@ private[spinach] trait AbstractFiberSensor extends Logging {
     val execId = fiberInfo.executorId
     val hostName = fiberInfo.hostName
     val fibersOnExecutor = CacheStatusSerDe.deserialize(fiberInfo.customizedInfo)
+    logInfo(s"======== ======== host: $hostName, executorId: $execId," +
+      s"info len is ${fibersOnExecutor.size}")
     fibersOnExecutor.foreach { case status =>
       fileToHost.get(status.file) match {
         case null => fileToHost.put(status.file, HostFiberCache(hostName, status))
