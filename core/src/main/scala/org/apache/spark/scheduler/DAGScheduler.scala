@@ -1542,10 +1542,13 @@ class DAGScheduler(
       return cached
     }
     // If the RDD has some placement preferences (as is the case for input RDDs), get those
-    val rddPrefs = Array(rdd.preferredLocations(rdd.partitions(partition)).head)
-    if (rddPrefs.nonEmpty) {
-      logInfo(s"^^^^^^^^ ^^^^^^^^ rddPrefs is ${rddPrefs.toString} ^^^^^^^^^^^^^^")
-      return rddPrefs.map(TaskLocation(_))
+    val locations =  rdd.preferredLocations(rdd.partitions(partition))
+    if (locations.nonEmpty) {
+      val rddPrefs = Array(rdd.preferredLocations(rdd.partitions(partition)).head)
+      if (rddPrefs.nonEmpty) {
+        logInfo(s"^^^^^^^^ ^^^^^^^^ rddPrefs is ${rddPrefs.toString} ^^^^^^^^^^^^^^")
+        return rddPrefs.map(TaskLocation(_))
+      }
     }
 
     // If the RDD has narrow dependencies, pick the first partition of the first narrow dependency
