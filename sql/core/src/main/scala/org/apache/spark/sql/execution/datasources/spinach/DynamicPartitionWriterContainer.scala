@@ -34,6 +34,8 @@ import org.apache.spark.sql.execution.UnsafeKVExternalSorter
 import org.apache.spark.sql.sources.{HadoopFsRelation, OutputWriter}
 import org.apache.spark.sql.types.{StructType, StringType}
 
+private[spinach] case class DynamicSpinachWriteResult(results: Seq[SpinachWriteResult])
+
 /**
  * Adapted from [[org.apache.spark.sql.execution.datasources.DynamicPartitionWriterContainer]]
  * A writer that dynamically opens files based on the given partition columns.  Internally this is
@@ -203,9 +205,9 @@ private[spinach] class DynamicPartitionWriterContainer(
       }
     }
 
-    outputFileNames.keySet().toArray.map { key =>
+    DynamicSpinachWriteResult(outputFileNames.keySet().toArray.map { key =>
       SpinachWriteResult(outputFileNames.get(key), rowsWrittens.get(key))
-    }.toSeq
+    })
   }
 
   override def commitJob(writeResults: Array[WriteResult]): Unit = {
@@ -215,7 +217,7 @@ private[spinach] class DynamicPartitionWriterContainer(
     val builder = DataSourceMeta.newBuilder()
     writeResults.foreach {
       // The file fingerprint is not used at the moment.
-      case results: Seq[SpinachWriteResult] => results.foreach(r =>
+      case d: DynamicSpinachWriteResult => d.results.foreach(r =>
         builder.addFileMeta(FileMeta("", r.rowsWritten, r.fileName)))
       case _ => throw new SparkException("Unexpected Spinach write result.")
     }
