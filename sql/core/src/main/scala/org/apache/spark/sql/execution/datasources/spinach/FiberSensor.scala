@@ -33,14 +33,15 @@ private[spinach] trait AbstractFiberSensor extends Logging {
 
   def update(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
     val execId = fiberInfo.executorId
+    val hostName = fiberInfo.hostName
     val fibersOnExecutor = CacheStatusSerDe.deserialize(fiberInfo.customizedInfo)
     fibersOnExecutor.foreach { case status =>
       fileToHost.get(status.file) match {
-        case null => fileToHost.put(status.file, HostFiberCache(execId, status))
+        case null => fileToHost.put(status.file, HostFiberCache(hostName, status))
         case HostFiberCache(_, fcs) if (status.moreCacheThan(fcs)) =>
           // only cache a single executor ID, TODO need to considered the fiber id requried
           // replace the old HostFiberCache as the new one has more data cached
-          fileToHost.put(status.file, HostFiberCache(execId, status))
+          fileToHost.put(status.file, HostFiberCache(hostName, status))
         case _ =>
       }
     }

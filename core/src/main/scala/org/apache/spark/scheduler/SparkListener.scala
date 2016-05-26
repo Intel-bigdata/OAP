@@ -131,8 +131,10 @@ case class SparkListenerApplicationEnd(time: Long) extends SparkListenerEvent
 private[spark] case class SparkListenerLogStart(sparkVersion: String) extends SparkListenerEvent
 
 @DeveloperApi
-case class SparkListenerCustomInfoUpdate(executorId: String, customizedInfo: String)
-  extends SparkListenerEvent
+case class SparkListenerCustomInfoUpdate(
+    hostName: String,
+    executorId: String,
+    customizedInfo: String) extends SparkListenerEvent
 
 /**
  * :: DeveloperApi ::
