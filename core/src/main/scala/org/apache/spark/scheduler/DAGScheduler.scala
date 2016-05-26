@@ -268,6 +268,25 @@ class DAGScheduler(
     cacheLocs(rdd.id)
   }
 
+  private [scheduler]
+  def getSpinachCacheLocs(rdd: RDD[_], partition: Int): Seq[TaskLocation] = {
+    val locations = rdd.preferredLocations(rdd.partitions(partition))
+
+    if (locations.nonEmpty) {
+      val cacheLocs = locations.filter(_.startsWith("SPINACH_HOST_"))
+      val spinachPrefs = cacheLocs.map { cacheLoc =>
+        val host = cacheLoc.split("_SPINACH_EXECUTOR_")(0).stripPrefix("SPINACH_HOST_")
+        val execId = cacheLoc.split("_SPINACH_EXECUTOR_")(1)
+        (host, execId)
+      }
+      if (spinachPrefs.nonEmpty) {
+        logInfo(s"^^^^^^^^ ^^^^^^^^ spinachPrefs is ${spinachPrefs} ^^^^^^^^^^^^^^")
+        return spinachPrefs.map(loc => TaskLocation(loc._1, loc._2))
+      }
+    }
+    Seq.empty
+  }
+
   private def clearCacheLocs(): Unit = cacheLocs.synchronized {
     cacheLocs.clear()
   }
@@ -1538,19 +1557,16 @@ class DAGScheduler(
     }
     // If the partition is cached, return the cache locations
     val cached = getCacheLocs(rdd)(partition)
-    if (cached.nonEmpty) {
-      return cached
+    val spinachCached = getSpinachCacheLocs(rdd, partition)
+    if (cached.nonEmpty || spinachCached.nonEmpty) {
+      return cached ++ spinachCached
     }
+
     // If the RDD has some placement preferences (as is the case for input RDDs), get those
-    val locations = rdd.preferredLocations(rdd.partitions(partition))
-    if (locations.nonEmpty) {
-      val cacheLocs = locations.filter(_.startsWith("SPINACH"))
-      val rddPrefs = cacheLocs.map { x =>
-        x.split("_SPINACH_EXECUTOR_")(0).stripPrefix("SPINACH_HOST_")}
-      if (rddPrefs.nonEmpty) {
-        logInfo(s"^^^^^^^^ ^^^^^^^^ rddPrefs is ${rddPrefs} ^^^^^^^^^^^^^^")
-        return rddPrefs.map(TaskLocation(_))
-      }
+    val rddPrefs = rdd.preferredLocations(rdd.partitions(partition))
+    if (rddPrefs.nonEmpty) {
+      logInfo(s"^^^^^^^^ ^^^^^^^^ rddPrefs is ${rddPrefs} ^^^^^^^^^^^^^^")
+      return rddPrefs.map(TaskLocation(_))
     }
 
     // If the RDD has narrow dependencies, pick the first partition of the first narrow dependency
