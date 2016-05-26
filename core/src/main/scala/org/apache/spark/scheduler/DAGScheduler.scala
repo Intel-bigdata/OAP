@@ -272,7 +272,12 @@ class DAGScheduler(
   def getSpinachCacheLocs(rdd: RDD[_], partition: Int): Seq[TaskLocation] = {
     val locations = rdd.preferredLocations(rdd.partitions(partition))
 
+    // here we check if the splits was cached, if the splits is cached, there will be hosts with
+    // format "SPINACH_HOST_host_SPINACH_EXECUTOR_exec", so we check the host list to filter out
+    // the cached hosts, so that the tasks' locality level will be PROCESS_LOCAL
     if (locations.nonEmpty) {
+      // TODO use constant value for prefixes, these prefixes should be the same with that in
+      // [[org.apache.spark.sql.execution.datasources.spinach.FiberSensor]]
       val cacheLocs = locations.filter(_.startsWith("SPINACH_HOST_"))
       val spinachPrefs = cacheLocs.map { cacheLoc =>
         val host = cacheLoc.split("_SPINACH_EXECUTOR_")(0).stripPrefix("SPINACH_HOST_")
@@ -280,7 +285,7 @@ class DAGScheduler(
         (host, execId)
       }
       if (spinachPrefs.nonEmpty) {
-        logInfo(s"^^^^^^^^ ^^^^^^^^ spinachPrefs is ${spinachPrefs} ^^^^^^^^^^^^^^")
+        logDebug(s"got spinach prefer location value spinachPrefs is ${spinachPrefs}")
         return spinachPrefs.map(loc => TaskLocation(loc._1, loc._2))
       }
     }
@@ -1563,9 +1568,8 @@ class DAGScheduler(
     }
 
     // If the RDD has some placement preferences (as is the case for input RDDs), get those
-    val rddPrefs = rdd.preferredLocations(rdd.partitions(partition))
+    val rddPrefs = rdd.preferredLocations(rdd.partitions(partition)).toList
     if (rddPrefs.nonEmpty) {
-      logInfo(s"^^^^^^^^ ^^^^^^^^ rddPrefs is ${rddPrefs} ^^^^^^^^^^^^^^")
       return rddPrefs.map(TaskLocation(_))
     }
 
