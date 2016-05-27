@@ -17,20 +17,19 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.util.{ArrayList => JArrayList, Iterator => JIterator, LinkedHashSet => JLinkedHashSet, List => JList}
+import java.util.{ArrayList => JArrayList, List => JList}
 
 import scala.collection.JavaConverters._
 
 import com.google.common.base.Stopwatch
 import org.apache.commons.logging.{Log, LogFactory}
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 import org.apache.hadoop.io.NullWritable
 import org.apache.hadoop.mapreduce.{InputSplit, JobContext, RecordReader, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
+import org.apache.spark.SparkException
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
 import org.apache.spark.sql.types.StructType
 
 class SpinachFileInputFormat extends FileInputFormat[NullWritable, InternalRow] {
@@ -51,25 +50,24 @@ class SpinachFileInputFormat extends FileInputFormat[NullWritable, InternalRow] 
     val sw: Stopwatch = new Stopwatch().start
 
     val splits: JList[InputSplit] = new JArrayList[InputSplit]
-    val fileIt: JIterator[FileStatus] = listStatus(job).iterator()
     val jobConf = SparkHadoopUtil.get.getConfigurationFromJobContext(job)
 
-    while (fileIt.hasNext) {
-      val file = fileIt.next()
-      val path: Path = file.getPath
-      val length: Long = file.getLen
-      if (length != 0) {
-        if (path.getName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION)) {
-          val fs = path.getFileSystem(jobConf)
-          val blkLocations = fs.getFileBlockLocations(file, 0, length)
-          val cachedHosts = FiberSensor.getHosts(file.getPath.toString)
-          val hosts = new JLinkedHashSet(
-            (cachedHosts.toBuffer ++ blkLocations(0).getHosts).asJavaCollection)
-          splits.add(new FiberSplit(length, file.getPath, hosts.asScala.toArray))
-        } else if (path.getName.endsWith(SpinachFileFormat.SPINACH_META_EXTENSION)) {
-          // ignore it, as we will get the schema from the configuration
-        }
-      }
+    val spinachMeta = listStatus(job).asScala.find(file =>
+      file.getPath.getName.endsWith(SpinachFileFormat.SPINACH_META_EXTENSION))
+    val metaPath = spinachMeta match {
+      case Some(f) => f.getPath
+      case None => throw new SparkException("No Spinach meta file found for the job.")
+    }
+    val meta = DataSourceMeta.initialize(metaPath, jobConf)
+
+    meta.fileMetas.foreach { fileMeta =>
+      val path = new Path(metaPath.getParent, fileMeta.dataFileName)
+      val fs = path.getFileSystem(jobConf)
+      val file = fs.getFileStatus(path)
+      val blkLocations = fs.getFileBlockLocations(file, 0, file.getLen)
+      val cachedHosts = FiberSensor.getHosts(path.toString)
+      val hosts = (cachedHosts.toBuffer ++ blkLocations(0).getHosts).distinct
+      splits.add(new FiberSplit(file.getLen, path, hosts.toArray))
     }
 
     sw.stop

@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce._
 import org.apache.spark._
 import org.apache.spark.deploy.SparkHadoopUtil
-
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.InternalRow
@@ -34,7 +33,13 @@ import org.apache.spark.sql.execution.UnsafeKVExternalSorter
 import org.apache.spark.sql.sources.{HadoopFsRelation, OutputWriter}
 import org.apache.spark.sql.types.{StructType, StringType}
 
-private[spinach] case class DynamicSpinachWriteResult(results: Seq[SpinachWriteResult])
+private[spinach] case class SpinachPartitionWriteResult(
+    partition: String,
+    fileName: String,
+    rowsWritten: Int)
+
+private[spinach] case class SpinachDynamicPartitionWriteResult(
+    results: Seq[SpinachPartitionWriteResult])
 
 /**
  * Adapted from [[org.apache.spark.sql.execution.datasources.DynamicPartitionWriterContainer]]
@@ -105,7 +110,7 @@ private[spinach] class DynamicPartitionWriterContainer(
             currentWriter = newOutputWriter(currentKey)
             outputWriters.put(copiedKey, currentWriter)
             rowsWrittens.put(copiedKey, 0)
-            outputFileNames.put(copiedKey, getOutputRelativePath(currentWriter, currentKey))
+            outputFileNames.put(copiedKey, getOutputFileName(currentWriter))
           }
           currentWriter.writeInternal(getOutputRow(inputRow))
           rowsWrittens.put(copiedKey, rowsWrittens.get(copiedKey) + 1)
@@ -139,7 +144,7 @@ private[spinach] class DynamicPartitionWriterContainer(
               if (currentWriter == null) {
                 currentWriter = newOutputWriter(currentKey)
                 rowsWrittens.put(currentKey, 0)
-                outputFileNames.put(currentKey, getOutputRelativePath(currentWriter, currentKey))
+                outputFileNames.put(currentKey, getOutputFileName(currentWriter))
               }
             }
 
@@ -159,10 +164,9 @@ private[spinach] class DynamicPartitionWriterContainer(
         throw new SparkException("Task failed while writing rows.", cause)
     }
 
-     def getOutputRelativePath(writer: OutputWriter, partitionKey: InternalRow): String = {
+     def getOutputFileName(writer: OutputWriter): String = {
        writer match {
-          case s: SpinachOutputWriter => new Path(
-            getPartitionString(partitionKey).getString(0), s.getFileName()).toString
+          case s: SpinachOutputWriter => s.getFileName
           case _ => throw new SparkException("Incorrect Spinach output writer.")
         }
      }
@@ -205,25 +209,35 @@ private[spinach] class DynamicPartitionWriterContainer(
       }
     }
 
-    DynamicSpinachWriteResult(outputFileNames.keySet().toArray.map { key =>
-      SpinachWriteResult(outputFileNames.get(key), rowsWrittens.get(key))
+    SpinachDynamicPartitionWriteResult(outputFileNames.keySet().toArray.map { key =>
+      SpinachPartitionWriteResult(
+        getPartitionString(key.asInstanceOf[InternalRow]).getString(0),
+        outputFileNames.get(key),
+        rowsWrittens.get(key))
     })
   }
 
   override def commitJob(writeResults: Array[WriteResult]): Unit = {
     val outputRoot = FileOutputFormat.getOutputPath(job)
-    val path = new Path(outputRoot, SpinachFileFormat.SPINACH_META_FILE)
 
-    val builder = DataSourceMeta.newBuilder()
-    writeResults.foreach {
-      // The file fingerprint is not used at the moment.
-      case d: DynamicSpinachWriteResult => d.results.foreach(r =>
-        builder.addFileMeta(FileMeta("", r.rowsWritten, r.fileName)))
-      case _ => throw new SparkException("Unexpected Spinach write result.")
+    val partitions = writeResults.flatMap { case d: SpinachDynamicPartitionWriteResult =>
+      d.results.map(_.partition)
+    }.distinct
+
+    partitions.foreach { p =>
+      val builder = DataSourceMeta.newBuilder()
+      writeResults.foreach {
+        case d: SpinachDynamicPartitionWriteResult =>
+          for (r <- d.results if (r.partition == p)) {
+            // The file fingerprint is not used at the moment.
+            builder.addFileMeta(FileMeta("", r.rowsWritten, r.fileName))
+          }
+        case _ => throw new SparkException("Unexpected Spinach write result.")
+      }
+      val spinachMeta = builder.withNewSchema(schema).build()
+      val path = new Path(new Path(outputRoot, p), SpinachFileFormat.SPINACH_META_FILE)
+      DataSourceMeta.write(path, relation.sqlContext.sparkContext.hadoopConfiguration, spinachMeta)
     }
-
-    val spinachMeta = builder.withNewSchema(schema).build()
-    DataSourceMeta.write(path, relation.sqlContext.sparkContext.hadoopConfiguration, spinachMeta)
 
     super.commitJob(writeResults)
   }

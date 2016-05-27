@@ -21,7 +21,7 @@ import java.io.File
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Descending}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.sql.test.SharedSQLContext
@@ -168,23 +168,100 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
   test("Spinach meta for partitioned table") {
     val df = sparkContext.parallelize(1 to 100, 3)
-      .map(i => (i, i % 2, s"this is row $i"))
-      .toDF("a", "b", "c")
-    df.write.format("spn").partitionBy("b").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+      .map(i => (i, s"row $i", 2015 + i % 2))
+      .toDF("id", "name", "year")
+    df.write.format("spn")
+      .partitionBy("year")
+      .mode(SaveMode.Overwrite)
+      .save(tmpDir.getAbsolutePath)
 
-    val path = new Path(
-      new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)
-    val spinachMeta = DataSourceMeta.initialize(path, new Configuration())
+    var path = new Path(
+      new Path(tmpDir.getAbsolutePath, "year=2015"), SpinachFileFormat.SPINACH_META_FILE)
+    var spinachMeta = DataSourceMeta.initialize(path, new Configuration())
 
-    val fileHeader = spinachMeta.fileHeader
-    assert(fileHeader.recordCount === 100)
-    assert(fileHeader.dataFileCount === 6)
+    var fileHeader = spinachMeta.fileHeader
+    assert(fileHeader.recordCount === 50)
+    assert(fileHeader.dataFileCount === 3)
     assert(fileHeader.indexCount === 0)
 
-    val fileMetas = spinachMeta.fileMetas
-    assert(fileMetas.length === 6)
-    assert(fileMetas.map(_.recordCount).sum === 100)
-    assert(fileMetas(0).dataFileName.startsWith("b="))
+    var fileMetas = spinachMeta.fileMetas
+    assert(fileMetas.length === 3)
+    assert(fileMetas.map(_.recordCount).sum === 50)
+    assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+
+    path = new Path(
+      new Path(tmpDir.getAbsolutePath, "year=2016"), SpinachFileFormat.SPINACH_META_FILE)
+    spinachMeta = DataSourceMeta.initialize(path, new Configuration())
+
+    fileHeader = spinachMeta.fileHeader
+    assert(fileHeader.recordCount === 50)
+    assert(fileHeader.dataFileCount === 3)
+    assert(fileHeader.indexCount === 0)
+
+    fileMetas = spinachMeta.fileMetas
+    assert(fileMetas.length === 3)
+    assert(fileMetas.map(_.recordCount).sum === 50)
+    assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+
+
+    val readDf = sqlContext.read.format("spn").load(tmpDir.getAbsolutePath)
+    assert(readDf.schema === new StructType()
+      .add("id", IntegerType).add("name", StringType).add("year", IntegerType))
+    val data = readDf.collect().sortBy(_.getInt(0)) // sort locally
+    assert(data.length === 100)
+    assert(data(0) === Row(1, "row 1", 2016))
+    assert(data(1) === Row(2, "row 2", 2015))
+    assert(data(99) === Row(100, "row 100", 2015))
+  }
+
+  test("Spinach meta for two columns partitioned table") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, s"row $i", 2015 + i % 2, 1 + i % 3))
+      .toDF("id", "name", "year", "month")
+    df.write.format("spn")
+      .partitionBy("year", "month")
+      .mode(SaveMode.Overwrite)
+      .save(tmpDir.getAbsolutePath)
+
+    var path = new Path(
+      new Path(tmpDir.getAbsolutePath, "year=2015/month=1"), SpinachFileFormat.SPINACH_META_FILE)
+    var spinachMeta = DataSourceMeta.initialize(path, new Configuration())
+
+    var fileHeader = spinachMeta.fileHeader
+    assert(fileHeader.recordCount === 16)
+    assert(fileHeader.dataFileCount === 3)
+    assert(fileHeader.indexCount === 0)
+
+    var fileMetas = spinachMeta.fileMetas
+    assert(fileMetas.length === 3)
+    assert(fileMetas.map(_.recordCount).sum === 16)
+
+    path = new Path(
+      new Path(tmpDir.getAbsolutePath, "year=2015/month=2"), SpinachFileFormat.SPINACH_META_FILE)
+    spinachMeta = DataSourceMeta.initialize(path, new Configuration())
+
+    fileHeader = spinachMeta.fileHeader
+    assert(fileHeader.recordCount === 17)
+    assert(fileHeader.dataFileCount === 3)
+    assert(fileHeader.indexCount === 0)
+
+    fileMetas = spinachMeta.fileMetas
+    assert(fileMetas.length === 3)
+    assert(fileMetas.map(_.recordCount).sum === 17)
+    assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+
+    path = new Path(
+      new Path(tmpDir.getAbsolutePath, "year=2015/month=3"), SpinachFileFormat.SPINACH_META_FILE)
+    spinachMeta = DataSourceMeta.initialize(path, new Configuration())
+
+    fileHeader = spinachMeta.fileHeader
+    assert(fileHeader.recordCount === 17)
+    assert(fileHeader.dataFileCount === 3)
+    assert(fileHeader.indexCount === 0)
+
+    fileMetas = spinachMeta.fileMetas
+    assert(fileMetas.length === 3)
+    assert(fileMetas.map(_.recordCount).sum === 17)
     assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
   }
 }
