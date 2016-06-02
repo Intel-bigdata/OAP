@@ -147,8 +147,7 @@ private[spark] class HeartbeatReceiver(sc: SparkContext, clock: Clock)
         logWarning(s"Dropping $heartbeat because TaskScheduler is not ready yet")
         context.reply(HeartbeatResponse(reregisterBlockManager = true))
       }
-      customizedInfo.foreach { x =>
-        sc.listenerBus.post(SparkListenerCustomInfoUpdate(blockManagerId.host, executorId, x))}
+      customizedInfo.foreach(x => sc.listenerBus.post(SparkListenerCustomInfoUpdate(executorId, x)))
   }
 
   /**
