@@ -87,12 +87,12 @@ class DDLParser(parseQuery: String => LogicalPlan)
   }
 
   /**
-   * DROP INDEX [IF EXISTS] indexName
+   * DROP INDEX [IF EXISTS] indexName on tableName
    */
   protected lazy val dropIndex: Parser[LogicalPlan] = {
-    (DROP ~ INDEX) ~> (IF ~> EXISTS).? ~ ident ^^ {
-      case allowNotExisting ~ indexIdent =>
-        DropIndex(indexIdent, allowNotExisting.isDefined)
+    (DROP ~ INDEX) ~> (IF ~> EXISTS).? ~ ident ~ (ON ~> tableIdentifier) ^^ {
+      case allowNotExisting ~ indexIdent ~ tableIdent =>
+        DropIndex(indexIdent, tableIdent, allowNotExisting.isDefined)
     }
   }
 

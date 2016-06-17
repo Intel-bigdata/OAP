@@ -22,7 +22,7 @@ import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.{Row, SQLContext}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.expressions.Attribute
-import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan, Subquery}
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Subquery}
 import org.apache.spark.sql.execution.RunnableCommand
 
 /**
@@ -32,7 +32,7 @@ case class CreateIndex(
     indexName: String,
     tableName: TableIdentifier,
     indexColumns: Array[IndexColumn],
-    ifNotExists: Boolean) extends RunnableCommand with Logging {
+    allowExists: Boolean) extends RunnableCommand with Logging {
   override def children: Seq[LogicalPlan] = Seq.empty
 
   override val output: Seq[Attribute] = Seq.empty
@@ -40,23 +40,10 @@ case class CreateIndex(
   override def run(sqlContext: SQLContext): Seq[Row] = {
     val catalog = sqlContext.catalog
     assert(catalog.tableExists(tableName), s"$tableName not exists")
-    val indexIdent = TableIdentifier(indexName)
-    if (catalog.tableExists(indexIdent)) {
-      val msg = s"already exists a index named $indexName"
-      if (ifNotExists) {
-        // do nothing
-        logWarning(msg)
-      } else {
-        sys.error(msg)
-      }
-    } else {
-      catalog.lookupRelation(tableName) match {
-        case Subquery(_, LogicalRelation(r: SpinachRelation, _)) =>
-          // TODO See [[[IndexMarker]]]
-          catalog.registerTable(indexIdent, IndexMarker(r))
-          r.createIndex(indexName, indexColumns)
-        case _ => sys.error("Only support CreateIndex for SpinachRelation")
-      }
+    catalog.lookupRelation(tableName) match {
+      case Subquery(_, LogicalRelation(r: SpinachRelation, _)) =>
+        r.createIndex(indexName, indexColumns, allowExists)
+      case _ => sys.error("Only support CreateIndex for SpinachRelation")
     }
     Seq.empty
   }
@@ -67,7 +54,8 @@ case class CreateIndex(
  */
 case class DropIndex(
     indexIdent: String,
-    ifExists: Boolean) extends RunnableCommand {
+    tableIdentifier: TableIdentifier,
+    allowNotExists: Boolean) extends RunnableCommand {
 
   override def children: Seq[LogicalPlan] = Seq.empty
 
@@ -75,29 +63,11 @@ case class DropIndex(
 
   override def run(sqlContext: SQLContext): Seq[Row] = {
     val catalog = sqlContext.catalog
-    if (!catalog.tableExists(TableIdentifier(indexIdent))) {
-      if (ifExists) {
-        // do nothing
-      } else {
-        sys.error(s"$indexIdent not found")
-      }
-    } else {
-      catalog.lookupRelation(TableIdentifier(indexIdent)) match {
-        case Subquery(_, IndexMarker(r: SpinachRelation)) =>
-          r.dropIndex(indexIdent)
-        case _ => sys.error("Only support DropIndex for SpinachRelation")
-      }
-      sqlContext.catalog.unregisterTable(TableIdentifier(indexIdent))
+    catalog.lookupRelation(tableIdentifier) match {
+      case Subquery(_, LogicalRelation(r: SpinachRelation, _)) =>
+        r.dropIndex(indexIdent, allowNotExists)
+      case _ => sys.error("Only support DropIndex for SpinachRelation")
     }
-    // TODO delete index file and delete index meta from spinach meta
     Seq.empty
   }
-}
-
-/**
- * use as the marker to distinguish between table and index in catalog.
- * TODO should use a separate place and APIs
- */
-case class IndexMarker(spinachRelation: SpinachRelation) extends LeafNode {
-  override val output: Seq[Attribute] = Seq.empty
 }

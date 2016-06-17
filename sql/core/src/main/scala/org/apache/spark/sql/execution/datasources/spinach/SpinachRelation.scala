@@ -185,13 +185,20 @@ private[spinach] class SpinachRelation(
   }
 
   def createIndex(
-      indexName: String, indexColumns: Array[IndexColumn]): Unit = {
+      indexName: String, indexColumns: Array[IndexColumn], allowExists: Boolean): Unit = {
     logInfo(s"Creating index $indexName")
     meta match {
       case Some(oldMeta) =>
+        val existsIndexes = oldMeta.indexMetas
+        val exist = existsIndexes.exists(_.name == indexName)
+        if (!allowExists) assert(!exist)
+        if (exist) {
+          logWarning(s"dup index name $indexName")
+          return
+        }
         val metaBuilder = DataSourceMeta.newBuilder()
         oldMeta.fileMetas.foreach(metaBuilder.addFileMeta)
-        oldMeta.indexMetas.foreach(metaBuilder.addIndexMeta)
+        existsIndexes.foreach(metaBuilder.addIndexMeta)
         val entries = indexColumns.map(c => {
           val dir = if (c.isAscending) Ascending else Descending
           BTreeIndexEntry(schema.map(_.name).toIndexedSeq.indexOf(c.columnName), dir)
@@ -210,15 +217,30 @@ private[spinach] class SpinachRelation(
     }
   }
 
-  def dropIndex(indexName: String): Unit = {
+  def dropIndex(indexName: String, allowNotExists: Boolean): Unit = {
     logInfo(s"Dropping index $indexName")
     assert(meta.nonEmpty)
     val oldMeta = meta.get
+    val existsIndexes = oldMeta.indexMetas
+    val exist = existsIndexes.exists(_.name == indexName)
+    if (!allowNotExists) assert(exist, "IndexMeta not found in SpinachMeta")
+    if (!exist) {
+      logWarning(s"drop non-exists index $indexName")
+      return
+    }
     val metaBuilder = DataSourceMeta.newBuilder()
     oldMeta.fileMetas.foreach(metaBuilder.addFileMeta)
-    val existsIndexes = oldMeta.indexMetas
-    assert(existsIndexes.exists(_.name == indexName), "IndexMeta not found in SpinachMeta")
     existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
+
+    val path = new Path(paths(0))
+    val fs = path.getFileSystem(sqlContext.sparkContext.hadoopConfiguration)
+    val allFile = fs.listFiles(path, true)
+    val filePaths = new Iterator[Path] {
+      override def hasNext: Boolean = allFile.hasNext
+      override def next(): Path = allFile.next().getPath
+    }.toSeq
+    filePaths.filter(_.toString.endsWith(
+      "." + indexName + SpinachFileFormat.SPINACH_INDEX_EXTENSION)).foreach(fs.delete(_, true))
 
     DataSourceMeta.write(
       _metaPaths(0).getPath,

@@ -58,9 +58,10 @@ class SpinachSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
   test("create index and drop index") {
     val df = sqlContext.read.format("spn").load(path.getAbsolutePath)
     df.registerTempTable("spntable1")
-    sqlContext.executePlan(CreateIndex("index1", TableIdentifier(
-      "spntable1"), Seq(IndexColumn("a", isAscending = true)).toArray, ifNotExists = false)).toRdd
-    sqlContext.executePlan(DropIndex("index1", ifExists = false))
+    val tableIdent = TableIdentifier("spntable1")
+    sqlContext.executePlan(CreateIndex("index1", tableIdent, Seq(
+      IndexColumn("a", isAscending = true)).toArray, allowExists = false)).toRdd
+    sqlContext.executePlan(DropIndex("index1", tableIdent, allowNotExists = false)).toRdd
   }
 
   /** Verifies data and schema. */
