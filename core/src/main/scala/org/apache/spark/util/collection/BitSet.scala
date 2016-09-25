@@ -32,6 +32,8 @@ class BitSet(numBits: Int) extends Serializable {
    */
   def capacity: Int = numWords * 64
 
+  def toLongArray(): Array[Long] = words
+
   /**
    * Clear all set bits.
    */
