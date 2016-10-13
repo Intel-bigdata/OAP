@@ -17,10 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.hadoop.io.NullWritable
 import org.apache.hadoop.mapreduce.{InputSplit, RecordReader, RecordWriter, TaskAttemptContext}
-
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.io.SnappyCompressionCodec
@@ -30,7 +30,7 @@ import org.apache.spark.sql.types.StructType
 private[spinach] class SpinachDataWriter2(
     isCompressed: Boolean,
     out: FSDataOutputStream,
-    schema: StructType) extends RecordWriter[NullWritable, InternalRow] with Logging {
+    schema: StructType) extends Logging {
   // Using java options to config
   // NOTE: java options should not start with spark (e.g. "spark.xxx.xxx"), or it cannot pass
   // the config validation of SparkConf
@@ -46,7 +46,7 @@ private[spinach] class SpinachDataWriter2(
   private val fiberMeta = new DataFileMeta(
     rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE, fieldCount = schema.length)
 
-  override def write(ignore: NullWritable, row: InternalRow) {
+  def write(ignore: NullWritable, row: InternalRow) {
     var idx = 0
     while (idx < rowGroup.length) {
       rowGroup(idx).append(row)
@@ -79,7 +79,7 @@ private[spinach] class SpinachDataWriter2(
     fiberMeta.appendRowGroupMeta(rowGroupMeta.withNewEnd(out.getPos))
   }
 
-  override def close(context: TaskAttemptContext) {
+  def close() {
     val remainingRowCount = rowCount % DEFAULT_ROW_GROUP_SIZE
     if (remainingRowCount != 0) {
       // should be end of the insertion, put the row groups into the last row group
@@ -98,22 +98,54 @@ private[spinach] class SpinachDataWriter2(
 }
 
 private[spinach] class SpinachDataReader2(
-    path: Path,
-    schema: StructType,
-    filterScanner: Option[RangeScanner],
-    requiredIds: Array[Int]) {
+  path: Path,
+  schema: StructType,
+  filterScanner: Option[RangeScanner],
+  requiredIds: Array[Int]) {
 
-  def initialize(context: TaskAttemptContext): Iterator[InternalRow] = {
+  private var totalRowCount: Int = 0
+  private var currentRowId: Int = 0
+  private var currentRowIter: Iterator[InternalRow] = _
+  private var currentRow: InternalRow = _
+  var dataFileMeta: DataFileMeta = _
+
+  def initialize(conf: Configuration): Unit = {
+    // TODO how to save the additional FS operation to get the Split size
     val pathInstring = path.toString
-    val fileScanner = DataFileScanner(path.toString, schema, context)
+    val fileScanner = DataFileScanner(path.toString, schema, conf)
+    dataFileMeta = DataMetaCacheManager(fileScanner)
 
     filterScanner match {
-      case Some(fs) => fs.initialize(pathInstring, context)
+      case Some(fs) => fs.initialize(pathInstring, conf)
         // total Row count can be get from the filter scanner
         val rowIDs = fs.toArray.sorted
-        fileScanner.iterator(requiredIds, rowIDs)
+        totalRowCount = rowIDs.length
+        currentRowIter = fileScanner.iterator(requiredIds, rowIDs)
       case None =>
-        fileScanner.iterator(requiredIds)
+        totalRowCount = dataFileMeta.totalRowCount()
+        currentRowIter = fileScanner.iterator(requiredIds)
     }
   }
+
+  def getProgress: Float = if (totalRowCount > 0) {
+    currentRowId / totalRowCount
+  } else {
+    1.0f
+  }
+
+  def nextKeyValue(): Boolean = {
+    if (currentRowIter.hasNext) {
+      currentRowId += 1
+      currentRow = currentRowIter.next()
+      true
+    } else {
+      false
+    }
+  }
+
+  def getCurrentValue: InternalRow = currentRow
+
+  def getCurrentKey: NullWritable = NullWritable.get()
+
+  def close() { }
 }

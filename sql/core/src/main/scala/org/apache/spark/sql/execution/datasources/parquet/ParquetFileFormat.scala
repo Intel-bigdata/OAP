@@ -140,10 +140,7 @@ private[sql] class ParquetFileFormat
     }
   }
 
-  def inferSchema(
-      sparkSession: SparkSession,
-      parameters: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType] = {
+  def inferSchema: Option[StructType] = {
     val parquetOptions = new ParquetOptions(parameters, sparkSession.sessionState.conf)
 
     // Should we merge schemas from all Parquet part-files?
@@ -151,7 +148,7 @@ private[sql] class ParquetFileFormat
 
     val mergeRespectSummaries = sparkSession.conf.get(SQLConf.PARQUET_SCHEMA_RESPECT_SUMMARIES)
 
-    val filesByType = splitFiles(files)
+    val filesByType = splitFiles(catalog.allFiles())
 
     // Sees which file(s) we need to touch in order to figure out the schema.
     //

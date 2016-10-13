@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import org.apache.hadoop.conf.Configuration
+
 import scala.collection.mutable
 import org.apache.hadoop.mapreduce.TaskAttemptContext
 import org.apache.spark.internal.Logging
@@ -218,12 +220,12 @@ private[spinach] trait RangeScanner extends Iterator[Int] {
   def meta: IndexMeta
   def start: Key // the start node
 
-  def initialize(dataPath: String, context: TaskAttemptContext): RangeScanner = {
+  def initialize(dataPath: String, conf: Configuration): RangeScanner = {
     assert(keySchema ne null)
     this.ordering = GenerateOrdering.create(keySchema)
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileNameFromDataFileName(dataPath, meta.name)
-    val indexFiber = IndexFiber(IndexFileScanner(path, keySchema, context))
+    val indexFiber = IndexFiber(IndexFileScanner(path, keySchema, conf))
     val indexData = IndexCacheManager(indexFiber)
     val root = meta.open(indexData, keySchema)
 
@@ -293,7 +295,7 @@ private[spinach] trait RangeScanner extends Iterator[Int] {
 // A dummy scanner will actually not do any scanning
 private[spinach] object DUMMY_SCANNER extends RangeScanner {
   override def shouldStop(key: CurrentKey): Boolean = true
-  override def initialize(path: String, context: TaskAttemptContext): RangeScanner = { this }
+  override def initialize(path: String, configuration: Configuration): RangeScanner = { this }
   override def hasNext: Boolean = false
   override def next(): Int = throw new NoSuchElementException("end of iterating.")
   override def withNewStart(key: Key, include: Boolean): RangeScanner = this
@@ -303,8 +305,8 @@ private[spinach] object DUMMY_SCANNER extends RangeScanner {
 }
 
 private[spinach] trait LeftOpenInitialize extends RangeScanner {
-  override def initialize(path: String, context: TaskAttemptContext): RangeScanner = {
-    super.initialize(path, context)
+  override def initialize(path: String, conf: Configuration): RangeScanner = {
+    super.initialize(path, conf)
     if (ordering.compare(start, currentKey.currentKey) == 0) {
       // find the exactly the key, since it's LeftOpen, skip the first key
       currentKey.moveNextKey

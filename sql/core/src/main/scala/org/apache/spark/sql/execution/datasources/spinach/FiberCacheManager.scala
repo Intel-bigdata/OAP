@@ -22,11 +22,11 @@ import java.util.concurrent.TimeUnit
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, Buffer, HashMap}
 import com.google.common.cache._
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, FileSystem, Path}
 import org.apache.hadoop.mapreduce.TaskAttemptContext
 import org.apache.hadoop.util.StringUtils
 import org.apache.spark.SparkConf
-import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.Logging
 import org.apache.spark.io.SnappyCompressionCodec
 import org.apache.spark.sql.catalyst.InternalRow
@@ -138,9 +138,8 @@ private[spinach] object FiberDataFileHandler extends Logging {
         }
       }).build(new CacheLoader[DataFileScanner, InputDataFileDescriptor] {
       override def load(key: DataFileScanner): InputDataFileDescriptor = {
-        val ctx = key.context.getConfiguration
         val path = new Path(StringUtils.unEscapeString(key.path))
-        val fs = FileSystem.get(ctx)
+        val fs = FileSystem.get(key.conf)
 
         InputDataFileDescriptor(fs.open(path), fs.getFileStatus(path).getLen)
       }
@@ -155,7 +154,7 @@ private[spinach] object FiberDataFileHandler extends Logging {
 private[spinach] case class Fiber(file: DataFileScanner, columnIndex: Int, rowGroupId: Int)
 
 private[spinach] case class DataFileScanner(
-    path: String, schema: StructType, context: TaskAttemptContext) {
+    path: String, schema: StructType, conf: Configuration) {
   lazy val meta: DataFileMeta = DataMetaCacheManager(this)
   // TODO: add SparkConf
   val compCodec = new SnappyCompressionCodec(new SparkConf())
@@ -257,7 +256,7 @@ private[spinach] case class IndexFiber(file: IndexFileScanner)
 
 // TODO create abstract class for this and [[[DataFileScannar]]]
 private[spinach] case class IndexFileScanner(
-    path: String, schema: StructType, context: TaskAttemptContext) {
+    path: String, schema: StructType, configuration: Configuration) {
   // TODO: add SparkConf
   val compCodec = new SnappyCompressionCodec(new SparkConf())
 
@@ -278,7 +277,7 @@ private[spinach] case class IndexFileScanner(
 
   def getIndexFiberData(): IndexFiberCacheData = {
     val file = new Path(path)
-    val fs = file.getFileSystem(context.getConfiguration)
+    val fs = file.getFileSystem(configuration)
     val fin = fs.open(file)
     // wind to end of file to get tree root
     // TODO check if enough to fit in Int

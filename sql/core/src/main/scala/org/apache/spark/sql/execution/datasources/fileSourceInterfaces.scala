@@ -79,6 +79,13 @@ abstract class OutputWriterFactory extends Serializable {
   private[sql] def newWriter(path: String): OutputWriter = {
     throw new UnsupportedOperationException("newInstance with just path not supported")
   }
+
+  /**
+   * This API called from the driver when all of the write task finished, and give the data
+   * source extensions to pass back the data writing task status, etc. writing the global
+   * meta information.
+   */
+  def commitJob(taskResults: Array[WriteResult]): Unit = { }
 }
 
 /**
@@ -106,7 +113,7 @@ abstract class OutputWriter {
    *
    * @since 1.4.0
    */
-  def close(): Unit
+  def close(): WriteResult
 
   private var converter: InternalRow => Row = _
 
@@ -175,15 +182,26 @@ case class HadoopFsRelation(
  * Used to read and write data stored in files to/from the [[InternalRow]] format.
  */
 trait FileFormat {
+  protected var catalog: FileCatalog = _
+  protected var parameters: Map[String, String] = _
+  protected var sparkSession: SparkSession = _
+
+  def prepareRead(
+    sparkSession: SparkSession,
+    options: Map[String, String],
+    fileCatalog: FileCatalog): FileFormat = {
+    this.sparkSession = sparkSession
+    this.parameters = options
+    this.catalog = fileCatalog
+    this
+  }
+
   /**
    * When possible, this method should return the schema of the given `files`.  When the format
    * does not support inference, or no valid files are given should return None.  In these cases
    * Spark will require that user specify the schema manually.
    */
-  def inferSchema(
-      sparkSession: SparkSession,
-      options: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType]
+  def inferSchema: Option[StructType]
 
   /**
    * Prepares a write job and returns an [[OutputWriterFactory]].  Client side job preparation can

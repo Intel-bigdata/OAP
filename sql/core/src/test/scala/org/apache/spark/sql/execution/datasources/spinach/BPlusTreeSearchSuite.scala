@@ -104,9 +104,6 @@ private[spinach] object BPlusTreeSearchSuite extends Serializable {
 private[spinach] class BPlusTreeSearchSuite
     extends SparkFunSuite with Logging with BeforeAndAfterAll {
   val conf: Configuration = new Configuration()
-  val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
-    conf,
-    new TaskAttemptID(new TaskID(new JobID(), true, 0), 0))
 
   val meta = new DataSourceMeta(
     null,
@@ -224,7 +221,7 @@ private[spinach] class BPlusTreeSearchSuite
     ic.getScannerBuilder match {
       case Some(builder) =>
         val scanner = builder.build
-        assert(scanner.initialize(null, attemptContext).toSet === expectedIds, "")
+        assert(scanner.initialize(null, conf).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")
     }
   }

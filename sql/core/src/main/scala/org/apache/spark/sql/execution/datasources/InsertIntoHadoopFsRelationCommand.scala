@@ -19,7 +19,6 @@ package org.apache.spark.sql.execution.datasources
 
 import java.io.IOException
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
@@ -140,8 +139,9 @@ private[sql] case class InsertIntoHadoopFsRelationCommand(
         writerContainer.driverSideSetup()
 
         try {
-          sparkSession.sparkContext.runJob(queryExecution.toRdd, writerContainer.writeRows _)
-          writerContainer.commitJob()
+          val results =
+            sparkSession.sparkContext.runJob(queryExecution.toRdd, writerContainer.writeRows _)
+          writerContainer.commitJob(results)
           refreshFunction()
         } catch { case cause: Throwable =>
           logError("Aborting job.", cause)

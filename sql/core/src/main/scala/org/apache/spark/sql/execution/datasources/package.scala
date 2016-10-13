@@ -15,16 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources
+package org.apache.spark.sql.execution
 
-import org.apache.spark.sql.catalyst.InternalRow
-
-package object spinach {
-  type Key = InternalRow
-}
-
-class SpinachException(message: String, cause: Throwable)
-  extends Exception(message, cause) {
-
-  def this(message: String) = this(message, null)
+package object datasources {
+  type WriteResult = Any
 }

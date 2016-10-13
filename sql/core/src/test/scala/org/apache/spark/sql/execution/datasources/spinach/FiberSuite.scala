@@ -35,10 +35,7 @@ import org.scalatest.BeforeAndAfterAll
 
 class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   private var file: File = null
-  val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
-    new Configuration(),
-    new TaskAttemptID(new TaskID(new JobID(), true, 0), 0))
-  val ctx: Configuration = SparkHadoopUtil.get.getConfigurationFromJobContext(attemptContext)
+  val conf: Configuration = new Configuration()
 
   override def beforeAll(): Unit = {
     System.setProperty("spinach.rowgroup.size", "1024")
@@ -58,13 +55,13 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
 
     val recordCount = 3
     val path = new Path(file.getAbsolutePath, "test1")
-    writeData(ctx, path, schema, recordCount, attemptContext)
+    writeData(path, schema, recordCount)
     val split = new FileSplit(
-      path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
-    assertData(path, schema, Array(0, 1, 2), split, attemptContext, recordCount)
-    assertData(path, schema, Array(0, 2, 1), split, attemptContext, recordCount)
-    assertData(path, schema, Array(0, 1), split, attemptContext, recordCount)
-    assertData(path, schema, Array(2, 1), split, attemptContext, recordCount)
+      path, 0, FileSystem.get(conf).getFileStatus(path).getLen(), Array.empty[String])
+    assertData(path, schema, Array(0, 1, 2), split, recordCount)
+    assertData(path, schema, Array(0, 2, 1), split, recordCount)
+    assertData(path, schema, Array(0, 1), split, recordCount)
+    assertData(path, schema, Array(2, 1), split, recordCount)
   }
 
   test("test different data types") {
@@ -83,10 +80,10 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       .add("h", LongType)
       .add("i", ShortType)
       .add("j", StringType)
-    writeData(ctx, childPath, schema, recordCount, attemptContext)
+    writeData(childPath, schema, recordCount)
     val split = new FileSplit(
-      childPath, 0, FileSystem.get(ctx).getFileStatus(childPath).getLen(), Array.empty[String])
-    assertData(childPath, schema, Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), split, attemptContext,
+      childPath, 0, FileSystem.get(conf).getFileStatus(childPath).getLen(), Array.empty[String])
+    assertData(childPath, schema, Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), split,
       recordCount)
 
   }
@@ -101,11 +98,9 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     val rowGroupCounts = Array(0, 1, 1, 2)
     for (i <- 0 until rowCounts.length) {
       val path = new Path(file.getAbsolutePath, rowCounts(i).toString)
-      writeData(ctx, path, schema, rowCounts(i), attemptContext)
+      writeData(path, schema, rowCounts(i))
       val reader = new SpinachDataReader2(path, schema, None, Array(0, 1))
-      val split = new FileSplit(
-        path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
-      reader.initialize(split, attemptContext)
+      reader.initialize(conf)
       val meta = reader.dataFileMeta
       assert(meta.totalRowCount() === rowCounts(i))
       assert(meta.rowCountInLastGroup === rowCountInLastGroups(i))
@@ -124,11 +119,9 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       .add("c", IntegerType)
 
     val path = new Path(file.getAbsolutePath, 10.toString)
-    writeData(ctx, path, schema, 10, attemptContext)
+    writeData(path, schema, 10)
     val reader = new SpinachDataReader2(path, schema, None, Array(0, 1))
-    val split = new FileSplit(
-      path, 0, FileSystem.get(ctx).getFileStatus(path).getLen(), Array.empty[String])
-    reader.initialize(split, attemptContext)
+    reader.initialize(conf)
     val meta = reader.dataFileMeta
     assert(meta.totalRowCount() === 10)
     assert(meta.rowCountInEachGroup === 12345)
@@ -144,10 +137,9 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   }
 
   def writeData(
-      ctx: Configuration, path: Path,
-      schema: StructType, count: Int,
-      attemptContext: TaskAttemptContext): Unit = {
-    val out = FileSystem.get(ctx).create(path, true)
+      path: Path,
+      schema: StructType, count: Int): Unit = {
+    val out = FileSystem.get(conf).create(path, true)
     val writer = new SpinachDataWriter2(false, out, schema)
     val row = new GenericMutableRow(schema.fields.length)
     for(i <- 0 until count) {
@@ -184,7 +176,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       }
       writer.write(null, row)
     }
-    writer.close(attemptContext)
+    writer.close()
   }
 
   def assertData(
@@ -192,10 +184,9 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       schema: StructType,
       requiredIds: Array[Int],
       split: FileSplit,
-      attemptContext: TaskAttemptContext,
       count: Int): Unit = {
     val reader = new SpinachDataReader2(path, schema, None, requiredIds)
-    reader.initialize(split, attemptContext)
+    reader.initialize(conf)
 
     var idx = 0
     while (reader.nextKeyValue()) {

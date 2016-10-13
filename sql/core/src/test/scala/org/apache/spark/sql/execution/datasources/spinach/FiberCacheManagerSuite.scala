@@ -33,9 +33,7 @@ class FiberCacheManagerSuite extends SparkFunSuite with Logging {
     object testFiberManager extends AbstractFiberCacheManger {
       override def fiber2Data(key: Fiber): FiberCacheData = MemoryManager.allocate(100)
     }
-    val attemptContext: TaskAttemptContext = new TaskAttemptContextImpl(
-      new Configuration(),
-      new TaskAttemptID(new TaskID(), 0))
+    val conf: Configuration = new Configuration()
     val rowGroupsMeta = new ArrayBuffer[RowGroupMeta](30)
     val fieldCount = 3
     val groupCount = 30
@@ -47,7 +45,7 @@ class FiberCacheManagerSuite extends SparkFunSuite with Logging {
       rowGroupsMeta, rowCountInEachGroup, rowCountInLastGroup, groupCount, fieldCount)
 
     // DataFileScanner will read file back and get dataMeta and cache it
-    val fileScanner = new DataFileScanner(filePath, new StructType(), attemptContext){
+    val fileScanner = new DataFileScanner(filePath, new StructType(), conf) {
       override lazy val meta: DataFileMeta = dataMeta
     }
 

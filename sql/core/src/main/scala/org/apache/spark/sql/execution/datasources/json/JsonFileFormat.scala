@@ -42,18 +42,15 @@ class JsonFileFormat extends TextBasedFileFormat with DataSourceRegister {
 
   override def shortName(): String = "json"
 
-  override def inferSchema(
-      sparkSession: SparkSession,
-      options: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType] = {
-    if (files.isEmpty) {
+  override def inferSchema: Option[StructType] = {
+    if (catalog.allFiles().isEmpty) {
       None
     } else {
-      val parsedOptions: JSONOptions = new JSONOptions(options)
+      val parsedOptions: JSONOptions = new JSONOptions(parameters)
       val columnNameOfCorruptRecord =
         parsedOptions.columnNameOfCorruptRecord
           .getOrElse(sparkSession.sessionState.conf.columnNameOfCorruptRecord)
-      val jsonFiles = files.filterNot { status =>
+      val jsonFiles = catalog.allFiles().filterNot { status =>
         val name = status.getPath.getName
         name.startsWith("_") || name.startsWith(".")
       }.toArray

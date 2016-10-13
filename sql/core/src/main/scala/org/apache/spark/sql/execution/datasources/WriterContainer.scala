@@ -84,7 +84,7 @@ private[sql] abstract class BaseWriterContainer(
 
   private var outputFormatClass: Class[_ <: OutputFormat[_, _]] = _
 
-  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): Unit
+  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): WriteResult
 
   def driverSideSetup(): Unit = {
     setupIDs(0, 0, 0)
@@ -218,8 +218,9 @@ private[sql] abstract class BaseWriterContainer(
     logError(s"Task attempt $taskAttemptId aborted.")
   }
 
-  def commitJob(): Unit = {
+  def commitJob(taskResults: Array[WriteResult]): Unit = {
     outputCommitter.commitJob(jobContext)
+    outputWriterFactory.commitJob(taskResults)
     logInfo(s"Job $jobId committed.")
   }
 
@@ -240,34 +241,22 @@ private[sql] class DefaultWriterContainer(
     isAppend: Boolean)
   extends BaseWriterContainer(relation, job, isAppend) {
 
-  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): Unit = {
+  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): WriteResult = {
     executorSideSetup(taskContext)
     val configuration = taskAttemptContext.getConfiguration
     configuration.set(DATASOURCE_OUTPUTPATH, outputPath)
     var writer = newOutputWriter(getWorkPath)
     writer.initConverter(dataSchema)
 
-    // If anything below fails, we should abort the task.
-    try {
-      Utils.tryWithSafeFinallyAndFailureCallbacks {
-        while (iterator.hasNext) {
-          val internalRow = iterator.next()
-          writer.writeInternal(internalRow)
-        }
-        commitTask()
-      }(catchBlock = abortTask())
-    } catch {
-      case t: Throwable =>
-        throw new SparkException("Task failed while writing rows", t)
-    }
-
-    def commitTask(): Unit = {
+    def commitTask(): WriteResult = {
       try {
+        var writeResult: WriteResult = null
         if (writer != null) {
-          writer.close()
+          writeResult = writer.close()
           writer = null
         }
         super.commitTask()
+        writeResult
       } catch {
         case cause: Throwable =>
           // This exception will be handled in `InsertIntoHadoopFsRelation.insert$writeRows`, and
@@ -284,6 +273,20 @@ private[sql] class DefaultWriterContainer(
       } finally {
         super.abortTask()
       }
+    }
+
+    // If anything below fails, we should abort the task.
+    try {
+      Utils.tryWithSafeFinallyAndFailureCallbacks {
+        while (iterator.hasNext) {
+          val internalRow = iterator.next()
+          writer.writeInternal(internalRow)
+        }
+        commitTask()
+      }(catchBlock = abortTask())
+    } catch {
+      case t: Throwable =>
+        throw new SparkException("Task failed while writing rows", t)
     }
   }
 }
@@ -363,7 +366,7 @@ private[sql] class DynamicPartitionWriterContainer(
     newWriter
   }
 
-  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): Unit = {
+  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): WriteResult = {
     executorSideSetup(taskContext)
 
     // We should first sort by partition columns, then bucket id, and finally sorting columns.
@@ -429,12 +432,14 @@ private[sql] class DynamicPartitionWriterContainer(
           }
           currentWriter.writeInternal(sortedIterator.getValue)
         }
+        var writeResult: WriteResult = null
         if (currentWriter != null) {
-          currentWriter.close()
+          writeResult = currentWriter.close()
           currentWriter = null
         }
 
         commitTask()
+        writeResult
       }(catchBlock = {
         if (currentWriter != null) {
           currentWriter.close()

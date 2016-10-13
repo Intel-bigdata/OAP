@@ -32,7 +32,7 @@ import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
-import org.apache.spark.sql.execution.datasources.{FileFormat, OutputWriter, OutputWriterFactory, PartitionedFile}
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.{DataSourceRegister, Filter}
 import org.apache.spark.sql.types.StructType
@@ -43,30 +43,38 @@ private[sql] class SpinachFileFormat extends FileFormat
   with Logging
   with Serializable {
 
-  override def inferSchema(
+  override def prepareRead(
     sparkSession: SparkSession,
     options: Map[String, String],
-    files: Seq[FileStatus]): Option[StructType] = {
-    val metaPaths = files.filter { status =>
+    fileCatalog: FileCatalog): FileFormat = {
+    super.prepareRead(sparkSession, options, fileCatalog)
+
+    val metaPaths = catalog.allFiles().filter { status =>
       status.getPath.getName.endsWith(SpinachFileFormat.SPINACH_META_FILE)
     }.toArray
 
     val meta: Option[DataSourceMeta] =
-      SpinachFileFormat.inferDataSourceMeta(sparkSession.sparkContext.hadoopConfiguration, files)
+      SpinachFileFormat.inferDataSourceMeta(
+        sparkSession.sparkContext.hadoopConfiguration, catalog.allFiles())
     SpinachFileFormat.serializeDataSourceMeta(sparkSession.sparkContext.hadoopConfiguration, meta)
-    meta.map(_.schema)
+
+    inferSchema = meta.map(_.schema)
+
+    this
   }
+
+  var inferSchema: Option[StructType] = _
 
   override def prepareWrite(
     sparkSession: SparkSession,
     job: Job, options: Map[String, String],
     dataSchema: StructType): OutputWriterFactory = {
     // TODO pass down something via job conf
-    val conf = sparkSession.sqlContext.sessionState.newHadoopConf()
+    val conf = job.getConfiguration
 
     new SpinachOutputWriterFactory(sparkSession.sqlContext.conf,
       dataSchema,
-      conf,
+      job,
       options)
   }
 
@@ -123,7 +131,7 @@ private[sql] class SpinachFileFormat extends FileFormat
 
           val iter = new SpinachDataReader2(
             new Path(new URI(file.filePath)), dataSchema, filterScanner, requiredIds
-          ).initialize(SpinachFileFormat.dummyTaskAttemptContext(broadcastedHadoopConf))
+          ).initialize(broadcastedHadoopConf.value.value)
 
           val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
           val joinedRow = new JoinedRow()
@@ -140,10 +148,9 @@ private[sql] class SpinachFileFormat extends FileFormat
 private[spinach] class SpinachOutputWriterFactory(
     sqlConf: SQLConf,
     dataSchema: StructType,
-    hadoopConf: Configuration,
+    job: Job,
     options: Map[String, String]) extends OutputWriterFactory {
   private val serializableConf: SerializableConfiguration = {
-    val job = Job.getInstance(hadoopConf)
     val conf = ContextUtil.getConfiguration(job)
 
     new SerializableConfiguration(conf)
@@ -156,35 +163,56 @@ private[spinach] class SpinachOutputWriterFactory(
     assert(bucketId.isDefined == false, "Spinach doesn't support bucket yet.")
     new SpinachOutputWriter(path, dataSchema, context, serializableConf)
   }
+
+  // this is called from driver side
+  override def commitJob(taskResults: Array[WriteResult]): Unit = {
+    // TODO supposedly, we put one single meta file for each partition, however,
+    // we need to thinking about how to read data from partitions
+    val outputRoot = FileOutputFormat.getOutputPath(job)
+    val path = new Path(outputRoot, SpinachFileFormat.SPINACH_META_FILE)
+
+    val builder = DataSourceMeta.newBuilder()
+    taskResults.foreach {
+      // The file fingerprint is not used at the moment.
+      case s: SpinachWriteResult => builder.addFileMeta(FileMeta("", s.rowsWritten, s.fileName))
+      case _ => throw new SpinachException("Unexpected Spinach write result.")
+    }
+
+    val spinachMeta = builder.withNewSchema(dataSchema).build()
+    DataSourceMeta.write(path, job.getConfiguration, spinachMeta)
+
+    super.commitJob(taskResults)
+  }
 }
+
+
+private[spinach] case class SpinachWriteResult(fileName: String, rowsWritten: Int)
 
 private[spinach] class SpinachOutputWriter(
                                             path: String,
                                             dataSchema: StructType,
                                             context: TaskAttemptContext,
                                             sc: SerializableConfiguration) extends OutputWriter {
-  private val writer = new FileOutputFormat[NullWritable, InternalRow] {
-    override def getDefaultWorkFile(context: TaskAttemptContext, extension: String): Path = {
-      new Path(path, getFileName(extension))
-    }
+  private var rowCount = 0
+  private val writer: SpinachDataWriter2 = {
+    val isCompressed: Boolean = FileOutputFormat.getCompressOutput(context)
+    val file: Path = new Path(path, getFileName(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+    val fs: FileSystem = file.getFileSystem(sc.value)
+    val fileOut: FSDataOutputStream = fs.create(file, false)
 
-    override def getRecordWriter(context: TaskAttemptContext)
-    : RecordWriter[NullWritable, InternalRow] = {
-
-      val isCompressed: Boolean = FileOutputFormat.getCompressOutput(context)
-
-      val file: Path = getDefaultWorkFile(context, SpinachFileFormat.SPINACH_DATA_EXTENSION)
-      val fs: FileSystem = file.getFileSystem(sc.value)
-      val fileOut: FSDataOutputStream = fs.create(file, false)
-      new SpinachDataWriter2(isCompressed, fileOut, dataSchema)
-    }
-  }.getRecordWriter(context)
+    new SpinachDataWriter2(isCompressed, fileOut, dataSchema)
+  }
 
   override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
   override protected[sql] def writeInternal(row: InternalRow): Unit = {
+    rowCount += 1
     writer.write(NullWritable.get(), row)
   }
-  override def close(): Unit = writer.close(context)
+
+  override def close(): WriteResult = {
+    writer.close()
+    SpinachWriteResult(getFileName(), rowCount)
+  }
 
   def getFileName(extension: String): String = {
     val configuration = sc.value
@@ -225,11 +253,5 @@ private[sql] object SpinachFileFormat {
       // TODO verify all of the schema from the meta data
       Some(DataSourceMeta.initialize(metaPaths(0).getPath, conf))
     }
-  }
-
-  def dummyTaskAttemptContext(hadoopConf: Broadcast[SerializableConfiguration])
-  : TaskAttemptContext = {
-    val attemptId = new TaskAttemptID(new TaskID(new JobID(), TaskType.MAP, 0), 0)
-    new TaskAttemptContextImpl(hadoopConf.value.value, attemptId)
   }
 }

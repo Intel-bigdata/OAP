@@ -181,10 +181,10 @@ case class DataSource(
         SparkHadoopUtil.get.globPathIfNecessary(qualified)
       }.toArray
       val fileCatalog = new ListingFileCatalog(sparkSession, globbedPaths, options, None)
-      format.inferSchema(
+      format.prepareRead(
         sparkSession,
         caseInsensitiveOptions,
-        fileCatalog.allFiles())
+        fileCatalog).inferSchema
     }.getOrElse {
       throw new AnalysisException("Unable to infer schema. It must be specified manually.")
     }
@@ -324,11 +324,9 @@ case class DataSource(
           if hasMetadata(caseInsensitiveOptions.get("path").toSeq ++ paths) =>
         val basePath = new Path((caseInsensitiveOptions.get("path").toSeq ++ paths).head)
         val fileCatalog = new MetadataLogFileCatalog(sparkSession, basePath)
+        format.prepareRead(sparkSession, caseInsensitiveOptions, fileCatalog)
         val dataSchema = userSpecifiedSchema.orElse {
-          format.inferSchema(
-            sparkSession,
-            caseInsensitiveOptions,
-            fileCatalog.allFiles())
+          format.inferSchema
         }.getOrElse {
           throw new AnalysisException(
             s"Unable to infer schema for $format at ${fileCatalog.allFiles().mkString(",")}. " +
@@ -379,6 +377,10 @@ case class DataSource(
           new ListingFileCatalog(
             sparkSession, globbedPaths, options, partitionSchema, !checkPathExist)
 
+        format.prepareRead(
+          sparkSession,
+          caseInsensitiveOptions,
+          fileCatalog)
         val dataSchema = userSpecifiedSchema.map { schema =>
           val equality =
             if (sparkSession.sessionState.conf.caseSensitiveAnalysis) {
@@ -389,10 +391,7 @@ case class DataSource(
 
           StructType(schema.filterNot(f => partitionColumns.exists(equality(_, f.name))))
         }.orElse {
-          format.inferSchema(
-            sparkSession,
-            caseInsensitiveOptions,
-            fileCatalog.allFiles())
+          format.inferSchema
         }.getOrElse {
           throw new AnalysisException(
             s"Unable to infer schema for $format at ${allPaths.take(2).mkString(",")}. " +

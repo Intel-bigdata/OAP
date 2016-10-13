@@ -69,12 +69,12 @@ private[spinach] case class SpinachIndexBuild(
         // scan every data file
         val reader = new SpinachDataReader2(d, schema, None, ids)
         val hadoopConf = confBroadcast.value.value
-        val it = reader.initialize(SpinachFileFormat.dummyTaskAttemptContext(confBroadcast))
+        reader.initialize(confBroadcast.value.value)
         // TODO maybe use Long as RowId?
         val hashMap = new java.util.HashMap[InternalRow, java.util.ArrayList[Int]]()
         var cnt = 0
-        while (it.hasNext) {
-          val v = it.next().copy()
+        while (reader.nextKeyValue()) {
+          val v = reader.getCurrentValue.copy()
           if (!hashMap.containsKey(v)) {
             val list = new java.util.ArrayList[Int]()
             list.add(cnt)
@@ -84,6 +84,7 @@ private[spinach] case class SpinachIndexBuild(
           }
           cnt = cnt + 1
         }
+        reader.close()
         val partitionUniqueSize = hashMap.size()
         val uniqueKeys = hashMap.keySet().toArray(new Array[InternalRow](partitionUniqueSize))
         assert(uniqueKeys.size == partitionUniqueSize)
