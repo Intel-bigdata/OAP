@@ -43,11 +43,11 @@ private[sql] class SpinachFileFormat extends FileFormat
   with Logging
   with Serializable {
 
-  override def prepareRead(
+  override def initialize(
     sparkSession: SparkSession,
     options: Map[String, String],
     fileCatalog: FileCatalog): FileFormat = {
-    super.prepareRead(sparkSession, options, fileCatalog)
+    super.initialize(sparkSession, options, fileCatalog)
 
     val metaPaths = catalog.allFiles().filter { status =>
       status.getPath.getName.endsWith(SpinachFileFormat.SPINACH_META_FILE)
@@ -56,6 +56,8 @@ private[sql] class SpinachFileFormat extends FileFormat
     val meta: Option[DataSourceMeta] =
       SpinachFileFormat.inferDataSourceMeta(
         sparkSession.sparkContext.hadoopConfiguration, catalog.allFiles())
+    // we save the global meta information into the configuration, which will be
+    // broadcast to all of the executor
     SpinachFileFormat.serializeDataSourceMeta(sparkSession.sparkContext.hadoopConfiguration, meta)
 
     inferSchema = meta.map(_.schema)
@@ -137,10 +139,12 @@ private[sql] class SpinachFileFormat extends FileFormat
           val joinedRow = new JoinedRow()
           val appendPartitionColumns = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
 
-          iter.asInstanceOf[Iterator[InternalRow]]
-            .map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+          iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
         }
-      case None => (_: PartitionedFile) => { Iterator.empty }
+      case None => (_: PartitionedFile) => {
+        // TODO need to think about when there is no spinach.meta file at all
+        Iterator.empty
+      }
     }
   }
 }
@@ -148,7 +152,7 @@ private[sql] class SpinachFileFormat extends FileFormat
 private[spinach] class SpinachOutputWriterFactory(
     sqlConf: SQLConf,
     dataSchema: StructType,
-    job: Job,
+    @transient job: Job,
     options: Map[String, String]) extends OutputWriterFactory {
   private val serializableConf: SerializableConfiguration = {
     val conf = ContextUtil.getConfiguration(job)
@@ -206,15 +210,15 @@ private[spinach] class SpinachOutputWriter(
   override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
   override protected[sql] def writeInternal(row: InternalRow): Unit = {
     rowCount += 1
-    writer.write(NullWritable.get(), row)
+    writer.write(row)
   }
 
   override def close(): WriteResult = {
     writer.close()
-    SpinachWriteResult(getFileName(), rowCount)
+    SpinachWriteResult(dataFileName, rowCount)
   }
 
-  def getFileName(extension: String): String = {
+  private def getFileName(extension: String): String = {
     val configuration = sc.value
     // this is the way how we pass down the uuid
     val uniqueWriteJobId = configuration.get("spark.sql.sources.writeJobUUID")
@@ -223,7 +227,7 @@ private[spinach] class SpinachOutputWriter(
     f"part-r-$split%05d-${uniqueWriteJobId}$extension"
   }
 
-  def getFileName(): String = getFileName(SpinachFileFormat.SPINACH_DATA_EXTENSION)
+  def dataFileName: String = getFileName(SpinachFileFormat.SPINACH_DATA_EXTENSION)
 }
 
 private[sql] object SpinachFileFormat {
@@ -239,7 +243,7 @@ private[sql] object SpinachFileFormat {
   }
 
   def deserializeDataSourceMeta(conf: Configuration): Option[DataSourceMeta] = {
-    Option(SerializationUtil.readObjectFromConfAsBase64(SPINACH_DATA_SOURCE_META, conf))
+    SerializationUtil.readObjectFromConfAsBase64(SPINACH_DATA_SOURCE_META, conf)
   }
 
   def inferDataSourceMeta(conf: Configuration, files: Seq[FileStatus]): Option[DataSourceMeta] = {

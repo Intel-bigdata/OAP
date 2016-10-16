@@ -288,7 +288,7 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
           sparkSession,
           new Path(metastoreRelation.catalogTable.storage.locationUri.get),
           partitionSpec)
-        defaultSource.prepareRead(sparkSession, options, fileCatalog)
+        defaultSource.initialize(sparkSession, options, fileCatalog)
 
         val inferredSchema = if (fileType.equals("parquet")) {
           val inferredSchema =

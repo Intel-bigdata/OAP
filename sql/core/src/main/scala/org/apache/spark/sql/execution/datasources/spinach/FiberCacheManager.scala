@@ -81,14 +81,12 @@ private[spinach] object IndexCacheManager extends Logging {
       .weigher(new Weigher[IndexFiber, IndexFiberCacheData] {
         override def weigh(key: IndexFiber, value: IndexFiberCacheData): Int =
          value.fiberData.size().toInt
-      })
-      .maximumWeight(MemoryManager.getCapacity())
+      }).maximumWeight(MemoryManager.getCapacity())
       .removalListener(new RemovalListener[IndexFiber, IndexFiberCacheData] {
         override def onRemoval(n: RemovalNotification[IndexFiber, IndexFiberCacheData]): Unit = {
           MemoryManager.free(FiberCacheData(n.getValue.fiberData))
         }
-      })
-      .build(new CacheLoader[IndexFiber, IndexFiberCacheData] {
+      }).build(new CacheLoader[IndexFiber, IndexFiberCacheData] {
         override def load(key: IndexFiber): IndexFiberCacheData = {
           key.file.getIndexFiberData()
         }

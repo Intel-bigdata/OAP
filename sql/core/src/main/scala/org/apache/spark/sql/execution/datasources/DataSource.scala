@@ -181,7 +181,7 @@ case class DataSource(
         SparkHadoopUtil.get.globPathIfNecessary(qualified)
       }.toArray
       val fileCatalog = new ListingFileCatalog(sparkSession, globbedPaths, options, None)
-      format.prepareRead(
+      format.initialize(
         sparkSession,
         caseInsensitiveOptions,
         fileCatalog).inferSchema
@@ -324,7 +324,7 @@ case class DataSource(
           if hasMetadata(caseInsensitiveOptions.get("path").toSeq ++ paths) =>
         val basePath = new Path((caseInsensitiveOptions.get("path").toSeq ++ paths).head)
         val fileCatalog = new MetadataLogFileCatalog(sparkSession, basePath)
-        format.prepareRead(sparkSession, caseInsensitiveOptions, fileCatalog)
+        format.initialize(sparkSession, caseInsensitiveOptions, fileCatalog)
         val dataSchema = userSpecifiedSchema.orElse {
           format.inferSchema
         }.getOrElse {
@@ -377,7 +377,7 @@ case class DataSource(
           new ListingFileCatalog(
             sparkSession, globbedPaths, options, partitionSchema, !checkPathExist)
 
-        format.prepareRead(
+        format.initialize(
           sparkSession,
           caseInsensitiveOptions,
           fileCatalog)

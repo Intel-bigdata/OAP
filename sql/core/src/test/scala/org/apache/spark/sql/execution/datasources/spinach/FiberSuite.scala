@@ -174,7 +174,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
           }
         }
       }
-      writer.write(null, row)
+      writer.write(row)
     }
     writer.close()
   }
@@ -186,11 +186,11 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       split: FileSplit,
       count: Int): Unit = {
     val reader = new SpinachDataReader2(path, schema, None, requiredIds)
-    reader.initialize(conf)
+    val it = reader.initialize(conf)
 
     var idx = 0
-    while (reader.nextKeyValue()) {
-      val row = reader.getCurrentValue
+    while (it.hasNext) {
+      val row = it.next()
       assert(row.numFields === requiredIds.length)
       requiredIds.zipWithIndex.foreach { case (fid, outputId) =>
         if (shouldBeNull(idx, fid)) {

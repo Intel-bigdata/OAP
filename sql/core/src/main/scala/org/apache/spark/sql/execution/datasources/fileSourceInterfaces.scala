@@ -186,7 +186,9 @@ trait FileFormat {
   protected var parameters: Map[String, String] = _
   protected var sparkSession: SparkSession = _
 
-  def prepareRead(
+  // Instead of making the FileFormat as stateless, we give chance to initialize
+  // the FileFormat before reading or writing
+  def initialize(
     sparkSession: SparkSession,
     options: Map[String, String],
     fileCatalog: FileCatalog): FileFormat = {

@@ -46,7 +46,7 @@ private[spinach] class SpinachDataWriter2(
   private val fiberMeta = new DataFileMeta(
     rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE, fieldCount = schema.length)
 
-  def write(ignore: NullWritable, row: InternalRow) {
+  def write(row: InternalRow) {
     var idx = 0
     while (idx < rowGroup.length) {
       rowGroup(idx).append(row)
@@ -103,13 +103,10 @@ private[spinach] class SpinachDataReader2(
   filterScanner: Option[RangeScanner],
   requiredIds: Array[Int]) {
 
-  private var totalRowCount: Int = 0
-  private var currentRowId: Int = 0
-  private var currentRowIter: Iterator[InternalRow] = _
-  private var currentRow: InternalRow = _
+  var totalRowCount: Int = 0
   var dataFileMeta: DataFileMeta = _
 
-  def initialize(conf: Configuration): Unit = {
+  def initialize(conf: Configuration): Iterator[InternalRow] = {
     // TODO how to save the additional FS operation to get the Split size
     val pathInstring = path.toString
     val fileScanner = DataFileScanner(path.toString, schema, conf)
@@ -120,32 +117,10 @@ private[spinach] class SpinachDataReader2(
         // total Row count can be get from the filter scanner
         val rowIDs = fs.toArray.sorted
         totalRowCount = rowIDs.length
-        currentRowIter = fileScanner.iterator(requiredIds, rowIDs)
+        fileScanner.iterator(requiredIds, rowIDs)
       case None =>
         totalRowCount = dataFileMeta.totalRowCount()
-        currentRowIter = fileScanner.iterator(requiredIds)
+        fileScanner.iterator(requiredIds)
     }
   }
-
-  def getProgress: Float = if (totalRowCount > 0) {
-    currentRowId / totalRowCount
-  } else {
-    1.0f
-  }
-
-  def nextKeyValue(): Boolean = {
-    if (currentRowIter.hasNext) {
-      currentRowId += 1
-      currentRow = currentRowIter.next()
-      true
-    } else {
-      false
-    }
-  }
-
-  def getCurrentValue: InternalRow = currentRow
-
-  def getCurrentKey: NullWritable = NullWritable.get()
-
-  def close() { }
 }
