@@ -32,10 +32,10 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     System.setProperty("spinach.rowgroup.size", "1024")
     val path = Utils.createTempDir().getAbsolutePath
     sql(s"""CREATE TEMPORARY TABLE spinach_test (a INT, b STRING)
-           | USING org.apache.spark.sql.execution.datasources.spinach
+           | USING spn
            | OPTIONS (path '$path')""".stripMargin)
     sql(s"""CREATE TEMPORARY TABLE spinach_test_date (a INT, b DATE)
-           | USING org.apache.spark.sql.execution.datasources.spinach
+           | USING spn
            | OPTIONS (path '$path')""".stripMargin)
   }
 
@@ -52,7 +52,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     checkAnswer(sql("SELECT * FROM spinach_test"), Seq.empty[Row])
-    sql("insert overwrite table spinach_test as select * from t")
+    sql("insert overwrite table spinach_test select * from t")
     checkAnswer(sql("SELECT * FROM spinach_test"), data.map { row => Row(row._1, row._2) })
   }
 
@@ -64,7 +64,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     checkAnswer(sql("SELECT * FROM spinach_test"), Seq.empty[Row])
-    sql("insert overwrite table spinach_test as select * from t")
+    sql("insert overwrite table spinach_test select * from t")
     checkAnswer(sql("SELECT * FROM spinach_test"), data.map { row => Row(row._1, row._2) })
     // set back to default value
     System.setProperty("spinach.rowgroup.size", defaultRowGroupSize)
@@ -73,14 +73,14 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   test("test date type") {
     val data: Seq[(Int, Date)] = (1 to 3000).map { i => (i, DateTimeUtils.toJavaDate(i)) }
     data.toDF("key", "value").registerTempTable("d")
-    sql("insert overwrite table spinach_test_date as select * from d")
+    sql("insert overwrite table spinach_test_date select * from d")
     checkAnswer(sql("SELECT * FROM spinach_test_date"), data.map {row => Row(row._1, row._2)})
   }
 
   test("filtering") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
-    sql("insert overwrite table spinach_test as select * from t")
+    sql("insert overwrite table spinach_test  select * from t")
     sql("create index index1 on spinach_test (a) using btree")
 
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),

@@ -49,22 +49,27 @@ private[sql] class SpinachFileFormat extends FileFormat
     fileCatalog: FileCatalog): FileFormat = {
     super.initialize(sparkSession, options, fileCatalog)
 
-    val metaPaths = catalog.allFiles().filter { status =>
-      status.getPath.getName.endsWith(SpinachFileFormat.SPINACH_META_FILE)
-    }.toArray
+    val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
+    // TODO
+    // 1. Make the scanning etc. as lazy loading, as inferSchema probably not be called
+    // 2. We need to pass down the spinach meta file and its associated partition path
+    val partition2Meta = catalog.allFiles().map(_.getPath.getParent).map { parent =>
+      (parent, new Path(parent, SpinachFileFormat.SPINACH_META_FILE))
+    }
+      .filter(pair => pair._2.getFileSystem(hadoopConf).exists(pair._2))
+      .toMap
 
-    val meta: Option[DataSourceMeta] =
-      SpinachFileFormat.inferDataSourceMeta(
-        sparkSession.sparkContext.hadoopConfiguration, catalog.allFiles())
-    // we save the global meta information into the configuration, which will be
-    // broadcast to all of the executor
-    SpinachFileFormat.serializeDataSourceMeta(sparkSession.sparkContext.hadoopConfiguration, meta)
-
+    // TODO we dont support partition for now
+    val meta = partition2Meta.values.headOption.map {
+      DataSourceMeta.initialize(_, hadoopConf)
+    }
+    SpinachFileFormat.serializeDataSourceMeta(hadoopConf, meta)
     inferSchema = meta.map(_.schema)
 
     this
   }
 
+  // TODO inferSchema could be lazy computed
   var inferSchema: Option[StructType] = _
 
   override def prepareWrite(
@@ -234,7 +239,7 @@ private[sql] object SpinachFileFormat {
   val SPINACH_DATA_EXTENSION = ".data"
   val SPINACH_INDEX_EXTENSION = ".index"
   val SPINACH_META_EXTENSION = ".meta"
-  val SPINACH_META_FILE = "spinach.meta"
+  val SPINACH_META_FILE = ".spinach.meta"
   val SPINACH_META_SCHEMA = "spinach.schema"
   val SPINACH_DATA_SOURCE_META = "spinach.meta.datasource"
 
@@ -244,18 +249,5 @@ private[sql] object SpinachFileFormat {
 
   def deserializeDataSourceMeta(conf: Configuration): Option[DataSourceMeta] = {
     SerializationUtil.readObjectFromConfAsBase64(SPINACH_DATA_SOURCE_META, conf)
-  }
-
-  def inferDataSourceMeta(conf: Configuration, files: Seq[FileStatus]): Option[DataSourceMeta] = {
-    val metaPaths = files.filter { status =>
-      status.getPath.getName.endsWith(SpinachFileFormat.SPINACH_META_FILE)
-    }.toArray
-
-    if (metaPaths.isEmpty) {
-      None
-    } else {
-      // TODO verify all of the schema from the meta data
-      Some(DataSourceMeta.initialize(metaPaths(0).getPath, conf))
-    }
   }
 }

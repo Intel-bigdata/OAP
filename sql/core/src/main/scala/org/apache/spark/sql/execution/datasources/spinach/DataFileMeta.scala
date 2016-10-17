@@ -148,7 +148,8 @@ private[spinach] class DataFileMeta(
     this.fieldCount = is.readInt()
 
     // seek to the start position of Meta
-    is.seek(fileLen - 16  - groupCount * (16 + 4 * fieldCount))
+    val rowGroupMetaPos = fileLen - 16  - groupCount * (16 + 4 * fieldCount)
+    is.seek(rowGroupMetaPos)
     var i = 0
     while(i < groupCount) {
       rowGroupsMeta.append(new RowGroupMeta().read(is, this.fieldCount))
