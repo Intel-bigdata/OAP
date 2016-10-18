@@ -67,7 +67,7 @@ private[spinach] case class SpinachIndexBuild(
       // data.foreach(dataString => {
         val d = new Path(dataString)
         // scan every data file
-        val reader = new SpinachDataReader2(d, schema, None, ids)
+        val reader = new SpinachDataReader(d, schema, None, ids)
         val hadoopConf = confBroadcast.value.value
         val it = reader.initialize(confBroadcast.value.value)
         // TODO maybe use Long as RowId?

@@ -27,13 +27,14 @@ import org.apache.spark.io.SnappyCompressionCodec
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.StructType
 
-private[spinach] class SpinachDataWriter2(
+private[spinach] class SpinachDataWriter(
     isCompressed: Boolean,
     out: FSDataOutputStream,
     schema: StructType) extends Logging {
   // Using java options to config
   // NOTE: java options should not start with spark (e.g. "spark.xxx.xxx"), or it cannot pass
   // the config validation of SparkConf
+  // TODO make it configuration via SparkContext / Table Properties
   private def DEFAULT_ROW_GROUP_SIZE = System.getProperty("spinach.rowgroup.size",
     "1024").toInt
   logDebug(s"spinach.rowgroup.size setting to ${DEFAULT_ROW_GROUP_SIZE}")
@@ -97,7 +98,7 @@ private[spinach] class SpinachDataWriter2(
   }
 }
 
-private[spinach] class SpinachDataReader2(
+private[spinach] class SpinachDataReader(
   path: Path,
   schema: StructType,
   filterScanner: Option[RangeScanner],

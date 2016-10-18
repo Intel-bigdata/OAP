@@ -133,7 +133,7 @@ private[sql] class SpinachFileFormat extends FileFormat
         (file: PartitionedFile) => {
           assert(file.partitionValues.numFields == partitionSchema.size)
 
-          val iter = new SpinachDataReader2(
+          val iter = new SpinachDataReader(
             new Path(new URI(file.filePath)), dataSchema, filterScanner, requiredIds
           ).initialize(broadcastedHadoopConf.value.value)
 
@@ -200,13 +200,13 @@ private[spinach] class SpinachOutputWriter(
                                             context: TaskAttemptContext,
                                             sc: SerializableConfiguration) extends OutputWriter {
   private var rowCount = 0
-  private val writer: SpinachDataWriter2 = {
+  private val writer: SpinachDataWriter = {
     val isCompressed: Boolean = FileOutputFormat.getCompressOutput(context)
     val file: Path = new Path(path, getFileName(SpinachFileFormat.SPINACH_DATA_EXTENSION))
     val fs: FileSystem = file.getFileSystem(sc.value)
     val fileOut: FSDataOutputStream = fs.create(file, false)
 
-    new SpinachDataWriter2(isCompressed, fileOut, dataSchema)
+    new SpinachDataWriter(isCompressed, fileOut, dataSchema)
   }
 
   override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")

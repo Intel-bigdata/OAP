@@ -99,7 +99,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     for (i <- 0 until rowCounts.length) {
       val path = new Path(file.getAbsolutePath, rowCounts(i).toString)
       writeData(path, schema, rowCounts(i))
-      val reader = new SpinachDataReader2(path, schema, None, Array(0, 1))
+      val reader = new SpinachDataReader(path, schema, None, Array(0, 1))
       reader.initialize(conf)
       val meta = reader.dataFileMeta
       assert(meta.totalRowCount() === rowCounts(i))
@@ -120,7 +120,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
 
     val path = new Path(file.getAbsolutePath, 10.toString)
     writeData(path, schema, 10)
-    val reader = new SpinachDataReader2(path, schema, None, Array(0, 1))
+    val reader = new SpinachDataReader(path, schema, None, Array(0, 1))
     reader.initialize(conf)
     val meta = reader.dataFileMeta
     assert(meta.totalRowCount() === 10)
@@ -140,7 +140,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       path: Path,
       schema: StructType, count: Int): Unit = {
     val out = FileSystem.get(conf).create(path, true)
-    val writer = new SpinachDataWriter2(false, out, schema)
+    val writer = new SpinachDataWriter(false, out, schema)
     val row = new GenericMutableRow(schema.fields.length)
     for(i <- 0 until count) {
       schema.fields.zipWithIndex.foreach { entry =>
@@ -185,7 +185,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       requiredIds: Array[Int],
       split: FileSplit,
       count: Int): Unit = {
-    val reader = new SpinachDataReader2(path, schema, None, requiredIds)
+    val reader = new SpinachDataReader(path, schema, None, requiredIds)
     val it = reader.initialize(conf)
 
     var idx = 0
