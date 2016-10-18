@@ -109,6 +109,7 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
       val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
       logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
 
+      files.fileFormat.initialize(files.sparkSession, files.options, files.location)
       val readFile = files.fileFormat.buildReaderWithPartitionValues(
         sparkSession = files.sparkSession,
         dataSchema = files.dataSchema,

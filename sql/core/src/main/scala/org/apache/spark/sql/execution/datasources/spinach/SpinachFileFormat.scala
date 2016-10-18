@@ -20,13 +20,10 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.net.URI
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataOutputStream, FileStatus, FileSystem, Path}
-import org.apache.hadoop.io.NullWritable
+import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
 import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
-import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
