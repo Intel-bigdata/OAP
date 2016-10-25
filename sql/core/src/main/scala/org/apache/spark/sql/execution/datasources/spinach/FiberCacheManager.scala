@@ -217,7 +217,7 @@ private[spinach] case class DataFileScanner(
     }
   }
 
-  // scan by given row ids
+  // scan by given row ids, and we assume the rowIds are sorted
   def iterator(requiredIds: Array[Int], rowIds: Array[Int]): Iterator[InternalRow] = {
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
@@ -228,7 +228,7 @@ private[spinach] case class DataFileScanner(
       val rowIdxInGroup = rowId % meta.rowCountInEachGroup
 
       if (lastGroupId != groupId) {
-        // if we didn't move to another row group
+        // if we move to another row group, or the first row group
         var i = 0
         while (i < columns.length) {
           columns(i) = new ColumnValues(
@@ -243,6 +243,8 @@ private[spinach] case class DataFileScanner(
         } else {
           row.reset(meta.rowCountInLastGroup, columns)
         }
+
+        lastGroupId = groupId
       }
 
       row.moveToRow(rowIdxInGroup)
@@ -255,8 +257,6 @@ private[spinach] case class IndexFiber(file: IndexFileScanner)
 // TODO create abstract class for this and [[[DataFileScannar]]]
 private[spinach] case class IndexFileScanner(
     path: String, schema: StructType, configuration: Configuration) {
-  // TODO: add SparkConf
-  val compCodec = new SnappyCompressionCodec(new SparkConf())
 
   override def hashCode(): Int = path.hashCode
   override def equals(that: Any): Boolean = that match {
