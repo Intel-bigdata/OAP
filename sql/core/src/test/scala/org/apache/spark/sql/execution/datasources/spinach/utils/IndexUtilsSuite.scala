@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.spinach.utils
 
 import java.io.{ByteArrayOutputStream, DataOutputStream}
 
+import org.junit.Assert._
+
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.unsafe.Platform
@@ -35,6 +37,9 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
   }
 
   test("index path generating") {
-    assert(IndexUtils.indexFileNameFromDataFileName("t1.data", "index1") == "t1.index1.index")
+    assertEquals("/path/to/.t1.index1.index",
+      IndexUtils.indexFileNameFromDataFileName("/path/to/t1.data", "index1"))
+    assertEquals("/.t1.index1.index",
+      IndexUtils.indexFileNameFromDataFileName("/t1.data", "index1"))
   }
 }

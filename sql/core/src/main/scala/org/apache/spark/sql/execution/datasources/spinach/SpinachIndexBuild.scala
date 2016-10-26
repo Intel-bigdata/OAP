@@ -105,8 +105,8 @@ private[spinach] case class SpinachIndexBuild(
         // build index file
         val dataFilePathString = d.toString
         val pos = dataFilePathString.lastIndexOf(SpinachFileFormat.SPINACH_DATA_EXTENSION)
-        val indexFile = new Path(dataFilePathString.substring(
-          0, pos) + "." + indexName + SpinachFileFormat.SPINACH_INDEX_EXTENSION)
+        val indexFile = new Path(
+          IndexUtils.indexFileNameFromDataFileName(dataFilePathString, indexName))
         val fs = indexFile.getFileSystem(hadoopConf)
         val fileOut = fs.create(indexFile, false)
         var i = 0

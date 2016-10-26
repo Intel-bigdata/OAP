@@ -35,7 +35,10 @@ object IndexUtils {
   def indexFileNameFromDataFileName(dataFile: String, name: String): String = {
     import SpinachFileFormat._
     assert(dataFile.endsWith(SPINACH_DATA_EXTENSION))
-    val prefix = dataFile.substring(0, dataFile.length - SPINACH_DATA_EXTENSION.length)
-    prefix + "." + name + SPINACH_INDEX_EXTENSION
+    val simpleName = dataFile.substring(
+      dataFile.lastIndexOf('/') + 1, dataFile.length - SPINACH_DATA_EXTENSION.length)
+    val path = dataFile.substring(0, dataFile.lastIndexOf('/') + 1)
+
+    path + "." + simpleName + "." + name + SPINACH_INDEX_EXTENSION
   }
 }
