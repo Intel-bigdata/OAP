@@ -19,19 +19,16 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.util.concurrent.TimeUnit
 
-import scala.collection.JavaConverters._
-import scala.collection.mutable.{ArrayBuffer, Buffer, HashMap}
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataInputStream, FileSystem, Path}
-import org.apache.hadoop.mapreduce.TaskAttemptContext
+import org.apache.hadoop.fs.{FileSystem, FSDataInputStream, Path}
 import org.apache.hadoop.util.StringUtils
+
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.io.SnappyCompressionCodec
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.util.collection.BitSet
 import org.apache.spark.unsafe.Platform
 
 private[spinach] trait AbstractFiberCacheManger extends Logging {
@@ -62,8 +59,8 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
 }
 
 /**
-  * Fiber Cache Manager
-  */
+ * Fiber Cache Manager
+ */
 object FiberCacheManager extends AbstractFiberCacheManger {
   override def fiber2Data(key: Fiber): FiberCacheData = {
     key.file.getFiberData(key.rowGroupId, key.columnIndex)

@@ -19,12 +19,10 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.hadoop.conf.Configuration
 
-import scala.collection.mutable
-import org.apache.hadoop.mapreduce.TaskAttemptContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.expressions.{Ascending, SortDirection, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
@@ -568,13 +566,13 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
 
 private[spinach] object ScannerBuilder {
   /**
-    * Build the scanner builder with multiple keys
-    *
-    * @param fields
-    * @param meta
-    * @param dirs
-    * @return
-    */
+   * Build the scanner builder with multiple keys
+   *
+   * @param fields
+   * @param meta
+   * @param dirs
+   * @return
+   */
   def apply(fields: Seq[StructField], meta: IndexMeta, dirs: Seq[SortDirection])
   : ScannerBuilder = {
     // TODO default we use the Ascending order
@@ -584,13 +582,13 @@ private[spinach] object ScannerBuilder {
   }
 
   /**
-    * Build the scanner builder while indexed field contains only a single key
-    *
-    * @param field the indexed field with name & data type
-    * @param meta the index meta info
-    * @param dir the direction of the index data (Ascending or Descending)
-    * @return the Scanner Builder
-    */
+   * Build the scanner builder while indexed field contains only a single key
+   *
+   * @param field the indexed field with name & data type
+   * @param meta the index meta info
+   * @param dir the direction of the index data (Ascending or Descending)
+   * @return the Scanner Builder
+   */
   def apply(field: StructField, meta: IndexMeta, dir: SortDirection): ScannerBuilder = {
     apply(new StructType().add(field), meta, dir :: Nil)
   }
@@ -598,7 +596,7 @@ private[spinach] object ScannerBuilder {
 
 // TODO currently only a single attribute index supported.
 private[spinach] class IndexContext(meta: DataSourceMeta) {
-  private val map = new mutable.HashMap[String, ScannerBuilder]()
+  private val map = new scala.collection.mutable.HashMap[String, ScannerBuilder]()
 
   def clear(): IndexContext = {
     map.clear()

@@ -17,10 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
-import org.apache.spark.internal.Logging
-
 import scala.collection.mutable.ArrayBuffer
+
+import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 
 //  Meta Part Format
 //  ..

@@ -17,17 +17,17 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.collection.BitSet
 
-import scala.collection.mutable.ArrayBuffer
-
 /**
-  * Used to build fiber on-heap
-  */
+ * Used to build fiber on-heap
+ */
 case class FiberByteData(fiberData: Array[Byte])
 
 private[spinach] trait FiberBuilder {

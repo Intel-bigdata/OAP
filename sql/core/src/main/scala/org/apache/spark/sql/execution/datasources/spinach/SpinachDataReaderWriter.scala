@@ -19,11 +19,8 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
-import org.apache.hadoop.io.NullWritable
-import org.apache.hadoop.mapreduce.{InputSplit, RecordReader, RecordWriter, TaskAttemptContext}
-import org.apache.spark.SparkConf
+
 import org.apache.spark.internal.Logging
-import org.apache.spark.io.SnappyCompressionCodec
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.StructType
 

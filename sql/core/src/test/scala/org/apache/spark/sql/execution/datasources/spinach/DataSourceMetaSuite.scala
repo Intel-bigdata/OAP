@@ -21,12 +21,14 @@ import java.io.File
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.scalatest.BeforeAndAfter
+
+import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Descending}
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
-import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.util.Utils
-import org.scalatest.BeforeAndAfter
+
 
 class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
   import testImplicits._

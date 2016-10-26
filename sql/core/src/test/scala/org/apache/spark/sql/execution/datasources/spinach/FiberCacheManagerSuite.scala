@@ -17,15 +17,15 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
-import org.apache.hadoop.mapreduce.{TaskAttemptContext, TaskAttemptID, TaskID}
+
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.collection.BitSet
 
-import scala.collection.mutable.ArrayBuffer
 
 class FiberCacheManagerSuite extends SparkFunSuite with Logging {
 

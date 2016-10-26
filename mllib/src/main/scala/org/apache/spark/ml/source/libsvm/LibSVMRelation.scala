@@ -95,13 +95,10 @@ private[libsvm] class LibSVMFileFormat extends TextBasedFileFormat with DataSour
     }
   }
 
-  override def inferSchema(
-      sparkSession: SparkSession,
-      options: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType] = {
-    val numFeatures: Int = options.get("numFeatures").map(_.toInt).filter(_ > 0).getOrElse {
+  override def inferSchema: Option[StructType] = {
+    val numFeatures: Int = parameters.get("numFeatures").map(_.toInt).filter(_ > 0).getOrElse {
       // Infers number of features if the user doesn't specify (a valid) one.
-      val dataFiles = files.filterNot(_.getPath.getName startsWith "_")
+      val dataFiles = catalog.allFiles().filterNot(_.getPath.getName startsWith "_")
       val path = if (dataFiles.length == 1) {
         dataFiles.head.getPath.toUri.toString
       } else if (dataFiles.isEmpty) {

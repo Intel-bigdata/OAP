@@ -19,12 +19,13 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.io.File
 
+import org.scalatest.BeforeAndAfter
+
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
-import org.scalatest.BeforeAndAfter
+
 
 class SpinachSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
   import testImplicits._

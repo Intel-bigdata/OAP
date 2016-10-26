@@ -20,10 +20,15 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.net.URI
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
-import org.apache.hadoop.mapreduce._
+import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.FSDataOutputStream
+import org.apache.hadoop.fs.Path
+import org.apache.hadoop.mapreduce.Job
+import org.apache.hadoop.mapreduce.TaskAttemptContext
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
+import org.apache.parquet.hadoop.util.ContextUtil
+import org.apache.parquet.hadoop.util.SerializationUtil
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
@@ -84,9 +89,6 @@ private[sql] class SpinachFileFormat extends FileFormat
 
   override def shortName(): String = "spn"
 
-  /**
-    * Returns whether the reader will return the rows as batch or not.
-    */
   override def supportBatch(sparkSession: SparkSession, schema: StructType): Boolean = {
     // TODO we should naturelly support batch
     false
@@ -151,10 +153,17 @@ private[sql] class SpinachFileFormat extends FileFormat
   }
 }
 
+/**
+ * Spinach Output Writer Factory
+ * @param sqlConf
+ * @param dataSchema
+ * @param job
+ * @param options
+ */
 private[spinach] class SpinachOutputWriterFactory(
     sqlConf: SQLConf,
     dataSchema: StructType,
-    @transient job: Job,
+    @transient protected val job: Job,
     options: Map[String, String]) extends OutputWriterFactory {
   private val serializableConf: SerializableConfiguration = {
     val conf = ContextUtil.getConfiguration(job)

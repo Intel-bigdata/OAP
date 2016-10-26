@@ -24,7 +24,6 @@ import scala.collection.mutable.{ArrayBuffer, BitSet}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
-import org.apache.hadoop.mapreduce.TaskAttemptContext
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
@@ -76,9 +75,9 @@ private[spinach] case class HashIndex(entries: Seq[Int] = Nil) extends IndexType
   def appendEntry(entry: Int): HashIndex = HashIndex(entries :+ entry)
 }
 
-import DataSourceMeta._
-
 private[spinach] class FileMeta {
+  import DataSourceMeta._
+
   var fingerprint: String = _
   var recordCount: Long = _
   var dataFileName: String = _
@@ -114,7 +113,9 @@ private[spinach] object FileMeta {
 
 private[spinach] class IndexMeta(var name: String = null, var indexType: IndexType = null)
     extends Serializable {
+  import DataSourceMeta._
   import IndexMeta._
+
   def open(data: IndexFiberCacheData, keySchema: StructType): IndexNode = {
     UnsafeIndexNode(FiberCacheData(data.fiberData), data.rootOffset, data.dataEnd, keySchema)
   }
@@ -202,6 +203,8 @@ private[spinach] object IndexMeta {
 private[spinach] case class Version(major: Byte, minor: Byte, revision: Byte)
 
 private[spinach] class FileHeader {
+  import DataSourceMeta._
+
   var recordCount: Long = _
   var dataFileCount: Long = _
   var indexCount: Long = _

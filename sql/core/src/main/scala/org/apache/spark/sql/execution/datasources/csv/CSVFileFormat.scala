@@ -50,7 +50,8 @@ class CSVFileFormat extends TextBasedFileFormat with DataSourceRegister {
     val csvOptions = new CSVOptions(parameters)
 
     // TODO: Move filtering.
-    val paths = catalog.allFiles().filterNot(_.getPath.getName startsWith "_").map(_.getPath.toString)
+    val paths = catalog.allFiles().filterNot(
+      _.getPath.getName startsWith "_").map(_.getPath.toString)
     val rdd = baseRdd(sparkSession, csvOptions, paths)
     val firstLine = findFirstLine(csvOptions, rdd)
     val firstRow = new LineCsvReader(csvOptions).parseLine(firstLine)

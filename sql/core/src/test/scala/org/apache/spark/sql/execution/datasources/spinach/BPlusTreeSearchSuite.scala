@@ -18,14 +18,14 @@
 package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
-import org.apache.hadoop.mapreduce.{JobID, TaskAttemptContext, TaskAttemptID, TaskID}
+import org.scalatest.BeforeAndAfterAll
+
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
-import org.scalatest.BeforeAndAfterAll
+
 
 private[spinach] class IntValues(values: Array[Int]) extends IndexNodeValue {
   override def length: Int = values.length
