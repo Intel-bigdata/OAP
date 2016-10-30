@@ -31,30 +31,40 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
+private sealed case class ConfigurationCache[T](key: T, conf: Configuration) {
+  override def hashCode: Int = key.hashCode()
+  override def equals(other: Any): Boolean = other match {
+    case cc: ConfigurationCache[_] => cc.key == key
+    case _ => false
+  }
+}
+
 private[spinach] trait AbstractFiberCacheManger extends Logging {
-  protected def fiber2Data(key: Fiber): FiberCacheData
+  type ENTRY = ConfigurationCache[Fiber]
+
+  protected def fiber2Data(key: Fiber, conf: Configuration): FiberCacheData
 
   @transient protected val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
-      .weigher(new Weigher[Fiber, FiberCacheData] {
-        override def weigh(key: Fiber, value: FiberCacheData): Int = value.fiberData.size().toInt
+      .weigher(new Weigher[ENTRY, FiberCacheData] {
+        override def weigh(key: ENTRY, value: FiberCacheData): Int = value.fiberData.size().toInt
       })
       .maximumWeight(MemoryManager.getCapacity())
-      .removalListener(new RemovalListener[Fiber, FiberCacheData] {
-        override def onRemoval(n: RemovalNotification[Fiber, FiberCacheData]): Unit = {
+      .removalListener(new RemovalListener[ENTRY, FiberCacheData] {
+        override def onRemoval(n: RemovalNotification[ENTRY, FiberCacheData]): Unit = {
           MemoryManager.free(n.getValue)
         }
       })
-      .build(new CacheLoader[Fiber, FiberCacheData] {
-        override def load(key: Fiber): FiberCacheData = {
-          fiber2Data(key)
+      .build(new CacheLoader[ENTRY, FiberCacheData]() {
+        override def load(key: ENTRY): FiberCacheData = {
+          fiber2Data(key.key, key.conf)
         }
       })
 
-  def apply(fiberCache: Fiber): FiberCacheData = {
-    cache.get(fiberCache)
+  def apply(fiberCache: Fiber, conf: Configuration): FiberCacheData = {
+    cache.get(ConfigurationCache(fiberCache, conf))
   }
 }
 
@@ -62,8 +72,8 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
  * Fiber Cache Manager
  */
 object FiberCacheManager extends AbstractFiberCacheManger {
-  override def fiber2Data(key: Fiber): FiberCacheData = {
-    key.file.getFiberData(key.rowGroupId, key.columnIndex)
+  override def fiber2Data(key: Fiber, conf: Configuration): FiberCacheData = {
+    key.file.getFiberData(key.rowGroupId, key.columnIndex, conf)
   }
 }
 
@@ -71,34 +81,34 @@ object FiberCacheManager extends AbstractFiberCacheManger {
  * Index Cache Manager TODO: merge this with AbstractFiberCacheManager
  */
 private[spinach] object IndexCacheManager extends Logging {
+  type ENTRY = ConfigurationCache[IndexFileScanner]
   @transient protected val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
-      .weigher(new Weigher[IndexFiber, IndexFiberCacheData] {
-        override def weigh(key: IndexFiber, value: IndexFiberCacheData): Int =
+      .weigher(new Weigher[ENTRY, IndexFiberCacheData] {
+        override def weigh(key: ENTRY, value: IndexFiberCacheData): Int =
          value.fiberData.size().toInt
       }).maximumWeight(MemoryManager.getCapacity())
-      .removalListener(new RemovalListener[IndexFiber, IndexFiberCacheData] {
-        override def onRemoval(n: RemovalNotification[IndexFiber, IndexFiberCacheData]): Unit = {
+      .removalListener(new RemovalListener[ENTRY, IndexFiberCacheData] {
+        override def onRemoval(n: RemovalNotification[ENTRY, IndexFiberCacheData]): Unit = {
           MemoryManager.free(FiberCacheData(n.getValue.fiberData))
         }
-      }).build(new CacheLoader[IndexFiber, IndexFiberCacheData] {
-        override def load(key: IndexFiber): IndexFiberCacheData = {
-          key.file.getIndexFiberData()
+      }).build(new CacheLoader[ENTRY, IndexFiberCacheData] {
+        override def load(key: ENTRY): IndexFiberCacheData = {
+          key.key.getIndexFiberData(key.conf)
         }
       })
 
-  def apply(fiberCache: IndexFiber): IndexFiberCacheData = {
-    cache.get(fiberCache)
+  def apply(fileScanner: IndexFileScanner, conf: Configuration): IndexFiberCacheData = {
+    cache.get(ConfigurationCache(fileScanner, conf))
   }
-
-  def status: String = sys.error("not implemented Index fiber status")
 }
 
 private[spinach] case class InputDataFileDescriptor(fin: FSDataInputStream, len: Long)
 
 private[spinach] object DataMetaCacheManager extends Logging {
+  type ENTRY = ConfigurationCache[DataFileScanner]
   // Using java options to config.
   val spinachDataMetaCacheSize = System.getProperty("spinach.datametacache.size",
     "262144").toLong  // default size is 256k
@@ -107,61 +117,59 @@ private[spinach] object DataMetaCacheManager extends Logging {
     CacheBuilder
       .newBuilder()
       .maximumSize(spinachDataMetaCacheSize)
-      .build(new CacheLoader[DataFileScanner, DataFileMeta] {
-      override def load(key: DataFileScanner): DataFileMeta = {
-        val fd = FiberDataFileHandler(key)
+      .build(new CacheLoader[ENTRY, DataFileMeta] {
+      override def load(entry: ENTRY): DataFileMeta = {
+        val fd = FiberDataFileHandler(entry.key, entry.conf)
         new DataFileMeta().read(fd.fin, fd.len)
       }
     })
 
-  def apply(fiberCache: DataFileScanner): DataFileMeta = {
-    cache.get(fiberCache)
+  def apply(fiberCache: DataFileScanner, conf: Configuration): DataFileMeta = {
+    cache.get(ConfigurationCache(fiberCache, conf))
   }
 }
 
 private[spinach] object FiberDataFileHandler extends Logging {
-  @transient private val cache =
+  type ENTRY = ConfigurationCache[DataFileScanner]
+  private val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
       .maximumSize(MemoryManager.getCapacity())
       .expireAfterAccess(1000, TimeUnit.SECONDS) // auto expire after 1000 seconds.
-      .removalListener(new RemovalListener[DataFileScanner, InputDataFileDescriptor] {
-        override def onRemoval(n: RemovalNotification[DataFileScanner, InputDataFileDescriptor])
+      .removalListener(new RemovalListener[ENTRY, InputDataFileDescriptor]() {
+        override def onRemoval(n: RemovalNotification[ENTRY, InputDataFileDescriptor])
         : Unit = {
           n.getValue.fin.close()
         }
-      }).build(new CacheLoader[DataFileScanner, InputDataFileDescriptor] {
-      override def load(key: DataFileScanner): InputDataFileDescriptor = {
-        val path = new Path(StringUtils.unEscapeString(key.path))
-        val fs = FileSystem.get(key.conf)
+      })
+      .build(new CacheLoader[ENTRY, InputDataFileDescriptor]() {
+        override def load(entry: ENTRY)
+        : InputDataFileDescriptor = {
+          val path = new Path(StringUtils.unEscapeString(entry.key.path))
+          val fs = FileSystem.get(entry.conf)
 
-        InputDataFileDescriptor(fs.open(path), fs.getFileStatus(path).getLen)
-      }
-    })
+          InputDataFileDescriptor(fs.open(path), fs.getFileStatus(path).getLen)
+        }
+      })
 
-  def apply(fiberCache: DataFileScanner): InputDataFileDescriptor = {
-    cache.get(fiberCache)
+  def apply(fiberCache: DataFileScanner, conf: Configuration): InputDataFileDescriptor = {
+    cache.get(ConfigurationCache(fiberCache, conf))
   }
-
 }
 
 private[spinach] case class Fiber(file: DataFileScanner, columnIndex: Int, rowGroupId: Int)
 
-private[spinach] case class DataFileScanner(
-    path: String, schema: StructType, conf: Configuration) {
-  lazy val meta: DataFileMeta = DataMetaCacheManager(this)
-  // TODO: add SparkConf
-  val compCodec = new SnappyCompressionCodec(new SparkConf())
-
+private[spinach] case class DataFileScanner(path: String, schema: StructType) {
   override def hashCode(): Int = path.hashCode
   override def equals(that: Any): Boolean = that match {
-    case DataFileScanner(thatPath, _, _) => path == thatPath
+    case DataFileScanner(thatPath, _) => path == thatPath
     case _ => false
   }
 
-  def getFiberData(groupId: Int, fiberId: Int): FiberCacheData = {
-    val is = FiberDataFileHandler(this).fin
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCacheData = {
+    val is = FiberDataFileHandler(this, conf).fin
+    val meta: DataFileMeta = DataMetaCacheManager(this, conf)
     val groupMeta = meta.rowGroupsMeta(groupId)
     // get the fiber data start position
     // TODO: update the meta to store the fiber start pos
@@ -192,7 +200,8 @@ private[spinach] case class DataFileScanner(
   }
 
   // full file scan
-  def iterator(requiredIds: Array[Int]): Iterator[InternalRow] = {
+  def iterator(requiredIds: Array[Int], conf: Configuration): Iterator[InternalRow] = {
+    val meta: DataFileMeta = DataMetaCacheManager(this, conf)
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     (0 until meta.groupCount).iterator.flatMap { groupId =>
@@ -201,7 +210,7 @@ private[spinach] case class DataFileScanner(
         columns(i) = new ColumnValues(
           meta.rowCountInEachGroup,
           schema(requiredIds(i)).dataType,
-          FiberCacheManager(Fiber(this, requiredIds(i), groupId)))
+          FiberCacheManager(Fiber(this, requiredIds(i), groupId), conf))
         i += 1
       }
 
@@ -215,7 +224,9 @@ private[spinach] case class DataFileScanner(
   }
 
   // scan by given row ids, and we assume the rowIds are sorted
-  def iterator(requiredIds: Array[Int], rowIds: Array[Int]): Iterator[InternalRow] = {
+  def iterator(requiredIds: Array[Int], rowIds: Array[Int], conf: Configuration)
+  : Iterator[InternalRow] = {
+    val meta: DataFileMeta = DataMetaCacheManager(this, conf)
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     var lastGroupId = -1
@@ -231,7 +242,7 @@ private[spinach] case class DataFileScanner(
           columns(i) = new ColumnValues(
             meta.rowCountInEachGroup,
             schema(requiredIds(i)).dataType,
-            FiberCacheManager(Fiber(this, requiredIds(i), groupId)))
+            FiberCacheManager(Fiber(this, requiredIds(i), groupId), conf))
           i += 1
         }
         if (groupId < meta.groupCount - 1) {
@@ -249,41 +260,40 @@ private[spinach] case class DataFileScanner(
   }
 }
 
-private[spinach] case class IndexFiber(file: IndexFileScanner)
-
-// TODO create abstract class for this and [[[DataFileScannar]]]
-private[spinach] case class IndexFileScanner(
-    path: String, schema: StructType, configuration: Configuration) {
-
+private[spinach] case class IndexFileScanner(path: String) {
   override def hashCode(): Int = path.hashCode
   override def equals(that: Any): Boolean = that match {
-    case DataFileScanner(thatPath, _, _) => path == thatPath
+    case DataFileScanner(thatPath, _) => path == thatPath
     case _ => false
   }
 
   def putToFiberCache(buf: Array[Byte]): FiberCacheData = {
     // TODO: make it configurable
-    // TODO: disable compress first since there's some issue to solve with conpression
     val fiberCacheData = MemoryManager.allocate(buf.length)
-    Platform.copyMemory(buf, Platform.BYTE_ARRAY_OFFSET, fiberCacheData.fiberData.getBaseObject,
+    Platform.copyMemory(
+      buf, Platform.BYTE_ARRAY_OFFSET, fiberCacheData.fiberData.getBaseObject,
       fiberCacheData.fiberData.getBaseOffset, buf.length)
     fiberCacheData
   }
 
-  def getIndexFiberData(): IndexFiberCacheData = {
+  def getIndexFiberData(conf: Configuration): IndexFiberCacheData = {
     val file = new Path(path)
-    val fs = file.getFileSystem(configuration)
+    val fs = file.getFileSystem(conf)
     val fin = fs.open(file)
     // wind to end of file to get tree root
     // TODO check if enough to fit in Int
     val fileLength = fs.getContentSummary(file).getLength
-    val bytes = new Array[Byte](fileLength.toInt)
+    var bytes = new Array[Byte](fileLength.toInt)
     fin.read(bytes, 0, fileLength.toInt)
     val offHeapMem = putToFiberCache(bytes)
+    bytes = null
+
     val baseObj = offHeapMem.fiberData.getBaseObject
     val baseOff = offHeapMem.fiberData.getBaseOffset
     val dataEnd = Platform.getInt(baseObj, baseOff + fileLength - 8)
     val rootOffset = Platform.getInt(baseObj, baseOff + fileLength - 4)
+
+    // TODO partial cached index fiber
     IndexFiberCacheData(offHeapMem.fiberData, dataEnd, rootOffset)
   }
 }

@@ -226,8 +226,8 @@ private[spinach] trait RangeScanner extends Iterator[Int] {
     this.ordering = GenerateOrdering.create(keySchema)
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileNameFromDataFileName(dataPath, meta.name)
-    val indexFiber = IndexFiber(IndexFileScanner(path, keySchema, conf))
-    val indexData = IndexCacheManager(indexFiber)
+    val indexScanner = IndexFileScanner(path)
+    val indexData = IndexCacheManager(indexScanner, conf)
     val root = meta.open(indexData, keySchema)
 
     if (start eq RangeScanner.DUMMY_KEY_START) {

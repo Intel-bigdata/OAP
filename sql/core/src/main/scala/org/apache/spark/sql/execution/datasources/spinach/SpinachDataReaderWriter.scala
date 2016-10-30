@@ -107,18 +107,18 @@ private[spinach] class SpinachDataReader(
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     // TODO how to save the additional FS operation to get the Split size
     val pathInstring = path.toString
-    val fileScanner = DataFileScanner(path.toString, schema, conf)
-    dataFileMeta = DataMetaCacheManager(fileScanner)
+    val fileScanner = DataFileScanner(path.toString, schema)
+    dataFileMeta = DataMetaCacheManager(fileScanner, conf)
 
     filterScanner match {
       case Some(fs) => fs.initialize(pathInstring, conf)
         // total Row count can be get from the filter scanner
         val rowIDs = fs.toArray.sorted
         totalRowCount = rowIDs.length
-        fileScanner.iterator(requiredIds, rowIDs)
+        fileScanner.iterator(requiredIds, rowIDs, conf)
       case None =>
         totalRowCount = dataFileMeta.totalRowCount()
-        fileScanner.iterator(requiredIds)
+        fileScanner.iterator(requiredIds, conf)
     }
   }
 }
