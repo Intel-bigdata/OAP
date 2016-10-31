@@ -93,7 +93,12 @@ private[spinach] class DataFileMeta(
    var rowCountInEachGroup: Int = 0,
    var rowCountInLastGroup: Int = 0,
    var groupCount: Int = 0,
-   var fieldCount: Int = 0) {
+   var fieldCount: Int = 0) extends DataFileHandle {
+  private var _fin: FSDataInputStream = null
+  private var _len: Long = 0
+
+  def fin: FSDataInputStream = _fin
+  def len: Long = _len
 
   def totalRowCount(): Int = {
       if (groupCount == 0) {
@@ -139,6 +144,9 @@ private[spinach] class DataFileMeta(
   }
 
   def read(is: FSDataInputStream, fileLen: Long): DataFileMeta = is.synchronized {
+    this._fin = is
+    this._len = fileLen
+
     // seek to the end of the end position of Meta
     is.seek(fileLen - 16L)
     this.rowCountInEachGroup = is.readInt()

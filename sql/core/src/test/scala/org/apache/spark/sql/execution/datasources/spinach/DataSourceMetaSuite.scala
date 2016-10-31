@@ -143,8 +143,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(fileMetas.map(_.recordCount).sum === 100)
     assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
 
-    assert(spinachMeta.schema === new StructType()
-      .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
+    assert(spinachMeta.schema === df.schema)
 
     sql("create index index1 on spnt1 (a) using btree")
     sql("create index index2 on spnt1 (a asc)") // dup as index1, still creating
