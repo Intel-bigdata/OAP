@@ -40,6 +40,15 @@ object SpinachUtils {
     }
   }
 
+  def getMeta(hadoopConf: Configuration, parent: Path): Option[DataSourceMeta] = {
+    val file = new Path(parent, SpinachFileFormat.SPINACH_META_FILE)
+    if (file.getFileSystem(hadoopConf).exists(file)) {
+      Some(DataSourceMeta.initialize(file, hadoopConf))
+    } else {
+      None
+    }
+  }
+
   def getPath(fileCatalog: FileCatalog): Option[Path] = {
     fileCatalog.allFiles().headOption.map(_.getPath.getParent)
   }

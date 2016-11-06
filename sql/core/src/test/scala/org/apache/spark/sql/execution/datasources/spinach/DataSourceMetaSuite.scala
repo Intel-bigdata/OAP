@@ -58,6 +58,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
         .appendEntry(2)))
       .withNewSchema(new StructType()
         .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
+      .withNewDataReaderClassName("NotExistedDataFileClassName")
       .build()
 
     DataSourceMeta.write(path, new Configuration(), spinachMeta)
@@ -103,6 +104,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
     assert(spinachMeta.schema === new StructType()
       .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
+    assert(spinachMeta.dataReaderClassName === "NotExistedDataFileClassName")
   }
 
   test("read empty Spinach Meta") {
@@ -119,6 +121,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(spinachMeta.fileMetas.length === 0)
     assert(spinachMeta.indexMetas.length === 0)
     assert(spinachMeta.schema.length === 0)
+    assert(spinachMeta.dataReaderClassName === SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME)
   }
 
   test("Spinach Meta integration test") {
@@ -164,6 +167,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(fileMetas2.map(_.recordCount).sum === 100)
     assert(fileMetas2(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
     assert(spinachMeta2.schema === spinachMeta.schema)
+    assert(spinachMeta2.dataReaderClassName === spinachMeta.dataReaderClassName)
   }
 
   test("Spinach meta for partitioned table") {
@@ -202,6 +206,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(fileMetas.length === 3)
     assert(fileMetas.map(_.recordCount).sum === 50)
     assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+    assert(spinachMeta.dataReaderClassName === SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME)
 
 
     val readDf = sqlContext.read.format("spn").load(tmpDir.getAbsolutePath)
