@@ -58,6 +58,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
         .appendEntry(2)))
       .withNewSchema(new StructType()
         .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
+      .withNewDataReaderClassName("NotExistedDataFileClassName")
       .build()
 
     DataSourceMeta.write(path, new Configuration(), spinachMeta)
@@ -103,6 +104,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
     assert(spinachMeta.schema === new StructType()
       .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
+    assert(spinachMeta.dataReaderClassName === "NotExistedDataFileClassName")
   }
 
   test("read empty Spinach Meta") {
@@ -119,6 +121,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(spinachMeta.fileMetas.length === 0)
     assert(spinachMeta.indexMetas.length === 0)
     assert(spinachMeta.schema.length === 0)
+    assert(spinachMeta.dataReaderClassName === SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME)
   }
 
   test("Spinach Meta integration test") {
@@ -145,13 +148,13 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
     assert(spinachMeta.schema === df.schema)
 
-    sql("create index index1 on spnt1 (a) using btree")
-    sql("create index index2 on spnt1 (a asc)") // dup as index1, still creating
-    sql("create index index3 on spnt1 (a desc)")
-    sql("create index if not exists index3 on spnt1 (a desc)") // not creating
-    sql("drop index index2") // dropping
-    sql("drop index if exists index5") // not dropping
-    sql("drop index if exists index2") // not dropping
+    sql("create sindex index1 on spnt1 (a)")
+    sql("create sindex index2 on spnt1 (a asc)") // dup as index1, still creating
+    sql("create sindex index3 on spnt1 (a desc)")
+    sql("create sindex if not exists index3 on spnt1 (a desc)") // not creating
+    sql("drop sindex index2 on spnt1") // dropping
+    sql("drop sindex if exists index5 on spnt1") // not dropping
+    sql("drop sindex if exists index2 on spnt1") // not dropping
 
     val spinachMeta2 = DataSourceMeta.initialize(path, new Configuration())
     val fileHeader2 = spinachMeta2.fileHeader
@@ -164,6 +167,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(fileMetas2.map(_.recordCount).sum === 100)
     assert(fileMetas2(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
     assert(spinachMeta2.schema === spinachMeta.schema)
+    assert(spinachMeta2.dataReaderClassName === spinachMeta.dataReaderClassName)
   }
 
   test("Spinach meta for partitioned table") {
@@ -202,6 +206,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(fileMetas.length === 3)
     assert(fileMetas.map(_.recordCount).sum === 50)
     assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+    assert(spinachMeta.dataReaderClassName === SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME)
 
 
     val readDf = sqlContext.read.format("spn").load(tmpDir.getAbsolutePath)

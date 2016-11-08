@@ -19,17 +19,19 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.util.concurrent.TimeUnit
 
+import scala.util.{Failure, Success, Try}
+
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, FSDataInputStream, Path}
 import org.apache.hadoop.util.StringUtils
 
-import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
-import org.apache.spark.io.SnappyCompressionCodec
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.SpinachException
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.unsafe.Platform
+import org.apache.spark.util.Utils
+
 
 private sealed case class ConfigurationCache[T](key: T, conf: Configuration) {
   override def hashCode: Int = key.hashCode()
@@ -161,6 +163,23 @@ abstract class DataFile {
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int])
   : Iterator[InternalRow]
+}
+
+private[spinach] object DataFile {
+  def apply(path: String, schema: StructType, dataFileClassName: String): DataFile = {
+    Try(Utils.classForName(dataFileClassName).getDeclaredConstructor(
+      classOf[String], classOf[StructType])).toOption match {
+      case Some(ctor) =>
+        Try (ctor.newInstance(path, schema).asInstanceOf[DataFile]) match {
+          case Success(e) => e
+          case Failure(e) =>
+            throw new SpinachException(s"Cannot instantiate class $dataFileClassName", e)
+        }
+      case None => throw new SpinachException(
+        s"Cannot find constructor of signature like:" +
+          s" (String, StructType) for class $dataFileClassName")
+    }
+  }
 }
 
 private[spinach] case class Fiber(file: DataFile, columnIndex: Int, rowGroupId: Int)

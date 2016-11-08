@@ -50,6 +50,7 @@ import org.apache.spark.sql.types._
  *    .
  * IndexMeta N
  * Schema           -- Variable Length -- The table schema in json format.
+ * Data Reader Class Name -- Variable Length -- The associated data reader class name.
  * FileHeader       --  32 bytes
  *     RecordCount  --   8 bytes -- The number of all of the records in the same folder.
  *     DataFileCount--   8 bytes -- The number of the data files.
@@ -250,13 +251,15 @@ private[spinach] object FileHeader {
 private[spinach] case class DataSourceMeta(
     @transient fileMetas: Array[FileMeta],
     @transient indexMetas: Array[IndexMeta],
-    @transient schema: StructType,
+    schema: StructType,
+    dataReaderClassName: String,
     @transient fileHeader: FileHeader)
 
 private[spinach] class DataSourceMetaBuilder {
   val fileMetas = ArrayBuffer.empty[FileMeta]
   val indexMetas = ArrayBuffer.empty[IndexMeta]
   var schema: StructType = new StructType()
+  var dataReaderClassName: String = classOf[SpinachDataFile].getCanonicalName
 
   def addFileMeta(fileMeta: FileMeta): this.type = {
     fileMetas += fileMeta
@@ -273,9 +276,14 @@ private[spinach] class DataSourceMetaBuilder {
     this
   }
 
+  def withNewDataReaderClassName(clsName: String): this.type = {
+    this.dataReaderClassName = clsName
+    this
+  }
+
   def build(): DataSourceMeta = {
     val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size, indexMetas.size)
-    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, fileHeader)
+    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, dataReaderClassName, fileHeader)
   }
 }
 
@@ -363,8 +371,9 @@ private[spinach] object DataSourceMeta {
     val fileMetas = readFileMetas(fileHeader, in)
     val indexMetas = readIndexMetas(fileHeader, in)
     val schema = readSchema(fileHeader, in)
+    val dataReaderClassName = in.readUTF()
     in.close()
-    DataSourceMeta(fileMetas, indexMetas, schema, fileHeader)
+    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
   }
 
   def write(
@@ -384,6 +393,7 @@ private[spinach] object DataSourceMeta {
     meta.fileMetas.foreach(_.write(out))
     meta.indexMetas.foreach(_.write(out))
     writeSchema(meta.schema, out)
+    out.writeUTF(meta.dataReaderClassName)
     meta.fileHeader.write(out)
     out.close()
   }

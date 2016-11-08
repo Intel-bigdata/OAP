@@ -30,7 +30,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
+import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
 
@@ -48,8 +48,9 @@ private[spinach] case class SpinachIndexBuild(
       // the input path probably be pruned, do nothing
     } else {
       // TODO use internal scan
+      val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
       @transient val p = paths(0)
-      @transient val fs = p.getFileSystem(sparkSession.sparkContext.hadoopConfiguration)
+      @transient val fs = p.getFileSystem(hadoopConf)
       @transient val fileIter = fs.listFiles(p, true)
       @transient val dataPaths = new Iterator[Path] {
         override def hasNext: Boolean = fileIter.hasNext
@@ -63,11 +64,16 @@ private[spinach] case class SpinachIndexBuild(
         new SerializableConfiguration(sparkSession.sparkContext.hadoopConfiguration)
       val confBroadcast = sparkSession.sparkContext.broadcast(serializableConfiguration)
       val num = dataPaths.length
+      val meta = SpinachUtils.getMeta(hadoopConf, p) match {
+        case Some(m) => m
+        case None => DataSourceMeta.newBuilder().withNewSchema(schema).build()
+      }
       sparkSession.sparkContext.parallelize(data, num).map(dataString => {
       // data.foreach(dataString => {
         val d = new Path(dataString)
         // scan every data file
-        val reader = new SpinachDataReader(d, schema, None, ids)
+        // TODO we need to set the Data Reader File class name here.
+        val reader = new SpinachDataReader(d, meta, None, ids)
         val hadoopConf = confBroadcast.value.value
         val it = reader.initialize(confBroadcast.value.value)
         // TODO maybe use Long as RowId?
@@ -108,7 +114,8 @@ private[spinach] case class SpinachIndexBuild(
         val indexFile = new Path(
           IndexUtils.indexFileNameFromDataFileName(dataFilePathString, indexName))
         val fs = indexFile.getFileSystem(hadoopConf)
-        val fileOut = fs.create(indexFile, false)
+        // we are overwriting index files
+        val fileOut = fs.create(indexFile, true)
         var i = 0
         var fileOffset = 0
         val offsetMap = new java.util.HashMap[InternalRow, Int]()

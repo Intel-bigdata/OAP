@@ -108,6 +108,7 @@ private[spinach] class BPlusTreeSearchSuite
     null,
     Array(BPlusTreeSearchSuite.indexMeta),
     new StructType().add("fake", StringType, true).add("test", IntegerType, true),
+    SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME,
     null)
 
   test("equal 11") {

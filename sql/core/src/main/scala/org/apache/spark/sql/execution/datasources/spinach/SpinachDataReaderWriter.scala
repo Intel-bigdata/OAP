@@ -97,7 +97,7 @@ private[spinach] class SpinachDataWriter(
 
 private[spinach] class SpinachDataReader(
   path: Path,
-  schema: StructType,
+  meta: DataSourceMeta,
   filterScanner: Option[RangeScanner],
   requiredIds: Array[Int]) {
 
@@ -107,7 +107,7 @@ private[spinach] class SpinachDataReader(
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     // TODO how to save the additional FS operation to get the Split size
     val pathInstring = path.toString
-    val fileScanner = SpinachDataFile(path.toString, schema)
+    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
     dataFileMeta = DataFileHandleCacheManager(fileScanner, conf)
 
     filterScanner match {

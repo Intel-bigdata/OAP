@@ -125,9 +125,9 @@ statement
     | SET ROLE .*?                                                     #failNativeCommand
     | SET .*?                                                          #setConfiguration
     | RESET                                                            #resetConfiguration
-    | CREATE SPINACH INDEX (IF NOT EXISTS)? IDENTIFIER ON
+    | CREATE SINDEX (IF NOT EXISTS)? IDENTIFIER ON
         tableIdentifier indexCols                             #spinachCreateIndex
-    | DROP SPINACH INDEX (IF EXISTS)? IDENTIFIER ON tableIdentifier    #spinachDropIndex
+    | DROP SINDEX (IF EXISTS)? IDENTIFIER ON tableIdentifier           #spinachDropIndex
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
     ;
 
@@ -885,7 +885,7 @@ ANTI: 'ANTI';
 LOCAL: 'LOCAL';
 INPATH: 'INPATH';
 
-SPINACH: 'SPINACH';
+SINDEX: 'SINDEX';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''

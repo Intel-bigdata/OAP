@@ -61,7 +61,9 @@ case class CreateIndex(
             }
             val metaBuilder = DataSourceMeta.newBuilder()
             if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)
-            if (existsIndexes != null) existsIndexes.foreach(metaBuilder.addIndexMeta)
+            if (existsIndexes != null) {
+              existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
+            }
             val entries = indexColumns.map(c => {
               val dir = if (c.isAscending) Ascending else Descending
               BTreeIndexEntry(s.map(_.name).toIndexedSeq.indexOf(c.columnName), dir)

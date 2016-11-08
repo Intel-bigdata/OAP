@@ -133,8 +133,8 @@ private[sql] class SpinachFileFormat extends FileFormat
           assert(file.partitionValues.numFields == partitionSchema.size)
 
           val iter = new SpinachDataReader(
-            new Path(new URI(file.filePath)), dataSchema, filterScanner, requiredIds
-          ).initialize(broadcastedHadoopConf.value.value)
+            new Path(new URI(file.filePath)), meta, filterScanner, requiredIds)
+            .initialize(broadcastedHadoopConf.value.value)
 
           val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
           val joinedRow = new JoinedRow()
@@ -184,6 +184,7 @@ private[spinach] class SpinachOutputWriterFactory(
     val path = new Path(outputRoot, SpinachFileFormat.SPINACH_META_FILE)
 
     val builder = DataSourceMeta.newBuilder()
+      .withNewDataReaderClassName(SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME)
     taskResults.foreach {
       // The file fingerprint is not used at the moment.
       case s: SpinachWriteResult => builder.addFileMeta(FileMeta("", s.rowsWritten, s.fileName))
@@ -245,6 +246,7 @@ private[sql] object SpinachFileFormat {
   val SPINACH_META_FILE = ".spinach.meta"
   val SPINACH_META_SCHEMA = "spinach.schema"
   val SPINACH_DATA_SOURCE_META = "spinach.meta.datasource"
+  val SPINACH_DATA_FILE_CLASSNAME = classOf[SpinachDataFile].getCanonicalName
 
   def serializeDataSourceMeta(conf: Configuration, meta: Option[DataSourceMeta]): Unit = {
     SerializationUtil.writeObjectToConfAsBase64(SPINACH_DATA_SOURCE_META, meta, conf)
