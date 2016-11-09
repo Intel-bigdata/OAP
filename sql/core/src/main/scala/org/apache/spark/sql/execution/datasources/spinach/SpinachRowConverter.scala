@@ -107,7 +107,7 @@ class SpinachRowConverter(
      """.stripMargin)
 
   /**
-   * Updater used together with field converters within a [[ParquetRowConverter]].  It propagates
+   * Updater used together with field converters within a [[SpinachRowConverter]].  It propagates
    * converted filed values to the `ordinal`-th cell in `currentRow`.
    */
   private final class RowUpdater(row: MutableRow, ordinal: Int) extends ParentContainerUpdater {
@@ -170,16 +170,16 @@ class SpinachRowConverter(
 
     catalystType match {
       case BooleanType | IntegerType | LongType | FloatType | DoubleType | BinaryType =>
-        new ParquetPrimitiveConverter(updater)
+        new SpinachPrimitiveConverter(updater)
 
       case ByteType =>
-        new ParquetPrimitiveConverter(updater) {
+        new SpinachPrimitiveConverter(updater) {
           override def addInt(value: Int): Unit =
             updater.setByte(value.asInstanceOf[ByteType#InternalType])
         }
 
       case ShortType =>
-        new ParquetPrimitiveConverter(updater) {
+        new SpinachPrimitiveConverter(updater) {
           override def addInt(value: Int): Unit =
             updater.setShort(value.asInstanceOf[ShortType#InternalType])
         }
@@ -208,7 +208,7 @@ class SpinachRowConverter(
 
       case TimestampType =>
         // TODO Implements `TIMESTAMP_MICROS` once parquet-mr has that.
-        new ParquetPrimitiveConverter(updater) {
+        new SpinachPrimitiveConverter(updater) {
           // Converts nanosecond timestamps stored as INT96
           override def addBinary(value: Binary): Unit = {
             assert(
@@ -224,7 +224,7 @@ class SpinachRowConverter(
         }
 
       case DateType =>
-        new ParquetPrimitiveConverter(updater) {
+        new SpinachPrimitiveConverter(updater) {
           override def addInt(value: Int): Unit = {
             // DateType is not specialized in `SpecificMutableRow`, have to box it here.
             updater.set(value.asInstanceOf[DateType#InternalType])
@@ -263,7 +263,7 @@ class SpinachRowConverter(
    * Parquet converter for strings. A dictionary is used to minimize string decoding cost.
    */
   private final class ParquetStringConverter(updater: ParentContainerUpdater)
-      extends ParquetPrimitiveConverter(updater) {
+      extends SpinachPrimitiveConverter(updater) {
 
     private var expandedDictionary: Array[UTF8String] = null
 
@@ -295,7 +295,7 @@ class SpinachRowConverter(
    */
   private abstract class ParquetDecimalConverter(
     precision: Int, scale: Int, updater: ParentContainerUpdater)
-      extends ParquetPrimitiveConverter(updater) {
+      extends SpinachPrimitiveConverter(updater) {
 
     protected var expandedDictionary: Array[Decimal] = _
 

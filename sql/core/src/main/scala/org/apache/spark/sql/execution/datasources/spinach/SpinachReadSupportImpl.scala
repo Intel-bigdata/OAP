@@ -70,7 +70,7 @@ class SpinachReadSupportImpl extends SpinachReadSupport[UnsafeRow] with Logging 
     }
 
     val spinachRequestedSchema =
-      ParquetReadSupport.clipParquetSchema(context.getFileSchema, catalystRequestedSchema)
+      SpinachReadSupportImpl.clipParquetSchema(context.getFileSchema, catalystRequestedSchema)
 
     catalystReadFromFileSchema = {
       val conf = context.getConfiguration
@@ -135,7 +135,7 @@ object SpinachReadSupportImpl {
     Types
       .buildMessage()
       .addFields(clippedParquetFields: _*)
-      .named(ParquetSchemaConverter.SPARK_PARQUET_SCHEMA_NAME)
+      .named(SpinachSchemaConverter.SPARK_PARQUET_SCHEMA_NAME)
   }
 
   private def clipParquetType(parquetType: Type, catalystType: DataType): Type = {
@@ -285,7 +285,7 @@ object SpinachReadSupportImpl {
   private def clipParquetGroupFields(
     parquetRecord: GroupType, structType: StructType): Seq[Type] = {
     val parquetFieldMap = parquetRecord.getFields.asScala.map(f => f.getName -> f).toMap
-    val toParquet = new ParquetSchemaConverter(writeLegacyParquetFormat = false)
+    val toParquet = new SpinachSchemaConverter(writeLegacyParquetFormat = false)
     structType.map { f =>
       parquetFieldMap
         .get(f.name)
