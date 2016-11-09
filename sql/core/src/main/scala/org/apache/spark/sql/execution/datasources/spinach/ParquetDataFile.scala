@@ -26,6 +26,7 @@ import org.apache.parquet.hadoop.SpinachRecordReader
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
+import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 import org.apache.spark.sql.types.StructType
 
 private[spinach] case class ParquetDataFile(path: String, schema: StructType) extends DataFile {
@@ -48,7 +49,7 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
       }
       requestSchema.json
     }
-    conf.set(SpinachReadSupportImpl.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
+    conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
     conf.set(SpinachReadSupportImpl.SPARK_ROW_READ_FROM_FILE_SCHEMA, requestSchemaString)
 
     val readSupport = new SpinachReadSupportImpl

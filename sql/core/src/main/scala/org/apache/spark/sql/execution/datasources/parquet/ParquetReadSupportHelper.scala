@@ -15,27 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.parquet
 
-import org.apache.parquet.io.api.{GroupConverter, RecordMaterializer}
 import org.apache.parquet.schema.MessageType
 
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.types.StructType
 
-/**
- * A [[SpinachRecordMaterializer]] for Catalyst rows.
- *
- * @param parquetSchema  Parquet schema of the records to be read
- * @param catalystSchema Catalyst schema of the rows to be constructed
- */
-class SpinachRecordMaterializer(
-                                 parquetSchema: MessageType, catalystSchema: StructType)
-  extends RecordMaterializer[UnsafeRow] {
+object ParquetReadSupportHelper {
 
-  private val rootConverter = new SpinachRowConverter(parquetSchema, catalystSchema, NoopUpdater)
+  val SPARK_ROW_REQUESTED_SCHEMA = ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA
 
-  override def getCurrentRecord: UnsafeRow = rootConverter.currentRecord
+  def expandUDT(schema: StructType): StructType = ParquetReadSupport.expandUDT(schema)
 
-  override def getRootConverter: GroupConverter = rootConverter
+  def clipParquetSchema(parquetSchema: MessageType, catalystSchema: StructType): MessageType
+  = ParquetReadSupport.clipParquetSchema(parquetSchema, catalystSchema)
 }
