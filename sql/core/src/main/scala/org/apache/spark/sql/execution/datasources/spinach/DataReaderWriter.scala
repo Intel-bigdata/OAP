@@ -49,19 +49,63 @@ private[spinach] abstract class DataReaderWriter(val cardinal: Int) {
 private[spinach] object DataReaderWriter {
   def initialDataReaderWriterFromSchema(schema: StructType): Array[DataReaderWriter] =
     schema.fields.zipWithIndex.map(_ match {
-      case (StructField(_, IntegerType, _, _), idx) => new IntDataReaderWriter(idx)
       case (StructField(_, StringType, _, _), idx) => new StringDataReaderWriter(idx)
+      case (StructField(_, dt, _, _), idx) if dt.defaultSize <= 8 =>
+        new FixedSizeDataReaderWriter(idx, dt)
       case (StructField(_, dt, _, _), idx) =>
         throw new UnsupportedOperationException(s"$idx:${dt.json}")
     })
 }
 
-private[spinach] class IntDataReaderWriter(cardinal: Int) extends DataReaderWriter(cardinal) {
+private[spinach] class FixedSizeDataReaderWriter(ordinal: Int, dataType: DataType)
+  extends DataReaderWriter(ordinal) {
   protected[this] def writeInternal(out: DataOutputStream, row: InternalRow): Unit = {
-    out.writeInt(row.getInt(cardinal))
+    dataType match {
+      case BooleanType =>
+        out.writeBoolean(row.getBoolean(ordinal))
+      case ByteType =>
+        out.writeByte(row.getByte(ordinal))
+      case DateType =>
+        out.writeInt(row.getInt(ordinal))
+      case DoubleType =>
+        out.writeDouble(row.getDouble(ordinal))
+      case FloatType =>
+        out.writeFloat(row.getFloat(ordinal))
+      case IntegerType =>
+        out.writeInt (row.getInt (ordinal) )
+      case LongType =>
+        out.writeLong(row.getLong(ordinal))
+      case ShortType =>
+        out.writeShort(row.getShort(ordinal))
+      case TimestampType =>
+        out.writeLong(row.getLong(ordinal))
+      case _ =>
+        throw new NotImplementedError("TODO")
+    }
   }
   protected[this] def readInternal(in: DataInputStream, row: MutableRow): Unit = {
-    row.setInt(cardinal, in.readInt())
+    dataType match {
+      case BooleanType =>
+        row.setBoolean(ordinal, in.readBoolean())
+      case ByteType =>
+        row.setByte(ordinal, in.readByte())
+      case DateType =>
+        row.setInt(ordinal, in.readInt())
+      case DoubleType =>
+        row.setDouble(ordinal, in.readDouble())
+      case FloatType =>
+        row.setFloat(ordinal, in.readFloat())
+      case IntegerType =>
+        row.setInt(ordinal, in.readInt())
+      case LongType =>
+        row.setLong(ordinal, in.readLong())
+      case ShortType =>
+        row.setShort(ordinal, in.readShort())
+      case TimestampType =>
+        row.setLong(ordinal, in.readLong())
+      case _ =>
+        throw new NotImplementedError("TODO")
+    }
   }
 }
 
