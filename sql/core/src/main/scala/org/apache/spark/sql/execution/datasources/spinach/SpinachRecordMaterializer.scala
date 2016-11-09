@@ -17,23 +17,21 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import org.apache.parquet.io.api.{ GroupConverter, RecordMaterializer }
+import org.apache.parquet.io.api.{GroupConverter, RecordMaterializer}
 import org.apache.parquet.schema.MessageType
 
-import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.catalyst.expressions.SpecificMutableRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
+import org.apache.spark.sql.types.StructType
 
 /**
- * A [[RecordMaterializer]] for Catalyst rows.
+ * A [[SpinachRecordMaterializer]] for Catalyst rows.
  *
- * @param parquetSchema Parquet schema of the records to be read
+ * @param parquetSchema  Parquet schema of the records to be read
  * @param catalystSchema Catalyst schema of the rows to be constructed
  */
 class SpinachRecordMaterializer(
-  parquetSchema: MessageType, catalystSchema: StructType)
-    extends RecordMaterializer[UnsafeRow] {
+                                 parquetSchema: MessageType, catalystSchema: StructType)
+  extends RecordMaterializer[UnsafeRow] {
 
   private val rootConverter = new SpinachRowConverter(parquetSchema, catalystSchema, NoopUpdater)
 

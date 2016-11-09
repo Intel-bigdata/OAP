@@ -25,9 +25,9 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.parquet.column.Dictionary
 import org.apache.parquet.io.api.{ Binary, Converter, GroupConverter, PrimitiveConverter }
-import org.apache.parquet.schema.{ GroupType, MessageType, PrimitiveType, Type }
-import org.apache.parquet.schema.OriginalType.{ INT_32, LIST, UTF8 }
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{ BINARY, DOUBLE, FIXED_LEN_BYTE_ARRAY, INT32, INT64 }
+import org.apache.parquet.schema.{ GroupType, PrimitiveType, Type }
+import org.apache.parquet.schema.OriginalType.LIST
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{ BINARY, FIXED_LEN_BYTE_ARRAY, INT32, INT64 }
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
@@ -193,7 +193,8 @@ class SpinachRowConverter(
         new ParquetLongDictionaryAwareDecimalConverter(t.precision, t.scale, updater)
 
       // For BINARY and FIXED_LEN_BYTE_ARRAY backed decimals
-      case t: DecimalType if parquetType.asPrimitiveType().getPrimitiveTypeName == FIXED_LEN_BYTE_ARRAY ||
+      case t: DecimalType
+        if parquetType.asPrimitiveType().getPrimitiveTypeName == FIXED_LEN_BYTE_ARRAY ||
         parquetType.asPrimitiveType().getPrimitiveTypeName == BINARY =>
         new ParquetBinaryDictionaryAwareDecimalConverter(t.precision, t.scale, updater)
 

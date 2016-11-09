@@ -17,39 +17,43 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.util.{ Map => JMap }
-
-import scala.collection.JavaConverters._
+import java.util.{Map => JMap}
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.hadoop.api.{ InitContext, ReadSupport }
+import org.apache.parquet.hadoop.api.{InitContext, ReadSupport}
 import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
+import org.apache.parquet.hadoop.api.SpinachReadSupport
+import org.apache.parquet.hadoop.api.SpinachReadSupport.SpinachReadContext
 import org.apache.parquet.io.api.RecordMaterializer
 import org.apache.parquet.schema._
 import org.apache.parquet.schema.Type.Repetition
+import scala.collection.JavaConverters._
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
-import org.apache.parquet.hadoop.api.SpinachReadSupport
-import org.apache.parquet.hadoop.api.SpinachReadSupport.SpinachReadContext
-import org.apache.spark.sql.catalyst.expressions.SpecificMutableRow
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
+
+
 
 /**
  * A Parquet [[ReadSupport]] implementation for reading Parquet records as Catalyst
  * [[InternalRow]]s.
  *
- * The API interface of [[ReadSupport]] is a little bit over complicated because of historical
- * reasons.  In older versions of parquet-mr (say 1.6.0rc3 and prior), [[ReadSupport]] need to be
- * instantiated and initialized twice on both driver side and executor side.  The [[init()]] method
- * is for driver side initialization, while [[prepareForRead()]] is for executor side.  However,
- * starting from parquet-mr 1.6.0, it's no longer the case, and [[ReadSupport]] is only instantiated
- * and initialized on executor side.  So, theoretically, now it's totally fine to combine these two
- * methods into a single initialization method.  The only reason (I could think of) to still have
- * them here is for parquet-mr API backwards-compatibility.
+ * The API interface of [[ReadSupport]] is a little bit over complicated because of
+ * historical reasons.  In older versions of parquet-mr (say 1.6.0rc3 and prior),
+ * [[ReadSupport]] need to be instantiated and initialized twice on both driver side
+ * and executor side.  The [[init()]] method is for driver side initialization,
+ * while [[prepareForRead()]] is for executor side.  However, starting from
+ * parquet-mr 1.6.0, it's no longer the case, and [[ReadSupport]] is only
+ * instantiated and initialized on executor side.
+ * So, theoretically, now it's totally fine to combine these two methods
+ * into a single initialization method.
+ * The only reason (I could think of) to still have them here
+ * is for parquet-mr API backwards-compatibility.
  *
- * Due to this reason, we no longer rely on [[ReadContext]] to pass requested schema from [[init()]]
+ * Due to this reason, we no longer rely on [[ReadContext]]
+ * to pass requested schema from [[init()]]
  * to [[prepareForRead()]], but use a private `var` for simplicity.
  */
 class SpinachReadSupportImpl extends SpinachReadSupport[UnsafeRow] with Logging {
@@ -96,10 +100,10 @@ class SpinachReadSupportImpl extends SpinachReadSupport[UnsafeRow] with Logging 
    * records to Catalyst [[InternalRow]]s.
    */
   override def prepareForRead(
-    conf: Configuration,
-    keyValueMetaData: JMap[String, String],
-    fileSchema: MessageType,
-    readContext: SpinachReadContext): RecordMaterializer[UnsafeRow] = {
+                               conf: Configuration,
+                               keyValueMetaData: JMap[String, String],
+                               fileSchema: MessageType,
+                               readContext: SpinachReadContext): RecordMaterializer[UnsafeRow] = {
     log.debug(s"Preparing for read Parquet file with message type: $fileSchema")
     val parquetRequestedSchema = readContext.getRequestedSchema
 
@@ -127,8 +131,9 @@ object SpinachReadSupportImpl {
   val SPARK_ROW_READ_FROM_FILE_SCHEMA = "org.apache.spark.sql.parquet.row.read_from_file_schema"
 
   /**
-   * Tailors `parquetSchema` according to `catalystSchema` by removing column paths don't exist
-   * in `catalystSchema`, and adding those only exist in `catalystSchema`.
+   * Tailors `parquetSchema` according to `catalystSchema`
+   * by removing column paths don't exist in `catalystSchema`,
+   * and adding those only exist in `catalystSchema`.
    */
   def clipParquetSchema(parquetSchema: MessageType, catalystSchema: StructType): MessageType = {
     val clippedParquetFields = clipParquetGroupFields(parquetSchema.asGroupType(), catalystSchema)
@@ -172,9 +177,9 @@ object SpinachReadSupportImpl {
   }
 
   /**
-   * Clips a Parquet [[GroupType]] which corresponds to a Catalyst [[ArrayType]].  The element type
-   * of the [[ArrayType]] should also be a nested type, namely an [[ArrayType]], a [[MapType]], or a
-   * [[StructType]].
+   * Clips a Parquet [[GroupType]] which corresponds to a Catalyst [[ArrayType]].]
+   * The element type of the [[ArrayType]] should also be a nested type,
+   * namely an [[ArrayType]], a [[MapType]], or a [[StructType]].
    */
   private def clipParquetListType(parquetList: GroupType, elementType: DataType): Type = {
     // Precondition of this method, should only be called for lists with nested element types.
@@ -232,12 +237,13 @@ object SpinachReadSupportImpl {
   }
 
   /**
-   * Clips a Parquet [[GroupType]] which corresponds to a Catalyst [[MapType]].  Either key type or
-   * value type of the [[MapType]] must be a nested type, namely an [[ArrayType]], a [[MapType]], or
-   * a [[StructType]].
+   * Clips a Parquet [[GroupType]] which corresponds to a Catalyst [[MapType]].
+   * Either key type or value type of the [[MapType]] must be a nested type,
+   * namely an [[ArrayType]], a [[MapType]], or a [[StructType]].
    */
-  private def clipParquetMapType(
-    parquetMap: GroupType, keyType: DataType, valueType: DataType): GroupType = {
+  private def clipParquetMapType(parquetMap: GroupType,
+                                 keyType: DataType,
+                                 valueType: DataType): GroupType = {
     // Precondition of this method, only handles maps with nested key types or value types.
     assert(!isPrimitiveCatalystType(keyType) || !isPrimitiveCatalystType(valueType))
 
@@ -282,8 +288,8 @@ object SpinachReadSupportImpl {
    *
    * @return A list of clipped [[GroupType]] fields, which can be empty.
    */
-  private def clipParquetGroupFields(
-    parquetRecord: GroupType, structType: StructType): Seq[Type] = {
+  private def clipParquetGroupFields(parquetRecord: GroupType,
+                                     structType: StructType): Seq[Type] = {
     val parquetFieldMap = parquetRecord.getFields.asScala.map(f => f.getName -> f).toMap
     val toParquet = new SpinachSchemaConverter(writeLegacyParquetFormat = false)
     structType.map { f =>

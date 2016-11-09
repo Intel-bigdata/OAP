@@ -31,30 +31,33 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 
 /**
-  * This converter class is used to convert Parquet [[MessageType]] to Spark SQL [[StructType]] and
-  * vice versa.
-  *
-  * Parquet format backwards-compatibility rules are respected when converting Parquet
-  * [[MessageType]] schemas.
-  *
-  * @see https://github.com/apache/parquet-format/blob/master/LogicalTypes.md
-  * @constructor
-  * @param assumeBinaryIsString Whether unannotated BINARY fields should be assumed to be Spark SQL
-  *        [[StringType]] fields when converting Parquet a [[MessageType]] to Spark SQL
-  *        [[StructType]].  This argument only affects Parquet read path.
-  * @param assumeInt96IsTimestamp Whether unannotated INT96 fields should be assumed to be Spark SQL
-  *        [[TimestampType]] fields when converting Parquet a [[MessageType]] to Spark SQL
-  *        [[StructType]].  Note that Spark SQL [[TimestampType]] is similar to Hive timestamp, which
-  *        has optional nanosecond precision, but different from `TIME_MILLS` and `TIMESTAMP_MILLIS`
-  *        described in Parquet format spec.  This argument only affects Parquet read path.
-  * @param writeLegacyParquetFormat Whether to use legacy Parquet format compatible with Spark 1.4
-  *        and prior versions when converting a Catalyst [[StructType]] to a Parquet [[MessageType]].
-  *        When set to false, use standard format defined in parquet-format spec.  This argument only
-  *        affects Parquet write path.
-  */
-class SpinachSchemaConverter(assumeBinaryIsString: Boolean = SQLConf.PARQUET_BINARY_AS_STRING.defaultValue.get,
-                             assumeInt96IsTimestamp: Boolean = SQLConf.PARQUET_INT96_AS_TIMESTAMP.defaultValue.get,
-                             writeLegacyParquetFormat: Boolean = SQLConf.PARQUET_WRITE_LEGACY_FORMAT.defaultValue.get) {
+ * This converter class is used to convert Parquet [[MessageType]] to Spark SQL [[StructType]] and
+ * vice versa.
+ *
+ * Parquet format backwards-compatibility rules are respected when converting Parquet
+ * [[MessageType]] schemas.
+ *
+ * @see https://github.com/apache/parquet-format/blob/master/LogicalTypes.md
+ * @constructor
+ * @param assumeBinaryIsString Whether unannotated BINARY fields should be assumed to be Spark SQL
+ *        [[StringType]] fields when converting Parquet a [[MessageType]] to Spark SQL
+ *        [[StructType]].  This argument only affects Parquet read path.
+ * @param assumeInt96IsTimestamp Whether unannotated INT96 fields should be assumed to be Spark SQL
+ *        [[TimestampType]] fields when converting Parquet a [[MessageType]] to Spark SQL
+ *        [[StructType]].  Note that Spark SQL [[TimestampType]] is similar to Hive timestamp,
+ *        which has optional nanosecond precision, but different from `TIME_MILLS`
+ *        and `TIMESTAMP_MILLIS` described in Parquet format spec.
+ *        This argument only affects Parquet read path.
+ * @param writeLegacyParquetFormat Whether to use legacy Parquet format compatible with Spark 1.4
+ *        and prior versions when converting a Catalyst [[StructType]]
+ *        to a Parquet [[MessageType]].
+ *        When set to false, use standard format defined in parquet-format spec.
+ *        This argument only affects Parquet write path.
+ */
+class SpinachSchemaConverter(
+      assumeBinaryIsString: Boolean = SQLConf.PARQUET_BINARY_AS_STRING.defaultValue.get,
+      assumeInt96IsTimestamp: Boolean = SQLConf.PARQUET_INT96_AS_TIMESTAMP.defaultValue.get,
+      writeLegacyParquetFormat: Boolean = SQLConf.PARQUET_WRITE_LEGACY_FORMAT.defaultValue.get) {
 
   def this(conf: SQLConf) = this(
     assumeBinaryIsString = conf.isParquetBinaryAsString,
@@ -68,8 +71,8 @@ class SpinachSchemaConverter(assumeBinaryIsString: Boolean = SQLConf.PARQUET_BIN
       SQLConf.PARQUET_WRITE_LEGACY_FORMAT.defaultValue.get.toString).toBoolean)
 
   /**
-    * Converts Parquet [[MessageType]] `parquetSchema` to a Spark SQL [[StructType]].
-    */
+   * Converts Parquet [[MessageType]] `parquetSchema` to a Spark SQL [[StructType]].
+   */
   def convert(parquetSchema: MessageType): StructType = convert(parquetSchema.asGroupType())
 
   private def convert(parquetSchema: GroupType): StructType = {
@@ -94,8 +97,8 @@ class SpinachSchemaConverter(assumeBinaryIsString: Boolean = SQLConf.PARQUET_BIN
   }
 
   /**
-    * Converts a Parquet [[Type]] to a Spark SQL [[DataType]].
-    */
+   * Converts a Parquet [[Type]] to a Spark SQL [[DataType]].
+   */
   def convertField(parquetType: Type): DataType = parquetType match {
     case t: PrimitiveType => convertPrimitiveField(t)
     case t: GroupType => convertGroupField(t.asGroupType())
@@ -304,8 +307,8 @@ class SpinachSchemaConverter(assumeBinaryIsString: Boolean = SQLConf.PARQUET_BIN
   }
 
   /**
-    * Converts a Spark SQL [[StructType]] to a Parquet [[MessageType]].
-    */
+   * Converts a Spark SQL [[StructType]] to a Parquet [[MessageType]].
+   */
   def convert(catalystSchema: StructType): MessageType = {
     Types
       .buildMessage()
@@ -314,8 +317,8 @@ class SpinachSchemaConverter(assumeBinaryIsString: Boolean = SQLConf.PARQUET_BIN
   }
 
   /**
-    * Converts a Spark SQL [[StructField]] to a Parquet [[Type]].
-    */
+   * Converts a Spark SQL [[StructField]] to a Parquet [[Type]].
+   */
   def convertField(field: StructField): Type = {
     convertField(field, if (field.nullable) OPTIONAL else REQUIRED)
   }
