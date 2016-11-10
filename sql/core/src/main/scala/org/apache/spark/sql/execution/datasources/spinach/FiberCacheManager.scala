@@ -159,6 +159,7 @@ abstract class DataFile {
   def path: String
   def schema: StructType
 
+  def createDataFileHandle(conf: Configuration): DataFileHandle
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCacheData
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
