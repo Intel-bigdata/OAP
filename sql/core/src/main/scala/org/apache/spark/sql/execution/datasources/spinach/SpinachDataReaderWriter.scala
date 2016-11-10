@@ -41,7 +41,7 @@ private[spinach] class SpinachDataWriter(
   private val rowGroup: Array[FiberBuilder] =
     FiberBuilder.initializeFromSchema(schema, DEFAULT_ROW_GROUP_SIZE)
 
-  private val fiberMeta = new DataFileMeta(
+  private val fiberMeta = new SpinachDataFileHandle(
     rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE, fieldCount = schema.length)
 
   def write(row: InternalRow) {
@@ -100,8 +100,6 @@ private[spinach] class SpinachDataReader(
   meta: DataSourceMeta,
   filterScanner: Option[RangeScanner],
   requiredIds: Array[Int]) {
-
-  var dataFileMeta: DataFileMeta = _
 
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     // TODO how to save the additional FS operation to get the Split size

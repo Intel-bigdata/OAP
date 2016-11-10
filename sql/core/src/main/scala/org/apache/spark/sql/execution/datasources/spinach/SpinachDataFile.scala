@@ -28,7 +28,7 @@ import org.apache.spark.unsafe.Platform
 private[spinach] case class SpinachDataFile(path: String, schema: StructType) extends DataFile {
 
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCacheData = {
-    val meta: DataFileMeta = DataFileHandleCacheManager(this, conf)
+    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
     val groupMeta = meta.rowGroupsMeta(groupId)
     // get the fiber data start position
     // TODO: update the meta to store the fiber start pos
@@ -60,7 +60,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
 
   // full file scan
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
-    val meta: DataFileMeta = DataFileHandleCacheManager(this, conf)
+    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     (0 until meta.groupCount).iterator.flatMap { groupId =>
@@ -85,7 +85,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
   // scan by given row ids, and we assume the rowIds are sorted
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
   : Iterator[InternalRow] = {
-    val meta: DataFileMeta = DataFileHandleCacheManager(this, conf)
+    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     var lastGroupId = -1
@@ -118,10 +118,10 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     }
   }
 
-  override def createDataFileHandle(conf: Configuration): DataFileHandle = {
+  override def createDataFileHandle(conf: Configuration): SpinachDataFileHandle = {
     val p = new Path(StringUtils.unEscapeString(path))
     val fs = FileSystem.get(conf)
 
-    new DataFileMeta().read(fs.open(p), fs.getFileStatus(p).getLen)
+    new SpinachDataFileHandle().read(fs.open(p), fs.getFileStatus(p).getLen)
   }
 }
