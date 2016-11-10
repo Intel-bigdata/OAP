@@ -250,10 +250,10 @@ private[spinach] object FileHeader {
 
 private[spinach] case class DataSourceMeta(
     @transient fileMetas: Array[FileMeta],
-    @transient indexMetas: Array[IndexMeta],
+    indexMetas: Array[IndexMeta],
     schema: StructType,
     dataReaderClassName: String,
-    @transient fileHeader: FileHeader)
+    @transient fileHeader: FileHeader) extends Serializable
 
 private[spinach] class DataSourceMetaBuilder {
   val fileMetas = ArrayBuffer.empty[FileMeta]

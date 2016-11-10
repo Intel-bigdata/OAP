@@ -86,4 +86,7 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
     }
   }
 
+  override def createDataFileHandle(conf: Configuration): DataFileHandle = {
+    throw new UnsupportedOperationException("Not support initialize Operation.")
+  }
 }

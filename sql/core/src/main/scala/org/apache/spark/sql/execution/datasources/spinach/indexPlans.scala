@@ -20,12 +20,13 @@ package org.apache.spark.sql.execution.datasources.spinach
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{Row, SparkSession}
+import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, Descending}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
 import org.apache.spark.sql.execution.command.RunnableCommand
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, SpinachException}
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 
 /**
@@ -43,44 +44,70 @@ case class CreateIndex(
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val catalog = sparkSession.sessionState.catalog
     assert(catalog.tableExists(tableName), s"$tableName not exists")
-    catalog.lookupRelation(tableName) match {
-      case SubqueryAlias(_, LogicalRelation(
-          HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, _)) =>
-        logInfo(s"Creating index $indexName")
-        val meta = SpinachUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, fileCatalog)
-        // TODO `path` can be None while in an empty spinach data source folder
-        val path = SpinachUtils.getPath(fileCatalog).get
-        meta match {
-          case Some(oldMeta) =>
-            val existsIndexes = oldMeta.indexMetas
-            val existsData = oldMeta.fileMetas
-            val exist = existsIndexes != null && existsIndexes.exists(_.name == indexName)
-            if (!allowExists) assert(!exist)
-            if (exist) {
-              log.warn(s"dup index name $indexName")
-            }
-            val metaBuilder = DataSourceMeta.newBuilder()
-            if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)
-            if (existsIndexes != null) {
-              existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
-            }
-            val entries = indexColumns.map(c => {
-              val dir = if (c.isAscending) Ascending else Descending
-              BTreeIndexEntry(s.map(_.name).toIndexedSeq.indexOf(c.columnName), dir)
-            })
-            metaBuilder.addIndexMeta(new IndexMeta(indexName, BTreeIndex(entries)))
 
-            DataSourceMeta.write(
-              new Path(path.toString + "/" + SpinachFileFormat.SPINACH_META_FILE),
-              sparkSession.sparkContext.hadoopConfiguration,
-              metaBuilder.withNewSchema(oldMeta.schema).build(),
-              deleteIfExits = true)
-            SpinachIndexBuild(sparkSession, indexName, indexColumns, s, Array(path)).execute()
-          case None =>
-            sys.error("meta cannot be empty during the index building")
-        }
-      case _ => sys.error("Only support CreateIndex for SpinachRelation")
+    val (fileCatalog, s, readerClassName) = catalog.lookupRelation(tableName) match {
+      case SubqueryAlias(_, LogicalRelation(
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, _)) =>
+        (fileCatalog, s, SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME)
+      case SubqueryAlias(_, LogicalRelation(
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: ParquetFileFormat, _), _, _)) =>
+        (fileCatalog, s, SpinachFileFormat.PARQUET_DATA_FILE_CLASSNAME)
+      case other =>
+        throw new SpinachException(s"We don't support index building for ${other.simpleString}")
     }
+
+    logInfo(s"Creating index $indexName")
+    val partitions = SpinachUtils.getPartitions(fileCatalog)
+    // TODO currently we ignore empty partitions, so each partition may have different indexes,
+    // this may impact index updating. It may also fail index existence check. Should put index
+    // info at table level also.
+    val bAndP = partitions.filter(_.files.nonEmpty).map(p => {
+      val metaBuilder = new DataSourceMetaBuilder()
+      val parent = p.files.head.getPath.getParent
+      // TODO get `fs` outside of map() to boost
+      val fs = parent.getFileSystem(sparkSession.sparkContext.hadoopConfiguration)
+      if (fs.exists(new Path(parent, SpinachFileFormat.SPINACH_META_FILE))) {
+        val m = SpinachUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, parent)
+        assert(m.nonEmpty)
+        val oldMeta = m.get
+        val existsIndexes = oldMeta.indexMetas
+        val existsData = oldMeta.fileMetas
+        if (existsIndexes.exists(_.name == indexName)) {
+          if (!allowExists) {
+            throw new AnalysisException(s"""Index $indexName exists on table $tableName""")
+          } else {
+            logWarning(s"Dup index name $indexName")
+          }
+        }
+        if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)
+        if (existsIndexes != null) {
+          existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
+        }
+        metaBuilder.withNewSchema(oldMeta.schema)
+      } else {
+        metaBuilder.withNewSchema(s)
+      }
+      val entries = indexColumns.map(c => {
+        val dir = if (c.isAscending) Ascending else Descending
+        BTreeIndexEntry(s.map(_.name).toIndexedSeq.indexOf(c.columnName), dir)
+      })
+      metaBuilder.addIndexMeta(new IndexMeta(indexName, BTreeIndex(entries)))
+      // we cannot build meta for those without spinach meta data
+      metaBuilder.withNewDataReaderClassName(readerClassName)
+      // when p.files is nonEmpty but no spinach meta, it means the relation is in parquet(else
+      // it is Spinach empty partition, we won't create meta for them).
+      // For Parquet, we only use Spinach meta to track schema and reader class, as well as
+      // `IndexMeta`s that must be empty at the moment, so `FileMeta`s are ok to leave empty.
+      // p.files.foreach(f => builder.addFileMeta(FileMeta("", 0, f.getPath.toString)))
+      (metaBuilder, parent)
+    })
+    // write updated metas down
+    bAndP.foreach(bp => DataSourceMeta.write(
+      new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
+      sparkSession.sparkContext.hadoopConfiguration,
+      bp._1.build(),
+      deleteIfExits = true))
+    SpinachIndexBuild(sparkSession, indexName, indexColumns, s, bAndP.map(_._2)).execute()
     Seq.empty
   }
 }
@@ -101,41 +128,50 @@ case class DropIndex(
     val catalog = sparkSession.sessionState.catalog
     catalog.lookupRelation(tableIdentifier) match {
       case SubqueryAlias(_, LogicalRelation(
-          HadoopFsRelation(_, fileCatalog, _, _, _, _: SpinachFileFormat, _), _, _)) =>
+          HadoopFsRelation(_, fileCatalog, _, _, _, format, _), _, _))
+          if format.isInstanceOf[SpinachFileFormat] || format.isInstanceOf[ParquetFileFormat] =>
         logInfo(s"Dropping index $indexName")
-        val meta = SpinachUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, fileCatalog)
-        // TODO `path` can be None while in an empty spinach data source folder
-        val path = SpinachUtils.getPath(fileCatalog).get
-        assert(meta.nonEmpty)
-        val oldMeta = meta.get
-        val existsIndexes = oldMeta.indexMetas
-        val existsData = oldMeta.fileMetas
-        val exist = existsIndexes != null && existsIndexes.exists(_.name == indexName)
-        if (!allowNotExists) assert(exist, "IndexMeta not found in SpinachMeta")
-        if (!exist) {
-          logWarning(s"drop non-exists index $indexName")
-        }
-        val metaBuilder = DataSourceMeta.newBuilder()
-        if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)
-        if (existsIndexes != null) {
-          existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
-        }
-
-        val fs = path.getFileSystem(sparkSession.sparkContext.hadoopConfiguration)
-        val allFile = fs.listFiles(path, true)
-        val filePaths = new Iterator[Path] {
-          override def hasNext: Boolean = allFile.hasNext
-          override def next(): Path = allFile.next().getPath
-        }.toSeq
-        filePaths.filter(_.toString.endsWith(
-          "." + indexName + SpinachFileFormat.SPINACH_INDEX_EXTENSION)).foreach(fs.delete(_, true))
-
-        DataSourceMeta.write(
-          new Path(path.toString + "/" + SpinachFileFormat.SPINACH_META_FILE),
-          sparkSession.sparkContext.hadoopConfiguration,
-          metaBuilder.withNewSchema(oldMeta.schema).build(),
-          deleteIfExits = true)
-      case _ => sys.error("Only support DropIndex for SpinachRelation")
+        val partitions = SpinachUtils.getPartitions(fileCatalog)
+        partitions.filter(_.files.nonEmpty).foreach(p => {
+          val parent = p.files.head.getPath.getParent
+          // TODO get `fs` outside of foreach() to boost
+          val fs = parent.getFileSystem(sparkSession.sparkContext.hadoopConfiguration)
+          if (fs.exists(new Path(parent, SpinachFileFormat.SPINACH_META_FILE))) {
+            val metaBuilder = new DataSourceMetaBuilder()
+            val m = SpinachUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, parent)
+            assert(m.nonEmpty)
+            val oldMeta = m.get
+            val existsIndexes = oldMeta.indexMetas
+            val existsData = oldMeta.fileMetas
+            if (!existsIndexes.exists(_.name == indexName)) {
+              if (!allowNotExists) {
+                throw new AnalysisException(
+                  s"""Index $indexName not exists on table $tableIdentifier""")
+              } else {
+                logWarning(s"drop non-exists index $indexName")
+              }
+            }
+            if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)
+            if (existsIndexes != null) {
+              existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
+            }
+            metaBuilder.withNewDataReaderClassName(oldMeta.dataReaderClassName)
+            DataSourceMeta.write(
+              new Path(parent.toString, SpinachFileFormat.SPINACH_META_FILE),
+              sparkSession.sparkContext.hadoopConfiguration,
+              metaBuilder.withNewSchema(oldMeta.schema).build(),
+              deleteIfExits = true)
+            val allFile = fs.listFiles(parent, false)
+            val filePaths = new Iterator[Path] {
+              override def hasNext: Boolean = allFile.hasNext
+              override def next(): Path = allFile.next().getPath
+            }.toSeq
+            filePaths.filter(_.toString.endsWith(
+              "." + indexName + SpinachFileFormat.SPINACH_INDEX_EXTENSION)).foreach(
+              fs.delete(_, true))
+          }
+        })
+      case _ => sys.error("We don't support index dropping for ${other.simpleString}")
     }
     Seq.empty
   }

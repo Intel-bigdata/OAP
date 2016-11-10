@@ -143,10 +143,7 @@ private[spinach] object DataFileHandleCacheManager extends Logging {
         override def load(entry: ENTRY)
         : DataFileHandle = {
           logDebug(s"Loading Data File Handle ${entry.key.path}")
-          val path = new Path(StringUtils.unEscapeString(entry.key.path))
-          val fs = FileSystem.get(entry.conf)
-
-          new DataFileMeta().read(fs.open(path), fs.getFileStatus(path).getLen)
+          entry.key.createDataFileHandle(entry.conf)
         }
       })
 
@@ -159,6 +156,7 @@ abstract class DataFile {
   def path: String
   def schema: StructType
 
+  def createDataFileHandle(conf: Configuration): DataFileHandle
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCacheData
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])

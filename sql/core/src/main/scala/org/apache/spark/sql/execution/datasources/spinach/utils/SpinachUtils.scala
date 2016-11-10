@@ -20,26 +20,13 @@ package org.apache.spark.sql.execution.datasources.spinach.utils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql.execution.datasources.FileCatalog
+import org.apache.spark.sql.execution.datasources.{FileCatalog, Partition}
 import org.apache.spark.sql.execution.datasources.spinach.{DataSourceMeta, SpinachFileFormat}
 
 /**
  * Utils for Spinach
  */
 object SpinachUtils {
-  def getMeta(hadoopConf: Configuration, fileCatalog: FileCatalog): Option[DataSourceMeta] = {
-    val partition2Meta = fileCatalog.allFiles().map(_.getPath.getParent).map { parent =>
-      (parent, new Path(parent, SpinachFileFormat.SPINACH_META_FILE))
-    }
-      .filter(pair => pair._2.getFileSystem(hadoopConf).exists(pair._2))
-      .toMap
-
-    // TODO we dont support partition for now
-    partition2Meta.values.headOption.map {
-      DataSourceMeta.initialize(_, hadoopConf)
-    }
-  }
-
   def getMeta(hadoopConf: Configuration, parent: Path): Option[DataSourceMeta] = {
     val file = new Path(parent, SpinachFileFormat.SPINACH_META_FILE)
     if (file.getFileSystem(hadoopConf).exists(file)) {
@@ -49,7 +36,7 @@ object SpinachUtils {
     }
   }
 
-  def getPath(fileCatalog: FileCatalog): Option[Path] = {
-    fileCatalog.allFiles().headOption.map(_.getPath.getParent)
+  def getPartitions(fileCatalog: FileCatalog): Seq[Partition] = {
+    fileCatalog.listFiles(Nil)
   }
 }

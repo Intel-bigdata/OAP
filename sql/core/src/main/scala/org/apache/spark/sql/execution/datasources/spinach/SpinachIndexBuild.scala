@@ -35,42 +35,46 @@ import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
 
 private[spinach] case class SpinachIndexBuild(
-    sparkSession: SparkSession,
+    @transient sparkSession: SparkSession,
     indexName: String,
     indexColumns: Array[IndexColumn],
     schema: StructType,
-    @transient paths: Array[Path]) extends Logging {
-  @transient private lazy val ids =
+    @transient paths: Seq[Path],
+    overwrite: Boolean = true) extends Logging {
+  private lazy val ids =
     indexColumns.map(c => schema.map(_.name).toIndexedSeq.indexOf(c.columnName))
-  @transient private lazy val keySchema = StructType(ids.map(schema.toIndexedSeq(_)))
+  private lazy val keySchema = StructType(ids.map(schema.toIndexedSeq(_)))
   def execute(): RDD[InternalRow] = {
     if (paths.isEmpty) {
       // the input path probably be pruned, do nothing
     } else {
       // TODO use internal scan
       val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
-      @transient val p = paths(0)
-      @transient val fs = p.getFileSystem(hadoopConf)
-      @transient val fileIter = fs.listFiles(p, true)
-      @transient val dataPaths = new Iterator[Path] {
+      val fs = paths.head.getFileSystem(hadoopConf)
+      val fileIters = paths.map(fs.listFiles(_, false))
+      val dataPaths = fileIters.flatMap(fileIter => new Iterator[Path] {
         override def hasNext: Boolean = fileIter.hasNext
         override def next(): Path = fileIter.next().getPath
-      }.toSeq
-      val data = dataPaths.map(_.toString).filter(
-        _.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
-      assert(!ids.exists(id => id < 0), "Index column not exists in schema.")
-      @transient lazy val ordering = buildOrdering(ids, keySchema)
-      val serializableConfiguration =
-        new SerializableConfiguration(sparkSession.sparkContext.hadoopConfiguration)
-      val confBroadcast = sparkSession.sparkContext.broadcast(serializableConfiguration)
-      val num = dataPaths.length
-      val meta = SpinachUtils.getMeta(hadoopConf, p) match {
-        case Some(m) => m
-        case None => DataSourceMeta.newBuilder().withNewSchema(schema).build()
+      }.toSeq)
+      val data = if (overwrite) {
+        dataPaths.map(_.toString).filter(_.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+      } else {
+        dataPaths.map(_.toString).filterNot(
+          n => fs.exists(new Path(IndexUtils.indexFileNameFromDataFileName(n, indexName)))).filter(
+            _.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
       }
-      sparkSession.sparkContext.parallelize(data, num).map(dataString => {
-      // data.foreach(dataString => {
+      assert(!ids.exists(id => id < 0), "Index column not exists in schema.")
+      lazy val ordering = buildOrdering(ids, keySchema)
+      val serializableConfiguration =
+        new SerializableConfiguration(hadoopConf)
+      val confBroadcast = sparkSession.sparkContext.broadcast(serializableConfiguration)
+      sparkSession.sparkContext.parallelize(data, data.length).map(dataString => {
         val d = new Path(dataString)
+        // TODO many task will use the same meta, so optimize here
+        val meta = SpinachUtils.getMeta(confBroadcast.value.value, d.getParent) match {
+          case Some(m) => m
+          case None => sys.error("Lost meta")
+        }
         // scan every data file
         // TODO we need to set the Data Reader File class name here.
         val reader = new SpinachDataReader(d, meta, None, ids)
@@ -109,10 +113,8 @@ private[spinach] case class SpinachIndexBuild(
         // sort keys
         java.util.Arrays.sort(uniqueKeys, comparator)
         // build index file
-        val dataFilePathString = d.toString
-        val pos = dataFilePathString.lastIndexOf(SpinachFileFormat.SPINACH_DATA_EXTENSION)
         val indexFile = new Path(
-          IndexUtils.indexFileNameFromDataFileName(dataFilePathString, indexName))
+          IndexUtils.indexFileNameFromDataFileName(dataString, indexName))
         val fs = indexFile.getFileSystem(hadoopConf)
         // we are overwriting index files
         val fileOut = fs.create(indexFile, true)

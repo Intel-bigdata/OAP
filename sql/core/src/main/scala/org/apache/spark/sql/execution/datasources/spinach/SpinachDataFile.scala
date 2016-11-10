@@ -18,6 +18,8 @@
 package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.util.StringUtils
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.StructType
@@ -114,5 +116,12 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
 
       row.moveToRow(rowIdxInGroup)
     }
+  }
+
+  override def createDataFileHandle(conf: Configuration): DataFileHandle = {
+    val p = new Path(StringUtils.unEscapeString(path))
+    val fs = FileSystem.get(conf)
+
+    new DataFileMeta().read(fs.open(p), fs.getFileStatus(p).getLen)
   }
 }
