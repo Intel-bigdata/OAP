@@ -170,7 +170,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(spinachMeta2.dataReaderClassName === spinachMeta.dataReaderClassName)
   }
 
-  ignore("Spinach Meta integration test for parquet") {
+  test("Spinach Meta integration test for parquet") {
     val df = sparkContext.parallelize(1 to 100, 3)
       .map(i => (i, i + 100, s"this is row $i"))
       .toDF("a", "b", "c")

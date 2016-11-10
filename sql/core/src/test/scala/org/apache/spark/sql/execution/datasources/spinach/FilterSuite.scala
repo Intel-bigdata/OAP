@@ -99,7 +99,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
   }
 
-  ignore("filtering parquet") {
+  test("filtering parquet") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table parquet_test  select * from t")
