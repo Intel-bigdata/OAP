@@ -143,10 +143,7 @@ private[spinach] object DataFileHandleCacheManager extends Logging {
         override def load(entry: ENTRY)
         : DataFileHandle = {
           logDebug(s"Loading Data File Handle ${entry.key.path}")
-          val path = new Path(StringUtils.unEscapeString(entry.key.path))
-          val fs = FileSystem.get(entry.conf)
-
-          new DataFileMeta().read(fs.open(path), fs.getFileStatus(path).getLen)
+          entry.key.createDataFileHandle(entry.conf)
         }
       })
 
