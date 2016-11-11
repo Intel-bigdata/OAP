@@ -268,7 +268,7 @@ private[sql] object SpinachFileFormat {
   val SPINACH_META_SCHEMA = "spinach.schema"
   val SPINACH_DATA_SOURCE_META = "spinach.meta.datasource"
   val SPINACH_DATA_FILE_CLASSNAME = classOf[SpinachDataFile].getCanonicalName
-  def PARQUET_DATA_FILE_CLASSNAME: String = throw new NotImplementedError("parquet reader")
+  val PARQUET_DATA_FILE_CLASSNAME = classOf[ParquetDataFile].getCanonicalName
 
   def serializeDataSourceMeta(conf: Configuration, meta: Option[DataSourceMeta]): Unit = {
     SerializationUtil.writeObjectToConfAsBase64(SPINACH_DATA_SOURCE_META, meta, conf)

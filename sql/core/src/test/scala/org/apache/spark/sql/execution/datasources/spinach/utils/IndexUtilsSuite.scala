@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.spinach.utils
 
 import java.io.{ByteArrayOutputStream, DataOutputStream}
 
+import org.apache.hadoop.fs.Path
 import org.junit.Assert._
 
 import org.apache.spark.SparkFunSuite
@@ -52,8 +53,10 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
 
   test("index path generating") {
     assertEquals("/path/to/.t1.index1.index",
-      IndexUtils.indexFileNameFromDataFileName("/path/to/t1.data", "index1"))
+      IndexUtils.indexFileFromDataFile(new Path("/path/to/t1.data"), "index1").toString)
     assertEquals("/.t1.index1.index",
-      IndexUtils.indexFileNameFromDataFileName("/t1.data", "index1"))
+      IndexUtils.indexFileFromDataFile(new Path("/t1.data"), "index1").toString)
+    assertEquals("/path/to/.t1.index1.index",
+      IndexUtils.indexFileFromDataFile(new Path("/path/to/t1.parquet"), "index1").toString)
   }
 }

@@ -170,6 +170,35 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(spinachMeta2.dataReaderClassName === spinachMeta.dataReaderClassName)
   }
 
+  test("Spinach Meta integration test for parquet") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i + 100, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val spnDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
+    spnDf.registerTempTable("spnt1")
+
+    val path = new Path(
+      new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)
+
+    val fs = path.getFileSystem(new Configuration())
+    assert(!fs.exists(path))
+
+    sql("create sindex index1 on spnt1 (a)")
+    sql("create sindex index2 on spnt1 (a asc)") // dup as index1, still creating
+    sql("create sindex index3 on spnt1 (a desc)")
+    sql("create sindex if not exists index3 on spnt1 (a desc)") // not creating
+    sql("drop sindex index2 on spnt1") // dropping
+    sql("drop sindex if exists index5 on spnt1") // not dropping
+    sql("drop sindex if exists index2 on spnt1") // not dropping
+
+    val spinachMeta2 = DataSourceMeta.initialize(path, new Configuration())
+    val fileHeader2 = spinachMeta2.fileHeader
+    assert(fileHeader2.recordCount === 100)
+    assert(fileHeader2.dataFileCount === 3)
+    assert(fileHeader2.indexCount === 2)
+  }
+
   test("Spinach meta for partitioned table") {
     val df = sparkContext.parallelize(1 to 100, 3)
       .map(i => (i, s"row $i", 2015 + i % 2))

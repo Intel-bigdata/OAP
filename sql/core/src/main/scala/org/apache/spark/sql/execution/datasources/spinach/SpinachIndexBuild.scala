@@ -40,13 +40,15 @@ private[spinach] case class SpinachIndexBuild(
     indexColumns: Array[IndexColumn],
     schema: StructType,
     @transient paths: Seq[Path],
+    readerClass: String,
     overwrite: Boolean = true) extends Logging {
   private lazy val ids =
     indexColumns.map(c => schema.map(_.name).toIndexedSeq.indexOf(c.columnName))
   private lazy val keySchema = StructType(ids.map(schema.toIndexedSeq(_)))
-  def execute(): RDD[InternalRow] = {
+  def execute(): Seq[IndexBuildResult] = {
     if (paths.isEmpty) {
       // the input path probably be pruned, do nothing
+      Nil
     } else {
       // TODO use internal scan
       val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
@@ -56,13 +58,14 @@ private[spinach] case class SpinachIndexBuild(
         override def hasNext: Boolean = fileIter.hasNext
         override def next(): Path = fileIter.next().getPath
       }.toSeq)
-      val data = if (overwrite) {
-        dataPaths.map(_.toString).filter(_.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+      val data = (if (overwrite) {
+        dataPaths.filterNot(dp =>
+          dp.getName.startsWith(".") || dp.getName.startsWith("_"))
       } else {
-        dataPaths.map(_.toString).filterNot(
-          n => fs.exists(new Path(IndexUtils.indexFileNameFromDataFileName(n, indexName)))).filter(
-            _.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
-      }
+        dataPaths.filterNot(dp =>
+          dp.getName.startsWith(".") || dp.getName.startsWith("_")).filterNot(
+          dp => fs.exists(IndexUtils.indexFileFromDataFile(dp, indexName)))
+      }).map(_.toString)
       assert(!ids.exists(id => id < 0), "Index column not exists in schema.")
       lazy val ordering = buildOrdering(ids, keySchema)
       val serializableConfiguration =
@@ -73,7 +76,8 @@ private[spinach] case class SpinachIndexBuild(
         // TODO many task will use the same meta, so optimize here
         val meta = SpinachUtils.getMeta(confBroadcast.value.value, d.getParent) match {
           case Some(m) => m
-          case None => sys.error("Lost meta")
+          case None => (new DataSourceMetaBuilder).withNewDataReaderClassName(
+            readerClass).withNewSchema(schema).build()
         }
         // scan every data file
         // TODO we need to set the Data Reader File class name here.
@@ -113,8 +117,7 @@ private[spinach] case class SpinachIndexBuild(
         // sort keys
         java.util.Arrays.sort(uniqueKeys, comparator)
         // build index file
-        val indexFile = new Path(
-          IndexUtils.indexFileNameFromDataFileName(dataString, indexName))
+        val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
         val fs = indexFile.getFileSystem(hadoopConf)
         // we are overwriting index files
         val fileOut = fs.create(indexFile, true)
@@ -150,9 +153,9 @@ private[spinach] case class SpinachIndexBuild(
         IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
         fileOut.close()
         indexFile.toString
-      }).collect()
+        IndexBuildResult(dataString, cnt, "", d.getParent.toString)
+      }).collect().toSeq
     }
-    sparkSession.sparkContext.emptyRDD[InternalRow]
   }
 
   private def buildOrdering(
@@ -250,3 +253,5 @@ private[spinach] case class SpinachIndexBuild(
     subOffset
   }
 }
+
+case class IndexBuildResult(dataFile: String, rowCount: Long, fingerprint: String, parent: String)

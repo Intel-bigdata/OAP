@@ -30,6 +30,8 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.DataSourceScanExec
 import org.apache.spark.sql.execution.DataSourceScanExec.{INPUT_PATHS, PUSHED_FILTERS}
 import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.execution.datasources.spinach.SpinachFileFormat
 
 /**
  * A strategy for planning scans over collections of files that might be partitioned or bucketed
@@ -57,7 +59,7 @@ import org.apache.spark.sql.execution.SparkPlan
 private[sql] object FileSourceStrategy extends Strategy with Logging {
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case PhysicalOperation(projects, filters,
-      l @ LogicalRelation(files: HadoopFsRelation, _, table)) =>
+      l @ LogicalRelation(_files: HadoopFsRelation, _, table)) =>
       // Filters on this relation fall into four categories based on where we can use them to avoid
       // reading unneeded data:
       //  - partition keys only - used to prune directories to read
@@ -74,6 +76,20 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
           case a: AttributeReference =>
             a.withName(l.output.find(_.semanticEquals(a)).get.name)
         }
+      }
+
+      def fileExists(r: HadoopFsRelation): Boolean = {
+        val path = r.location.paths.headOption.getOrElse(new Path(""))
+        val fs = path.getFileSystem(r.sparkSession.sparkContext.hadoopConfiguration)
+        val meta = new Path(path, SpinachFileFormat.SPINACH_META_FILE)
+        fs.exists(meta)
+      }
+      val files: HadoopFsRelation = _files.fileFormat match {
+        case a: ParquetFileFormat if fileExists(_files) =>
+          // TODO a better rule to check if we need to substitute the ParquetFileFormat
+          // as SpinachFileFormat
+          _files.copy(fileFormat = new SpinachFileFormat)
+        case other: FileFormat => _files
       }
 
       val partitionColumns =
