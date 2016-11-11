@@ -55,9 +55,12 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
 
     val readSupport = new SpinachReadSupportImpl
 
+    val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this, conf)
+
     val recordReader = SpinachRecordReader
       .builder(readSupport, new Path(StringUtils.unEscapeString(path)), conf)
-      .withGlobalRowIds(rowIds).build()
+      .withGlobalRowIds(rowIds).withFooter(meta.footer)
+      .build()
     recordReader.initialize()
     new FileRecordReaderIterator[JLong, UnsafeRow](
       recordReader.asInstanceOf[RecordReader[JLong, UnsafeRow]])
@@ -88,7 +91,7 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
     }
   }
 
-  override def createDataFileHandle(conf: Configuration): DataFileHandle = {
-    new ParquetDataFileMeta().read(conf, new Path(StringUtils.unEscapeString(path)))
+  override def createDataFileHandle(conf: Configuration): ParquetDataFileHandle = {
+    new ParquetDataFileHandle().read(conf, new Path(StringUtils.unEscapeString(path)))
   }
 }

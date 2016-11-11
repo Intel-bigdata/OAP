@@ -17,30 +17,23 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.util.{List => JList}
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.apache.parquet.format.converter.ParquetMetadataConverter._
 import org.apache.parquet.hadoop.ParquetFileReader
-import org.apache.parquet.hadoop.metadata.{BlockMetaData, FileMetaData}
+import org.apache.parquet.hadoop.metadata.ParquetMetadata
 
 
-private[spinach] class ParquetDataFileMeta(var meta: FileMetaData,
-                 var blocks: JList[BlockMetaData]) extends DataFileHandle {
+private[spinach] class ParquetDataFileHandle(
+  var footer: ParquetMetadata = null)
+  extends DataFileHandle {
 
   override def fin: FSDataInputStream = null
 
   override def len: Long = 0
 
-  def this() = {
-    this(null, null)
-  }
-
-  def read(conf: Configuration, path: Path): ParquetDataFileMeta = {
-    val footer = ParquetFileReader.readFooter(conf, path, NO_FILTER)
-    this.meta = footer.getFileMetaData
-    this.blocks = footer.getBlocks
+  def read(conf: Configuration, path: Path): ParquetDataFileHandle = {
+    this.footer = ParquetFileReader.readFooter(conf, path, NO_FILTER)
     this
   }
 

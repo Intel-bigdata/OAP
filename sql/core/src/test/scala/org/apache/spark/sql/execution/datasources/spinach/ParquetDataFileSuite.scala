@@ -101,6 +101,18 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
     }
   }
 
+  test("createDataFileHandle") {
+    val reader = ParquetDataFile(fileName, requestStructType)
+    val meta = reader.createDataFileHandle(DataGenerator.configuration)
+    val footer = meta.footer
+
+    assert(footer.getFileMetaData != null)
+    assert(footer.getBlocks != null)
+    assert(!footer.getBlocks.isEmpty)
+    assert(footer.getBlocks.size() == 1)
+    assert(footer.getBlocks.get(0).getRowCount == DataGenerator.ONE_K)
+  }
+
 }
 
 

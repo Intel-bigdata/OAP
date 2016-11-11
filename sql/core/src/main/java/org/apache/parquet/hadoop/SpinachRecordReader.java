@@ -44,13 +44,14 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
     private Filter filter;
     private List<Long> filteredStartRowIdList = Lists.newArrayList();
     private long[] globalRowIds;
+    private ParquetMetadata footer;
 
     private InternalSpinachRecordReader<T> internalReader;
 
     private SpinachReadSupport<T> readSupport;
 
     private SpinachRecordReader(SpinachReadSupport<T> readSupport, Path file, Configuration configuration,
-            Filter filter, long[] globalRowIds) {
+                                Filter filter, long[] globalRowIds, ParquetMetadata footer) {
         this.readSupport = readSupport;
         this.filter = checkNotNull(filter, "filter");
         this.file = file;
@@ -85,7 +86,10 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
 
     public void initialize() throws IOException, InterruptedException {
 
-        ParquetMetadata footer = readFooter(configuration, file, NO_FILTER);
+        if (this.footer == null) {
+            footer = readFooter(configuration, file, NO_FILTER);
+        }
+
         MessageType fileSchema = footer.getFileMetaData().getSchema();
 
         List<BlockMetaData> blocks = footer.getBlocks();
@@ -122,8 +126,8 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
                 }
             }
             internalReader = new RowIdsIterInternalSpinachRecordReader<T>(readSupport, filter);
-            internalReader.initialize(fileSchema, footer.getFileMetaData().getKeyValueMetaData(), file,
-                    inputBlockList, rowIdsList, configuration);
+            internalReader.initialize(fileSchema, footer.getFileMetaData().getKeyValueMetaData(), file, inputBlockList,
+                    rowIdsList, configuration);
         } else {
 
             for (BlockMetaData block : blocks) {
@@ -132,8 +136,8 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
                 filteredStartRowIdList.add(currentRowGroupStartRowId);
             }
             internalReader = new CounterInternalSpinachRecordReader<T>(readSupport, filter);
-            internalReader.initialize(fileSchema, footer.getFileMetaData().getKeyValueMetaData(), file,
-                    blocks, rowIdsList, configuration);
+            internalReader.initialize(fileSchema, footer.getFileMetaData().getKeyValueMetaData(), file, blocks,
+                    rowIdsList, configuration);
         }
 
     }
@@ -157,6 +161,7 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
         private Configuration conf;
         private Filter filter;
         private long[] globalRowIds;
+        private ParquetMetadata footer;
 
         private Builder(SpinachReadSupport<T> readSupport, Path path, Configuration conf) {
             this.readSupport = checkNotNull(readSupport, "readSupport");
@@ -187,8 +192,13 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
             return this;
         }
 
+        public Builder<T> withFooter(ParquetMetadata footer) {
+            this.footer = footer;
+            return this;
+        }
+
         public SpinachRecordReader<T> build() throws IOException {
-            return new SpinachRecordReader<T>(readSupport, file, conf, filter, globalRowIds);
+            return new SpinachRecordReader<>(readSupport, file, conf, filter, globalRowIds, footer);
         }
     }
 }
