@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{BlockLocation, FileStatus, LocatedFileStatus, Path}
 
 import org.apache.spark.internal.Logging
@@ -78,9 +79,14 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
         }
       }
 
+      def fileExists(r: HadoopFsRelation): Boolean = {
+        val path = r.location.paths.headOption.getOrElse(new Path(""))
+        val fs = path.getFileSystem(r.sparkSession.sparkContext.hadoopConfiguration)
+        val meta = new Path(path, SpinachFileFormat.SPINACH_META_FILE)
+        fs.exists(meta)
+      }
       val files: HadoopFsRelation = _files.fileFormat match {
-        case a: ParquetFileFormat if _files.location.allFiles().exists(
-          _.getPath.toString.endsWith(SpinachFileFormat.SPINACH_META_SCHEMA)) =>
+        case a: ParquetFileFormat if fileExists(_files) =>
           // TODO a better rule to check if we need to substitute the ParquetFileFormat
           // as SpinachFileFormat
           _files.copy(fileFormat = new SpinachFileFormat)
