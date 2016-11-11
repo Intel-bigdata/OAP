@@ -38,11 +38,19 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sql(s"""CREATE TEMPORARY TABLE spinach_test_date (a INT, b DATE)
            | USING spn
            | OPTIONS (path '$path')""".stripMargin)
+    sql(s"""CREATE TEMPORARY TABLE parquet_test (a INT, b STRING)
+           | USING parquet
+           | OPTIONS (path '$path')""".stripMargin)
+    sql(s"""CREATE TEMPORARY TABLE parquet_test_date (a INT, b DATE)
+           | USING parquet
+           | OPTIONS (path '$path')""".stripMargin)
   }
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("spinach_test")
     sqlContext.dropTempTable("spinach_test_date")
+    sqlContext.dropTempTable("parquet_test")
+    sqlContext.dropTempTable("parquet_test_date")
   }
 
   test("empty table") {
@@ -88,6 +96,19 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       Row(1, "this is test 1") :: Nil)
 
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 1 AND a <= 3"),
+      Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+  }
+
+  test("filtering parquet") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table parquet_test  select * from t")
+    sql("create sindex index1 on parquet_test (a)")
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
+      Row(1, "this is test 1") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
   }
 }

@@ -66,7 +66,8 @@ case class CreateIndex(
       val parent = p.files.head.getPath.getParent
       // TODO get `fs` outside of map() to boost
       val fs = parent.getFileSystem(sparkSession.sparkContext.hadoopConfiguration)
-      if (fs.exists(new Path(parent, SpinachFileFormat.SPINACH_META_FILE))) {
+      val existOld = fs.exists(new Path(parent, SpinachFileFormat.SPINACH_META_FILE))
+      if (existOld) {
         val m = SpinachUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, parent)
         assert(m.nonEmpty)
         val oldMeta = m.get
@@ -99,15 +100,21 @@ case class CreateIndex(
       // For Parquet, we only use Spinach meta to track schema and reader class, as well as
       // `IndexMeta`s that must be empty at the moment, so `FileMeta`s are ok to leave empty.
       // p.files.foreach(f => builder.addFileMeta(FileMeta("", 0, f.getPath.toString)))
-      (metaBuilder, parent)
+      (metaBuilder, parent, existOld)
     })
+    val ret = SpinachIndexBuild(
+      sparkSession, indexName, indexColumns, s, bAndP.map(_._2), readerClassName).execute()
+    val retMap = ret.groupBy(_.parent)
+    bAndP.foreach(bp =>
+      retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
+        if (!bp._3) bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile)))
+    )
     // write updated metas down
     bAndP.foreach(bp => DataSourceMeta.write(
       new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
       sparkSession.sparkContext.hadoopConfiguration,
       bp._1.build(),
       deleteIfExits = true))
-    SpinachIndexBuild(sparkSession, indexName, indexColumns, s, bAndP.map(_._2)).execute()
     Seq.empty
   }
 }

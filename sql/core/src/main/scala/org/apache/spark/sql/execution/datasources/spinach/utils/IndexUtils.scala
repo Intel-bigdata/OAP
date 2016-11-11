@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.spinach.utils
 
 import java.io.OutputStream
 
+import org.apache.hadoop.fs.Path
+
 import org.apache.spark.sql.execution.datasources.spinach.SpinachFileFormat
 
 /**
@@ -43,13 +45,11 @@ object IndexUtils {
     out.write((v >>> 56).toInt & 0xFF)
   }
 
-  def indexFileNameFromDataFileName(dataFile: String, name: String): String = {
+  def indexFileFromDataFile(dataFile: Path, name: String): Path = {
     import SpinachFileFormat._
-    assert(dataFile.endsWith(SPINACH_DATA_EXTENSION))
-    val simpleName = dataFile.substring(
-      dataFile.lastIndexOf('/') + 1, dataFile.length - SPINACH_DATA_EXTENSION.length)
-    val path = dataFile.substring(0, dataFile.lastIndexOf('/') + 1)
+    val dataFileName = dataFile.getName
+    val simpleName = dataFileName.substring(0, dataFileName.lastIndexOf("."))
 
-    path + "." + simpleName + "." + name + SPINACH_INDEX_EXTENSION
+    new Path(dataFile.getParent, "." + simpleName + "." + name + SPINACH_INDEX_EXTENSION)
   }
 }

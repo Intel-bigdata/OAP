@@ -17,9 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import scala.collection.mutable
-
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
@@ -200,11 +199,11 @@ private[spinach] trait RangeScanner extends Iterator[Long] {
   def meta: IndexMeta
   def start: Key // the start node
 
-  def initialize(dataPath: String, conf: Configuration): RangeScanner = {
+  def initialize(dataPath: Path, conf: Configuration): RangeScanner = {
     assert(keySchema ne null)
     this.ordering = GenerateOrdering.create(keySchema)
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
-    val path = IndexUtils.indexFileNameFromDataFileName(dataPath, meta.name)
+    val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
     val indexScanner = IndexFile(path)
     val indexData = IndexCacheManager(indexScanner, conf)
     val root = meta.open(indexData, keySchema)
@@ -275,7 +274,7 @@ private[spinach] trait RangeScanner extends Iterator[Long] {
 // A dummy scanner will actually not do any scanning
 private[spinach] object DUMMY_SCANNER extends RangeScanner {
   override def shouldStop(key: CurrentKey): Boolean = true
-  override def initialize(path: String, configuration: Configuration): RangeScanner = { this }
+  override def initialize(path: Path, configuration: Configuration): RangeScanner = { this }
   override def hasNext: Boolean = false
   override def next(): Long = throw new NoSuchElementException("end of iterating.")
   override def withNewStart(key: Key, include: Boolean): RangeScanner = this
@@ -285,7 +284,7 @@ private[spinach] object DUMMY_SCANNER extends RangeScanner {
 }
 
 private[spinach] trait LeftOpenInitialize extends RangeScanner {
-  override def initialize(path: String, conf: Configuration): RangeScanner = {
+  override def initialize(path: Path, conf: Configuration): RangeScanner = {
     super.initialize(path, conf)
     if (ordering.compare(start, currentKey.currentKey) == 0) {
       // find the exactly the key, since it's LeftOpen, skip the first key

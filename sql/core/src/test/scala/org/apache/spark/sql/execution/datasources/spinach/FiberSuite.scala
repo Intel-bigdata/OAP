@@ -97,12 +97,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     for (i <- 0 until rowCounts.length) {
       val path = new Path(file.getAbsolutePath, rowCounts(i).toString)
       writeData(path, schema, rowCounts(i))
-      val m = DataSourceMeta.newBuilder().
-        withNewSchema(schema).
-        withNewDataReaderClassName(SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME).build()
-      val reader = new SpinachDataReader(path, m, None, Array(0, 1))
-      reader.initialize(conf)
-      val meta = reader.dataFileMeta
+      val meta = SpinachDataFile(path.toString, schema).createDataFileHandle(conf)
       assert(meta.totalRowCount() === rowCounts(i))
       assert(meta.rowCountInLastGroup === rowCountInLastGroups(i))
       assert(meta.rowGroupsMeta.length === rowGroupCounts(i))
@@ -121,12 +116,8 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
 
     val path = new Path(file.getAbsolutePath, 10.toString)
     writeData(path, schema, 10)
-    val m = DataSourceMeta.newBuilder().
-      withNewSchema(schema).
-      withNewDataReaderClassName(SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME).build()
-    val reader = new SpinachDataReader(path, m, None, Array(0, 1))
-    reader.initialize(conf)
-    val meta = reader.dataFileMeta
+
+    val meta = SpinachDataFile(path.toString, schema).createDataFileHandle(conf)
     assert(meta.totalRowCount() === 10)
     assert(meta.rowCountInEachGroup === 12345)
     assert(meta.rowCountInLastGroup === 10)

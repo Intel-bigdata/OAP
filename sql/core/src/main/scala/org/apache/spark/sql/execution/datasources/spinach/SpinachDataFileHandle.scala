@@ -88,7 +88,7 @@ private[spinach] class RowGroupMeta {
   }
 }
 
-private[spinach] class DataFileMeta(
+private[spinach] class SpinachDataFileHandle(
    var rowGroupsMeta: ArrayBuffer[RowGroupMeta] = new ArrayBuffer[RowGroupMeta](),
    var rowCountInEachGroup: Int = 0,
    var rowCountInLastGroup: Int = 0,
@@ -108,17 +108,17 @@ private[spinach] class DataFileMeta(
       }
   }
 
-  def appendRowGroupMeta(meta: RowGroupMeta): DataFileMeta = {
+  def appendRowGroupMeta(meta: RowGroupMeta): SpinachDataFileHandle = {
     this.rowGroupsMeta.append(meta)
     this
   }
 
-  def withRowCountInLastGroup(count: Int): DataFileMeta = {
+  def withRowCountInLastGroup(count: Int): SpinachDataFileHandle = {
     this.rowCountInLastGroup = count
     this
   }
 
-  def withGroupCount(count: Int): DataFileMeta = {
+  def withGroupCount(count: Int): SpinachDataFileHandle = {
     this.groupCount = count
     this
   }
@@ -143,7 +143,7 @@ private[spinach] class DataFileMeta(
     os.writeInt(this.fieldCount)
   }
 
-  def read(is: FSDataInputStream, fileLen: Long): DataFileMeta = is.synchronized {
+  def read(is: FSDataInputStream, fileLen: Long): SpinachDataFileHandle = is.synchronized {
     this._fin = is
     this._len = fileLen
 

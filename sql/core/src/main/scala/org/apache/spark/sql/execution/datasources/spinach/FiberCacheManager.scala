@@ -99,12 +99,12 @@ private[spinach] object IndexCacheManager extends Logging {
       }).maximumWeight(MemoryManager.getCapacity())
       .removalListener(new RemovalListener[ENTRY, IndexFiberCacheData] {
         override def onRemoval(n: RemovalNotification[ENTRY, IndexFiberCacheData]): Unit = {
-          logDebug(s"Evicting Index Block ${n.getKey.key.path}")
+          logDebug(s"Evicting Index Block ${n.getKey.key.file}")
           MemoryManager.free(FiberCacheData(n.getValue.fiberData))
         }
       }).build(new CacheLoader[ENTRY, IndexFiberCacheData] {
         override def load(key: ENTRY): IndexFiberCacheData = {
-          logDebug(s"Loading Index Block ${key.key.path}")
+          logDebug(s"Loading Index Block ${key.key.file}")
           key.key.getIndexFiberData(key.conf)
         }
       })
