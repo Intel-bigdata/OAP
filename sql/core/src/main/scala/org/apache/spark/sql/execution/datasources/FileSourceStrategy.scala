@@ -79,7 +79,7 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
       }
 
       val files: HadoopFsRelation = _files.fileFormat match {
-        case a: ParquetFileFormat if files.location.allFiles().exists(
+        case a: ParquetFileFormat if _files.location.allFiles().exists(
           _.getPath.toString.endsWith(SpinachFileFormat.SPINACH_META_SCHEMA)) =>
           // TODO a better rule to check if we need to substitute the ParquetFileFormat
           // as SpinachFileFormat
