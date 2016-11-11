@@ -21,6 +21,7 @@ import java.lang.{Long => JLong}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.hadoop.api.RecordReader
 import org.apache.parquet.hadoop.SpinachRecordReader
 
@@ -54,7 +55,8 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
 
     val readSupport = new SpinachReadSupportImpl
 
-    val recordReader = SpinachRecordReader.builder(readSupport, new Path(path), conf)
+    val recordReader = SpinachRecordReader
+      .builder(readSupport, new Path(StringUtils.unEscapeString(path)), conf)
       .withGlobalRowIds(rowIds).build()
     recordReader.initialize()
     new FileRecordReaderIterator[JLong, UnsafeRow](
@@ -87,6 +89,6 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
   }
 
   override def createDataFileHandle(conf: Configuration): DataFileHandle = {
-    throw new UnsupportedOperationException("Not support initialize Operation.")
+    new ParquetDataFileMeta().read(conf, new Path(StringUtils.unEscapeString(path)))
   }
 }
