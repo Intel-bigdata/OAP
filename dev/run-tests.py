@@ -523,7 +523,8 @@ def main():
         changed_modules = determine_modules_for_files(changed_files)
         excluded_tags = determine_tags_to_exclude(changed_modules)
     if not changed_modules:
-        changed_modules = [modules.root]
+        # changed_modules = [modules.root]
+        changed_modules = [modules.sql]
         excluded_tags = []
     print("[info] Found the following changed modules:",
           ", ".join(x.name for x in changed_modules))
