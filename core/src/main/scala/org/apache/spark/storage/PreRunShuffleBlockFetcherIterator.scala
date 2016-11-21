@@ -334,7 +334,7 @@ final class PreRunShuffleBlockFetcherIterator(
 
       case SuccessFetchResult(blockId, address, _, buf) =>
         try {
-          (result.blockId, new BufferReleasingInputStream(buf.createInputStream(), this))
+          (result.blockId, new PreRunBufferReleasingInputStream(buf.createInputStream(), this))
         } catch {
           case NonFatal(t) =>
             throwFetchFailedException(blockId, address, t)
@@ -359,4 +359,38 @@ final class PreRunShuffleBlockFetcherIterator(
           "Failed to get block " + blockId + ", which is not a shuffle block", e)
     }
   }
+}
+
+/**
+ * Helper class that ensures a ManagedBuffer is release upon InputStream.close()
+ */
+private class PreRunBufferReleasingInputStream(
+    private val delegate: InputStream,
+    private val iterator: PreRunShuffleBlockFetcherIterator)
+  extends InputStream {
+  private[this] var closed = false
+
+  override def read(): Int = delegate.read()
+
+  override def close(): Unit = {
+    if (!closed) {
+      delegate.close()
+      iterator.releaseCurrentResultBuffer()
+      closed = true
+    }
+  }
+
+  override def available(): Int = delegate.available()
+
+  override def mark(readlimit: Int): Unit = delegate.mark(readlimit)
+
+  override def skip(n: Long): Long = delegate.skip(n)
+
+  override def markSupported(): Boolean = delegate.markSupported()
+
+  override def read(b: Array[Byte]): Int = delegate.read(b)
+
+  override def read(b: Array[Byte], off: Int, len: Int): Int = delegate.read(b, off, len)
+
+  override def reset(): Unit = delegate.reset()
 }
