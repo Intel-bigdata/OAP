@@ -67,7 +67,7 @@ private[spinach] case class SpinachIndexBuild(
           dp => fs.exists(IndexUtils.indexFileFromDataFile(dp, indexName)))
       }).map(_.toString)
       assert(!ids.exists(id => id < 0), "Index column not exists in schema.")
-      lazy val ordering = buildOrdering(ids, keySchema)
+      lazy val ordering = buildOrdering(keySchema)
       val serializableConfiguration =
         new SerializableConfiguration(hadoopConf)
       val confBroadcast = sparkSession.sparkContext.broadcast(serializableConfiguration)
@@ -158,11 +158,14 @@ private[spinach] case class SpinachIndexBuild(
     }
   }
 
-  private def buildOrdering(
-      requiredIds: Array[Int], keySchema: StructType): Ordering[InternalRow] = {
-    val order = requiredIds.toSeq.map(id => SortOrder(
-      BoundReference(id, keySchema(id).dataType, nullable = true),
-      if (indexColumns(requiredIds.indexOf(id)).isAscending) Ascending else Descending))
+  private def buildOrdering(keySchema: StructType): Ordering[InternalRow] = {
+    // here i change to use param id to index_id to get datatype in keySchema
+    val order = keySchema.zipWithIndex.map {
+      case (field, index) => SortOrder(
+        BoundReference(index, field.dataType, nullable = true),
+        if (indexColumns(index).isAscending) Ascending else Descending)
+    }
+
     GenerateOrdering.generate(order, keySchema.toAttributes)
   }
 
