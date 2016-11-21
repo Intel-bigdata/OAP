@@ -186,9 +186,9 @@ case class HadoopFsRelation(
  * Used to read and write data stored in files to/from the [[InternalRow]] format.
  */
 trait FileFormat {
-  protected var catalog: FileCatalog = _
-  protected var parameters: Map[String, String] = _
-  protected var sparkSession: SparkSession = _
+  @transient protected var catalog: FileCatalog = _
+  @transient protected var parameters: Map[String, String] = _
+  @transient protected var sparkSession: SparkSession = _
 
   // Instead of making the FileFormat as stateless, we give chance to initialize
   // the FileFormat before reading or writing
