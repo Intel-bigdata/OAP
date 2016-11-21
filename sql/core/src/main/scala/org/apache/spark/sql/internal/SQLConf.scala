@@ -552,6 +552,13 @@ object SQLConf {
       .timeConf(TimeUnit.MILLISECONDS)
       .createWithDefault(10L)
 
+  val SPINACH_PARQUET_ENABLE =
+    SQLConfigBuilder("spark.sql.spinach.parquet.enable")
+    .internal()
+    .doc("Whether enable spinach file format when encounter parquet files")
+    .booleanConf
+    .createWithDefault(true)
+
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
   }

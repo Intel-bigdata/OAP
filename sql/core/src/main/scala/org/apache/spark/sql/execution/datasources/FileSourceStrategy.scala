@@ -32,6 +32,7 @@ import org.apache.spark.sql.execution.DataSourceScanExec.{INPUT_PATHS, PUSHED_FI
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach.SpinachFileFormat
+import org.apache.spark.sql.internal.SQLConf
 
 /**
  * A strategy for planning scans over collections of files that might be partitioned or bucketed
@@ -91,14 +92,9 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
           // add spark.sql.spinach.parquet.enable config
           // if config true turn to SpinachFileFormat
           // else turn to ParquetFileFormat
-          val OPTION = "spark.sql.spinach.parquet.enable"
-          val enableParquetOption = _files.sparkSession.conf.getOption(OPTION)
-          val enableParquet = enableParquetOption match {
-            case Some(opt) => opt.equalsIgnoreCase("true")
-            case None => false
-          }
+          val enableSpinachOption = _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLE)
 
-          if (enableParquet) {
+          if (enableSpinachOption) {
             _files.copy(fileFormat = new SpinachFileFormat)
           } else {
             _files
