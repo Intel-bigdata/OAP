@@ -27,7 +27,7 @@ import org.apache.spark.unsafe.Platform
 
 private[spinach] case class SpinachDataFile(path: String, schema: StructType) extends DataFile {
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCacheData = {
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
     val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
     val groupMeta = meta.rowGroupsMeta(groupId)
     // get the fiber data start position
@@ -49,7 +49,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     }
   }
 
-  private def putToFiberCache(buf: Array[Byte]): FiberCacheData = {
+  private def putToFiberCache(buf: Array[Byte]): DataFiberCache = {
     // TODO: make it configurable
     // TODO: disable compress first since there's some issue to solve with conpression
     val fiberCacheData = MemoryManager.allocate(buf.length)
@@ -69,7 +69,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
         columns(i) = new ColumnValues(
           meta.rowCountInEachGroup,
           schema(requiredIds(i)).dataType,
-          FiberCacheManager(Fiber(this, requiredIds(i), groupId), conf))
+          FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
         i += 1
       }
 
@@ -101,7 +101,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
           columns(i) = new ColumnValues(
             meta.rowCountInEachGroup,
             schema(requiredIds(i)).dataType,
-            FiberCacheManager(Fiber(this, requiredIds(i), groupId), conf))
+            FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
           i += 1
         }
         if (groupId < meta.groupCount - 1) {
