@@ -86,19 +86,14 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
         fs.exists(meta)
       }
       val files: HadoopFsRelation = _files.fileFormat match {
-        case a: ParquetFileFormat if fileExists(_files) =>
-          // TODO a better rule to check if we need to substitute the ParquetFileFormat
-          // as SpinachFileFormat
-          // add spark.sql.spinach.parquet.enable config
-          // if config true turn to SpinachFileFormat
-          // else turn to ParquetFileFormat
-          val enableSpinachOption = _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLE)
-
-          if (enableSpinachOption) {
+        // TODO a better rule to check if we need to substitute the ParquetFileFormat
+        // as SpinachFileFormat
+        // add spark.sql.spinach.parquet.enable config
+        // if config true turn to SpinachFileFormat
+        // else turn to ParquetFileFormat
+        case a: ParquetFileFormat
+          if fileExists(_files) &&  _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLED) =>
             _files.copy(fileFormat = new SpinachFileFormat)
-          } else {
-            _files
-          }
         case other: FileFormat => _files
       }
 

@@ -552,7 +552,7 @@ object SQLConf {
       .timeConf(TimeUnit.MILLISECONDS)
       .createWithDefault(10L)
 
-  val SPINACH_PARQUET_ENABLE =
+  val SPINACH_PARQUET_ENABLED =
     SQLConfigBuilder("spark.sql.spinach.parquet.enable")
     .internal()
     .doc("Whether enable spinach file format when encounter parquet files")
