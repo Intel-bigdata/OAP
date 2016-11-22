@@ -88,7 +88,21 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
         case a: ParquetFileFormat if fileExists(_files) =>
           // TODO a better rule to check if we need to substitute the ParquetFileFormat
           // as SpinachFileFormat
-          _files.copy(fileFormat = new SpinachFileFormat)
+          // add spark.sql.spinach.parquet.enable config
+          // if config true turn to SpinachFileFormat
+          // else turn to ParquetFileFormat
+          val OPTION = "spark.sql.spinach.parquet.enable"
+          val enableParquetOption = _files.sparkSession.conf.getOption(OPTION)
+          val enableParquet = enableParquetOption match {
+            case Some(opt) => opt.equalsIgnoreCase("true")
+            case None => false
+          }
+
+          if (enableParquet) {
+            _files.copy(fileFormat = new SpinachFileFormat)
+          } else {
+            _files
+          }
         case other: FileFormat => _files
       }
 
