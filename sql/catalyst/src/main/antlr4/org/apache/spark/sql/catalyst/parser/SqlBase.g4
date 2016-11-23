@@ -114,6 +114,7 @@ statement
     | (DESC | DESCRIBE) option=(EXTENDED | FORMATTED)?
         tableIdentifier partitionSpec? describeColName?                #describeTable
     | REFRESH TABLE tableIdentifier                                    #refreshTable
+    | REFRESH SINDEX ON tableIdentifier                                #spinachRefreshIndices
     | REFRESH .*?                                                      #refreshResource
     | CACHE LAZY? TABLE tableIdentifier (AS? query)?                   #cacheTable
     | UNCACHE TABLE tableIdentifier                                    #uncacheTable
