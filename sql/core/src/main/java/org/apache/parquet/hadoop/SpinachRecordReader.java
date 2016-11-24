@@ -198,7 +198,7 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
         }
 
         public SpinachRecordReader<T> build() throws IOException {
-            return new SpinachRecordReader<>(readSupport, file, conf, filter, globalRowIds, footer);
+            return new SpinachRecordReader<T>(readSupport, file, conf, filter, globalRowIds, footer);
         }
     }
 }
