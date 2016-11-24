@@ -19,10 +19,13 @@ package org.apache.spark.sql.execution
 
 import scala.collection.JavaConverters._
 import scala.util.Try
+
 import org.antlr.v4.runtime.{ParserRuleContext, Token}
 import org.antlr.v4.runtime.tree.TerminalNode
+
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
+import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.parser._
 import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
@@ -1383,8 +1386,7 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
   override def visitSpinachCreateIndex(ctx: SpinachCreateIndexContext): LogicalPlan =
     withOrigin(ctx) {
       CreateIndex(
-        ctx.IDENTIFIER.getText, null,
-        visitTableIdentifier(ctx.tableIdentifier),
+        ctx.IDENTIFIER.getText, UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier())),
         visitIndexCols(ctx.indexCols), ctx.EXISTS != null)
     }
 

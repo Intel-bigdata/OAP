@@ -18,8 +18,10 @@
 package org.apache.spark.sql.hive
 
 import scala.collection.JavaConverters._
+
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import org.apache.hadoop.fs.Path
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}
@@ -394,10 +396,10 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
           SubqueryAlias(relation.alias.getOrElse(relation.tableName), parquetRelation)
 
         // create index
-        case CreateIndex(indexName, r: MetastoreRelation, tableName, indexColumns, allowExists) =>
+        case CreateIndex(indexName, r: MetastoreRelation, indexColumns, allowExists) =>
           // Create a new Spinach index on file of Parquet format
           val parquetRelation = convertToParquetRelation(r)
-          CreateIndex(indexName, parquetRelation, tableName, indexColumns, allowExists)
+          CreateIndex(indexName, parquetRelation, indexColumns, allowExists)
 
       }
     }

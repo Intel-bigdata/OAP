@@ -30,33 +30,23 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 
 /**
-  * Creates an index for table on indexColumns
-  */
+ * Creates an index for table on indexColumns
+ */
 case class CreateIndex(indexName: String,
                        tableLP: LogicalPlan,
-                       tableName: TableIdentifier,
                        indexColumns: Array[IndexColumn],
                        allowExists: Boolean) extends RunnableCommand with Logging {
-  override def children: Seq[LogicalPlan] = Seq.empty
+  override def children: Seq[LogicalPlan] = Seq(tableLP)
 
   override val output: Seq[Attribute] = Seq.empty
 
-  override def analyzed: Boolean =
-    if (tableLP == null) false else tableLP.analyzed
-
-  override lazy val resolved: Boolean =
-    if (tableLP == null) false else tableLP.resolved
-
   override def run(sparkSession: SparkSession): Seq[Row] = {
-    val catalog = sparkSession.sessionState.catalog
-    assert(catalog.tableExists(tableName), s"$tableName not exists")
-
-    val (fileCatalog, s, readerClassName) = catalog.lookupRelation(tableName) match {
-      case SubqueryAlias(_, LogicalRelation(
-      HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, _)) =>
+    val (fileCatalog, s, readerClassName) = tableLP match {
+      case LogicalRelation(
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, _) =>
         (fileCatalog, s, SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME)
-      case SubqueryAlias(_, LogicalRelation(
-      HadoopFsRelation(_, fileCatalog, _, s, _, _: ParquetFileFormat, _), _, _)) =>
+      case LogicalRelation(
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: ParquetFileFormat, _), _, _) =>
         (fileCatalog, s, SpinachFileFormat.PARQUET_DATA_FILE_CLASSNAME)
       case other =>
         throw new SpinachException(s"We don't support index building for ${other.simpleString}")
@@ -81,7 +71,7 @@ case class CreateIndex(indexName: String,
         val existsData = oldMeta.fileMetas
         if (existsIndexes.exists(_.name == indexName)) {
           if (!allowExists) {
-            throw new AnalysisException(s"""Index $indexName exists on table $tableName""")
+            throw new AnalysisException(s"""Index $indexName exists on target table""")
           } else {
             logWarning(s"Dup index name $indexName")
           }
