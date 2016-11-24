@@ -56,6 +56,9 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       .addIndexMeta(IndexMeta("index2", BitMapIndex()
         .appendEntry(1)
         .appendEntry(2)))
+      .addIndexMeta(IndexMeta("index3", BTreeIndex()
+        .appendEntry(BTreeIndexEntry(1, Descending))
+        .appendEntry(BTreeIndexEntry(0, Ascending))))
       .withNewSchema(new StructType()
         .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
       .withNewDataReaderClassName("NotExistedDataFileClassName")
@@ -73,7 +76,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     val fileHeader = spinachMeta.fileHeader
     assert(fileHeader.recordCount === 100)
     assert(fileHeader.dataFileCount === 2)
-    assert(fileHeader.indexCount === 2)
+    assert(fileHeader.indexCount === 3)
 
     val fileMetas = spinachMeta.fileMetas
     assert(fileMetas.length === 2)
@@ -85,7 +88,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(fileMetas(1).recordCount === 40)
 
     val indexMetas = spinachMeta.indexMetas
-    assert(indexMetas.length === 2)
+    assert(indexMetas.length === 3)
     assert(indexMetas(0).name === "index1")
     assert(indexMetas(0).indexType.isInstanceOf[BTreeIndex])
     val index1 = indexMetas(0).indexType.asInstanceOf[BTreeIndex]
@@ -94,6 +97,10 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(index1.entries(0).dir === Descending)
     assert(index1.entries(1).ordinal === 1)
     assert(index1.entries(1).dir === Ascending)
+    val index3 = indexMetas(2).indexType.asInstanceOf[BTreeIndex]
+    assert(index3.entries.size === 2)
+    assert(index3.entries(0).ordinal === 1)
+    assert(index3.entries(0).dir === Descending)
 
     assert(indexMetas(1).name === "index2")
     assert(indexMetas(1).indexType.isInstanceOf[BitMapIndex])
@@ -168,6 +175,33 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(fileMetas2(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
     assert(spinachMeta2.schema === spinachMeta.schema)
     assert(spinachMeta2.dataReaderClassName === spinachMeta.dataReaderClassName)
+  }
+
+  test("Spinach IndexMeta Test") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i + 100, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("spn").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val spnDf = sqlContext.read.format("spn").load(tmpDir.getAbsolutePath)
+    spnDf.registerTempTable("spnt1")
+
+    val path = new Path(
+      new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)
+
+    sql("create sindex mi on spnt1 (a, c desc, b asc)")
+
+    val spinachMeta = DataSourceMeta.initialize(path, new Configuration())
+    val fileHeader = spinachMeta.fileHeader
+    assert(fileHeader.indexCount === 1)
+    val indexMetas = spinachMeta.indexMetas
+    assert(indexMetas.length === 1)
+    val indexMeta = indexMetas.head
+    assert(indexMeta.name === "mi")
+    assert(indexMeta.indexType === BTreeIndex(Seq(
+      BTreeIndexEntry(0, Ascending),
+      BTreeIndexEntry(2, Descending),
+      BTreeIndexEntry(1, Ascending)
+    )))
   }
 
   test("Spinach Meta integration test for parquet") {
