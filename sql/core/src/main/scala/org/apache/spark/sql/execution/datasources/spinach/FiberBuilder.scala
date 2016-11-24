@@ -278,7 +278,7 @@ private[spinach] case class StringFiberBuilder(
   }
 }
 
-object FiberBuilder {
+object DataFiberBuilder {
   def apply(dataType: DataType, ordinal: Int, defaultRowGroupRowCount: Int): DataFiberBuilder = {
     dataType match {
       case BinaryType =>
@@ -309,7 +309,7 @@ object FiberBuilder {
       schema: StructType,
       defaultRowGroupRowCount: Int): Array[DataFiberBuilder] = {
     schema.fields.zipWithIndex.map {
-      case (field, oridinal) => FiberBuilder(field.dataType, oridinal, defaultRowGroupRowCount)
+      case (field, oridinal) => DataFiberBuilder(field.dataType, oridinal, defaultRowGroupRowCount)
     }
   }
 }
