@@ -188,6 +188,7 @@ final class PreRunShuffleBlockFetcherIterator(
     val remoteRequests = new ArrayBuffer[FetchRequest]
 
     val (outputMissing, status) = getBlocksHandler()
+    // logInfo(s"lyjmark: status: $status")
     var needFetchedBlocks = false
 
     // Tracks total number of blocks (including zero sized blocks)
@@ -238,6 +239,7 @@ final class PreRunShuffleBlockFetcherIterator(
     }
     fetchLocalBlocks()
     logInfo(s"Getting $numBlocksToFetch non-empty blocks out of $totalBlocks blocks")
+    logInfo(s"lyjmark outputMissing: $outputMissing, needFetchedBlocks: $needFetchedBlocks")
     
     val hasNext = (outputMissing, needFetchedBlocks) match {
       case (_, true) => true
@@ -298,9 +300,19 @@ final class PreRunShuffleBlockFetcherIterator(
       return true
     }
 
-    val (remoteRequests, hasNext) = splitLocalRemoteBlocks()
-    fetchRequests ++= Utils.randomize(remoteRequests)
-    fetchUpToMaxBytes()
+    var hasNext = true
+    do {
+      val (remoteRequests, next) = splitLocalRemoteBlocks()
+      hasNext = next
+      fetchRequests ++= Utils.randomize(remoteRequests)
+      fetchUpToMaxBytes()
+      if (results.isEmpty) {
+        results.synchronized{
+          results.wait(500)
+        }
+      }
+    }
+    while (results.isEmpty && hasNext)
 
     hasNext
   }

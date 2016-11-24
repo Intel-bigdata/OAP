@@ -938,6 +938,26 @@ class DAGScheduler(
     }
   }
 
+  private def isStagePreRunnable(stage: Stage): Boolean = {
+    // try to match plan of LimitExec as much as possible
+    val finalRdd = stage.rdd
+    if (finalRdd.getNumPartitions != 1
+        || finalRdd.dependencies.size != 1
+        || !finalRdd.dependencies.head.isInstanceOf[OneToOneDependency[_]]) {
+      return false
+    }
+
+    val parentRdd = finalRdd.firstParent
+    if (parentRdd.dependencies.size != 1
+        || !parentRdd.dependencies.head.isInstanceOf[ShuffleDependency[_, _, _]]
+        || parentRdd.dependencies.head.asInstanceOf[ShuffleDependency[_, _, _]].aggregator.nonEmpty) {
+      return false
+    }
+
+    logInfo(s"lyjmark: stagePreRun true, $stage")
+    true
+  }
+
   /** Called when stage's parents are available and we can now do its task. */
   private def submitMissingTasks(stage: Stage, jobId: Int) {
     logDebug("submitMissingTasks(" + stage + ")")

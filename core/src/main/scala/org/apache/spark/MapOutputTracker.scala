@@ -184,7 +184,9 @@ private[spark] abstract class MapOutputTracker(conf: SparkConf) extends Logging 
     if (statuses == null) {
       return true
     }
-    size != statuses.length
+    val length = statuses.length
+    logInfo(s"lyjmark: [isMapOutputsMissing]shuffleId($shuffleId) status!=null, size($size) status.length($length)")
+    size != length
   }
 
   /**
