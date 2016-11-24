@@ -18,10 +18,8 @@
 package org.apache.spark.sql.hive
 
 import scala.collection.JavaConverters._
-
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import org.apache.hadoop.fs.Path
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}
@@ -34,6 +32,7 @@ import org.apache.spark.sql.execution.command.CreateDataSourceTableUtils._
 import org.apache.spark.sql.execution.command.CreateHiveTableAsSelectLogicalPlan
 import org.apache.spark.sql.execution.datasources.{Partition => _, _}
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ParquetOptions}
+import org.apache.spark.sql.execution.datasources.spinach.{CreateIndex, IndexColumn}
 import org.apache.spark.sql.hive.orc.OrcFileFormat
 import org.apache.spark.sql.types._
 
@@ -393,6 +392,13 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
         case relation: MetastoreRelation if shouldConvertMetastoreParquet(relation) =>
           val parquetRelation = convertToParquetRelation(relation)
           SubqueryAlias(relation.alias.getOrElse(relation.tableName), parquetRelation)
+
+        // create index
+        case CreateIndex(indexName, r: MetastoreRelation, tableName, indexColumns, allowExists) =>
+          // Create a new Spinach index on file of Parquet format
+          val parquetRelation = convertToParquetRelation(r)
+          CreateIndex(indexName, parquetRelation, tableName, indexColumns, allowExists)
+
       }
     }
   }

@@ -30,16 +30,22 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 
 /**
- * Creates an index for table on indexColumns
- */
-case class CreateIndex(
-    indexName: String,
-    tableName: TableIdentifier,
-    indexColumns: Array[IndexColumn],
-    allowExists: Boolean) extends RunnableCommand with Logging {
+  * Creates an index for table on indexColumns
+  */
+case class CreateIndex(indexName: String,
+                       tableLP: LogicalPlan,
+                       tableName: TableIdentifier,
+                       indexColumns: Array[IndexColumn],
+                       allowExists: Boolean) extends RunnableCommand with Logging {
   override def children: Seq[LogicalPlan] = Seq.empty
 
   override val output: Seq[Attribute] = Seq.empty
+
+  override def analyzed: Boolean =
+    if (tableLP == null) false else tableLP.analyzed
+
+  override lazy val resolved: Boolean =
+    if (tableLP == null) false else tableLP.resolved
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val catalog = sparkSession.sessionState.catalog
