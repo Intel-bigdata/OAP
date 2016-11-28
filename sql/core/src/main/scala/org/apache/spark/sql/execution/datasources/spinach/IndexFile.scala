@@ -42,7 +42,7 @@ private[spinach] case class IndexFile(file: Path) {
     // TODO check if enough to fit in Int
     val fileLength = fs.getContentSummary(file).getLength
     var bytes = new Array[Byte](fileLength.toInt)
-    // fin.read(bytes, 0, fileLength.toInt)
+
     fin.readFully(0, bytes)
     val offHeapMem = putToFiberCache(bytes)
     bytes = null
