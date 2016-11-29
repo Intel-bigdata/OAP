@@ -40,6 +40,7 @@ case class CreateIndex(
 
   override val output: Seq[Attribute] = Seq.empty
 
+
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val (fileCatalog, s, readerClassName) = relation match {
       case LogicalRelation(
@@ -71,7 +72,18 @@ case class CreateIndex(
         val existsData = oldMeta.fileMetas
         if (existsIndexes.exists(_.name == indexName)) {
           if (!allowExists) {
-            throw new AnalysisException(s"""Index $indexName exists on target table""")
+            val hasTable = relation.isInstanceOf[LogicalRelation] &&
+              !relation.asInstanceOf[LogicalRelation].metastoreTableIdentifier.isEmpty
+            val logInfo =
+              if (hasTable) {
+                val tableIdf = relation.asInstanceOf[LogicalRelation].metastoreTableIdentifier
+                "table " + tableIdf.get.table
+              } else if (fileCatalog.paths.length > 0) {
+                "path " + fileCatalog.paths(0).getParent
+              } else {
+                "target table"
+              }
+            throw new AnalysisException(s"""Index $indexName exists on $logInfo""")
           } else {
             logWarning(s"Dup index name $indexName")
           }
@@ -146,8 +158,18 @@ case class DropIndex(
             val existsData = oldMeta.fileMetas
             if (!existsIndexes.exists(_.name == indexName)) {
               if (!allowNotExists) {
-                throw new AnalysisException(
-                  s"""Index $indexName not exists on target table""")
+                val hasTable = relation.isInstanceOf[LogicalRelation] &&
+                  !relation.asInstanceOf[LogicalRelation].metastoreTableIdentifier.isEmpty
+                val logInfo =
+                  if (hasTable) {
+                    val tableIdf = relation.asInstanceOf[LogicalRelation].metastoreTableIdentifier
+                    "table " + tableIdf.get.table
+                  } else if (fileCatalog.paths.length > 0) {
+                    "path " + fileCatalog.paths(0).getParent
+                  } else {
+                    "target table"
+                  }
+                throw new AnalysisException(s"""Index $indexName exists on $logInfo""")
               } else {
                 logWarning(s"drop non-exists index $indexName")
               }

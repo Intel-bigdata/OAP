@@ -394,13 +394,6 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
         case relation: MetastoreRelation if shouldConvertMetastoreParquet(relation) =>
           val parquetRelation = convertToParquetRelation(relation)
           SubqueryAlias(relation.alias.getOrElse(relation.tableName), parquetRelation)
-
-        // create index
-        case CreateIndex(indexName, r: MetastoreRelation, indexColumns, allowExists) =>
-          // Create a new Spinach index on file of Parquet format
-          val parquetRelation = convertToParquetRelation(r)
-          CreateIndex(indexName, parquetRelation, indexColumns, allowExists)
-
       }
     }
   }

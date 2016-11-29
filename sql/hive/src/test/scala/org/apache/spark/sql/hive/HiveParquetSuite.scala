@@ -77,11 +77,4 @@ class HiveParquetSuite extends QueryTest with ParquetTest with TestHiveSingleton
       }
     }
   }
-
-  test("Create Spinach index on hive table in parquet format") {
-    withParquetTable((1 to 4).map(i => (i, s"val_$i")), "s_test") {
-      sql("create sindex if not exists p_index on s_test (`_1`)")
-      checkAnswer(sql("SELECT * FROM s_test WHERE `_1` = 1"), Row(1, "val_1"))
-    }
-  }
 }
