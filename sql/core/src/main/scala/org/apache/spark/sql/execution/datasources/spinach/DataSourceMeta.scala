@@ -133,6 +133,28 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
     }
   }
 
+  private def writeBTreeIndexEntries(
+      entries: Seq[BTreeIndexEntry], totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {
+    val sizeBefore = out.size
+    out.writeInt(entries.size)
+    entries.foreach(e => {
+      val abs = e.ordinal + 1
+      val v = if (e.dir == Descending) {
+        -abs
+      } else {
+        abs
+      }
+      out.writeInt(v)
+    })
+    val sizeWritten = out.size - sizeBefore
+    val remaining = totalSizeToWrite - sizeWritten
+    assert(remaining >= 0,
+      s"Failed to write $entries as it exceeds the max allowed $totalSizeToWrite bytes.")
+    for (i <- 0 until remaining) {
+      out.writeByte(0)
+    }
+  }
+
   def write(out: FSDataOutputStream): Unit = {
     writeString(name, INDEX_META_NAME_LENGTH, out)
     val keyBits = BitSet.empty
@@ -140,19 +162,18 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
     indexType match {
       case BTreeIndex(entries) =>
         out.writeByte(BTREE_INDEX_TYPE)
-        entries.foreach { entry =>
-          keyBits += entry.ordinal
-          if (entry.dir == Descending) dirBits += entry.ordinal
-        }
+        writeBTreeIndexEntries(entries, INDEX_META_KEY_LENGTH * 2, out)
       case BitMapIndex(entries) =>
         out.writeByte(BITMAP_INDEX_TYPE)
         entries.foreach(keyBits += _)
+        writeBitSet(keyBits, INDEX_META_KEY_LENGTH, out)
+        writeBitSet(dirBits, INDEX_META_KEY_LENGTH, out)
       case HashIndex(entries) =>
         out.writeByte(HASH_INDEX_TYPE)
         entries.foreach(keyBits += _)
+        writeBitSet(keyBits, INDEX_META_KEY_LENGTH, out)
+        writeBitSet(dirBits, INDEX_META_KEY_LENGTH, out)
     }
-    writeBitSet(keyBits, INDEX_META_KEY_LENGTH, out)
-    writeBitSet(dirBits, INDEX_META_KEY_LENGTH, out)
   }
 
   def read(in: FSDataInputStream): Unit = {
@@ -162,27 +183,25 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
 
     in.seek(readPos)
     val indexTypeFlag = in.readByte()
-    val bitMask = new Array[Long](INDEX_META_KEY_LENGTH / 8)
-    val keyBits = {
-      for (j <- 0 until INDEX_META_KEY_LENGTH / 8) {
-        bitMask(j) = in.readLong()
-      }
-      BitSet.fromBitMask(bitMask)
-    }
-    val dirBits = if (indexTypeFlag == BTREE_INDEX_TYPE) {
-      for (j <- 0 until INDEX_META_KEY_LENGTH / 8) {
-        bitMask(j) = in.readLong()
-      }
-      BitSet.fromBitMask(bitMask)
-    } else {
-      BitSet.empty
-    }
 
     indexType = indexTypeFlag match {
-      case BTREE_INDEX_TYPE => BTreeIndex(keyBits.toSeq.map(o =>
-        BTreeIndexEntry(o, if (dirBits(o)) Descending else Ascending)))
-      case BITMAP_INDEX_TYPE => BitMapIndex(keyBits.toSeq)
-      case HASH_INDEX_TYPE => HashIndex(keyBits.toSeq)
+      case BTREE_INDEX_TYPE =>
+        val size = in.readInt()
+        val data = (0 until size).map(_ => in.readInt())
+        BTreeIndex(data.map(d =>
+          BTreeIndexEntry(math.abs(d) - 1, if (d > 0) Ascending else Descending)))
+      case flag =>
+        val bitMask = new Array[Long](INDEX_META_KEY_LENGTH / 8)
+        val keyBits = {
+          for (j <- 0 until INDEX_META_KEY_LENGTH / 8) {
+            bitMask(j) = in.readLong()
+          }
+          BitSet.fromBitMask(bitMask)
+        }
+        flag match {
+          case BITMAP_INDEX_TYPE => BitMapIndex(keyBits.toSeq)
+          case HASH_INDEX_TYPE => HashIndex(keyBits.toSeq)
+        }
     }
   }
 }

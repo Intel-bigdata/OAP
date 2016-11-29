@@ -20,6 +20,7 @@ package org.apache.spark.sql.hive
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetTest
 import org.apache.spark.sql.hive.test.TestHiveSingleton
+import org.apache.spark.util.Utils
 
 case class Cases(lower: String, UPPER: String)
 
@@ -74,6 +75,13 @@ class HiveParquetSuite extends QueryTest with ParquetTest with TestHiveSingleton
           checkAnswer(sql("SELECT * FROM p"), sql("SELECT * FROM t").collect().toSeq)
         }
       }
+    }
+  }
+
+  test("Create Spinach index on hive table in parquet format") {
+    withParquetTable((1 to 4).map(i => (i, s"val_$i")), "s_test") {
+      sql("create sindex if not exists p_index on s_test (`_1`)")
+      checkAnswer(sql("SELECT * FROM s_test WHERE `_1` = 1"), Row(1, "val_1"))
     }
   }
 }
