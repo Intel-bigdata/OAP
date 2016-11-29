@@ -20,12 +20,17 @@ public abstract class PositionableRecordReaderImpl<T> implements PositionableRec
     public PositionableRecordReaderImpl(RecordReader<T> recordReader, long recordCount) {
         this.recordReader = recordReader;
         this.recordMaxCount = recordCount;
-        this.states = (State[]) Reflections.getFieldValue(recordReader, "states");
+        if(recordReader instanceof RecordReaderImplementation){
+            this.states = (State[]) Reflections.getFieldValue(recordReader, "states");
+        }
+
     }
 
     public T read() {
-        currentRowId = this.nextRowId();
-        seek(currentRowId);
+        if(this.states != null){
+            currentRowId = this.nextRowId();
+            seek(currentRowId);
+        }
 
         if (recordsRead == recordMaxCount) {
             return null;
@@ -37,7 +42,8 @@ public abstract class PositionableRecordReaderImpl<T> implements PositionableRec
 
     private void seek(long position) {
 
-        Preconditions.checkArgument(position >= recordsRead, "Not support seek to backward position");
+        Preconditions.checkArgument(position >= recordsRead,
+                "Not support seek to backward position recordsRead: " + recordsRead + " want to read: " + position);
         Preconditions.checkArgument(position < recordMaxCount, "Seek position must less than recordCount");
 
         while (recordsRead < position) {
