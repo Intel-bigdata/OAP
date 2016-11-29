@@ -43,7 +43,7 @@ public abstract class PositionableRecordReaderImpl<T> implements PositionableRec
     private void seek(long position) {
 
         Preconditions.checkArgument(position >= recordsRead,
-                "Not support seek to backward position recordsRead: " + recordsRead + " want to read: " + position);
+                "Not support seek to backward position, recordsRead: %s want to read: %s", recordsRead, position);
         Preconditions.checkArgument(position < recordMaxCount, "Seek position must less than recordCount");
 
         while (recordsRead < position) {
