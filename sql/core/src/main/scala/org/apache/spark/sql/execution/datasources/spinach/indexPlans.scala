@@ -42,13 +42,13 @@ case class CreateIndex(
 
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
-    val (fileCatalog, s, readerClassName) = relation match {
+    val (fileCatalog, s, readerClassName, identifier) = relation match {
       case LogicalRelation(
-      HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, _) =>
-        (fileCatalog, s, SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME)
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, id) =>
+        (fileCatalog, s, SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME, id)
       case LogicalRelation(
-      HadoopFsRelation(_, fileCatalog, _, s, _, _: ParquetFileFormat, _), _, _) =>
-        (fileCatalog, s, SpinachFileFormat.PARQUET_DATA_FILE_CLASSNAME)
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: ParquetFileFormat, _), _, id) =>
+        (fileCatalog, s, SpinachFileFormat.PARQUET_DATA_FILE_CLASSNAME, id)
       case other =>
         throw new SpinachException(s"We don't support index building for ${other.simpleString}")
     }
@@ -72,18 +72,8 @@ case class CreateIndex(
         val existsData = oldMeta.fileMetas
         if (existsIndexes.exists(_.name == indexName)) {
           if (!allowExists) {
-            val hasTable = relation.isInstanceOf[LogicalRelation] &&
-              !relation.asInstanceOf[LogicalRelation].metastoreTableIdentifier.isEmpty
-            val logInfo =
-              if (hasTable) {
-                val tableIdf = relation.asInstanceOf[LogicalRelation].metastoreTableIdentifier
-                "table " + tableIdf.get.table
-              } else if (fileCatalog.paths.length > 0) {
-                "path " + fileCatalog.paths(0).getParent
-              } else {
-                "target table"
-              }
-            throw new AnalysisException(s"""Index $indexName exists on $logInfo""")
+            throw new AnalysisException(
+              s"""Index $indexName exists on ${identifier.getOrElse(parent)}""")
           } else {
             logWarning(s"Dup index name $indexName")
           }
@@ -141,7 +131,7 @@ case class DropIndex(
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     relation match {
-      case LogicalRelation(HadoopFsRelation(_, fileCatalog, _, _, _, format, _), _, _)
+      case LogicalRelation(HadoopFsRelation(_, fileCatalog, _, _, _, format, _), _, identifier)
           if format.isInstanceOf[SpinachFileFormat] || format.isInstanceOf[ParquetFileFormat] =>
         logInfo(s"Dropping index $indexName")
         val partitions = SpinachUtils.getPartitions(fileCatalog)
@@ -158,18 +148,8 @@ case class DropIndex(
             val existsData = oldMeta.fileMetas
             if (!existsIndexes.exists(_.name == indexName)) {
               if (!allowNotExists) {
-                val hasTable = relation.isInstanceOf[LogicalRelation] &&
-                  !relation.asInstanceOf[LogicalRelation].metastoreTableIdentifier.isEmpty
-                val logInfo =
-                  if (hasTable) {
-                    val tableIdf = relation.asInstanceOf[LogicalRelation].metastoreTableIdentifier
-                    "table " + tableIdf.get.table
-                  } else if (fileCatalog.paths.length > 0) {
-                    "path " + fileCatalog.paths(0).getParent
-                  } else {
-                    "target table"
-                  }
-                throw new AnalysisException(s"""Index $indexName exists on $logInfo""")
+                throw new AnalysisException(
+                  s"""Index $indexName exists on ${identifier.getOrElse(parent)}""")
               } else {
                 logWarning(s"drop non-exists index $indexName")
               }
