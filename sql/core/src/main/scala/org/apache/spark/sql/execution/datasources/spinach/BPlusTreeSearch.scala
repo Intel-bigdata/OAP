@@ -60,7 +60,7 @@ private[spinach] trait IndexNode {
 }
 
 trait UnsafeIndexTree {
-  def buffer: FiberCacheData
+  def buffer: DataFiberCache
   def offset: Long
   def baseObj: Object = buffer.fiberData.getBaseObject
   def baseOffset: Long = buffer.fiberData.getBaseOffset
@@ -68,7 +68,7 @@ trait UnsafeIndexTree {
 }
 
 private[spinach] case class UnsafeIndexNodeValue(
-    buffer: FiberCacheData,
+    buffer: DataFiberCache,
     offset: Long,
     dataEnd: Long) extends IndexNodeValue with UnsafeIndexTree {
   // 4 <- value1, 8 <- value2
@@ -80,7 +80,7 @@ private[spinach] case class UnsafeIndexNodeValue(
 }
 
 private[spinach] case class UnsafeIndexNode(
-    buffer: FiberCacheData,
+    buffer: DataFiberCache,
     offset: Long,
     dataEnd: Long,
     schema: StructType) extends IndexNode with UnsafeIndexTree {
@@ -204,8 +204,8 @@ private[spinach] trait RangeScanner extends Iterator[Long] {
     this.ordering = GenerateOrdering.create(keySchema)
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
-    val indexScanner = IndexFile(path)
-    val indexData = IndexCacheManager(indexScanner, conf)
+    val indexScanner = IndexFiber(IndexFile(path))
+    val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
     val root = meta.open(indexData, keySchema)
 
     if (start eq RangeScanner.DUMMY_KEY_START) {

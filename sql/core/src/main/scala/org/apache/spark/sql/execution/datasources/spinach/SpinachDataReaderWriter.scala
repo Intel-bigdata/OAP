@@ -38,8 +38,8 @@ private[spinach] class SpinachDataWriter(
   private var rowCount: Int = 0
   private var rowGroupCount: Int = 0
 
-  private val rowGroup: Array[FiberBuilder] =
-    FiberBuilder.initializeFromSchema(schema, DEFAULT_ROW_GROUP_SIZE)
+  private val rowGroup: Array[DataFiberBuilder] =
+    DataFiberBuilder.initializeFromSchema(schema, DEFAULT_ROW_GROUP_SIZE)
 
   private val fiberMeta = new SpinachDataFileHandle(
     rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE, fieldCount = schema.length)

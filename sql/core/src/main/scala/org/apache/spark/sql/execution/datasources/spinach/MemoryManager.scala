@@ -20,55 +20,31 @@ package org.apache.spark.sql.execution.datasources.spinach
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
 
 // TODO: make it an alias of MemoryBlock
-case class FiberCacheData(fiberData: MemoryBlock)
+trait FiberCache {
+  def fiberData: MemoryBlock
+}
 
-/**
- * Used to cache data in MemoryBlock (on-heap or off-heap)
- */
+// Data fiber caching, the in-memory representation can be found at [[DataFiberBuilder]]
+case class DataFiberCache(fiberData: MemoryBlock) extends FiberCache
+
+// Index fiber caching, only used internally by Spinach
 private[spinach] case class IndexFiberCacheData(
-    fiberData: MemoryBlock, dataEnd: Long, rootOffset: Long)
-
-private[spinach] trait MemoryMode
-private[spinach] case object OffHeap extends MemoryMode
-private[spinach] case object OnHeap extends MemoryMode
+    fiberData: MemoryBlock, dataEnd: Long, rootOffset: Long) extends FiberCache
 
 private[spinach] object MemoryManager {
-  // TODO make it configurable
-  // TODO temporarily using Long.MaxValue
-  val capacity: Long = Long.MaxValue
-  var maxMemoryInByte: Long = capacity
-  var memoryMode: MemoryMode = OffHeap
+  private val indexCapacity: Long = Long.MaxValue / 2
+  private val dataCapacity: Long = Long.MaxValue / 2
 
-  def getMemoryMode: MemoryMode = memoryMode
-
-  def setMemoryMode(memoryMode: MemoryMode): Unit = {
-    this.memoryMode = memoryMode
+  def allocate(numOfBytes: Int): DataFiberCache = {
+    val fiberData = MemoryAllocator.UNSAFE.allocate(numOfBytes)
+    DataFiberCache(fiberData)
   }
 
-  def allocate(numOfBytes: Int): FiberCacheData = synchronized {
-    if (maxMemoryInByte - numOfBytes >= 0) {
-      maxMemoryInByte -= numOfBytes
-      val fiberData = memoryMode match {
-        case OnHeap => MemoryAllocator.HEAP.allocate(numOfBytes)
-        case OffHeap => MemoryAllocator.UNSAFE.allocate(numOfBytes)
-        case _ => MemoryAllocator.HEAP.allocate(numOfBytes)
-      }
-      FiberCacheData(fiberData)
-    } else {
-      null
-    }
+  def free(fiber: FiberCache): Unit = {
+    MemoryAllocator.UNSAFE.free(fiber.fiberData)
   }
 
-  def free(fiber: FiberCacheData): Unit = synchronized {
-    memoryMode match {
-      case OnHeap => MemoryAllocator.HEAP.free(fiber.fiberData)
-      case OffHeap => MemoryAllocator.UNSAFE.free(fiber.fiberData)
-      case _ => MemoryAllocator.HEAP.free(fiber.fiberData)
-    }
-    maxMemoryInByte += fiber.fiberData.size()
-  }
-
-  def getCapacity(): Long = capacity
-
-  def remain(): Long = maxMemoryInByte
+  def getCapacity(): Long = indexCapacity + dataCapacity
+  def getIndexCacheCapacity(): Long = indexCapacity
+  def getDataCacheCapacity(): Long = dataCapacity
 }

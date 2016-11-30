@@ -26,7 +26,7 @@ import org.apache.spark.unsafe.Platform
  * Read the index file into memory(offheap), and can be accessed as [[IndexFiberCacheData]].
  */
 private[spinach] case class IndexFile(file: Path) {
-  def putToFiberCache(buf: Array[Byte]): FiberCacheData = {
+  def putToFiberCache(buf: Array[Byte]): DataFiberCache = {
     // TODO: make it configurable
     val fiberCacheData = MemoryManager.allocate(buf.length)
     Platform.copyMemory(

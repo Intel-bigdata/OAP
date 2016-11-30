@@ -30,7 +30,7 @@ import org.apache.spark.util.collection.BitSet
  */
 case class FiberByteData(fiberData: Array[Byte])
 
-private[spinach] trait FiberBuilder {
+private[spinach] trait DataFiberBuilder {
   def defaultRowGroupRowCount: Int
   def ordinal: Int
 
@@ -68,7 +68,7 @@ private[spinach] trait FiberBuilder {
 private[spinach] case class FixedSizeTypeFiberBuilder(
     defaultRowGroupRowCount: Int,
     ordinal: Int,
-    dataType: DataType) extends FiberBuilder {
+    dataType: DataType) extends DataFiberBuilder {
   private val typeDefaultSize = dataType match {
     case BooleanType => BooleanType.defaultSize
     case ByteType => ByteType.defaultSize
@@ -139,7 +139,7 @@ private[spinach] case class FixedSizeTypeFiberBuilder(
 
 private[spinach] case class BinaryFiberBuilder(
     defaultRowGroupRowCount: Int,
-    ordinal: Int) extends FiberBuilder {
+    ordinal: Int) extends DataFiberBuilder {
   private val binaryArrs: ArrayBuffer[Array[Byte]] =
     new ArrayBuffer[Array[Byte]](defaultRowGroupRowCount)
   private var totalLengthInByte: Int = 0
@@ -211,7 +211,7 @@ private[spinach] case class BinaryFiberBuilder(
 
 private[spinach] case class StringFiberBuilder(
     defaultRowGroupRowCount: Int,
-    ordinal: Int) extends FiberBuilder {
+    ordinal: Int) extends DataFiberBuilder {
   private val strings: ArrayBuffer[UTF8String] =
     new ArrayBuffer[UTF8String](defaultRowGroupRowCount)
   private var totalStringDataLengthInByte: Int = 0
@@ -278,8 +278,8 @@ private[spinach] case class StringFiberBuilder(
   }
 }
 
-object FiberBuilder {
-  def apply(dataType: DataType, ordinal: Int, defaultRowGroupRowCount: Int): FiberBuilder = {
+object DataFiberBuilder {
+  def apply(dataType: DataType, ordinal: Int, defaultRowGroupRowCount: Int): DataFiberBuilder = {
     dataType match {
       case BinaryType =>
         new BinaryFiberBuilder(defaultRowGroupRowCount, ordinal)
@@ -307,9 +307,9 @@ object FiberBuilder {
 
   def initializeFromSchema(
       schema: StructType,
-      defaultRowGroupRowCount: Int): Array[FiberBuilder] = {
+      defaultRowGroupRowCount: Int): Array[DataFiberBuilder] = {
     schema.fields.zipWithIndex.map {
-      case (field, oridinal) => FiberBuilder(field.dataType, oridinal, defaultRowGroupRowCount)
+      case (field, oridinal) => DataFiberBuilder(field.dataType, oridinal, defaultRowGroupRowCount)
     }
   }
 }

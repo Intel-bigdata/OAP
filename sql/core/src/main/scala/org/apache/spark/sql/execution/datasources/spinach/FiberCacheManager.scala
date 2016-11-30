@@ -47,31 +47,31 @@ private sealed case class ConfigurationCache[T](key: T, conf: Configuration) {
 private[spinach] sealed trait AbstractFiberCacheManger extends Logging {
   type ENTRY = ConfigurationCache[Fiber]
 
-  protected def fiber2Data(key: Fiber, conf: Configuration): FiberCacheData
+  protected def fiber2Data(key: Fiber, conf: Configuration): FiberCache
 
   @transient protected val cache =
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
-      .weigher(new Weigher[ENTRY, FiberCacheData] {
-        override def weigh(key: ENTRY, value: FiberCacheData): Int = value.fiberData.size().toInt
+      .weigher(new Weigher[ENTRY, FiberCache] {
+        override def weigh(key: ENTRY, value: FiberCache): Int = value.fiberData.size().toInt
       })
-      .maximumWeight(MemoryManager.getCapacity())
-      .removalListener(new RemovalListener[ENTRY, FiberCacheData] {
-        override def onRemoval(n: RemovalNotification[ENTRY, FiberCacheData]): Unit = {
+      .maximumWeight(MemoryManager.getDataCacheCapacity())
+      .removalListener(new RemovalListener[ENTRY, FiberCache] {
+        override def onRemoval(n: RemovalNotification[ENTRY, FiberCache]): Unit = {
           // TODO cause exception while we removal the using data. we need an lock machanism
           // to lock the allocate, using and the free
           MemoryManager.free(n.getValue)
         }
       })
-      .build(new CacheLoader[ENTRY, FiberCacheData]() {
-        override def load(key: ENTRY): FiberCacheData = {
+      .build(new CacheLoader[ENTRY, FiberCache]() {
+        override def load(key: ENTRY): FiberCache = {
           fiber2Data(key.key, key.conf)
         }
       })
 
-  def apply(fiberCache: Fiber, conf: Configuration): FiberCacheData = {
-    cache.get(ConfigurationCache(fiberCache, conf))
+  def apply[T <: FiberCache](fiberCache: Fiber, conf: Configuration): T = {
+    cache.get(ConfigurationCache(fiberCache, conf)).asInstanceOf[T]
   }
 }
 
@@ -79,38 +79,11 @@ private[spinach] sealed trait AbstractFiberCacheManger extends Logging {
  * Fiber Cache Manager
  */
 object FiberCacheManager extends AbstractFiberCacheManger {
-  override def fiber2Data(key: Fiber, conf: Configuration): FiberCacheData = {
-    key.file.getFiberData(key.rowGroupId, key.columnIndex, conf)
-  }
-}
-
-/**
- * Index Cache Manager TODO: merge this with AbstractFiberCacheManager
- */
-private[spinach] object IndexCacheManager extends Logging {
-  type ENTRY = ConfigurationCache[IndexFile]
-  @transient protected val cache =
-    CacheBuilder
-      .newBuilder()
-      .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
-      .weigher(new Weigher[ENTRY, IndexFiberCacheData] {
-        override def weigh(key: ENTRY, value: IndexFiberCacheData): Int =
-         value.fiberData.size().toInt
-      }).maximumWeight(MemoryManager.getCapacity())
-      .removalListener(new RemovalListener[ENTRY, IndexFiberCacheData] {
-        override def onRemoval(n: RemovalNotification[ENTRY, IndexFiberCacheData]): Unit = {
-          logDebug(s"Evicting Index Block ${n.getKey.key.file}")
-          MemoryManager.free(FiberCacheData(n.getValue.fiberData))
-        }
-      }).build(new CacheLoader[ENTRY, IndexFiberCacheData] {
-        override def load(key: ENTRY): IndexFiberCacheData = {
-          logDebug(s"Loading Index Block ${key.key.file}")
-          key.key.getIndexFiberData(key.conf)
-        }
-      })
-
-  def apply(fileScanner: IndexFile, conf: Configuration): IndexFiberCacheData = {
-    cache.get(ConfigurationCache(fileScanner, conf))
+  override def fiber2Data(key: Fiber, conf: Configuration): FiberCache = key match {
+    case DataFiber(file, columnIndex, rowGroupId) =>
+      file.getFiberData(rowGroupId, columnIndex, conf)
+    case IndexFiber(file) => file.getIndexFiberData(conf)
+    case other => throw new SpinachException(s"Cannot identify what's $other")
   }
 }
 
@@ -130,7 +103,6 @@ private[spinach] object DataFileHandleCacheManager extends Logging {
     CacheBuilder
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
-      .maximumSize(MemoryManager.getCapacity())
       .expireAfterAccess(1000, TimeUnit.SECONDS) // auto expire after 1000 seconds.
       .removalListener(new RemovalListener[ENTRY, DataFileHandle]() {
         override def onRemoval(n: RemovalNotification[ENTRY, DataFileHandle])
@@ -157,7 +129,7 @@ abstract class DataFile {
   def schema: StructType
 
   def createDataFileHandle(conf: Configuration): DataFileHandle
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCacheData
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
   : Iterator[InternalRow]
@@ -180,4 +152,10 @@ private[spinach] object DataFile {
   }
 }
 
-private[spinach] case class Fiber(file: DataFile, columnIndex: Int, rowGroupId: Int)
+private[spinach] trait Fiber
+
+private[spinach]
+case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber
+
+private[spinach]
+case class IndexFiber(file: IndexFile) extends Fiber
