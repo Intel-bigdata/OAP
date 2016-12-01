@@ -201,12 +201,17 @@ private[spinach] trait RangeScanner extends Iterator[Long] {
 
   def initialize(dataPath: Path, conf: Configuration): RangeScanner = {
     assert(keySchema ne null)
-    this.ordering = GenerateOrdering.create(keySchema)
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
     val indexScanner = IndexFile(path)
     val indexData = IndexCacheManager(indexScanner, conf)
     val root = meta.open(indexData, keySchema)
+
+    _init(root)
+  }
+
+  def _init(root : IndexNode): RangeScanner = {
+    this.ordering = GenerateOrdering.create(keySchema)
 
     if (start eq RangeScanner.DUMMY_KEY_START) {
       // find the first key in the left-most leaf node
@@ -248,7 +253,7 @@ private[spinach] trait RangeScanner extends Iterator[Long] {
       currentKey = new CurrentKey(node, m, 0)
       if (notFind) {
         // if not find, then let's move forward a key
-        currentKey.moveNextValue
+        currentKey.moveNextKey
       }
     } else {
       moveTo(node.childAt(m), candidate)
@@ -286,6 +291,15 @@ private[spinach] object DUMMY_SCANNER extends RangeScanner {
 private[spinach] trait LeftOpenInitialize extends RangeScanner {
   override def initialize(path: Path, conf: Configuration): RangeScanner = {
     super.initialize(path, conf)
+    if (ordering.compare(start, currentKey.currentKey) == 0) {
+      // find the exactly the key, since it's LeftOpen, skip the first key
+      currentKey.moveNextKey
+    }
+    this
+  }
+
+  override def _init(root: IndexNode): RangeScanner = {
+    super._init(root)
     if (ordering.compare(start, currentKey.currentKey) == 0) {
       // find the exactly the key, since it's LeftOpen, skip the first key
       currentKey.moveNextKey
