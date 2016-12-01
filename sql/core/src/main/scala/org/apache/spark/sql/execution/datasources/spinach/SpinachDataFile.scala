@@ -120,7 +120,8 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
 
   override def createDataFileHandle(conf: Configuration): SpinachDataFileHandle = {
     val p = new Path(StringUtils.unEscapeString(path))
-    val fs = FileSystem.get(conf)
+
+    val fs = p.getFileSystem(conf)
 
     new SpinachDataFileHandle().read(fs.open(p), fs.getFileStatus(p).getLen)
   }

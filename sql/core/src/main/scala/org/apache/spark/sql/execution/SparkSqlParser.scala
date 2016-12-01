@@ -25,6 +25,7 @@ import org.antlr.v4.runtime.tree.TerminalNode
 
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
+import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.parser._
 import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
@@ -1385,7 +1386,7 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
   override def visitSpinachCreateIndex(ctx: SpinachCreateIndexContext): LogicalPlan =
     withOrigin(ctx) {
       CreateIndex(
-        ctx.IDENTIFIER.getText, visitTableIdentifier(ctx.tableIdentifier),
+        ctx.IDENTIFIER.getText, UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier())),
         visitIndexCols(ctx.indexCols), ctx.EXISTS != null)
     }
 
@@ -1397,12 +1398,13 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
    * }}}
    */
   override def visitSpinachDropIndex(ctx: SpinachDropIndexContext): LogicalPlan = withOrigin(ctx) {
-    DropIndex(ctx.IDENTIFIER.getText, visitTableIdentifier(ctx.tableIdentifier), ctx.EXISTS != null)
+    DropIndex(
+      ctx.IDENTIFIER.getText,
+      UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier)), ctx.EXISTS != null)
   }
 
   override def visitIndexCols(ctx: IndexColsContext): Array[IndexColumn] = withOrigin(ctx) {
-    // ctx.indexCol.toArray(new Array[IndexColContext](ctx.indexCol.size)).map(visitIndexCol)
-    Array(visitIndexCol(ctx.indexCol))
+    ctx.indexCol.toArray(new Array[IndexColContext](ctx.indexCol.size)).map(visitIndexCol)
   }
 
   override def visitIndexCol(ctx: IndexColContext): IndexColumn = withOrigin(ctx) {

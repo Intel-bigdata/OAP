@@ -21,9 +21,8 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
-import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, Descending}
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, SpinachException}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
@@ -34,24 +33,22 @@ import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
  */
 case class CreateIndex(
     indexName: String,
-    tableName: TableIdentifier,
+    relation : LogicalPlan,
     indexColumns: Array[IndexColumn],
     allowExists: Boolean) extends RunnableCommand with Logging {
-  override def children: Seq[LogicalPlan] = Seq.empty
+  override def children: Seq[LogicalPlan] = Seq(relation)
 
   override val output: Seq[Attribute] = Seq.empty
 
-  override def run(sparkSession: SparkSession): Seq[Row] = {
-    val catalog = sparkSession.sessionState.catalog
-    assert(catalog.tableExists(tableName), s"$tableName not exists")
 
-    val (fileCatalog, s, readerClassName) = catalog.lookupRelation(tableName) match {
-      case SubqueryAlias(_, LogicalRelation(
-      HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, _)) =>
-        (fileCatalog, s, SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME)
-      case SubqueryAlias(_, LogicalRelation(
-      HadoopFsRelation(_, fileCatalog, _, s, _, _: ParquetFileFormat, _), _, _)) =>
-        (fileCatalog, s, SpinachFileFormat.PARQUET_DATA_FILE_CLASSNAME)
+  override def run(sparkSession: SparkSession): Seq[Row] = {
+    val (fileCatalog, s, readerClassName, identifier) = relation match {
+      case LogicalRelation(
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, id) =>
+        (fileCatalog, s, SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME, id)
+      case LogicalRelation(
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: ParquetFileFormat, _), _, id) =>
+        (fileCatalog, s, SpinachFileFormat.PARQUET_DATA_FILE_CLASSNAME, id)
       case other =>
         throw new SpinachException(s"We don't support index building for ${other.simpleString}")
     }
@@ -75,7 +72,8 @@ case class CreateIndex(
         val existsData = oldMeta.fileMetas
         if (existsIndexes.exists(_.name == indexName)) {
           if (!allowExists) {
-            throw new AnalysisException(s"""Index $indexName exists on table $tableName""")
+            throw new AnalysisException(
+              s"""Index $indexName exists on ${identifier.getOrElse(parent)}""")
           } else {
             logWarning(s"Dup index name $indexName")
           }
@@ -124,18 +122,16 @@ case class CreateIndex(
  */
 case class DropIndex(
     indexName: String,
-    tableIdentifier: TableIdentifier,
+    relation: LogicalPlan,
     allowNotExists: Boolean) extends RunnableCommand {
 
-  override def children: Seq[LogicalPlan] = Seq.empty
+  override def children: Seq[LogicalPlan] = Seq(relation)
 
   override val output: Seq[Attribute] = Seq.empty
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
-    val catalog = sparkSession.sessionState.catalog
-    catalog.lookupRelation(tableIdentifier) match {
-      case SubqueryAlias(_, LogicalRelation(
-          HadoopFsRelation(_, fileCatalog, _, _, _, format, _), _, _))
+    relation match {
+      case LogicalRelation(HadoopFsRelation(_, fileCatalog, _, _, _, format, _), _, identifier)
           if format.isInstanceOf[SpinachFileFormat] || format.isInstanceOf[ParquetFileFormat] =>
         logInfo(s"Dropping index $indexName")
         val partitions = SpinachUtils.getPartitions(fileCatalog)
@@ -153,7 +149,7 @@ case class DropIndex(
             if (!existsIndexes.exists(_.name == indexName)) {
               if (!allowNotExists) {
                 throw new AnalysisException(
-                  s"""Index $indexName not exists on table $tableIdentifier""")
+                  s"""Index $indexName exists on ${identifier.getOrElse(parent)}""")
               } else {
                 logWarning(s"drop non-exists index $indexName")
               }
@@ -178,7 +174,7 @@ case class DropIndex(
               fs.delete(_, true))
           }
         })
-      case _ => sys.error("We don't support index dropping for ${other.simpleString}")
+      case other => sys.error(s"We don't support index dropping for ${other.simpleString}")
     }
     Seq.empty
   }

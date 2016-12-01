@@ -132,7 +132,7 @@ statement
     ;
 
 indexCols
-    : '(' indexCol ')'
+    : '(' indexCol (',' indexCol)* ')'
     ;
 
 indexCol
