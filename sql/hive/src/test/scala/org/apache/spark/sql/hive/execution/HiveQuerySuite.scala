@@ -81,7 +81,7 @@ class HiveQuerySuite extends HiveComparisonTest with BeforeAndAfter {
 
   private def assertDupIndex(body: => Unit): Unit = {
     val e = intercept[AnalysisException] { body }
-    assert(e.getMessage.toLowerCase.contains("exists on table"))
+    assert(e.getMessage.toLowerCase.contains("exists"))
   }
 
   // Testing the Broadcast based join for cartesian join (cross join)
