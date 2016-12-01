@@ -221,8 +221,8 @@ private[spinach] class BPlusTreeSearchSuite
     ic.getScannerBuilder match {
       case Some(builder) =>
         val scanner = builder.build
-        assert(scanner._init(BPlusTreeSearchSuite.indexMeta.open(null, null)).toSet
-          === expectedIds, "")
+        assert(scanner._init(
+          BPlusTreeSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")
     }
   }

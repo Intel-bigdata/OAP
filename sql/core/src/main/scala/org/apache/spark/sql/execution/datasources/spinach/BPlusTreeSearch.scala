@@ -253,7 +253,7 @@ private[spinach] trait RangeScanner extends Iterator[Long] {
       currentKey = new CurrentKey(node, m, 0)
       if (notFind) {
         // if not find, then let's move forward a key
-        currentKey.moveNextKey
+        currentKey.moveNextValue
       }
     } else {
       moveTo(node.childAt(m), candidate)
@@ -289,15 +289,6 @@ private[spinach] object DUMMY_SCANNER extends RangeScanner {
 }
 
 private[spinach] trait LeftOpenInitialize extends RangeScanner {
-  override def initialize(path: Path, conf: Configuration): RangeScanner = {
-    super.initialize(path, conf)
-    if (ordering.compare(start, currentKey.currentKey) == 0) {
-      // find the exactly the key, since it's LeftOpen, skip the first key
-      currentKey.moveNextKey
-    }
-    this
-  }
-
   override def _init(root: IndexNode): RangeScanner = {
     super._init(root)
     if (ordering.compare(start, currentKey.currentKey) == 0) {
