@@ -245,7 +245,7 @@ case class RefreshIndex(
       // p.files.foreach(f => builder.addFileMeta(FileMeta("", 0, f.getPath.toString)))
       (metaBuilder, parent)
     })
-    val ret = indices.map(i => {
+    val buildrst = indices.map(i => {
       val indexColumns = i.indexType match {
         case BTreeIndex(entries) =>
           entries.map(e => IndexColumn(s(e.ordinal).name, e.dir == Ascending))
@@ -253,18 +253,21 @@ case class RefreshIndex(
       }
       SpinachIndexBuild(sparkSession, i.name, indexColumns.toArray, s, bAndP.map(
         _._2), readerClassName, overwrite = false).execute()
-    }).head
-    val retMap = ret.groupBy(_.parent)
-    bAndP.foreach(bp =>
-      retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
-        bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile)))
-    )
-    // write updated metas down
-    bAndP.foreach(bp => DataSourceMeta.write(
-      new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
-      sparkSession.sparkContext.hadoopConfiguration,
-      bp._1.build(),
-      deleteIfExits = true))
+    })
+    if (!buildrst.isEmpty) {
+      val ret = buildrst.head
+      val retMap = ret.groupBy(_.parent)
+      bAndP.foreach(bp =>
+        retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
+          bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile)))
+      )
+      // write updated metas down
+      bAndP.foreach(bp => DataSourceMeta.write(
+        new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
+        sparkSession.sparkContext.hadoopConfiguration,
+        bp._1.build(),
+        deleteIfExits = true))
+    }
     Seq.empty
   }
 }
