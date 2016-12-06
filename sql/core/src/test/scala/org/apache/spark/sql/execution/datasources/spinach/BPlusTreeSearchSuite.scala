@@ -173,6 +173,11 @@ private[spinach] class BPlusTreeSearchSuite
     assertScanner(meta, filters, Array(), Set(160, 161, 162, 170, 171, 180))
   }
 
+  test("> 40") {
+    val filters: Array[Filter] = Array(GreaterThan("test", 40))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
   test(">= 15") {
     val filters: Array[Filter] = Array(GreaterThanOrEqual("test", 15))
     assertScanner(meta, filters, Array(), Set(150, 160, 161, 162, 170, 171, 180))
