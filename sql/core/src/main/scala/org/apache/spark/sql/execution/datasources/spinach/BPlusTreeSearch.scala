@@ -294,9 +294,11 @@ private[spinach] object DUMMY_SCANNER extends RangeScanner {
 private[spinach] trait LeftOpenInitialize extends RangeScanner {
   override def _init(root: IndexNode): RangeScanner = {
     super._init(root)
-    if (ordering.compare(start, currentKey.currentKey) == 0) {
-      // find the exactly the key, since it's LeftOpen, skip the first key
-      currentKey.moveNextKey
+    if(currentKey.currentKey != RangeScanner.DUMMY_KEY_END) {
+      if (ordering.compare(start, currentKey.currentKey) == 0) {
+        // find the exactly the key, since it's LeftOpen, skip the first key
+        currentKey.moveNextKey
+      }
     }
     this
   }
