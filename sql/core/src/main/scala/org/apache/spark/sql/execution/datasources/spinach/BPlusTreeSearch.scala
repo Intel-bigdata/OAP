@@ -88,7 +88,7 @@ private[spinach] case class UnsafeIndexNode(
     // 16 <- value5, 12(4 + 8) <- value3 + value4
     val keyOffset = Platform.getLong(baseObj, baseOffset + offset + 12 + idx * 16)
     val len = Platform.getInt(baseObj, baseOffset + keyOffset)
-    // val row = new UnsafeRow(schema.length) // this is for debug use
+//     val row = new UnsafeRow(schema.length) // this is for debug use
     val row = UnsafeIndexNode.row
     row.setNumFields(schema.length)
     row.pointTo(baseObj, baseOffset + keyOffset + 4, len)
@@ -256,7 +256,10 @@ private[spinach] trait RangeScanner extends Iterator[Long] {
 
       if (notFind) {
         // if not find, then let's move forward a key
-        currentKey.moveNextKey
+        if (ordering.compare(node.keyAt(m), candidate) < 0) {// if current key < candidate
+          currentKey.moveNextKey
+        }
+
       }
     } else {
       moveTo(node.childAt(m), candidate)
@@ -294,9 +297,11 @@ private[spinach] object DUMMY_SCANNER extends RangeScanner {
 private[spinach] trait LeftOpenInitialize extends RangeScanner {
   override def _init(root: IndexNode): RangeScanner = {
     super._init(root)
-    if (ordering.compare(start, currentKey.currentKey) == 0) {
-      // find the exactly the key, since it's LeftOpen, skip the first key
-      currentKey.moveNextKey
+    if(currentKey.currentKey != RangeScanner.DUMMY_KEY_END) {
+      if (ordering.compare(start, currentKey.currentKey) == 0) {
+        // find the exactly the key, since it's LeftOpen, skip the first key
+        currentKey.moveNextKey
+      }
     }
     this
   }
