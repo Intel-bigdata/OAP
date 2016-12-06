@@ -80,7 +80,10 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
       }
 
       def fileExists(r: HadoopFsRelation): Boolean = {
-        val path = r.location.paths.headOption.getOrElse(new Path(""))
+        val paths = r.location.paths
+        // no paths specify
+        if (paths.length < 1) return false
+        val path = paths.head
         val fs = path.getFileSystem(r.sparkSession.sparkContext.hadoopConfiguration)
         val meta = new Path(path, SpinachFileFormat.SPINACH_META_FILE)
         fs.exists(meta)
