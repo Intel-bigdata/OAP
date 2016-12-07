@@ -79,6 +79,11 @@ class HiveQuerySuite extends HiveComparisonTest with BeforeAndAfter {
     assert(e.getMessage.toLowerCase.contains("operation not allowed"))
   }
 
+  private def assertDupIndex(body: => Unit): Unit = {
+    val e = intercept[AnalysisException] { body }
+    assert(e.getMessage.toLowerCase.contains("exists"))
+  }
+
   // Testing the Broadcast based join for cartesian join (cross join)
   // We assume that the Broadcast Join Threshold will works since the src is a small table
   private val spark_10484_1 = """
@@ -1211,6 +1216,23 @@ class HiveQuerySuite extends HiveComparisonTest with BeforeAndAfter {
       sql("CREATE TEMPORARY MACRO SIGMOID (x DOUBLE) 1.0 / (1.0 + EXP(-x))")
     }
     assertUnsupportedFeature { sql("DROP TEMPORARY MACRO SIGMOID") }
+  }
+
+  test("create hive table in parquet format") {
+    sql("create table p_table (key int, val string) stored as parquet")
+    sql("insert overwrite table p_table select * from src")
+    sql("create sindex if not exists p_index on p_table(key)")
+
+    assert(sql("select val from p_table where key = 238").collect().head.getString(0) == "val_238")
+    sql("drop table p_table")
+  }
+
+  test("create duplicate hive table in parquet format") {
+    sql("create table p_table1 (key int, val string) stored as parquet")
+    sql("insert overwrite table p_table1 select * from src")
+
+    sql("create sindex p_index on p_table1(key)")
+    assertDupIndex { sql("create sindex p_index on p_table1(key)") }
   }
 }
 

@@ -60,7 +60,7 @@ private[spinach] trait IndexNode {
 }
 
 trait UnsafeIndexTree {
-  def buffer: FiberCacheData
+  def buffer: DataFiberCache
   def offset: Long
   def baseObj: Object = buffer.fiberData.getBaseObject
   def baseOffset: Long = buffer.fiberData.getBaseOffset
@@ -68,7 +68,7 @@ trait UnsafeIndexTree {
 }
 
 private[spinach] case class UnsafeIndexNodeValue(
-    buffer: FiberCacheData,
+    buffer: DataFiberCache,
     offset: Long,
     dataEnd: Long) extends IndexNodeValue with UnsafeIndexTree {
   // 4 <- value1, 8 <- value2
@@ -80,7 +80,7 @@ private[spinach] case class UnsafeIndexNodeValue(
 }
 
 private[spinach] case class UnsafeIndexNode(
-    buffer: FiberCacheData,
+    buffer: DataFiberCache,
     offset: Long,
     dataEnd: Long,
     schema: StructType) extends IndexNode with UnsafeIndexTree {
@@ -88,7 +88,7 @@ private[spinach] case class UnsafeIndexNode(
     // 16 <- value5, 12(4 + 8) <- value3 + value4
     val keyOffset = Platform.getLong(baseObj, baseOffset + offset + 12 + idx * 16)
     val len = Platform.getInt(baseObj, baseOffset + keyOffset)
-    // val row = new UnsafeRow(schema.length) // this is for debug use
+//     val row = new UnsafeRow(schema.length) // this is for debug use
     val row = UnsafeIndexNode.row
     row.setNumFields(schema.length)
     row.pointTo(baseObj, baseOffset + keyOffset + 4, len)
@@ -201,12 +201,17 @@ private[spinach] trait RangeScanner extends Iterator[Long] {
 
   def initialize(dataPath: Path, conf: Configuration): RangeScanner = {
     assert(keySchema ne null)
-    this.ordering = GenerateOrdering.create(keySchema)
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
-    val indexScanner = IndexFile(path)
-    val indexData = IndexCacheManager(indexScanner, conf)
+    val indexScanner = IndexFiber(IndexFile(path))
+    val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
     val root = meta.open(indexData, keySchema)
+
+    _init(root)
+  }
+
+  def _init(root : IndexNode): RangeScanner = {
+    this.ordering = GenerateOrdering.create(keySchema)
 
     if (start eq RangeScanner.DUMMY_KEY_START) {
       // find the first key in the left-most leaf node
@@ -245,10 +250,16 @@ private[spinach] trait RangeScanner extends Iterator[Long] {
     }
 
     if (node.isLeaf) {
+      // here currentKey is equal to candidate or the last key in the left
+      // which is less than the candidate
       currentKey = new CurrentKey(node, m, 0)
+
       if (notFind) {
         // if not find, then let's move forward a key
-        currentKey.moveNextValue
+        if (ordering.compare(node.keyAt(m), candidate) < 0) {// if current key < candidate
+          currentKey.moveNextKey
+        }
+
       }
     } else {
       moveTo(node.childAt(m), candidate)
@@ -284,11 +295,13 @@ private[spinach] object DUMMY_SCANNER extends RangeScanner {
 }
 
 private[spinach] trait LeftOpenInitialize extends RangeScanner {
-  override def initialize(path: Path, conf: Configuration): RangeScanner = {
-    super.initialize(path, conf)
-    if (ordering.compare(start, currentKey.currentKey) == 0) {
-      // find the exactly the key, since it's LeftOpen, skip the first key
-      currentKey.moveNextKey
+  override def _init(root: IndexNode): RangeScanner = {
+    super._init(root)
+    if(currentKey.currentKey != RangeScanner.DUMMY_KEY_END) {
+      if (ordering.compare(start, currentKey.currentKey) == 0) {
+        // find the exactly the key, since it's LeftOpen, skip the first key
+        currentKey.moveNextKey
+      }
     }
     this
   }

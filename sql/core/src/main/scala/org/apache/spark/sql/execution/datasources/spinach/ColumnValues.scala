@@ -25,7 +25,7 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 import org.apache.spark.util.collection.BitSet
 
-class ColumnValues(defaultSize: Int, dataType: DataType, val raw: FiberCacheData) {
+class ColumnValues(defaultSize: Int, dataType: DataType, val raw: DataFiberCache) {
   require(dataType.isInstanceOf[AtomicType], "Only atomic type accepted for now.")
 
   private val baseObject = raw.fiberData.getBaseObject

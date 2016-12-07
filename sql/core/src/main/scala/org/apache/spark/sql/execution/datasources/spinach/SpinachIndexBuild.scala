@@ -147,7 +147,7 @@ private[spinach] case class SpinachIndexBuild(
         val uniqueKeysList = new java.util.LinkedList[InternalRow]()
         import scala.collection.JavaConverters._
         uniqueKeysList.addAll(uniqueKeys.toSeq.asJava)
-        writeTreeToOut(treeShape, fileOut, offsetMap, fileOffset, uniqueKeysList, keySchema, 0, -1)
+        writeTreeToOut(treeShape, fileOut, offsetMap, fileOffset, uniqueKeysList, keySchema, 0, -1L)
         assert(uniqueKeysList.size == 1)
         IndexUtils.writeLong(fileOut, dataEnd)
         IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
@@ -169,6 +169,9 @@ private[spinach] case class SpinachIndexBuild(
     GenerateOrdering.generate(order, keySchema.toAttributes)
   }
 
+  /**
+   * Write tree to output, return bytes written and updated nextPos
+   */
   private def writeTreeToOut(
       tree: BTreeNode,
       out: FSDataOutputStream,
@@ -177,29 +180,31 @@ private[spinach] case class SpinachIndexBuild(
       keysList: java.util.LinkedList[InternalRow],
       keySchema: StructType,
       listOffsetFromEnd: Int,
-      nextOffset: Long): (Long, Long) = {
-    var subOffset = 0L
+      nextP: Long): (Long, Long) = {
     if (tree.children.nonEmpty) {
+      var subOffset = 0L
       // this is a non-leaf node
       // Need to write down all subtrees
       val childrenCount = tree.children.size
       assert(childrenCount == tree.root)
       var iter = childrenCount
+      var currentNextPos = nextP
       // write down all subtrees reversely
-      var lastStart = nextOffset
       while (iter > 0) {
         iter -= 1
         val subTree = tree.children(iter)
         val subListOffsetFromEnd = listOffsetFromEnd + childrenCount - 1 - iter
-        val (writeOffset, oneLevelStart) = writeTreeToOut(
+        val (writeOffset, newNext) = writeTreeToOut(
           subTree, out, map, fileOffset + subOffset,
-          keysList, keySchema, subListOffsetFromEnd, lastStart)
-        lastStart = oneLevelStart
+          keysList, keySchema, subListOffsetFromEnd, currentNextPos)
+        currentNextPos = newNext
         subOffset += writeOffset
       }
+      (subOffset + writeIndexNode(
+        tree, out, map, keysList, listOffsetFromEnd, subOffset + fileOffset, -1L), currentNextPos)
+    } else {
+      (writeIndexNode(tree, out, map, keysList, listOffsetFromEnd, fileOffset, nextP), fileOffset)
     }
-    (subOffset + writeIndexNode(
-      tree, out, map, keysList, listOffsetFromEnd, nextOffset, subOffset + fileOffset), subOffset)
   }
 
   @transient private lazy val converter = UnsafeProjection.create(keySchema)
@@ -213,14 +218,14 @@ private[spinach] case class SpinachIndexBuild(
       map: java.util.HashMap[InternalRow, Long],
       keysList: java.util.LinkedList[InternalRow],
       listOffsetFromEnd: Int,
-      nextOffset: Long,
-      updateOffset: Long): Long = {
+      updateOffset: Long,
+      nextPointer: Long): Long = {
     var subOffset = 0
     // write road sign count on every node first
     IndexUtils.writeInt(out, tree.root)
     // 4 -> value3, stores tree branch count
     subOffset = subOffset + 4
-    IndexUtils.writeLong(out, nextOffset)
+    IndexUtils.writeLong(out, nextPointer)
     // 8 -> value4, stores next offset
     subOffset = subOffset + 8
     // For all IndexNode, write down all road sign, each pointing to specific data segment
