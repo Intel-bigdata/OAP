@@ -186,7 +186,7 @@ private[spinach] class SpinachOutputWriterFactory(
     fs.exists(new Path(path, SpinachFileFormat.SPINACH_META_FILE))
   }
 
-  def addOldMetaToPartBuilder(path: Path, builder: DataSourceMetaBuilder): Unit = {
+  def addOldMetaToBuilder(path: Path, builder: DataSourceMetaBuilder): Unit = {
     if (spnMetaFileExists(path)) {
       val m = SpinachUtils.getMeta(job.getConfiguration, path)
       assert(m.nonEmpty)
