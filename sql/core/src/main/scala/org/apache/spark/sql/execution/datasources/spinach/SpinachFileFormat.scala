@@ -186,7 +186,7 @@ private[spinach] class SpinachOutputWriterFactory(
     fs.exists(new Path(path, SpinachFileFormat.SPINACH_META_FILE))
   }
 
-  def addOldMetaToPartBuilder(path: Path, builder: DataSourceMetaBuilder): Unit = {
+  def addOldMetaToBuilder(path: Path, builder: DataSourceMetaBuilder): Unit = {
     if (spnMetaFileExists(path)) {
       val m = SpinachUtils.getMeta(job.getConfiguration, path)
       assert(m.nonEmpty)
@@ -229,14 +229,14 @@ private[spinach] class SpinachOutputWriterFactory(
         val parent = new Path(outputRoot, p._1)
         val partBuilder = DataSourceMeta.newBuilder()
 
-        addOldMetaToPartBuilder(parent, partBuilder)
+        addOldMetaToBuilder(parent, partBuilder)
 
         p._2.foreach(m => partBuilder.addFileMeta(FileMeta("", m._2._2, m._2._1)))
         val partMetaPath = new Path(parent, SpinachFileFormat.SPINACH_META_FILE)
         DataSourceMeta.write(partMetaPath, conf, partBuilder.build())
       })
     } else if (partitionMeta.nonEmpty) { // normal table file without partitions
-      addOldMetaToPartBuilder(outputRoot, builder)
+      addOldMetaToBuilder(outputRoot, builder)
       DataSourceMeta.write(path, conf, builder.build())
     }
 
