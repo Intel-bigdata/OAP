@@ -56,7 +56,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
   override protected def afterAll(): Unit = DataGenerator.clean()
 
-  test("read by columnIds and rowIds") {ead by columnIds and empty rowIds array
+  test("read by columnIds and rowIds") {
 
     val reader = ParquetDataFile(fileName, requestStructType)
 
