@@ -21,9 +21,10 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.{ArrayBuffer, BitSet}
+
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Options.Rename
 import org.apache.hadoop.fs._
+
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 
