@@ -42,23 +42,32 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
   def iterator(conf: Configuration,
                requiredIds: Array[Int],
                rowIds: Array[Long]): Iterator[InternalRow] = {
-    val requestSchemaString = {
-      var requestSchema = new StructType
-      for (index <- requiredIds) {
-        requestSchema = requestSchema.add(schema(index))
+    if (rowIds != null && rowIds.length == 0) {
+      new Iterator[UnsafeRow] {
+        override def hasNext: Boolean = false
+
+        override def next(): UnsafeRow =
+          throw new java.util.NoSuchElementException("Input is Empty RowIds Array")
       }
-      requestSchema.json
+    } else {
+      val requestSchemaString = {
+        var requestSchema = new StructType
+        for (index <- requiredIds) {
+          requestSchema = requestSchema.add(schema(index))
+        }
+        requestSchema.json
+      }
+      conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
+      conf.set(SpinachReadSupportImpl.SPARK_ROW_READ_FROM_FILE_SCHEMA, requestSchemaString)
+
+      val readSupport = new SpinachReadSupportImpl
+
+      val recordReader = SpinachRecordReader.builder(readSupport, new Path(path), conf)
+        .withGlobalRowIds(rowIds).build()
+      recordReader.initialize()
+      new FileRecordReaderIterator[JLong, UnsafeRow](
+        recordReader.asInstanceOf[RecordReader[JLong, UnsafeRow]])
     }
-    conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
-    conf.set(SpinachReadSupportImpl.SPARK_ROW_READ_FROM_FILE_SCHEMA, requestSchemaString)
-
-    val readSupport = new SpinachReadSupportImpl
-
-    val recordReader = SpinachRecordReader.builder(readSupport, new Path(path), conf)
-      .withGlobalRowIds(rowIds).build()
-    recordReader.initialize()
-    new FileRecordReaderIterator[JLong, UnsafeRow](
-      recordReader.asInstanceOf[RecordReader[JLong, UnsafeRow]])
   }
 
   private class FileRecordReaderIterator[ID, V](rowReader: RecordReader[ID, V])
