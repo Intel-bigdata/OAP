@@ -230,6 +230,8 @@ case class RefreshIndex(
         val m = SpinachUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, parent)
         assert(m.nonEmpty)
         val oldMeta = m.get
+        // add filemeta list already exist
+        oldMeta.fileMetas.foreach(metaBuilder.addFileMeta)
         // TODO for now we only support data file adding before updating index
         metaBuilder.withNewSchema(oldMeta.schema)
       } else {
@@ -257,17 +259,38 @@ case class RefreshIndex(
     if (!buildrst.isEmpty) {
       val ret = buildrst.head
       val retMap = ret.groupBy(_.parent)
-      bAndP.foreach(bp =>
-        retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
-          bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile)))
-      )
+
+      // there some cases spn meta files have already been updated
+      // e.g. when inserting data in spn files the meta has already updated
+      // so, we should ignore these cases
+      // And files modifications for parquet should refresh spn meta in this way
+      val filteredBAndP = bAndP.filter(x => retMap.contains(x._2.toString)).map(bp => {
+        val newFilesMetas = retMap.get(bp._2.toString).get
+          .filterNot(r => bp._1.containsFileMate(r.dataFile.substring(r.parent.length + 1)))
+
+        var exec = true;
+
+        if (newFilesMetas.nonEmpty) {
+          newFilesMetas.foreach(r => {
+            bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile))
+          })
+        } else {
+          exec = false;
+        }
+
+        (bp._1, bp._2, exec)
+      })
+
       // write updated metas down
-      bAndP.foreach(bp => DataSourceMeta.write(
+      filteredBAndP.filter(_._3).foreach(bp => DataSourceMeta.write(
         new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
         sparkSession.sparkContext.hadoopConfiguration,
         bp._1.build(),
         deleteIfExits = true))
+
+      fileCatalog.refresh()
     }
+
     Seq.empty
   }
 }

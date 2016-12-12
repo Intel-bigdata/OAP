@@ -290,6 +290,10 @@ private[spinach] class DataSourceMetaBuilder {
     this
   }
 
+  def containsFileMate(fileName: String): Boolean = {
+    fileMetas.filter(_.dataFileName.equals(fileName)).nonEmpty
+  }
+
   def withNewSchema(schema: StructType): this.type = {
     this.schema = schema
     this
