@@ -401,20 +401,31 @@ private[spinach] object DataSourceMeta {
       meta: DataSourceMeta,
       deleteIfExits: Boolean = true): Unit = {
     val fs = path.getFileSystem(jobConf)
-    if (fs.exists(path)) {
-      if (deleteIfExits) {
-        fs.delete(path, true)
-      } else {
-        throw new FileAlreadyExistsException(s"File $path already exists.")
-      }
+
+    if (fs.exists(path) && !deleteIfExits) {
+      throw new FileAlreadyExistsException(s"File $path already exists.")
     }
-    val out = fs.create(path)
+
+    val rn_path = new Path(path.getName + "_bk")
+
+    val out = fs.create(rn_path)
     meta.fileMetas.foreach(_.write(out))
     meta.indexMetas.foreach(_.write(out))
     writeSchema(meta.schema, out)
     out.writeUTF(meta.dataReaderClassName)
     meta.fileHeader.write(out)
     out.close()
+
+    if (fs.exists(rn_path)) {
+      if (fs.exists(path)) {
+        fs.delete(path, true) // just in case it exists
+      }
+      if (!fs.rename(rn_path, path)) {
+        throw new IOException(s"Could not rename from $rn_path to $path")
+      }
+    } else {
+      throw new IOException(s"Could not create $rn_path")
+    }
   }
 
   def newBuilder() : DataSourceMetaBuilder = {
