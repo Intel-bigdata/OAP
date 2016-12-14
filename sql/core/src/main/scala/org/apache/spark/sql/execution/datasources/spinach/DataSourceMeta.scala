@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.io.IOException
+import java.io.{ByteArrayOutputStream, IOException}
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.{ArrayBuffer, BitSet}
@@ -25,7 +25,9 @@ import scala.collection.mutable.{ArrayBuffer, BitSet}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.types._
 
 /**
@@ -267,11 +269,65 @@ private[spinach] object FileHeader {
   }
 }
 
+private [spinach] class Range {
+  var schema: StructType = _
+  var start: InternalRow = _
+  var end: InternalRow = _
+
+  @transient private lazy val converter = UnsafeProjection.create(schema)
+
+
+
+  def writeHelper(internalRow: InternalRow, keyBuf: ByteArrayOutputStream): UnsafeRow = {
+    val writeRow = converter.apply(internalRow)
+    IndexUtils.writeInt(keyBuf, writeRow.getSizeInBytes)
+    writeRow
+  }
+
+  def write(out: FSDataOutputStream): Unit = {
+    val keyBuf = new ByteArrayOutputStream()
+    writeHelper(start, keyBuf).writeToStream(keyBuf, null)
+    val startOffset = keyBuf.size()
+    out.writeLong(startOffset)
+
+    writeHelper(end, keyBuf).writeToStream(keyBuf, null)
+    val endOffset = keyBuf.size() - startOffset
+    out.writeLong(endOffset)
+
+    keyBuf.writeTo(out)
+  }
+
+  def read(in: FSDataInputStream, schema: StructType): Long = {
+    val readPos = in.getPos
+    in.seek(readPos)
+    val startOffet = in.readLong().toInt
+    val endOffset = in.readLong().toInt
+
+    val startBuf = new Array[Byte](startOffet)
+    val endBuf = new Array[Byte](endOffset)
+    in.read(startBuf)
+    in.read(endBuf)
+    16 + startOffet + endOffset
+  }
+}
+
+private [spinach] object Range {
+  def apply(): Range = new Range()
+  def apply(start: InternalRow, end: InternalRow, schema: StructType): Range = {
+    val range = new Range()
+    range.start = start
+    range.end = end
+    range.schema = schema
+    range
+  }
+}
+
 private[spinach] case class DataSourceMeta(
     @transient fileMetas: Array[FileMeta],
     indexMetas: Array[IndexMeta],
     schema: StructType,
     dataReaderClassName: String,
+    dataRanges: Array[Range],
     @transient fileHeader: FileHeader) extends Serializable
 
 private[spinach] class DataSourceMetaBuilder {
@@ -279,6 +335,7 @@ private[spinach] class DataSourceMetaBuilder {
   val indexMetas = ArrayBuffer.empty[IndexMeta]
   var schema: StructType = new StructType()
   var dataReaderClassName: String = classOf[SpinachDataFile].getCanonicalName
+  var dataRanges = ArrayBuffer.empty[Range]
 
   def addFileMeta(fileMeta: FileMeta): this.type = {
     fileMetas += fileMeta
@@ -290,6 +347,15 @@ private[spinach] class DataSourceMetaBuilder {
     this
   }
 
+  def containsFileMate(fileName: String): Boolean = {
+    fileMetas.filter(_.dataFileName.equals(fileName)).nonEmpty
+  }
+
+  def addRange(range: Range): this.type = {
+    dataRanges += range
+    this
+  }
+  
   def withNewSchema(schema: StructType): this.type = {
     this.schema = schema
     this
@@ -302,7 +368,8 @@ private[spinach] class DataSourceMetaBuilder {
 
   def build(): DataSourceMeta = {
     val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size, indexMetas.size)
-    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, dataReaderClassName, fileHeader)
+    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, dataReaderClassName,
+      dataRanges.toArray, fileHeader)
   }
 }
 
@@ -365,6 +432,21 @@ private[spinach] object DataSourceMeta {
     StructType.fromString(in.readUTF())
   }
 
+  private def readRanges(file: FileStatus, in: FSDataInputStream,
+                         schema: StructType): Array[Range] = {
+    val endPos = file.getLen - FILE_HEAD_LEN
+    var startPos = in.getPos
+    val rangeArray = new ArrayBuffer[Range]
+
+    while (startPos < endPos) {
+      val range = new Range()
+      startPos += range.read(in, schema)
+
+      rangeArray += range
+    }
+    rangeArray.toArray
+  }
+
   private def writeSchema(schema: StructType, out: FSDataOutputStream): Unit = {
     out.writeUTF(schema.json)
   }
@@ -391,8 +473,9 @@ private[spinach] object DataSourceMeta {
     val indexMetas = readIndexMetas(fileHeader, in)
     val schema = readSchema(fileHeader, in)
     val dataReaderClassName = in.readUTF()
+    val ranges = readRanges(file, in, schema)
     in.close()
-    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
+    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, ranges, fileHeader)
   }
 
   def write(
@@ -413,6 +496,7 @@ private[spinach] object DataSourceMeta {
     meta.indexMetas.foreach(_.write(out))
     writeSchema(meta.schema, out)
     out.writeUTF(meta.dataReaderClassName)
+    meta.dataRanges.foreach(_.write(out))
     meta.fileHeader.write(out)
     out.close()
 
