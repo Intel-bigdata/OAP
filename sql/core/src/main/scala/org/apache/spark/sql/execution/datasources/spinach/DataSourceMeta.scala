@@ -267,11 +267,39 @@ private[spinach] object FileHeader {
   }
 }
 
+private [spinach] class Range {
+  var start: Long = _
+  var end: Long = _
+
+  def write(out: FSDataOutputStream): Unit = {
+    out.writeLong(start)
+    out.writeLong(end)
+  }
+
+  def read(in: FSDataInputStream): Unit = {
+    val readPos = in.getPos
+    in.seek(readPos)
+    start = in.readLong()
+    end = in.readLong()
+  }
+}
+
+private [spinach] object Range {
+  def apply(): Range = new Range()
+  def apply(start: Long, end: Long): Range = {
+    val range = new Range()
+    range.start = start
+    range.end = end
+    range
+  }
+}
+
 private[spinach] case class DataSourceMeta(
     @transient fileMetas: Array[FileMeta],
     indexMetas: Array[IndexMeta],
     schema: StructType,
     dataReaderClassName: String,
+    dataRanges: Array[Range],
     @transient fileHeader: FileHeader) extends Serializable
 
 private[spinach] class DataSourceMetaBuilder {
@@ -279,6 +307,7 @@ private[spinach] class DataSourceMetaBuilder {
   val indexMetas = ArrayBuffer.empty[IndexMeta]
   var schema: StructType = new StructType()
   var dataReaderClassName: String = classOf[SpinachDataFile].getCanonicalName
+  var dataRanges = ArrayBuffer.empty[Range]
 
   def addFileMeta(fileMeta: FileMeta): this.type = {
     fileMetas += fileMeta
@@ -290,6 +319,15 @@ private[spinach] class DataSourceMetaBuilder {
     this
   }
 
+  def containsFileMate(fileName: String): Boolean = {
+    fileMetas.filter(_.dataFileName.equals(fileName)).nonEmpty
+  }
+
+  def addRange(range: Range): this.type = {
+    dataRanges += range
+    this
+  }
+  
   def withNewSchema(schema: StructType): this.type = {
     this.schema = schema
     this
@@ -302,7 +340,8 @@ private[spinach] class DataSourceMetaBuilder {
 
   def build(): DataSourceMeta = {
     val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size, indexMetas.size)
-    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, dataReaderClassName, fileHeader)
+    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, dataReaderClassName,
+      dataRanges.toArray, fileHeader)
   }
 }
 
@@ -365,6 +404,22 @@ private[spinach] object DataSourceMeta {
     StructType.fromString(in.readUTF())
   }
 
+  private def readRanges(file: FileStatus, in: FSDataInputStream) : Array[Range] = {
+    var count = 0
+    val endPos = file.getLen - FILE_HEAD_LEN
+    val startPos = in.getPos
+    val rangeArray = new ArrayBuffer[Range]
+
+    while (startPos < endPos) {
+      val start = in.readLong()
+      val end = in.readLong()
+
+      rangeArray(count) = Range(start, end)
+      count += 1
+    }
+    rangeArray.toArray
+  }
+
   private def writeSchema(schema: StructType, out: FSDataOutputStream): Unit = {
     out.writeUTF(schema.json)
   }
@@ -391,8 +446,9 @@ private[spinach] object DataSourceMeta {
     val indexMetas = readIndexMetas(fileHeader, in)
     val schema = readSchema(fileHeader, in)
     val dataReaderClassName = in.readUTF()
+    val ranges = readRanges(file, in)
     in.close()
-    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
+    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, ranges, fileHeader)
   }
 
   def write(
@@ -413,6 +469,7 @@ private[spinach] object DataSourceMeta {
     meta.indexMetas.foreach(_.write(out))
     writeSchema(meta.schema, out)
     out.writeUTF(meta.dataReaderClassName)
+    meta.dataRanges.foreach(_.write(out))
     meta.fileHeader.write(out)
     out.close()
 
