@@ -111,4 +111,26 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
   }
+
+  test("filtering by string") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_test  select * from t")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 1'"),
+      Row(1, "this is test 1") :: Nil)
+    sql("create sindex index1 on spinach_test (b)")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 1'"),
+      Row(1, "this is test 1") :: Nil)
+  }
+
+  test("filtering parquet by string") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table parquet_test  select * from t")
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE b = 'this is test 1'"),
+      Row(1, "this is test 1") :: Nil)
+    sql("create sindex index1 on parquet_test (b)")
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE b = 'this is test 1'"),
+      Row(1, "this is test 1") :: Nil)
+  }
 }
