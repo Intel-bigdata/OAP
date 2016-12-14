@@ -18,7 +18,6 @@
 package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.hadoop.fs.Path
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, Descending}
@@ -27,6 +26,7 @@ import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, SpinachException}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
+import org.apache.spark.sql.types.StructType
 
 /**
  * Creates an index for table on indexColumns
@@ -102,12 +102,34 @@ case class CreateIndex(
     })
     val ret = SpinachIndexBuild(
       sparkSession, indexName, indexColumns, s, bAndP.map(_._2), readerClassName).execute()
+
     val retMap = ret.groupBy(_.parent)
-    bAndP.foreach(bp =>
+
+
+
+    bAndP.foreach(bp => {
+      val ids =
+      indexColumns.map(c => bp._1.schema.map(_.name).toIndexedSeq.indexOf(c.columnName))
+      val keySchema = StructType(ids.map( bp._1.schema.toIndexedSeq(_)))
+      val keyRangeMap = retMap.mapValues( indexRetSeq => indexRetSeq.map(indexRet =>
+        Range(indexRet.minKey, indexRet.maxKey, keySchema) ) )
+      keyRangeMap.getOrElse(bp._2.toString, Nil).foreach(bp._1.addRange(_))
       retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
-        if (!bp._3) bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile)))
-    )
+        if (!bp._3) {
+          bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile))})
+    })
+
     // write updated metas down
+
+//    val bAndPWithRange = bAndP.map(bp => {
+//      val indexRetSeq = retMap.getOrElse(bp._2.toString, Nil)
+//
+//      val keyRangeArray = indexRetSeq.map(indexRet => (indexRet.minKey, indexRet.maxKey))
+//
+//      (bp._1, bp._2, bp._3, keyRangeArray)
+//    })
+
+
     bAndP.foreach(bp => DataSourceMeta.write(
       new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
       sparkSession.sparkContext.hadoopConfiguration,
