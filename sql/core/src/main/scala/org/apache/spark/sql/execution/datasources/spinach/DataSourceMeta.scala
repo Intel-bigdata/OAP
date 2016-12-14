@@ -275,6 +275,7 @@ private [spinach] class Range {
   var end: InternalRow = _
 
   @transient private lazy val converter = UnsafeProjection.create(schema)
+  @transient private lazy val converter2 = FromUnsafeProjection.apply(schema)
 
 
 
@@ -286,6 +287,7 @@ private [spinach] class Range {
 
   def write(out: FSDataOutputStream): Unit = {
     val keyBuf = new ByteArrayOutputStream()
+    val size = keyBuf.size()
     writeHelper(start, keyBuf).writeToStream(keyBuf, null)
     val startOffset = keyBuf.size()
     out.writeLong(startOffset)
@@ -307,6 +309,15 @@ private [spinach] class Range {
     val endBuf = new Array[Byte](endOffset)
     in.read(startBuf)
     in.read(endBuf)
+    val startKey = UnsafeIndexNode.row.get
+    startKey.setNumFields(1)
+    startKey.pointTo(startBuf, startBuf.length)
+
+//    val startKey = UnsafeIndexNode.row.get
+//    startKey.setNumFields(schema.length)
+//    startKey.pointTo(startBuf, startBuf.length)
+
+    start = startKey.asInstanceOf[InternalRow]
     16 + startOffet + endOffset
   }
 }
@@ -327,7 +338,7 @@ private[spinach] case class DataSourceMeta(
     indexMetas: Array[IndexMeta],
     schema: StructType,
     dataReaderClassName: String,
-    dataRanges: Array[Range],
+    @transient dataRanges: Array[Range],
     @transient fileHeader: FileHeader) extends Serializable
 
 private[spinach] class DataSourceMetaBuilder {
@@ -442,7 +453,10 @@ private[spinach] object DataSourceMeta {
       val range = new Range()
       startPos += range.read(in, schema)
 
+
       rangeArray += range
+
+
     }
     rangeArray.toArray
   }
