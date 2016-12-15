@@ -21,7 +21,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, SortDirection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
@@ -88,8 +88,8 @@ private[spinach] case class UnsafeIndexNode(
     // 16 <- value5, 12(4 + 8) <- value3 + value4
     val keyOffset = Platform.getLong(baseObj, baseOffset + offset + 12 + idx * 16)
     val len = Platform.getInt(baseObj, baseOffset + keyOffset)
-//     val row = new UnsafeRow(schema.length) // this is for debug use
-    val row = UnsafeIndexNode.row
+    // val row = new UnsafeRow(schema.length) // this is for debug use
+    val row = UnsafeIndexNode.row.get
     row.setNumFields(schema.length)
     row.pointTo(baseObj, baseOffset + keyOffset + 4, len)
     row
@@ -129,7 +129,9 @@ private[spinach] case class UnsafeIndexNode(
 }
 
 private[spinach] object UnsafeIndexNode {
-  val row = new UnsafeRow
+  lazy val row = new ThreadLocal[UnsafeRow] {
+    override def initialValue = new UnsafeRow
+  }
 }
 
 private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
@@ -617,7 +619,8 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
     map.get(attribute)
   }
 
-  def unapply(value: Any): Option[Key] = Some(InternalRow(value))
+  def unapply(value: Any): Option[Key] =
+    Some(InternalRow(CatalystTypeConverters.convertToCatalyst(value)))
 
   private def findIndexer(attribute: String): Option[ScannerBuilder] = {
     val ordinal = meta.schema.fieldIndex(attribute)
