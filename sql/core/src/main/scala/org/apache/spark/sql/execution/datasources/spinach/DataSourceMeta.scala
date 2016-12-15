@@ -290,7 +290,7 @@ private[spinach] class DataSourceMetaBuilder {
     this
   }
 
-  def containsFileMate(fileName: String): Boolean = {
+  def containsFileMeta(fileName: String): Boolean = {
     fileMetas.filter(_.dataFileName.equals(fileName)).nonEmpty
   }
 

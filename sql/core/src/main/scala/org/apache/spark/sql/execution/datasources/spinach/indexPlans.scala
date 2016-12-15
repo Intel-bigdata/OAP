@@ -266,7 +266,7 @@ case class RefreshIndex(
       // And files modifications for parquet should refresh spn meta in this way
       val filteredBAndP = bAndP.filter(x => retMap.contains(x._2.toString)).map(bp => {
         val newFilesMetas = retMap.get(bp._2.toString).get
-          .filterNot(r => bp._1.containsFileMate(r.dataFile.substring(r.parent.length + 1)))
+          .filterNot(r => bp._1.containsFileMeta(r.dataFile.substring(r.parent.length + 1)))
 
         var exec = true;
 
