@@ -21,7 +21,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, SortDirection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
@@ -619,7 +619,8 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
     map.get(attribute)
   }
 
-  def unapply(value: Any): Option[Key] = Some(InternalRow(value))
+  def unapply(value: Any): Option[Key] =
+    Some(InternalRow(CatalystTypeConverters.convertToCatalyst(value)))
 
   private def findIndexer(attribute: String): Option[ScannerBuilder] = {
     val ordinal = meta.schema.fieldIndex(attribute)
