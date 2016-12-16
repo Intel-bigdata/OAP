@@ -184,6 +184,8 @@ class DAGScheduler(
   private[scheduler] val eventProcessLoop = new DAGSchedulerEventProcessLoop(this)
   taskScheduler.setDAGScheduler(this)
 
+  private val openPreRun = sc.getConf.getBoolean("spark.sql.baidu.stagePreRun", false)
+
   /**
    * Called by the TaskSetManager to report task's starting.
    */
@@ -902,7 +904,8 @@ class DAGScheduler(
 
     // If the whole stage has already finished, tell the listener and remove it
     if (finalStage.isAvailable) {
-      markMapStageJobAsFinished(job, mapOutputTracker.getStatistics(dependency))
+      markMapStageJobAsFinished(job,
+        mapOutputTracker.getStatistics(dependency, openPreRun = openPreRun))
     }
 
     submitWaitingStages()
@@ -923,12 +926,36 @@ class DAGScheduler(
           for (parent <- missing) {
             submitStage(parent)
           }
-          waitingStages += stage
+          if (openPreRun && isStagePreRunnable(stage)) {
+            submitMissingTasks(stage, jobId.get)
+          } else {
+            waitingStages += stage
+          }
         }
       }
     } else {
       abortStage(stage, "No active job for stage " + stage.id, None)
     }
+  }
+
+  private def isStagePreRunnable(stage: Stage): Boolean = {
+    // try to match plan of LimitExec as much as possible
+    val finalRdd = stage.rdd
+    if (finalRdd.getNumPartitions != 1
+        || finalRdd.dependencies.size != 1
+        || !finalRdd.dependencies.head.isInstanceOf[OneToOneDependency[_]]) {
+      return false
+    }
+
+    val parentRdd = finalRdd.firstParent
+    if (parentRdd.dependencies.size != 1
+        || !parentRdd.dependencies.head.isInstanceOf[ShuffleDependency[_, _, _]]
+        || parentRdd.dependencies.head.asInstanceOf[ShuffleDependency[_, _, _]].aggregator.nonEmpty) {
+      return false
+    }
+
+    logInfo(s"lyjmark: stagePreRun true, $stage")
+    true
   }
 
   /** Called when stage's parents are available and we can now do its task. */
@@ -1154,6 +1181,11 @@ class DAGScheduler(
                   // If the whole job has finished, remove it
                   if (job.numFinished == job.numPartitions) {
                     markStageAsFinished(resultStage)
+                    // When pre-run opened, while final job finished, it's independent running
+                    // stages may not finish.
+                    if(openPreRun) {
+                      cancelJobIndependentRunningStages(job, "job has finished")
+                    }
                     cleanupStateForJobAndIndependentStages(job)
                     listenerBus.post(
                       SparkListenerJobEnd(job.jobId, clock.getTimeMillis(), JobSucceeded))
@@ -1201,7 +1233,7 @@ class DAGScheduler(
               mapOutputTracker.registerMapOutputs(
                 shuffleStage.shuffleDep.shuffleId,
                 shuffleStage.outputLocInMapOutputTrackerFormat(),
-                changeEpoch = true)
+                changeEpoch = true, openPreRun = openPreRun)
 
               clearCacheLocs()
 
@@ -1215,7 +1247,8 @@ class DAGScheduler(
               } else {
                 // Mark any map-stage jobs waiting on this stage as finished
                 if (shuffleStage.mapStageJobs.nonEmpty) {
-                  val stats = mapOutputTracker.getStatistics(shuffleStage.shuffleDep)
+                  val stats = mapOutputTracker.getStatistics(shuffleStage.shuffleDep,
+                    openPreRun = openPreRun)
                   for (job <- shuffleStage.mapStageJobs) {
                     markMapStageJobAsFinished(job, stats)
                   }
@@ -1223,6 +1256,13 @@ class DAGScheduler(
               }
 
               // Note: newly runnable stages will be submitted below when we submit waiting stages
+            } else {
+              if (openPreRun) {
+                mapOutputTracker.registerMapOutput(
+                  shuffleStage.shuffleDep.shuffleId,
+                  smt.partitionId, status,
+                  openPreRun = openPreRun)
+              }
             }
         }
 
@@ -1327,7 +1367,7 @@ class DAGScheduler(
           mapOutputTracker.registerMapOutputs(
             shuffleId,
             stage.outputLocInMapOutputTrackerFormat(),
-            changeEpoch = true)
+            changeEpoch = true, openPreRun = openPreRun)
         }
         if (shuffleToMapStage.isEmpty) {
           mapOutputTracker.incrementEpoch()
@@ -1470,6 +1510,47 @@ class DAGScheduler(
       job.listener.jobFailed(error)
       cleanupStateForJobAndIndependentStages(job)
       listenerBus.post(SparkListenerJobEnd(job.jobId, clock.getTimeMillis(), JobFailed(error)))
+    }
+  }
+
+  /** While pre-run opened, we should handle the running parent running stage,
+    * mainly logic of this func same with failJobAndIndependentStages
+    */
+  private def cancelJobIndependentRunningStages(
+       job: ActiveJob,
+       cancelReason: String): Unit = {
+    val shouldInterruptThread =
+      if (job.properties == null) false
+      else job.properties.getProperty(SparkContext.SPARK_JOB_INTERRUPT_ON_CANCEL, "false").toBoolean
+
+    // Cancel all independent, running stages.
+    val stages = jobIdToStageIds(job.jobId)
+    if (stages.isEmpty) {
+      logError("No stages registered for job " + job.jobId)
+    }
+    stages.foreach { stageId =>
+      val jobsForStage: Option[HashSet[Int]] = stageIdToStage.get(stageId).map(_.jobIds)
+      if (jobsForStage.isEmpty || !jobsForStage.get.contains(job.jobId)) {
+        logError(
+          "Job %d not registered for stage %d even though that stage was registered for the job"
+            .format(job.jobId, stageId))
+      } else if (jobsForStage.get.size == 1) {
+        if (!stageIdToStage.contains(stageId)) {
+          logError(s"Missing Stage for stage with id $stageId")
+        } else {
+          // This is the only job that uses this stage, so fail the stage if it is running.
+          val stage = stageIdToStage(stageId)
+          if (runningStages.contains(stage)) {
+            try { // cancelTasks will fail if a SchedulerBackend does not implement killTask
+              taskScheduler.cancelTasks(stageId, shouldInterruptThread)
+              markStageAsFinished(stage, Some(cancelReason))
+            } catch {
+              case e: UnsupportedOperationException =>
+                logInfo(s"Could not cancel tasks for stage $stageId", e)
+            }
+          }
+        }
+      }
     }
   }
 

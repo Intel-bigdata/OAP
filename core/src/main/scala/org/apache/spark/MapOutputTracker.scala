@@ -157,10 +157,44 @@ private[spark] abstract class MapOutputTracker(conf: SparkConf) extends Logging 
   }
 
   /**
-   * Return statistics about all of the outputs for a given shuffle.
-   */
-  def getStatistics(dep: ShuffleDependency[_, _, _]): MapOutputStatistics = {
-    val statuses = getStatuses(dep.shuffleId)
+    * This function used while "spark.sql.baidu.stagePreRun=true".
+    * When 'isMissing' inconsistent with the return of MapOutputStatus, mainly 2 scenarios:
+    *   1. isMissing = true but MapOutputStatus is completed: This will cause the BlockFetcher hang.
+    *   2. isMissing = false but MapOutputStatus not completed: This will cause data loss!
+    * So here we should get the isMissing flag and MapOutputStatus atomicly.
+    * @return Tuple of shuffleId missing flag and sequence same with getMapSizesByExecutorId.
+    */
+  def preRunGetMapSizesByExecutorId(shuffleId: Int, startPartition: Int, endPartition: Int)
+  : (Boolean, Seq[(BlockManagerId, Seq[(BlockId, Long)])]) = {
+    logDebug(s"[pre-run] Fetching outputs for shuffle $shuffleId," +
+      s"partitions $startPartition-$endPartition")
+    val statuses = getStatuses(shuffleId, openPreRun = true)
+    // Synchronize on the returned array because, on the driver, it gets mutated in place
+    statuses.synchronized {
+      val status = MapOutputTracker.convertMapStatuses(shuffleId,
+        startPartition, endPartition, statuses, openPreRun = true)
+      val isMissing = isMapOutputsMissing(shuffleId)
+      return (isMissing, status)
+    }
+  }
+
+  private def isMapOutputsMissing(shuffleId: Int): Boolean = {
+    val statuses = mapStatuses.get(shuffleId).orNull
+    val size = mapStatusesSize.getOrElse(shuffleId, 0)
+    if (statuses == null) {
+      return true
+    }
+    val length = statuses.length
+    logInfo(s"lyjmark: [isMapOutputsMissing]shuffleId($shuffleId) status!=null, size($size) status.length($length)")
+    size != length
+  }
+
+  /**
+    * Return statistics about all of the outputs for a given shuffle.
+    */
+  def getStatistics(dep: ShuffleDependency[_, _, _],
+                    openPreRun: Boolean = false): MapOutputStatistics = {
+    val statuses = getStatuses(dep.shuffleId, openPreRun = openPreRun)
     // Synchronize on the returned array because, on the driver, it gets mutated in place
     statuses.synchronized {
       val totalSizes = new Array[Long](dep.partitioner.numPartitions)
@@ -176,13 +210,13 @@ private[spark] abstract class MapOutputTracker(conf: SparkConf) extends Logging 
   /**
    * Get or fetch the array of MapStatuses for a given shuffle ID. NOTE: clients MUST synchronize
    * on this array when reading it, because on the driver, we may be changing it in place.
-   *
+   * lyjmark: add a default param openPreRun here
    * (It would be nice to remove this restriction in the future.)
    */
-  private def getStatuses(shuffleId: Int): Array[MapStatus] = {
+  private def getStatuses(shuffleId: Int, openPreRun: Boolean = false): Array[MapStatus] = {
     val statuses = mapStatuses.get(shuffleId).orNull
-    if (statuses == null) {
-      logInfo("Don't have map outputs for shuffle " + shuffleId + ", fetching them")
+    if (statuses == null || (openPreRun && isMapOutputsMissing(shuffleId))) {
+      logInfo("Don't have(or missing) map outputs for shuffle " + shuffleId + ", fetching them")
       val startTime = System.currentTimeMillis
       var fetchedStatuses: Array[MapStatus] = null
       fetching.synchronized {
@@ -198,9 +232,12 @@ private[spark] abstract class MapOutputTracker(conf: SparkConf) extends Logging 
         // Either while we waited the fetch happened successfully, or
         // someone fetched it in between the get and the fetching.synchronized.
         fetchedStatuses = mapStatuses.get(shuffleId).orNull
-        if (fetchedStatuses == null) {
+        if (fetchedStatuses == null || (openPreRun && isMapOutputsMissing(shuffleId))) {
           // We have to do the fetch, get others to wait for us.
           fetching += shuffleId
+          if (openPreRun) {
+            fetchedStatuses = null
+          }
         }
       }
 
@@ -213,6 +250,9 @@ private[spark] abstract class MapOutputTracker(conf: SparkConf) extends Logging 
           fetchedStatuses = MapOutputTracker.deserializeMapStatuses(fetchedBytes)
           logInfo("Got the output locations")
           mapStatuses.put(shuffleId, fetchedStatuses)
+          if (openPreRun) {
+            mapStatusesSize.put(shuffleId, fetchedStatuses.count(_ != null))
+          }
         } finally {
           fetching.synchronized {
             fetching -= shuffleId
@@ -309,18 +349,28 @@ private[spark] class MapOutputTrackerMaster(conf: SparkConf)
     }
   }
 
-  def registerMapOutput(shuffleId: Int, mapId: Int, status: MapStatus) {
+  def registerMapOutput(shuffleId: Int, mapId: Int, status: MapStatus,
+                        openPreRun: Boolean = false) {
     val array = mapStatuses(shuffleId)
     array.synchronized {
       array(mapId) = status
     }
+    // lyjmark: for performance consideration, here add a swich
+    if (openPreRun) {
+      cachedSerializedStatuses.remove(shuffleId)
+    }
   }
 
   /** Register multiple map output information for the given shuffle */
-  def registerMapOutputs(shuffleId: Int, statuses: Array[MapStatus], changeEpoch: Boolean = false) {
+  def registerMapOutputs(shuffleId: Int, statuses: Array[MapStatus],
+                         changeEpoch: Boolean = false, openPreRun: Boolean = false) {
     mapStatuses.put(shuffleId, Array[MapStatus]() ++ statuses)
     if (changeEpoch) {
       incrementEpoch()
+    }
+    // lyjmark: for performance consideration, here add a swich
+    if (openPreRun) {
+      cachedSerializedStatuses.remove(shuffleId)
     }
   }
 
@@ -532,14 +582,17 @@ private[spark] object MapOutputTracker extends Logging {
       shuffleId: Int,
       startPartition: Int,
       endPartition: Int,
-      statuses: Array[MapStatus]): Seq[(BlockManagerId, Seq[(BlockId, Long)])] = {
+      statuses: Array[MapStatus],
+      openPreRun: Boolean = false): Seq[(BlockManagerId, Seq[(BlockId, Long)])] = {
     assert (statuses != null)
     val splitsByAddress = new HashMap[BlockManagerId, ArrayBuffer[(BlockId, Long)]]
     for ((status, mapId) <- statuses.zipWithIndex) {
       if (status == null) {
-        val errorMessage = s"Missing an output location for shuffle $shuffleId"
-        logError(errorMessage)
-        throw new MetadataFetchFailedException(shuffleId, startPartition, errorMessage)
+        if (!openPreRun) {
+          val errorMessage = s"Missing an output location for shuffle $shuffleId"
+          logError(errorMessage)
+          throw new MetadataFetchFailedException(shuffleId, startPartition, errorMessage)
+        }
       } else {
         for (part <- startPartition until endPartition) {
           splitsByAddress.getOrElseUpdate(status.location, ArrayBuffer()) +=
