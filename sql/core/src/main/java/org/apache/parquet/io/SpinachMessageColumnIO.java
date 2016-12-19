@@ -24,9 +24,14 @@ public class SpinachMessageColumnIO extends MessageColumnIO {
 
     private final boolean validating;
 
+    private final String creatteBy;
+
     public SpinachMessageColumnIO(MessageColumnIO messageColumnIO) {
-        super(messageColumnIO.getType(), (Boolean) Reflections.getFieldValue(messageColumnIO, "validating"));
+        super(messageColumnIO.getType(),
+                (Boolean) Reflections.getFieldValue(messageColumnIO, "validating"),
+                (String) Reflections.getFieldValue(messageColumnIO, "createdBy"));
         this.validating = (Boolean) Reflections.getFieldValue(messageColumnIO, "validating");
+        this.creatteBy =  (String) Reflections.getFieldValue(messageColumnIO, "createdBy");
         this.leaves = messageColumnIO.getLeaves();
     }
 
@@ -53,7 +58,7 @@ public class SpinachMessageColumnIO extends MessageColumnIO {
 
                 return new RecordReaderImplementation<T>(SpinachMessageColumnIO.this,
                         filteringRecordMaterializer, validating, new SpinachColumnReadStoreImpl(columns,
-                                filteringRecordMaterializer.getRootConverter(), getType()));
+                                filteringRecordMaterializer.getRootConverter(), getType(),creatteBy));
             }
 
             @Override
@@ -65,7 +70,7 @@ public class SpinachMessageColumnIO extends MessageColumnIO {
             public RecordReader<T> visit(NoOpFilter noOpFilter) {
                 return new RecordReaderImplementation<T>(SpinachMessageColumnIO.this, recordMaterializer,
                         validating, new SpinachColumnReadStoreImpl(columns,
-                                recordMaterializer.getRootConverter(), getType()));
+                                recordMaterializer.getRootConverter(), getType(),creatteBy));
             }
         });
     }
