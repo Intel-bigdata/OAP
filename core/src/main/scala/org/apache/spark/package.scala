@@ -58,10 +58,10 @@ package object spark {
       val resourceStream = Thread.currentThread().getContextClassLoader.
         getResourceAsStream("spark-version-info.properties")
 
-      try {
+      val temp = try {
         val unknownProp = "<unknown>"
         val props = new Properties()
-        props.load(resourceStream)
+//        props.load(resourceStream) // for windows app, spark-version-info can not be generated
         (
           props.getProperty("version", unknownProp),
           props.getProperty("branch", unknownProp),
@@ -85,6 +85,7 @@ package object spark {
           }
         }
       }
+      temp
     }
   }
 

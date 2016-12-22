@@ -31,8 +31,8 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   override def beforeEach(): Unit = {
     System.setProperty("spinach.rowgroup.size", "1024")
-    val path = Utils.createTempDir().getAbsolutePath
-
+    val path_tmp = Utils.createTempDir().getAbsolutePath
+    val path = path_tmp.replace("\\", "\\\\")
     sql(s"""CREATE TEMPORARY TABLE spinach_test (a INT, b STRING)
            | USING spn
            | OPTIONS (path '$path')""".stripMargin)
