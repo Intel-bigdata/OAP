@@ -153,7 +153,8 @@ private[spinach] case class SpinachIndexBuild(
         IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
         fileOut.close()
         indexFile.toString
-        IndexBuildResult(dataString, cnt, "", d.getParent.toString)
+        IndexBuildResult(dataString, cnt, "", d.getParent.toString,
+          uniqueKeys.head, uniqueKeys.last)
       }).collect().toSeq
     }
   }
@@ -262,4 +263,5 @@ private[spinach] case class SpinachIndexBuild(
   }
 }
 
-case class IndexBuildResult(dataFile: String, rowCount: Long, fingerprint: String, parent: String)
+case class IndexBuildResult(dataFile: String, rowCount: Long, fingerprint: String, parent: String,
+                            minkey: InternalRow, maxKey: InternalRow)
