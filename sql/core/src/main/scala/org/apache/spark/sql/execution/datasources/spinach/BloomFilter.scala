@@ -28,7 +28,9 @@ class BloomFilter(maxBitCount: Int, numOfHashFunc: Int) {
   private val hashFunctions: Array[BloomHashFunction] =
     BloomHashFunction.getMurmurHashFunction(maxBitCount, numOfHashFunc)
 
-  def this() = this(1 << 6, 3)
+  def this() = this(1 << 16, 3)
+
+  def getBitMapLongArray: Array[Long] = bloomBitSet.toLongArray()
 
   private def getIndices(value: String): Array[Int] =
     hashFunctions.map(func => func.hash(value))

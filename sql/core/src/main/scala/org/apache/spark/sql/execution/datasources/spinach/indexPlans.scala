@@ -18,7 +18,6 @@
 package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.hadoop.fs.Path
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, Descending}
@@ -26,7 +25,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, SpinachException}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
+import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
 
 /**
  * Creates an index for table on indexColumns
@@ -40,7 +39,6 @@ case class CreateIndex(
   override def children: Seq[LogicalPlan] = Seq(relation)
 
   override val output: Seq[Attribute] = Seq.empty
-
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val (fileCatalog, s, readerClassName, identifier) = relation match {

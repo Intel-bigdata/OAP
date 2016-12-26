@@ -68,6 +68,12 @@ private[spinach] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) exte
   def appendEntry(entry: BTreeIndexEntry): BTreeIndex = BTreeIndex(entries :+ entry)
 }
 
+private[spinach] case class BloomFilterIndex(entries: Seq[Int] = Nil)
+  extends IndexType {
+  def appendEntry(entry: Int): BloomFilterIndex =
+    BloomFilterIndex(entries :+ entry)
+}
+
 private[spinach] case class BitMapIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): BitMapIndex = BitMapIndex(entries :+ entry)
 }
@@ -173,6 +179,11 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
         entries.foreach(keyBits += _)
         writeBitSet(keyBits, INDEX_META_KEY_LENGTH, out)
         writeBitSet(dirBits, INDEX_META_KEY_LENGTH, out)
+      case BloomFilterIndex(entries) =>
+        out.writeByte(BLOOM_FILTER_INDEX_TYPE)
+        entries.foreach(keyBits += _)
+        writeBitSet(keyBits, INDEX_META_KEY_LENGTH, out)
+        writeBitSet(dirBits, INDEX_META_KEY_LENGTH, out)
     }
   }
 
@@ -201,6 +212,7 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
         flag match {
           case BITMAP_INDEX_TYPE => BitMapIndex(keyBits.toSeq)
           case HASH_INDEX_TYPE => HashIndex(keyBits.toSeq)
+          case BLOOM_FILTER_INDEX_TYPE => BloomFilterIndex(keyBits.toSeq)
         }
     }
   }
@@ -210,6 +222,7 @@ private[spinach] object IndexMeta {
   final val BTREE_INDEX_TYPE = 0
   final val BITMAP_INDEX_TYPE = 1
   final val HASH_INDEX_TYPE = 2
+  final val BLOOM_FILTER_INDEX_TYPE = 3
 
   def apply() : IndexMeta = new IndexMeta()
   def apply(name: String, indexType: IndexType): IndexMeta = {
