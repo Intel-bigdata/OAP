@@ -116,13 +116,35 @@ private[spinach] case class SpinachIndexBuild(
         }
         // sort keys
         java.util.Arrays.sort(uniqueKeys, comparator)
+
         // build index file
         val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
         val fs = indexFile.getFileSystem(hadoopConf)
         // we are overwriting index files
         val fileOut = fs.create(indexFile, true)
+
+        // write min and max value at the beginning of index file
+        val keyBuf = new ByteArrayOutputStream()
+
+        val minVal = convertHelper(uniqueKeys.head, keyBuf)
+        minVal.writeToStream(keyBuf, null)
+        val minLen = keyBuf.size()
+
+        val maxVal = convertHelper(uniqueKeys.last, keyBuf)
+        maxVal.writeToStream(keyBuf, null)
+        val maxLen = keyBuf.size() - minLen
+
+        IndexUtils.writeInt(fileOut, minLen)
+
+        IndexUtils.writeInt(fileOut, maxLen)
+        fileOut.flush()
+
+        keyBuf.writeTo(fileOut)
+        keyBuf.close()
+
         var i = 0
         var fileOffset = 0L
+
         val offsetMap = new java.util.HashMap[InternalRow, Long]()
         // write data segment.
         while (i < partitionUniqueSize) {
@@ -151,10 +173,10 @@ private[spinach] case class SpinachIndexBuild(
         assert(uniqueKeysList.size == 1)
         IndexUtils.writeLong(fileOut, dataEnd)
         IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
+
         fileOut.close()
         indexFile.toString
-        IndexBuildResult(dataString, cnt, "", d.getParent.toString,
-          uniqueKeys.head, uniqueKeys.last)
+        IndexBuildResult(dataString, cnt, "", d.getParent.toString)
       }).collect().toSeq
     }
   }
@@ -211,6 +233,18 @@ private[spinach] case class SpinachIndexBuild(
   @transient private lazy val converter = UnsafeProjection.create(keySchema)
 
   /**
+    * This method help spinach convert InternalRow type to UnsafeRow type
+    * @param internalRow
+    * @param keyBuf
+    * @return unsafeRow
+    */
+  private def convertHelper(internalRow: InternalRow, keyBuf: ByteArrayOutputStream): UnsafeRow = {
+    val writeRow = converter.apply(internalRow)
+    IndexUtils.writeInt(keyBuf, writeRow.getSizeInBytes)
+    writeRow
+  }
+
+  /**
    * write file correspond to [[UnsafeIndexNode]]
    */
   private def writeIndexNode(
@@ -246,8 +280,7 @@ private[spinach] case class SpinachIndexBuild(
       IndexUtils.writeLong(out, map.get(writeKey))
       // 16 -> value5, stores 2 long values, key offset and child offset
       subOffset += 16
-      val writeRow = converter.apply(writeKey)
-      IndexUtils.writeInt(keyBuf, writeRow.getSizeInBytes)
+      val writeRow = convertHelper(writeKey, keyBuf)
       writeRow.writeToStream(keyBuf, null)
       i += 1
     }
@@ -263,5 +296,4 @@ private[spinach] case class SpinachIndexBuild(
   }
 }
 
-case class IndexBuildResult(dataFile: String, rowCount: Long, fingerprint: String, parent: String,
-                            minkey: InternalRow, maxKey: InternalRow)
+case class IndexBuildResult(dataFile: String, rowCount: Long, fingerprint: String, parent: String)

@@ -234,7 +234,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
     sql("refresh sindex on t_refresh")
 
-    checkAnswer(sql("select * from t_refresh"),
+    checkAnswer(sql("select * from t_refresh where a < 5"),
       Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 2) :: Nil)
   }
 
