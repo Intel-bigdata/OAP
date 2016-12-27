@@ -51,8 +51,6 @@ trait SharedSQLContext extends SQLTestUtils {
    */
   protected override def beforeAll(): Unit = {
     SparkSession.sqlListener.set(null)
-    sparkConf.set("spark.sql.warehouse.dir",
-      "C:\\Users\\gefeili\\Documents\\gefei\\IdeaProject\\Spinach\\warehouse")
     if (_spark == null) {
       _spark = new TestSparkSession(sparkConf)
     }
