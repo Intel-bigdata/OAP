@@ -44,7 +44,7 @@ private[spinach] case class IndexFile(file: Path) {
     val fileLength = fs.getContentSummary(file).getLength.toInt
 
     var fullArray = new Array[Byte](fileLength)
-    fin.read(fullArray)
+    fin.readFully(fullArray)
 
     val minLen = Platform.getInt(fullArray, Platform.BYTE_ARRAY_OFFSET)
     val maxLen = Platform.getInt(fullArray, Platform.BYTE_ARRAY_OFFSET + 4)
