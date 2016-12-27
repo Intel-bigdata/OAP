@@ -169,7 +169,8 @@ private[spinach] case class SpinachIndexBuild(
           val uniqueKeysList = new java.util.LinkedList[InternalRow]()
           import scala.collection.JavaConverters._
           uniqueKeysList.addAll(uniqueKeys.toSeq.asJava)
-          writeTreeToOut(treeShape, fileOut, offsetMap, fileOffset, uniqueKeysList, keySchema, 0, -1L)
+          writeTreeToOut(treeShape, fileOut, offsetMap,
+            fileOffset, uniqueKeysList, keySchema, 0, -1L)
           assert(uniqueKeysList.size == 1)
           IndexUtils.writeLong(fileOut, dataEnd)
           IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
