@@ -17,8 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import org.apache.spark.util.collection.BitSet
 import scala.util.hashing.{MurmurHash3 => MH3}
+
+import org.apache.spark.util.collection.BitSet
 
 /**
  * Implementation for Bloom filter.

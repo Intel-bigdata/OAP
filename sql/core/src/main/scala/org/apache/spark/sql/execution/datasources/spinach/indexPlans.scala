@@ -18,8 +18,8 @@
 package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.internal.Logging
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, Descending}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
