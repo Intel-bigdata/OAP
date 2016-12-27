@@ -104,10 +104,6 @@ case class CreateIndex(
         val ret = SpinachIndexBuild(
           sparkSession, indexName, indexColumns, s, bAndP.map(_._2), readerClassName).execute()
         val retMap = ret.groupBy(_.parent)
-        bAndP.foreach(bp =>
-          retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
-            if (!bp._3) bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile)))
-        )
         // write updated metas down
         bAndP.foreach(bp => DataSourceMeta.write(
           new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
