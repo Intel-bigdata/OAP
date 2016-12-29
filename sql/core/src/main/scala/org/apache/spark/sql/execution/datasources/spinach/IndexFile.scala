@@ -43,15 +43,17 @@ private[spinach] case class IndexFile(file: Path) {
 
     val fileLength = fs.getContentSummary(file).getLength.toInt
 
-    var fullArray = new Array[Byte](fileLength)
-    fin.readFully(fullArray)
+    var fullArray = new Array[Byte](8)
+    fin.read(fullArray)
 
     val minLen = Platform.getInt(fullArray, Platform.BYTE_ARRAY_OFFSET)
     val maxLen = Platform.getInt(fullArray, Platform.BYTE_ARRAY_OFFSET + 4)
 
-    val contentLen = fileLength - 8 - minLen - maxLen
+    val metaLen = 8 + minLen + maxLen
+    val contentLen = fileLength - metaLen
 
-    var bytes = fullArray.splitAt(8 + minLen + maxLen)._2
+    var bytes = new Array[Byte](contentLen)
+    fin.readFully(metaLen, bytes)
 
     val offHeapMem = putToFiberCache(bytes)
     bytes = null
