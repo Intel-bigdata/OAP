@@ -128,7 +128,7 @@ private[sql] class SpinachFileFormat extends FileFormat
       case Some(m) =>
         val ic = new IndexContext(m)
         BPlusTreeSearch.build(filters.toArray, ic)
-        val filterScanner = ic.getScannerBuilder.map(_.build)
+        val filterScanner = ic.getScannerBuilder.map(i => i.map(_.build))
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
         val broadcastedHadoopConf =

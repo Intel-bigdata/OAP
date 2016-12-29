@@ -98,10 +98,14 @@ private[spinach] case class SpinachIndexBuild(
           }
           val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
           val fs = indexFile.getFileSystem(hadoopConf)
-          // we are overwriting index files
-          val fileOut = fs.create(indexFile, true)
+          // Bloom filter index file format:
+          // numOfLong: Int, numOfHashFunc: Int,
+          // long1: Long, long2: Long, ... long(numOfLong-1): Long
+          val fileOut = fs.create(indexFile, true) // overwrite index file
           val bitArray = bf_index.getBitMapLongArray
+          val numHashFunc = bf_index.getNumOfHashFunc
           IndexUtils.writeInt(fileOut, bitArray.length)
+          IndexUtils.writeInt(fileOut, numHashFunc)
           bitArray.foreach(l => IndexUtils.writeLong(fileOut, l))
           fileOut.close()
           IndexBuildResult(dataString, 1000, "", d.getParent.toString)

@@ -283,9 +283,9 @@ private[spinach] class BPlusTreeSearchSuite
     val unHandledFilters = BPlusTreeSearch.build(filters, ic)
     assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
     ic.getScannerBuilder match {
-      case Some(builder) =>
-        val scanner = builder.build
-        assert(scanner._init(
+      case Some(builders) =>
+        val scanner = builders.map(_.build)
+        assert(scanner.head._init(
           BPlusTreeSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")
     }

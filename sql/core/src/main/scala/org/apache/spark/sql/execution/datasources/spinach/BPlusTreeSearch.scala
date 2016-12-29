@@ -343,8 +343,41 @@ override def hasNext: Boolean = {
     this.keySchema = schema
     this
   }
-//  def withNewStart(key: Key, include: Boolean): RangeScanner = this
-//  def withNewEnd(key: Key, include: Boolean): RangeScanner = this
+//  def withNewStart(key: Key, include: Boolean): RangeScanner
+//  def withNewEnd(key: Key, include: Boolean): RangeScanner
+}
+
+private[spinach] case class BloomFilterScanner(me: IndexMeta, value: Key) extends RangeScanner(me) {
+  var stopFlag = false
+//  override def start: Key = value
+
+  var equalValue: Key = _
+  var bloomFilter: BloomFilter = _
+
+  override def meta: IndexMeta = me
+
+  override def initialize(inputPath: Path, configuration: Configuration): RangeScanner = {
+    assert(keySchema ne null)
+
+    val path = IndexUtils.indexFileFromDataFile(inputPath, meta.name)
+    val indexScanner = IndexFiber(IndexFile(path))
+    val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, configuration)
+    val baseObj = indexData.fiberData.getBaseObject
+    val bitArrayLength = Platform.getInt(baseObj, 0)
+    val numOfHashFunc = Platform.getInt(baseObj, 4)
+
+//    val bitSetLongArr = new Array[Long](bitArrayLength)
+    var cur_pos = 0
+    val bitSetLongArr = (0 until bitArrayLength).map( i => {
+      cur_pos += 8
+      Platform.getLong(baseObj, cur_pos)
+    }).toArray
+
+    bloomFilter = BloomFilter(bitSetLongArr, numOfHashFunc)
+    val key = equalValue.getString(0) // TODO i cannot get it
+    stopFlag = !bloomFilter.checkExist(key)
+    this
+  }
 }
 
 // A dummy scanner will actually not do any scanning
@@ -550,6 +583,15 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
     scanner.intervalArray = intervalArray
   }
 
+  def withEqualValue(e: Key): ScannerBuilder = {
+    if (scanner == null) {
+      scanner = BloomFilterScanner(meta, e)
+    } else {
+      // TODO equal value for every scanner
+    }
+    this
+  }
+
   def build: RangeScanner = {
     assert(scanner ne null, "Scanner is not set")
     scanner.withKeySchema(keySchema)
@@ -570,6 +612,11 @@ private[spinach] object ScannerBuilder {
     // TODO default we use the Ascending order
     // val ordering = GenerateOrdering.create(StructType(fields))
     val keySchema = StructType(fields)
+    new ScannerBuilder(meta, keySchema)
+  }
+
+  def apply(field: StructField, meta: IndexMeta): ScannerBuilder = {
+    val keySchema = new StructType().add(field)
     new ScannerBuilder(meta, keySchema)
   }
 
@@ -631,8 +678,11 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
         case BTreeIndex(entries) => entries.map { entry =>
           // TODO support multiple key in the index
         }
+        case BloomFilterIndex(entries) =>
+          return Some(ScannerBuilder(meta.schema(ordinal),
+            meta.indexMetas(idx)))
         case other => // we don't support other types of index
-          // TODO support the other types of index
+        // TODO support the other types of index
       }
 
       idx += 1
