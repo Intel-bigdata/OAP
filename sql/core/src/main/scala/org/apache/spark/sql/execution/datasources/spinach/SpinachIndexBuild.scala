@@ -233,11 +233,11 @@ private[spinach] case class SpinachIndexBuild(
   @transient private lazy val converter = UnsafeProjection.create(keySchema)
 
   /**
-    * This method help spinach convert InternalRow type to UnsafeRow type
-    * @param internalRow
-    * @param keyBuf
-    * @return unsafeRow
-    */
+   * This method help spinach convert InternalRow type to UnsafeRow type
+   * @param internalRow
+   * @param keyBuf
+   * @return unsafeRow
+   */
   private def convertHelper(internalRow: InternalRow, keyBuf: ByteArrayOutputStream): UnsafeRow = {
     val writeRow = converter.apply(internalRow)
     IndexUtils.writeInt(keyBuf, writeRow.getSizeInBytes)
