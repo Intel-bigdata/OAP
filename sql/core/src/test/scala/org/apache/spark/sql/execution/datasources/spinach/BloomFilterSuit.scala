@@ -22,7 +22,7 @@ import org.apache.spark.SparkFunSuite
  * Bloom filter test suit
  */
 class BloomFilterSuit extends SparkFunSuite {
-  val strs = Array("bloom", "fiter", "spark", "fun", "suite")
+  val strs = Array("bloom", "filter", "spark", "fun", "suite")
   val bloomFilter = new BloomFilter()
 
   for (s <- strs) {
@@ -32,5 +32,24 @@ class BloomFilterSuit extends SparkFunSuite {
   test("exist test") {
     assert(!bloomFilter.checkExist("gefei"), "gefei is not in this filter")
     assert(!bloomFilter.checkExist("sutie"), "sutie is not in this filter")
+    assert(bloomFilter.checkExist("bloom"), "bloom is in this filter")
+    assert(bloomFilter.checkExist("filter"), "filter is in this filter")
+    assert(bloomFilter.checkExist("spark"), "spark is in this filter")
+    assert(bloomFilter.checkExist("fun"), "fun is in this filter")
+    assert(bloomFilter.checkExist("suite"), "suite is in this filter")
+  }
+
+  test("filter rebuild test") {
+    val numOfHashFunc = bloomFilter.getNumOfHashFunc
+    val longArr = bloomFilter.getBitMapLongArray
+
+    val new_bf = BloomFilter(longArr, numOfHashFunc)
+    assert(!new_bf.checkExist("gefei"), "gefei is not in this filter")
+    assert(!new_bf.checkExist("sutie"), "sutie is not in this filter")
+    assert(new_bf.checkExist("bloom"), "bloom is in this filter")
+    assert(new_bf.checkExist("filter"), "filter is in this filter")
+    assert(new_bf.checkExist("spark"), "spark is in this filter")
+    assert(new_bf.checkExist("fun"), "fun is in this filter")
+    assert(new_bf.checkExist("suite"), "suite is in this filter")
   }
 }

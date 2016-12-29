@@ -19,46 +19,56 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import scala.util.hashing.{MurmurHash3 => MH3}
 
-import org.apache.spark.util.collection.BitSet
+import scala.collection.mutable
 
 /**
  * Implementation for Bloom filter.
  */
-class BloomFilter(maxBitCount: Int, numOfHashFunc: Int) {
-  private val bloomBitSet: BitSet = new BitSet(maxBitCount)
+class BloomFilter(maxBitCount: Int, numOfHashFunc: Int)
+                 (var bloomBitSet: mutable.BitSet = null) {
+//  private var bloomBitSet: mutable.BitSet = new mutable.BitSet(maxBitCount)
   private val hashFunctions: Array[BloomHashFunction] =
     BloomHashFunction.getMurmurHashFunction(maxBitCount, numOfHashFunc)
+  if (bloomBitSet == null) {
+    bloomBitSet = new mutable.BitSet(maxBitCount)
+  }
 
-  def this() = this(1 << 16, 3)
+  def this() = this(1 << 16, 3)()
 
-  def getBitMapLongArray: Array[Long] = bloomBitSet.toLongArray()
+  def getBitMapLongArray: Array[Long] = bloomBitSet.toBitMask
+  def getNumOfHashFunc: Int = numOfHashFunc
 
   private def getIndices(value: String): Array[Int] =
     hashFunctions.map(func => func.hash(value))
 
   def addValue(value: String): Unit = {
     val indices = getIndices(value)
-    indices.foreach(bloomBitSet.set)
+    indices.foreach(bloomBitSet.add)
   }
 
   def checkExist(value: String): Boolean = {
     val indices = getIndices(value)
     for (i <- indices)
-      if (!bloomBitSet.get(i)) return false
+      if (!bloomBitSet.contains(i)) return false
     true
   }
 }
 
-trait BloomHashFunction {
+object BloomFilter {
+  def apply(longArr: Array[Long], numOfHashFunc: Int): BloomFilter =
+    new BloomFilter(longArr.length * 64, numOfHashFunc)(mutable.BitSet.fromBitMask(longArr))
+}
+
+private[spinach] trait BloomHashFunction {
   def hash(value: String): Int
 }
 
-class MurmurHashFunction(maxCount: Int, seed: Int) extends BloomHashFunction {
+private[spinach] class MurmurHashFunction(maxCount: Int, seed: Int) extends BloomHashFunction {
   def hash(value: String): Int =
     (MH3.stringHash(value, seed) % maxCount + maxCount) % maxCount
 }
 
-object BloomHashFunction {
+private[spinach] object BloomHashFunction {
   def getMurmurHashFunction(maxCount: Int, cnt: Int): Array[BloomHashFunction] = {
     (0 until cnt).map(i => new MurmurHashFunction(maxCount, i.toString.hashCode())).toArray
   }
