@@ -137,6 +137,7 @@ private[spinach] object UnsafeIndexNode {
   }
 }
 
+
 private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
   assert(node.isLeaf, "Should be Leaf Node")
 
@@ -351,31 +352,51 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta, value: Key) extend
   var stopFlag = false
 //  override def start: Key = value
 
-  var equalValue: Key = _
+  var equalValue: Key = value
   var bloomFilter: BloomFilter = _
 
   override def meta: IndexMeta = me
 
+  var numOfElem: Int = _
+
+  var curIdx: Int = 0
+
+  override def hasNext: Boolean = {
+    curIdx < numOfElem
+  }
+
+  override def next(): Long = {
+    val tmp = curIdx
+    curIdx += 1
+    tmp.toLong
+  }
+
   override def initialize(inputPath: Path, configuration: Configuration): RangeScanner = {
     assert(keySchema ne null)
+    this.ordering = GenerateOrdering.create(keySchema)
 
     val path = IndexUtils.indexFileFromDataFile(inputPath, meta.name)
     val indexScanner = IndexFiber(IndexFile(path))
     val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, configuration)
-    val baseObj = indexData.fiberData.getBaseObject
-    val bitArrayLength = Platform.getInt(baseObj, 0)
-    val numOfHashFunc = Platform.getInt(baseObj, 4)
+
+    def buffer: DataFiberCache = DataFiberCache(indexData.fiberData)
+    def dataEnd: Long = indexData.dataEnd
+    def getBaseObj = buffer.fiberData.getBaseObject
+    def getBaseOffset = buffer.fiberData.getBaseOffset
+    val bitArrayLength = Platform.getInt(getBaseObj, getBaseOffset + 0 )
+    val numOfHashFunc = Platform.getInt(getBaseObj, getBaseOffset + 4)
+    numOfElem = Platform.getInt(getBaseObj, getBaseOffset + 8)
 
 //    val bitSetLongArr = new Array[Long](bitArrayLength)
-    var cur_pos = 0
+    var cur_pos = 4
     val bitSetLongArr = (0 until bitArrayLength).map( i => {
       cur_pos += 8
-      Platform.getLong(baseObj, cur_pos)
+      Platform.getLong(getBaseObj, getBaseOffset + cur_pos)
     }).toArray
 
     bloomFilter = BloomFilter(bitSetLongArr, numOfHashFunc)
-    val key = equalValue.getString(0) // TODO i cannot get it
-    stopFlag = !bloomFilter.checkExist(key)
+    val key = equalValue.getInt(0) // TODO i cannot get it
+    stopFlag = !bloomFilter.checkExist(key.toString)
     this
   }
 }
@@ -587,7 +608,7 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
     if (scanner == null) {
       scanner = BloomFilterScanner(meta, e)
     } else {
-      // TODO equal value for every scanner
+      if (IndexUtils.isBloomFileIndex(meta.name)) scanner = BloomFilterScanner(meta, e)
     }
     this
   }

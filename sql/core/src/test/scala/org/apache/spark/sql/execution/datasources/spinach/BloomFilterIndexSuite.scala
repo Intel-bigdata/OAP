@@ -95,12 +95,9 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index1 on spinach_test (a)")
     sql("create sindex index2_bf on spinach_test (a)")
-    sql("SELECT * FROM spinach_test WHERE a = 10").show()
-
-  }
-
-  test("bitset test") {
-    val bs = new mutable.BitSet(1 << 10)
-    bs.add(10)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10").count() == 1)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 20").count() == 1)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 200").count() == 1)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 301").count() == 0)
   }
 }

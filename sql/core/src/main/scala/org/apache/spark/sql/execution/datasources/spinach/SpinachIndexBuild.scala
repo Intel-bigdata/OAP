@@ -90,8 +90,10 @@ private[spinach] case class SpinachIndexBuild(
           val index_oridinals = indexColumns
             .flatMap(col => schema.fields.map(f => (f.name, f.dataType))
             .zipWithIndex.filter(item => item._1._1.equals(col.columnName)))
+          var elemCnt = 0 // element count
           while (it.hasNext) {
             val row = it.next()
+            elemCnt += 1
             val indexKey = index_oridinals.map(item => row.get(item._2, item._1._2).toString)
               .reduce((l, r) => l + r)
             bf_index.addValue(indexKey)
@@ -99,14 +101,22 @@ private[spinach] case class SpinachIndexBuild(
           val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
           val fs = indexFile.getFileSystem(hadoopConf)
           // Bloom filter index file format:
-          // numOfLong: Int, numOfHashFunc: Int,
+          // numOfLong: Int, numOfHashFunc: Int, elemCnt: Int
           // long1: Long, long2: Long, ... long(numOfLong-1): Long
           val fileOut = fs.create(indexFile, true) // overwrite index file
           val bitArray = bf_index.getBitMapLongArray
           val numHashFunc = bf_index.getNumOfHashFunc
+          var offset = 0L
           IndexUtils.writeInt(fileOut, bitArray.length)
           IndexUtils.writeInt(fileOut, numHashFunc)
-          bitArray.foreach(l => IndexUtils.writeLong(fileOut, l))
+          IndexUtils.writeInt(fileOut, elemCnt)
+          offset += 8
+          bitArray.foreach(l => {
+            offset += 8
+            IndexUtils.writeLong(fileOut, l)
+          })
+          IndexUtils.writeLong(fileOut, offset) // dataEnd
+          IndexUtils.writeLong(fileOut, offset) // rootOffset
           fileOut.close()
           IndexBuildResult(dataString, 1000, "", d.getParent.toString)
         } else {
