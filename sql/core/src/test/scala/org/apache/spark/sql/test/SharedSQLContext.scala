@@ -19,7 +19,7 @@ package org.apache.spark.sql.test
 
 import org.apache.commons.lang.SystemUtils
 import org.apache.spark.SparkConf
-import org.apache.spark.sql.{SQLContext, SparkSession}
+import org.apache.spark.sql.{SparkSession, SQLContext}
 
 
 /**

@@ -93,8 +93,8 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test select * from t")
-    sql("create sindex index1 on spinach_test (a)")
-    sql("create sindex index2_bf on spinach_test (a)")
+//    sql("create sindex index1 on spinach_test (a)")
+//    sql("create sindex index2_bf on spinach_test (a)")
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 10").count() == 1)
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 20").count() == 1)
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 200").count() == 1)

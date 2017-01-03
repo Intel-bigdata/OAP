@@ -137,7 +137,6 @@ private[spinach] object UnsafeIndexNode {
   }
 }
 
-
 private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
   assert(node.isLeaf, "Should be Leaf Node")
 
@@ -605,6 +604,8 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
   }
 
   def withEqualValue(e: Key): ScannerBuilder = {
+    // if a bloom filter index found, skip all other range scanner
+    // every index structure only maps to exact one RangeScanner
     if (scanner == null) {
       scanner = BloomFilterScanner(meta, e)
     } else {
@@ -636,6 +637,12 @@ private[spinach] object ScannerBuilder {
     new ScannerBuilder(meta, keySchema)
   }
 
+  /**
+    * For scanner with no direction
+    * @param field to build a schema
+    * @param meta meta info
+    * @return
+    */
   def apply(field: StructField, meta: IndexMeta): ScannerBuilder = {
     val keySchema = new StructType().add(field)
     new ScannerBuilder(meta, keySchema)
@@ -729,8 +736,6 @@ private [spinach] class RangeInterval(s: Key, e: Key, includeStart: Boolean, inc
 private [spinach] object RangeInterval{
   def apply(s: Key, e: Key, includeStart: Boolean, includeEnd: Boolean): RangeInterval
   = new RangeInterval(s, e, includeStart, includeEnd)
-
-
 }
 
 // The build the BPlushTree Search Scanner according to the filter and indices,
