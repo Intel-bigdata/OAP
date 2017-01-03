@@ -106,7 +106,7 @@ private[spinach] class SpinachDataReader(
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
 
     filterScanners match {
-      case Some(fs) =>
+      case Some(fs) if fs.length >= 1 =>
         val rowIDs = fs.map(_.initialize(path, conf).toArray.sorted)
         val resIDs = rowIDs.reduce((l, r) => l.intersect(r))
         fileScanner.iterator(conf, requiredIds, resIDs)
@@ -114,7 +114,7 @@ private[spinach] class SpinachDataReader(
 //         total Row count can be get from the filter scanner
 //        val rowIDs = fs.toArray.sorted
 //        fileScanner.iterator(conf, requiredIds, rowIDs)
-      case None =>
+      case _ =>
         fileScanner.iterator(conf, requiredIds)
     }
   }

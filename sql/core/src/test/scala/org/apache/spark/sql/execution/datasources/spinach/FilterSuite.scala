@@ -122,19 +122,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
   }
 
-  // test for bloom filter index
-  test("Bloom filter index") {
-    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-    sql("create sindex index_bf on spinach_test (a)")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
-      Row(1, "this is test 1") :: Nil)
-
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 1 AND a <= 3"),
-      Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
-  }
-
   test("test refresh in parquet format on same partition") {
     val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
     data.toDF("key", "value").registerTempTable("t")

@@ -360,9 +360,7 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta, value: Key) extend
 
   var curIdx: Int = 0
 
-  override def hasNext: Boolean = {
-    curIdx < numOfElem
-  }
+  override def hasNext: Boolean = !stopFlag && curIdx < numOfElem
 
   override def next(): Long = {
     val tmp = curIdx
