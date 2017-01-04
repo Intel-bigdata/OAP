@@ -351,7 +351,6 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta, value: Key) extend
   var stopFlag = false
 //  override def start: Key = value
 
-  var equalValue: Key = value
   var bloomFilter: BloomFilter = _
 
   override def meta: IndexMeta = me
@@ -377,14 +376,12 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta, value: Key) extend
     val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, configuration)
 
     def buffer: DataFiberCache = DataFiberCache(indexData.fiberData)
-    def dataEnd: Long = indexData.dataEnd
     def getBaseObj = buffer.fiberData.getBaseObject
     def getBaseOffset = buffer.fiberData.getBaseOffset
     val bitArrayLength = Platform.getInt(getBaseObj, getBaseOffset + 0 )
     val numOfHashFunc = Platform.getInt(getBaseObj, getBaseOffset + 4)
     numOfElem = Platform.getInt(getBaseObj, getBaseOffset + 8)
 
-//    val bitSetLongArr = new Array[Long](bitArrayLength)
     var cur_pos = 4
     val bitSetLongArr = (0 until bitArrayLength).map( i => {
       cur_pos += 8
@@ -392,8 +389,10 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta, value: Key) extend
     }).toArray
 
     bloomFilter = BloomFilter(bitSetLongArr, numOfHashFunc)
-    val key = equalValue.getInt(0) // TODO i cannot get it
-    stopFlag = !bloomFilter.checkExist(key.toString)
+    if (value != null) {
+      val key = value.getInt(0)
+      stopFlag = !bloomFilter.checkExist(key.toString)
+    }
     this
   }
 }
@@ -614,6 +613,11 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
 
   def build: RangeScanner = {
     assert(scanner ne null, "Scanner is not set")
+    // for range queries with Bloom filter index, do nothing for the index part
+    if (meta.indexType.isInstanceOf[BloomFilterIndex] &&
+          !scanner.isInstanceOf[BloomFilterScanner]) {
+      scanner = BloomFilterScanner(meta)
+    }
     scanner.withKeySchema(keySchema)
   }
 }

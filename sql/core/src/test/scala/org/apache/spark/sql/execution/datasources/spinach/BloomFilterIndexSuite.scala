@@ -105,7 +105,7 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test select * from t")
-    sql("create sindex index1 on spinach_test (a)")
+    sql("create sindex index_bf on spinach_test (a)")
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 10").count() == 1)
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 20").count() == 1)
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 200").count() == 1)
@@ -113,7 +113,7 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 310").count() == 0)
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 10301").count() == 0)
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 801").count() == 0)
-    sql("drop sindex index1 on spinach_test")
+    sql("drop sindex index_bf on spinach_test")
   }
 
   test("multi-index support bf + B+tree") {
