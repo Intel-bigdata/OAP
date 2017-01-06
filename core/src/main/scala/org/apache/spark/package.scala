@@ -61,7 +61,7 @@ package object spark {
       try {
         val unknownProp = "<unknown>"
         val props = new Properties()
-        if (resourceStream != null) props.load(resourceStream) // for windows debugging
+        props.load(resourceStream)
         (
           props.getProperty("version", unknownProp),
           props.getProperty("branch", unknownProp),

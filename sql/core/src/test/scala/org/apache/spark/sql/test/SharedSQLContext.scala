@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.test
 
-import org.apache.commons.lang.SystemUtils
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.{SparkSession, SQLContext}
 
@@ -52,7 +51,6 @@ trait SharedSQLContext extends SQLTestUtils {
    */
   protected override def beforeAll(): Unit = {
     SparkSession.sqlListener.set(null)
-    if (SystemUtils.IS_OS_WINDOWS) sparkConf.set("spark.sql.warehouse.dir", ".\\warehouse")
     if (_spark == null) {
       _spark = new TestSparkSession(sparkConf)
     }
