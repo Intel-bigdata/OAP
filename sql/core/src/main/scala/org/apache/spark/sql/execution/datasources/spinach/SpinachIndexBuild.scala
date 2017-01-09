@@ -87,22 +87,38 @@ private[spinach] case class SpinachIndexBuild(
 
         if (IndexUtils.isBloomFileIndex(indexName)) {
           val bf_index = new BloomFilter()
+          // collect index oridinals from indexColumns and schema
+          // index_oridinals: (indexName, Datatype, oridinal)
           val index_oridinals = indexColumns
             .flatMap(col => schema.fields.map(f => (f.name, f.dataType))
             .zipWithIndex.filter(item => item._1._1.equals(col.columnName)))
+            .map(tuple => (tuple._1._1, tuple._1._2, tuple._2))
           var elemCnt = 0 // element count
+          def rowsToInsert(cols: Array[String]): Seq[String] = {
+            // TODO add more rows to enable multi-column index support
+            cols.reduceLeft((l, r) => l + r) :: Nil
+          }
           while (it.hasNext) {
             val row = it.next()
             elemCnt += 1
-            val indexKey = index_oridinals.map(item => row.get(item._2, item._1._2).toString)
-              .reduce((l, r) => l + r)
-            bf_index.addValue(indexKey)
+            val cols = index_oridinals.map(item => row.get(item._3, item._2).toString)
+            val indexKeys = rowsToInsert(cols)
+            indexKeys.foreach(bf_index.addValue)
           }
           val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
           val fs = indexFile.getFileSystem(hadoopConf)
           // Bloom filter index file format:
-          // numOfLong: Int, numOfHashFunc: Int, elemCnt: Int
-          // long1: Long, long2: Long, ... long(numOfLong-1): Long
+          // numOfLong            4 Bytes, Int, record the total number of Longs in bit array
+          // numOfHashFunction    4 Bytes, Int, record the total number of Hash Functions
+          // elementCount         4 Bytes, Int, number of elements stored in the related DataFile
+          //
+          // long 1               8 Bytes, Long, the first element in bit array
+          // long 2               8 Bytes, Long, the second element in bit array
+          // ...
+          // long $numOfLong      8 Bytes, Long, the $numOfLong -th element in bit array
+          //
+          // dataEndOffset        8 Bytes, Long, data end offset
+          // rootOffset           8 Bytes, Long, root Offset
           val fileOut = fs.create(indexFile, true) // overwrite index file
           val bitArray = bf_index.getBitMapLongArray
           val numHashFunc = bf_index.getNumOfHashFunc
