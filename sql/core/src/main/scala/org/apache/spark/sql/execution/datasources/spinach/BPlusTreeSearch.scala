@@ -228,25 +228,26 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
     this.ordering = GenerateOrdering.create(keySchema)
     currentKeyArray = new Array[CurrentKey](intervalArray.length)
     currentKeyIdx = 0 // reset to initialized value for this thread
-    for(i <- intervalArray.indices) {
-      if (intervalArray(i).start == RangeScanner.DUMMY_KEY_START) {
+    intervalArray.zipWithIndex.foreach {
+      case(interval: RangeInterval, i: Int) =>
+      if (interval.start == RangeScanner.DUMMY_KEY_START) {
         // find the first key in the left-most leaf node
         var tmpNode = root
-        while (tmpNode.isLeaf == false) tmpNode = tmpNode.childAt(0)
+        while (!tmpNode.isLeaf) tmpNode = tmpNode.childAt(0)
         currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0)
       } else {
         // find the identical key or the first key right greater than the specified one
-        moveTo(root, intervalArray(i).start, i)
+        moveTo(root, interval.start, i)
       }
       // process the LeftOpen condition
-      if(!intervalArray(i).startInclude
+      if (!interval.startInclude
         && currentKeyArray(i).currentKey != RangeScanner.DUMMY_KEY_END) {
-        if (ordering.compare(intervalArray(i).start, currentKeyArray(i).currentKey) == 0) {
+        if (ordering.compare(interval.start, currentKeyArray(i).currentKey) == 0) {
           // find the exactly the key, since it's LeftOpen, skip the first key
           currentKeyArray(i).moveNextKey
         }
       }
-    }// end for
+    }
 
 //    // filter the useless conditions(useless search ranges)
 //    currentKeyArray = currentKeyArray.filter(
