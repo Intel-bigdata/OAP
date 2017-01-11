@@ -600,17 +600,6 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
     scanner.intervalArray = intervalArray
   }
 
-  def withEqualValue(e: Key): ScannerBuilder = {
-    // if a bloom filter index found, skip all other range scanner
-    // every index structure only maps to exact one RangeScanner
-    if (scanner == null) {
-      scanner = BloomFilterScanner(meta, e)
-    } else {
-      if (IndexUtils.isBloomFileIndex(meta.name)) scanner = BloomFilterScanner(meta, e)
-    }
-    this
-  }
-
   def build: RangeScanner = {
     assert(scanner ne null, "Scanner is not set")
     // for range queries with Bloom filter index, do nothing for the index part
@@ -709,8 +698,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
           // TODO support multiple key in the index
         }
         case BloomFilterIndex(entries) =>
-          return Some(ScannerBuilder(meta.schema(ordinal),
-            meta.indexMetas(idx)))
+          return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx)))
         case other => // we don't support other types of index
         // TODO support the other types of index
       }
