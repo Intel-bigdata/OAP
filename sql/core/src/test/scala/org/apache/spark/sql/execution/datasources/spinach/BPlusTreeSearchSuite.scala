@@ -281,7 +281,7 @@ private[spinach] class BPlusTreeSearchSuite
       expectedIds: Set[Int]): Unit = {
     val ic = new IndexContext(meta)
     val unHandledFilters = BPlusTreeSearch.build(filters, ic)
-//    assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
+    assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
     ic.getScannerBuilder match {
       case Some(builder) =>
         val scanner = builder.build

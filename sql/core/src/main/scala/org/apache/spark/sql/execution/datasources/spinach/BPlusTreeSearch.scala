@@ -720,6 +720,20 @@ private[spinach] object BPlusTreeSearch extends Logging {
       case _ => null// new mutable.HashMap[String, ArrayBuffer[RangeInterval]]()
     }
   }
+
+  // return whether a Filter predicate can be supported by our current work
+  def canSupport(filter: Filter, ic: IndexContext): Boolean = {
+    filter match {
+      case EqualTo(ic(indexer), _) => true
+      case GreaterThan(ic(indexer), _) => true
+      case GreaterThanOrEqual(ic(indexer), _) => true
+      case LessThan(ic(indexer), _) => true
+      case LessThanOrEqual(ic(indexer), _) => true
+      case Or(ic(indexer), _) => true
+      case And(ic(indexer), _) => true
+      case _ => false
+    }
+  }
   // TODO support multiple scanner & And / Or
   def build(filters: Array[Filter], ic: IndexContext): Array[Filter] = {
 //    def buildScannerBound2(filter: Filter, k: Int): Boolean = {
@@ -781,7 +795,7 @@ private[spinach] object BPlusTreeSearch extends Logging {
 //    val retFilters = filters.filter(f => buildScannerBound2(f, 1))
 // //  ic.getScannerBuilder.foreach(_.updateBound)
 //    retFilters
-    filters
+    filters.filterNot(canSupport(_, ic))
   }
 
 }
