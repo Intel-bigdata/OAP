@@ -278,7 +278,8 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
 
     val start = intervalArray.head.start
     val end = intervalArray.last.end
-    (start ne RangeScanner.DUMMY_KEY_START) && ordering.gt(start, max)
+    (start ne RangeScanner.DUMMY_KEY_START) && ordering.gt(start, max) ||
+      (end ne RangeScanner.DUMMY_KEY_END) && ordering.lt(end, min)
   }
 
   def getUnsafeRow(array: Array[Byte], offset: Int): UnsafeRow = {
@@ -381,10 +382,7 @@ private[spinach] object DUMMY_SCANNER extends RangeScanner(null) {
   override def initialize(path: Path, configuration: Configuration): RangeScanner = { this }
   override def hasNext: Boolean = false
   override def next(): Long = throw new NoSuchElementException("end of iterating.")
-//  override def withNewStart(key: Key, include: Boolean): RangeScanner = this
-//  override def withNewEnd(key: Key, include: Boolean): RangeScanner = this
   override def meta: IndexMeta = throw new NotImplementedError()
-//  override def start: Key = throw new NotImplementedError()
 }
 
 private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
