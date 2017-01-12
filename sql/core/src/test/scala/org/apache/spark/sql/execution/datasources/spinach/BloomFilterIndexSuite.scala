@@ -32,8 +32,7 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
 
   override def beforeEach(): Unit = {
     System.setProperty("spinach.rowgroup.size", "1024")
-    val path_tmp = Utils.createTempDir().getAbsolutePath
-    val path = path_tmp.replace("\\", "\\\\")
+    val path = Utils.createTempDir().getAbsolutePath
     sql(s"""CREATE TEMPORARY TABLE spinach_test (a INT, b STRING)
             | USING spn
             | OPTIONS (path '$path')""".stripMargin)
@@ -63,7 +62,7 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     sql("DROP TABLE IF EXISTS t_refresh_parquet")
   }
 
-  test("filtering without index") {
+  test("filtering without index") { // not passed for RangeInterval must be built with an index
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test select * from t")
@@ -75,40 +74,17 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
   }
 
-  test("Bloom filter index for equal value predicate") {
+  test("Single Bloom filter single equal value test") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test select * from t")
-    sql("create sindex index_bf on spinach_test (a)")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
-      Row(1, "this is test 1") :: Nil)
-    sql("drop sindex index_bf on spinach_test")
-  }
-
-  test("Single B+tree index test") {
-    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-    sql("create sindex index1 on spinach_test (a)")
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10").count() == 1)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 20").count() == 1)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 200").count() == 1)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 301").count() == 0)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 310").count() == 0)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10301").count() == 0)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 801").count() == 0)
-    sql("DROP TABLE IF EXISTS index1")
-    sql("drop sindex index1 on spinach_test")
-  }
-
-  test("Single Bloom filter index test") {
-    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-    sql("create sindex index_bf on spinach_test (a)")
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10").count() == 1)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 20").count() == 1)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 200").count() == 1)
+    sql("create sindex index_bf on spinach_test (a) USING BLOOM")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 10"),
+      Row(10, "this is test 10") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 20"),
+      Row(20, "this is test 20") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100"),
+      Row(100, "this is test 100") :: Nil)
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 301").count() == 0)
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 310").count() == 0)
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 10301").count() == 0)
@@ -116,21 +92,16 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     sql("drop sindex index_bf on spinach_test")
   }
 
-  test("multi-index support bf + B+tree") {
+  test("Single Bloom filter multiple equal value test") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test select * from t")
-    sql("create sindex index1 on spinach_test (a)")
-    sql("create sindex index2_bf on spinach_test (a)")
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10").count() == 1)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 20").count() == 1)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 200").count() == 1)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 301").count() == 0)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 310").count() == 0)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10301").count() == 0)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 801").count() == 0)
-    sql("drop sindex index2_bf on spinach_test")
-    sql("drop sindex index1 on spinach_test")
+    sql("create sindex index_bf on spinach_test (a) USING BLOOM")
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10 AND a = 11").count() == 0)
+    checkAnswer(sql(s"SELECT * FROM spinach_test WHERE a = 20 OR a = 21"),
+      Row(20, "this is test 20") :: Row(21, "this is test 21") :: Nil)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10 AND a = 11").count() == 0)
+    sql("drop sindex index_bf on spinach_test")
   }
 
   test("Bloom filter index for range predicate") {
@@ -138,8 +109,8 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index_bf on spinach_test (a)")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 1 AND a <= 3"),
-      Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a >= 3 AND a <= 3 AND a < 5"),
+      Row(3, "this is test 3") :: Nil)
     sql("drop sindex index_bf on spinach_test")
   }
 }

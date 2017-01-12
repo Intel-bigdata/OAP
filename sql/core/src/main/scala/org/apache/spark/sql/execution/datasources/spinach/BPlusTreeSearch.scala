@@ -347,8 +347,13 @@ override def hasNext: Boolean = {
 //  def withNewEnd(key: Key, include: Boolean): RangeScanner
 }
 
-private[spinach] case class BloomFilterScanner(me: IndexMeta,
-         var value: Key = null) extends RangeScanner(me) {
+private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScanner(me) {
+  def this(rangeScanner: RangeScanner) {
+    this(rangeScanner.meta)
+    this.intervalArray = rangeScanner.intervalArray
+    this
+  }
+
   var stopFlag = false
 //  override def start: Key = value
 
@@ -366,6 +371,14 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta,
     val tmp = curIdx
     curIdx += 1
     tmp.toLong
+  }
+
+  lazy val equalValues: Array[Key] = { // get equal value from intervalArray
+    if (intervalArray.nonEmpty) {
+      // should not use ordering.compare here
+      intervalArray.filter(interval => (interval.start eq interval.end)
+        && interval.startInclude && interval.endInclude).map(_.start).toArray
+    } else null
   }
 
   override def initialize(inputPath: Path, configuration: Configuration): RangeScanner = {
@@ -390,12 +403,15 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta,
     }).toArray
 
     bloomFilter = BloomFilter(bitSetLongArr, numOfHashFunc)
-    if (value != null) {
-      val key = value.getInt(0)
-      stopFlag = !bloomFilter.checkExist(key.toString)
+    if (equalValues != null && equalValues.length > 0) {
+      stopFlag = !equalValues.map(value => bloomFilter
+        .checkExist(value.getInt(0).toString)) // TODO getValue needs to be optimized
+        .reduceOption(_ || _).getOrElse(false)
     }
     this
   }
+
+  override def toString: String = "BloomFilterScanner"
 }
 
 // A dummy scanner will actually not do any scanning
@@ -606,7 +622,7 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
     // for range queries with Bloom filter index, do nothing for the index part
     if (meta.indexType.isInstanceOf[BloomFilterIndex] &&
           !scanner.isInstanceOf[BloomFilterScanner]) {
-      scanner = BloomFilterScanner(meta)
+      scanner = new BloomFilterScanner(scanner)
     }
     scanner.withKeySchema(keySchema)
   }

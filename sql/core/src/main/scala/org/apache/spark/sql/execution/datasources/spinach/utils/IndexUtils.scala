@@ -56,10 +56,4 @@ object IndexUtils {
     }
     new Path(dataFile.getParent, "." + indexFileName + "." + name + SPINACH_INDEX_EXTENSION)
   }
-
-  // TODO add index type parameter in SQLParser
-  // a temporary strategy for index type detection,
-  // indexName ends with "_bf" is regarded as Bloom Filter index
-  def isBloomFileIndex(indexName: String): Boolean =
-    indexName.endsWith("_bf")
 }

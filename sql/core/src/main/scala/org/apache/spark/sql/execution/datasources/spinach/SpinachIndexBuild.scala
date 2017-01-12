@@ -41,7 +41,7 @@ private[spinach] case class SpinachIndexBuild(
     schema: StructType,
     @transient paths: Seq[Path],
     readerClass: String,
-    indexType: String = "BTREE",
+    indexType: AnyIndexType = BTreeIndexType,
     overwrite: Boolean = true) extends Logging {
   private lazy val ids =
     indexColumns.map(c => schema.map(_.name).toIndexedSeq.indexOf(c.columnName))
@@ -87,7 +87,7 @@ private[spinach] case class SpinachIndexBuild(
         val it = reader.initialize(confBroadcast.value.value)
 
         indexType match {
-          case "BTREE" =>
+          case BTreeIndexType =>
             // key -> RowIDs list
             val hashMap = new java.util.HashMap[InternalRow, java.util.ArrayList[Long]]()
             var cnt = 0L
@@ -159,7 +159,7 @@ private[spinach] case class SpinachIndexBuild(
             fileOut.close()
             indexFile.toString
             IndexBuildResult(dataString, cnt, "", d.getParent.toString)
-          case "BLOOM" =>
+          case BloomFilterIndexType =>
             val bf_index = new BloomFilter()
             // collect index oridinals from indexColumns and schema
             // index_oridinals: (indexName, Datatype, oridinal)
@@ -168,10 +168,9 @@ private[spinach] case class SpinachIndexBuild(
                 .zipWithIndex.filter(item => item._1._1.equals(col.columnName)))
               .map(tuple => (tuple._1._1, tuple._1._2, tuple._2))
             var elemCnt = 0 // element count
-          def rowsToInsert(cols: Array[String]): Seq[String] = {
-            // TODO add more rows to enable multi-column index support
-            cols.reduceLeft((l, r) => l + r) :: Nil
-          }
+            def rowsToInsert(cols: Array[String]): Seq[String] = {
+              cols.reduceLeft((l, r) => l + r) :: Nil
+            }
             while (it.hasNext) {
               val row = it.next()
               elemCnt += 1
@@ -194,7 +193,7 @@ private[spinach] case class SpinachIndexBuild(
             // dataEndOffset        8 Bytes, Long, data end offset
             // rootOffset           8 Bytes, Long, root Offset
             val fileOut = fs.create(indexFile, true) // overwrite index file
-          val bitArray = bf_index.getBitMapLongArray
+            val bitArray = bf_index.getBitMapLongArray
             val numHashFunc = bf_index.getNumOfHashFunc
             var offset = 0L
             IndexUtils.writeInt(fileOut, bitArray.length)
