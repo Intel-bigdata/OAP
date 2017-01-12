@@ -40,17 +40,27 @@ private[spinach] case class IndexFile(file: Path) {
     val fin = fs.open(file)
     // wind to end of file to get tree root
     // TODO check if enough to fit in Int
-    val fileLength = fs.getContentSummary(file).getLength
-    var bytes = new Array[Byte](fileLength.toInt)
 
-    fin.readFully(0, bytes)
+    val fileLength = fs.getContentSummary(file).getLength.toInt
+
+    var fullArray = new Array[Byte](fileLength)
+    fin.read(fullArray)
+
+    val minLen = Platform.getInt(fullArray, Platform.BYTE_ARRAY_OFFSET)
+    val maxLen = Platform.getInt(fullArray, Platform.BYTE_ARRAY_OFFSET + 4)
+
+    val contentLen = fileLength - 8 - minLen - maxLen
+
+    var bytes = fullArray.splitAt(8 + minLen + maxLen)._2
+
     val offHeapMem = putToFiberCache(bytes)
     bytes = null
+    fullArray = null
 
     val baseObj = offHeapMem.fiberData.getBaseObject
     val baseOff = offHeapMem.fiberData.getBaseOffset
-    val dataEnd = Platform.getLong(baseObj, baseOff + fileLength - 16)
-    val rootOffset = Platform.getLong(baseObj, baseOff + fileLength - 8)
+    val dataEnd = Platform.getLong(baseObj, baseOff + contentLen - 16)
+    val rootOffset = Platform.getLong(baseObj, baseOff + contentLen - 8)
 
     // TODO partial cached index fiber
     IndexFiberCacheData(offHeapMem.fiberData, dataEnd, rootOffset)
