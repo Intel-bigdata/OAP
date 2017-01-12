@@ -758,6 +758,7 @@ private[spinach] object BPlusTreeSearch extends Logging {
 //      }
 //    }
 
+    if (filters == null || filters.isEmpty) return filters
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
     // reduce multiple hashMap to one hashMap
     val intervalMap = intervalMapArray.reduce(
@@ -771,10 +772,13 @@ private[spinach] object BPlusTreeSearch extends Logging {
         else {
           for ((attribute, intervals) <- rightMap) {
             if (leftMap.contains(attribute)) {
-              val ic(sBuilder) = attribute // extract the corresponding scannerBuilder
-              // combine all intervals of the same attribute of leftMap and rightMap
-              leftMap.put(
-                attribute, sBuilder.mergeBound(leftMap.getOrElseUpdate(attribute, null), intervals))
+              attribute match {
+                case ic (sBuilder) => // extract the corresponding scannerBuilder
+                // combine all intervals of the same attribute of leftMap and rightMap
+                  leftMap.put (attribute,
+                sBuilder.mergeBound (leftMap.getOrElseUpdate (attribute, null), intervals) )
+                case _ => // this attribute is not index, do nothing
+              }
             }
             else {
               leftMap.put(attribute, intervals)
