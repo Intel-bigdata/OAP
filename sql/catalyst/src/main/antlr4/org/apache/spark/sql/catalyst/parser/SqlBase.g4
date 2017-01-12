@@ -127,7 +127,7 @@ statement
     | SET .*?                                                          #setConfiguration
     | RESET                                                            #resetConfiguration
     | CREATE SINDEX (IF NOT EXISTS)? IDENTIFIER ON
-        tableIdentifier indexCols                             #spinachCreateIndex
+        tableIdentifier indexCols (USING indexType)?                   #spinachCreateIndex
     | DROP SINDEX (IF EXISTS)? IDENTIFIER ON tableIdentifier           #spinachDropIndex
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
     ;
@@ -138,6 +138,11 @@ indexCols
 
 indexCol
     : identifier (ASC | DESC)?
+    ;
+
+indexType
+    : BTREE
+    | BLOOM
     ;
 
 unsupportedHiveNativeCommands
@@ -887,6 +892,8 @@ LOCAL: 'LOCAL';
 INPATH: 'INPATH';
 
 SINDEX: 'SINDEX';
+BTREE: 'BTREE';
+BLOOM: 'BLOOM';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''

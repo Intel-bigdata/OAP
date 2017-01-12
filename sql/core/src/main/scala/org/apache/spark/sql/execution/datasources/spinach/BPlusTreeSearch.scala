@@ -27,7 +27,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, SortDirection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
+import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.unsafe.Platform
@@ -211,6 +211,12 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
 //  val stInclude = new ArrayBuffer[Boolean]()
 //  val endInclude = new ArrayBuffer[Boolean]()
   var currentKeyIdx = 0
+
+  def exist(dataPath: Path, conf: Configuration): Boolean = {
+    val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
+    path.getFileSystem(conf).exists(path)
+  }
+
 
   def initialize(dataPath: Path, conf: Configuration): RangeScanner = {
     assert(keySchema ne null)
