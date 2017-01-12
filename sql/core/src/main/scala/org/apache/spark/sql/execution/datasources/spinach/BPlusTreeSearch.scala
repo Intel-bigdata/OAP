@@ -276,10 +276,25 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
 
     fin.close()
 
-    val start = intervalArray.head.start
-    val end = intervalArray.last.end
-    (start ne RangeScanner.DUMMY_KEY_START) && ordering.gt(start, max) ||
-      (end ne RangeScanner.DUMMY_KEY_END) && ordering.lt(end, min)
+    val start = intervalArray.head
+    val end = intervalArray.last
+    var result = false
+    if (start.start != RangeScanner.DUMMY_KEY_START) { // > or >= start
+      if (start.startInclude) {
+        result |= ordering.gt(start.start, max)
+      } else {
+        result |= ordering.gteq(start.start, max)
+      }
+    }
+    if (end.end != RangeScanner.DUMMY_KEY_END) { // < or <= end
+      if (end.endInclude) {
+        result |= ordering.lt(end.end, min)
+      } else {
+        result |= ordering.lteq(end.end, min)
+      }
+    }
+
+    result
   }
 
   def getUnsafeRow(array: Array[Byte], offset: Int): UnsafeRow = {
@@ -346,12 +361,12 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
   }
 
   override def hasNext: Boolean = {
-    if (intervalArray.isEmpty) {
+    if (intervalArray == null || intervalArray.isEmpty || currentKeyArray == null) {
       false
     } else {
       for (i <- currentKeyIdx until currentKeyArray.length) {
         if (!currentKeyArray(i).isEnd && !intervalShouldStop(i)) {
-          true
+          return true
         }
       }
       false
@@ -790,6 +805,7 @@ private[spinach] object BPlusTreeSearch extends Logging {
 //      }
 //    }
 
+    if (filters == null || filters.isEmpty) return filters
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
     // reduce multiple hashMap to one hashMap
     val intervalMap = intervalMapArray.reduce(
