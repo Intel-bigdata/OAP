@@ -98,22 +98,19 @@ private[spinach] class SpinachDataWriter(
 private[spinach] class SpinachDataReader(
   path: Path,
   meta: DataSourceMeta,
-  filterScanners: Option[Array[RangeScanner]],
+  filterScanner: Option[RangeScanner],
   requiredIds: Array[Int]) {
 
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
 
-    filterScanners match {
-      case Some(fs) if fs.length >= 1 =>
-        val rowIDs = fs.map(_.initialize(path, conf).toArray.sorted)
-        val resIDs = rowIDs.reduce((l, r) => l.intersect(r))
-        fileScanner.iterator(conf, requiredIds, resIDs)
-//        fs.initialize(path, conf)
+    filterScanner match {
+      case Some(fs) =>
+        fs.initialize(path, conf)
 //         total Row count can be get from the filter scanner
-//        val rowIDs = fs.toArray.sorted
-//        fileScanner.iterator(conf, requiredIds, rowIDs)
+        val rowIDs = fs.toArray.sorted
+        fileScanner.iterator(conf, requiredIds, rowIDs)
       case _ =>
         fileScanner.iterator(conf, requiredIds)
     }

@@ -347,7 +347,8 @@ override def hasNext: Boolean = {
 //  def withNewEnd(key: Key, include: Boolean): RangeScanner
 }
 
-private[spinach] case class BloomFilterScanner(me: IndexMeta, value: Key) extends RangeScanner(me) {
+private[spinach] case class BloomFilterScanner(me: IndexMeta,
+         var value: Key = null) extends RangeScanner(me) {
   var stopFlag = false
 //  override def start: Key = value
 
@@ -829,6 +830,7 @@ private[spinach] object BPlusTreeSearch extends Logging {
 //      }
 //    }
 
+    if (filters.isEmpty) return filters // [GEFEI] hotfix for EmptyReduceLeft error
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
     // reduce multiple hashMap to one hashMap
     val intervalMap = intervalMapArray.reduce(
