@@ -349,18 +349,9 @@ override def hasNext: Boolean = {
 }
 
 private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScanner(me) {
-  def this(rangeScanner: RangeScanner) {
-    this(rangeScanner.meta)
-    this.intervalArray = rangeScanner.intervalArray
-    this
-  }
-
   var stopFlag = false
-//  override def start: Key = value
 
   var bloomFilter: BloomFilter = _
-
-  override def meta: IndexMeta = me
 
   var numOfElem: Int = _
 
@@ -614,17 +605,17 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
 
   def buildScanner(intervalArray: ArrayBuffer[RangeInterval]): Unit = {
     intervalArray.sortWith(compare)
-    scanner = new RangeScanner(meta)
+    scanner = meta.indexType match {
+      case BloomFilterIndex(entries) =>
+        BloomFilterScanner(meta)
+      case _ =>
+        new RangeScanner(meta)
+    }
     scanner.intervalArray = intervalArray
   }
 
   def build: RangeScanner = {
     assert(scanner ne null, "Scanner is not set")
-    // for range queries with Bloom filter index, do nothing for the index part
-    if (meta.indexType.isInstanceOf[BloomFilterIndex] &&
-          !scanner.isInstanceOf[BloomFilterScanner]) {
-      scanner = new BloomFilterScanner(scanner)
-    }
     scanner.withKeySchema(keySchema)
   }
 }
