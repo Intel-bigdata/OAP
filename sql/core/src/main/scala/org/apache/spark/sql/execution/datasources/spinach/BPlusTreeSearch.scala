@@ -647,11 +647,11 @@ private[spinach] object ScannerBuilder {
   }
 
   /**
-    * For scanner with no direction
-    * @param field to build a schema
-    * @param meta meta info
-    * @return
-    */
+   * For scanner with no direction
+   * @param field to build a schema
+   * @param meta meta info
+   * @return
+   */
   def apply(field: StructField, meta: IndexMeta): ScannerBuilder = {
     val keySchema = new StructType().add(field)
     new ScannerBuilder(meta, keySchema)

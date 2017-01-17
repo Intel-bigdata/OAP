@@ -21,7 +21,7 @@ import org.apache.spark.SparkFunSuite
 /**
  * Bloom filter test suit
  */
-class BloomFilterSuit extends SparkFunSuite {
+class BloomFilterSuite extends SparkFunSuite {
   val strs = Array("bloom", "filter", "spark", "fun", "suite")
   val bloomFilter = new BloomFilter()
 

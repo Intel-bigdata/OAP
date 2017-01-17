@@ -17,9 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import scala.util.hashing.{MurmurHash3 => MH3}
-
 import scala.collection.mutable
+import scala.util.hashing.{MurmurHash3 => MH3}
 
 /**
  * Implementation for Bloom filter.
