@@ -127,7 +127,6 @@ case class CreateIndex(
   }
 }
 
-
 /**
  * Drops an index
  */
