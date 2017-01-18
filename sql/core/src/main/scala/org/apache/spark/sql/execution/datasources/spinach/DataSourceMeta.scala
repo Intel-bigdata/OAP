@@ -294,12 +294,16 @@ private[spinach] class DataSourceMetaBuilder {
   var dataReaderClassName: String = classOf[SpinachDataFile].getCanonicalName
 
   def addFileMeta(fileMeta: FileMeta): this.type = {
-    fileMetas += fileMeta
+    if (!fileMetas.contains(fileMeta)) {
+      fileMetas += fileMeta
+    }
     this
   }
 
   def addIndexMeta(indexMeta: IndexMeta): this.type = {
-    indexMetas += indexMeta
+    if (!indexMetas.contains(indexMeta)) {
+      indexMetas += indexMeta
+    }
     this
   }
 

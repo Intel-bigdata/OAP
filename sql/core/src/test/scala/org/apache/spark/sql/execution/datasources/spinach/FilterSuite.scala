@@ -232,10 +232,17 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
         |SELECT key from t where value == 4
       """.stripMargin)
 
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh
+        |partition (b=1)
+        |SELECT key from t where value == 5
+      """.stripMargin)
+
     sql("refresh sindex on t_refresh")
 
     checkAnswer(sql("select * from t_refresh"),
-      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 2) :: Nil)
+      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 2) :: Row(5, 1) :: Nil)
   }
 
   test("refresh table of spinach format without partition") {
