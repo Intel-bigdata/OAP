@@ -103,6 +103,21 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     sql("drop sindex index_bf on spinach_test")
   }
 
+  test("Single Bloom filter refresh test") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("create sindex index_bf on spinach_test (a) USING BLOOM")
+    checkAnswer(sql(s"SELECT * FROM spinach_test WHERE a = 20 OR a = 21"),
+      Row(20, "this is test 20") :: Row(21, "this is test 21") :: Nil)
+    sql("insert into table spinach_test select * from t")
+    sql("refresh sindex on spinach_test")
+    checkAnswer(sql(s"SELECT * FROM spinach_test where a = 20 or a = 21"),
+      Row(20, "this is test 20") :: Row(21, "this is test 21") ::
+      Row(20, "this is test 20") :: Row(21, "this is test 21") :: Nil)
+    sql("drop sindex index_bf on spinach_test")
+  }
+
   test("Bloom filter index for range predicate") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")

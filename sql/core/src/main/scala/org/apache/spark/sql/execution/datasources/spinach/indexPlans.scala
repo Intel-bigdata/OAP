@@ -263,6 +263,8 @@ case class RefreshIndex(
       val indexColumns = i.indexType match {
         case BTreeIndex(entries) =>
           entries.map(e => IndexColumn(s(e.ordinal).name, e.dir == Ascending))
+        case BloomFilterIndex(entries) =>
+          entries.map(e => IndexColumn(s(e).name))
         case it => sys.error(s"Not implemented index type $it")
       }
       SpinachIndexBuild(sparkSession, i.name, indexColumns.toArray, s, bAndP.map(

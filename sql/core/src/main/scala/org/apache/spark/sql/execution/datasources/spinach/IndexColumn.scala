@@ -33,4 +33,6 @@ private[sql] object IndexColumn {
     case "ASC" => new IndexColumn(columnName, true)
     case "DESC" => new IndexColumn(columnName, false)
   }
+
+  def apply(columnName: String): IndexColumn = new IndexColumn(columnName, true)
 }
