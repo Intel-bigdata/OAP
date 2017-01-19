@@ -394,8 +394,6 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScann
       Platform.getLong(getBaseObj, getBaseOffset + cur_pos)
     }).toArray
 
-    keySchema
-
     bloomFilter = BloomFilter(bitSetLongArr, numOfHashFunc)
     stopFlag = if (equalValues != null && equalValues.length > 0) {
       !equalValues.map(value => bloomFilter
