@@ -294,21 +294,25 @@ private[spinach] class DataSourceMetaBuilder {
   var dataReaderClassName: String = classOf[SpinachDataFile].getCanonicalName
 
   def addFileMeta(fileMeta: FileMeta): this.type = {
-    if (!fileMetas.contains(fileMeta)) {
-      fileMetas += fileMeta
-    }
+    fileMetas += fileMeta
     this
   }
 
   def addIndexMeta(indexMeta: IndexMeta): this.type = {
-    if (!indexMetas.contains(indexMeta)) {
-      indexMetas += indexMeta
-    }
+    indexMetas += indexMeta
     this
   }
 
+  def containsFileMeta(fileMeta: FileMeta): Boolean = {
+    fileMetas.indexWhere{_.dataFileName == fileMeta.dataFileName} >= 0
+  }
+
   def containsFileMeta(fileName: String): Boolean = {
-    fileMetas.filter(_.dataFileName.equals(fileName)).nonEmpty
+    fileMetas.indexWhere{_.dataFileName == fileName} >= 0
+  }
+
+  def containsIndexMeta(indexMeta: IndexMeta): Boolean = {
+    indexMetas.indexWhere{_.name == indexMeta.name} >= 0
   }
 
   def withNewSchema(schema: StructType): this.type = {
