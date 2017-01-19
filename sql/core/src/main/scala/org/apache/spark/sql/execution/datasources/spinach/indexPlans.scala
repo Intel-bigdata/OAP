@@ -115,8 +115,9 @@ case class CreateIndex(
     val retMap = ret.groupBy(_.parent)
     bAndP.foreach(bp =>
       retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
-        if (!bp._3) bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile)))
-    )
+        if (!bp._3) bp._1.addFileMeta(
+            FileMeta(r.fingerprint, r.rowCount, r.dataFile.drop(bp._2.toString.length + 1)))
+    ))
     // write updated metas down
     bAndP.foreach(bp => DataSourceMeta.write(
       new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
@@ -281,6 +282,14 @@ case class RefreshIndex(
       // so, we should ignore these cases
       // And files modifications for parquet should refresh spn meta in this way
       val filteredBAndP = bAndP.filter(x => retMap.contains(x._2.toString))
+      filteredBAndP.foreach(bp =>
+        retMap.getOrElse(bp._2.toString, Nil).foreach(r => {
+          val fileName = r.dataFile.drop(bp._2.toString.length + 1)
+          if (!bp._1.containsFileMeta(fileName)) {
+            bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, fileName))
+          }
+        }
+      ))
 
       // write updated metas down
       filteredBAndP.foreach(bp => DataSourceMeta.write(
