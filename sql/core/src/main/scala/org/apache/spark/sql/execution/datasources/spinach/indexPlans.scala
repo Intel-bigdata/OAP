@@ -116,7 +116,7 @@ case class CreateIndex(
     bAndP.foreach(bp =>
       retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
         if (!bp._3) bp._1.addFileMeta(
-            FileMeta(r.fingerprint, r.rowCount, r.dataFile.drop(bp._2.toString.length + 1)))
+            FileMeta(r.fingerprint, r.rowCount, r.dataFile))
     ))
     // write updated metas down
     bAndP.foreach(bp => DataSourceMeta.write(
@@ -280,9 +280,8 @@ case class RefreshIndex(
       val filteredBAndP = bAndP.filter(x => retMap.contains(x._2.toString))
       filteredBAndP.foreach(bp =>
         retMap.getOrElse(bp._2.toString, Nil).foreach(r => {
-          val fileName = r.dataFile.drop(bp._2.toString.length + 1)
-          if (!bp._1.containsFileMeta(fileName)) {
-            bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, fileName))
+          if (!bp._1.containsFileMeta(r.dataFile)) {
+            bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile))
           }
         }
       ))

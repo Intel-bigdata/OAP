@@ -158,7 +158,7 @@ private[spinach] case class SpinachIndexBuild(
             IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
             fileOut.close()
             indexFile.toString
-            IndexBuildResult(dataString, cnt, "", d.getParent.toString)
+            IndexBuildResult(d.getName, cnt, "", d.getParent.toString)
           case BloomFilterIndexType =>
             val bf_index = new BloomFilter()
             // collect index oridinals from indexColumns and schema
@@ -207,7 +207,7 @@ private[spinach] case class SpinachIndexBuild(
             IndexUtils.writeLong(fileOut, offset) // dataEnd
             IndexUtils.writeLong(fileOut, offset) // rootOffset
             fileOut.close()
-            IndexBuildResult(dataString, 1000, "", d.getParent.toString)
+            IndexBuildResult(d.getName, 1000, "", d.getParent.toString)
           case _ => throw new Exception("unsupported index type")
         }
       }).collect().toSeq
