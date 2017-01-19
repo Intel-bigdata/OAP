@@ -707,7 +707,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
         case BTreeIndex(entries) => entries.map { entry =>
           // TODO support multiple key in the index
         }
-        case BloomFilterIndex(entries) if entries.length == 1 && entries.head == ordinal =>
+        case BloomFilterIndex(entries) if entries.indexOf(ordinal) >= 0 =>
           // TODO support muliple key in the index
           return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx)))
         case other => // we don't support other types of index
