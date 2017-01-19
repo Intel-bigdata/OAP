@@ -210,7 +210,7 @@ private[spinach] case class SpinachIndexBuild(
             IndexUtils.writeLong(fileOut, offset) // dataEnd
             IndexUtils.writeLong(fileOut, offset) // rootOffset
             fileOut.close()
-            IndexBuildResult(dataString, elemCnt, "", d.getParent.toString)
+            IndexBuildResult(d.getName, elemCnt, "", d.getParent.toString)
           case _ => throw new Exception("unsupported index type")
         }
       }).collect().toSeq
