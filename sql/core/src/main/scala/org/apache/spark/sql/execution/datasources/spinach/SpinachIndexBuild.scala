@@ -158,7 +158,7 @@ private[spinach] case class SpinachIndexBuild(
             IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
             fileOut.close()
             indexFile.toString
-            IndexBuildResult(dataString, cnt, "", d.getParent.toString)
+            IndexBuildResult(d.getName, cnt, "", d.getParent.toString)
           case BloomFilterIndexType =>
             val bf_index = new BloomFilter()
             // collect index oridinals from indexColumns and schema
@@ -168,13 +168,17 @@ private[spinach] case class SpinachIndexBuild(
                 .zipWithIndex.filter(item => item._1._1.equals(col.columnName)))
               .map(tuple => (tuple._1._1, tuple._1._2, tuple._2))
             var elemCnt = 0 // element count
-            def rowsToInsert(cols: Array[String]): Seq[String] = {
-              cols.reduceLeft((l, r) => l + r) :: Nil
+            def rowsToInsert(cols: Seq[String]): Seq[String] = {
+              // for multi-column index, add all subsets into bloom filter
+              // For example, a column with a = 1, b = 2, a and b are index columns
+              // then three records: a = 1, b = 2, a = 1 b = 2, are inserted to bf
+              cols.toSet.subsets().filter(_.nonEmpty).map(_.reduce(_ + _)).toSeq
             }
             while (it.hasNext) {
               val row = it.next()
               elemCnt += 1
-              val cols = index_oridinals.map(item => row.get(item._3, item._2).toString)
+              val cols = keySchema.fields.indices.map(i =>
+                row.get(i, keySchema(i).dataType).toString)
               val indexKeys = rowsToInsert(cols)
               indexKeys.foreach(bf_index.addValue)
             }
@@ -195,19 +199,18 @@ private[spinach] case class SpinachIndexBuild(
             val fileOut = fs.create(indexFile, true) // overwrite index file
             val bitArray = bf_index.getBitMapLongArray
             val numHashFunc = bf_index.getNumOfHashFunc
-            var offset = 0L
             IndexUtils.writeInt(fileOut, bitArray.length)
             IndexUtils.writeInt(fileOut, numHashFunc)
             IndexUtils.writeInt(fileOut, elemCnt)
-            offset += 8
+            var offset = 12L
             bitArray.foreach(l => {
-              offset += 8
               IndexUtils.writeLong(fileOut, l)
+              offset += 8
             })
             IndexUtils.writeLong(fileOut, offset) // dataEnd
             IndexUtils.writeLong(fileOut, offset) // rootOffset
             fileOut.close()
-            IndexBuildResult(dataString, 1000, "", d.getParent.toString)
+            IndexBuildResult(d.getName, elemCnt, "", d.getParent.toString)
           case _ => throw new Exception("unsupported index type")
         }
       }).collect().toSeq

@@ -349,13 +349,13 @@ override def hasNext: Boolean = {
 }
 
 private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScanner(me) {
-  var stopFlag = false
+  var stopFlag: Boolean = _
 
   var bloomFilter: BloomFilter = _
 
   var numOfElem: Int = _
 
-  var curIdx: Int = 0
+  var curIdx: Int = _
 
   override def hasNext: Boolean = !stopFlag && curIdx < numOfElem
 
@@ -395,11 +395,12 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScann
     }).toArray
 
     bloomFilter = BloomFilter(bitSetLongArr, numOfHashFunc)
-    if (equalValues != null && equalValues.length > 0) {
-      stopFlag = !equalValues.map(value => bloomFilter
+    stopFlag = if (equalValues != null && equalValues.length > 0) {
+      !equalValues.map(value => bloomFilter
         .checkExist(value.getInt(0).toString)) // TODO getValue needs to be optimized
         .reduceOption(_ || _).getOrElse(false)
-    }
+    } else false
+    curIdx = 0
     this
   }
 
@@ -706,7 +707,8 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
         case BTreeIndex(entries) => entries.map { entry =>
           // TODO support multiple key in the index
         }
-        case BloomFilterIndex(entries) =>
+        case BloomFilterIndex(entries) if entries.indexOf(ordinal) >= 0 =>
+          // TODO support muliple key in the index
           return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx)))
         case other => // we don't support other types of index
         // TODO support the other types of index

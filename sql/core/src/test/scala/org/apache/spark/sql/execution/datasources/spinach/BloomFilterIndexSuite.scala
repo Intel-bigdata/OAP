@@ -73,6 +73,16 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
   }
 
+  test("Bloom filter on replicated items") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("insert into spinach_test select * from t")
+    sql("create sindex index_bf on spinach_test (a) USING BLOOM")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 10"),
+      Row(10, "this is test 10") :: Row(10, "this is test 10") :: Nil)
+  }
+
   test("Single Bloom filter single equal value test") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
@@ -127,6 +137,42 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     sql("create sindex index_bf on spinach_test (a)")
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a >= 3 AND a <= 3 AND a < 5"),
       Row(3, "this is test 3") :: Nil)
+    sql("drop sindex index_bf on spinach_test")
+  }
+
+  test("Single Bloom filter test on other column") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("create sindex index_bf on spinach_test (b) USING BLOOM")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 10"),
+      Row(10, "this is test 10") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 20"),
+      Row(20, "this is test 20") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100"),
+      Row(100, "this is test 100") :: Nil)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 301").count() == 0)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 310").count() == 0)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10301").count() == 0)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 801").count() == 0)
+    sql("drop sindex index_bf on spinach_test")
+  }
+
+  test("Multiple column Bloom filter index test") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("create sindex index_bf on spinach_test (a, b) USING BLOOM")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 10"),
+      Row(10, "this is test 10") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 20"),
+      Row(20, "this is test 20") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100"),
+      Row(100, "this is test 100") :: Nil)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 301").count() == 0)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 310").count() == 0)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10301").count() == 0)
+    assert(sql(s"SELECT * FROM spinach_test WHERE a = 801").count() == 0)
     sql("drop sindex index_bf on spinach_test")
   }
 }

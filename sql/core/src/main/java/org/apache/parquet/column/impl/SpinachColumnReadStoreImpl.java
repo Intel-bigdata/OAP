@@ -9,8 +9,8 @@ import org.apache.parquet.schema.MessageType;
 public class SpinachColumnReadStoreImpl extends ColumnReadStoreImpl {
 
     public SpinachColumnReadStoreImpl(PageReadStore pageReadStore, GroupConverter recordConverter,
-            MessageType schema) {
-        super(pageReadStore, recordConverter, schema);
+                                      MessageType schema, String createdBy) {
+        super(pageReadStore, recordConverter, schema, createdBy);
     }
 
     @Override

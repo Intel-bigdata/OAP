@@ -31,6 +31,7 @@ import org.apache.parquet.io.api.Binary;
  */
 public class VectorizedPlainValuesReader extends ValuesReader implements VectorizedValuesReader {
   private byte[] buffer;
+
   private int offset;
   private int bitOffset; // Only used for booleans.
   private ByteBuffer byteBuffer; // used to wrap the byte array buffer
@@ -48,6 +49,11 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     if (bigEndianPlatform) {
       byteBuffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
     }
+  }
+
+  @Override
+  public void initFromPage(int valueCount, ByteBuffer page, int offset) throws IOException {
+    throw new UnsupportedOperationException();
   }
 
   @Override
