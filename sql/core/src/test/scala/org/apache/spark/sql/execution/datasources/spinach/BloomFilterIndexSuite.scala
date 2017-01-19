@@ -73,11 +73,23 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
   }
 
+  test("Bloom filter on replicated items") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("insert into spinach_test select * from t")
+    sql("create sindex index_bf on spinach_test (a) USING BLOOM")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 10"),
+      Row(10, "this is test 10") :: Row(10, "this is test 10") :: Nil)
+  }
+
   test("Single Bloom filter single equal value test") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test select * from t")
-    sql("create sindex index_bf on spinach_test (a) USING BLOOM")
+    sql("create sindex index_bf on spinach_test (b) USING BLOOM")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 10'"),
+      Row(10, "this is test 10") :: Nil)
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 10"),
       Row(10, "this is test 10") :: Nil)
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 20"),
