@@ -237,6 +237,43 @@ private[spinach] class BPlusTreeSearchSuite
     assertScanner(meta, filters, Array(), Set())
   }
 
+  test("(3<test<=9 or 13<test<17) & (4<test<10 or 14<test<38)") {
+    val filters: Array[Filter] = Array(
+      Or(
+        And(GreaterThan("test", 3), LessThanOrEqual("test", 9)),
+        And(GreaterThan("test", 13), LessThan("test", 17))),
+      Or(
+        And(GreaterThan("test", 4), LessThan("test", 10)),
+        And(GreaterThan("test", 14), LessThan("test", 38)))
+    )
+    assertScanner(meta, filters, Array(), Set(50, 80, 81, 82, 90, 91, 150, 160, 161, 162))
+  }
+
+  test("4=<test<=13 or 15<test<38") {
+    val filters: Array[Filter] = Array(
+      Or(And(GreaterThanOrEqual("test", 4), LessThanOrEqual("test", 13)),
+        And(GreaterThan("test", 15), LessThan("test", 38)))
+    )
+    assertScanner(meta, filters, Array(), Set(40, 41, 50, 80, 81, 82, 90, 91, 100, 101, 102,
+      130, 131, 132, 160, 161, 162, 170, 171))
+  }
+
+  test("9<test<14 or 13<test<16") {
+    val filters: Array[Filter] = Array(
+      Or(And(GreaterThan("test", 9), LessThan("test", 14)),
+        And(GreaterThan("test", 13), LessThan("test", 16)))
+    )
+    assertScanner(meta, filters, Array(), Set(100, 101, 102, 130, 131, 132, 140, 141, 150))
+  }
+
+  test("9<test<14 or 14<test<16") {
+    val filters: Array[Filter] = Array(
+      Or(And(GreaterThan("test", 9), LessThan("test", 14)),
+        And(GreaterThan("test", 14), LessThan("test", 16)))
+    )
+    assertScanner(meta, filters, Array(), Set(100, 101, 102, 130, 131, 132, 150))
+  }
+
   private def assertScanner(
       meta: DataSourceMeta,
       filters: Array[Filter],

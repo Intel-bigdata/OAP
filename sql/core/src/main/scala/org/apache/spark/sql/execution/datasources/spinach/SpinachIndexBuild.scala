@@ -41,6 +41,7 @@ private[spinach] case class SpinachIndexBuild(
     schema: StructType,
     @transient paths: Seq[Path],
     readerClass: String,
+    indexType: AnyIndexType = BTreeIndexType,
     overwrite: Boolean = true) extends Logging {
   private lazy val ids =
     indexColumns.map(c => schema.map(_.name).toIndexedSeq.indexOf(c.columnName))
@@ -84,76 +85,134 @@ private[spinach] case class SpinachIndexBuild(
         val reader = new SpinachDataReader(d, meta, None, ids)
         val hadoopConf = confBroadcast.value.value
         val it = reader.initialize(confBroadcast.value.value)
-        // key -> RowIDs list
-        val hashMap = new java.util.HashMap[InternalRow, java.util.ArrayList[Long]]()
-        var cnt = 0L
-        while (it.hasNext) {
-          val v = it.next().copy()
-          if (!hashMap.containsKey(v)) {
-            val list = new java.util.ArrayList[Long]()
-            list.add(cnt)
-            hashMap.put(v, list)
-          } else {
-            hashMap.get(v).add(cnt)
-          }
-          cnt = cnt + 1
-        }
-        val partitionUniqueSize = hashMap.size()
-        val uniqueKeys = hashMap.keySet().toArray(new Array[InternalRow](partitionUniqueSize))
-        assert(uniqueKeys.size == partitionUniqueSize)
-        lazy val comparator: Comparator[InternalRow] = new Comparator[InternalRow]() {
-          override def compare(o1: InternalRow, o2: InternalRow): Int = {
-            if (o1 == null && o2 == null) {
-              0
-            } else if (o1 == null) {
-              -1
-            } else if (o2 == null) {
-              1
-            } else {
-              ordering.compare(o1, o2)
+
+        indexType match {
+          case BTreeIndexType =>
+            // key -> RowIDs list
+            val hashMap = new java.util.HashMap[InternalRow, java.util.ArrayList[Long]]()
+            var cnt = 0L
+            while (it.hasNext) {
+              val v = it.next().copy()
+              if (!hashMap.containsKey(v)) {
+                val list = new java.util.ArrayList[Long]()
+                list.add(cnt)
+                hashMap.put(v, list)
+              } else {
+                hashMap.get(v).add(cnt)
+              }
+              cnt = cnt + 1
             }
-          }
+            val partitionUniqueSize = hashMap.size()
+            val uniqueKeys = hashMap.keySet().toArray(new Array[InternalRow](partitionUniqueSize))
+            assert(uniqueKeys.size == partitionUniqueSize)
+            lazy val comparator: Comparator[InternalRow] = new Comparator[InternalRow]() {
+              override def compare(o1: InternalRow, o2: InternalRow): Int = {
+                if (o1 == null && o2 == null) {
+                  0
+                } else if (o1 == null) {
+                  -1
+                } else if (o2 == null) {
+                  1
+                } else {
+                  ordering.compare(o1, o2)
+                }
+              }
+            }
+            // sort keys
+            java.util.Arrays.sort(uniqueKeys, comparator)
+            // build index file
+            val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
+            val fs = indexFile.getFileSystem(hadoopConf)
+            // we are overwriting index files
+            val fileOut = fs.create(indexFile, true)
+            var i = 0
+            var fileOffset = 0L
+            val offsetMap = new java.util.HashMap[InternalRow, Long]()
+            // write data segment.
+            while (i < partitionUniqueSize) {
+              offsetMap.put(uniqueKeys(i), fileOffset)
+              val rowIds = hashMap.get(uniqueKeys(i))
+              // row count for same key
+              IndexUtils.writeInt(fileOut, rowIds.size())
+              // 4 -> value1, stores rowIds count.
+              fileOffset = fileOffset + 4
+              var idIter = 0
+              while (idIter < rowIds.size()) {
+                IndexUtils.writeLong(fileOut, rowIds.get(idIter))
+                // 8 -> value2, stores a row id
+                fileOffset = fileOffset + 8
+                idIter = idIter + 1
+              }
+              i = i + 1
+            }
+            val dataEnd = fileOffset
+            // write index segment.
+            val treeShape = BTreeUtils.generate2(partitionUniqueSize)
+            val uniqueKeysList = new java.util.LinkedList[InternalRow]()
+            import scala.collection.JavaConverters._
+            uniqueKeysList.addAll(uniqueKeys.toSeq.asJava)
+            writeTreeToOut(treeShape, fileOut, offsetMap,
+              fileOffset, uniqueKeysList, keySchema, 0, -1L)
+            assert(uniqueKeysList.size == 1)
+            IndexUtils.writeLong(fileOut, dataEnd)
+            IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
+            fileOut.close()
+            indexFile.toString
+            IndexBuildResult(d.getName, cnt, "", d.getParent.toString)
+          case BloomFilterIndexType =>
+            val bf_index = new BloomFilter()
+            // collect index oridinals from indexColumns and schema
+            // index_oridinals: (indexName, Datatype, oridinal)
+            val index_oridinals = indexColumns
+              .flatMap(col => schema.fields.map(f => (f.name, f.dataType))
+                .zipWithIndex.filter(item => item._1._1.equals(col.columnName)))
+              .map(tuple => (tuple._1._1, tuple._1._2, tuple._2))
+            var elemCnt = 0 // element count
+            def rowsToInsert(cols: Seq[String]): Seq[String] = {
+              // for multi-column index, add all subsets into bloom filter
+              // For example, a column with a = 1, b = 2, a and b are index columns
+              // then three records: a = 1, b = 2, a = 1 b = 2, are inserted to bf
+              cols.toSet.subsets().filter(_.nonEmpty).map(_.reduce(_ + _)).toSeq
+            }
+            while (it.hasNext) {
+              val row = it.next()
+              elemCnt += 1
+              val cols = keySchema.fields.indices.map(i =>
+                row.get(i, keySchema(i).dataType).toString)
+              val indexKeys = rowsToInsert(cols)
+              indexKeys.foreach(bf_index.addValue)
+            }
+            val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
+            val fs = indexFile.getFileSystem(hadoopConf)
+            // Bloom filter index file format:
+            // numOfLong            4 Bytes, Int, record the total number of Longs in bit array
+            // numOfHashFunction    4 Bytes, Int, record the total number of Hash Functions
+            // elementCount         4 Bytes, Int, number of elements stored in the related DataFile
+            //
+            // long 1               8 Bytes, Long, the first element in bit array
+            // long 2               8 Bytes, Long, the second element in bit array
+            // ...
+            // long $numOfLong      8 Bytes, Long, the $numOfLong -th element in bit array
+            //
+            // dataEndOffset        8 Bytes, Long, data end offset
+            // rootOffset           8 Bytes, Long, root Offset
+            val fileOut = fs.create(indexFile, true) // overwrite index file
+            val bitArray = bf_index.getBitMapLongArray
+            val numHashFunc = bf_index.getNumOfHashFunc
+            IndexUtils.writeInt(fileOut, bitArray.length)
+            IndexUtils.writeInt(fileOut, numHashFunc)
+            IndexUtils.writeInt(fileOut, elemCnt)
+            var offset = 12L
+            bitArray.foreach(l => {
+              IndexUtils.writeLong(fileOut, l)
+              offset += 8
+            })
+            IndexUtils.writeLong(fileOut, offset) // dataEnd
+            IndexUtils.writeLong(fileOut, offset) // rootOffset
+            fileOut.close()
+            IndexBuildResult(d.getName, elemCnt, "", d.getParent.toString)
+          case _ => throw new Exception("unsupported index type")
         }
-        // sort keys
-        java.util.Arrays.sort(uniqueKeys, comparator)
-        // build index file
-        val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
-        val fs = indexFile.getFileSystem(hadoopConf)
-        // we are overwriting index files
-        val fileOut = fs.create(indexFile, true)
-        var i = 0
-        var fileOffset = 0L
-        val offsetMap = new java.util.HashMap[InternalRow, Long]()
-        // write data segment.
-        while (i < partitionUniqueSize) {
-          offsetMap.put(uniqueKeys(i), fileOffset)
-          val rowIds = hashMap.get(uniqueKeys(i))
-          // row count for same key
-          IndexUtils.writeInt(fileOut, rowIds.size())
-          // 4 -> value1, stores rowIds count.
-          fileOffset = fileOffset + 4
-          var idIter = 0
-          while (idIter < rowIds.size()) {
-            IndexUtils.writeLong(fileOut, rowIds.get(idIter))
-            // 8 -> value2, stores a row id
-            fileOffset = fileOffset + 8
-            idIter = idIter + 1
-          }
-          i = i + 1
-        }
-        val dataEnd = fileOffset
-        // write index segment.
-        val treeShape = BTreeUtils.generate2(partitionUniqueSize)
-        val uniqueKeysList = new java.util.LinkedList[InternalRow]()
-        import scala.collection.JavaConverters._
-        uniqueKeysList.addAll(uniqueKeys.toSeq.asJava)
-        writeTreeToOut(treeShape, fileOut, offsetMap, fileOffset, uniqueKeysList, keySchema, 0, -1L)
-        assert(uniqueKeysList.size == 1)
-        IndexUtils.writeLong(fileOut, dataEnd)
-        IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
-        fileOut.close()
-        indexFile.toString
-        IndexBuildResult(dataString, cnt, "", d.getParent.toString)
       }).collect().toSeq
     }
   }

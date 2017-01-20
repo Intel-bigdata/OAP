@@ -21,12 +21,13 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, Descending}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, SpinachException}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
+import org.apache.spark.sql.types.{IntegerType, StringType}
 
 /**
  * Creates an index for table on indexColumns
@@ -35,11 +36,11 @@ case class CreateIndex(
     indexName: String,
     relation : LogicalPlan,
     indexColumns: Array[IndexColumn],
-    allowExists: Boolean) extends RunnableCommand with Logging {
+    allowExists: Boolean,
+    indexType: AnyIndexType) extends RunnableCommand with Logging {
   override def children: Seq[LogicalPlan] = Seq(relation)
 
   override val output: Seq[Attribute] = Seq.empty
-
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val (fileCatalog, s, readerClassName, identifier) = relation match {
@@ -86,27 +87,38 @@ case class CreateIndex(
       } else {
         metaBuilder.withNewSchema(s)
       }
-      val entries = indexColumns.map(c => {
-        val dir = if (c.isAscending) Ascending else Descending
-        BTreeIndexEntry(s.map(_.name).toIndexedSeq.indexOf(c.columnName), dir)
-      })
-      metaBuilder.addIndexMeta(new IndexMeta(indexName, BTreeIndex(entries)))
+
+      indexType match {
+        case BTreeIndexType =>
+          val entries = indexColumns.map(c => {
+            val dir = if (c.isAscending) Ascending else Descending
+            BTreeIndexEntry(s.map(_.name).toIndexedSeq.indexOf(c.columnName), dir)
+          })
+          metaBuilder.addIndexMeta(new IndexMeta(indexName, BTreeIndex(entries)))
+        case BloomFilterIndexType =>
+          val entries = indexColumns.map(col => s.map(_.name).toIndexedSeq.indexOf(col.columnName))
+          metaBuilder.addIndexMeta(new IndexMeta(indexName, BloomFilterIndex(entries)))
+        case _ =>
+          sys.error(s"Not supported index type $indexType")
+      }
+
       // we cannot build meta for those without spinach meta data
       metaBuilder.withNewDataReaderClassName(readerClassName)
-      // when p.files is nonEmpty but no spinach meta, it means the relation is in parquet(else
-      // it is Spinach empty partition, we won't create meta for them).
+      // when p.files is nonEmpty but no spinach meta, it means the relation is in parquet
+      // (else it is Spinach empty partition, we won't create meta for them).
       // For Parquet, we only use Spinach meta to track schema and reader class, as well as
       // `IndexMeta`s that must be empty at the moment, so `FileMeta`s are ok to leave empty.
       // p.files.foreach(f => builder.addFileMeta(FileMeta("", 0, f.getPath.toString)))
       (metaBuilder, parent, existOld)
     })
-    val ret = SpinachIndexBuild(
-      sparkSession, indexName, indexColumns, s, bAndP.map(_._2), readerClassName).execute()
+    val ret = SpinachIndexBuild(sparkSession, indexName,
+      indexColumns, s, bAndP.map(_._2), readerClassName, indexType).execute()
     val retMap = ret.groupBy(_.parent)
     bAndP.foreach(bp =>
       retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
-        if (!bp._3) bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile)))
-    )
+        if (!bp._3) bp._1.addFileMeta(
+            FileMeta(r.fingerprint, r.rowCount, r.dataFile))
+    ))
     // write updated metas down
     bAndP.foreach(bp => DataSourceMeta.write(
       new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
@@ -177,5 +189,174 @@ case class DropIndex(
       case other => sys.error(s"We don't support index dropping for ${other.simpleString}")
     }
     Seq.empty
+  }
+}
+
+/**
+ * Refreshes an index for table
+ */
+case class RefreshIndex(
+    relation: LogicalPlan) extends RunnableCommand with Logging {
+  override def children: Seq[LogicalPlan] = Seq(relation)
+
+  override val output: Seq[Attribute] = Seq.empty
+
+  override def run(sparkSession: SparkSession): Seq[Row] = {
+    val (fileCatalog, s, readerClassName) = relation match {
+      case LogicalRelation(
+          HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, _) =>
+        (fileCatalog, s, SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME)
+      case LogicalRelation(
+          HadoopFsRelation(_, fileCatalog, _, s, _, _: ParquetFileFormat, _), _, _) =>
+        (fileCatalog, s, SpinachFileFormat.PARQUET_DATA_FILE_CLASSNAME)
+      case other =>
+        throw new SpinachException(s"We don't support index refreshing for ${other.simpleString}")
+    }
+
+    val partitions = SpinachUtils.getPartitions(fileCatalog).filter(_.files.nonEmpty)
+    // TODO currently we ignore empty partitions, so each partition may have different indexes,
+    // this may impact index updating. It may also fail index existence check. Should put index
+    // info at table level also.
+    // aggregate all existing indices
+    val indices = partitions.flatMap(p => {
+      val parent = p.files.head.getPath.getParent
+      // TODO get `fs` outside of map() to boost
+      val fs = parent.getFileSystem(sparkSession.sparkContext.hadoopConfiguration)
+      val existOld = fs.exists(new Path(parent, SpinachFileFormat.SPINACH_META_FILE))
+      if (existOld) {
+        val m = SpinachUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, parent)
+        assert(m.nonEmpty)
+        val oldMeta = m.get
+        oldMeta.indexMetas
+      } else {
+        Nil
+      }
+    }).groupBy(_.name).map(_._2.head)
+
+    val bAndP = partitions.map(p => {
+      val metaBuilder = new DataSourceMetaBuilder()
+      val parent = p.files.head.getPath.getParent
+      // TODO get `fs` outside of map() to boost
+      val fs = parent.getFileSystem(sparkSession.sparkContext.hadoopConfiguration)
+      val existOld = fs.exists(new Path(parent, SpinachFileFormat.SPINACH_META_FILE))
+      if (existOld) {
+        val m = SpinachUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, parent)
+        assert(m.nonEmpty)
+        val oldMeta = m.get
+        // add filemeta list already exist
+        oldMeta.fileMetas.foreach(metaBuilder.addFileMeta)
+        // TODO for now we only support data file adding before updating index
+        metaBuilder.withNewSchema(oldMeta.schema)
+      } else {
+        metaBuilder.withNewSchema(s)
+      }
+      indices.foreach(metaBuilder.addIndexMeta)
+      // we cannot build meta for those without spinach meta data
+      metaBuilder.withNewDataReaderClassName(readerClassName)
+      // when p.files is nonEmpty but no spinach meta, it means the relation is in parquet(else
+      // it is Spinach empty partition, we won't create meta for them).
+      // For Parquet, we only use Spinach meta to track schema and reader class, as well as
+      // `IndexMeta`s that must be empty at the moment, so `FileMeta`s are ok to leave empty.
+      // p.files.foreach(f => builder.addFileMeta(FileMeta("", 0, f.getPath.toString)))
+      (metaBuilder, parent)
+    })
+
+    val buildrst = indices.map(i => {
+      val indexColumns = i.indexType match {
+        case BTreeIndex(entries) =>
+          entries.map(e => IndexColumn(s(e.ordinal).name, e.dir == Ascending))
+        case it => sys.error(s"Not implemented index type $it")
+      }
+      SpinachIndexBuild(sparkSession, i.name, indexColumns.toArray, s, bAndP.map(
+        _._2), readerClassName, overwrite = false).execute()
+    })
+    if (!buildrst.isEmpty) {
+      val ret = buildrst.head
+      val retMap = ret.groupBy(_.parent)
+
+      // there some cases spn meta files have already been updated
+      // e.g. when inserting data in spn files the meta has already updated
+      // so, we should ignore these cases
+      // And files modifications for parquet should refresh spn meta in this way
+      val filteredBAndP = bAndP.filter(x => retMap.contains(x._2.toString))
+      filteredBAndP.foreach(bp =>
+        retMap.getOrElse(bp._2.toString, Nil).foreach(r => {
+          if (!bp._1.containsFileMeta(r.dataFile)) {
+            bp._1.addFileMeta(FileMeta(r.fingerprint, r.rowCount, r.dataFile))
+          }
+        }
+      ))
+
+      // write updated metas down
+      filteredBAndP.foreach(bp => DataSourceMeta.write(
+        new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
+        sparkSession.sparkContext.hadoopConfiguration,
+        bp._1.build(),
+        deleteIfExits = true))
+
+      fileCatalog.refresh()
+    }
+
+    Seq.empty
+  }
+}
+
+/**
+ * List indices for table
+ */
+case class SpinachShowIndex(relation: LogicalPlan) extends RunnableCommand with Logging {
+  override def children: Seq[LogicalPlan] = Seq(relation)
+
+  override val output: Seq[Attribute] = {
+    AttributeReference("table", StringType, nullable = true)() ::
+      AttributeReference("key_name", StringType, nullable = false)() ::
+      AttributeReference("seq_in_index", IntegerType, nullable = false)() ::
+      AttributeReference("column_name", StringType, nullable = false)() ::
+      AttributeReference("collation", StringType, nullable = true)() ::
+      AttributeReference("index_type", StringType, nullable = false)() :: Nil
+  }
+
+  override def run(sparkSession: SparkSession): Seq[Row] = {
+    val (fileCatalog, s, readerClassName, identifier) = relation match {
+      case LogicalRelation(
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, id) =>
+        (fileCatalog, s, SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME, id)
+      case LogicalRelation(
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: ParquetFileFormat, _), _, id) =>
+        (fileCatalog, s, SpinachFileFormat.PARQUET_DATA_FILE_CLASSNAME, id)
+      case other =>
+        throw new SpinachException(s"We don't support index refreshing for ${other.simpleString}")
+    }
+
+    val partitions = SpinachUtils.getPartitions(fileCatalog).filter(_.files.nonEmpty)
+    // TODO currently we ignore empty partitions, so each partition may have different indexes,
+    // this may impact index updating. It may also fail index existence check. Should put index
+    // info at table level also.
+    // aggregate all existing indices
+    val indices = partitions.flatMap(p => {
+      val parent = p.files.head.getPath.getParent
+      // TODO get `fs` outside of map() to boost
+      val fs = parent.getFileSystem(sparkSession.sparkContext.hadoopConfiguration)
+      val existOld = fs.exists(new Path(parent, SpinachFileFormat.SPINACH_META_FILE))
+      if (existOld) {
+        val m = SpinachUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, parent)
+        assert(m.nonEmpty)
+        val oldMeta = m.get
+        oldMeta.indexMetas
+      } else {
+        Nil
+      }
+    }).groupBy(_.name).map(_._2.head)
+    indices.toSeq.flatMap(i => i.indexType match {
+      case BTreeIndex(entries) =>
+        entries.zipWithIndex.map(ei => {
+          val dir = if (ei._1.dir == Ascending) "A" else "D"
+          Row(identifier.get.table, i.name, ei._2, s(ei._1.ordinal).name, dir, "BTREE")})
+      case BloomFilterIndex(entries) =>
+        // using "A" for collation as MySQL does since it is ignored.
+        entries.zipWithIndex.map(ei =>
+          Row(identifier.get.table, i.name, ei._2, s(ei._1).name, "A", "BLOOM"))
+      case t => sys.error(s"not support index type $t for index ${i.name}")
+    })
   }
 }

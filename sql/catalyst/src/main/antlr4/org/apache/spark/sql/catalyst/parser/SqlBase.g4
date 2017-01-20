@@ -114,6 +114,7 @@ statement
     | (DESC | DESCRIBE) option=(EXTENDED | FORMATTED)?
         tableIdentifier partitionSpec? describeColName?                #describeTable
     | REFRESH TABLE tableIdentifier                                    #refreshTable
+    | REFRESH SINDEX ON tableIdentifier                                #spinachRefreshIndices
     | REFRESH .*?                                                      #refreshResource
     | CACHE LAZY? TABLE tableIdentifier (AS? query)?                   #cacheTable
     | UNCACHE TABLE tableIdentifier                                    #uncacheTable
@@ -126,8 +127,9 @@ statement
     | SET .*?                                                          #setConfiguration
     | RESET                                                            #resetConfiguration
     | CREATE SINDEX (IF NOT EXISTS)? IDENTIFIER ON
-        tableIdentifier indexCols                             #spinachCreateIndex
+        tableIdentifier indexCols (USING indexType)?                   #spinachCreateIndex
     | DROP SINDEX (IF EXISTS)? IDENTIFIER ON tableIdentifier           #spinachDropIndex
+    | SHOW SINDEX (FROM | IN) tableIdentifier                          #spinachShowIndex
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
     ;
 
@@ -137,6 +139,11 @@ indexCols
 
 indexCol
     : identifier (ASC | DESC)?
+    ;
+
+indexType
+    : BTREE
+    | BLOOM
     ;
 
 unsupportedHiveNativeCommands
@@ -886,6 +893,8 @@ LOCAL: 'LOCAL';
 INPATH: 'INPATH';
 
 SINDEX: 'SINDEX';
+BTREE: 'BTREE';
+BLOOM: 'BLOOM';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''

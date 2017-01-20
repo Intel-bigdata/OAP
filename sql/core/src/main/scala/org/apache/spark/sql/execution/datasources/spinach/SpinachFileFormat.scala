@@ -31,6 +31,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.{DataSourceRegister, Filter}
 import org.apache.spark.sql.types.StructType
@@ -180,6 +181,28 @@ private[spinach] class SpinachOutputWriterFactory(
     new SpinachOutputWriter(path, dataSchema, context, serializableConf)
   }
 
+  def spnMetaFileExists(path: Path): Boolean = {
+    val fs = path.getFileSystem(job.getConfiguration)
+    fs.exists(new Path(path, SpinachFileFormat.SPINACH_META_FILE))
+  }
+
+  def addOldMetaToBuilder(path: Path, builder: DataSourceMetaBuilder): Unit = {
+    if (spnMetaFileExists(path)) {
+      val m = SpinachUtils.getMeta(job.getConfiguration, path)
+      assert(m.nonEmpty)
+      val oldMeta = m.get
+      val existsIndexes = oldMeta.indexMetas
+      val existsData = oldMeta.fileMetas
+      if (existsData != null) existsData.foreach(builder.addFileMeta(_))
+      if (existsIndexes != null) {
+        existsIndexes.foreach(builder.addIndexMeta(_))
+      }
+      builder.withNewSchema(oldMeta.schema)
+    } else {
+      builder.withNewSchema(dataSchema)
+    }
+  }
+
   // this is called from driver side
   override def commitJob(taskResults: Array[WriteResult]): Unit = {
     // TODO supposedly, we put one single meta file for each partition, however,
@@ -197,17 +220,24 @@ private[spinach] class SpinachOutputWriterFactory(
         (s.partitionString, (s.fileName, s.rowsWritten))
       case _ => throw new SpinachException("Unexpected Spinach write result.")
     }.groupBy(_._1)
+
     if (partitionMeta.nonEmpty && partitionMeta.head._1 != "") {
       partitionMeta.foreach(p => {
-        val partBuilder = DataSourceMeta.newBuilder().withNewSchema(dataSchema)
+        // we should judge if exists old meta files
+        // if exists we should load old meta info
+        // and write that to new mete files
+        val parent = new Path(outputRoot, p._1)
+        val partBuilder = DataSourceMeta.newBuilder()
+
+        addOldMetaToBuilder(parent, partBuilder)
+
         p._2.foreach(m => partBuilder.addFileMeta(FileMeta("", m._2._2, m._2._1)))
-        val partMetaPath = new Path(
-          new Path(outputRoot, p._1), SpinachFileFormat.SPINACH_META_FILE)
+        val partMetaPath = new Path(parent, SpinachFileFormat.SPINACH_META_FILE)
         DataSourceMeta.write(partMetaPath, conf, partBuilder.build())
       })
-    } else if (partitionMeta.nonEmpty) {
-      val spinachMeta = builder.withNewSchema(dataSchema).build()
-      DataSourceMeta.write(path, conf, spinachMeta)
+    } else if (partitionMeta.nonEmpty) { // normal table file without partitions
+      addOldMetaToBuilder(outputRoot, builder)
+      DataSourceMeta.write(path, conf, builder.build())
     }
 
     super.commitJob(taskResults)

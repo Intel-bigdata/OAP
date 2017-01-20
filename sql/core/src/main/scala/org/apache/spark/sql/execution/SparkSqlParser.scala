@@ -18,7 +18,6 @@
 package org.apache.spark.sql.execution
 
 import scala.collection.JavaConverters._
-import scala.util.Try
 
 import org.antlr.v4.runtime.{ParserRuleContext, Token}
 import org.antlr.v4.runtime.tree.TerminalNode
@@ -32,7 +31,7 @@ import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, OneRowRelation, ScriptInputOutputSchema}
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.{CreateTempViewUsing, _}
-import org.apache.spark.sql.execution.datasources.spinach.{CreateIndex, DropIndex, IndexColumn}
+import org.apache.spark.sql.execution.datasources.spinach._
 import org.apache.spark.sql.internal.{HiveSerDe, SQLConf, VariableSubstitution}
 import org.apache.spark.sql.types.DataType
 
@@ -1380,14 +1379,14 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
    *
    * {{{
    *   CREATE INDEX [IF NOT EXISTS] indexName ON tableName (col1 [ASC | DESC], col2, ...)
-   *   [USING BTREE]
+   *   [USING (BTREE | BLOOM)]
    * }}}
    */
   override def visitSpinachCreateIndex(ctx: SpinachCreateIndexContext): LogicalPlan =
     withOrigin(ctx) {
       CreateIndex(
         ctx.IDENTIFIER.getText, UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier())),
-        visitIndexCols(ctx.indexCols), ctx.EXISTS != null)
+        visitIndexCols(ctx.indexCols), ctx.EXISTS != null, visitIndexType(ctx.indexType))
     }
 
   /**
@@ -1409,5 +1408,22 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
 
   override def visitIndexCol(ctx: IndexColContext): IndexColumn = withOrigin(ctx) {
     IndexColumn(ctx.identifier.getText, ctx.DESC == null)
+  }
+
+  override def visitIndexType(ctx: IndexTypeContext): AnyIndexType = if (ctx == null) {
+    BTreeIndexType
+  } else {
+    withOrigin(ctx) {
+      if (ctx.BTREE != null) BTreeIndexType else BloomFilterIndexType
+    }
+  }
+
+  override def visitSpinachRefreshIndices(ctx: SpinachRefreshIndicesContext): LogicalPlan =
+    withOrigin(ctx) {
+      RefreshIndex(UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier)))
+    }
+
+  override def visitSpinachShowIndex(ctx: SpinachShowIndexContext): LogicalPlan = withOrigin(ctx) {
+    SpinachShowIndex(UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier)))
   }
 }

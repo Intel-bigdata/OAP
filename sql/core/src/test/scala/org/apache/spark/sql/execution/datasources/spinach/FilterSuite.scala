@@ -32,6 +32,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   override def beforeEach(): Unit = {
     System.setProperty("spinach.rowgroup.size", "1024")
     val path = Utils.createTempDir().getAbsolutePath
+
     sql(s"""CREATE TEMPORARY TABLE spinach_test (a INT, b STRING)
            | USING spn
            | OPTIONS (path '$path')""".stripMargin)
@@ -44,6 +45,12 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sql(s"""CREATE TEMPORARY TABLE parquet_test_date (a INT, b DATE)
            | USING parquet
            | OPTIONS (path '$path')""".stripMargin)
+    sql(s"""CREATE TABLE t_refresh (a int, b int)
+           | USING spn
+           | PARTITIONED by (b)""".stripMargin)
+    sql(s"""CREATE TABLE t_refresh_parquet (a int, b int)
+            | USING parquet
+            | PARTITIONED by (b)""".stripMargin)
   }
 
   override def afterEach(): Unit = {
@@ -51,6 +58,8 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sqlContext.dropTempTable("spinach_test_date")
     sqlContext.dropTempTable("parquet_test")
     sqlContext.dropTempTable("parquet_test_date")
+    sql("DROP TABLE IF EXISTS t_refresh")
+    sql("DROP TABLE IF EXISTS t_refresh_parquet")
   }
 
   test("empty table") {
@@ -89,7 +98,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   test("filtering") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
-    sql("insert overwrite table spinach_test  select * from t")
+    sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index1 on spinach_test (a)")
 
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
@@ -97,12 +106,13 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 1 AND a <= 3"),
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+    sql("drop sindex index1 on spinach_test")
   }
 
   test("filtering parquet") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
-    sql("insert overwrite table parquet_test  select * from t")
+    sql("insert overwrite table parquet_test select * from t")
     sql("create sindex index1 on parquet_test (a)")
 
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
@@ -112,25 +122,193 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
   }
 
+  test("test refresh in parquet format on same partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").registerTempTable("t")
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE t_refresh_parquet
+        |partition (b=1)
+        |SELECT key from t where value < 4
+      """.stripMargin)
+
+    sql("create sindex index1 on t_refresh_parquet (a)")
+
+    checkAnswer(sql("select * from t_refresh_parquet"),
+      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Nil)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh_parquet
+        |partition (b=1)
+        |SELECT key from t where value == 4
+      """.stripMargin)
+
+    sql("refresh sindex on t_refresh_parquet")
+
+    checkAnswer(sql("select * from t_refresh_parquet"),
+      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 1) :: Nil)
+  }
+
+  test("test refresh in parquet format on different partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").registerTempTable("t")
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE t_refresh_parquet
+        |partition (b=1)
+        |SELECT key from t where value < 4
+      """.stripMargin)
+
+    sql("create sindex index1 on t_refresh_parquet (a)")
+
+    checkAnswer(sql("select * from t_refresh_parquet"),
+      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Nil)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh_parquet
+        |partition (b=2)
+        |SELECT key from t where value == 4
+      """.stripMargin)
+
+    sql("refresh sindex on t_refresh_parquet")
+
+    checkAnswer(sql("select * from t_refresh_parquet"),
+      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 2) :: Nil)
+  }
+
+  test("test refresh in spn format on same partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").registerTempTable("t")
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE t_refresh
+        |partition (b=1)
+        |SELECT key from t where value < 4
+      """.stripMargin)
+
+    sql("create sindex index1 on t_refresh (a)")
+
+    checkAnswer(sql("select * from t_refresh"),
+      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Nil)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh
+        |partition (b=1)
+        |SELECT key from t where value == 4
+      """.stripMargin)
+
+    sql("refresh sindex on t_refresh")
+
+    checkAnswer(sql("select * from t_refresh"),
+      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 1) :: Nil)
+  }
+
+  test("test refresh in spn format on different partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").registerTempTable("t")
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE t_refresh
+        |partition (b=1)
+        |SELECT key from t where value < 4
+      """.stripMargin)
+
+    sql("create sindex index1 on t_refresh (a)")
+
+    checkAnswer(sql("select * from t_refresh"),
+      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Nil)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh
+        |partition (b=2)
+        |SELECT key from t where value == 4
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh
+        |partition (b=1)
+        |SELECT key from t where value == 5
+      """.stripMargin)
+
+    sql("refresh sindex on t_refresh")
+
+    checkAnswer(sql("select * from t_refresh"),
+      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 2) :: Row(5, 1) :: Nil)
+  }
+
+  test("refresh table of spinach format without partition") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("create sindex index1 on spinach_test (a)")
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
+      Row(1, "this is test 1") :: Nil)
+
+    sql("insert into table spinach_test select * from t")
+    sql("refresh sindex on spinach_test")
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
+      Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
+  }
+
+  test("refresh table of parquet format without partition") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create sindex index1 on parquet_test (a)")
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
+      Row(1, "this is test 1") :: Nil)
+
+    sql("insert into table parquet_test select * from t")
+    sql("refresh sindex on parquet_test")
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
+      Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
+  }
+
   test("filtering by string") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
-    sql("insert overwrite table spinach_test  select * from t")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 1'"),
+    sql("insert overwrite table spinach_test select * from t")
+    sql("create sindex index1 on spinach_test (a) using btree")
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
       Row(1, "this is test 1") :: Nil)
-    sql("create sindex index1 on spinach_test (b)")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 1'"),
-      Row(1, "this is test 1") :: Nil)
+
+    sql("insert into table spinach_test select * from t")
+    sql("refresh sindex on spinach_test")
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
+      Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
   }
 
-  test("filtering parquet by string") {
+  test("support data append without refresh") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
-    sql("insert overwrite table parquet_test  select * from t")
-    checkAnswer(sql("SELECT * FROM parquet_test WHERE b = 'this is test 1'"),
-      Row(1, "this is test 1") :: Nil)
-    sql("create sindex index1 on parquet_test (b)")
-    checkAnswer(sql("SELECT * FROM parquet_test WHERE b = 'this is test 1'"),
-      Row(1, "this is test 1") :: Nil)
+
+    sql("insert overwrite table spinach_test select * from t where key > 100")
+    sql("create sindex index1 on spinach_test (a)")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100"), Nil)
+    sql("insert into table spinach_test select * from t where key = 100")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100"),
+      Row(100, "this is test 100") :: Nil)
+
+    sql("insert overwrite table parquet_test select * from t where key > 100")
+    sql("create sindex index1 on parquet_test (a)")
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 100"), Nil)
+    sql("insert into table parquet_test select * from t where key = 100")
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 100"),
+      Row(100, "this is test 100") :: Nil)
   }
 }
