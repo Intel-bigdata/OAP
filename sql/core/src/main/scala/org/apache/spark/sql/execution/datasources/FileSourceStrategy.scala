@@ -97,7 +97,7 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
         case a: ParquetFileFormat
           if fileExists(_files) && _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLED) =>
           val spinachFileFormat = new SpinachFileFormat
-          spinachFileFormat.initialize(files.sparkSession, files.options, files.location)
+          spinachFileFormat.initialize(_files.sparkSession, _files.options, _files.location)
           val hasAvailableIndex = filters.map {
             case attr: AttributeReference => spinachFileFormat.attrHasIndex(attr.name)
             case _ => false
