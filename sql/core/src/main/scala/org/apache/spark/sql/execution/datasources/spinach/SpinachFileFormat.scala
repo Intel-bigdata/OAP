@@ -31,6 +31,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.{DataSourceRegister, Filter}
@@ -128,6 +129,7 @@ private[sql] class SpinachFileFormat extends FileFormat
       case Some(m) =>
         val ic = new IndexContext(m)
         BPlusTreeSearch.build(filters.toArray, ic)
+
         val filterScanner = ic.getScannerBuilder.map(_.build)
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
@@ -151,6 +153,35 @@ private[sql] class SpinachFileFormat extends FileFormat
         // TODO need to think about when there is no spinach.meta file at all
         Iterator.empty
       }
+    }
+  }
+
+  def attrHasIndex(attribute: String): Boolean = {
+
+    meta match {
+      case Some(m) =>
+        val ordinal = m.schema.fieldIndex(attribute)
+
+        var idx = 0
+        while (idx < m.indexMetas.length) {
+          m.indexMetas(idx).indexType match {
+            case BTreeIndex(entries) if (entries.length == 1 && entries(0).ordinal == ordinal) =>
+              return true
+            case BTreeIndex(entries) => entries.map { entry =>
+              // TODO support multiple key in the index
+            }
+            case BloomFilterIndex(entries) if entries.indexOf(ordinal) >= 0 =>
+              // TODO support muliple key in the index
+              return true
+            case other => // we don't support other types of index
+            // TODO support the other types of index
+          }
+
+          idx += 1
+        }
+
+        false
+      case None => false
     }
   }
 }

@@ -95,9 +95,19 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
         // if config true turn to SpinachFileFormat
         // else turn to ParquetFileFormat
         case a: ParquetFileFormat
-          if fileExists(_files) &&  _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLED) =>
-            _files.copy(fileFormat = new SpinachFileFormat)
-        case other: FileFormat => _files
+          if fileExists(_files) && _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLED) =>
+          val spinachFileFormat = new SpinachFileFormat
+          spinachFileFormat.initialize(files.sparkSession, files.options, files.location)
+          val hasAvailableIndex = filters.map {
+            case attr: AttributeReference => spinachFileFormat.attrHasIndex(attr.name)
+            case _ => false
+          }.contains(true)
+
+          hasAvailableIndex match {
+            case true => _files.copy(fileFormat = spinachFileFormat)
+            case _ => _files
+          }
+        case _: FileFormat => _files
       }
 
       val partitionColumns =
@@ -133,7 +143,7 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
       val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
       logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
 
-      files.fileFormat.initialize(files.sparkSession, files.options, files.location)
+      //files.fileFormat.initialize(files.sparkSession, files.options, files.location)
       val readFile = files.fileFormat.buildReaderWithPartitionValues(
         sparkSession = files.sparkSession,
         dataSchema = files.dataSchema,
