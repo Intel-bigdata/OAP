@@ -540,9 +540,7 @@ private[parquet] object ParquetSchemaConverter {
 
   val EMPTY_MESSAGE = Types
     .buildMessage()
-    .required(PrimitiveType.PrimitiveTypeName.INT32).named("dummy")
     .named(SPARK_PARQUET_SCHEMA_NAME)
-  EMPTY_MESSAGE.getFields.clear()
 
   def checkFieldName(name: String): Unit = {
     // ,;{}()\n\t= and space are special characters in Parquet schema
