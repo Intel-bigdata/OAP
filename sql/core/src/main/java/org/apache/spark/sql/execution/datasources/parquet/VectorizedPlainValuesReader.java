@@ -51,10 +51,6 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     }
   }
 
-  @Override
-  public void initFromPage(int valueCount, ByteBuffer page, int offset) throws IOException {
-    throw new UnsupportedOperationException();
-  }
 
   @Override
   public void skip() {
@@ -176,7 +172,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public final Binary readBinary(int len) {
-    Binary result = Binary.fromByteArray(buffer, offset - Platform.BYTE_ARRAY_OFFSET, len);
+    Binary result = Binary.fromReusedByteArray(buffer, offset - Platform.BYTE_ARRAY_OFFSET, len);
     offset += len;
     return result;
   }
