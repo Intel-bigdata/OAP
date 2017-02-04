@@ -6,7 +6,7 @@ import java.util.List;
 import org.apache.parquet.Preconditions;
 import org.apache.parquet.filter2.compat.FilterCompat;
 import org.apache.parquet.filter2.compat.FilterCompat.Filter;
-import org.apache.parquet.hadoop.api.SpinachReadSupport;
+import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.io.PositionableRecordReader;
 import org.apache.parquet.io.RecordReader;
@@ -16,11 +16,11 @@ public class RowIdsIterInternalSpinachRecordReader<T> extends InternalSpinachRec
 
     protected Iterator<List<Long>> rowIdsIter = null;
 
-    public RowIdsIterInternalSpinachRecordReader(SpinachReadSupport<T> readSupport, Filter filter) {
+    public RowIdsIterInternalSpinachRecordReader(ReadSupport<T> readSupport, Filter filter) {
         super(readSupport, filter);
     }
 
-    public RowIdsIterInternalSpinachRecordReader(SpinachReadSupport<T> readSupport) {
+    public RowIdsIterInternalSpinachRecordReader(ReadSupport<T> readSupport) {
         this(readSupport, FilterCompat.NOOP);
     }
 

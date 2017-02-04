@@ -22,17 +22,12 @@ import java.util.{Map => JMap}
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.api.{InitContext, ReadSupport}
 import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
-import org.apache.parquet.hadoop.api.SpinachReadSupport
-import org.apache.parquet.hadoop.api.SpinachReadSupport.SpinachReadContext
 import org.apache.parquet.io.api.RecordMaterializer
 import org.apache.parquet.schema._
-import scala.collection.JavaConverters._
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportHelper, UnsafeRowParquetRecordMaterializer}
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 
 
 
@@ -56,42 +51,15 @@ import org.apache.spark.sql.types._
  * to pass requested schema from [[init()]]
  * to [[prepareForRead()]], but use a private `var` for simplicity.
  */
-class SpinachReadSupportImpl extends SpinachReadSupport[UnsafeRow] with Logging {
+class SpinachReadSupportImpl extends ReadSupport[InternalRow] with Logging {
 
-  private var catalystRequestedSchema: StructType = _
-  private var catalystReadFromFileSchema: StructType = _
 
   /**
    * Called on executor side before [[prepareForRead()]] and instantiating actual Parquet record
    * readers.  Responsible for figuring out Parquet requested schema used for column pruning.
    */
-  override def init(context: InitContext): SpinachReadContext = {
-    catalystRequestedSchema = {
-      val conf = context.getConfiguration
-      val schemaString = conf.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
-      assert(schemaString != null, "Parquet requested schema not set.")
-      StructType.fromString(schemaString)
-    }
-
-    val spinachRequestedSchema =
-      ParquetReadSupportHelper.clipParquetSchema(context.getFileSchema, catalystRequestedSchema)
-
-    catalystReadFromFileSchema = {
-      val conf = context.getConfiguration
-      val readFromFileSchemaString =
-        conf.get(SpinachReadSupportImpl.SPARK_ROW_READ_FROM_FILE_SCHEMA)
-      if (readFromFileSchemaString == null) {
-        StructType.fromString(conf.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA))
-      } else {
-        StructType.fromString(readFromFileSchemaString)
-      }
-    }
-
-    val spinachReadFromFileSchema =
-      ParquetReadSupportHelper.clipParquetSchema(context.getFileSchema, catalystReadFromFileSchema)
-
-    val readContext = new ReadContext(spinachRequestedSchema, Map.empty[String, String].asJava)
-    new SpinachReadContext(spinachReadFromFileSchema, readContext)
+  override def init(context: InitContext): ReadContext = {
+    ParquetReadSupportHelper.init(context)
   }
 
   /**
@@ -103,27 +71,8 @@ class SpinachReadSupportImpl extends SpinachReadSupport[UnsafeRow] with Logging 
                                conf: Configuration,
                                keyValueMetaData: JMap[String, String],
                                fileSchema: MessageType,
-                               readContext: SpinachReadContext): RecordMaterializer[UnsafeRow] = {
-    log.debug(s"Preparing for read Parquet file with message type: $fileSchema")
-    val parquetRequestedSchema = readContext.getRequestedSchema
-
-    logInfo {
-      s"""Going to read the following fields from the Parquet file:
-          |
-         |Parquet form:
-          |$parquetRequestedSchema
-          |Catalyst form:
-          |$catalystRequestedSchema
-       """.stripMargin
-    }
-
-    new UnsafeRowParquetRecordMaterializer(
-      parquetRequestedSchema,
-      ParquetReadSupportHelper.expandUDT(catalystRequestedSchema))
+                               readContext: ReadContext): RecordMaterializer[InternalRow] = {
+    ParquetReadSupportHelper.prepareForRead(conf, keyValueMetaData, fileSchema, readContext)
   }
 }
 
-object SpinachReadSupportImpl {
-
-  val SPARK_ROW_READ_FROM_FILE_SCHEMA = "org.apache.spark.sql.parquet.row.read_from_file_schema"
-}

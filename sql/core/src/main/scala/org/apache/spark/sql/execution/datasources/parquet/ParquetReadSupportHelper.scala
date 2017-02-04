@@ -17,16 +17,29 @@
 
 package org.apache.spark.sql.execution.datasources.parquet
 
+import java.util.{Map => JMap}
+
+import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.hadoop.api.InitContext
+import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
+import org.apache.parquet.io.api.RecordMaterializer
 import org.apache.parquet.schema.MessageType
 
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.catalyst.InternalRow
 
 object ParquetReadSupportHelper {
 
+  val readSupport = new ParquetReadSupport
+
+  def init(context: InitContext): ReadContext = readSupport.init(context)
+
+  def prepareForRead(
+                      conf: Configuration,
+                      keyValueMetaData: JMap[String, String],
+                      fileSchema: MessageType,
+                      readContext: ReadContext): RecordMaterializer[InternalRow]
+  = readSupport.prepareForRead(conf, keyValueMetaData, fileSchema, readContext)
+
   val SPARK_ROW_REQUESTED_SCHEMA = ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA
 
-  def expandUDT(schema: StructType): StructType = ParquetReadSupport.expandUDT(schema)
-
-  def clipParquetSchema(parquetSchema: MessageType, catalystSchema: StructType): MessageType
-  = ParquetReadSupport.clipParquetSchema(parquetSchema, catalystSchema)
 }

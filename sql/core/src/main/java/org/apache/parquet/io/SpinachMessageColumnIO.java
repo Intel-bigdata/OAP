@@ -4,7 +4,7 @@ import static org.apache.parquet.Preconditions.checkNotNull;
 
 import java.util.List;
 
-import org.apache.parquet.column.impl.SpinachColumnReadStoreImpl;
+import org.apache.parquet.column.impl.ColumnReadStoreImpl;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.filter2.compat.FilterCompat.Filter;
 import org.apache.parquet.filter2.compat.FilterCompat.FilterPredicateCompat;
@@ -36,7 +36,7 @@ public class SpinachMessageColumnIO extends MessageColumnIO {
     }
 
     public <T> RecordReader<T> getRecordReader(final PageReadStore columns,
-            final RecordMaterializer<T> recordMaterializer, final Filter filter) {
+                                               final RecordMaterializer<T> recordMaterializer, final Filter filter) {
         checkNotNull(columns, "columns");
         checkNotNull(recordMaterializer, "recordMaterializer");
         checkNotNull(filter, "filter");
@@ -57,7 +57,7 @@ public class SpinachMessageColumnIO extends MessageColumnIO {
                         recordMaterializer, leaves, builder.getValueInspectorsByColumn(), streamingPredicate);
 
                 return new RecordReaderImplementation<T>(SpinachMessageColumnIO.this,
-                        filteringRecordMaterializer, validating, new SpinachColumnReadStoreImpl(columns,
+                        filteringRecordMaterializer, validating, new ColumnReadStoreImpl(columns,
                         filteringRecordMaterializer.getRootConverter(), getType(), creatteBy));
             }
 
@@ -69,7 +69,7 @@ public class SpinachMessageColumnIO extends MessageColumnIO {
             @Override
             public RecordReader<T> visit(NoOpFilter noOpFilter) {
                 return new RecordReaderImplementation<T>(SpinachMessageColumnIO.this, recordMaterializer,
-                        validating, new SpinachColumnReadStoreImpl(columns,
+                        validating, new ColumnReadStoreImpl(columns,
                         recordMaterializer.getRootConverter(), getType(), creatteBy));
             }
         });

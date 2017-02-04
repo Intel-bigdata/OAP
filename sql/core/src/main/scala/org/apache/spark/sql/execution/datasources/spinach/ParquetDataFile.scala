@@ -25,7 +25,6 @@ import org.apache.parquet.hadoop.api.RecordReader
 import org.apache.parquet.hadoop.SpinachRecordReader
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 import org.apache.spark.sql.types.StructType
 
@@ -43,10 +42,10 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
                requiredIds: Array[Int],
                rowIds: Array[Long]): Iterator[InternalRow] = {
     if (rowIds != null && rowIds.length == 0) {
-      new Iterator[UnsafeRow] {
+      new Iterator[InternalRow] {
         override def hasNext: Boolean = false
 
-        override def next(): UnsafeRow =
+        override def next(): InternalRow =
           throw new java.util.NoSuchElementException("Input is Empty RowIds Array")
       }
     } else {
@@ -58,15 +57,14 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
         requestSchema.json
       }
       conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
-      conf.set(SpinachReadSupportImpl.SPARK_ROW_READ_FROM_FILE_SCHEMA, requestSchemaString)
 
       val readSupport = new SpinachReadSupportImpl
 
       val recordReader = SpinachRecordReader.builder(readSupport, new Path(path), conf)
         .withGlobalRowIds(rowIds).build()
       recordReader.initialize()
-      new FileRecordReaderIterator[JLong, UnsafeRow](
-        recordReader.asInstanceOf[RecordReader[JLong, UnsafeRow]])
+      new FileRecordReaderIterator[JLong, InternalRow](
+        recordReader.asInstanceOf[RecordReader[JLong, InternalRow]])
     }
   }
 

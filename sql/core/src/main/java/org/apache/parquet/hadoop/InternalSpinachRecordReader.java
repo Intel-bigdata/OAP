@@ -21,7 +21,7 @@ import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.filter2.compat.FilterCompat;
 import org.apache.parquet.filter2.compat.FilterCompat.Filter;
 import org.apache.parquet.hadoop.api.InitContext;
-import org.apache.parquet.hadoop.api.SpinachReadSupport;
+import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.util.counters.BenchmarkCounter;
 import org.apache.parquet.io.ColumnIOFactory;
@@ -41,10 +41,9 @@ abstract class InternalSpinachRecordReader<T> {
     protected final Filter filter;
 
     protected MessageType requestedSchema;
-    protected MessageType readFromFileSchema;
     protected MessageType fileSchema;
     protected int columnCount;
-    protected final SpinachReadSupport<T> readSupport;
+    protected final ReadSupport<T> readSupport;
 
     protected RecordMaterializer<T> recordConverter;
 
@@ -71,7 +70,7 @@ abstract class InternalSpinachRecordReader<T> {
      * @param readSupport Object which helps reads files of the given type, e.g. Thrift, Avro.
      * @param filter for filtering individual records
      */
-    public InternalSpinachRecordReader(SpinachReadSupport<T> readSupport, Filter filter) {
+    public InternalSpinachRecordReader(ReadSupport<T> readSupport, Filter filter) {
         this.readSupport = readSupport;
         this.filter = checkNotNull(filter, "filter");
     }
@@ -79,7 +78,7 @@ abstract class InternalSpinachRecordReader<T> {
     /**
      * @param readSupport Object which helps reads files of the given type, e.g. Thrift, Avro.
      */
-    public InternalSpinachRecordReader(SpinachReadSupport<T> readSupport) {
+    public InternalSpinachRecordReader(ReadSupport<T> readSupport) {
         this(readSupport, FilterCompat.NOOP);
     }
 
@@ -149,17 +148,16 @@ abstract class InternalSpinachRecordReader<T> {
             throws IOException {
         // initialize a ReadContext for this file
         // TODO init read from file schema
-        SpinachReadSupport.SpinachReadContext readContext =
+        ReadSupport.ReadContext readContext =
                 readSupport.init(new InitContext(configuration, toSetMultiMap(fileMetadata), fileSchema));
         this.requestedSchema = readContext.getRequestedSchema();
-        this.readFromFileSchema = readContext.getReadFromFileSchema();
         this.fileSchema = fileSchema;
         this.file = file;
         this.columnCount = requestedSchema.getPaths().size();
         this.recordConverter =
                 readSupport.prepareForRead(configuration, fileMetadata, fileSchema, readContext);
         this.strictTypeChecking = configuration.getBoolean(STRICT_TYPE_CHECKING, true);
-        List<ColumnDescriptor> columns = readFromFileSchema.getColumns();
+        List<ColumnDescriptor> columns = requestedSchema.getColumns();
         parquetFileReader = new ParquetFileReader(configuration, file, blocks, columns);
         this.initOthers(rowIdsList, blocks);
         LOG.info("RecordReader initialized will read a total of " + total + " records.");

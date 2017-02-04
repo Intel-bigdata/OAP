@@ -8,8 +8,6 @@ public interface RecordReader<ID, V> extends Closeable {
     /**
      * Called once at initialization.
      * 
-     * @param split the split that defines the range of records to read
-     * @param context the information about the task
      * @throws IOException
      * @throws InterruptedException
      */

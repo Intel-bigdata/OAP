@@ -29,8 +29,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.filter2.compat.FilterCompat;
 import org.apache.parquet.filter2.compat.FilterCompat.Filter;
+import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
-import org.apache.parquet.hadoop.api.SpinachReadSupport;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
@@ -47,9 +47,9 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
 
     private InternalSpinachRecordReader<T> internalReader;
 
-    private SpinachReadSupport<T> readSupport;
+    private ReadSupport<T> readSupport;
 
-    private SpinachRecordReader(SpinachReadSupport<T> readSupport, Path file, Configuration configuration,
+    private SpinachRecordReader(ReadSupport<T> readSupport, Path file, Configuration configuration,
             Filter filter, long[] globalRowIds) {
         this.readSupport = readSupport;
         this.filter = checkNotNull(filter, "filter");
@@ -143,29 +143,29 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
         return internalReader.nextKeyValue();
     }
 
-    public static <T> Builder<T> builder(SpinachReadSupport<T> readSupport, Path path) {
+    public static <T> Builder<T> builder(ReadSupport<T> readSupport, Path path) {
         return new Builder<T>(readSupport, path);
     }
 
-    public static <T> Builder<T> builder(SpinachReadSupport<T> readSupport, Path path, Configuration conf) {
+    public static <T> Builder<T> builder(ReadSupport<T> readSupport, Path path, Configuration conf) {
         return new Builder<T>(readSupport, path, conf);
     }
 
     public static class Builder<T> {
-        private final SpinachReadSupport<T> readSupport;
+        private final ReadSupport<T> readSupport;
         private final Path file;
         private Configuration conf;
         private Filter filter;
         private long[] globalRowIds;
 
-        private Builder(SpinachReadSupport<T> readSupport, Path path, Configuration conf) {
+        private Builder(ReadSupport<T> readSupport, Path path, Configuration conf) {
             this.readSupport = checkNotNull(readSupport, "readSupport");
             this.file = checkNotNull(path, "path");
             this.conf = checkNotNull(conf, "configuration");
             this.filter = FilterCompat.NOOP;
         }
 
-        private Builder(SpinachReadSupport<T> readSupport, Path path) {
+        private Builder(ReadSupport<T> readSupport, Path path) {
             this.readSupport = checkNotNull(readSupport, "readSupport");
             this.file = checkNotNull(path, "path");
             this.conf = new Configuration();
