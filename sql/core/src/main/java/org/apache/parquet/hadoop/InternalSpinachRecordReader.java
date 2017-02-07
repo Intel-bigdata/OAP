@@ -34,7 +34,7 @@ import org.apache.parquet.schema.MessageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-abstract class InternalSpinachRecordReader<T> {
+abstract class InternalSpinachRecordReader<T> implements InternalRecordReader<T> {
 
     protected static final Logger LOG = LoggerFactory.getLogger(InternalSpinachRecordReader.class);
 
@@ -138,14 +138,16 @@ abstract class InternalSpinachRecordReader<T> {
     protected abstract PositionableRecordReader<T> getPositionableRecordReader(RecordReader<T> recordReader,
             long rowCount);
 
+    @Override
     public void close() throws IOException {
         if (parquetFileReader != null) {
             parquetFileReader.close();
         }
     }
 
+    @Override
     public void initialize(MessageType fileSchema, Map<String, String> fileMetadata, Path file,
-            List<BlockMetaData> blocks, List<List<Long>> rowIdsList, Configuration configuration)
+                           List<BlockMetaData> blocks, List<List<Long>> rowIdsList, Configuration configuration)
             throws IOException {
         // initialize a ReadContext for this file
         ReadSupport.ReadContext readContext =
@@ -165,6 +167,7 @@ abstract class InternalSpinachRecordReader<T> {
 
     protected abstract void initOthers(List<List<Long>> rowIdsList, List<BlockMetaData> blocks);
 
+    @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
         boolean recordFound = false;
 
@@ -199,22 +202,27 @@ abstract class InternalSpinachRecordReader<T> {
         return true;
     }
 
+    @Override
     public Void getCurrentKey() throws IOException, InterruptedException {
         return null;
     }
 
+    @Override
     public T getCurrentValue() throws IOException, InterruptedException {
         return currentValue;
     }
 
+    @Override
     public float getProgress() throws IOException, InterruptedException {
         return (float) current / total;
     }
 
+    @Override
     public int getCurrentBlockIndex() {
         return currentBlock;
     }
 
+    @Override
     public long getInternalRowId() {
         return pRecordReader.getCurrentRowId();
     }
