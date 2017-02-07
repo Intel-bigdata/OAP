@@ -88,6 +88,7 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
         val meta = new Path(path, SpinachFileFormat.SPINACH_META_FILE)
         fs.exists(meta)
       }
+
       val files: HadoopFsRelation = _files.fileFormat match {
         // TODO a better rule to check if we need to substitute the ParquetFileFormat
         // as SpinachFileFormat
@@ -98,8 +99,11 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
           if fileExists(_files) && _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLED) =>
           val spinachFileFormat = new SpinachFileFormat
           spinachFileFormat.initialize(_files.sparkSession, _files.options, _files.location)
-          val hasAvailableIndex = filters.exists{
-            case attr: AttributeReference => spinachFileFormat.attrHasIndex(attr.name)
+          val hasAvailableIndex = normalizedFilters.exists{
+            case binary: BinaryExpression => binary.left match {
+              case attr: AttributeReference => spinachFileFormat.attrHasIndex(attr.name)
+              case _ => false
+            }
             case _ => false
           }
 
