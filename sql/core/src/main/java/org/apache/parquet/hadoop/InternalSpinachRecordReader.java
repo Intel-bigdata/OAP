@@ -15,7 +15,6 @@ import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.Log;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.filter2.compat.FilterCompat;
@@ -32,10 +31,12 @@ import org.apache.parquet.io.RecordReader;
 import org.apache.parquet.io.SpinachMessageColumnIO;
 import org.apache.parquet.io.api.RecordMaterializer;
 import org.apache.parquet.schema.MessageType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 abstract class InternalSpinachRecordReader<T> {
 
-    protected static final Log LOG = Log.getLog(InternalSpinachRecordReader.class);
+    protected static final Logger LOG = LoggerFactory.getLogger(InternalSpinachRecordReader.class);
 
     protected final ColumnIOFactory columnIOFactory = new ColumnIOFactory();
     protected final Filter filter;
@@ -85,9 +86,9 @@ abstract class InternalSpinachRecordReader<T> {
     protected void checkRead() throws IOException {
         if (current == totalCountLoadedSoFar) {
             if (current != 0) {
-                totalTimeSpentProcessingRecords 
+                totalTimeSpentProcessingRecords
                         += (System.currentTimeMillis() - startedAssemblingCurrentBlockAt);
-                if (Log.INFO) {
+                if (LOG.isInfoEnabled()) {
                     LOG.info("Assembled and processed " + totalCountLoadedSoFar + " records from "
                             + columnCount + " columns in " + totalTimeSpentProcessingRecords + " ms: "
                             + ((float) totalCountLoadedSoFar / totalTimeSpentProcessingRecords) + " rec/ms, "
@@ -115,12 +116,12 @@ abstract class InternalSpinachRecordReader<T> {
             long timeSpentReading = System.currentTimeMillis() - t0;
             totalTimeSpentReadingBytes += timeSpentReading;
             BenchmarkCounter.incrementTime(timeSpentReading);
-            if (Log.INFO) {
-                LOG.info("block read in memory in " + timeSpentReading + " ms. row count = "
-                        + pages.getRowCount());
+            if (LOG.isInfoEnabled()) {
+                LOG.info("block read in memory in {} ms. row count = {}",
+                        timeSpentReading, pages.getRowCount());
             }
-            if (Log.DEBUG) {
-                LOG.debug("initializing Record assembly with requested schema " + requestedSchema);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("initializing Record assembly with requested schema {}", requestedSchema);
             }
             MessageColumnIO columnIO =
                     columnIOFactory.getColumnIO(requestedSchema, fileSchema, strictTypeChecking);
@@ -147,7 +148,6 @@ abstract class InternalSpinachRecordReader<T> {
             List<BlockMetaData> blocks, List<List<Long>> rowIdsList, Configuration configuration)
             throws IOException {
         // initialize a ReadContext for this file
-        // TODO init read from file schema
         ReadSupport.ReadContext readContext =
                 readSupport.init(new InitContext(configuration, toSetMultiMap(fileMetadata), fileSchema));
         this.requestedSchema = readContext.getRequestedSchema();
