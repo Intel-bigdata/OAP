@@ -20,15 +20,14 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.net.URI
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, FSDataOutputStream, Path}
+import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.JoinedRow
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, EqualTo, Expression, GreaterThan, GreaterThanOrEqual, JoinedRow, LessThan, LessThanOrEqual}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
@@ -155,12 +154,27 @@ private[sql] class SpinachFileFormat extends FileFormat
     }
   }
 
-  def attrHasIndex(attribute: String, isRangeQuery: Boolean): Boolean = {
+  def hasAvailableIndex(filters: Seq[Expression]): Boolean = {
+    filters.exists {
+      case EqualTo(attr: AttributeReference, _) =>
+        attrHasIndex(attr.name, false)
+      case GreaterThan(attr: AttributeReference, _) =>
+        attrHasIndex(attr.name, true)
+      case GreaterThanOrEqual(attr: AttributeReference, _) =>
+        attrHasIndex(attr.name, true)
+      case LessThan(attr: AttributeReference, _) =>
+        attrHasIndex(attr.name, true)
+      case LessThanOrEqual(attr: AttributeReference, _) =>
+        attrHasIndex(attr.name, true)
+      case _ => false
+    }
+  }
+
+  private def attrHasIndex(attribute: String, isRangeQuery: Boolean): Boolean = {
 
     meta match {
       case Some(m) =>
         val ordinal = m.schema.fieldIndex(attribute)
-
         var idx = 0
         while (idx < m.indexMetas.length) {
           m.indexMetas(idx).indexType match {

@@ -99,29 +99,16 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
           if fileExists(_files) && _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLED) =>
           val spinachFileFormat = new SpinachFileFormat
           spinachFileFormat.initialize(_files.sparkSession, _files.options, _files.location)
-          val hasAvailableIndex = normalizedFilters.exists{
-            case EqualTo(attr: AttributeReference, _) =>
-              spinachFileFormat.attrHasIndex(attr.name, false)
-            case GreaterThan(attr: AttributeReference, _) =>
-              spinachFileFormat.attrHasIndex(attr.name, true)
-            case GreaterThanOrEqual(attr: AttributeReference, _) =>
-              spinachFileFormat.attrHasIndex(attr.name, true)
-            case LessThan(attr: AttributeReference, _) =>
-              spinachFileFormat.attrHasIndex(attr.name, true)
-            case LessThanOrEqual(attr: AttributeReference, _) =>
-              spinachFileFormat.attrHasIndex(attr.name, true)
-            case _ => false
+
+          if (spinachFileFormat.hasAvailableIndex(normalizedFilters)) {
+            logInfo("hasAvailableIndex = true, will replace with SpinachFileFormat.")
+            _files.copy(fileFormat = spinachFileFormat)
+          } else {
+            logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
+            _files.fileFormat.initialize(_files.sparkSession, _files.options, _files.location)
+            _files
           }
 
-          hasAvailableIndex match {
-            case true =>
-              logInfo("hasAvailableIndex = true, will replace with SpinachFileFormat.")
-              _files.copy(fileFormat = spinachFileFormat)
-            case _ =>
-              logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
-              _files.fileFormat.initialize(_files.sparkSession, _files.options, _files.location)
-              _files
-          }
         case _: FileFormat =>
           _files.fileFormat.initialize(_files.sparkSession, _files.options, _files.location)
           _files
