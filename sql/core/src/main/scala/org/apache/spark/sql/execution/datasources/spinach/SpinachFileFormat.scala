@@ -155,7 +155,7 @@ private[sql] class SpinachFileFormat extends FileFormat
     }
   }
 
-  def attrHasIndex(attribute: String): Boolean = {
+  def attrHasIndex(attribute: String, isRangeQuery: Boolean): Boolean = {
 
     meta match {
       case Some(m) =>
@@ -166,16 +166,10 @@ private[sql] class SpinachFileFormat extends FileFormat
           m.indexMetas(idx).indexType match {
             case BTreeIndex(entries) if (entries.length == 1 && entries(0).ordinal == ordinal) =>
               return true
-            case BTreeIndex(entries) => entries.map { entry =>
-              // TODO support multiple key in the index
-            }
-            case BloomFilterIndex(entries) if entries.indexOf(ordinal) >= 0 =>
-              // TODO support muliple key in the index
+            case BloomFilterIndex(entries) if (!isRangeQuery && entries.indexOf(ordinal) >= 0) =>
               return true
-            case other => // we don't support other types of index
-            // TODO support the other types of index
+            case _ => // we don't support other types of index
           }
-
           idx += 1
         }
 

@@ -100,10 +100,16 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
           val spinachFileFormat = new SpinachFileFormat
           spinachFileFormat.initialize(_files.sparkSession, _files.options, _files.location)
           val hasAvailableIndex = normalizedFilters.exists{
-            case binary: BinaryExpression => binary.left match {
-              case attr: AttributeReference => spinachFileFormat.attrHasIndex(attr.name)
-              case _ => false
-            }
+            case EqualTo(attr: AttributeReference, _) =>
+              spinachFileFormat.attrHasIndex(attr.name, false)
+            case GreaterThan(attr: AttributeReference, _) =>
+              spinachFileFormat.attrHasIndex(attr.name, true)
+            case GreaterThanOrEqual(attr: AttributeReference, _) =>
+              spinachFileFormat.attrHasIndex(attr.name, true)
+            case LessThan(attr: AttributeReference, _) =>
+              spinachFileFormat.attrHasIndex(attr.name, true)
+            case LessThanOrEqual(attr: AttributeReference, _) =>
+              spinachFileFormat.attrHasIndex(attr.name, true)
             case _ => false
           }
 
