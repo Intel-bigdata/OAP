@@ -285,7 +285,40 @@ private[spinach] case class DataSourceMeta(
     indexMetas: Array[IndexMeta],
     schema: StructType,
     dataReaderClassName: String,
-    @transient fileHeader: FileHeader) extends Serializable
+    @transient fileHeader: FileHeader) extends Serializable {
+
+   def hasAvailableIndex(filters: Seq[Expression]): Boolean = {
+    filters.exists {
+      case EqualTo(attr: AttributeReference, _) =>
+        attrHasIndex(attr.name, false)
+      case GreaterThan(attr: AttributeReference, _) =>
+        attrHasIndex(attr.name, true)
+      case GreaterThanOrEqual(attr: AttributeReference, _) =>
+        attrHasIndex(attr.name, true)
+      case LessThan(attr: AttributeReference, _) =>
+        attrHasIndex(attr.name, true)
+      case LessThanOrEqual(attr: AttributeReference, _) =>
+        attrHasIndex(attr.name, true)
+      case _ => false
+    }
+  }
+
+  private def attrHasIndex(attribute: String, isRangeQuery: Boolean): Boolean = {
+    val ordinal = schema.fieldIndex(attribute)
+    var idx = 0
+    while (idx < indexMetas.length) {
+      indexMetas(idx).indexType match {
+        case BTreeIndex(entries) if (entries.length == 1 && entries(0).ordinal == ordinal) =>
+          return true
+        case BloomFilterIndex(entries) if (!isRangeQuery && entries.indexOf(ordinal) >= 0) =>
+          return true
+        case _ => // we don't support other types of index
+      }
+      idx += 1
+    }
+    false
+  }
+}
 
 private[spinach] class DataSourceMetaBuilder {
   val fileMetas = ArrayBuffer.empty[FileMeta]
