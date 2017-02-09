@@ -46,7 +46,7 @@ public class InternalSpinachRecordReader<T> {
 
     private RecordReader<T> recordReader;
 
-    private Iterator<List<Long>> rowIdsIter = null;
+    private Iterator<List<Long>> rowIdsIter;
 
     private String createdBy;
 
