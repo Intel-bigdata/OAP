@@ -39,27 +39,20 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
 
     private Configuration configuration;
     private Path file;
-//    private Filter filter;
     private List<Long> filteredStartRowIdList = Lists.newArrayList();
     private long[] globalRowIds;
 
-//    private InternalSpinachRecordReader<T> internalReader;
-
-    private InternalRecordReader<T> internalReader;
+    private InternalSpinachRecordReader<T> internalReader;
 
     private ReadSupport<T> readSupport;
 
     private SpinachRecordReader(ReadSupport<T> readSupport, Path file, Configuration configuration, long[] globalRowIds) {
         this.readSupport = readSupport;
-//        this.filter = checkNotNull(filter, "filter");
         this.file = file;
         this.configuration = configuration;
         this.globalRowIds = globalRowIds;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void close() throws IOException {
         internalReader.close();
@@ -151,26 +144,18 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
         private final ReadSupport<T> readSupport;
         private final Path file;
         private Configuration conf;
-//        private Filter filter;
-        private long[] globalRowIds;
+        private long[] globalRowIds = new long[0];
 
         private Builder(ReadSupport<T> readSupport, Path path, Configuration conf) {
             this.readSupport = checkNotNull(readSupport, "readSupport");
             this.file = checkNotNull(path, "path");
             this.conf = checkNotNull(conf, "configuration");
-//            this.filter = FilterCompat.NOOP;
         }
 
         private Builder(ReadSupport<T> readSupport, Path path) {
             this.readSupport = checkNotNull(readSupport, "readSupport");
             this.file = checkNotNull(path, "path");
             this.conf = new Configuration();
-//            this.filter = FilterCompat.NOOP;
-        }
-
-        public Builder<T> withConf(Configuration conf) {
-            this.conf = checkNotNull(conf, "conf");
-            return this;
         }
 
         public Builder<T> withGlobalRowIds(long[] globalRowIds) {
@@ -179,7 +164,6 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
         }
 
         public SpinachRecordReader<T> build() throws IOException {
-//            return new SpinachRecordReader<T>(readSupport, file, conf, filter, globalRowIds);
             return new SpinachRecordReader<>(readSupport, file, conf, globalRowIds);
         }
     }

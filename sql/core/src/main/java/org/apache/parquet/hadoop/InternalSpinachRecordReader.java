@@ -21,7 +21,7 @@ import org.apache.parquet.schema.MessageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class InternalSpinachRecordReader<T> implements InternalRecordReader<T> {
+public class InternalSpinachRecordReader<T> {
 
     protected static final Logger LOG = LoggerFactory.getLogger(InternalSpinachRecordReader.class);
 
@@ -118,7 +118,6 @@ public class InternalSpinachRecordReader<T> implements InternalRecordReader<T> {
         return new RowIdIteratorRecordReaderImpl<>(recordReader, rowIdsIter.next(), rowCount);
     }
 
-    @Override
     public void close() throws IOException {
         if (parquetFileReader != null) {
             parquetFileReader.close();
@@ -140,16 +139,9 @@ public class InternalSpinachRecordReader<T> implements InternalRecordReader<T> {
                 configuration, fileMetadata, fileSchema, readContext);
         this.strictTypeChecking = configuration.getBoolean(STRICT_TYPE_CHECKING, true);
         this.parquetFileReader.setRequestedSchema(requestedSchema);
-
     }
 
-    //    this.total = reader.getRecordCount();
-//    this.unmaterializableRecordCounter = new UnmaterializableRecordCounter(configuration, total);
-//    this.filterRecords = configuration.getBoolean(
-//    RECORD_FILTERING_ENABLED, RECORD_FILTERING_ENABLED_DEFAULT);
-
     public void initOthers(List<List<Long>> rowIdsList) {
-        Preconditions.checkArgument(rowIdsList != null && !rowIdsList.isEmpty(), "RowIdsList must not empty");
         this.rowIdsIter = rowIdsList.iterator();
         for (List<Long> rowIdList : rowIdsList) {
             total += rowIdList.size();
@@ -158,7 +150,6 @@ public class InternalSpinachRecordReader<T> implements InternalRecordReader<T> {
     }
 
 
-    @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
         boolean recordFound = false;
 
@@ -193,27 +184,25 @@ public class InternalSpinachRecordReader<T> implements InternalRecordReader<T> {
         return true;
     }
 
-    @Override
     public Void getCurrentKey() throws IOException, InterruptedException {
         return null;
     }
 
-    @Override
     public T getCurrentValue() throws IOException, InterruptedException {
         return currentValue;
     }
 
-    @Override
     public float getProgress() throws IOException, InterruptedException {
+        if(total == 0L){
+            return 1F;
+        }
         return (float) current / total;
     }
 
-    @Override
     public int getCurrentBlockIndex() {
         return currentBlock;
     }
 
-    @Override
     public long getInternalRowId() {
         return pRecordReader.getCurrentRowId();
     }

@@ -58,7 +58,7 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
   def iterator(conf: Configuration,
                requiredIds: Array[Int],
                rowIds: Array[Long]): Iterator[InternalRow] = {
-    if (rowIds != null && rowIds.length == 0) {
+    if (rowIds == null || rowIds.length == 0) {
       new Iterator[InternalRow] {
         override def hasNext: Boolean = false
 
