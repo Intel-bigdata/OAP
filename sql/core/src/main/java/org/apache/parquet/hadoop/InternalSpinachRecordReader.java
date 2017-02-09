@@ -22,37 +22,37 @@ import org.slf4j.LoggerFactory;
 
 public class InternalSpinachRecordReader<T> {
 
-    protected static final Logger LOG = LoggerFactory.getLogger(InternalSpinachRecordReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(InternalSpinachRecordReader.class);
 
-    protected SColumnIOFactory columnIOFactory;
+    private SColumnIOFactory columnIOFactory;
 
-    protected MessageType requestedSchema;
-    protected MessageType fileSchema;
-    protected int columnCount;
-    protected final ReadSupport<T> readSupport;
+    private MessageType requestedSchema;
+    private MessageType fileSchema;
+    private int columnCount;
+    private final ReadSupport<T> readSupport;
 
-    protected RecordMaterializer<T> recordConverter;
+    private RecordMaterializer<T> recordConverter;
 
-    protected T currentValue;
-    protected long total;
-    protected long current = 0;
-    protected int currentBlock = -1;
+    private T currentValue;
+    private long total;
+    private long current = 0;
+    private int currentBlock = -1;
 
-    protected boolean strictTypeChecking;
+    private boolean strictTypeChecking;
 
-    protected long totalTimeSpentReadingBytes;
-    protected long totalTimeSpentProcessingRecords;
-    protected long startedAssemblingCurrentBlockAt;
+    private long totalTimeSpentReadingBytes;
+    private long totalTimeSpentProcessingRecords;
+    private long startedAssemblingCurrentBlockAt;
 
-    protected long totalCountLoadedSoFar = 0;
+    private long totalCountLoadedSoFar = 0;
 
-    protected Path file;
+    private Path file;
 
-    protected ParquetFileReader parquetFileReader;
+    private ParquetFileReader parquetFileReader;
 
-    protected RecordReader<T> recordReader;
+    private RecordReader<T> recordReader;
 
-    protected Iterator<List<Long>> rowIdsIter = null;
+    private Iterator<List<Long>> rowIdsIter = null;
 
     /**
      * @param readSupport Object which helps reads files of the given type, e.g. Thrift, Avro.
@@ -61,7 +61,7 @@ public class InternalSpinachRecordReader<T> {
         this.readSupport = readSupport;
     }
 
-    protected void checkRead() throws IOException {
+    private void checkRead() throws IOException {
         if (current == totalCountLoadedSoFar) {
             if (current != 0) {
                 totalTimeSpentProcessingRecords
@@ -105,9 +105,7 @@ public class InternalSpinachRecordReader<T> {
                     columnIOFactory.getColumnIO(requestedSchema, fileSchema, strictTypeChecking);
             List<Long> rowIdList = rowIdsIter.next();
             this.recordReader = columnIO.getRecordReader(pages, recordConverter, rowIdList);
-
             startedAssemblingCurrentBlockAt = System.currentTimeMillis();
-
             totalCountLoadedSoFar += rowIdList.size();
             ++currentBlock;
         }
