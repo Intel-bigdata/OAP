@@ -49,7 +49,8 @@ public class SColumnMessageIO extends GroupColumnIO {
     }
 
     public <T> RecordReader<T> getRecordReader(final PageReadStore columns,
-                                               final RecordMaterializer<T> recordMaterializer) {
+                                               final RecordMaterializer<T> recordMaterializer,
+                                               List<Long> rowIdList) {
         checkNotNull(columns, "columns");
         checkNotNull(recordMaterializer, "recordMaterializer");
 
@@ -57,10 +58,12 @@ public class SColumnMessageIO extends GroupColumnIO {
             return new EmptyRecordReader<>(recordMaterializer);
         }
 
-        return new SRecordReaderImplementation<>(
+        return  new PositionableRecordReaderImpl<>(
                 SColumnMessageIO.this,
                 recordMaterializer,
-                new ColumnReadStoreImpl(columns, recordMaterializer.getRootConverter(), getType(), createdBy));
+                new ColumnReadStoreImpl(columns, recordMaterializer.getRootConverter(), getType(), createdBy),
+                columns.getRowCount(),
+                rowIdList);
     }
 
     void setLevels() {

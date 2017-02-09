@@ -9,7 +9,6 @@ import java.util.*;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.Preconditions;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.hadoop.api.InitContext;
 import org.apache.parquet.hadoop.api.ReadSupport;
@@ -51,7 +50,7 @@ public class InternalSpinachRecordReader<T> {
 
     protected ParquetFileReader parquetFileReader;
 
-    protected PositionableRecordReader<T> pRecordReader;
+    protected RecordReader<T> recordReader;
 
     protected Iterator<List<Long>> rowIdsIter = null;
 
@@ -104,18 +103,14 @@ public class InternalSpinachRecordReader<T> {
             }
             SColumnMessageIO columnIO =
                     columnIOFactory.getColumnIO(requestedSchema, fileSchema, strictTypeChecking);
-            RecordReader<T> recordReader = columnIO.getRecordReader(pages,recordConverter);
+            List<Long> rowIdList = rowIdsIter.next();
+            this.recordReader = columnIO.getRecordReader(pages, recordConverter, rowIdList);
 
             startedAssemblingCurrentBlockAt = System.currentTimeMillis();
-            this.pRecordReader = getPositionableRecordReader(recordReader, pages.getRowCount());
-            totalCountLoadedSoFar += pRecordReader.getRecordCount();
+
+            totalCountLoadedSoFar += rowIdList.size();
             ++currentBlock;
         }
-    }
-
-    protected PositionableRecordReader<T> getPositionableRecordReader(RecordReader<T> recordReader,
-                                                                      long rowCount) {
-        return new RowIdIteratorRecordReaderImpl<>(recordReader, rowIdsIter.next(), rowCount);
     }
 
     public void close() throws IOException {
@@ -161,9 +156,9 @@ public class InternalSpinachRecordReader<T> {
 
             try {
                 checkRead();
-                this.currentValue = pRecordReader.read();
+                this.currentValue = recordReader.read();
                 current++;
-                if (pRecordReader.shouldSkipCurrentRecord()) {
+                if (recordReader.shouldSkipCurrentRecord()) {
                     // this record is being filtered via the filter2 package
                     if (DEBUG) {
                         LOG.debug("skipping record");

@@ -2,42 +2,44 @@ package org.apache.parquet.io;
 
 import org.apache.parquet.Preconditions;
 import org.apache.parquet.column.ColumnReader;
-import org.apache.parquet.io.RecordReaderImplementation.State;
-import org.apache.parquet.utils.Reflections;
+import org.apache.parquet.column.impl.ColumnReadStoreImpl;
+import org.apache.parquet.io.api.RecordMaterializer;
 
-public abstract class PositionableRecordReaderImpl<T> implements PositionableRecordReader<T> {
+import java.util.Iterator;
+import java.util.List;
+
+public class PositionableRecordReaderImpl<T> extends SRecordReaderImplementation<T> {
 
     protected final long recordMaxCount;
 
     private long recordsRead = 0;
 
-    private RecordReader<T> recordReader;
-
-    private State[] states;
-
     protected Long currentRowId = -1L;
 
-    public PositionableRecordReaderImpl(RecordReader<T> recordReader, long recordCount) {
-        this.recordReader = recordReader;
-        this.recordMaxCount = recordCount;
-        if(recordReader instanceof RecordReaderImplementation){
-            this.states = (State[]) Reflections.getFieldValue(recordReader, "states");
-        }
+    private Iterator<Long> rowIdIter = null;
 
+    public PositionableRecordReaderImpl(SColumnMessageIO root,
+                                        RecordMaterializer<T> recordMaterializer,
+                                        ColumnReadStoreImpl columnStore,
+                                        long recordCount,
+                                        List<Long> rowIdList
+    ) {
+        super(root, recordMaterializer, columnStore);
+        this.recordMaxCount = recordCount;
+        Preconditions.checkArgument(rowIdList != null && !rowIdList.isEmpty(), "rowIdList must has item.");
+        this.rowIdIter = rowIdList.iterator();
     }
 
     public T read() {
-        if(this.states != null){
-            currentRowId = this.nextRowId();
-            seek(currentRowId);
-        }
+        currentRowId = rowIdIter.next();
+        seek(currentRowId);
 
         if (recordsRead == recordMaxCount) {
             return null;
         }
 
         ++recordsRead;
-        return recordReader.read();
+        return super.read();
     }
 
     private void seek(long position) {
@@ -66,20 +68,5 @@ public abstract class PositionableRecordReaderImpl<T> implements PositionableRec
             recordsRead++;
         }
     }
-
-    private State getState(int i) {
-        return states[i];
-    }
-
-    public boolean shouldSkipCurrentRecord() {
-        return this.recordReader.shouldSkipCurrentRecord();
-    }
-
-    @Override
-    public Long getCurrentRowId() {
-        return currentRowId;
-    }
-
-    protected abstract Long nextRowId();
 
 }
