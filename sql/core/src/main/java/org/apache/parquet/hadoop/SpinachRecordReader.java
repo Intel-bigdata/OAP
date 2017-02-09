@@ -51,7 +51,7 @@ public class SpinachRecordReader<T> implements RecordReader<T> {
                         Configuration configuration,
                         long[] globalRowIds,
                         ParquetMetadata footer) {
-        Preconditions.checkNotNull(globalRowIds,"index collection can not Bbe null!");
+        Preconditions.checkNotNull(globalRowIds,"index collection can not be null!");
         this.readSupport = readSupport;
         this.file = file;
         this.configuration = configuration;
