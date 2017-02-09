@@ -383,11 +383,7 @@ class SRecordReaderImplementation<T> extends RecordReader<T> {
     public boolean shouldSkipCurrentRecord() {
         return shouldSkipCurrentRecord;
     }
-
-    private static void log(String string) {
-        LOG.debug(string);
-    }
-
+    
     int getNextReader(int current, int nextRepetitionLevel) {
         State nextState = states[current].nextState[nextRepetitionLevel];
         return nextState == null ? states.length : nextState.id;
