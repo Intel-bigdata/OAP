@@ -214,7 +214,7 @@ class SRecordReaderImplementation<T> extends RecordReader<T> {
      */
     public SRecordReaderImplementation(SColumnMessageIO root, RecordMaterializer<T> recordMaterializer, ColumnReadStoreImpl columnStore) {
         this.recordMaterializer = recordMaterializer;
-        this.recordRootConverter = recordMaterializer.getRootConverter(); // TODO: validator(wrap(recordMaterializer), validating, root.getType());
+        this.recordRootConverter = recordMaterializer.getRootConverter();
         PrimitiveColumnIO[] leaves = root.getLeaves().toArray(new PrimitiveColumnIO[root.getLeaves().size()]);
         columnReaders = new ColumnReader[leaves.length];
         int[][] nextColumnIdxForRepLevel = new int[leaves.length][];
