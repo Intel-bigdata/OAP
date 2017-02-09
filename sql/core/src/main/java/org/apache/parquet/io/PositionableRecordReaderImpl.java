@@ -22,11 +22,11 @@ public class PositionableRecordReaderImpl<T> extends SRecordReaderImplementation
                                         RecordMaterializer<T> recordMaterializer,
                                         ColumnReadStoreImpl columnStore,
                                         long recordCount,
-                                        List<Long> rowIdList
-    ) {
+                                        List<Long> rowIdList) {
         super(root, recordMaterializer, columnStore);
+        Preconditions.checkNotNull(rowIdList,"rowIdList can not be null.");
+        Preconditions.checkArgument(!rowIdList.isEmpty(), "rowIdList must has item.");
         this.recordMaxCount = recordCount;
-        Preconditions.checkArgument(rowIdList != null && !rowIdList.isEmpty(), "rowIdList must has item.");
         this.rowIdIter = rowIdList.iterator();
     }
 
