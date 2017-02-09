@@ -23,15 +23,6 @@ public interface RecordReader<ID, V> extends Closeable {
     boolean nextKeyValue() throws IOException, InterruptedException;
 
     /**
-     * Get the current key
-     * 
-     * @return the current key or null if there is no current key
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    ID getCurrentRowId() throws IOException, InterruptedException;
-
-    /**
      * Get the current value.
      * 
      * @return the object that was read

@@ -58,11 +58,6 @@ public class DefaultRecordReader<T> implements RecordReader<Long, T> {
     }
 
     @Override
-    public Long getCurrentRowId() throws IOException, InterruptedException {
-        return 0L;
-    }
-
-    @Override
     public T getCurrentValue() throws IOException, InterruptedException {
         return internalReader.getCurrentValue();
     }

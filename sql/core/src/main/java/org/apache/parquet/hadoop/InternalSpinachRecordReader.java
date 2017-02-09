@@ -184,10 +184,6 @@ public class InternalSpinachRecordReader<T> {
         return true;
     }
 
-    public Void getCurrentKey() throws IOException, InterruptedException {
-        return null;
-    }
-
     public T getCurrentValue() throws IOException, InterruptedException {
         return currentValue;
     }
@@ -197,14 +193,6 @@ public class InternalSpinachRecordReader<T> {
             return 1F;
         }
         return (float) current / total;
-    }
-
-    public int getCurrentBlockIndex() {
-        return currentBlock;
-    }
-
-    public long getInternalRowId() {
-        return pRecordReader.getCurrentRowId();
     }
 
     private static <K, V> Map<K, Set<V>> toSetMultiMap(Map<K, V> map) {
