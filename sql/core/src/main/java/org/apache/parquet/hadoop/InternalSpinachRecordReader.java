@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.util.*;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.hadoop.api.InitContext;
 import org.apache.parquet.hadoop.api.ReadSupport;
@@ -46,7 +45,7 @@ public class InternalSpinachRecordReader<T> {
 
     private long totalCountLoadedSoFar = 0;
 
-    private ParquetFileReader parquetFileReader;
+    private ParquetFileReader reader;
 
     private RecordReader<T> recordReader;
 
@@ -83,7 +82,7 @@ public class InternalSpinachRecordReader<T> {
 
             LOG.info("at row " + current + ". reading next block");
             long t0 = System.currentTimeMillis();
-            PageReadStore pages = parquetFileReader.readNextRowGroup();
+            PageReadStore pages = reader.readNextRowGroup();
             if (pages == null) {
                 throw new IOException(
                         "expecting more rows but reached last block. Read " + current + " out of " + total);
@@ -110,14 +109,14 @@ public class InternalSpinachRecordReader<T> {
     }
 
     public void close() throws IOException {
-        if (parquetFileReader != null) {
-            parquetFileReader.close();
+        if (reader != null) {
+            reader.close();
         }
     }
 
     public void initialize(ParquetFileReader parquetFileReader, Configuration configuration)
             throws IOException {
-        this.parquetFileReader = parquetFileReader;
+        this.reader = parquetFileReader;
         FileMetaData parquetFileMetadata = parquetFileReader.getFooter().getFileMetaData();
         this.fileSchema = parquetFileMetadata.getSchema();
         Map<String, String> fileMetadata = parquetFileMetadata.getKeyValueMetaData();
@@ -129,7 +128,12 @@ public class InternalSpinachRecordReader<T> {
         this.recordConverter = readSupport.prepareForRead(
                 configuration, fileMetadata, fileSchema, readContext);
         this.strictTypeChecking = configuration.getBoolean(STRICT_TYPE_CHECKING, true);
-        this.parquetFileReader.setRequestedSchema(requestedSchema);
+//        this.unmaterializableRecordCounter = new UnmaterializableRecordCounter(configuration, total);
+//        this.filterRecords = configuration.getBoolean(
+//                RECORD_FILTERING_ENABLED, RECORD_FILTERING_ENABLED_DEFAULT);
+
+        //TODO init total count
+        this.reader.setRequestedSchema(requestedSchema);
     }
 
     void initOthers(List<List<Long>> rowIdsList) {
@@ -169,7 +173,7 @@ public class InternalSpinachRecordReader<T> {
                 }
             } catch (RuntimeException e) {
                 throw new ParquetDecodingException(format("Can not read value at %d in block %d in file %s",
-                        current, currentBlock, parquetFileReader.getPath()), e);
+                        current, currentBlock, reader.getPath()), e);
             }
         }
         return true;
