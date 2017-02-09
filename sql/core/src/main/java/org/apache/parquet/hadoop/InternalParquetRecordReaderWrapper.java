@@ -10,27 +10,17 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-public class IntenalParquetRecordReaderWrapper<T> implements InternalRecordReader<T> {
+public class InternalParquetRecordReaderWrapper<T> implements InternalRecordReader<T> {
 
     private final InternalParquetRecordReader<T> internalParquetRecordReader;
 
-    public IntenalParquetRecordReaderWrapper(InternalParquetRecordReader<T> internalParquetRecordReader) {
+    public InternalParquetRecordReaderWrapper(InternalParquetRecordReader<T> internalParquetRecordReader) {
         this.internalParquetRecordReader = internalParquetRecordReader;
     }
 
     @Override
     public void close() throws IOException {
         internalParquetRecordReader.close();
-    }
-
-    @Override
-    public void initialize(MessageType fileSchema,
-                           Map<String, String> fileMetadata,
-                           Path file,
-                           List<BlockMetaData> blocks,
-                           List<List<Long>> rowIdsList,
-                           Configuration configuration) throws IOException {
-        //TODO do this method
     }
 
     @Override
@@ -63,5 +53,14 @@ public class IntenalParquetRecordReaderWrapper<T> implements InternalRecordReade
     public long getInternalRowId() {
         //TODO do this method
         return 0;
+    }
+
+    public void initOthers(List<List<Long>> rowIdsList) {
+        // do nothing
+    }
+
+    @Override
+    public void initialize(ParquetFileReader reader, Configuration configuration) throws IOException {
+        this.internalParquetRecordReader.initialize(reader,configuration);
     }
 }

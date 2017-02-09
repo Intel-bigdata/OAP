@@ -13,10 +13,6 @@ import java.util.Map;
 public interface InternalRecordReader<T> {
     void close() throws IOException;
 
-    void initialize(MessageType fileSchema, Map<String, String> fileMetadata, Path file,
-                    List<BlockMetaData> blocks, List<List<Long>> rowIdsList, Configuration configuration)
-            throws IOException;
-
     boolean nextKeyValue() throws IOException, InterruptedException;
 
     Void getCurrentKey() throws IOException, InterruptedException;
@@ -28,4 +24,9 @@ public interface InternalRecordReader<T> {
     int getCurrentBlockIndex();
 
     long getInternalRowId();
+
+    void initOthers(List<List<Long>> rowIdsList);
+
+    void initialize(ParquetFileReader reader, Configuration configuration)
+            throws IOException;
 }

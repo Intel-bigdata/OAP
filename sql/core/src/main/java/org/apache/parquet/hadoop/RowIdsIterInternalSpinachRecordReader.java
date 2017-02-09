@@ -16,12 +16,8 @@ public class RowIdsIterInternalSpinachRecordReader<T> extends InternalSpinachRec
 
     protected Iterator<List<Long>> rowIdsIter = null;
 
-    public RowIdsIterInternalSpinachRecordReader(ReadSupport<T> readSupport, Filter filter) {
-        super(readSupport, filter);
-    }
-
     public RowIdsIterInternalSpinachRecordReader(ReadSupport<T> readSupport) {
-        this(readSupport, FilterCompat.NOOP);
+        super(readSupport);
     }
 
     protected void initOthers(List<List<Long>> rowIdsList, List<BlockMetaData> blocks) {
@@ -35,7 +31,7 @@ public class RowIdsIterInternalSpinachRecordReader<T> extends InternalSpinachRec
     @Override
     protected PositionableRecordReader<T> getPositionableRecordReader(RecordReader<T> recordReader,
             long rowCount) {
-        return new RowIdIteratorRecordReaderImpl<T>(recordReader, rowIdsIter.next(), rowCount);
+        return new RowIdIteratorRecordReaderImpl<>(recordReader, rowIdsIter.next(), rowCount);
     }
 
 }
