@@ -21,8 +21,8 @@ import java.lang.{Long => JLong}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.parquet.hadoop.{DefaultRecordReader, SpinachRecordReader}
 import org.apache.parquet.hadoop.api.RecordReader
-import org.apache.parquet.hadoop.SpinachRecordReader
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
@@ -35,7 +35,24 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
   }
 
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
-    iterator(conf, requiredIds, null)
+    val requestSchemaString = {
+      var requestSchema = new StructType
+      for (index <- requiredIds) {
+        requestSchema = requestSchema.add(schema(index))
+      }
+      requestSchema.json
+    }
+    conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
+
+    val readSupport = new SpinachReadSupportImpl
+
+    val recordReader = DefaultRecordReader.builder(readSupport, new Path(path), conf).build()
+
+    recordReader.initialize()
+
+    new FileRecordReaderIterator[JLong, InternalRow](
+      recordReader.asInstanceOf[RecordReader[JLong, InternalRow]])
+
   }
 
   def iterator(conf: Configuration,
