@@ -76,7 +76,7 @@ public class SpinachRecordReader<T> implements RecordReader<T> {
 
     public void initialize() throws IOException, InterruptedException {
 
-        if(this.footer  == null){
+        if (this.footer == null) {
             this.footer = readFooter(configuration, file, NO_FILTER);
         }
 
