@@ -39,10 +39,6 @@ public class InternalSpinachRecordReader<T> {
 
     private boolean strictTypeChecking;
 
-//    private long totalTimeSpentReadingBytes;
-//    private long totalTimeSpentProcessingRecords;
-//    private long startedAssemblingCurrentBlockAt;
-
     private long totalCountLoadedSoFar = 0;
 
     private ParquetFileReader reader;
