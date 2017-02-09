@@ -45,12 +45,7 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
                requiredIds: Array[Int],
                rowIds: Array[Long]): Iterator[InternalRow] = {
     if (rowIds == null || rowIds.length == 0) {
-      new Iterator[InternalRow] {
-        override def hasNext: Boolean = false
-
-        override def next(): InternalRow =
-          throw new java.util.NoSuchElementException("Input is Empty RowIds Array")
-      }
+      ParquetDataFile.emptyIterator
     } else {
       val recordReader = recordReaderBuilder(conf, requiredIds)
         .withGlobalRowIds(rowIds).buildIndexed()
@@ -106,5 +101,15 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
 
   override def createDataFileHandle(conf: Configuration): ParquetDataFileHandle = {
     new ParquetDataFileHandle().read(conf, new Path(StringUtils.unEscapeString(path)))
+  }
+}
+
+private[spinach] object  ParquetDataFile {
+
+  val emptyIterator = new Iterator[InternalRow] {
+    override def hasNext: Boolean = false
+
+    override def next(): InternalRow =
+      throw new java.util.NoSuchElementException("Input is Empty RowIds Array")
   }
 }
