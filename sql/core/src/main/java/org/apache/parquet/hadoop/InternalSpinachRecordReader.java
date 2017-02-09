@@ -13,6 +13,7 @@ import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.hadoop.api.InitContext;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.metadata.FileMetaData;
+import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.util.counters.BenchmarkCounter;
 import org.apache.parquet.io.*;
 import org.apache.parquet.io.api.RecordMaterializer;
@@ -111,17 +112,13 @@ public class InternalSpinachRecordReader<T> {
 //        this.unmaterializableRecordCounter = new UnmaterializableRecordCounter(configuration, total);
 //        this.filterRecords = configuration.getBoolean(
 //                RECORD_FILTERING_ENABLED, RECORD_FILTERING_ENABLED_DEFAULT);
-
-        //TODO init total count
-        this.reader.setRequestedSchema(requestedSchema);
-        this.metrics = new ParquetReadMetrics();
-    }
-
-    void initOthers(List<List<Long>> rowIdsList) {
+        List<List<Long>> rowIdsList = ((IndexedParquetMetadata)parquetFileReader.getFooter()).getRowIdsList();
         this.rowIdsIter = rowIdsList.iterator();
         for (List<Long> rowIdList : rowIdsList) {
             total += rowIdList.size();
         }
+        this.reader.setRequestedSchema(requestedSchema);
+        this.metrics = new ParquetReadMetrics();
         LOG.info("RecordReader initialized will read a total of {} records.", total);
     }
 

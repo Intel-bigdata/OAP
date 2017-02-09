@@ -30,6 +30,7 @@ import org.apache.parquet.Preconditions;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
+import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
 import com.google.common.collect.Lists;
@@ -100,11 +101,12 @@ public class SpinachRecordReader<T> implements RecordReader<T> {
                 rowIdsList.add(rowIdList);
             }
         }
+        IndexedParquetMetadata indexedFooter =
+                new IndexedParquetMetadata(footer.getFileMetaData(), inputBlockList,rowIdsList);
         ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file,
-                new ParquetMetadata(footer.getFileMetaData(), inputBlockList));
+                indexedFooter);
         this.internalReader = new InternalSpinachRecordReader<>(readSupport);
         this.internalReader.initialize(parquetFileReader, configuration);
-        this.internalReader.initOthers(rowIdsList);
 
     }
 
