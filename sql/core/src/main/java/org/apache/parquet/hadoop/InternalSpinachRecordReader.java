@@ -46,8 +46,6 @@ public class InternalSpinachRecordReader<T> {
 
     private long totalCountLoadedSoFar = 0;
 
-    private Path file;
-
     private ParquetFileReader parquetFileReader;
 
     private RecordReader<T> recordReader;
@@ -57,7 +55,7 @@ public class InternalSpinachRecordReader<T> {
     /**
      * @param readSupport Object which helps reads files of the given type, e.g. Thrift, Avro.
      */
-    public InternalSpinachRecordReader(ReadSupport<T> readSupport) {
+    InternalSpinachRecordReader(ReadSupport<T> readSupport) {
         this.readSupport = readSupport;
     }
 
@@ -134,7 +132,7 @@ public class InternalSpinachRecordReader<T> {
         this.parquetFileReader.setRequestedSchema(requestedSchema);
     }
 
-    public void initOthers(List<List<Long>> rowIdsList) {
+    void initOthers(List<List<Long>> rowIdsList) {
         this.rowIdsIter = rowIdsList.iterator();
         for (List<Long> rowIdList : rowIdsList) {
             total += rowIdList.size();
@@ -143,7 +141,7 @@ public class InternalSpinachRecordReader<T> {
     }
 
 
-    public boolean nextKeyValue() throws IOException, InterruptedException {
+    boolean nextKeyValue() throws IOException, InterruptedException {
         boolean recordFound = false;
 
         while (!recordFound) {
@@ -171,13 +169,13 @@ public class InternalSpinachRecordReader<T> {
                 }
             } catch (RuntimeException e) {
                 throw new ParquetDecodingException(format("Can not read value at %d in block %d in file %s",
-                        current, currentBlock, file), e);
+                        current, currentBlock, parquetFileReader.getPath()), e);
             }
         }
         return true;
     }
 
-    public T getCurrentValue() throws IOException, InterruptedException {
+    T getCurrentValue() throws IOException, InterruptedException {
         return currentValue;
     }
 
@@ -189,9 +187,9 @@ public class InternalSpinachRecordReader<T> {
     }
 
     private static <K, V> Map<K, Set<V>> toSetMultiMap(Map<K, V> map) {
-        Map<K, Set<V>> setMultiMap = new HashMap<K, Set<V>>();
+        Map<K, Set<V>> setMultiMap = new HashMap<>();
         for (Map.Entry<K, V> entry : map.entrySet()) {
-            Set<V> set = new HashSet<V>();
+            Set<V> set = new HashSet<>();
             set.add(entry.getValue());
             setMultiMap.put(entry.getKey(), Collections.unmodifiableSet(set));
         }
