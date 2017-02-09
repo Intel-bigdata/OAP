@@ -33,13 +33,13 @@ import static org.apache.parquet.Preconditions.checkNotNull;
  *
  * @author Julien Le Dem
  */
-public class SColumnMessageIO extends GroupColumnIO {
+public class SMessageColumnIO extends GroupColumnIO {
 
     private List<PrimitiveColumnIO> leaves;
 
     private final String createdBy;
 
-    SColumnMessageIO(MessageType messageType, String createdBy) {
+    SMessageColumnIO(MessageType messageType, String createdBy) {
         super(messageType, null, 0);
         this.createdBy = createdBy;
     }
@@ -59,7 +59,7 @@ public class SColumnMessageIO extends GroupColumnIO {
         }
 
         return  new PositionableRecordReaderImpl<>(
-                SColumnMessageIO.this,
+                SMessageColumnIO.this,
                 recordMaterializer,
                 new ColumnReadStoreImpl(columns, recordMaterializer.getRootConverter(), getType(), createdBy),
                 columns.getRowCount(),

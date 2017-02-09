@@ -38,7 +38,7 @@ public class SColumnIOFactory {
      * @param fileSchema the file schema (when reading it can be different from the requested schema)
      * @return the corresponding serializing/deserializing structure
      */
-    public SColumnMessageIO getColumnIO(MessageType requestedSchema, MessageType fileSchema) {
+    public SMessageColumnIO getColumnIO(MessageType requestedSchema, MessageType fileSchema) {
         return getColumnIO(requestedSchema, fileSchema, true);
     }
 
@@ -48,7 +48,7 @@ public class SColumnIOFactory {
      * @param strict should file type and requested primitive types match
      * @return the corresponding serializing/deserializing structure
      */
-    public SColumnMessageIO getColumnIO(MessageType requestedSchema, MessageType fileSchema, boolean strict) {
+    public SMessageColumnIO getColumnIO(MessageType requestedSchema, MessageType fileSchema, boolean strict) {
         SpinachColumnIOCreatorVisitor visitor = new SpinachColumnIOCreatorVisitor(requestedSchema, createdBy, strict);
         fileSchema.accept(visitor);
         return visitor.getColumnIO();
@@ -58,7 +58,7 @@ public class SColumnIOFactory {
      * @param schema the schema we want to read/write
      * @return the corresponding serializing/deserializing structure
      */
-    public SColumnMessageIO getColumnIO(MessageType schema) {
+    public SMessageColumnIO getColumnIO(MessageType schema) {
         return this.getColumnIO(schema, schema);
     }
 

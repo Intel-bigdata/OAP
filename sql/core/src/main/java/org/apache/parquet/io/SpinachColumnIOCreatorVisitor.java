@@ -7,7 +7,7 @@ import java.util.List;
 
 
 public class SpinachColumnIOCreatorVisitor implements TypeVisitor {
-    private SColumnMessageIO columnIO;
+    private SMessageColumnIO columnIO;
     private GroupColumnIO current;
     private List<PrimitiveColumnIO> leaves = new ArrayList<PrimitiveColumnIO>();
     private final MessageType requestedSchema;
@@ -24,7 +24,7 @@ public class SpinachColumnIOCreatorVisitor implements TypeVisitor {
 
     @Override
     public void visit(MessageType messageType) {
-        columnIO = new SColumnMessageIO(requestedSchema, createdBy);
+        columnIO = new SMessageColumnIO(requestedSchema, createdBy);
         visitChildren(columnIO, messageType, requestedSchema);
         columnIO.setLevels();
         columnIO.setLeaves(leaves);
@@ -72,7 +72,7 @@ public class SpinachColumnIOCreatorVisitor implements TypeVisitor {
         throw new ParquetDecodingException("The requested schema is not compatible with the file schema. incompatible types: " + requestedType + " != " + fileType);
     }
 
-    public SColumnMessageIO getColumnIO() {
+    public SMessageColumnIO getColumnIO() {
         return columnIO;
     }
 }

@@ -18,7 +18,7 @@ public class PositionableRecordReaderImpl<T> extends SRecordReaderImplementation
 
     private Iterator<Long> rowIdIter = null;
 
-    public PositionableRecordReaderImpl(SColumnMessageIO root,
+    public PositionableRecordReaderImpl(SMessageColumnIO root,
                                         RecordMaterializer<T> recordMaterializer,
                                         ColumnReadStoreImpl columnStore,
                                         long recordCount,

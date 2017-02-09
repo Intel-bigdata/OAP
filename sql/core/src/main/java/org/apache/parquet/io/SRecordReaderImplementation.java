@@ -212,7 +212,7 @@ class SRecordReaderImplementation<T> extends RecordReader<T> {
      * @param recordMaterializer responsible of materializing the records
      * @param columnStore where to read the column data from
      */
-    public SRecordReaderImplementation(SColumnMessageIO root, RecordMaterializer<T> recordMaterializer, ColumnReadStoreImpl columnStore) {
+    public SRecordReaderImplementation(SMessageColumnIO root, RecordMaterializer<T> recordMaterializer, ColumnReadStoreImpl columnStore) {
         this.recordMaterializer = recordMaterializer;
         this.recordRootConverter = recordMaterializer.getRootConverter();
         PrimitiveColumnIO[] leaves = root.getLeaves().toArray(new PrimitiveColumnIO[root.getLeaves().size()]);

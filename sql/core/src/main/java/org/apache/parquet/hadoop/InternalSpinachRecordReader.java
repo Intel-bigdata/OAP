@@ -98,7 +98,7 @@ public class InternalSpinachRecordReader<T> {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("initializing Record assembly with requested schema {}", requestedSchema);
             }
-            SColumnMessageIO columnIO =
+            SMessageColumnIO columnIO =
                     columnIOFactory.getColumnIO(requestedSchema, fileSchema, strictTypeChecking);
             List<Long> rowIdList = rowIdsIter.next();
             this.recordReader = columnIO.getRecordReader(pages, recordConverter, rowIdList);
