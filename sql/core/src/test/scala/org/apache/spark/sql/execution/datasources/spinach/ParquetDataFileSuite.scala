@@ -69,6 +69,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
     val result = ArrayBuffer[ Int ]()
     while (iterator.hasNext) {
       val row = iterator.next
+      assert(row.numFields == 2)
       result += row.getInt(0)
     }
 
@@ -110,6 +111,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     while (iterator.hasNext) {
       val row = iterator.next
+      assert(row.numFields == 1)
       result += row.getInt(0)
     }
 

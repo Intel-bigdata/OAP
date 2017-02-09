@@ -150,6 +150,8 @@ class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     val row = iterator.next
 
+    assert(row.numFields == 3)
+
     val docId = row.getLong(0)
 
     assert(docId == 20L)
@@ -160,7 +162,7 @@ class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     val reader = ParquetDataFile(fileName, requestStructType)
 
-    val requiredIds = Array(0, 1, 2)
+    val requiredIds = Array(0, 2)
 
     val iterator = reader.iterator(DataGenerator.configuration, requiredIds)
 
@@ -168,14 +170,17 @@ class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     val rowOne = iterator.next
 
+    assert(rowOne.numFields == 2)
+
     val docIdOne = rowOne.getLong(0)
 
     assert(docIdOne == 10L)
 
-
     assert(iterator.hasNext)
 
     val rowTwo = iterator.next
+
+    assert(rowTwo.numFields == 2)
 
     val docIdTwo = rowTwo.getLong(0)
 
