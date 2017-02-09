@@ -111,7 +111,6 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     while (iterator.hasNext) {
       val row = iterator.next
-      assert(row.numFields == 1)
       result += row.getInt(0)
     }
 
@@ -120,6 +119,18 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
     for (i <- 0 until DataGenerator.ONE_K) {
       assert(i == result(i))
     }
+  }
+
+  test("createDataFileHandle") {
+    val reader = ParquetDataFile(fileName, requestStructType)
+    val meta = reader.createDataFileHandle(DataGenerator.configuration)
+    val footer = meta.footer
+
+    assert(footer.getFileMetaData != null)
+    assert(footer.getBlocks != null)
+    assert(!footer.getBlocks.isEmpty)
+    assert(footer.getBlocks.size() == 1)
+    assert(footer.getBlocks.get(0).getRowCount == DataGenerator.ONE_K)
   }
 
 }

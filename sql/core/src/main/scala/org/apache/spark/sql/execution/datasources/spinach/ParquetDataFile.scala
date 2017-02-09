@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.hadoop.RecordReaderBuilder
 import org.apache.parquet.hadoop.api.RecordReader
 
@@ -33,24 +34,11 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
   }
 
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
-    val requestSchemaString = {
-      var requestSchema = new StructType
-      for (index <- requiredIds) {
-        requestSchema = requestSchema.add(schema(index))
-      }
-      requestSchema.json
-    }
-    conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
-
-    val readSupport = new SpinachReadSupportImpl
-
-    val recordReader = RecordReaderBuilder.builder(readSupport, new Path(path), conf).buildDefault()
-
+    val recordReader = recordReaderBuilder(conf, requiredIds)
+      .buildDefault()
     recordReader.initialize()
-
     new FileRecordReaderIterator[InternalRow](
       recordReader.asInstanceOf[RecordReader[InternalRow]])
-
   }
 
   def iterator(conf: Configuration,
@@ -64,23 +52,31 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
           throw new java.util.NoSuchElementException("Input is Empty RowIds Array")
       }
     } else {
-      val requestSchemaString = {
-        var requestSchema = new StructType
-        for (index <- requiredIds) {
-          requestSchema = requestSchema.add(schema(index))
-        }
-        requestSchema.json
-      }
-      conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
-
-      val readSupport = new SpinachReadSupportImpl
-
-      val recordReader = RecordReaderBuilder.builder(readSupport, new Path(path), conf)
+      val recordReader = recordReaderBuilder(conf, requiredIds)
         .withGlobalRowIds(rowIds).buildIndexed()
       recordReader.initialize()
       new FileRecordReaderIterator[InternalRow](
         recordReader.asInstanceOf[RecordReader[InternalRow]])
     }
+  }
+
+  private def recordReaderBuilder(conf: Configuration,
+                                  requiredIds: Array[Int]): RecordReaderBuilder[InternalRow] = {
+    val requestSchemaString = {
+      var requestSchema = new StructType
+      for (index <- requiredIds) {
+        requestSchema = requestSchema.add(schema(index))
+      }
+      requestSchema.json
+    }
+    conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
+
+    val readSupport = new SpinachReadSupportImpl
+
+    val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this, conf)
+    RecordReaderBuilder
+      .builder(readSupport, new Path(StringUtils.unEscapeString(path)), conf)
+      .withFooter(meta.footer)
   }
 
   private class FileRecordReaderIterator[V](rowReader: RecordReader[V])
@@ -108,7 +104,7 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
     }
   }
 
-  override def createDataFileHandle(conf: Configuration): DataFileHandle = {
-    throw new UnsupportedOperationException("Not support initialize Operation.")
+  override def createDataFileHandle(conf: Configuration): ParquetDataFileHandle = {
+    new ParquetDataFileHandle().read(conf, new Path(StringUtils.unEscapeString(path)))
   }
 }

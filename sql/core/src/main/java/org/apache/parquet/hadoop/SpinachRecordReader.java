@@ -40,17 +40,23 @@ public class SpinachRecordReader<T> implements RecordReader<T> {
     private Configuration configuration;
     private Path file;
     private long[] globalRowIds;
+    private ParquetMetadata footer;
 
     private InternalSpinachRecordReader<T> internalReader;
 
     private ReadSupport<T> readSupport;
 
-    SpinachRecordReader(ReadSupport<T> readSupport, Path file, Configuration configuration, long[] globalRowIds) {
+    SpinachRecordReader(ReadSupport<T> readSupport,
+                        Path file,
+                        Configuration configuration,
+                        long[] globalRowIds,
+                        ParquetMetadata footer) {
         Preconditions.checkNotNull(globalRowIds,"index collection can not Bbe null!");
         this.readSupport = readSupport;
         this.file = file;
         this.configuration = configuration;
         this.globalRowIds = globalRowIds;
+        this.footer = footer;
     }
 
     @Override
@@ -70,7 +76,9 @@ public class SpinachRecordReader<T> implements RecordReader<T> {
 
     public void initialize() throws IOException, InterruptedException {
 
-        ParquetMetadata footer = readFooter(configuration, file, NO_FILTER);
+        if(this.footer  == null){
+            this.footer = readFooter(configuration, file, NO_FILTER);
+        }
 
         List<BlockMetaData> blocks = footer.getBlocks();
 
@@ -96,7 +104,7 @@ public class SpinachRecordReader<T> implements RecordReader<T> {
                 }
 
             }
-            if (rowIdList != null && !rowIdList.isEmpty()) {
+            if (!rowIdList.isEmpty()) {
                 inputBlockList.add(block);
                 rowIdsList.add(rowIdList);
             }

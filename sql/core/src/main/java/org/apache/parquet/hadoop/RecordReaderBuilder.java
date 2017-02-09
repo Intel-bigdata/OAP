@@ -4,6 +4,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
 import java.io.IOException;
 
@@ -16,6 +17,7 @@ public class RecordReaderBuilder<T> {
     private final Path file;
     private Configuration conf;
     private long[] globalRowIds = new long[0];
+    private ParquetMetadata footer;
 
     private RecordReaderBuilder(ReadSupport<T> readSupport, Path path, Configuration conf) {
         this.readSupport = checkNotNull(readSupport, "readSupport");
@@ -34,13 +36,18 @@ public class RecordReaderBuilder<T> {
         return this;
     }
 
+    public RecordReaderBuilder<T> withFooter(ParquetMetadata footer) {
+        this.footer = footer;
+        return this;
+    }
+
     public RecordReader<T> buildDefault() throws IOException {
-        return new DefaultRecordReader<>(readSupport, file, conf);
+        return new DefaultRecordReader<>(readSupport, file, conf, footer);
     }
 
 
     public RecordReader<T> buildIndexed() throws IOException {
-        return new SpinachRecordReader<>(readSupport, file, conf, globalRowIds);
+        return new SpinachRecordReader<>(readSupport, file, conf, globalRowIds, footer);
     }
 
     public static <T> RecordReaderBuilder<T> builder(ReadSupport<T> readSupport, Path path) {
