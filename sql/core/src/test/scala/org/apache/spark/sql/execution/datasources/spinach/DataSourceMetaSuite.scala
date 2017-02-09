@@ -336,8 +336,8 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     val df = sparkContext.parallelize(1 to 100, 3)
       .map(i => (i, i + 100, s"this is row $i"))
       .toDF("a", "b", "c")
-    df.write.format("spn").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
-    val spnDf = sqlContext.read.format("spn").load(tmpDir.getAbsolutePath)
+    df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val spnDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
     spnDf.createOrReplaceTempView("spnt1")
 
     sql("create sindex index1 on spnt1 (a)")
