@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.*;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.parquet.Preconditions;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.hadoop.api.InitContext;
 import org.apache.parquet.hadoop.api.ReadSupport;
@@ -67,11 +68,7 @@ public class InternalSpinachRecordReader<T> {
             LOG.info("at row " + current + ". reading next block");
             metrics.startReadOneRowGroup();
             PageReadStore pages = reader.readNextRowGroup();
-            if (pages == null) {
-                throw new IOException(
-                        "expecting more rows but reached last block. Read " + current + " out of " + total);
-            }
-
+            checkIOState(pages);
             metrics.overReadOneRowGroup(pages);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("initializing Record assembly with requested schema {}", requestedSchema);
@@ -182,6 +179,13 @@ public class InternalSpinachRecordReader<T> {
             setMultiMap.put(entry.getKey(), Collections.unmodifiableSet(set));
         }
         return Collections.unmodifiableMap(setMultiMap);
+    }
+
+    private void checkIOState(PageReadStore pages) throws IOException {
+        if (pages == null) {
+            throw new IOException(
+                    "expecting more rows but reached last block. Read " + current + " out of " + total);
+        }
     }
 
 }
