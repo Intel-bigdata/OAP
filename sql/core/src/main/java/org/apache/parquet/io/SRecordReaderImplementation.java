@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
  * @param <T> the type of the materialized record
  */
 class SRecordReaderImplementation<T> extends RecordReader<T> {
-    private static final Logger LOG = LoggerFactory.getLogger(RecordReaderImplementation.class);
 
     public static class Case {
 
@@ -383,7 +382,7 @@ class SRecordReaderImplementation<T> extends RecordReader<T> {
     public boolean shouldSkipCurrentRecord() {
         return shouldSkipCurrentRecord;
     }
-    
+
     int getNextReader(int current, int nextRepetitionLevel) {
         State nextState = states[current].nextState[nextRepetitionLevel];
         return nextState == null ? states.length : nextState.id;
