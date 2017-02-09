@@ -44,9 +44,6 @@ public class DefaultRecordReader<T> implements RecordReader<T> {
         this.configuration = configuration;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void close() throws IOException {
         internalReader.close();

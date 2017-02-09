@@ -39,9 +39,9 @@ public class InternalSpinachRecordReader<T> {
 
     private boolean strictTypeChecking;
 
-    private long totalTimeSpentReadingBytes;
-    private long totalTimeSpentProcessingRecords;
-    private long startedAssemblingCurrentBlockAt;
+//    private long totalTimeSpentReadingBytes;
+//    private long totalTimeSpentProcessingRecords;
+//    private long startedAssemblingCurrentBlockAt;
 
     private long totalCountLoadedSoFar = 0;
 
@@ -53,6 +53,8 @@ public class InternalSpinachRecordReader<T> {
 
     private String createdBy;
 
+    private ParquetReadMetrics metrics;
+
     /**
      * @param readSupport Object which helps reads files of the given type, e.g. Thrift, Avro.
      */
@@ -63,40 +65,18 @@ public class InternalSpinachRecordReader<T> {
     private void checkRead() throws IOException {
         if (current == totalCountLoadedSoFar) {
             if (current != 0) {
-                totalTimeSpentProcessingRecords
-                        += (System.currentTimeMillis() - startedAssemblingCurrentBlockAt);
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("Assembled and processed " + totalCountLoadedSoFar + " records from "
-                            + columnCount + " columns in " + totalTimeSpentProcessingRecords + " ms: "
-                            + ((float) totalCountLoadedSoFar / totalTimeSpentProcessingRecords) + " rec/ms, "
-                            + ((float) totalCountLoadedSoFar * columnCount / totalTimeSpentProcessingRecords)
-                            + " cell/ms");
-                    final long totalTime = totalTimeSpentProcessingRecords + totalTimeSpentReadingBytes;
-                    if (totalTime != 0) {
-                        final long percentReading = 100 * totalTimeSpentReadingBytes / totalTime;
-                        final long percentProcessing = 100 * totalTimeSpentProcessingRecords / totalTime;
-                        LOG.info("time spent so far " + percentReading + "% reading ("
-                                + totalTimeSpentReadingBytes + " ms) and " + percentProcessing
-                                + "% processing (" + totalTimeSpentProcessingRecords + " ms)");
-                    }
-                }
+                metrics.record(totalCountLoadedSoFar,columnCount);
             }
 
             LOG.info("at row " + current + ". reading next block");
-            long t0 = System.currentTimeMillis();
+            metrics.startReadOneRowGroup();
             PageReadStore pages = reader.readNextRowGroup();
             if (pages == null) {
                 throw new IOException(
                         "expecting more rows but reached last block. Read " + current + " out of " + total);
             }
 
-            long timeSpentReading = System.currentTimeMillis() - t0;
-            totalTimeSpentReadingBytes += timeSpentReading;
-            BenchmarkCounter.incrementTime(timeSpentReading);
-            if (LOG.isInfoEnabled()) {
-                LOG.info("block read in memory in {} ms. row count = {}",
-                        timeSpentReading, pages.getRowCount());
-            }
+            metrics.overReadOneRowGroup(pages);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("initializing Record assembly with requested schema {}", requestedSchema);
             }
@@ -104,7 +84,7 @@ public class InternalSpinachRecordReader<T> {
                     columnIOFactory.getColumnIO(requestedSchema, fileSchema, strictTypeChecking);
             List<Long> rowIdList = rowIdsIter.next();
             this.recordReader = getRecordReader(columnIO,pages,rowIdList);
-            startedAssemblingCurrentBlockAt = System.currentTimeMillis();
+            metrics.start();
             totalCountLoadedSoFar += rowIdList.size();
             ++currentBlock;
         }
@@ -141,6 +121,7 @@ public class InternalSpinachRecordReader<T> {
 
         //TODO init total count
         this.reader.setRequestedSchema(requestedSchema);
+        this.metrics = new ParquetReadMetrics();
     }
 
     void initOthers(List<List<Long>> rowIdsList) {
