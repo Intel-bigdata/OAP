@@ -8,7 +8,7 @@ import org.apache.parquet.io.api.RecordMaterializer;
 import java.util.Iterator;
 import java.util.List;
 
-public class PositionableRecordReaderImpl<T> extends SRecordReaderImplementation<T> {
+public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<T> {
 
     protected final long recordMaxCount;
 
@@ -18,12 +18,12 @@ public class PositionableRecordReaderImpl<T> extends SRecordReaderImplementation
 
     private Iterator<Long> rowIdIter = null;
 
-    public PositionableRecordReaderImpl(SMessageColumnIO root,
+    public PositionableRecordReaderImpl(MessageColumnIO root,
                                         RecordMaterializer<T> recordMaterializer,
                                         ColumnReadStoreImpl columnStore,
                                         long recordCount,
                                         List<Long> rowIdList) {
-        super(root, recordMaterializer, columnStore);
+        super(root, recordMaterializer, false, columnStore);
         Preconditions.checkNotNull(rowIdList,"rowIdList can not be null.");
         Preconditions.checkArgument(!rowIdList.isEmpty(), "rowIdList must has item.");
         this.recordMaxCount = recordCount;

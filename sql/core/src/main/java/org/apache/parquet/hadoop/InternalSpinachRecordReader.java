@@ -23,7 +23,7 @@ public class InternalSpinachRecordReader<T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(InternalSpinachRecordReader.class);
 
-    private SColumnIOFactory columnIOFactory;
+    private ColumnIOFactory columnIOFactory;
 
     private MessageType requestedSchema;
     private MessageType fileSchema;
@@ -50,6 +50,8 @@ public class InternalSpinachRecordReader<T> {
     private RecordReader<T> recordReader;
 
     private Iterator<List<Long>> rowIdsIter = null;
+
+    private String createdBy;
 
     /**
      * @param readSupport Object which helps reads files of the given type, e.g. Thrift, Avro.
@@ -98,14 +100,18 @@ public class InternalSpinachRecordReader<T> {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("initializing Record assembly with requested schema {}", requestedSchema);
             }
-            SMessageColumnIO columnIO =
+            MessageColumnIO columnIO =
                     columnIOFactory.getColumnIO(requestedSchema, fileSchema, strictTypeChecking);
             List<Long> rowIdList = rowIdsIter.next();
-            this.recordReader = columnIO.getRecordReader(pages, recordConverter, rowIdList);
+            this.recordReader = getRecordReader(columnIO,pages,rowIdList);
             startedAssemblingCurrentBlockAt = System.currentTimeMillis();
             totalCountLoadedSoFar += rowIdList.size();
             ++currentBlock;
         }
+    }
+
+    private RecordReader<T> getRecordReader(MessageColumnIO columnIO, PageReadStore pages, List<Long> rowIdList) {
+        return RecordReaderFactory.getRecordReader(columnIO, pages, recordConverter, createdBy, rowIdList);
     }
 
     public void close() throws IOException {
@@ -122,7 +128,8 @@ public class InternalSpinachRecordReader<T> {
         Map<String, String> fileMetadata = parquetFileMetadata.getKeyValueMetaData();
         ReadSupport.ReadContext readContext = readSupport.init(new InitContext(
                 configuration, toSetMultiMap(fileMetadata), fileSchema));
-        this.columnIOFactory = new SColumnIOFactory(parquetFileMetadata.getCreatedBy());
+        this.createdBy = parquetFileMetadata.getCreatedBy();
+        this.columnIOFactory = new ColumnIOFactory(createdBy);
         this.requestedSchema = readContext.getRequestedSchema();
         this.columnCount = requestedSchema.getPaths().size();
         this.recordConverter = readSupport.prepareForRead(

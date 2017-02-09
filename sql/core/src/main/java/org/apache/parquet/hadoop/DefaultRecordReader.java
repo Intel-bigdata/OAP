@@ -18,23 +18,18 @@
  */
 package org.apache.parquet.hadoop;
 
-import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
-import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.parquet.schema.MessageType;
 
 import java.io.IOException;
-import java.util.List;
 
-import static org.apache.parquet.Preconditions.checkNotNull;
 import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
 import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 
-public class DefaultRecordReader<T> implements RecordReader<Long, T> {
+public class DefaultRecordReader<T> implements RecordReader<T> {
 
     private Configuration configuration;
     private Path file;
@@ -43,7 +38,7 @@ public class DefaultRecordReader<T> implements RecordReader<Long, T> {
 
     private ReadSupport<T> readSupport;
 
-    private DefaultRecordReader(ReadSupport<T> readSupport, Path file, Configuration configuration) {
+    DefaultRecordReader(ReadSupport<T> readSupport, Path file, Configuration configuration) {
         this.readSupport = readSupport;
         this.file = file;
         this.configuration = configuration;
@@ -77,35 +72,5 @@ public class DefaultRecordReader<T> implements RecordReader<Long, T> {
     @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
         return internalReader.nextKeyValue();
-    }
-
-    public static <T> Builder<T> builder(ReadSupport<T> readSupport, Path path) {
-        return new Builder<>(readSupport, path);
-    }
-
-    public static <T> Builder<T> builder(ReadSupport<T> readSupport, Path path, Configuration conf) {
-        return new Builder<>(readSupport, path, conf);
-    }
-
-    public static class Builder<T> {
-        private final ReadSupport<T> readSupport;
-        private final Path file;
-        private Configuration conf;
-
-        private Builder(ReadSupport<T> readSupport, Path path, Configuration conf) {
-            this.readSupport = checkNotNull(readSupport, "readSupport");
-            this.file = checkNotNull(path, "path");
-            this.conf = checkNotNull(conf, "configuration");
-        }
-
-        private Builder(ReadSupport<T> readSupport, Path path) {
-            this.readSupport = checkNotNull(readSupport, "readSupport");
-            this.file = checkNotNull(path, "path");
-            this.conf = new Configuration();
-        }
-
-        public DefaultRecordReader<T> build() throws IOException {
-            return new DefaultRecordReader<>(readSupport, file, conf);
-        }
     }
 }

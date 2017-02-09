@@ -17,11 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.lang.{Long => JLong}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.hadoop.{DefaultRecordReader, SpinachRecordReader}
+import org.apache.parquet.hadoop.RecordReaderBuilder
 import org.apache.parquet.hadoop.api.RecordReader
 
 import org.apache.spark.sql.catalyst.InternalRow
@@ -46,12 +45,12 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
 
     val readSupport = new SpinachReadSupportImpl
 
-    val recordReader = DefaultRecordReader.builder(readSupport, new Path(path), conf).build()
+    val recordReader = RecordReaderBuilder.builder(readSupport, new Path(path), conf).buildDefault()
 
     recordReader.initialize()
 
-    new FileRecordReaderIterator[JLong, InternalRow](
-      recordReader.asInstanceOf[RecordReader[JLong, InternalRow]])
+    new FileRecordReaderIterator[InternalRow](
+      recordReader.asInstanceOf[RecordReader[InternalRow]])
 
   }
 
@@ -77,15 +76,15 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
 
       val readSupport = new SpinachReadSupportImpl
 
-      val recordReader = SpinachRecordReader.builder(readSupport, new Path(path), conf)
-        .withGlobalRowIds(rowIds).build()
+      val recordReader = RecordReaderBuilder.builder(readSupport, new Path(path), conf)
+        .withGlobalRowIds(rowIds).buildIndexed()
       recordReader.initialize()
-      new FileRecordReaderIterator[JLong, InternalRow](
-        recordReader.asInstanceOf[RecordReader[JLong, InternalRow]])
+      new FileRecordReaderIterator[InternalRow](
+        recordReader.asInstanceOf[RecordReader[InternalRow]])
     }
   }
 
-  private class FileRecordReaderIterator[ID, V](rowReader: RecordReader[ID, V])
+  private class FileRecordReaderIterator[V](rowReader: RecordReader[V])
     extends Iterator[V] {
     private[this] var havePair = false
     private[this] var finished = false
