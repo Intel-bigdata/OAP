@@ -27,6 +27,7 @@ import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.parquet.Preconditions;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
@@ -39,7 +40,6 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
 
     private Configuration configuration;
     private Path file;
-    private List<Long> filteredStartRowIdList = Lists.newArrayList();
     private long[] globalRowIds;
 
     private InternalSpinachRecordReader<T> internalReader;
@@ -47,6 +47,7 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
     private ReadSupport<T> readSupport;
 
     private SpinachRecordReader(ReadSupport<T> readSupport, Path file, Configuration configuration, long[] globalRowIds) {
+        Preconditions.checkNotNull(globalRowIds,"index collection can not Bbe null!");
         this.readSupport = readSupport;
         this.file = file;
         this.configuration = configuration;
@@ -60,9 +61,7 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
 
     @Override
     public Long getCurrentRowId() throws IOException, InterruptedException {
-        int currentBlockIndex = internalReader.getCurrentBlockIndex();
-        long baseValue = filteredStartRowIdList.get(currentBlockIndex);
-        return baseValue + internalReader.getInternalRowId();
+        return 0L;
     }
 
     @Override
@@ -78,52 +77,41 @@ public class SpinachRecordReader<T> implements RecordReader<Long, T> {
     public void initialize() throws IOException, InterruptedException {
 
         ParquetMetadata footer = readFooter(configuration, file, NO_FILTER);
-        MessageType fileSchema = footer.getFileMetaData().getSchema();
 
         List<BlockMetaData> blocks = footer.getBlocks();
-
-        long currentRowGroupStartRowId = 0;
-        long nextRowGroupStartRowId = 0;
 
         List<BlockMetaData> inputBlockList = Lists.newArrayList();
 
         List<List<Long>> rowIdsList = Lists.newArrayList();
 
-        if (globalRowIds != null && globalRowIds.length != 0) {
-            int totalCount = globalRowIds.length;
-            int index = 0;
+        long nextRowGroupStartRowId = 0;
+        int totalCount = globalRowIds.length;
+        int index = 0;
 
-            for (BlockMetaData block : blocks) {
-                currentRowGroupStartRowId = nextRowGroupStartRowId;
-                nextRowGroupStartRowId += block.getRowCount();
-                List<Long> rowIdList = Lists.newArrayList();
-                while (index < totalCount) {
-                    long globalRowGroupId = globalRowIds[index];
-                    if (globalRowGroupId < nextRowGroupStartRowId) {
-                        rowIdList.add(globalRowGroupId - currentRowGroupStartRowId);
-                        index++;
-                    } else {
-                        break;
-                    }
+        for (BlockMetaData block : blocks) {
+            long currentRowGroupStartRowId = nextRowGroupStartRowId;
+            nextRowGroupStartRowId += block.getRowCount();
+            List<Long> rowIdList = Lists.newArrayList();
+            while (index < totalCount) {
+                long globalRowGroupId = globalRowIds[index];
+                if (globalRowGroupId < nextRowGroupStartRowId) {
+                    rowIdList.add(globalRowGroupId - currentRowGroupStartRowId);
+                    index++;
+                } else {
+                    break;
+                }
 
-                }
-                if (rowIdList != null && !rowIdList.isEmpty()) {
-                    inputBlockList.add(block);
-                    rowIdsList.add(rowIdList);
-                    filteredStartRowIdList.add(currentRowGroupStartRowId);
-                }
             }
-            ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration,file,
-                    new ParquetMetadata(footer.getFileMetaData(),inputBlockList));
-            this.internalReader = new RowIdsIterInternalSpinachRecordReader<>(readSupport);
-            this.internalReader.initialize(parquetFileReader,configuration);
-            this.internalReader.initOthers(rowIdsList);
-        } else {
-            ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration,file,footer);
-            InternalParquetRecordReader internalParquetRecordReader = new InternalParquetRecordReader<>(readSupport);
-            this.internalReader = new InternalParquetRecordReaderWrapper(internalParquetRecordReader);
-            this.internalReader.initialize(parquetFileReader,configuration);
+            if (rowIdList != null && !rowIdList.isEmpty()) {
+                inputBlockList.add(block);
+                rowIdsList.add(rowIdList);
+            }
         }
+        ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file,
+                new ParquetMetadata(footer.getFileMetaData(), inputBlockList));
+        this.internalReader = new InternalSpinachRecordReader<>(readSupport);
+        this.internalReader.initialize(parquetFileReader, configuration);
+        this.internalReader.initOthers(rowIdsList);
 
     }
 
