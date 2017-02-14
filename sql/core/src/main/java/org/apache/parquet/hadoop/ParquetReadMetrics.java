@@ -14,7 +14,7 @@ public class ParquetReadMetrics {
     private long startedAssemblingCurrentBlockAt;
     private long readRowGroupStart;
 
-    public void start(){
+    public void startRecordAssemblyTime(){
         this.startedAssemblingCurrentBlockAt = System.currentTimeMillis();
     }
 
@@ -32,7 +32,7 @@ public class ParquetReadMetrics {
         }
     }
 
-    public void record(long totalCountLoadedSoFar, int columnCount){
+    public void recordMetrics(long totalCountLoadedSoFar, int columnCount){
         totalTimeSpentProcessingRecords
                 += (System.currentTimeMillis() - startedAssemblingCurrentBlockAt);
         if (LOG.isInfoEnabled()) {

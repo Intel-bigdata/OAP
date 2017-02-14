@@ -8,13 +8,11 @@ import java.io.IOException;
 import java.util.*;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.parquet.Preconditions;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.hadoop.api.InitContext;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
-import org.apache.parquet.hadoop.util.counters.BenchmarkCounter;
 import org.apache.parquet.io.*;
 import org.apache.parquet.io.api.RecordMaterializer;
 import org.apache.parquet.schema.MessageType;
@@ -63,7 +61,7 @@ public class InternalSpinachRecordReader<T> {
     private void checkRead() throws IOException {
         if (current == totalCountLoadedSoFar) {
             if (current != 0) {
-                metrics.record(totalCountLoadedSoFar,columnCount);
+                metrics.recordMetrics(totalCountLoadedSoFar,columnCount);
             }
 
             LOG.info("at row " + current + ". reading next block");
@@ -78,7 +76,7 @@ public class InternalSpinachRecordReader<T> {
                     columnIOFactory.getColumnIO(requestedSchema, fileSchema, strictTypeChecking);
             List<Long> rowIdList = rowIdsIter.next();
             this.recordReader = getRecordReader(columnIO,pages,rowIdList);
-            metrics.start();
+            metrics.startRecordAssemblyTime();
             totalCountLoadedSoFar += rowIdList.size();
             ++currentBlock;
         }
@@ -109,9 +107,6 @@ public class InternalSpinachRecordReader<T> {
         this.recordConverter = readSupport.prepareForRead(
                 configuration, fileMetadata, fileSchema, readContext);
         this.strictTypeChecking = configuration.getBoolean(STRICT_TYPE_CHECKING, true);
-//        this.unmaterializableRecordCounter = new UnmaterializableRecordCounter(configuration, total);
-//        this.filterRecords = configuration.getBoolean(
-//                RECORD_FILTERING_ENABLED, RECORD_FILTERING_ENABLED_DEFAULT);
         List<List<Long>> rowIdsList = ((IndexedParquetMetadata)parquetFileReader.getFooter()).getRowIdsList();
         this.rowIdsIter = rowIdsList.iterator();
         for (List<Long> rowIdList : rowIdsList) {
