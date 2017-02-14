@@ -35,7 +35,7 @@ import org.apache.spark.sql.types.StructType
 class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
   with org.scalatest.BeforeAndAfterAll with org.apache.spark.internal.Logging {
 
-  val requestSchema =
+  val requestSchema: String =
     """{
       |    "type": "struct",
       |    "fields": [
@@ -125,9 +125,9 @@ class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
       |}
     """.stripMargin
 
-  val requestStructType = StructType.fromString(requestSchema)
+  val requestStructType: StructType = StructType.fromString(requestSchema)
 
-  val fileName = DataGenerator.TARGET_DIR + "/Paper.parquet"
+  val fileName: String = DataGenerator.TARGET_DIR + "/Paper.parquet"
 
   override protected def beforeAll(): Unit = {
     DataGenerator.clean()

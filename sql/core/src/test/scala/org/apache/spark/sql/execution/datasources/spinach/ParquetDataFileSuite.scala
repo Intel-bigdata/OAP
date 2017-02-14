@@ -35,7 +35,7 @@ import org.apache.spark.sql.types.StructType
 class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
   with org.scalatest.BeforeAndAfterAll with org.apache.spark.internal.Logging {
 
-  val requestSchema =
+  val requestSchema: String =
     """{"type": "struct",
           "fields": [{"name": "int32_field","type": "integer","nullable": true,"metadata": {}},
                      {"name": "int64_field","type": "long","nullable": true,"metadata": {}},
@@ -45,9 +45,9 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
           }
     """.stripMargin
 
-  val requestStructType = StructType.fromString(requestSchema)
+  val requestStructType: StructType = StructType.fromString(requestSchema)
 
-  val fileName = DataGenerator.TARGET_DIR + "/PARQUET-TEST"
+  val fileName: String = DataGenerator.TARGET_DIR + "/PARQUET-TEST"
 
   override protected def beforeAll(): Unit = {
     DataGenerator.clean()
@@ -75,7 +75,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     assert(rowIds.length == result.length)
 
-    for (i <- 0 until rowIds.length) {
+    for (i <- rowIds.indices) {
       assert(rowIds(i) == result(i))
     }
   }
@@ -90,7 +90,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     val iterator = reader.iterator(DataGenerator.configuration, requiredIds, rowIds)
 
-    assert(iterator.hasNext == false)
+    assert(!iterator.hasNext)
 
     val e = intercept[java.util.NoSuchElementException] {
       iterator.next()
