@@ -53,14 +53,13 @@ public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<
             do {
                 ColumnReader columnReader = currentState.column;
 
-                // currentLevel = depth + 1 at this point
-                // set the current value
+                // has value, skip it
                 if (columnReader.getCurrentDefinitionLevel() >= currentState.maxDefinitionLevel) {
                     columnReader.skip();
                 }
+                // change r,d state
                 columnReader.consume();
 
-                // Based on repetition level work out next state to go to
                 int nextR =
                         currentState.maxRepetitionLevel == 0 ? 0 : columnReader.getCurrentRepetitionLevel();
                 currentState = currentState.getNextState(nextR);
