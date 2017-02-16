@@ -40,7 +40,7 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
     recordReader.initialize()
     val iterator = new FileRecordReaderIterator[InternalRow](
       recordReader.asInstanceOf[RecordReader[InternalRow]])
-
+    // TODO data cache
     throw new UnsupportedOperationException("Not support getFiberData Operation.")
   }
 
