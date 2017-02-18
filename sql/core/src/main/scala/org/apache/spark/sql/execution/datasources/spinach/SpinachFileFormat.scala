@@ -33,7 +33,8 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjectio
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.sources.{DataSourceRegister, Filter}
+import org.apache.spark.sql.sources.{And, DataSourceRegister, EqualTo, Filter,
+GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual, Or}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.SerializableConfiguration
 
@@ -126,9 +127,40 @@ private[sql] class SpinachFileFormat extends FileFormat
     // SpinachFileFormat.deserializeDataSourceMeta(hadoopConf) match {
     meta match {
       case Some(m) =>
+        def canTriggerIndex(filter: Filter): Boolean = {
+          var attr: String = null
+          def checkAttribute(filter: Filter): Boolean = filter match {
+              case Or(left, right) =>
+                checkAttribute(left) && checkAttribute(right)
+              case And(left, right) =>
+                checkAttribute(left) && checkAttribute(right)
+              case EqualTo(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case LessThan(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case LessThanOrEqual(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case GreaterThan(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case GreaterThanOrEqual(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case _ => true
+            }
+
+          checkAttribute(filter)
+        }
+
         val ic = new IndexContext(m)
-        BPlusTreeSearch.build(filters.toArray, ic)
-        val filterScanner = ic.getScannerBuilder.map(_.build)
+        // filter out the "filters" on which we can use the B+ tree index
+        val supportFilters = filters.toArray.filter(canTriggerIndex)
+        // After filtered, supportFilter only contains:
+        // 1. Or predicate that contains only one attribute internally;
+        // 2. Some atomic predicates, such as LessThan, EqualTo, etc.
+        if(supportFilters.nonEmpty) { // determine whether we can use B+ tree index
+          BPlusTreeSearch.build(supportFilters, ic)
+        }
+//        val filterScanner = ic.getScannerBuilder.map(_.build)
+        val filterScanner = ic.getScanner
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
         val broadcastedHadoopConf =
