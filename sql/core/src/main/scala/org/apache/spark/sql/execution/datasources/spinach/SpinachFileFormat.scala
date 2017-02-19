@@ -151,13 +151,16 @@ private[sql] class SpinachFileFormat extends FileFormat
         }
 
         val ic = new IndexContext(m)
-        // filter out the "filters" on which we can use the B+ tree index
-        val supportFilters = filters.toArray.filter(canTriggerIndex)
-        // After filtered, supportFilter only contains:
-        // 1. Or predicate that contains only one attribute internally;
-        // 2. Some atomic predicates, such as LessThan, EqualTo, etc.
-        if(supportFilters.nonEmpty) { // determine whether we can use B+ tree index
-          BPlusTreeSearch.build(supportFilters, ic)
+        if (m.indexMetas.nonEmpty) { // check and use index
+          // filter out the "filters" on which we can use the B+ tree index
+          val supportFilters = filters.toArray.filter(canTriggerIndex)
+          // After filtered, supportFilter only contains:
+          // 1. Or predicate that contains only one attribute internally;
+          // 2. Some atomic predicates, such as LessThan, EqualTo, etc.
+          if (supportFilters.nonEmpty) {
+            // determine whether we can use B+ tree index
+            BPlusTreeSearch.build(supportFilters, ic)
+          }
         }
 //        val filterScanner = ic.getScannerBuilder.map(_.build)
         val filterScanner = ic.getScanner

@@ -746,20 +746,44 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
     } // end while
   }
 
-  def getBestIndexer: (Int, IndexMeta) = {
-    var maxIdx = -1
+  /**
+    * A simple approach to select best indexer:
+    * For B+ tree index, we expect to make full use of index:
+    * On one hand, match as many attributes as possible in a SQL statement;
+    * On the other hand, use as many attributes as possible in a B+ tree index
+    * So we want the number of matched attributes to be close to
+    * both the total number of attributes in a SQL statement
+    * and the total number of entries in a B+ tree index candidate
+    * we introduce a variable ratio to indicate the match extent
+    * ratio = totalAttributes/matchedAttributed + totalIndexEntries/matchedAttributes
+    * @param attrNum: the total number of attributes in the SQL statement
+    * @return (Int, IndexMeta): the best indexMeta,
+    *         and the Int is the index of the last attribute in the index entries
+    */
+  def getBestIndexer(attrNum: Int): (Int, IndexMeta) = {
+    var lastIdx = -1
     var bestIndexer: IndexMeta = null
+    var ratio: Double = 0.0
+    var isFirst = true
     for ((idx, indexMeta) <- availableIndexes) {
       indexMeta.indexType match {
-        case BTreeIndex(_)  if idx > maxIdx => bestIndexer = indexMeta; maxIdx = idx
+        case BTreeIndex(entries) =>
+          val matchedAttr: Double = idx + 1
+          val currentRatio = attrNum/matchedAttr + entries.length/matchedAttr
+          if (isFirst || ratio > currentRatio) {
+            ratio = currentRatio
+            bestIndexer = indexMeta
+            lastIdx = idx
+            isFirst = false
+          }
         case _ =>
       }
     }
     if (bestIndexer == null && availableIndexes.nonEmpty) {
-      maxIdx = availableIndexes.head._1
+      lastIdx = availableIndexes.head._1
       bestIndexer = availableIndexes.head._2
     }
-    (maxIdx, bestIndexer)
+    (lastIdx, bestIndexer)
   }
 
   def buildScanner(idx: Int, bestIndexer: IndexMeta, intervalMap:
@@ -779,7 +803,8 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
         val fields = for (idx <- entries.slice(0, idx + 1).map(_.ordinal)) yield meta.schema(idx)
         keySchema = StructType(fields)
         scanner = new RangeScanner(bestIndexer)
-        val attributes = fields.map(_.name)
+        val attributes = fields.map(_.name) // get column names in the composite index
+        scanner.intervalArray = new ArrayBuffer[RangeInterval](intervalMap(attributes.last).length)
         for (i <- attributes.indices) {
           if (i == attributes.length-1) {}
           intervalMap(attributes(i)).head.start
@@ -997,7 +1022,7 @@ private[spinach] object BPlusTreeSearch extends Logging {
     )
     // need to be modified to traverse indexes ****************************
     ic.selectAvailableIndex(intervalMap)
-    val (num, idxMeta) = ic.getBestIndexer
+    val (num, idxMeta) = ic.getBestIndexer(intervalMap.size)
     ic.buildScanner(num, idxMeta, intervalMap)
 //    for((attribute, intervalArray) <- intervalMap) {
 //      attribute match {
