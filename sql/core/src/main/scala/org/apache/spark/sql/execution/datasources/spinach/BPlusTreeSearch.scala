@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, SortDirection, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.{Ascending, JoinedRow, SortDirection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
 import org.apache.spark.sql.sources._
@@ -786,39 +786,60 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
     (lastIdx, bestIndexer)
   }
 
-  def buildScanner(idx: Int, bestIndexer: IndexMeta, intervalMap:
+  def buildScanner(lastIdx: Int, bestIndexer: IndexMeta, intervalMap:
   mutable.HashMap[String, ArrayBuffer[RangeInterval]]): Unit = {
 //    intervalArray.sortWith(compare)
-    if (idx == -1 && bestIndexer == null) return
+    if (lastIdx == -1 && bestIndexer == null) return
     var keySchema: StructType = null
     bestIndexer.indexType match {
       case BTreeIndex(entries) if entries.length == 1 =>
-        keySchema = new StructType().add(meta.schema(entries(idx).ordinal))
+        keySchema = new StructType().add(meta.schema(entries(lastIdx).ordinal))
         scanner = new RangeScanner(bestIndexer)
-        val attribute = meta.schema(entries(idx).ordinal).name
+        val attribute = meta.schema(entries(lastIdx).ordinal).name
         val filterOptimizer = unapply(attribute).get
         scanner.intervalArray =
           intervalMap(attribute).sortWith(filterOptimizer.compareRangeInterval)
       case BTreeIndex(entries) =>
-        val fields = for (idx <- entries.slice(0, idx + 1).map(_.ordinal)) yield meta.schema(idx)
-        keySchema = StructType(fields)
+        val indexFields = for (idx <- entries.map(_.ordinal)) yield meta.schema(idx)
+        val fields = indexFields.slice(0, lastIdx + 1)
+        keySchema = StructType(indexFields)
         scanner = new RangeScanner(bestIndexer)
         val attributes = fields.map(_.name) // get column names in the composite index
         scanner.intervalArray = new ArrayBuffer[RangeInterval](intervalMap(attributes.last).length)
-        for (i <- attributes.indices) {
-          if (i == attributes.length-1) {}
-          intervalMap(attributes(i)).head.start
-        }
+
+        for (i <- intervalMap(attributes.last).indices) {
+          val startKeys = attributes.indices.map(attrIdx =>
+            if (attrIdx == attributes.length-1) intervalMap(attributes(attrIdx))(i).start
+            else intervalMap(attributes(attrIdx)).head.start )
+          var compositeStartKey = startKeys.reduce((key1, key2) => new JoinedRow(key1, key2))
+
+          val endKeys = attributes.indices.map(attrIdx =>
+            if (attrIdx == attributes.length-1) intervalMap(attributes(attrIdx))(i).end
+            else intervalMap(attributes(attrIdx)).head.end )
+          var compositeEndKey = endKeys.reduce((key1, key2) => new JoinedRow(key1, key2))
+
+          var nullIdx = lastIdx + 1
+          while(nullIdx<entries.length) {
+            compositeStartKey = new JoinedRow(compositeStartKey, null)
+            compositeEndKey = new JoinedRow(compositeEndKey, null)
+            nullIdx += 1
+          }
+          scanner.intervalArray(i).start = compositeStartKey
+          scanner.intervalArray(i).end = compositeEndKey
+          scanner.intervalArray(i).startInclude = intervalMap(attributes.last)(i).startInclude
+          scanner.intervalArray(i).endInclude = intervalMap(attributes.last)(i).endInclude
+
+        } // end for
       case BloomFilterIndex(entries) =>
-        keySchema = new StructType().add(meta.schema(entries(idx)))
+        keySchema = new StructType().add(meta.schema(entries(lastIdx)))
         scanner = BloomFilterScanner(bestIndexer)
-        val attribute = meta.schema(entries(idx)).name
+        val attribute = meta.schema(entries(lastIdx)).name
         val filterOptimizer = unapply(attribute).get
         scanner.intervalArray =
           intervalMap(attribute).sortWith(filterOptimizer.compareRangeInterval)
       case _ =>
     }
-//    scanner.intervalArray = intervalArray
+
     scanner.withKeySchema(keySchema)
   }
 
