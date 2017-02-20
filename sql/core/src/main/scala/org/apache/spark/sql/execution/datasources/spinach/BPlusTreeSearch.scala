@@ -747,19 +747,19 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
   }
 
   /**
-    * A simple approach to select best indexer:
-    * For B+ tree index, we expect to make full use of index:
-    * On one hand, match as many attributes as possible in a SQL statement;
-    * On the other hand, use as many attributes as possible in a B+ tree index
-    * So we want the number of matched attributes to be close to
-    * both the total number of attributes in a SQL statement
-    * and the total number of entries in a B+ tree index candidate
-    * we introduce a variable ratio to indicate the match extent
-    * ratio = totalAttributes/matchedAttributed + totalIndexEntries/matchedAttributes
-    * @param attrNum: the total number of attributes in the SQL statement
-    * @return (Int, IndexMeta): the best indexMeta,
-    *         and the Int is the index of the last attribute in the index entries
-    */
+   * A simple approach to select best indexer:
+   * For B+ tree index, we expect to make full use of index:
+   * On one hand, match as many attributes as possible in a SQL statement;
+   * On the other hand, use as many attributes as possible in a B+ tree index
+   * So we want the number of matched attributes to be close to
+   * both the total number of attributes in a SQL statement
+   * and the total number of entries in a B+ tree index candidate
+   * we introduce a variable ratio to indicate the match extent
+   * ratio = totalAttributes/matchedAttributed + totalIndexEntries/matchedAttributes
+   * @param attrNum: the total number of attributes in the SQL statement
+   * @return (Int, IndexMeta): the best indexMeta,
+   *         and the Int is the index of the last attribute in the index entries
+   */
   def getBestIndexer(attrNum: Int): (Int, IndexMeta) = {
     var lastIdx = -1
     var bestIndexer: IndexMeta = null
