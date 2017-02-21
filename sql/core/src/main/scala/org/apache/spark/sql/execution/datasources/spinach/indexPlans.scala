@@ -21,12 +21,13 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, Descending}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, SpinachException}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
+import org.apache.spark.sql.types.{IntegerType, StringType}
 
 /**
  * Creates an index for table on indexColumns
@@ -297,5 +298,65 @@ case class RefreshIndex(
     }
 
     Seq.empty
+  }
+}
+
+/**
+ * List indices for table
+ */
+case class SpinachShowIndex(relation: LogicalPlan) extends RunnableCommand with Logging {
+  override def children: Seq[LogicalPlan] = Seq(relation)
+
+  override val output: Seq[Attribute] = {
+    AttributeReference("table", StringType, nullable = true)() ::
+      AttributeReference("key_name", StringType, nullable = false)() ::
+      AttributeReference("seq_in_index", IntegerType, nullable = false)() ::
+      AttributeReference("column_name", StringType, nullable = false)() ::
+      AttributeReference("collation", StringType, nullable = true)() ::
+      AttributeReference("index_type", StringType, nullable = false)() :: Nil
+  }
+
+  override def run(sparkSession: SparkSession): Seq[Row] = {
+    val (fileCatalog, s, readerClassName, identifier) = relation match {
+      case LogicalRelation(
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: SpinachFileFormat, _), _, id) =>
+        (fileCatalog, s, SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME, id)
+      case LogicalRelation(
+      HadoopFsRelation(_, fileCatalog, _, s, _, _: ParquetFileFormat, _), _, id) =>
+        (fileCatalog, s, SpinachFileFormat.PARQUET_DATA_FILE_CLASSNAME, id)
+      case other =>
+        throw new SpinachException(s"We don't support index refreshing for ${other.simpleString}")
+    }
+
+    val partitions = SpinachUtils.getPartitions(fileCatalog).filter(_.files.nonEmpty)
+    // TODO currently we ignore empty partitions, so each partition may have different indexes,
+    // this may impact index updating. It may also fail index existence check. Should put index
+    // info at table level also.
+    // aggregate all existing indices
+    val indices = partitions.flatMap(p => {
+      val parent = p.files.head.getPath.getParent
+      // TODO get `fs` outside of map() to boost
+      val fs = parent.getFileSystem(sparkSession.sparkContext.hadoopConfiguration)
+      val existOld = fs.exists(new Path(parent, SpinachFileFormat.SPINACH_META_FILE))
+      if (existOld) {
+        val m = SpinachUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, parent)
+        assert(m.nonEmpty)
+        val oldMeta = m.get
+        oldMeta.indexMetas
+      } else {
+        Nil
+      }
+    }).groupBy(_.name).map(_._2.head)
+    indices.toSeq.flatMap(i => i.indexType match {
+      case BTreeIndex(entries) =>
+        entries.zipWithIndex.map(ei => {
+          val dir = if (ei._1.dir == Ascending) "A" else "D"
+          Row(identifier.get.table, i.name, ei._2, s(ei._1.ordinal).name, dir, "BTREE")})
+      case BloomFilterIndex(entries) =>
+        // using "A" for collation as MySQL does since it is ignored.
+        entries.zipWithIndex.map(ei =>
+          Row(identifier.get.table, i.name, ei._2, s(ei._1).name, "A", "BLOOM"))
+      case t => sys.error(s"not support index type $t for index ${i.name}")
+    })
   }
 }

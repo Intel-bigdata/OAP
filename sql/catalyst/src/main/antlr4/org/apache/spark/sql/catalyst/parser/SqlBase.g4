@@ -129,6 +129,7 @@ statement
     | CREATE SINDEX (IF NOT EXISTS)? IDENTIFIER ON
         tableIdentifier indexCols (USING indexType)?                   #spinachCreateIndex
     | DROP SINDEX (IF EXISTS)? IDENTIFIER ON tableIdentifier           #spinachDropIndex
+    | SHOW SINDEX (FROM | IN) tableIdentifier                          #spinachShowIndex
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
     ;
 

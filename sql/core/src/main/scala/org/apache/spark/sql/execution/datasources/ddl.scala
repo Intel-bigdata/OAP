@@ -84,7 +84,8 @@ case class CreateTempViewUsing(
       options = options)
     sparkSession.sessionState.catalog.createTempView(
       tableIdent.table,
-      Dataset.ofRows(sparkSession, LogicalRelation(dataSource.resolveRelation())).logicalPlan,
+      Dataset.ofRows(sparkSession, LogicalRelation(dataSource.resolveRelation(),
+        metastoreTableIdentifier = Some(tableIdent))).logicalPlan,
       replace)
 
     Seq.empty[Row]
