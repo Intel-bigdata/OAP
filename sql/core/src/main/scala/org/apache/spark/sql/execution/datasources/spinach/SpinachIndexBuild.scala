@@ -151,14 +151,19 @@ private[spinach] case class SpinachIndexBuild(
             val uniqueKeysList = new java.util.LinkedList[InternalRow]()
             import scala.collection.JavaConverters._
             uniqueKeysList.addAll(uniqueKeys.toSeq.asJava)
-            writeTreeToOut(treeShape, fileOut, offsetMap,
+            val treeOffset = writeTreeToOut(treeShape, fileOut, offsetMap,
               fileOffset, uniqueKeysList, keySchema, 0, -1L)
+
+            simpleStatistics(fileOut, uniqueKeys, offsetMap)
+
             assert(uniqueKeysList.size == 1)
+            IndexUtils.writeLong(fileOut, dataEnd + treeOffset._1)
             IndexUtils.writeLong(fileOut, dataEnd)
             IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
+
             fileOut.close()
             indexFile.toString
-            IndexBuildResult(d.getName, cnt, "", d.getParent.toString)
+            IndexBuildResult(dataString, cnt, "", d.getParent.toString)
           case BloomFilterIndexType =>
             val bf_index = new BloomFilter()
             // collect index oridinals from indexColumns and schema
@@ -217,6 +222,37 @@ private[spinach] case class SpinachIndexBuild(
     }
   }
 
+  private def simpleStatistics(fileOut: FSDataOutputStream,
+                               uniqueKeys: Array[InternalRow],
+                               offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
+    // write stats size
+    IndexUtils.writeInt(fileOut, 2)
+
+    // write minval
+    writeStatistic(uniqueKeys.head, offsetMap, fileOut)
+
+    // write maxval
+    writeStatistic(uniqueKeys.last, offsetMap, fileOut)
+
+  }
+
+  // write min and max value at the beginning of index file
+  // the statistics is like
+  // | value[Bytes] | offset[Long] |
+  private def writeStatistic(row: InternalRow,
+                             offsetMap: java.util.HashMap[InternalRow, Long],
+                             fileOut: FSDataOutputStream) = {
+    val keyBuf = new ByteArrayOutputStream()
+    val value = convertHelper(row, keyBuf)
+    value.writeToStream(keyBuf, null)
+
+    keyBuf.writeTo(fileOut)
+    IndexUtils.writeLong(fileOut, offsetMap.get(row))
+    fileOut.flush()
+
+    keyBuf.close()
+  }
+
   private def buildOrdering(keySchema: StructType): Ordering[InternalRow] = {
     // here i change to use param id to index_id to get datatype in keySchema
     val order = keySchema.zipWithIndex.map {
@@ -267,6 +303,18 @@ private[spinach] case class SpinachIndexBuild(
   }
 
   @transient private lazy val converter = UnsafeProjection.create(keySchema)
+
+  /**
+   * This method help spinach convert InternalRow type to UnsafeRow type
+   * @param internalRow
+   * @param keyBuf
+   * @return unsafeRow
+   */
+  private def convertHelper(internalRow: InternalRow, keyBuf: ByteArrayOutputStream): UnsafeRow = {
+    val writeRow = converter.apply(internalRow)
+    IndexUtils.writeInt(keyBuf, writeRow.getSizeInBytes)
+    writeRow
+  }
 
   /**
    * write file correspond to [[UnsafeIndexNode]]
