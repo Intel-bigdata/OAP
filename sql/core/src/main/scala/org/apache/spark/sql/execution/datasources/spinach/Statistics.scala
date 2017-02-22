@@ -160,11 +160,11 @@ class MinMaxStatistics extends Statistics {
   }
 
   /**
-    * This method help spinach convert InternalRow type to UnsafeRow type
-    * @param internalRow
-    * @param keyBuf
-    * @return unsafeRow
-    */
+   * This method help spinach convert InternalRow type to UnsafeRow type
+   * @param internalRow
+   * @param keyBuf
+   * @return unsafeRow
+   */
   private def convertHelper(internalRow: InternalRow, keyBuf: ByteArrayOutputStream): UnsafeRow = {
     val writeRow = converter.apply(internalRow)
     IndexUtils.writeInt(keyBuf, writeRow.getSizeInBytes)

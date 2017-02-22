@@ -134,10 +134,10 @@ private[spinach] class SpinachDataReader(
   }
 
   /**
-    * Through getting statistics from related index file,
-    * judging if we should bypass this datafile or full scan or by index.
-    * return -1 means bypass, 0 means full scan and 1 means by index.
-    */
+   * Through getting statistics from related index file,
+   * judging if we should bypass this datafile or full scan or by index.
+   * return -1 means bypass, 0 means full scan and 1 means by index.
+   */
   private def readStatistics(intervalArray: ArrayBuffer[RangeInterval],
                              indexPath: Path, conf: Configuration): Double = {
     if (intervalArray.length == 0) {
