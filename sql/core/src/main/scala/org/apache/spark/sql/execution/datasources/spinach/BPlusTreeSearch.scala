@@ -395,9 +395,11 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScann
     }).toArray
 
     bloomFilter = BloomFilter(bitSetLongArr, numOfHashFunc)
+
+    // TODO need optimization while considering multi-column
     stopFlag = if (equalValues != null && equalValues.length > 0) {
       !equalValues.map(value => bloomFilter
-        .checkExist(value.getInt(0).toString)) // TODO getValue needs to be optimized
+        .checkExist(value.get(0, keySchema.head.dataType).toString))
         .reduceOption(_ || _).getOrElse(false)
     } else false
     curIdx = 0

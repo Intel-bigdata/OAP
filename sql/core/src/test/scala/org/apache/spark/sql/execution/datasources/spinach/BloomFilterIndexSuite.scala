@@ -50,10 +50,14 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     sql(s"""CREATE TABLE t_refresh_parquet (a int, b int)
             | USING parquet
             | PARTITIONED by (b)""".stripMargin)
+    sql(s"""CREATE TEMPORARY TABLE spinach_double_test (a DOUBLE, b STRING)
+           | USING spn
+           | OPTIONS (path '$path')""".stripMargin)
   }
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("spinach_test")
+    sqlContext.dropTempTable("spinach_double_test")
     sqlContext.dropTempTable("spinach_test_date")
     sqlContext.dropTempTable("parquet_test")
     sqlContext.dropTempTable("parquet_test_date")
@@ -157,5 +161,23 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 10301").count() == 0)
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 801").count() == 0)
     sql("drop sindex index_bf on spinach_test")
+  }
+
+  test("Bloom filter on non-INT column") {
+    val data: Seq[(Double, String)] = (1 to 300).map { i => (i + 0.0, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_double_test select * from t")
+    sql("create sindex index_bf on spinach_double_test (a) USING BLOOM")
+    checkAnswer(sql("SELECT * FROM spinach_double_test WHERE a = 10.0"),
+      Row(10.0, "this is test 10") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_double_test WHERE a = 20.0"),
+      Row(20.0, "this is test 20") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_double_test WHERE a = 100"),
+      Row(100.0, "this is test 100") :: Nil)
+    assert(sql(s"SELECT * FROM spinach_double_test WHERE a = 301").count() == 0)
+    assert(sql(s"SELECT * FROM spinach_double_test WHERE a = 310").count() == 0)
+    assert(sql(s"SELECT * FROM spinach_double_test WHERE a = 10301").count() == 0)
+    assert(sql(s"SELECT * FROM spinach_double_test WHERE a = 801").count() == 0)
+    sql("drop sindex index_bf on spinach_double_test")
   }
 }
