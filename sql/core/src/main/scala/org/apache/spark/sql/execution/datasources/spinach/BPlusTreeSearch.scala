@@ -486,16 +486,16 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
       return intervalArray1
     }
 
-    intervalArray1.sortWith(compareRangeInterval)
+    val sortedArray = intervalArray1.sortWith(compareRangeInterval)
 
-    val result = ArrayBuffer(intervalArray1.head)
-    for(i <- 1 until intervalArray1.length) {
+    val result = ArrayBuffer(sortedArray.head)
+    for(i <- 1 until sortedArray.length) {
       val interval = result.last
       if ((interval.end eq RangeScanner.DUMMY_KEY_END) && interval.startInclude) {
         return result
       }
-      if(!intervalUnion(interval, intervalArray1(i))) {
-        result += intervalArray1(i)
+      if(!intervalUnion(interval, sortedArray(i))) {
+        result += sortedArray(i)
       }
 
     }// end for
@@ -708,25 +708,26 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
             availableIndexes.append((0, meta.indexMetas(idx)) )
           }
         case BTreeIndex(entries) =>
-          var num = 0
+          var num = 0 // the number of matched column
           var flag = 0
           // flag (terminated indication):
           // 0 -> Equivalence column; 1 -> Range column; 2 -> Absent column
           for (entry <- entries if flag == 0) {
             val attribute = meta.schema(entry.ordinal).name
-            if (intervalMap.contains(attribute) &&
-              intervalMap.getOrElse(attribute, null).length == 1) {
-              val start = intervalMap.getOrElse(attribute, null).head.start
-              val end = intervalMap.getOrElse(attribute, null).head.end
+            if (intervalMap.contains(attribute) && intervalMap(attribute).length == 1) {
+              val start = intervalMap(attribute).head.start
+              val end = intervalMap(attribute).head.end
               val ordering = unapply(attribute).get.order
-              if(ordering.compare(start, end) == 0) {num += 1} else flag = 1
+              if(start != RangeScanner.DUMMY_KEY_START &&
+                end != RangeScanner.DUMMY_KEY_END &&
+                ordering.compare(start, end) == 0) {num += 1} else flag = 1
             }
             else {
               if (!intervalMap.contains(attribute)) flag = 2 else flag = 1
             }
           } // end for
+          if (flag == 1) num += 1
           if (num>0) {
-            if (flag == 1) num += 1
             availableIndexes.append( (num-1, meta.indexMetas(idx)) )
           }
         case BloomFilterIndex(entries) =>
@@ -758,7 +759,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
    * ratio = totalAttributes/matchedAttributed + totalIndexEntries/matchedAttributes
    * @param attrNum: the total number of attributes in the SQL statement
    * @return (Int, IndexMeta): the best indexMeta,
-   *         and the Int is the index of the last attribute in the index entries
+   *         and the Int is the index of the last matched attribute in the index entries
    */
   def getBestIndexer(attrNum: Int): (Int, IndexMeta) = {
     var lastIdx = -1
@@ -802,7 +803,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
       case BTreeIndex(entries) =>
         val indexFields = for (idx <- entries.map(_.ordinal)) yield meta.schema(idx)
         val fields = indexFields.slice(0, lastIdx + 1)
-        keySchema = StructType(indexFields)
+        keySchema = StructType(fields)
         scanner = new RangeScanner(bestIndexer)
         val attributes = fields.map(_.name) // get column names in the composite index
         scanner.intervalArray = new ArrayBuffer[RangeInterval](intervalMap(attributes.last).length)
@@ -811,23 +812,23 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
           val startKeys = attributes.indices.map(attrIdx =>
             if (attrIdx == attributes.length-1) intervalMap(attributes(attrIdx))(i).start
             else intervalMap(attributes(attrIdx)).head.start )
-          var compositeStartKey = startKeys.reduce((key1, key2) => new JoinedRow(key1, key2))
+          val compositeStartKey = startKeys.reduce((key1, key2) => new JoinedRow(key1, key2))
 
           val endKeys = attributes.indices.map(attrIdx =>
             if (attrIdx == attributes.length-1) intervalMap(attributes(attrIdx))(i).end
             else intervalMap(attributes(attrIdx)).head.end )
-          var compositeEndKey = endKeys.reduce((key1, key2) => new JoinedRow(key1, key2))
+          val compositeEndKey = endKeys.reduce((key1, key2) => new JoinedRow(key1, key2))
 
-          var nullIdx = lastIdx + 1
-          while(nullIdx<entries.length) {
-            compositeStartKey = new JoinedRow(compositeStartKey, null)
-            compositeEndKey = new JoinedRow(compositeEndKey, null)
-            nullIdx += 1
-          }
-          scanner.intervalArray(i).start = compositeStartKey
-          scanner.intervalArray(i).end = compositeEndKey
-          scanner.intervalArray(i).startInclude = intervalMap(attributes.last)(i).startInclude
-          scanner.intervalArray(i).endInclude = intervalMap(attributes.last)(i).endInclude
+//          var nullIdx = lastIdx + 1
+//          while(nullIdx<entries.length) {
+//            compositeStartKey = new JoinedRow(compositeStartKey, null)
+//            compositeEndKey = new JoinedRow(compositeEndKey, null)
+//            nullIdx += 1
+//          }
+          scanner.intervalArray(i) = RangeInterval(
+            compositeStartKey, compositeEndKey,
+            intervalMap(attributes.last)(i).startInclude,
+            intervalMap(attributes.last)(i).endInclude)
 
         } // end for
       case BloomFilterIndex(entries) =>
