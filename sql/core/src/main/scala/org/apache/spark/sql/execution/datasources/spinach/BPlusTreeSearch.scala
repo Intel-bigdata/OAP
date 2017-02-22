@@ -209,7 +209,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
   @transient protected var currentKeyArray: Array[CurrentKey] = _
   @transient protected var ordering: Ordering[Key] = _
   var intervalArray: ArrayBuffer[RangeInterval] = _
-  protected var keySchema: StructType = _
+  var keySchema: StructType = _
 
   def meta: IndexMeta = idxMeta
   var currentKeyIdx = 0
@@ -227,15 +227,11 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
     this.ordering = GenerateOrdering.create(keySchema)
 
-    if (intervalArray.length == 0 || canPass(path, conf)) {
-      this
-    } else {
-      val indexScanner = IndexFiber(IndexFile(path))
-      val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
-      val root = meta.open(indexData, keySchema)
+    val indexScanner = IndexFiber(IndexFile(path))
+    val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
+    val root = meta.open(indexData, keySchema)
 
-      _init(root)
-    }
+    _init(root)
   }
 
   def _init(root : IndexNode): RangeScanner = {
@@ -261,78 +257,6 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
         }
     }
     this
-  }
-
-  def canPass(path: Path, conf: Configuration): Boolean = {
-    val fs = path.getFileSystem(conf)
-    val fin = fs.open(path)
-
-    // read stats size
-    val fileLength = fs.getContentSummary(path).getLength.toInt
-    val offsetArray = new Array[Byte](8)
-
-    fin.readFully(fileLength - 24, offsetArray)
-    val stBase = Platform.getLong(offsetArray, Platform.BYTE_ARRAY_OFFSET).toInt
-
-    val stsArray = new Array[Byte](fileLength - stBase)
-    fin.readFully(stBase, stsArray)
-
-    val stats = buildSimpleStatistics(stsArray)
-
-    fin.close()
-
-    val min = stats.head._2
-    val max = stats.last._2
-
-    val start = intervalArray.head
-    val end = intervalArray.last
-    var result = false
-    if (start.start != RangeScanner.DUMMY_KEY_START) { // > or >= start
-      if (start.startInclude) {
-        result |= ordering.gt(start.start, max)
-      } else {
-        result |= ordering.gteq(start.start, max)
-      }
-    }
-    if (end.end != RangeScanner.DUMMY_KEY_END) { // < or <= end
-      if (end.endInclude) {
-        result |= ordering.lt(end.end, min)
-      } else {
-        result |= ordering.lteq(end.end, min)
-      }
-    }
-
-    result
-  }
-
-  def buildSimpleStatistics(stsArray: Array[Byte]): ArrayBuffer[(Int, UnsafeRow, Long)] = {
-    val sts = ArrayBuffer[(Int, UnsafeRow, Long)]()
-    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET)
-    var i = 0
-    var base = 4L
-
-    while (i < size) {
-      val now = getStatistics(base, stsArray)
-      sts += now
-      i += 1
-      base += now._1 + 8
-    }
-
-    sts
-  }
-
-  def getStatistics(base: Long, stsArray: Array[Byte]): (Int, UnsafeRow, Long) = {
-    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base)
-    val value = getUnsafeRow(stsArray, base, size).copy()
-    val offset = Platform.getLong(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
-    (size + 4, value, offset)
-  }
-
-  def getUnsafeRow(array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
-    val row = UnsafeRangeNode.row.get
-    row.setNumFields(keySchema.length)
-    row.pointTo(array, Platform.BYTE_ARRAY_OFFSET + offset + 4, size)
-    row
   }
 
   // i: the interval index
