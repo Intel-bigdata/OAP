@@ -115,7 +115,7 @@ private[spinach] class SpinachDataReader(
       case Some(fs) if fs.exist(path, conf) => fs.initialize(path, conf)
         val indexPath = IndexUtils.indexFileFromDataFile(path, fs.meta.name)
 
-        val analysis = analyzeSts(indexPath, conf)
+        val analysis = readStatistics(indexPath, conf)
         if (analysis == 0) {
           fileScanner.iterator(conf, requiredIds)
         } else if (analysis == 1) {
@@ -135,57 +135,60 @@ private[spinach] class SpinachDataReader(
    * judging if we should bypass this datafile or full scan or by index.
    * return -1 means bypass, 0 means full scan and 1 means by index.
    */
-  def analyzeSts(indexPath: Path, conf: Configuration): Int = {
+  def readStatistics(indexPath: Path, conf: Configuration): Double = {
     val intervalArray = filterScanner.get.intervalArray
 
     if (intervalArray.length == 0) {
       -1
     } else {
-      val fs = indexPath.getFileSystem(conf)
-      val fin = fs.open(indexPath)
+      readMinMaxSts(indexPath, conf, intervalArray)
+    }
+  }
 
-      // read stats size
-      val fileLength = fs.getContentSummary(indexPath).getLength.toInt
-      val offsetArray = new Array[Byte](8)
+  def readMinMaxSts(indexPath: Path, conf: Configuration,
+                    intervalArray: ArrayBuffer[RangeInterval]): Double = {
+    val fs = indexPath.getFileSystem(conf)
+    val fin = fs.open(indexPath)
 
-      fin.readFully(fileLength - 24, offsetArray)
-      val stBase = Platform.getLong(offsetArray, Platform.BYTE_ARRAY_OFFSET).toInt
+    // read stats size
+    val fileLength = fs.getContentSummary(indexPath).getLength.toInt
+    val offsetArray = new Array[Byte](8)
 
-      val stsArray = new Array[Byte](fileLength - stBase)
-      fin.readFully(stBase, stsArray)
+    fin.readFully(fileLength - 24, offsetArray)
+    val stBase = Platform.getLong(offsetArray, Platform.BYTE_ARRAY_OFFSET).toInt
 
-      val stats = getSimpleStatistics(stsArray)
+    val stsArray = new Array[Byte](fileLength - stBase)
+    fin.readFully(stBase, stsArray)
 
-      fin.close()
+    val stats = getSimpleStatistics(stsArray)
 
-      val min = stats.head._2
-      val max = stats.last._2
+    fin.close()
 
-      val start = intervalArray.head
-      val end = intervalArray.last
-      var result = false
+    val min = stats.head._2
+    val max = stats.last._2
 
-      val ordering = GenerateOrdering.create(filterScanner.get.keySchema)
+    val start = intervalArray.head
+    val end = intervalArray.last
+    var result = false
 
-      if (start.start != RangeScanner.DUMMY_KEY_START) { // > or >= start
-        if (start.startInclude) {
-          result |= ordering.gt(start.start, max)
-        } else {
-          result |= ordering.gteq(start.start, max)
-        }
+    val ordering = GenerateOrdering.create(filterScanner.get.keySchema)
+
+    if (start.start != RangeScanner.DUMMY_KEY_START) { // > or >= start
+      if (start.startInclude) {
+        result |= ordering.gt(start.start, max)
+      } else {
+        result |= ordering.gteq(start.start, max)
       }
-      if (end.end != RangeScanner.DUMMY_KEY_END) { // < or <= end
-        if (end.endInclude) {
-          result |= ordering.lt(end.end, min)
-        } else {
-          result |= ordering.lteq(end.end, min)
-        }
+    }
+    if (end.end != RangeScanner.DUMMY_KEY_END) { // < or <= end
+      if (end.endInclude) {
+        result |= ordering.lt(end.end, min)
+      } else {
+        result |= ordering.lteq(end.end, min)
       }
-
-      if (result) -1 else 1
     }
 
-
+    if (result) -1 else 1
   }
 
   def getSimpleStatistics(stsArray: Array[Byte]): ArrayBuffer[(Int, UnsafeRow, Long)] = {

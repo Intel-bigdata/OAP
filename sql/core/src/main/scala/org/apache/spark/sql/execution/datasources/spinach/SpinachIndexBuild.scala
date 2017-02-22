@@ -154,7 +154,7 @@ private[spinach] case class SpinachIndexBuild(
             val treeOffset = writeTreeToOut(treeShape, fileOut, offsetMap,
               fileOffset, uniqueKeysList, keySchema, 0, -1L)
 
-            simpleStatistics(fileOut, uniqueKeys, offsetMap)
+            writeStatistics(fileOut, uniqueKeys, offsetMap)
 
             assert(uniqueKeysList.size == 1)
             IndexUtils.writeLong(fileOut, dataEnd + treeOffset._1)
@@ -162,7 +162,6 @@ private[spinach] case class SpinachIndexBuild(
             IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
 
             fileOut.close()
-            indexFile.toString
             IndexBuildResult(dataString, cnt, "", d.getParent.toString)
           case BloomFilterIndexType =>
             val bf_index = new BloomFilter()
@@ -222,9 +221,16 @@ private[spinach] case class SpinachIndexBuild(
     }
   }
 
-  private def simpleStatistics(fileOut: FSDataOutputStream,
+  private def writeStatistics(fileOut: FSDataOutputStream,
                                uniqueKeys: Array[InternalRow],
                                offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
+    // write Min Max sts
+    writeMinMaxSts(fileOut, uniqueKeys, offsetMap)
+  }
+
+  private def writeMinMaxSts(fileOut: FSDataOutputStream,
+                             uniqueKeys: Array[InternalRow],
+                             offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
     // write stats size
     IndexUtils.writeInt(fileOut, 2)
 
@@ -233,7 +239,6 @@ private[spinach] case class SpinachIndexBuild(
 
     // write maxval
     writeStatistic(uniqueKeys.last, offsetMap, fileOut)
-
   }
 
   // write min and max value at the beginning of index file
