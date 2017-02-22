@@ -107,6 +107,8 @@ private[spinach] class SpinachDataReader(
   filterScanner: Option[RangeScanner],
   requiredIds: Array[Int]) {
 
+  private var arrayOffset = 0L
+
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
@@ -141,28 +143,30 @@ private[spinach] class SpinachDataReader(
     if (intervalArray.length == 0) {
       -1
     } else {
-      readMinMaxSts(indexPath, conf, intervalArray)
+      val fs = indexPath.getFileSystem(conf)
+      val fin = fs.open(indexPath)
+
+      // read stats size
+      val fileLength = fs.getContentSummary(indexPath).getLength.toInt
+      val startPosArray = new Array[Byte](8)
+
+      fin.readFully(fileLength - 24, startPosArray)
+      val stBase = Platform.getLong(startPosArray, Platform.BYTE_ARRAY_OFFSET).toInt
+
+      val stsArray = new Array[Byte](fileLength - stBase)
+      fin.readFully(stBase, stsArray)
+      fin.close()
+
+      arrayOffset = 0L
+      readMinMaxSts(indexPath, conf, intervalArray, stsArray, arrayOffset)
     }
   }
 
   def readMinMaxSts(indexPath: Path, conf: Configuration,
-                    intervalArray: ArrayBuffer[RangeInterval]): Double = {
-    val fs = indexPath.getFileSystem(conf)
-    val fin = fs.open(indexPath)
-
-    // read stats size
-    val fileLength = fs.getContentSummary(indexPath).getLength.toInt
-    val offsetArray = new Array[Byte](8)
-
-    fin.readFully(fileLength - 24, offsetArray)
-    val stBase = Platform.getLong(offsetArray, Platform.BYTE_ARRAY_OFFSET).toInt
-
-    val stsArray = new Array[Byte](fileLength - stBase)
-    fin.readFully(stBase, stsArray)
-
-    val stats = getSimpleStatistics(stsArray)
-
-    fin.close()
+                    intervalArray: ArrayBuffer[RangeInterval],
+                    stsArray: Array[Byte],
+                    offset: Long): Double = {
+    val stats = getSimpleStatistics(stsArray, offset)
 
     val min = stats.head._2
     val max = stats.last._2
@@ -191,11 +195,12 @@ private[spinach] class SpinachDataReader(
     if (result) -1 else 1
   }
 
-  def getSimpleStatistics(stsArray: Array[Byte]): ArrayBuffer[(Int, UnsafeRow, Long)] = {
+  def getSimpleStatistics(stsArray: Array[Byte],
+                          offset: Long): ArrayBuffer[(Int, UnsafeRow, Long)] = {
     val sts = ArrayBuffer[(Int, UnsafeRow, Long)]()
     val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET)
     var i = 0
-    var base = 4L
+    var base = offset + 4
 
     while (i < size) {
       val now = extractSts(base, stsArray)
@@ -203,6 +208,8 @@ private[spinach] class SpinachDataReader(
       i += 1
       base += now._1 + 8
     }
+
+    arrayOffset = base
 
     sts
   }
