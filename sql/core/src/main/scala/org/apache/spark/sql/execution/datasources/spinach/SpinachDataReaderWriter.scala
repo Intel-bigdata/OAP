@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
@@ -24,6 +26,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.unsafe.Platform
 
 private[spinach] class SpinachDataWriter(
     isCompressed: Boolean,
@@ -102,6 +105,7 @@ private[spinach] class SpinachDataReader(
   filterScanner: Option[RangeScanner],
   requiredIds: Array[Int]) {
 
+  var arrayOffset = 0L
 
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     // TODO how to save the additional FS operation to get the Split size
@@ -113,8 +117,7 @@ private[spinach] class SpinachDataReader(
 
         val analysis =
           if (fs.canBeOptimizedByStatistics) {
-            new MinMaxStatistics().read(filterScanner.get.keySchema,
-              filterScanner.get.intervalArray, indexPath, conf)
+            readStatistics(fs.intervalArray, indexPath, conf)
           } else 1 // for index without Statistics, use the index
         if (analysis == 0) {
           fileScanner.iterator(conf, requiredIds)
@@ -130,4 +133,38 @@ private[spinach] class SpinachDataReader(
     }
   }
 
+  /**
+    * Through getting statistics from related index file,
+    * judging if we should bypass this datafile or full scan or by index.
+    * return -1 means bypass, 0 means full scan and 1 means by index.
+    */
+  private def readStatistics(intervalArray: ArrayBuffer[RangeInterval],
+                             indexPath: Path, conf: Configuration): Double = {
+    if (intervalArray.length == 0) {
+      -1
+    } else {
+      val fs = indexPath.getFileSystem(conf)
+      val fin = fs.open(indexPath)
+
+      // read stats size
+      val fileLength = fs.getContentSummary(indexPath).getLength.toInt
+      val startPosArray = new Array[Byte](8)
+
+      fin.readFully(fileLength - 24, startPosArray)
+      val stBase = Platform.getLong(startPosArray, Platform.BYTE_ARRAY_OFFSET).toInt
+
+      val stsArray = new Array[Byte](fileLength - stBase)
+      fin.readFully(stBase, stsArray)
+      fin.close()
+
+      arrayOffset = 0L
+
+      val minmax = new MinMaxStatistics()
+      val res = minmax.read(filterScanner.get.keySchema,
+        filterScanner.get.intervalArray, stsArray, arrayOffset)
+      arrayOffset = minmax.arrayOffset
+
+      res
+    }
+  }
 }

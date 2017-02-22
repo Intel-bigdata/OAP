@@ -21,13 +21,12 @@ import java.io.ByteArrayOutputStream
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataOutputStream, Path}
+import org.apache.hadoop.fs.FSDataOutputStream
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
+import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
@@ -41,61 +40,19 @@ abstract class Statistics{
 
   // parameter needs to be optimized
   def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
-           indexPath: Path, conf: Configuration): Double
+           stsArray: Array[Byte], offset: Long): Double
 }
 
 class MinMaxStatistics extends Statistics {
   override val id: Int = 0
   private var keySchema: StructType = _
   @transient private lazy val converter = UnsafeProjection.create(keySchema)
-  private var arrayOffset = 0L
+  var arrayOffset = 0L
 
   override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
-                    indexPath: Path, conf: Configuration): Double = {
+                    stsArray: Array[Byte], offset: Long): Double = {
     keySchema = schema
-    readStatistics(intervalArray, indexPath, conf)
-  }
 
-  override def write(schema: StructType, fileOut: FSDataOutputStream,
-                     uniqueKeys: Array[InternalRow],
-                     offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
-    keySchema = schema
-    writeStatistics(fileOut, uniqueKeys, offsetMap)
-  }
-
-  /**
-    * Through getting statistics from related index file,
-    * judging if we should bypass this datafile or full scan or by index.
-    * return -1 means bypass, 0 means full scan and 1 means by index.
-    */
-  private def readStatistics(intervalArray: ArrayBuffer[RangeInterval],
-                     indexPath: Path, conf: Configuration): Double = {
-    if (intervalArray.length == 0) {
-      -1
-    } else {
-      val fs = indexPath.getFileSystem(conf)
-      val fin = fs.open(indexPath)
-
-      // read stats size
-      val fileLength = fs.getContentSummary(indexPath).getLength.toInt
-      val startPosArray = new Array[Byte](8)
-
-      fin.readFully(fileLength - 24, startPosArray)
-      val stBase = Platform.getLong(startPosArray, Platform.BYTE_ARRAY_OFFSET).toInt
-
-      val stsArray = new Array[Byte](fileLength - stBase)
-      fin.readFully(stBase, stsArray)
-      fin.close()
-
-      arrayOffset = 0L
-      readMinMaxSts(indexPath, conf, intervalArray, stsArray, arrayOffset)
-    }
-  }
-
-  private def readMinMaxSts(indexPath: Path, conf: Configuration,
-                    intervalArray: ArrayBuffer[RangeInterval],
-                    stsArray: Array[Byte],
-                    offset: Long): Double = {
     val stats = getSimpleStatistics(stsArray, offset)
 
     val min = stats.head._2
@@ -123,6 +80,13 @@ class MinMaxStatistics extends Statistics {
     }
 
     if (result) -1 else 1
+  }
+
+  override def write(schema: StructType, fileOut: FSDataOutputStream,
+                     uniqueKeys: Array[InternalRow],
+                     offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
+    keySchema = schema
+    writeStatistics(fileOut, uniqueKeys, offsetMap)
   }
 
   private def getSimpleStatistics(stsArray: Array[Byte],
