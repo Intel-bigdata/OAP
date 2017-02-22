@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.io.FileInputStream
-
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -203,6 +201,7 @@ private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
 // we scan the index from the smallest to the greatest, this is the root class
 // of scanner, which will scan the B+ Tree (index) leaf node.
 private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] with Serializable {
+  def canBeOptimizedByStatistics: Boolean = true
   // TODO this is a temp work around
   override def toString(): String = "RangeScanner"
 //  @transient protected var currentKey: CurrentKey = _
@@ -345,6 +344,8 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
 }
 
 private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScanner(me) {
+  override def canBeOptimizedByStatistics: Boolean = false
+
   var stopFlag: Boolean = _
 
   var bloomFilter: BloomFilter = _

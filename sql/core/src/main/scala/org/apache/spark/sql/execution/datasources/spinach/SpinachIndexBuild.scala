@@ -25,7 +25,6 @@ import scala.collection.JavaConverters._
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
@@ -154,7 +153,8 @@ private[spinach] case class SpinachIndexBuild(
             val treeOffset = writeTreeToOut(treeShape, fileOut, offsetMap,
               fileOffset, uniqueKeysList, keySchema, 0, -1L)
 
-            writeStatistics(fileOut, uniqueKeys, offsetMap)
+            // TODO add `StatisticsManager` to manage Statistics information
+            new MinMaxStatistics().write(keySchema, fileOut, uniqueKeys, offsetMap)
 
             assert(uniqueKeysList.size == 1)
             IndexUtils.writeLong(fileOut, dataEnd + treeOffset._1)
@@ -219,43 +219,6 @@ private[spinach] case class SpinachIndexBuild(
         }
       }).collect().toSeq
     }
-  }
-
-  private def writeStatistics(fileOut: FSDataOutputStream,
-                               uniqueKeys: Array[InternalRow],
-                               offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
-    // write Min Max sts
-    writeMinMaxSts(fileOut, uniqueKeys, offsetMap)
-  }
-
-  private def writeMinMaxSts(fileOut: FSDataOutputStream,
-                             uniqueKeys: Array[InternalRow],
-                             offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
-    // write stats size
-    IndexUtils.writeInt(fileOut, 2)
-
-    // write minval
-    writeStatistic(uniqueKeys.head, offsetMap, fileOut)
-
-    // write maxval
-    writeStatistic(uniqueKeys.last, offsetMap, fileOut)
-  }
-
-  // write min and max value at the beginning of index file
-  // the statistics is like
-  // | value[Bytes] | offset[Long] |
-  private def writeStatistic(row: InternalRow,
-                             offsetMap: java.util.HashMap[InternalRow, Long],
-                             fileOut: FSDataOutputStream) = {
-    val keyBuf = new ByteArrayOutputStream()
-    val value = convertHelper(row, keyBuf)
-    value.writeToStream(keyBuf, null)
-
-    keyBuf.writeTo(fileOut)
-    IndexUtils.writeLong(fileOut, offsetMap.get(row))
-    fileOut.flush()
-
-    keyBuf.close()
   }
 
   private def buildOrdering(keySchema: StructType): Ordering[InternalRow] = {

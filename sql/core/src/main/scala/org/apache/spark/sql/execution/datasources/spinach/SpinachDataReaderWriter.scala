@@ -17,18 +17,13 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.unsafe.Platform
 
 private[spinach] class SpinachDataWriter(
     isCompressed: Boolean,
@@ -107,7 +102,6 @@ private[spinach] class SpinachDataReader(
   filterScanner: Option[RangeScanner],
   requiredIds: Array[Int]) {
 
-  private var arrayOffset = 0L
 
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     // TODO how to save the additional FS operation to get the Split size
@@ -117,7 +111,11 @@ private[spinach] class SpinachDataReader(
       case Some(fs) if fs.exist(path, conf) => fs.initialize(path, conf)
         val indexPath = IndexUtils.indexFileFromDataFile(path, fs.meta.name)
 
-        val analysis = readStatistics(indexPath, conf)
+        val analysis =
+          if (fs.canBeOptimizedByStatistics) {
+            new MinMaxStatistics().read(filterScanner.get.keySchema,
+              filterScanner.get.intervalArray, indexPath, conf)
+          } else 1 // for index without Statistics, use the index
         if (analysis == 0) {
           fileScanner.iterator(conf, requiredIds)
         } else if (analysis == 1) {
@@ -132,99 +130,4 @@ private[spinach] class SpinachDataReader(
     }
   }
 
-  /**
-   * Through getting statistics from related index file,
-   * judging if we should bypass this datafile or full scan or by index.
-   * return -1 means bypass, 0 means full scan and 1 means by index.
-   */
-  def readStatistics(indexPath: Path, conf: Configuration): Double = {
-    val intervalArray = filterScanner.get.intervalArray
-
-    if (intervalArray.length == 0) {
-      -1
-    } else {
-      val fs = indexPath.getFileSystem(conf)
-      val fin = fs.open(indexPath)
-
-      // read stats size
-      val fileLength = fs.getContentSummary(indexPath).getLength.toInt
-      val startPosArray = new Array[Byte](8)
-
-      fin.readFully(fileLength - 24, startPosArray)
-      val stBase = Platform.getLong(startPosArray, Platform.BYTE_ARRAY_OFFSET).toInt
-
-      val stsArray = new Array[Byte](fileLength - stBase)
-      fin.readFully(stBase, stsArray)
-      fin.close()
-
-      arrayOffset = 0L
-      readMinMaxSts(indexPath, conf, intervalArray, stsArray, arrayOffset)
-    }
-  }
-
-  def readMinMaxSts(indexPath: Path, conf: Configuration,
-                    intervalArray: ArrayBuffer[RangeInterval],
-                    stsArray: Array[Byte],
-                    offset: Long): Double = {
-    val stats = getSimpleStatistics(stsArray, offset)
-
-    val min = stats.head._2
-    val max = stats.last._2
-
-    val start = intervalArray.head
-    val end = intervalArray.last
-    var result = false
-
-    val ordering = GenerateOrdering.create(filterScanner.get.keySchema)
-
-    if (start.start != RangeScanner.DUMMY_KEY_START) { // > or >= start
-      if (start.startInclude) {
-        result |= ordering.gt(start.start, max)
-      } else {
-        result |= ordering.gteq(start.start, max)
-      }
-    }
-    if (end.end != RangeScanner.DUMMY_KEY_END) { // < or <= end
-      if (end.endInclude) {
-        result |= ordering.lt(end.end, min)
-      } else {
-        result |= ordering.lteq(end.end, min)
-      }
-    }
-
-    if (result) -1 else 1
-  }
-
-  def getSimpleStatistics(stsArray: Array[Byte],
-                          offset: Long): ArrayBuffer[(Int, UnsafeRow, Long)] = {
-    val sts = ArrayBuffer[(Int, UnsafeRow, Long)]()
-    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET)
-    var i = 0
-    var base = offset + 4
-
-    while (i < size) {
-      val now = extractSts(base, stsArray)
-      sts += now
-      i += 1
-      base += now._1 + 8
-    }
-
-    arrayOffset = base
-
-    sts
-  }
-
-  def extractSts(base: Long, stsArray: Array[Byte]): (Int, UnsafeRow, Long) = {
-    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base)
-    val value = getUnsafeRow(stsArray, base, size).copy()
-    val offset = Platform.getLong(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
-    (size + 4, value, offset)
-  }
-
-  def getUnsafeRow(array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
-    val row = UnsafeRangeNode.row.get
-    row.setNumFields(filterScanner.get.keySchema.length)
-    row.pointTo(array, Platform.BYTE_ARRAY_OFFSET + offset + 4, size)
-    row
-  }
 }
