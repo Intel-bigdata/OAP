@@ -825,10 +825,11 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
 //            compositeEndKey = new JoinedRow(compositeEndKey, null)
 //            nullIdx += 1
 //          }
-          scanner.intervalArray(i) = RangeInterval(
-            compositeStartKey, compositeEndKey,
+          scanner.intervalArray.append(
+            RangeInterval(compositeStartKey, compositeEndKey,
             intervalMap(attributes.last)(i).startInclude,
             intervalMap(attributes.last)(i).endInclude)
+          )
 
         } // end for
       case BloomFilterIndex(entries) =>
