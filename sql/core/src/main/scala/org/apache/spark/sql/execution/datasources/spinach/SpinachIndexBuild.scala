@@ -154,7 +154,7 @@ private[spinach] case class SpinachIndexBuild(
               fileOffset, uniqueKeysList, keySchema, 0, -1L)
 
             // TODO add `StatisticsManager` to manage Statistics information
-            new MinMaxStatistics().write(keySchema, fileOut, uniqueKeys, offsetMap)
+            new PartedByValueStatistics().write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
 
             assert(uniqueKeysList.size == 1)
             IndexUtils.writeLong(fileOut, dataEnd + treeOffset._1)

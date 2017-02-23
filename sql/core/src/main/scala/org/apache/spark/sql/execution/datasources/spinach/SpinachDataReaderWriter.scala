@@ -136,7 +136,7 @@ private[spinach] class SpinachDataReader(
   /**
    * Through getting statistics from related index file,
    * judging if we should bypass this datafile or full scan or by index.
-   * return -1 means bypass, 0 means full scan and 1 means by index.
+   * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
    */
   private def readStatistics(intervalArray: ArrayBuffer[RangeInterval],
                              indexPath: Path, conf: Configuration): Double = {
@@ -159,12 +159,15 @@ private[spinach] class SpinachDataReader(
 
       arrayOffset = 0L
 
-      val minmax = new MinMaxStatistics()
+      val minmax = new PartedByValueStatistics()
       val res = minmax.read(filterScanner.get.keySchema,
         filterScanner.get.intervalArray, stsArray, arrayOffset)
+
       arrayOffset = minmax.arrayOffset
 
-      res
+      if (res <= 0) -1
+      else if (res >= 0.8) 1
+      else 0
     }
   }
 }
