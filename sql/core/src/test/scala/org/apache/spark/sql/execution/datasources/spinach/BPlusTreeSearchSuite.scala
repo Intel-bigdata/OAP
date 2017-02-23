@@ -229,7 +229,7 @@ private[spinach] class BPlusTreeSearchSuite
       LessThanOrEqual("test", 10),
       fake,
       GreaterThanOrEqual("test", 5))
-    assertScanner(meta, filters, Array(fake), Set(50, 80, 81, 82, 90, 91, 100, 101, 102))
+    assertScanner(meta, filters, Array(), Set(50, 80, 81, 82, 90, 91, 100, 101, 102))
   }
 
   test(">= 10 & <= 5") {
@@ -282,12 +282,18 @@ private[spinach] class BPlusTreeSearchSuite
     val ic = new IndexContext(meta)
     val unHandledFilters = BPlusTreeSearch.build(filters, ic)
     assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
-    ic.getScannerBuilder match {
-      case Some(builder) =>
-        val scanner = builder.build
+    ic.getScanner match {
+      case Some(scanner) =>
         assert(scanner._init(
           BPlusTreeSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")
     }
+//    ic.getScannerBuilder match {
+//      case Some(builder) =>
+//        val scanner = builder.build
+//        assert(scanner._init(
+//          BPlusTreeSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
+//      case None => throw new Exception(s"expect scanner, but got None")
+//    }
   }
 }
