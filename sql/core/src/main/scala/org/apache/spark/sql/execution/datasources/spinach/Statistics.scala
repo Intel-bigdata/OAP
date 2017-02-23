@@ -20,12 +20,13 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.io.ByteArrayOutputStream
 
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Random
 
 import org.apache.hadoop.fs.FSDataOutputStream
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.catalyst.expressions.codegen.{BaseOrdering, GenerateOrdering}
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
@@ -41,6 +42,105 @@ abstract class Statistics{
   // parameter needs to be optimized
   def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
            stsArray: Array[Byte], offset: Long): Double
+}
+
+class SampleBasedStatistics extends Statistics {
+  override val id: Int = 1
+
+  private var sampleRate = 0.1
+
+  def setSampleRate(rate: Double): Unit = {
+    sampleRate = rate
+  }
+
+  // for SampleBasedStatistics, input keys should be the whole file
+  // instead of uniqueKeys, can be refactor later
+  def write(schema: StructType, fileOut: FSDataOutputStream,
+            uniqueKeys: Array[InternalRow],
+            offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
+    // SampleBasedStatistics file structure
+    // statistics_id        4 Bytes, Int, specify the [[Statistic]] type
+    // sample_size          4 Bytes, Int, number of UnsafeRow
+    //
+    // | unsafeRow-1 sizeInBytes | unsafeRow-1 content |
+    // | unsafeRow-2 sizeInBytes | unsafeRow-2 content |
+    // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |
+    // ...
+    // | unsafeRow-(sample_size) sizeInBytes | unsafeRow-(sample_size) content |
+
+    val converter = UnsafeProjection.create(schema)
+    val sample_size = (uniqueKeys.length * sampleRate).toInt
+
+    IndexUtils.writeInt(fileOut, id)
+    IndexUtils.writeInt(fileOut, sample_size)
+
+    val sample_array_index = Random.shuffle(uniqueKeys.indices.toList).take(sample_size)
+    sample_array_index.foreach(idx => writeSingleRow(uniqueKeys(idx), fileOut))
+
+    // can be reused, consider transfer this function to [[Statistics]] class
+    def writeSingleRow(row: InternalRow, fileOut: FSDataOutputStream): Unit = {
+      val unsafeRow = converter(row)
+      val keyBuf = new ByteArrayOutputStream()
+      IndexUtils.writeInt(keyBuf, unsafeRow.getSizeInBytes)
+      unsafeRow.writeToStream(keyBuf, null)
+      keyBuf.writeTo(fileOut)
+      fileOut.flush()
+      keyBuf.close()
+    }
+  }
+
+  var arrayOffset: Long = _
+
+  override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
+                    stsArray: Array[Byte], offset_temp: Long): Double = {
+    var offset = Platform.BYTE_ARRAY_OFFSET + offset_temp
+    val id_from_file = Platform.getInt(stsArray, offset)
+    offset += 4
+    assert(id_from_file == id, "Statistics type mismatch")
+    val ordering = GenerateOrdering.create(schema)
+    val size_from_file = Platform.getInt(stsArray, offset)
+    offset += 4
+
+    def readSingleUnsafeRow(array: Array[Byte], offset: Long): (UnsafeRow, Long) = {
+      val size = Platform.getInt(array, offset)
+      val row = UnsafeIndexNode.row.get
+      row.setNumFields(schema.length)
+      row.pointTo(array, offset + 4, size)
+      (row.copy(), offset + 4 + size)
+    }
+
+    def rowInSingleInterval(row: UnsafeRow, interval: RangeInterval)
+                           (implicit order: BaseOrdering = ordering): Boolean = {
+      if (interval.start == RangeScanner.DUMMY_KEY_START) {
+        if (interval.end == RangeScanner.DUMMY_KEY_END) true
+        else {
+          if (order.lt(row, interval.end)) true
+          else if (order.equiv(row, interval.end) && interval.endInclude) true
+          else false
+        }
+      } else {
+        if (order.lt(row, interval.start)) false
+        else if (order.equiv(row, interval.start) && !interval.startInclude) false
+        else if (interval.end != RangeScanner.DUMMY_KEY_END && (order.gt(row, interval.end) ||
+          (order.equiv(row, interval.end) && !interval.endInclude))) {false}
+        else true
+      }
+    }
+    def rowInIntervalArray(row: UnsafeRow, intervalArray: ArrayBuffer[RangeInterval])
+                          (implicit order: BaseOrdering = ordering): Boolean = {
+      if (intervalArray == null || intervalArray.isEmpty) false
+      else intervalArray.exists(interval => rowInSingleInterval(row, interval))
+    }
+
+    val sample_array_unsaferow = new Array[UnsafeRow](size_from_file)
+    (0 until size_from_file).foreach(i => {
+      val (row, off) = readSingleUnsafeRow(stsArray, offset)
+      sample_array_unsaferow(i) = row
+      offset = off
+    })
+    arrayOffset = offset - Platform.BYTE_ARRAY_OFFSET
+    sample_array_unsaferow.count(rowInIntervalArray(_, intervalArray)) / (1.0 * size_from_file)
+  }
 }
 
 class MinMaxStatistics extends Statistics {
