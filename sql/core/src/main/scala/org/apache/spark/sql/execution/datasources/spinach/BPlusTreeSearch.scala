@@ -236,23 +236,33 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
     currentKeyIdx = 0 // reset to initialized value for this thread
     intervalArray.zipWithIndex.foreach {
       case(interval: RangeInterval, i: Int) =>
-      if (interval.start == RangeScanner.DUMMY_KEY_START) {
+        var order: Ordering[Key] = null
+        if (interval.start == RangeScanner.DUMMY_KEY_START) {
         // find the first key in the left-most leaf node
         var tmpNode = root
         while (!tmpNode.isLeaf) tmpNode = tmpNode.childAt(0)
         currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0)
-      } else {
-        // find the identical key or the first key right greater than the specified one
-        moveTo(root, interval.start, i)
-      }
-      // process the LeftOpen condition
-      if (!interval.startInclude
-        && currentKeyArray(i).currentKey != RangeScanner.DUMMY_KEY_END) {
-        if (ordering.compare(interval.start, currentKeyArray(i).currentKey) == 0) {
+        }
+        else {
+          // find the identical key or the first key right greater than the specified one
+          if (keySchema.size > interval.start.numFields) { // exists Dummy_Key
+            order = GenerateOrdering.create(StructType(keySchema.dropRight(1)))
+          }
+          else order = this.ordering
+          currentKeyArray(i) = moveTo(root, interval.start, true, order)
+          if (keySchema.size > interval.end.numFields) { // exists Dummy_Key
+            order = GenerateOrdering.create(StructType(keySchema.dropRight(1)))
+            this.intervalArray(i).end = moveTo(root, interval.end, false, order).currentKey
+          }
+
+        }
+        // process the LeftOpen condition
+        while (!interval.startInclude &&
+          currentKeyArray(i).currentKey != RangeScanner.DUMMY_KEY_END &&
+          ordering.compare(interval.start, currentKeyArray(i).currentKey) == 0) {
           // find the exactly the key, since it's LeftOpen, skip the first key
           currentKeyArray(i).moveNextKey
         }
-      }
     }
 
 //    // filter the useless conditions(useless search ranges)
@@ -279,7 +289,8 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
 
   }
 
-  protected def moveTo(node: IndexNode, candidate: Key, keyIdx: Int): Unit = {
+  protected def moveTo(node: IndexNode, candidate: Key, findFirst: Boolean, order: Ordering[Key])
+  : CurrentKey = {
     var s = 0
     var e = node.length - 1
     var notFind = true
@@ -287,7 +298,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
     var m = s
     while (s <= e & notFind) {
       m = (s + e) / 2
-      val cmp = ordering.compare(node.keyAt(m), candidate)
+      val cmp = order.compare(node.keyAt(m), candidate)
       if (cmp == 0) {
         notFind = false
       } else if (cmp < 0) {
@@ -300,21 +311,32 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
     if (notFind) {
       m = if (e < 0) 0 else e
     }
+    else { // the candidate key is found in the B+ tree
+      if (findFirst) {
+        while (m>0 && order.compare(node.keyAt(m-1), candidate) == 0) {m -= 1}
+      }
+      else {
+        while (m<node.length-1 && order.compare(node.keyAt(m + 1), candidate) == 0)
+          m += 1
+      }
+    }
 
     if (node.isLeaf) {
       // here currentKey is equal to candidate or the last key in the left
       // which is less than the candidate
-      currentKeyArray(keyIdx) = new CurrentKey(node, m, 0)
+//      currentKeyArray(keyIdx) = new CurrentKey(node, m, 0)
+      val currentKey = new CurrentKey(node, m, 0)
 
       if (notFind) {
         // if not find, then let's move forward a key
-        if (ordering.compare(node.keyAt(m), candidate) < 0) {// if current key < candidate
-          currentKeyArray(keyIdx).moveNextKey
+        if (order.compare(node.keyAt(m), candidate) < 0) {// if current key < candidate
+//          currentKeyArray(keyIdx).moveNextKey
+          currentKey.moveNextKey
         }
-
       }
+      currentKey
     } else {
-      moveTo(node.childAt(m), candidate, keyIdx)
+      moveTo(node.childAt(m), candidate, findFirst, order)
     }
   }
 
