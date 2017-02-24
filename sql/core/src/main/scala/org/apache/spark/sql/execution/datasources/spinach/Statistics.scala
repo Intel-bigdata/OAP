@@ -420,6 +420,7 @@ object Statistics {
     keyBuf.close()
   }
 
+  // logic is complex, needs to be refactored :(
   def rowInSingleInterval(row: UnsafeRow, interval: RangeInterval,
                           order: BaseOrdering): Boolean = {
     if (interval.start == RangeScanner.DUMMY_KEY_START) {
@@ -432,8 +433,11 @@ object Statistics {
     } else {
       if (order.lt(row, interval.start)) false
       else if (order.equiv(row, interval.start)) {
-        if (interval.startInclude) true
-        else interval.end == RangeScanner.DUMMY_KEY_END || order.gt(interval.end, row)
+        if (interval.startInclude) {
+          if (interval.end != RangeScanner.DUMMY_KEY_END &&
+            order.equiv(interval.start, interval.end) && !interval.endInclude) {false}
+          else true
+        } else interval.end == RangeScanner.DUMMY_KEY_END || order.gt(interval.end, row)
       }
       else if (interval.end != RangeScanner.DUMMY_KEY_END && (order.gt(row, interval.end) ||
         (order.equiv(row, interval.end) && !interval.endInclude))) {false}
