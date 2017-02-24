@@ -33,6 +33,7 @@ import org.apache.spark.unsafe.Platform
 
 abstract class Statistics{
   val id: Int
+  var arrayOffset: Long
 
   // write function parameters need to be optimized
   def write(schema: StructType, fileOut: FSDataOutputStream, uniqueKeys: Array[InternalRow],
@@ -42,105 +43,6 @@ abstract class Statistics{
   // parameter needs to be optimized
   def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
            stsArray: Array[Byte], offset: Long): Double
-}
-
-class SampleBasedStatistics extends Statistics {
-  override val id: Int = 1
-
-  private var sampleRate = 0.1
-
-  def setSampleRate(rate: Double): Unit = {
-    sampleRate = rate
-  }
-
-  // for SampleBasedStatistics, input keys should be the whole file
-  // instead of uniqueKeys, can be refactor later
-  def write(schema: StructType, fileOut: FSDataOutputStream,
-            uniqueKeys: Array[InternalRow],
-            offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
-    // SampleBasedStatistics file structure
-    // statistics_id        4 Bytes, Int, specify the [[Statistic]] type
-    // sample_size          4 Bytes, Int, number of UnsafeRow
-    //
-    // | unsafeRow-1 sizeInBytes | unsafeRow-1 content |
-    // | unsafeRow-2 sizeInBytes | unsafeRow-2 content |
-    // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |
-    // ...
-    // | unsafeRow-(sample_size) sizeInBytes | unsafeRow-(sample_size) content |
-
-    val converter = UnsafeProjection.create(schema)
-    val sample_size = (uniqueKeys.length * sampleRate).toInt
-
-    IndexUtils.writeInt(fileOut, id)
-    IndexUtils.writeInt(fileOut, sample_size)
-
-    val sample_array_index = Random.shuffle(uniqueKeys.indices.toList).take(sample_size)
-    sample_array_index.foreach(idx => writeSingleRow(uniqueKeys(idx), fileOut))
-
-    // can be reused, consider transfer this function to [[Statistics]] class
-    def writeSingleRow(row: InternalRow, fileOut: FSDataOutputStream): Unit = {
-      val unsafeRow = converter(row)
-      val keyBuf = new ByteArrayOutputStream()
-      IndexUtils.writeInt(keyBuf, unsafeRow.getSizeInBytes)
-      unsafeRow.writeToStream(keyBuf, null)
-      keyBuf.writeTo(fileOut)
-      fileOut.flush()
-      keyBuf.close()
-    }
-  }
-
-  var arrayOffset: Long = _
-
-  override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
-                    stsArray: Array[Byte], offset_temp: Long): Double = {
-    var offset = Platform.BYTE_ARRAY_OFFSET + offset_temp
-    val id_from_file = Platform.getInt(stsArray, offset)
-    offset += 4
-    assert(id_from_file == id, "Statistics type mismatch")
-    val ordering = GenerateOrdering.create(schema)
-    val size_from_file = Platform.getInt(stsArray, offset)
-    offset += 4
-
-    def readSingleUnsafeRow(array: Array[Byte], offset: Long): (UnsafeRow, Long) = {
-      val size = Platform.getInt(array, offset)
-      val row = UnsafeIndexNode.row.get
-      row.setNumFields(schema.length)
-      row.pointTo(array, offset + 4, size)
-      (row.copy(), offset + 4 + size)
-    }
-
-    def rowInSingleInterval(row: UnsafeRow, interval: RangeInterval)
-                           (implicit order: BaseOrdering = ordering): Boolean = {
-      if (interval.start == RangeScanner.DUMMY_KEY_START) {
-        if (interval.end == RangeScanner.DUMMY_KEY_END) true
-        else {
-          if (order.lt(row, interval.end)) true
-          else if (order.equiv(row, interval.end) && interval.endInclude) true
-          else false
-        }
-      } else {
-        if (order.lt(row, interval.start)) false
-        else if (order.equiv(row, interval.start) && !interval.startInclude) false
-        else if (interval.end != RangeScanner.DUMMY_KEY_END && (order.gt(row, interval.end) ||
-          (order.equiv(row, interval.end) && !interval.endInclude))) {false}
-        else true
-      }
-    }
-    def rowInIntervalArray(row: UnsafeRow, intervalArray: ArrayBuffer[RangeInterval])
-                          (implicit order: BaseOrdering = ordering): Boolean = {
-      if (intervalArray == null || intervalArray.isEmpty) false
-      else intervalArray.exists(interval => rowInSingleInterval(row, interval))
-    }
-
-    val sample_array_unsaferow = new Array[UnsafeRow](size_from_file)
-    (0 until size_from_file).foreach(i => {
-      val (row, off) = readSingleUnsafeRow(stsArray, offset)
-      sample_array_unsaferow(i) = row
-      offset = off
-    })
-    arrayOffset = offset - Platform.BYTE_ARRAY_OFFSET
-    sample_array_unsaferow.count(rowInIntervalArray(_, intervalArray)) / (1.0 * size_from_file)
-  }
 }
 
 class MinMaxStatistics extends Statistics {
@@ -188,6 +90,9 @@ class MinMaxStatistics extends Statistics {
                      offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
     keySchema = schema
 
+    // write statistic id
+    IndexUtils.writeInt(fileOut, id)
+
     // write stats size
     IndexUtils.writeInt(fileOut, 2)
 
@@ -199,11 +104,11 @@ class MinMaxStatistics extends Statistics {
   }
 
   private def getSimpleStatistics(stsArray: Array[Byte],
-                          offset: Long): ArrayBuffer[(Int, UnsafeRow, Long)] = {
+                                  offset: Long): ArrayBuffer[(Int, UnsafeRow, Long)] = {
     val sts = ArrayBuffer[(Int, UnsafeRow, Long)]()
-    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
+    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset + 4)
     var i = 0
-    var base = offset + 4
+    var base = offset + 8
 
     while (i < size) {
       val now = extractSts(base, stsArray)
@@ -237,8 +142,75 @@ class MinMaxStatistics extends Statistics {
 
 }
 
-class PartedByValueStatistics extends Statistics {
+class SampleBasedStatistics extends Statistics {
   override val id: Int = 1
+
+  private var sampleRate = 0.1
+
+  def setSampleRate(rate: Double): Unit = {
+    sampleRate = rate
+  }
+
+  // for SampleBasedStatistics, input keys should be the whole file
+  // instead of uniqueKeys, can be refactor later
+  def write(schema: StructType, fileOut: FSDataOutputStream, uniqueKeys: Array[InternalRow],
+            hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
+            offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
+    // SampleBasedStatistics file structure
+    // statistics_id        4 Bytes, Int, specify the [[Statistic]] type
+    // sample_size          4 Bytes, Int, number of UnsafeRow
+    //
+    // | unsafeRow-1 sizeInBytes | unsafeRow-1 content |
+    // | unsafeRow-2 sizeInBytes | unsafeRow-2 content |
+    // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |
+    // ...
+    // | unsafeRow-(sample_size) sizeInBytes | unsafeRow-(sample_size) content |
+
+    val converter = UnsafeProjection.create(schema)
+    val sample_size = (uniqueKeys.length * sampleRate).toInt
+
+    IndexUtils.writeInt(fileOut, id)
+    IndexUtils.writeInt(fileOut, sample_size)
+
+    val sample_array_index = Random.shuffle(uniqueKeys.indices.toList).take(sample_size)
+    sample_array_index.foreach(idx =>
+      Statistics.writeInternalRow(converter, uniqueKeys(idx), fileOut))
+  }
+
+  override var arrayOffset: Long = _
+
+  override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
+                    stsArray: Array[Byte], offset_temp: Long): Double = {
+    var offset = offset_temp
+    val id_from_file = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
+    offset += 4
+    assert(id_from_file == id, "Statistics type mismatch")
+    val ordering = GenerateOrdering.create(schema)
+    val size_from_file = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
+    offset += 4
+
+    def readSingleUnsafeRow(array: Array[Byte], offset: Long): (UnsafeRow, Long) = {
+      val size = Platform.getInt(array, Platform.BYTE_ARRAY_OFFSET + offset)
+      val row = Statistics.getUnsafeRow(schema.length, array, offset, size).copy()
+      (row, offset + 4 + size)
+    }
+
+
+    val sample_array_unsaferow = new Array[UnsafeRow](size_from_file)
+    (0 until size_from_file).foreach(i => {
+      val (row, off) = readSingleUnsafeRow(stsArray, offset)
+      sample_array_unsaferow(i) = row
+      offset = off
+    })
+    arrayOffset = offset
+
+    sample_array_unsaferow.count(
+      Statistics.rowInIntervalArray(_, intervalArray, ordering)) / (1.0 * size_from_file)
+  }
+}
+
+class PartedByValueStatistics extends Statistics {
+  override val id: Int = 2
   private val maxPartNum: Int = 5
   private var keySchema: StructType = _
   @transient private lazy val converter = UnsafeProjection.create(keySchema)
@@ -300,14 +272,16 @@ class PartedByValueStatistics extends Statistics {
      */
 
     var i = 0
-    while (i <= partNum && !isBetween(stats(i)._2, start.start, end.end, ordering)) {
+    while (i <= partNum &&
+      !Statistics.rowInIntervalArray(stats(i)._2, intervalArray, ordering)) {
       i += 1
     }
     val left = i
     if (left == partNum + 1) {
       -1
     } else {
-      while (i <= partNum && isBetween(stats(i)._2, start.start, end.end, ordering)) {
+      while (i <= partNum &&
+        Statistics.rowInIntervalArray(stats(i)._2, intervalArray, ordering)) {
         i += 1
       }
       val right = i
@@ -329,18 +303,18 @@ class PartedByValueStatistics extends Statistics {
     }
   }
 
-  private def isBetween(obj: InternalRow, min: InternalRow, max: InternalRow,
-                        ordering: BaseOrdering): Boolean = {
-    (min == RangeScanner.DUMMY_KEY_START || ordering.gteq(obj, min)) &&
-      (max == RangeScanner.DUMMY_KEY_END || ordering.lteq(obj, max))
-  }
+//  private def isBetween(obj: InternalRow, min: InternalRow, max: InternalRow,
+//                        ordering: BaseOrdering): Boolean = {
+//    (min == RangeScanner.DUMMY_KEY_START || ordering.gteq(obj, min)) &&
+//      (max == RangeScanner.DUMMY_KEY_END || ordering.lteq(obj, max))
+//  }
 
   private def getStatistics(stsArray: Array[Byte],
                              offset: Long): ArrayBuffer[(Int, UnsafeRow, Int, Int)] = {
     val sts = ArrayBuffer[(Int, UnsafeRow, Int, Int)]()
-    val partNum = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
+    val partNum = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset + 4)
     var i = 0
-    var base = offset + 4
+    var base = offset + 8
 
     while (i < partNum) {
       val now = extractSts(base, stsArray)
@@ -367,6 +341,9 @@ class PartedByValueStatistics extends Statistics {
                      hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
                      offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
     keySchema = schema
+
+    // first write statistic id
+    IndexUtils.writeInt(fileOut, id)
 
     val size = hashMap.size()
     if (size > 0) {
@@ -441,5 +418,31 @@ object Statistics {
     keyBuf.writeTo(fileOut)
     fileOut.flush()
     keyBuf.close()
+  }
+
+  def rowInSingleInterval(row: UnsafeRow, interval: RangeInterval,
+                          order: BaseOrdering): Boolean = {
+    if (interval.start == RangeScanner.DUMMY_KEY_START) {
+      if (interval.end == RangeScanner.DUMMY_KEY_END) true
+      else {
+        if (order.lt(row, interval.end)) true
+        else if (order.equiv(row, interval.end) && interval.endInclude) true
+        else false
+      }
+    } else {
+      if (order.lt(row, interval.start)) false
+      else if (order.equiv(row, interval.start)) {
+        if (interval.startInclude) true
+        else interval.end == RangeScanner.DUMMY_KEY_END || order.gt(interval.end, row)
+      }
+      else if (interval.end != RangeScanner.DUMMY_KEY_END && (order.gt(row, interval.end) ||
+        (order.equiv(row, interval.end) && !interval.endInclude))) {false}
+      else true
+    }
+  }
+  def rowInIntervalArray(row: UnsafeRow, intervalArray: ArrayBuffer[RangeInterval],
+                        order: BaseOrdering): Boolean = {
+    if (intervalArray == null || intervalArray.isEmpty) false
+    else intervalArray.exists(interval => rowInSingleInterval(row, interval, order))
   }
 }

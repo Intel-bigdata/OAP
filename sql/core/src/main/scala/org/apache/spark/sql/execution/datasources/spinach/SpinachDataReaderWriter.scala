@@ -105,8 +105,6 @@ private[spinach] class SpinachDataReader(
   filterScanner: Option[RangeScanner],
   requiredIds: Array[Int]) {
 
-  var arrayOffset = 0L
-
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
@@ -157,25 +155,36 @@ private[spinach] class SpinachDataReader(
       fin.readFully(stBase, stsArray)
       fin.close()
 
-      arrayOffset = 0L
+      var arrayOffset = 0L
 
-      val minmax = new PartedByValueStatistics()
-      val res = minmax.read(filterScanner.get.keySchema,
-        filterScanner.get.intervalArray, stsArray, arrayOffset)
-      arrayOffset = minmax.arrayOffset
+      val stsEndOffset = fileLength - stBase - 24
+      var resSum: Double = 0
+      var resNum = 0
 
-      if (res == -1) -1
-      else { // for Statstics not certainly by-pass
-        var coverage_acc = res
-        var stats_count = 1
-        
-        val sampleBased = new SampleBasedStatistics()
-        coverage_acc += sampleBased.read(filterScanner.get.keySchema,
+      while (arrayOffset < stsEndOffset && resSum != -1) {
+        val id = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + arrayOffset)
+        val st = id match {
+          case 0 => new MinMaxStatistics()
+          case 1 => new SampleBasedStatistics()
+          case 2 => new PartedByValueStatistics
+          case _ => throw new UnsupportedOperationException(s"non-supported statistic in id $id")
+        }
+        val res = st.read(filterScanner.get.keySchema,
           filterScanner.get.intervalArray, stsArray, arrayOffset)
-        stats_count += 1
-        
-        // use average method to process multiple Statistic information
-        if (coverage_acc / (1.0 * stats_count)  >= 0.8) 1
+        arrayOffset = st.arrayOffset
+
+        if (res == -1) {
+          resSum = -1
+        } else {
+          resSum += res
+          resNum += 1
+        }
+      }
+
+      if (resSum == -1) -1
+      else if (resNum == 0) 0
+      else {
+        if (resSum / resNum >= 0.8) 1
         else 0
       }
     }
