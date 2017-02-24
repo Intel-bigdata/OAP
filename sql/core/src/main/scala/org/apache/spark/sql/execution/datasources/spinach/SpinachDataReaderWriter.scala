@@ -162,12 +162,22 @@ private[spinach] class SpinachDataReader(
       val minmax = new PartedByValueStatistics()
       val res = minmax.read(filterScanner.get.keySchema,
         filterScanner.get.intervalArray, stsArray, arrayOffset)
-
       arrayOffset = minmax.arrayOffset
 
-      if (res <= 0) -1
-      else if (res >= 0.8) 1
-      else 0
+      if (res == -1) -1
+      else { // for Statstics not certainly by-pass
+        var coverage_acc = res
+        var stats_count = 1
+        
+        val sampleBased = new SampleBasedStatistics()
+        coverage_acc += sampleBased.read(filterScanner.get.keySchema,
+          filterScanner.get.intervalArray, stsArray, arrayOffset)
+        stats_count += 1
+        
+        // use average method to process multiple Statistic information
+        if (coverage_acc / (1.0 * stats_count)  >= 0.8) 1
+        else 0
+      }
     }
   }
 }
