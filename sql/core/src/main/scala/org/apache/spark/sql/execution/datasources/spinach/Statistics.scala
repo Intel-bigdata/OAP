@@ -35,8 +35,8 @@ abstract class Statistics{
   val id: Int
 
   // write function parameters need to be optimized
-  def write(schema: StructType, fileOut: FSDataOutputStream,
-            uniqueKeys: Array[InternalRow],
+  def write(schema: StructType, fileOut: FSDataOutputStream, uniqueKeys: Array[InternalRow],
+            hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
             offsetMap: java.util.HashMap[InternalRow, Long]): Unit
 
   // parameter needs to be optimized
@@ -179,20 +179,29 @@ class MinMaxStatistics extends Statistics {
       }
     }
 
-    if (result) -1 else 1
+    if (result) -1 else 0
   }
 
   override def write(schema: StructType, fileOut: FSDataOutputStream,
                      uniqueKeys: Array[InternalRow],
+                     hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
                      offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
     keySchema = schema
-    writeStatistics(fileOut, uniqueKeys, offsetMap)
+
+    // write stats size
+    IndexUtils.writeInt(fileOut, 2)
+
+    // write minval
+    writeStatistic(uniqueKeys.head, offsetMap, fileOut)
+
+    // write maxval
+    writeStatistic(uniqueKeys.last, offsetMap, fileOut)
   }
 
   private def getSimpleStatistics(stsArray: Array[Byte],
                           offset: Long): ArrayBuffer[(Int, UnsafeRow, Long)] = {
     val sts = ArrayBuffer[(Int, UnsafeRow, Long)]()
-    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET)
+    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
     var i = 0
     var base = offset + 4
 
@@ -210,36 +219,9 @@ class MinMaxStatistics extends Statistics {
 
   private def extractSts(base: Long, stsArray: Array[Byte]): (Int, UnsafeRow, Long) = {
     val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base)
-    val value = getUnsafeRow(stsArray, base, size).copy()
+    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size).copy()
     val offset = Platform.getLong(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
     (size + 4, value, offset)
-  }
-
-  private def getUnsafeRow(array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
-    val row = UnsafeRangeNode.row.get
-    row.setNumFields(keySchema.length)
-    row.pointTo(array, Platform.BYTE_ARRAY_OFFSET + offset + 4, size)
-    row
-  }
-
-  private def writeStatistics(fileOut: FSDataOutputStream,
-                              uniqueKeys: Array[InternalRow],
-                              offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
-    // write Min Max sts
-    writeMinMaxSts(fileOut, uniqueKeys, offsetMap)
-  }
-
-  private def writeMinMaxSts(fileOut: FSDataOutputStream,
-                             uniqueKeys: Array[InternalRow],
-                             offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
-    // write stats size
-    IndexUtils.writeInt(fileOut, 2)
-
-    // write minval
-    writeStatistic(uniqueKeys.head, offsetMap, fileOut)
-
-    // write maxval
-    writeStatistic(uniqueKeys.last, offsetMap, fileOut)
   }
 
   // write min and max value at the beginning of index file
@@ -248,26 +230,216 @@ class MinMaxStatistics extends Statistics {
   private def writeStatistic(row: InternalRow,
                              offsetMap: java.util.HashMap[InternalRow, Long],
                              fileOut: FSDataOutputStream) = {
-    val keyBuf = new ByteArrayOutputStream()
-    val value = convertHelper(row, keyBuf)
-    value.writeToStream(keyBuf, null)
-
-    keyBuf.writeTo(fileOut)
+    Statistics.writeInternalRow(converter, row, fileOut)
     IndexUtils.writeLong(fileOut, offsetMap.get(row))
     fileOut.flush()
+  }
 
-    keyBuf.close()
+}
+
+class PartedByValueStatistics extends Statistics {
+  override val id: Int = 1
+  private val maxPartNum: Int = 5
+  private var keySchema: StructType = _
+  @transient private lazy val converter = UnsafeProjection.create(keySchema)
+  var arrayOffset = 0L
+
+  override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
+                    stsArray: Array[Byte], offset: Long): Double = {
+    keySchema = schema
+
+    val stats = getStatistics(stsArray, offset)
+
+    // ._2 value
+    // ._3 index
+    // ._4 count
+    val wholeCount = stats.last._4
+    val partNum = stats.length - 1
+
+    val start = intervalArray.head
+    val end = intervalArray.last
+
+    val ordering = GenerateOrdering.create(keySchema)
+
+    /*
+      if (start.start != RangeScanner.DUMMY_KEY_START) { // > or >= start
+        if (ordering.gt(start.start, stats.last._2)) {
+          cover = 0
+          left = partNum + 1
+        } else {
+          while (left <= partNum && ordering.gt(start.start, stats(left)._2)) {
+            left += 1
+          }
+          val resi = if (left > 0) {
+            stats(left)._4 - stats(left - 1)._4
+          } else 0
+
+          if (ordering.gt(stats(left)._2, start.start)) {
+            cover -= stats(left)._4
+            cover += 0.5 * resi
+          }
+        }
+      }
+      if (end.end != RangeScanner.DUMMY_KEY_END) { // < or <= end
+        if (ordering.gt(stats.head._2, end.end)) {
+          cover = 0
+        } else {
+          while (right >= left && ordering.lt(end.end, stats(right)._2)) {
+            right -= 1
+          }
+
+          val resi = if (right < partNum) {
+            stats(right + 1)._4 - stats(right)._4
+          } else 0
+
+          if (ordering.lt(stats(right)._2, end.end)) {
+            cover += 0.5 * stats(right + 1)._4
+          }
+        }
+      }
+     */
+
+    var i = 0
+    while (i <= partNum && !isBetween(stats(i)._2, start.start, end.end, ordering)) {
+      i += 1
+    }
+    val left = i
+    if (left == partNum + 1) {
+      -1
+    } else {
+      while (i <= partNum && isBetween(stats(i)._2, start.start, end.end, ordering)) {
+        i += 1
+      }
+      val right = i
+
+      var cover: Double = if (right <= partNum) stats(right)._4 else stats.last._4
+
+      if (start.start != RangeScanner.DUMMY_KEY_START && left > 0 &&
+        ordering.lteq(start.start, stats(left)._2)) {
+        cover -= stats(left - 1)._4
+        cover += 0.5 * (stats(left)._4 - stats(left - 1)._4)
+      }
+
+      if (end.end != RangeScanner.DUMMY_KEY_END && right <= partNum &&
+        ordering.gteq(end.end, stats(right - 1)._2)) {
+        cover -= 0.5 * (stats(right)._4 - stats(right - 1)._4)
+      }
+
+      cover / wholeCount
+    }
+  }
+
+  private def isBetween(obj: InternalRow, min: InternalRow, max: InternalRow,
+                        ordering: BaseOrdering): Boolean = {
+    (min == RangeScanner.DUMMY_KEY_START || ordering.gteq(obj, min)) &&
+      (max == RangeScanner.DUMMY_KEY_END || ordering.lteq(obj, max))
+  }
+
+  private def getStatistics(stsArray: Array[Byte],
+                             offset: Long): ArrayBuffer[(Int, UnsafeRow, Int, Int)] = {
+    val sts = ArrayBuffer[(Int, UnsafeRow, Int, Int)]()
+    val partNum = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
+    var i = 0
+    var base = offset + 4
+
+    while (i < partNum) {
+      val now = extractSts(base, stsArray)
+      sts += now
+      i += 1
+      base += now._1
+    }
+
+    arrayOffset = base
+
+    sts
+  }
+
+  private def extractSts(base: Long, stsArray: Array[Byte]): (Int, UnsafeRow, Int, Int) = {
+    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base)
+    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size).copy()
+    val index = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
+    val count = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 8 + size)
+    (size + 12, value, index, count)
+  }
+
+  override def write(schema: StructType, fileOut: FSDataOutputStream,
+                     uniqueKeys: Array[InternalRow],
+                     hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
+                     offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
+    keySchema = schema
+
+    val size = hashMap.size()
+    if (size > 0) {
+      val partNum = if (size > maxPartNum) maxPartNum else size
+      val perSize = size / partNum
+
+      // first write part number
+      IndexUtils.writeInt(fileOut, partNum + 1)
+
+      var i = 0
+      var count = 0
+      var index = 0
+      while (i < partNum) {
+        index = i * perSize
+        var begin = Math.max(index - perSize + 1, 0)
+        while (begin <= index) {
+          count += hashMap.get(uniqueKeys(begin)).size()
+          begin += 1
+        }
+        writeEntry(fileOut, uniqueKeys(index), index, count)
+        i += 1
+      }
+
+      index += 1
+      while (index < uniqueKeys.size) {
+        count += hashMap.get(uniqueKeys(index)).size()
+        index += 1
+      }
+      writeEntry(fileOut, uniqueKeys.last, size - 1, count)
+    }
+  }
+
+  private def writeEntry(fileOut: FSDataOutputStream,
+                         internalRow: InternalRow,
+                         index: Int, count: Int): Unit = {
+    Statistics.writeInternalRow(converter, internalRow, fileOut)
+    IndexUtils.writeInt(fileOut, index)
+    IndexUtils.writeInt(fileOut, count)
+    fileOut.flush()
+  }
+}
+
+object Statistics {
+  def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
+    val row = UnsafeRangeNode.row.get
+    row.setNumFields(schemaLen)
+    row.pointTo(array, Platform.BYTE_ARRAY_OFFSET + offset + 4, size)
+    row
   }
 
   /**
-   * This method help spinach convert InternalRow type to UnsafeRow type
-   * @param internalRow
-   * @param keyBuf
-   * @return unsafeRow
-   */
-  private def convertHelper(internalRow: InternalRow, keyBuf: ByteArrayOutputStream): UnsafeRow = {
+    * This method help spinach convert InternalRow type to UnsafeRow type
+    * @param internalRow
+    * @param keyBuf
+    * @return unsafeRow
+    */
+  def convertHelper(converter: UnsafeProjection,
+                    internalRow: InternalRow,
+                    keyBuf: ByteArrayOutputStream): UnsafeRow = {
     val writeRow = converter.apply(internalRow)
     IndexUtils.writeInt(keyBuf, writeRow.getSizeInBytes)
     writeRow
+  }
+
+  def writeInternalRow(converter: UnsafeProjection,
+                       internalRow: InternalRow,
+                       fileOut: FSDataOutputStream): Unit = {
+    val keyBuf = new ByteArrayOutputStream()
+    val value = convertHelper(converter, internalRow, keyBuf)
+    value.writeToStream(keyBuf, null)
+
+    keyBuf.writeTo(fileOut)
+    fileOut.flush()
+    keyBuf.close()
   }
 }
