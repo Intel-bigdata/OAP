@@ -1066,9 +1066,11 @@ private[spinach] object BPlusTreeSearch extends Logging {
       }
     )
     // need to be modified to traverse indexes ****************************
-    ic.selectAvailableIndex(intervalMap)
-    val (num, idxMeta) = ic.getBestIndexer(intervalMap.size)
-    ic.buildScanner(num, idxMeta, intervalMap)
+    if (intervalMap != null) {
+      ic.selectAvailableIndex(intervalMap)
+      val (num, idxMeta) = ic.getBestIndexer(intervalMap.size)
+      ic.buildScanner(num, idxMeta, intervalMap)
+    }
 //    for((attribute, intervalArray) <- intervalMap) {
 //      attribute match {
 //        case ic(scannerBuilder) =>
