@@ -160,9 +160,9 @@ class SampleBasedStatistics extends Statistics {
     // statistics_id        4 Bytes, Int, specify the [[Statistic]] type
     // sample_size          4 Bytes, Int, number of UnsafeRow
     //
-    // | unsafeRow-1 sizeInBytes | unsafeRow-1 content |
-    // | unsafeRow-2 sizeInBytes | unsafeRow-2 content |
-    // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |
+    // | unsafeRow-1 sizeInBytes | unsafeRow-1 content |   (4 + u1_sizeInBytes) Bytes, unsafeRow-1
+    // | unsafeRow-2 sizeInBytes | unsafeRow-2 content |   (4 + u2_sizeInBytes) Bytes, unsafeRow-2
+    // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |   (4 + u3_sizeInBytes) Bytes, unsafeRow-3
     // ...
     // | unsafeRow-(sample_size) sizeInBytes | unsafeRow-(sample_size) content |
 
@@ -395,11 +395,11 @@ object Statistics {
   }
 
   /**
-    * This method help spinach convert InternalRow type to UnsafeRow type
-    * @param internalRow
-    * @param keyBuf
-    * @return unsafeRow
-    */
+   * This method help spinach convert InternalRow type to UnsafeRow type
+   * @param internalRow
+   * @param keyBuf
+   * @return unsafeRow
+   */
   def convertHelper(converter: UnsafeProjection,
                     internalRow: InternalRow,
                     keyBuf: ByteArrayOutputStream): UnsafeRow = {
