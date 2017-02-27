@@ -172,14 +172,162 @@ private[spinach] class BPlusTreeMultiColumnSearchSuite
     assertScanner(meta, filters, Array(), Set())
   }
 
+  test("a=3 & 4<b<6") {
+    val filters: Array[Filter] = Array(EqualTo("a", 3), LessThan("b", 6), GreaterThan("b", 4))
+    assertScanner(meta, filters, Array(), Set(80, 81, 82))
+  }
+
+  test("a=3 & 4<b<=6") {
+    val filters: Array[Filter] = Array(EqualTo("a", 3), LessThanOrEqual("b", 6),
+      GreaterThan("b", 4))
+    assertScanner(meta, filters, Array(), Set(80, 81, 82, 90, 91, 100, 101, 102))
+  }
+
+  test("a=3 & 4<b<7") {
+    val filters: Array[Filter] = Array(EqualTo("a", 3), LessThan("b", 7),
+      GreaterThan("b", 4))
+    assertScanner(meta, filters, Array(), Set(80, 81, 82, 90, 91, 100, 101, 102))
+  }
+
+  test("a=3 & 4<=b<=6") {
+    val filters: Array[Filter] = Array(EqualTo("a", 3), LessThanOrEqual("b", 6),
+      GreaterThanOrEqual("b", 4))
+    assertScanner(meta, filters, Array(), Set(30, 31, 32, 40, 41, 42, 50, 52, 55, 60,
+      80, 81, 82, 90, 91, 100, 101, 102))
+  }
+
+  test("a=3 & 4<=b<6") {
+    val filters: Array[Filter] = Array(EqualTo("a", 3), LessThan("b", 6),
+      GreaterThanOrEqual("b", 4))
+    assertScanner(meta, filters, Array(), Set(30, 31, 32, 40, 41, 42, 50, 52, 55, 60,
+      80, 81, 82))
+  }
+
+  test("a=8 & 1<b<3") {
+    val filters: Array[Filter] = Array(EqualTo("a", 8), LessThan("b", 3),
+      GreaterThan("b", 1))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
+  test("a=8 & 1<b<3 & b>6 and c=14.3") {
+    val filters: Array[Filter] = Array(EqualTo("a", 8), LessThan("b", 3),
+      GreaterThan("b", 1), GreaterThan("b", 6), EqualTo("c", 14.3))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
   test("a=16 & b=5 & c>3") {
     val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5), GreaterThan("c", 3.0))
     assertScanner(meta, filters, Array(), Set(200, 214, 218, 223))
   }
 
+  test("a=16 & b=5 & c=3") {
+    val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5), EqualTo("c", 3.0))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
   test("a=16 & b=5 & c<3") {
     val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5), LessThan("c", 3.0))
     assertScanner(meta, filters, Array(), Set(185, 187, 193))
+  }
+
+  test("a=16 & b=5 & c>20.9") {
+    val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5), GreaterThan("c", 20.9))
+    assertScanner(meta, filters, Array(), Set(214, 218, 223))
+  }
+
+  test("a=16 & b=5 & c=20.9") {
+    val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5), EqualTo("c", 20.9))
+    assertScanner(meta, filters, Array(), Set(200))
+  }
+
+  test("a=16 & b=5 & c<20.9") {
+    val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5), LessThan("c", 20.9))
+    assertScanner(meta, filters, Array(), Set(185, 187, 193))
+  }
+
+  test("a=16 & b=5 & c<=20.9") {
+    val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5),
+      LessThanOrEqual("c", 20.9))
+    assertScanner(meta, filters, Array(), Set(185, 187, 193, 200))
+  }
+
+  // The correct result is Set(100,101,102), however, this test is only for index utilization.
+  // Our approach of Spinach is:
+  // the multi-column index will use the first two columns to search, and deliver the result set to
+  // upper layer, and then Spark SQL will use Filters of SQL statements to filter out
+  // the unmatched keys within this result set
+  test("a=3 & b>5 & c>1.0") {
+    val filters: Array[Filter] = Array(EqualTo("a", 3), GreaterThan("b", 5),
+      GreaterThan("c", 1.0))
+    assertScanner(meta, filters, Array(), Set(90, 91, 100, 101, 102))
+  }
+
+  // The correct result is Set(170, 171), however, this test is only for index utilization.
+  // Our approach of Spinach is:
+  // the multi-column index will use the first column to search, and deliver the result set to
+  // upper layer, and then Spark SQL will use Filters of SQL statements to filter out
+  // the unmatched keys within this result set
+  test("3<a<9 & b>5 & c>1.0") {
+    val filters: Array[Filter] = Array(GreaterThan("a", 3), GreaterThan("b", 5),
+      GreaterThan("c", 1.0), LessThan("a", 9))
+    assertScanner(meta, filters, Array(), Set(130, 131, 132, 150, 160, 161, 162, 170, 171))
+  }
+
+  test("a=16 & b=5 & c<=20.9 & c>100") {
+    val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5),
+      LessThanOrEqual("c", 20.9), GreaterThan("c", 100.0))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
+  test("a=16 & b=5 & c<=20.9 & c=1") {
+    val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5),
+      LessThanOrEqual("c", 20.9), EqualTo("c", 1.0))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
+  test("a=16 & b=5 & c<=20.9 & b=10") {
+    val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5),
+      LessThanOrEqual("c", 20.9), EqualTo("b", 10))
+    assertScanner(meta, filters, Array(), Set())
+  }
+
+  // Multi-column and Multi-range Test
+  // Although "Or" is not supported in most relational databases's B+ tree index,
+  // Spinach supports "Or" in order to make full use of index, but with one limit:
+  // Only when one attribute exists in "Or" predicate is B+ tree index able to support "Or"
+  test("a=3 & (b=5 || b=6)") {
+    val filters: Array[Filter] = Array(EqualTo("a", 3), Or(EqualTo("b", 5), EqualTo("b", 6)) )
+    assertScanner(meta, filters, Array(), Set(80, 81, 82, 90, 91, 100, 101, 102))
+  }
+
+  test("a=3 & (b=5 || b=7)") {
+    val filters: Array[Filter] = Array(EqualTo("a", 3), Or(EqualTo("b", 5), EqualTo("b", 7)) )
+    assertScanner(meta, filters, Array(), Set(80, 81, 82))
+  }
+
+  // The correct result is Set(100,101,102), however, this test is only for index utilization.
+  // Our approach of Spinach is:
+  // the multi-column index will use the first two columns to search, and deliver the result set to
+  // upper layer, and then Spark SQL will use Filters of SQL statements to filter out
+  // the unmatched keys within this result set
+  test("a=3 & (b=5 || b=6) & c=2.4") {
+    val filters: Array[Filter] = Array(EqualTo("a", 3), Or(EqualTo("b", 5), EqualTo("b", 6)),
+      EqualTo("c", 2.4))
+    assertScanner(meta, filters, Array(), Set(80, 81, 82, 90, 91, 100, 101, 102))
+  }
+
+  test("a=3 & (b<5 || b>=6)") {
+    val filters: Array[Filter] = Array(EqualTo("a", 3), Or(LessThan("b", 5),
+      GreaterThanOrEqual("b", 6)) )
+    assertScanner(meta, filters, Array(), Set(30, 31, 32, 40, 41, 42, 50, 52,
+      55, 60, 90, 91, 100, 101, 102))
+  }
+
+  test("a=16 & b=5 &(-5.0<c<1.0 || 25<c<=35.3)") {
+    val filters: Array[Filter] = Array(EqualTo("a", 16), EqualTo("b", 5),
+      Or(And(GreaterThan("c", -5.0), LessThan("c", 1.0)),
+        And(LessThanOrEqual("c", 35.3), GreaterThan("c", 25.0))) )
+    assertScanner(meta, filters, Array(), Set(185, 187, 193, 214, 218, 223))
   }
 
 }
