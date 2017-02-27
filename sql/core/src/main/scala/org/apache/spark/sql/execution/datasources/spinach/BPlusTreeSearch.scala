@@ -244,7 +244,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
         currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0)
         }
         else {
-          // find the identical key or the first key right greater than the specified one
+          // find the first identical key or the first key right greater than the specified one
           if (keySchema.size > interval.start.numFields) { // exists Dummy_Key
             order = GenerateOrdering.create(StructType(keySchema.dropRight(1)))
           }
@@ -252,6 +252,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
           currentKeyArray(i) = moveTo(root, interval.start, true, order)
           if (keySchema.size > interval.end.numFields) { // exists Dummy_Key
             order = GenerateOrdering.create(StructType(keySchema.dropRight(1)))
+            // find the last identical key or the last key less than the specified one on the left
             this.intervalArray(i).end = moveTo(root, interval.end, false, order).currentKey
           }
 
@@ -260,7 +261,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
         while (!interval.startInclude &&
           currentKeyArray(i).currentKey != RangeScanner.DUMMY_KEY_END &&
           ordering.compare(interval.start, currentKeyArray(i).currentKey) == 0) {
-          // find the exactly the key, since it's LeftOpen, skip the first key
+          // find exactly the key, since it's LeftOpen, skip the equivalent key(s)
           currentKeyArray(i).moveNextKey
         }
     }
@@ -289,6 +290,23 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
 
   }
 
+  /**
+   * search the key that equals to candidate in the IndexNode of B+ tree
+   * @param node: the node where binary search is executed
+   * @param candidate: the candidate key
+   * @param findFirst: indicates whether the goal is to find the
+   *                  first appeared key that equals to candidate
+   * @param order: the ordering that used to compare two keys
+   * @return the CurrentKey object that points to the target key
+   * findFirst == true -> find the first appeared key that equals to candidate, this is used
+   * to determine the start key that begins the scan.
+   * In this case, the first identical key(if found) or
+   * the first key greater than the specified one on the right(if not found) is returned;
+   * findFirst == false -> find the last appeared key that equals to candidate, this is used
+   * to determine the end key that terminates the scan.
+   * In this case, the last identical key(if found) or
+   * the last key less than the specified one on the left(if not found) is returned.
+   */
   protected def moveTo(node: IndexNode, candidate: Key, findFirst: Boolean, order: Ordering[Key])
   : CurrentKey = {
     var s = 0
@@ -312,8 +330,12 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
       m = if (e < 0) 0 else e
     }
     else { // the candidate key is found in the B+ tree
-      if (findFirst) {
-        while (m>0 && order.compare(node.keyAt(m-1), candidate) == 0) {m -= 1}
+      if (findFirst) {// if the goal is to find the first appeared key that equals to candidate
+        // if the goal is to find the start key,
+        // then find the last key that is less than the specified one on the left
+        // is always necessary in all Non-Leaf layers(considering the multi-column search)
+        while (m>0 && order.compare(node.keyAt(m), candidate) == 0) {m -= 1}
+        if (order.compare(node.keyAt(m), candidate) < 0) notFind = true
       }
       else {
         while (m<node.length-1 && order.compare(node.keyAt(m + 1), candidate) == 0)
@@ -322,13 +344,14 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
     }
 
     if (node.isLeaf) {
-      // here currentKey is equal to candidate or the last key in the left
+      // here currentKey is equal to candidate or the last key on the left side
       // which is less than the candidate
 //      currentKeyArray(keyIdx) = new CurrentKey(node, m, 0)
       val currentKey = new CurrentKey(node, m, 0)
 
-      if (notFind) {
-        // if not find, then let's move forward a key
+      if (notFind && findFirst) {
+        // if not found and the goal is to find the start key, then let's move forward a key
+        // if the goal is to find the end key, no need to move next
         if (order.compare(node.keyAt(m), candidate) < 0) {// if current key < candidate
 //          currentKeyArray(keyIdx).moveNextKey
           currentKey.moveNextKey
