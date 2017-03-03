@@ -266,8 +266,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
       if (intervalArray(i).endInclude) { // RightClose
         ordering.compare(
           currentKeyArray(i).currentKey, intervalArray(i).end) > 0
-      }
-      else { // RightOpen
+      } else { // RightOpen
         ordering.compare(
           currentKeyArray(i).currentKey, intervalArray(i).end) >= 0
       }

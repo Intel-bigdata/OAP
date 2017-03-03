@@ -164,8 +164,8 @@ private[spinach] class SpinachDataReader(
       while (arrayOffset < stsEndOffset && resSum != -1) {
         val id = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + arrayOffset)
         val st = id match {
-          case 0 => new MinMaxStatistics()
-          case 1 => new SampleBasedStatistics()
+          case 0 => new MinMaxStatistics
+          case 1 => new SampleBasedStatistics
           case 2 => new PartedByValueStatistics
           case _ => throw new UnsupportedOperationException(s"non-supported statistic in id $id")
         }
