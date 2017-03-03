@@ -137,6 +137,12 @@ private[spinach] object UnsafeIndexNode {
   }
 }
 
+private[spinach] object UnsafeRangeNode {
+  lazy val row = new ThreadLocal[UnsafeRow] {
+    override def initialValue = new UnsafeRow
+  }
+}
+
 private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
   assert(node.isLeaf, "Should be Leaf Node")
 
@@ -195,21 +201,16 @@ private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
 // we scan the index from the smallest to the greatest, this is the root class
 // of scanner, which will scan the B+ Tree (index) leaf node.
 private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] with Serializable {
+  def canBeOptimizedByStatistics: Boolean = true
   // TODO this is a temp work around
   override def toString(): String = "RangeScanner"
 //  @transient protected var currentKey: CurrentKey = _
   @transient protected var currentKeyArray: Array[CurrentKey] = _
   @transient protected var ordering: Ordering[Key] = _
   var intervalArray: ArrayBuffer[RangeInterval] = _
-  protected var keySchema: StructType = _
+  var keySchema: StructType = _
 
   def meta: IndexMeta = idxMeta
-//  def start: Key = null // the start node
-
-//  val startArray = new ArrayBuffer[Key]()
-//  val endArray = new ArrayBuffer[Key]()
-//  val stInclude = new ArrayBuffer[Boolean]()
-//  val endInclude = new ArrayBuffer[Boolean]()
   var currentKeyIdx = 0
 
   def exist(dataPath: Path, conf: Configuration): Boolean = {
@@ -220,8 +221,11 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
 
   def initialize(dataPath: Path, conf: Configuration): RangeScanner = {
     assert(keySchema ne null)
+    assert(intervalArray ne null, "intervalArray is null!")
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
+    this.ordering = GenerateOrdering.create(keySchema)
+
     val indexScanner = IndexFiber(IndexFile(path))
     val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
     val root = meta.open(indexData, keySchema)
@@ -230,53 +234,43 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
   }
 
   def _init(root : IndexNode): RangeScanner = {
-    assert(intervalArray ne null, "intervalArray is null!")
-    this.ordering = GenerateOrdering.create(keySchema)
     currentKeyArray = new Array[CurrentKey](intervalArray.length)
     currentKeyIdx = 0 // reset to initialized value for this thread
     intervalArray.zipWithIndex.foreach {
-      case(interval: RangeInterval, i: Int) =>
-      if (interval.start == RangeScanner.DUMMY_KEY_START) {
-        // find the first key in the left-most leaf node
-        var tmpNode = root
-        while (!tmpNode.isLeaf) tmpNode = tmpNode.childAt(0)
-        currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0)
-      } else {
-        // find the identical key or the first key right greater than the specified one
-        moveTo(root, interval.start, i)
-      }
-      // process the LeftOpen condition
-      if (!interval.startInclude
-        && currentKeyArray(i).currentKey != RangeScanner.DUMMY_KEY_END) {
-        if (ordering.compare(interval.start, currentKeyArray(i).currentKey) == 0) {
-          // find the exactly the key, since it's LeftOpen, skip the first key
-          currentKeyArray(i).moveNextKey
+      case (interval: RangeInterval, i: Int) =>
+        if (interval.start == RangeScanner.DUMMY_KEY_START) {
+          // find the first key in the left-most leaf node
+          var tmpNode = root
+          while (!tmpNode.isLeaf) tmpNode = tmpNode.childAt(0)
+          currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0)
+        } else {
+          // find the identical key or the first key right greater than the specified one
+          moveTo(root, interval.start, i)
         }
-      }
+
+        // if leftopen here we should move related currentKey to next one
+        if (!interval.startInclude &&
+          currentKeyArray(i).currentKey != RangeScanner.DUMMY_KEY_END &&
+          ordering.compare(interval.start, currentKeyArray(i).currentKey) == 0) {
+            currentKeyArray(i).moveNextKey
+        }
     }
-
-//    // filter the useless conditions(useless search ranges)
-//    currentKeyArray = currentKeyArray.filter(
-//      key => !(key.isEnd || shouldStop(key)))
-
     this
   }
 
   // i: the interval index
   def intervalShouldStop(i: Int): Boolean = { // detect if we need to stop scanning
     if (intervalArray(i).end == RangeScanner.DUMMY_KEY_END) { // Left-Only search
-      return false
+      false
+    } else {
+      if (intervalArray(i).endInclude) { // RightClose
+        ordering.compare(
+          currentKeyArray(i).currentKey, intervalArray(i).end) > 0
+      } else { // RightOpen
+        ordering.compare(
+          currentKeyArray(i).currentKey, intervalArray(i).end) >= 0
+      }
     }
-    if (intervalArray(i).endInclude) { // RightClose
-      ordering.compare(
-        currentKeyArray(i).currentKey, intervalArray(i).end) > 0
-    }
-    else { // RightOpen
-//      val k = currentKeyArray(i).currentKey
-      ordering.compare(
-        currentKeyArray(i).currentKey, intervalArray(i).end) >= 0
-    }
-
   }
 
   protected def moveTo(node: IndexNode, candidate: Key, keyIdx: Int): Unit = {
@@ -286,7 +280,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
 
     var m = s
     while (s <= e & notFind) {
-      m = (s + e) / 2
+      m = (s + e) >> 1
       val cmp = ordering.compare(node.keyAt(m), candidate)
       if (cmp == 0) {
         notFind = false
@@ -318,18 +312,18 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
     }
   }
 
-//  override def hasNext: Boolean = !(currentKey.isEnd || shouldStop(currentKey))
-override def hasNext: Boolean = {
-//  intervalArray.nonEmpty && !(currentKeyIdx == currentKeyArray.length-1 &&
-//    (currentKeyArray(currentKeyIdx).isEnd || intervalShouldStop(currentKeyIdx)) )
-  if (intervalArray.isEmpty) return false
-  for(i <- currentKeyIdx until currentKeyArray.length) {
-    if (!currentKeyArray(i).isEnd && !intervalShouldStop(i)) {
-      return true
+  override def hasNext: Boolean = {
+    if (intervalArray == null || intervalArray.isEmpty || currentKeyArray == null) {
+      false
+    } else {
+      for (i <- currentKeyIdx until currentKeyArray.length) {
+        if (!currentKeyArray(i).isEnd && !intervalShouldStop(i)) {
+          return true
+        }
+      }
+      false
     }
-  }// end for
-  false
-}
+  }
 
   override def next(): Long = {
     while (currentKeyArray(currentKeyIdx).isEnd || intervalShouldStop(currentKeyIdx)) {
@@ -349,6 +343,8 @@ override def hasNext: Boolean = {
 }
 
 private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScanner(me) {
+  override def canBeOptimizedByStatistics: Boolean = false
+
   var stopFlag: Boolean = _
 
   var bloomFilter: BloomFilter = _
@@ -416,10 +412,7 @@ private[spinach] object DUMMY_SCANNER extends RangeScanner(null) {
   override def initialize(path: Path, configuration: Configuration): RangeScanner = { this }
   override def hasNext: Boolean = false
   override def next(): Long = throw new NoSuchElementException("end of iterating.")
-//  override def withNewStart(key: Key, include: Boolean): RangeScanner = this
-//  override def withNewEnd(key: Key, include: Boolean): RangeScanner = this
   override def meta: IndexMeta = throw new NotImplementedError()
-//  override def start: Key = throw new NotImplementedError()
 }
 
 private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
@@ -431,13 +424,14 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
   def compare(interval1: RangeInterval, interval2: RangeInterval): Boolean = {
     if ((interval1.start eq RangeScanner.DUMMY_KEY_START) &&
       (interval2.start ne RangeScanner.DUMMY_KEY_START)) {
-      return true
+      true
+    } else if (interval2.start eq RangeScanner.DUMMY_KEY_START) {
+      false
+    } else {
+      order.compare(interval1.start, interval2.start) < 0
     }
-    if(interval2.start eq RangeScanner.DUMMY_KEY_START) {
-      return false
-    }
-    order.compare(interval1.start, interval2.start) < 0
   }
+
   // unite interval extra to interval base
   // return: if two intervals is unioned
   def intervalUnion(base: RangeInterval, extra: RangeInterval): Boolean = {
@@ -481,6 +475,7 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
       union
     }
   }
+
   // Or operation: (union multiple range intervals which may overlap)
   def addBound(intervalArray1: ArrayBuffer[RangeInterval],
                intervalArray2: ArrayBuffer[RangeInterval] ): ArrayBuffer[RangeInterval] = {
