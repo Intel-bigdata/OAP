@@ -228,44 +228,6 @@ class PartedByValueStatistics extends Statistics {
 
     val ordering = GenerateOrdering.create(keySchema)
 
-    /*
-      if (start.start != RangeScanner.DUMMY_KEY_START) { // > or >= start
-        if (ordering.gt(start.start, stats.last._2)) {
-          cover = 0
-          left = partNum + 1
-        } else {
-          while (left <= partNum && ordering.gt(start.start, stats(left)._2)) {
-            left += 1
-          }
-          val resi = if (left > 0) {
-            stats(left)._4 - stats(left - 1)._4
-          } else 0
-
-          if (ordering.gt(stats(left)._2, start.start)) {
-            cover -= stats(left)._4
-            cover += 0.5 * resi
-          }
-        }
-      }
-      if (end.end != RangeScanner.DUMMY_KEY_END) { // < or <= end
-        if (ordering.gt(stats.head._2, end.end)) {
-          cover = 0
-        } else {
-          while (right >= left && ordering.lt(end.end, stats(right)._2)) {
-            right -= 1
-          }
-
-          val resi = if (right < partNum) {
-            stats(right + 1)._4 - stats(right)._4
-          } else 0
-
-          if (ordering.lt(stats(right)._2, end.end)) {
-            cover += 0.5 * stats(right + 1)._4
-          }
-        }
-      }
-     */
-
     var i = 0
     while (i <= partNum &&
       !Statistics.rowInIntervalArray(stats(i)._2, intervalArray, ordering)) {
@@ -382,6 +344,8 @@ class PartedByValueStatistics extends Statistics {
 }
 
 object Statistics {
+  val thresName = "spn_fsthreshold"
+
   def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
     val row = UnsafeRangeNode.row.get
     row.setNumFields(schemaLen)

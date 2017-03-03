@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
@@ -179,9 +177,11 @@ private[spinach] class SpinachDataReader(
         }
       }
 
+      val fs_rate = conf.get(Statistics.thresName).toDouble
+
       if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
         StaticsAnalysisResult.SKIP_INDEX
-      } else if (resNum == 0 || resSum / resNum <= 0.8) {
+      } else if (resNum == 0 || resSum / resNum <= fs_rate) {
         StaticsAnalysisResult.USE_INDEX
       } else {
         StaticsAnalysisResult.FULL_SCAN

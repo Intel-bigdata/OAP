@@ -554,10 +554,19 @@ object SQLConf {
 
   val SPINACH_PARQUET_ENABLED =
     SQLConfigBuilder("spark.sql.spinach.parquet.enable")
-    .internal()
-    .doc("Whether enable spinach file format when encounter parquet files")
-    .booleanConf
-    .createWithDefault(true)
+      .internal()
+      .doc("Whether enable spinach file format when encounter parquet files")
+      .booleanConf
+      .createWithDefault(true)
+
+  val SPINACH_FULL_SCAN_THRESHOLD =
+    SQLConfigBuilder("spark.sql.spinach.fsthreshold")
+      .internal()
+      .doc("Define the full scan threshold based on spinach statistics in index file." +
+        "If the analysis result is above this threshold, it will full scan data file," +
+        "otherwise, follow index way.")
+      .doubleConf
+      .createWithDefault(0.8)
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
