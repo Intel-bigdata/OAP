@@ -179,6 +179,7 @@ class SampleBasedStatistics extends Statistics {
 
   override var arrayOffset: Long = _
 
+  // TODO refactor offset variable to provide an easy access to file offset
   override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
                     stsArray: Array[Byte], offset_temp: Long): Double = {
     var offset = offset_temp
@@ -189,23 +190,17 @@ class SampleBasedStatistics extends Statistics {
     val size_from_file = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
     offset += 4
 
-    def readSingleUnsafeRow(array: Array[Byte], offset: Long): (UnsafeRow, Long) = {
-      val size = Platform.getInt(array, Platform.BYTE_ARRAY_OFFSET + offset)
-      val row = Statistics.getUnsafeRow(schema.length, array, offset, size).copy()
-      (row, offset + 4 + size)
+    var hit_count = 0
+    for (_ <- 0 until size_from_file) {
+      // read UnsafeRow, calculate hit_count without storing a single row
+      val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
+      val row = Statistics.getUnsafeRow(schema.length, stsArray, offset + 4, size)
+      offset = offset + 4 + size
+
+      if (Statistics.rowInIntervalArray(row, intervalArray, ordering)) hit_count += 1
     }
-
-
-    val sample_array_unsaferow = new Array[UnsafeRow](size_from_file)
-    (0 until size_from_file).foreach(i => {
-      val (row, off) = readSingleUnsafeRow(stsArray, offset)
-      sample_array_unsaferow(i) = row
-      offset = off
-    })
     arrayOffset = offset
-
-    sample_array_unsaferow.count(
-      Statistics.rowInIntervalArray(_, intervalArray, ordering)) / (1.0 * size_from_file)
+    hit_count * 1.0 / size_from_file
   }
 }
 
