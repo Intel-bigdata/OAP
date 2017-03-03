@@ -58,6 +58,8 @@ private[spinach] case class SpinachIndexBuild(
       hadoopConf.setDouble(Statistics.thresName,
         sparkSession.conf.get(SQLConf.SPINACH_FULL_SCAN_THRESHOLD))
 
+      val staticsTypes = sparkSession.conf.get(SQLConf.SPINACH_STATISTICS_TYPES)
+
       val fs = paths.head.getFileSystem(hadoopConf)
       val fileIters = paths.map(fs.listFiles(_, false))
       val dataPaths = fileIters.flatMap(fileIter => new Iterator[Path] {
@@ -160,8 +162,23 @@ private[spinach] case class SpinachIndexBuild(
               fileOffset, uniqueKeysList, keySchema, 0, -1L)
 
             // TODO add `StatisticsManager` to manage Statistics information
-            new PartedByValueStatistics().write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
-            new SampleBasedStatistics().write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
+            val stTypes = staticsTypes.split(",")
+            stTypes.foreach(stType => {
+              val t = stType.trim
+              if (t.length > 0) {
+                val st = t match {
+                  case "0" => new MinMaxStatistics
+                  case "1" => new SampleBasedStatistics
+                  case "2" => new PartedByValueStatistics
+                  case _ =>
+                    throw new UnsupportedOperationException(s"non-supported statistic in id $t")
+                }
+                st.write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
+              }
+            })
+
+//            new PartedByValueStatistics().write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
+//            new SampleBasedStatistics().write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
 
             assert(uniqueKeysList.size == 1)
             IndexUtils.writeLong(fileOut, dataEnd + treeOffset._1)
