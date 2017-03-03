@@ -24,7 +24,7 @@ import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfter
 
 import org.apache.spark.sql.{Row, SaveMode}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, Descending}
+import org.apache.spark.sql.catalyst.expressions.{Ascending, AttributeReference, Descending, EqualTo, GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual, Literal}
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
@@ -331,5 +331,35 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(fileMetas.length === 3)
     assert(fileMetas.map(_.recordCount).sum === 17)
     assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+  }
+
+  test("test hasAvailableIndex from Meta") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i + 100, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val spnDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
+    spnDf.createOrReplaceTempView("spnt1")
+
+    sql("create sindex index1 on spnt1 (a)")
+
+    val path = new Path(
+      new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)
+    val meta = DataSourceMeta.initialize(path, new Configuration())
+
+    val eq = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)))
+    val eq2 = Seq(EqualTo(AttributeReference("b", IntegerType)(), Literal(1)))
+    val lt = Seq(LessThan(AttributeReference("a", IntegerType)(), Literal(1)))
+    val gt = Seq(GreaterThan(AttributeReference("a", IntegerType)(), Literal(1)))
+    val lte = Seq(LessThanOrEqual(AttributeReference("a", IntegerType)(), Literal(1)))
+    val gte = Seq(GreaterThanOrEqual(AttributeReference("a", IntegerType)(), Literal(1)))
+
+    assert(meta.hasAvailableIndex(eq) == true)
+    assert(meta.hasAvailableIndex(lt) == true)
+    assert(meta.hasAvailableIndex(gt) == true)
+    assert(meta.hasAvailableIndex(lte) == true)
+    assert(meta.hasAvailableIndex(gte) == true)
+    assert(meta.hasAvailableIndex(eq2) == false)
+
   }
 }

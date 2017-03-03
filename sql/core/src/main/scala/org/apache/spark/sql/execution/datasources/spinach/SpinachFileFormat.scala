@@ -28,7 +28,7 @@ import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.JoinedRow
+import org.apache.spark.sql.catalyst.expressions.{Expression, JoinedRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
@@ -151,6 +151,7 @@ private[sql] class SpinachFileFormat extends FileFormat
         }
 
         val ic = new IndexContext(m)
+
         if (m.indexMetas.nonEmpty) { // check and use index
           // filter out the "filters" on which we can use the B+ tree index
           val supportFilters = filters.toArray.filter(canTriggerIndex)
@@ -164,6 +165,7 @@ private[sql] class SpinachFileFormat extends FileFormat
         }
 //        val filterScanner = ic.getScannerBuilder.map(_.build)
         val filterScanner = ic.getScanner
+
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
         val broadcastedHadoopConf =
@@ -186,6 +188,13 @@ private[sql] class SpinachFileFormat extends FileFormat
         // TODO need to think about when there is no spinach.meta file at all
         Iterator.empty
       }
+    }
+  }
+
+  def hasAvailableIndex(filters: Seq[Expression]): Boolean = {
+    meta match {
+      case Some(m) => m.hasAvailableIndex(filters)
+      case None => false
     }
   }
 }
