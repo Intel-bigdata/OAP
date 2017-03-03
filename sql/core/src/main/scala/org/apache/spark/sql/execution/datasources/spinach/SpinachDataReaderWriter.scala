@@ -113,18 +113,15 @@ private[spinach] class SpinachDataReader(
       case Some(fs) if fs.exist(path, conf) => fs.initialize(path, conf)
         val indexPath = IndexUtils.indexFileFromDataFile(path, fs.meta.name)
 
-        val analysis =
-          if (fs.canBeOptimizedByStatistics) {
-            readStatistics(fs.intervalArray, indexPath, conf)
-          } else 1 // for index without Statistics, use the index
-        if (analysis == 0) {
-          fileScanner.iterator(conf, requiredIds)
-        } else if (analysis == 1) {
-          // total Row count can be get from the filter scanner
-          val rowIDs = fs.toArray.sorted
-          fileScanner.iterator(conf, requiredIds, rowIDs)
-        } else {
-          Iterator.empty
+        tryToReadStatistics(indexPath, conf) match {
+          case StaticsAnalysisResult.FULL_SCAN =>
+            fileScanner.iterator(conf, requiredIds)
+          case StaticsAnalysisResult.USE_INDEX =>
+            // total Row count can be get from the filter scanner
+            val rowIDs = fs.toArray.sorted
+            fileScanner.iterator(conf, requiredIds, rowIDs)
+          case StaticsAnalysisResult.SKIP_INDEX =>
+            Iterator.empty
         }
       case _ =>
         fileScanner.iterator(conf, requiredIds)
@@ -136,10 +133,11 @@ private[spinach] class SpinachDataReader(
    * judging if we should bypass this datafile or full scan or by index.
    * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
    */
-  private def readStatistics(intervalArray: ArrayBuffer[RangeInterval],
-                             indexPath: Path, conf: Configuration): Double = {
-    if (intervalArray.length == 0) {
-      -1
+  private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
+    if (!filterScanner.get.canBeOptimizedByStatistics) {
+      StaticsAnalysisResult.USE_INDEX
+    } else if (filterScanner.get.intervalArray.length == 0) {
+      StaticsAnalysisResult.SKIP_INDEX
     } else {
       val fs = indexPath.getFileSystem(conf)
       val fin = fs.open(indexPath)
@@ -161,7 +159,7 @@ private[spinach] class SpinachDataReader(
       var resSum: Double = 0
       var resNum = 0
 
-      while (arrayOffset < stsEndOffset && resSum != -1) {
+      while (arrayOffset < stsEndOffset && resSum != StaticsAnalysisResult.SKIP_INDEX) {
         val id = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + arrayOffset)
         val st = id match {
           case 0 => new MinMaxStatistics
@@ -173,19 +171,20 @@ private[spinach] class SpinachDataReader(
           filterScanner.get.intervalArray, stsArray, arrayOffset)
         arrayOffset = st.arrayOffset
 
-        if (res == -1) {
-          resSum = -1
+        if (res == StaticsAnalysisResult.SKIP_INDEX) {
+          resSum = StaticsAnalysisResult.SKIP_INDEX
         } else {
           resSum += res
           resNum += 1
         }
       }
 
-      if (resSum == -1) -1
-      else if (resNum == 0) 0
-      else {
-        if (resSum / resNum >= 0.8) 1
-        else 0
+      if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
+        StaticsAnalysisResult.SKIP_INDEX
+      } else if (resNum == 0 || resSum / resNum <= 0.8) {
+        StaticsAnalysisResult.USE_INDEX
+      } else {
+        StaticsAnalysisResult.FULL_SCAN
       }
     }
   }

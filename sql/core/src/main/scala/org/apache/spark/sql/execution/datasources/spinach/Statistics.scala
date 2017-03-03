@@ -445,3 +445,9 @@ object Statistics {
     else intervalArray.exists(interval => rowInSingleInterval(row, interval, order))
   }
 }
+
+object StaticsAnalysisResult {
+  val FULL_SCAN = 1
+  val SKIP_INDEX = -1
+  val USE_INDEX = 0
+}
