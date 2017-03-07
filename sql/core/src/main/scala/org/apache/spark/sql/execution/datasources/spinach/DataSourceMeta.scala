@@ -21,12 +21,14 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.{ArrayBuffer, BitSet}
+import scala.collection.mutable
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
+
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 
-import scala.collection.mutable
 
 /**
  * The Spinach meta file is organized in the following format.
@@ -299,32 +301,27 @@ private[spinach] case class DataSourceMeta(
          if (attr ==  null || attr == attrRef.name) {
            attr = attrRef.name
            bTreeSet.contains(attr) || bloomSet.contains(attr)
-         }
-         else false
+         } else false
        case LessThan(attrRef: AttributeReference, _) =>
          if (attr ==  null || attr == attrRef.name) {
            attr = attrRef.name
            bTreeSet.contains(attr)
-         }
-         else false
+         } else false
        case LessThanOrEqual(attrRef: AttributeReference, _) =>
          if (attr ==  null || attr == attrRef.name) {
            attr = attrRef.name
            bTreeSet.contains(attr)
-         }
-         else false
+         } else false
        case GreaterThan(attrRef: AttributeReference, _) =>
          if (attr ==  null || attr == attrRef.name) {
            attr = attrRef.name
            bTreeSet.contains(attr)
-         }
-         else false
+         } else false
        case GreaterThanOrEqual(attrRef: AttributeReference, _) =>
          if (attr ==  null || attr == attrRef.name) {
            attr = attrRef.name
            bTreeSet.contains(attr)
-         }
-         else false
+         } else false
        case _ => true
      }
 

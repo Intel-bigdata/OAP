@@ -238,17 +238,15 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
       case(interval: RangeInterval, i: Int) =>
         var order: Ordering[Key] = null
         if (interval.start == RangeScanner.DUMMY_KEY_START) {
-        // find the first key in the left-most leaf node
-        var tmpNode = root
-        while (!tmpNode.isLeaf) tmpNode = tmpNode.childAt(0)
-        currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0)
-        }
-        else {
+          // find the first key in the left-most leaf node
+          var tmpNode = root
+          while (!tmpNode.isLeaf) tmpNode = tmpNode.childAt(0)
+          currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0)
+        } else {
           // find the first identical key or the first key right greater than the specified one
           if (keySchema.size > interval.start.numFields) { // exists Dummy_Key
             order = GenerateOrdering.create(StructType(keySchema.dropRight(1)))
-          }
-          else order = this.ordering
+          } else order = this.ordering
           currentKeyArray(i) = moveTo(root, interval.start, true, order)
           if (keySchema.size > interval.end.numFields) { // exists Dummy_Key
             order = GenerateOrdering.create(StructType(keySchema.dropRight(1)))
@@ -336,8 +334,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
         // is always necessary in all Non-Leaf layers(considering the multi-column search)
         while (m>0 && order.compare(node.keyAt(m), candidate) == 0) {m -= 1}
         if (order.compare(node.keyAt(m), candidate) < 0) notFind = true
-      }
-      else {
+      } else {
         while (m<node.length-1 && order.compare(node.keyAt(m + 1), candidate) == 0)
           m += 1
       }
