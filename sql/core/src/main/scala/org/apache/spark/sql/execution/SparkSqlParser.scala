@@ -1379,7 +1379,7 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
    *
    * {{{
    *   CREATE INDEX [IF NOT EXISTS] indexName ON tableName (col1 [ASC | DESC], col2, ...)
-   *   [USING (BTREE | BLOOM)]
+   *   [USING (BTREE | BLOOM | BITMAP)]
    * }}}
    */
   override def visitSpinachCreateIndex(ctx: SpinachCreateIndexContext): LogicalPlan =
@@ -1414,7 +1414,13 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
     BTreeIndexType
   } else {
     withOrigin(ctx) {
-      if (ctx.BTREE != null) BTreeIndexType else BloomFilterIndexType
+      if (ctx.BTREE != null) {
+        BTreeIndexType
+      } else if (ctx.BLOOM != null) {
+        BloomFilterIndexType
+      } else {
+        BitMapIndexType
+      }
     }
   }
 

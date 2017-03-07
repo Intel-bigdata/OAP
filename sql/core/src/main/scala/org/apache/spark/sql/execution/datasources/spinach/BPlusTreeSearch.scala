@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import java.io.{ByteArrayInputStream, ObjectInputStream}
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -27,10 +29,11 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, SortDirection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
+import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.unsafe.Platform
+import org.apache.spark.util.collection.BitSet
 
 
 private[spinach] object RangeScanner {
@@ -409,6 +412,85 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScann
   override def toString: String = "BloomFilterScanner"
 }
 
+private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends RangeScanner(idxMeta) {
+
+  @transient var internalItr: Iterator[Int] = Iterator[Int]()
+  var empty = true
+  var internalBitSet: BitSet = _
+
+  override def hasNext: Boolean = !empty && internalItr.hasNext
+
+  override def next(): Long = internalItr.next().toLong
+
+  override def initialize(dataPath: Path, conf: Configuration): RangeScanner = {
+    assert(keySchema ne null)
+    val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
+    val indexScanner = IndexFiber(IndexFile(path))
+    val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
+
+    val buffer: DataFiberCache = DataFiberCache(indexData.fiberData)
+    val baseObj = buffer.fiberData.getBaseObject
+    val baseOffset = buffer.fiberData.getBaseOffset
+
+    // get the byte number first
+    val objLenth = Platform.getInt(baseObj, baseOffset)
+    val byteArrayStart = baseOffset + 4
+
+    // deserialize hashMap[Key: InternalRow, Value: BitSet] from index file
+    val byteArray = (0 until objLenth).map(i => {
+      Platform.getByte(baseObj, byteArrayStart + i)
+    }).toArray
+    val inputStream = new ByteArrayInputStream(byteArray)
+    val in = new ObjectInputStream(inputStream)
+    val hashMap = in.readObject().asInstanceOf[mutable.HashMap[InternalRow, BitSet]]
+    this.ordering = GenerateOrdering.create(keySchema)
+
+    // get sorted key list and generate final bitset
+    val sortedKeyList = hashMap.keySet.toList.sorted(this.ordering)
+    val bitMapArray = intervalArray.flatMap(range => {
+      val startIdx = if (range.start == RangeScanner.DUMMY_KEY_START) {
+        // diff from which startIdx not found, so here startIdx = -2
+        -2
+      } else {
+        // find first key which >= start key, can't find return -1
+        if (range.startInclude) {
+          sortedKeyList.indexWhere(ordering.compare(range.start, _) <= 0)
+        } else {
+          sortedKeyList.indexWhere(ordering.compare(range.start, _) < 0)
+        }
+      }
+      val endIdx = if (range.end == RangeScanner.DUMMY_KEY_END) {
+        sortedKeyList.size
+      } else {
+        // find last key which <= end key, can't find return -1
+        if (range.endInclude) {
+          sortedKeyList.lastIndexWhere(ordering.compare(_, range.end) <= 0)
+        } else {
+          sortedKeyList.lastIndexWhere(ordering.compare(_, range.end) < 0)
+        }
+      }
+
+      if (startIdx == -1 || endIdx == -1) {
+        // range not fond in cur bitmap, return empty for performance consideration
+        Array.empty[BitSet]
+      } else {
+        sortedKeyList.slice(startIdx, endIdx + 1).map(key =>
+          hashMap.get(key).get)
+      }
+    })
+
+    if (bitMapArray.nonEmpty) {
+      internalBitSet = bitMapArray.reduceLeft(_ | _)
+      internalItr = internalBitSet.iterator
+      empty = false
+    }
+
+    this
+  }
+
+  override def toString: String = "BitMapScanner"
+}
+
 // A dummy scanner will actually not do any scanning
 private[spinach] object DUMMY_SCANNER extends RangeScanner(null) {
   //  override def shouldStop(key: CurrentKey): Boolean = true
@@ -611,6 +693,8 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
     scanner = meta.indexType match {
       case BloomFilterIndex(entries) =>
         BloomFilterScanner(meta)
+      case BitMapIndex(_) =>
+        BitMapScanner(meta)
       case _ =>
         new RangeScanner(meta)
     }
@@ -711,6 +795,8 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
         }
         case BloomFilterIndex(entries) if entries.indexOf(ordinal) >= 0 =>
           // TODO support muliple key in the index
+          return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx)))
+        case BitMapIndex(entries) =>
           return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx)))
         case other => // we don't support other types of index
         // TODO support the other types of index
