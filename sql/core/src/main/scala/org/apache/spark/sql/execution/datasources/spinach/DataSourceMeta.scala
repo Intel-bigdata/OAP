@@ -312,6 +312,8 @@ private[spinach] case class DataSourceMeta(
           return true
         case BloomFilterIndex(entries) if (!isRangeQuery && entries.indexOf(ordinal) >= 0) =>
           return true
+        case BitMapIndex(entries) if entries.indexOf(ordinal) >= 0 =>
+          return true
         case _ => // we don't support other types of index
       }
       idx += 1

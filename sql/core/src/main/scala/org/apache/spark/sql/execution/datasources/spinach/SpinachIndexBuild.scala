@@ -253,6 +253,8 @@ private[spinach] case class SpinachIndexBuild(
             // write byteArray length and byteArray
             IndexUtils.writeInt(fileOut, objLen)
             fileOut.write(writeBuf.toByteArray)
+            // write dataEnd
+            IndexUtils.writeLong(fileOut, 4 + objLen)
             out.close()
             fileOut.close()
             IndexBuildResult(d.getName, rowCnt, "", d.getParent.toString)
