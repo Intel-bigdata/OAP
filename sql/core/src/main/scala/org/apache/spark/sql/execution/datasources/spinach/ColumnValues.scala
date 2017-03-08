@@ -67,7 +67,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: DataFiberCache
   }
 
   private def getAs[T](idx: Int): T = genericGet(idx).asInstanceOf[T]
-  def get(idx: Int): AnyRef = getAs(idx)
+  def get(idx: Int): AnyRef = if (isNullAt(idx)) null else getAs(idx)
 
   def getBooleanValue(idx: Int): Boolean = {
     Platform.getBoolean(baseObject, baseOffset + idx * BooleanType.defaultSize)
