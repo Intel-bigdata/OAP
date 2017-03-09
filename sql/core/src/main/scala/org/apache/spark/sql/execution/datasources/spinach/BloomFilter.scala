@@ -39,6 +39,8 @@ class BloomFilter(maxBitCount: Int, numOfHashFunc: Int)
 
   private def getIndices(value: String): Array[Int] =
     hashFunctions.map(func => func.hash(value))
+  private def getIndices(value: Array[Byte]): Array[Int] =
+    hashFunctions.map(func => func.hash(value))
 
   def addValue(value: String): Unit = {
     val indices = getIndices(value)
@@ -47,6 +49,18 @@ class BloomFilter(maxBitCount: Int, numOfHashFunc: Int)
 
   def checkExist(value: String): Boolean = {
     val indices = getIndices(value)
+    for (i <- indices)
+      if (!bloomBitSet.contains(i)) return false
+    true
+  }
+
+  def addValue(data: Array[Byte]): Unit = {
+    val indices = getIndices(data)
+    indices.foreach(bloomBitSet.add)
+  }
+
+  def checkExist(data: Array[Byte]): Boolean = {
+    val indices = getIndices(data)
     for (i <- indices)
       if (!bloomBitSet.contains(i)) return false
     true
@@ -60,11 +74,15 @@ object BloomFilter {
 
 private[spinach] trait BloomHashFunction {
   def hash(value: String): Int
+  def hash(value: Array[Byte]): Int
 }
 
 private[spinach] class MurmurHashFunction(maxCount: Int, seed: Int) extends BloomHashFunction {
   def hash(value: String): Int =
     (MH3.stringHash(value, seed) % maxCount + maxCount) % maxCount
+
+  override def hash(value: Array[Byte]): Int =
+    (MH3.bytesHash(value, seed) % maxCount + maxCount) % maxCount
 }
 
 private[spinach] object BloomHashFunction {

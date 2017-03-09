@@ -161,26 +161,16 @@ private[spinach] case class SpinachIndexBuild(
             IndexBuildResult(d.getName, cnt, "", d.getParent.toString)
           case BloomFilterIndexType =>
             val bf_index = new BloomFilter()
-            // collect index oridinals from indexColumns and schema
-            // index_oridinals: (indexName, Datatype, oridinal)
-            val index_oridinals = indexColumns
-              .flatMap(col => schema.fields.map(f => (f.name, f.dataType))
-                .zipWithIndex.filter(item => item._1._1.equals(col.columnName)))
-              .map(tuple => (tuple._1._1, tuple._1._2, tuple._2))
             var elemCnt = 0 // element count
-            def rowsToInsert(cols: Seq[String]): Seq[String] = {
-              // for multi-column index, add all subsets into bloom filter
-              // For example, a column with a = 1, b = 2, a and b are index columns
-              // then three records: a = 1, b = 2, a = 1 b = 2, are inserted to bf
-              cols.toSet.subsets().filter(_.nonEmpty).map(_.reduce(_ + _)).toSeq
-            }
+            // for multi-column index, add all subsets into bloom filter
+            // For example, a column with a = 1, b = 2, a and b are index columns
+            // then three records: a = 1, b = 2, a = 1 b = 2, are inserted to bf
+            val projector = keySchema.toSet.subsets().filter(_.nonEmpty).map(s =>
+              UnsafeProjection.create(StructType(s.toArray))).toArray
             while (it.hasNext) {
               val row = it.next()
               elemCnt += 1
-              val cols = keySchema.fields.indices.map(i =>
-                row.get(i, keySchema(i).dataType).toString)
-              val indexKeys = rowsToInsert(cols)
-              indexKeys.foreach(bf_index.addValue)
+              projector.foreach(p => bf_index.addValue(p(row).copy().getBytes))
             }
             val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
             val fs = indexFile.getFileSystem(hadoopConf)

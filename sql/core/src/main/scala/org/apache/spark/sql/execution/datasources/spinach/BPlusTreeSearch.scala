@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, SortDirection, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.{Ascending, SortDirection, UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
 import org.apache.spark.sql.sources._
@@ -396,10 +396,12 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScann
 
     bloomFilter = BloomFilter(bitSetLongArr, numOfHashFunc)
 
+    val projector = UnsafeProjection.create(keySchema)
+
     // TODO need optimization while considering multi-column
     stopFlag = if (equalValues != null && equalValues.length > 0) {
       !equalValues.map(value => bloomFilter
-        .checkExist(value.get(0, keySchema.head.dataType).toString))
+        .checkExist(projector(value).getBytes))
         .reduceOption(_ || _).getOrElse(false)
     } else false
     curIdx = 0
