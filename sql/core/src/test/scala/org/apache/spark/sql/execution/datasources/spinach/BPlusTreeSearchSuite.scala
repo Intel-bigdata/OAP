@@ -106,7 +106,7 @@ private[spinach] class BPlusTreeSearchSuite
 
   val meta = new DataSourceMeta(
     null,
-    Array(BPlusTreeSearchSuite.indexMeta),
+    Array(BPlusTreeSearchSuite.indexMeta), null,
     new StructType().add("fake", StringType, true).add("test", IntegerType, true),
     SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME,
     null)

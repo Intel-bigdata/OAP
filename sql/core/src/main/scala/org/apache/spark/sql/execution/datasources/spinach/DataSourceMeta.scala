@@ -51,10 +51,11 @@ import org.apache.spark.sql.types._
  * IndexMeta N
  * Schema           -- Variable Length -- The table schema in json format.
  * Data Reader Class Name -- Variable Length -- The associated data reader class name.
- * FileHeader       --  32 bytes
+ * FileHeader       --  36 bytes
  *     RecordCount  --   8 bytes -- The number of all of the records in the same folder.
  *     DataFileCount--   8 bytes -- The number of the data files.
  *     IndexCount   --   8 bytes -- The number of the index.
+ *     StatsCount   --   4 bytes -- The number of types of Statistics.
  *     Version      --   3 bytes -- Each bytes represents Major, Minor and Revision.
  *     MagicNumber  --   5 bytes -- The magic number of the meta file which is always "FIBER".
  *
@@ -233,6 +234,30 @@ private[spinach] object IndexMeta {
   }
 }
 
+private[spinach] class StatsMeta() extends Serializable {
+  import DataSourceMeta._
+
+  var id: Int = _
+
+  def write(out: FSDataOutputStream): Unit = {
+
+  }
+
+  def read(in: FSDataInputStream): Unit = {
+
+  }
+}
+
+private[spinach] object StatsMeta {
+  def apply() : StatsMeta = new StatsMeta()
+
+  def apply(id: Int): StatsMeta = {
+    val statsMeta = new StatsMeta()
+    statsMeta.id = id
+    statsMeta
+  }
+}
+
 private[spinach] case class Version(major: Byte, minor: Byte, revision: Byte)
 
 private[spinach] class FileHeader {
@@ -241,11 +266,13 @@ private[spinach] class FileHeader {
   var recordCount: Long = _
   var dataFileCount: Long = _
   var indexCount: Long = _
+  var statsCount: Int = _
 
   def write(out: FSDataOutputStream): Unit = {
     out.writeLong(recordCount)
     out.writeLong(dataFileCount)
     out.writeLong(indexCount)
+    out.writeInt(statsCount)
     out.writeByte(VERSION.major)
     out.writeByte(VERSION.minor)
     out.writeByte(VERSION.revision)
@@ -256,6 +283,7 @@ private[spinach] class FileHeader {
     recordCount = in.readLong()
     dataFileCount = in.readLong()
     indexCount = in.readLong()
+    statsCount = in.readInt()
     val version = Version(in.readByte(), in.readByte(), in.readByte())
     val buffer = new Array[Byte](MAGIC_NUMBER.length)
     in.readFully(buffer)
@@ -271,11 +299,13 @@ private[spinach] class FileHeader {
 
 private[spinach] object FileHeader {
   def apply(): FileHeader = new FileHeader()
-  def apply(recordCount: Long, dataFileCount: Long, indexCount: Long): FileHeader = {
+  def apply(recordCount: Long, dataFileCount: Long, indexCount: Long,
+            statsCount: Int): FileHeader = {
     val fileHeader = new FileHeader()
     fileHeader.recordCount = recordCount
     fileHeader.dataFileCount = dataFileCount
     fileHeader.indexCount = indexCount
+    fileHeader.statsCount = statsCount
     fileHeader
   }
 }
@@ -283,6 +313,7 @@ private[spinach] object FileHeader {
 private[spinach] case class DataSourceMeta(
     @transient fileMetas: Array[FileMeta],
     indexMetas: Array[IndexMeta],
+    statsMetas: Array[StatsMeta],
     schema: StructType,
     dataReaderClassName: String,
     @transient fileHeader: FileHeader) extends Serializable
@@ -290,6 +321,7 @@ private[spinach] case class DataSourceMeta(
 private[spinach] class DataSourceMetaBuilder {
   val fileMetas = ArrayBuffer.empty[FileMeta]
   val indexMetas = ArrayBuffer.empty[IndexMeta]
+  val statsMetas = ArrayBuffer.empty[StatsMeta]
   var schema: StructType = new StructType()
   var dataReaderClassName: String = classOf[SpinachDataFile].getCanonicalName
 
@@ -326,15 +358,17 @@ private[spinach] class DataSourceMetaBuilder {
   }
 
   def build(): DataSourceMeta = {
-    val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size, indexMetas.size)
-    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, dataReaderClassName, fileHeader)
+    val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size,
+      indexMetas.size, statsMetas.size)
+    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, statsMetas.toArray,
+      schema, dataReaderClassName, fileHeader)
   }
 }
 
 private[spinach] object DataSourceMeta {
   final val MAGIC_NUMBER = "FIBER"
   final val VERSION = Version(1, 0, 0)
-  final val FILE_HEAD_LEN = 32
+  final val FILE_HEAD_LEN = 36
 
   final val FILE_META_START_OFFSET = 0
   final val FILE_META_LENGTH = 512
@@ -384,6 +418,13 @@ private[spinach] object DataSourceMeta {
     indexMetas
   }
 
+  private def readStatsMetas(in: FSDataInputStream): Array[StatsMeta] = {
+    val statsCount = in.readInt()
+    val statsMetas = new Array[StatsMeta](statsCount)
+
+    statsMetas
+  }
+
   private def readSchema(fileHeader: FileHeader, in: FSDataInputStream) : StructType = {
     in.seek(FILE_META_START_OFFSET + FILE_META_LENGTH * fileHeader.dataFileCount +
       INDEX_META_LENGTH * fileHeader.indexCount)
@@ -414,10 +455,13 @@ private[spinach] object DataSourceMeta {
     val fileHeader = readFileHeader(file, in)
     val fileMetas = readFileMetas(fileHeader, in)
     val indexMetas = readIndexMetas(fileHeader, in)
+
+    val statsMetas = readStatsMetas(in)
+
     val schema = readSchema(fileHeader, in)
     val dataReaderClassName = in.readUTF()
     in.close()
-    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
+    DataSourceMeta(fileMetas, indexMetas, statsMetas, schema, dataReaderClassName, fileHeader)
   }
 
   def write(
@@ -436,6 +480,9 @@ private[spinach] object DataSourceMeta {
     val out = fs.create(rn_path)
     meta.fileMetas.foreach(_.write(out))
     meta.indexMetas.foreach(_.write(out))
+
+    meta.statsMetas.foreach(_.write(out))
+
     writeSchema(meta.schema, out)
     out.writeUTF(meta.dataReaderClassName)
     meta.fileHeader.write(out)
