@@ -230,6 +230,7 @@ class PartedByValueStatistics extends Statistics {
 
     var i = 0
     while (i <= partNum &&
+      ordering.gteq(end.end, stats(i)._2) &&
       !Statistics.rowInIntervalArray(stats(i)._2, intervalArray, ordering)) {
       i += 1
     }
