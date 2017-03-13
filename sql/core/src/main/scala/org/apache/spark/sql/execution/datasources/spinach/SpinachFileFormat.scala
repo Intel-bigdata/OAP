@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.net.URI
 
+import scala.collection.mutable
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, FSDataOutputStream, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
@@ -33,9 +35,11 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjectio
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.sources.{DataSourceRegister, Filter}
+import org.apache.spark.sql.sources.{And, DataSourceRegister, EqualTo, Filter,
+GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual, Or}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.SerializableConfiguration
+
 
 private[sql] class SpinachFileFormat extends FileFormat
   with DataSourceRegister
@@ -126,10 +130,45 @@ private[sql] class SpinachFileFormat extends FileFormat
     // SpinachFileFormat.deserializeDataSourceMeta(hadoopConf) match {
     meta match {
       case Some(m) =>
-        val ic = new IndexContext(m)
-        BPlusTreeSearch.build(filters.toArray, ic)
+        def canTriggerIndex(filter: Filter): Boolean = {
+          var attr: String = null
+          def checkAttribute(filter: Filter): Boolean = filter match {
+              case Or(left, right) =>
+                checkAttribute(left) && checkAttribute(right)
+              case And(left, right) =>
+                checkAttribute(left) && checkAttribute(right)
+              case EqualTo(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case LessThan(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case LessThanOrEqual(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case GreaterThan(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case GreaterThanOrEqual(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case _ => true
+            }
 
-        val filterScanner = ic.getScannerBuilder.map(_.build)
+          checkAttribute(filter)
+        }
+
+        val ic = new IndexContext(m)
+
+        if (m.indexMetas.nonEmpty) { // check and use index
+          // filter out the "filters" on which we can use the B+ tree index
+          val supportFilters = filters.toArray.filter(canTriggerIndex)
+          // After filtered, supportFilter only contains:
+          // 1. Or predicate that contains only one attribute internally;
+          // 2. Some atomic predicates, such as LessThan, EqualTo, etc.
+          if (supportFilters.nonEmpty) {
+            // determine whether we can use B+ tree index
+            BPlusTreeSearch.build(supportFilters, ic)
+          }
+        }
+//        val filterScanner = ic.getScannerBuilder.map(_.build)
+        val filterScanner = ic.getScanner
+
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
         val broadcastedHadoopConf =
@@ -155,9 +194,30 @@ private[sql] class SpinachFileFormat extends FileFormat
     }
   }
 
-  def hasAvailableIndex(filters: Seq[Expression]): Boolean = {
+  def hasAvailableIndex(expressions: Seq[Expression]): Boolean = {
     meta match {
-      case Some(m) => m.hasAvailableIndex(filters)
+      case Some(m) =>
+        val bTreeIndexAttrSet = new mutable.HashSet[String]()
+        val bloomIndexAttrSet = new mutable.HashSet[String]()
+        val bitmapIndexAttrSet = new mutable.HashSet[String]()
+        var idx = 0
+        while(idx < m.indexMetas.length) {
+          m.indexMetas(idx).indexType match {
+            case BTreeIndex(entries) =>
+              bTreeIndexAttrSet.add(m.schema(entries(0).ordinal).name)
+            case BloomFilterIndex(entries) =>
+              entries.map(ordinal => m.schema(ordinal).name).foreach(bloomIndexAttrSet.add)
+            case BitMapIndex(entries) =>
+              entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
+            case _ => // we don't support other types of index
+          }
+          idx += 1
+        }
+        val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
+        hashSetList.append(bTreeIndexAttrSet)
+        hashSetList.append(bloomIndexAttrSet)
+        hashSetList.append(bitmapIndexAttrSet)
+        expressions.exists(m.isSupportedByIndex(_, hashSetList))
       case None => false
     }
   }

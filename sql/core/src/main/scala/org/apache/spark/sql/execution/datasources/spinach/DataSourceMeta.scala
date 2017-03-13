@@ -21,12 +21,14 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.{ArrayBuffer, BitSet}
+import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
+
 
 /**
  * The Spinach meta file is organized in the following format.
@@ -287,38 +289,46 @@ private[spinach] case class DataSourceMeta(
     dataReaderClassName: String,
     @transient fileHeader: FileHeader) extends Serializable {
 
-   def hasAvailableIndex(filters: Seq[Expression]): Boolean = {
-    filters.exists {
-      case EqualTo(attr: AttributeReference, _) =>
-        attrHasIndex(attr.name, false)
-      case GreaterThan(attr: AttributeReference, _) =>
-        attrHasIndex(attr.name, true)
-      case GreaterThanOrEqual(attr: AttributeReference, _) =>
-        attrHasIndex(attr.name, true)
-      case LessThan(attr: AttributeReference, _) =>
-        attrHasIndex(attr.name, true)
-      case LessThanOrEqual(attr: AttributeReference, _) =>
-        attrHasIndex(attr.name, true)
-      case _ => false
-    }
-  }
+   def isSupportedByIndex(exp: Expression,
+                          hashSetList: mutable.ListBuffer[mutable.HashSet[String]]): Boolean = {
+     val bTreeSet: mutable.HashSet[String] = hashSetList(0)
+     val bloomSet: mutable.HashSet[String] = hashSetList(1)
+     val bitmapSet: mutable.HashSet[String] = hashSetList(2)
+     var attr: String = null
+     def checkAttribute(filter: Expression): Boolean = filter match {
+       case Or(left, right) =>
+         checkAttribute(left) && checkAttribute(right)
+       case And(left, right) =>
+         checkAttribute(left) && checkAttribute(right)
+       case EqualTo(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bloomSet.contains(attr) || bitmapSet.contains(attr)
+         } else false
+       case LessThan(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
+         } else false
+       case LessThanOrEqual(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
+         } else false
+       case GreaterThan(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
+         } else false
+       case GreaterThanOrEqual(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
+         } else false
+       case _ => true
+     }
 
-  private def attrHasIndex(attribute: String, isRangeQuery: Boolean): Boolean = {
-    val ordinal = schema.fieldIndex(attribute)
-    var idx = 0
-    while (idx < indexMetas.length) {
-      indexMetas(idx).indexType match {
-        case BTreeIndex(entries) if (entries.length == 1 && entries(0).ordinal == ordinal) =>
-          return true
-        case BloomFilterIndex(entries) if (!isRangeQuery && entries.indexOf(ordinal) >= 0) =>
-          return true
-        case BitMapIndex(entries) if entries.indexOf(ordinal) >= 0 =>
-          return true
-        case _ => // we don't support other types of index
-      }
-      idx += 1
-    }
-    false
+     checkAttribute(exp)
   }
 }
 
