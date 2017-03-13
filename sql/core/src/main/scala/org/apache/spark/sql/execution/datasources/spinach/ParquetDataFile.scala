@@ -30,16 +30,6 @@ import org.apache.spark.sql.types.StructType
 private[spinach] case class ParquetDataFile(path: String, schema: StructType) extends DataFile {
 
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
-    val requestSchemaString = new StructType().add(schema(fiberId)).json
-    conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
-    val readSupport = new SpinachReadSupportImpl
-    val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this, conf)
-    val recordReader = RecordReaderBuilder
-      .builder(readSupport, new Path(StringUtils.unEscapeString(path)), conf)
-      .withFooter(meta.footer).buildDefault()
-    recordReader.initialize()
-    val iterator = new FileRecordReaderIterator[InternalRow](
-      recordReader.asInstanceOf[RecordReader[InternalRow]])
     // TODO data cache
     throw new UnsupportedOperationException("Not support getFiberData Operation.")
   }
