@@ -88,6 +88,7 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
         val meta = new Path(path, SpinachFileFormat.SPINACH_META_FILE)
         fs.exists(meta)
       }
+
       val files: HadoopFsRelation = _files.fileFormat match {
         // TODO a better rule to check if we need to substitute the ParquetFileFormat
         // as SpinachFileFormat
@@ -95,9 +96,22 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
         // if config true turn to SpinachFileFormat
         // else turn to ParquetFileFormat
         case a: ParquetFileFormat
-          if fileExists(_files) &&  _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLED) =>
-            _files.copy(fileFormat = new SpinachFileFormat)
-        case other: FileFormat => _files
+          if fileExists(_files) && _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLED) =>
+          val spinachFileFormat = new SpinachFileFormat
+          spinachFileFormat.initialize(_files.sparkSession, _files.options, _files.location)
+
+          if (spinachFileFormat.hasAvailableIndex(normalizedFilters)) {
+            logInfo("hasAvailableIndex = true, will replace with SpinachFileFormat.")
+            _files.copy(fileFormat = spinachFileFormat)
+          } else {
+            logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
+            _files.fileFormat.initialize(_files.sparkSession, _files.options, _files.location)
+            _files
+          }
+
+        case _: FileFormat =>
+          _files.fileFormat.initialize(_files.sparkSession, _files.options, _files.location)
+          _files
       }
 
       val partitionColumns =
@@ -133,7 +147,8 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
       val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
       logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
 
-      files.fileFormat.initialize(files.sparkSession, files.options, files.location)
+      // files.fileFormat.initialize(files.sparkSession, files.options, files.location)
+
       val readFile = files.fileFormat.buildReaderWithPartitionValues(
         sparkSession = files.sparkSession,
         dataSchema = files.dataSchema,

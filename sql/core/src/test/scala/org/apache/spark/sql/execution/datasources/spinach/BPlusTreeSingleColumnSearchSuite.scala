@@ -53,7 +53,7 @@ private[spinach] class LeafNode(keys: Array[Key], values: Array[IntValues], sibl
   override def valueAt(idx: Int): IndexNodeValue = values(idx)
 }
 
-private[spinach] object BPlusTreeSearchSuite extends Serializable {
+private[spinach] object BPlusTreeSingleColumnSearchSuite extends Serializable {
   implicit def int2internalRow(keys: Array[Int]): Array[Key] = keys.map(InternalRow(_))
 
   val indexMeta: IndexMeta = new IndexMeta("test", BTreeIndex(BTreeIndexEntry(1) :: Nil)) {
@@ -100,13 +100,13 @@ private[spinach] object BPlusTreeSearchSuite extends Serializable {
   }
 }
 
-private[spinach] class BPlusTreeSearchSuite
+private[spinach] class BPlusTreeSingleColumnSearchSuite
     extends SparkFunSuite with Logging with BeforeAndAfterAll {
   val conf: Configuration = new Configuration()
 
   val meta = new DataSourceMeta(
     null,
-    Array(BPlusTreeSearchSuite.indexMeta),
+    Array(BPlusTreeSingleColumnSearchSuite.indexMeta),
     new StructType().add("fake", StringType, true).add("test", IntegerType, true),
     SpinachFileFormat.SPINACH_DATA_FILE_CLASSNAME,
     null)
@@ -229,7 +229,7 @@ private[spinach] class BPlusTreeSearchSuite
       LessThanOrEqual("test", 10),
       fake,
       GreaterThanOrEqual("test", 5))
-    assertScanner(meta, filters, Array(fake), Set(50, 80, 81, 82, 90, 91, 100, 101, 102))
+    assertScanner(meta, filters, Array(), Set(50, 80, 81, 82, 90, 91, 100, 101, 102))
   }
 
   test(">= 10 & <= 5") {
@@ -282,12 +282,18 @@ private[spinach] class BPlusTreeSearchSuite
     val ic = new IndexContext(meta)
     val unHandledFilters = BPlusTreeSearch.build(filters, ic)
     assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
-    ic.getScannerBuilder match {
-      case Some(builder) =>
-        val scanner = builder.build
+    ic.getScanner match {
+      case Some(scanner) =>
         assert(scanner._init(
-          BPlusTreeSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
+          BPlusTreeSingleColumnSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")
     }
+//    ic.getScannerBuilder match {
+//      case Some(builder) =>
+//        val scanner = builder.build
+//        assert(scanner._init(
+//          BPlusTreeSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
+//      case None => throw new Exception(s"expect scanner, but got None")
+//    }
   }
 }

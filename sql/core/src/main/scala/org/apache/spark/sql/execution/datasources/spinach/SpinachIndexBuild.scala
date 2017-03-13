@@ -177,8 +177,10 @@ private[spinach] case class SpinachIndexBuild(
             while (it.hasNext) {
               val row = it.next()
               elemCnt += 1
-              val cols = keySchema.fields.indices.map(i =>
-                row.get(i, keySchema(i).dataType).toString)
+              val cols = keySchema.fields.indices.map{i =>
+                val value = row.get(i, keySchema(i).dataType)
+                if (value != null) value.toString else ""
+              }
               val indexKeys = rowsToInsert(cols)
               indexKeys.foreach(bf_index.addValue)
             }
