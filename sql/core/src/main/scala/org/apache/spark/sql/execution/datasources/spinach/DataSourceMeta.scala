@@ -26,8 +26,10 @@ import scala.collection.mutable
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
+import org.apache.spark.util.SerializableConfiguration
 
 
 /**
@@ -235,6 +237,65 @@ private[spinach] object IndexMeta {
   }
 }
 
+private[spinach] class StatsMeta(
+     var stats_id: Int, var statistics: Statistics = null) extends Serializable {
+  def write(out: FSDataOutputStream): Unit = {
+    statistics.write(out)
+  }
+  def read(in: FSDataInputStream, stats_id: Int): Unit = {
+    statistics = stats_id match {
+      case StatsMeta.MINMAX =>
+        new MinMaxStatistics()
+      case StatsMeta.SAMPLE =>
+        new SampleBasedStatistics()
+      case _ =>
+        new SampleBasedStatistics()
+    }
+    statistics.read(in)
+//    statistics.read(in)
+  }
+}
+
+private[spinach] object StatsMeta {
+  final val MINMAX: Int = 0
+  final val SAMPLE: Int = 1
+  final val stats_to_use: Seq[Int] = Seq(MINMAX, SAMPLE)
+  var statsEnable: Boolean = true
+
+  def build(sparkSession: SparkSession, statsMetas: Array[StatsMeta],
+            parentPath: Path, meta: DataSourceMeta): Unit = {
+    val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
+    val fs = parentPath.getFileSystem(hadoopConf)
+    val fileIter = fs.listFiles(parentPath, false)
+    val dataPathString = new Iterator[Path] {
+      override def hasNext: Boolean = fileIter.hasNext
+      override def next(): Path = fileIter.next().getPath
+    }.toSeq.filter(path => !path.getName.startsWith(".") && !path.getName.startsWith("_"))
+      .map(_.toString).toArray
+    val metaBroadCast = sparkSession.sparkContext.broadcast(meta)
+    val confBroadCase = sparkSession.sparkContext.broadcast(
+      new SerializableConfiguration(hadoopConf))
+    val statsIds = sparkSession.sparkContext.broadcast(statsMetas.map(_.stats_id).toSeq)
+
+    val local_res = sparkSession.sparkContext.parallelize(dataPathString,
+      dataPathString.length).map(str => {
+      val path = new Path(str)
+      val me = metaBroadCast.value
+      val hConf = confBroadCase.value.value
+      val reader = new SpinachDataReader(path, me, None, me.schema.indices.toArray)
+      val internalRows = reader.initialize(hConf).toArray
+
+      val ids = statsIds.value
+      ids.map(Statistics.buildLocalStatstics(internalRows, _))
+    }).collect()
+
+    for (i <- statsMetas.indices) {
+      statsMetas(i).statistics = Statistics.fromLocalResult(
+        local_res.map(_(i)), dataPathString, statsMetas(i).stats_id)
+    }
+  }
+}
+
 private[spinach] case class Version(major: Byte, minor: Byte, revision: Byte)
 
 private[spinach] class FileHeader {
@@ -243,11 +304,13 @@ private[spinach] class FileHeader {
   var recordCount: Long = _
   var dataFileCount: Long = _
   var indexCount: Long = _
+  var statsCount: Long = _
 
   def write(out: FSDataOutputStream): Unit = {
     out.writeLong(recordCount)
     out.writeLong(dataFileCount)
     out.writeLong(indexCount)
+    out.writeLong(statsCount)
     out.writeByte(VERSION.major)
     out.writeByte(VERSION.minor)
     out.writeByte(VERSION.revision)
@@ -258,6 +321,7 @@ private[spinach] class FileHeader {
     recordCount = in.readLong()
     dataFileCount = in.readLong()
     indexCount = in.readLong()
+    statsCount = in.readLong()
     val version = Version(in.readByte(), in.readByte(), in.readByte())
     val buffer = new Array[Byte](MAGIC_NUMBER.length)
     in.readFully(buffer)
@@ -273,11 +337,13 @@ private[spinach] class FileHeader {
 
 private[spinach] object FileHeader {
   def apply(): FileHeader = new FileHeader()
-  def apply(recordCount: Long, dataFileCount: Long, indexCount: Long): FileHeader = {
+  def apply(recordCount: Long, dataFileCount: Long, indexCount: Long,
+            statsCount: Long): FileHeader = {
     val fileHeader = new FileHeader()
     fileHeader.recordCount = recordCount
     fileHeader.dataFileCount = dataFileCount
     fileHeader.indexCount = indexCount
+    fileHeader.statsCount = statsCount
     fileHeader
   }
 }
@@ -287,7 +353,13 @@ private[spinach] case class DataSourceMeta(
     indexMetas: Array[IndexMeta],
     schema: StructType,
     dataReaderClassName: String,
-    @transient fileHeader: FileHeader) extends Serializable {
+    @transient fileHeader: FileHeader,
+    var statsMetas: Array[StatsMeta] = null) extends Serializable {
+
+  def withStatsMetas(statsMetas: Array[StatsMeta]): this.type = {
+    this.statsMetas = statsMetas
+    this
+  }
 
    def isSupportedByIndex(exp: Expression, bTreeSet: mutable.HashSet[String],
                           bloomSet: mutable.HashSet[String]): Boolean = {
@@ -333,6 +405,7 @@ private[spinach] case class DataSourceMeta(
 private[spinach] class DataSourceMetaBuilder {
   val fileMetas = ArrayBuffer.empty[FileMeta]
   val indexMetas = ArrayBuffer.empty[IndexMeta]
+  val statsMetas = ArrayBuffer.empty[StatsMeta]
   var schema: StructType = new StructType()
   var dataReaderClassName: String = classOf[SpinachDataFile].getCanonicalName
 
@@ -343,6 +416,11 @@ private[spinach] class DataSourceMetaBuilder {
 
   def addIndexMeta(indexMeta: IndexMeta): this.type = {
     indexMetas += indexMeta
+    this
+  }
+
+  def addStatsMeta(statsMeta: StatsMeta): this.type = {
+    statsMetas += statsMeta
     this
   }
 
@@ -368,8 +446,30 @@ private[spinach] class DataSourceMetaBuilder {
     this
   }
 
+  // the overall entrance for Statistics build
+  def build(sparkSession: SparkSession, parentPath: Path): DataSourceMeta = {
+    val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size,
+      indexMetas.size, StatsMeta.stats_to_use.length)
+
+    val meta = DataSourceMeta(fileMetas.toArray, indexMetas.toArray,
+      schema, dataReaderClassName, fileHeader)
+
+    // build statstics with sparkSession
+    if (sparkSession != null && StatsMeta.statsEnable) {
+      println("start building statistics")
+      StatsMeta.stats_to_use.foreach(stat => addStatsMeta(new StatsMeta(stat)))
+      val statsMetaArray: Array[StatsMeta] = statsMetas.toArray
+      StatsMeta.build(sparkSession, statsMetaArray, parentPath, meta)
+      meta.withStatsMetas(statsMetaArray)
+      println("hello world " +statsMetaArray.head.statistics)
+    }
+
+    meta
+  }
+
   def build(): DataSourceMeta = {
-    val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size, indexMetas.size)
+    val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum,
+      fileMetas.size, indexMetas.size, 0)
     DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, dataReaderClassName, fileHeader)
   }
 }
@@ -377,7 +477,7 @@ private[spinach] class DataSourceMetaBuilder {
 private[spinach] object DataSourceMeta {
   final val MAGIC_NUMBER = "FIBER"
   final val VERSION = Version(1, 0, 0)
-  final val FILE_HEAD_LEN = 32
+  final val FILE_HEAD_LEN = 40
 
   final val FILE_META_START_OFFSET = 0
   final val FILE_META_LENGTH = 512
@@ -449,6 +549,36 @@ private[spinach] object DataSourceMeta {
     }
   }
 
+  private def readStatsMeta(fileHeader: FileHeader, in: FSDataInputStream): Array[StatsMeta] = {
+    val stats_count = fileHeader.statsCount.toInt
+    if (stats_count == 0) return null
+    val stats_ids = new Array[Int](stats_count)
+    val statsMetas = new Array[StatsMeta](stats_count)
+
+    for (i <- stats_ids.indices) {
+      stats_ids(i) = in.readInt()
+    }
+    println("ssssss: " + stats_ids(0) + "    " + stats_ids(1))
+//    stats_ids(0) = in.readInt()
+//    stats_ids(1) = in.readInt()
+
+    for (i <- stats_ids.indices) {
+      statsMetas(i) = new StatsMeta(stats_ids(i))
+      statsMetas(i).read(in, stats_ids(i))
+    }
+//    statsMetas.foreach(stats => stats.read(in))
+    statsMetas
+  }
+  private def writeStatsMeta(fileHeader: FileHeader,
+                             statsMetas: Array[StatsMeta], out: FSDataOutputStream): Unit = {
+    if (fileHeader.statsCount == 0) return
+    for (i <- 0 until fileHeader.statsCount.toInt) {
+      val statsMeta: StatsMeta = statsMetas(i)
+      out.writeInt(statsMeta.stats_id)
+    }
+    statsMetas.foreach(_.write(out))
+  }
+
   def initialize(path: Path, jobConf: Configuration): DataSourceMeta = {
     val fs = path.getFileSystem(jobConf)
     val file = fs.getFileStatus(path)
@@ -458,9 +588,10 @@ private[spinach] object DataSourceMeta {
     val fileMetas = readFileMetas(fileHeader, in)
     val indexMetas = readIndexMetas(fileHeader, in)
     val schema = readSchema(fileHeader, in)
+    val statsMetas = readStatsMeta(fileHeader, in)
     val dataReaderClassName = in.readUTF()
     in.close()
-    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
+    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader, statsMetas)
   }
 
   def write(
@@ -480,6 +611,7 @@ private[spinach] object DataSourceMeta {
     meta.fileMetas.foreach(_.write(out))
     meta.indexMetas.foreach(_.write(out))
     writeSchema(meta.schema, out)
+    writeStatsMeta(meta.fileHeader, meta.statsMetas, out)
     out.writeUTF(meta.dataReaderClassName)
     meta.fileHeader.write(out)
     out.close()
