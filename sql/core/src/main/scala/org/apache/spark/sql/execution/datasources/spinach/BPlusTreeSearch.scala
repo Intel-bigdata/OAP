@@ -610,6 +610,7 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
     intervalArray.filter(validate)
   }
 }
+
 private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
   private var scanner: RangeScanner = _
 
@@ -776,13 +777,22 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
           }
         case BloomFilterIndex(entries) =>
           // traverse all attributes that are in the bloomIndex,
-          // and return the first one which matches
+          // return indexMeta and the first one's index which matches
           // TODO support multiple key in the index
           var flag = true
-          for(entry <- entries if flag) {
-            if (intervalMap.contains(meta.schema(entry).name)) {
-              availableIndexes.append( (entries.indexOf(entry), meta.indexMetas(idx)) )
-              flag = false
+          var attrName: String = null
+          for (entry <- entries if flag) {
+            attrName = meta.schema(entry).name
+            if (intervalMap.contains(attrName) &&
+              intervalMap(attrName).length == 1) {
+              val ordering = unapply(attrName).get.order
+              val start = intervalMap(attrName).head.start
+              val end = intervalMap(attrName).head.end
+              if(start != RangeScanner.DUMMY_KEY_START &&
+                end != RangeScanner.DUMMY_KEY_END && ordering.compare(start, end) == 0) {
+                availableIndexes.append((entries.indexOf(entry), meta.indexMetas(idx)))
+                flag = false
+              }
             }
           }
         case other => // TODO support other types of index
