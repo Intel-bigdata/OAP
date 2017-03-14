@@ -21,12 +21,14 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.{ArrayBuffer, BitSet}
+import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
+
 
 /**
  * The Spinach meta file is organized in the following format.
@@ -285,7 +287,48 @@ private[spinach] case class DataSourceMeta(
     indexMetas: Array[IndexMeta],
     schema: StructType,
     dataReaderClassName: String,
-    @transient fileHeader: FileHeader) extends Serializable
+    @transient fileHeader: FileHeader) extends Serializable {
+
+   def isSupportedByIndex(exp: Expression, bTreeSet: mutable.HashSet[String],
+                          bloomSet: mutable.HashSet[String]): Boolean = {
+     var attr: String = null
+     def checkAttribute(filter: Expression): Boolean = filter match {
+       case Or(left, right) =>
+         checkAttribute(left) && checkAttribute(right)
+       case And(left, right) =>
+         checkAttribute(left) && checkAttribute(right)
+       case EqualTo(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bloomSet.contains(attr)
+         } else false
+       case LessThan(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr)
+         } else false
+       case LessThanOrEqual(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr)
+         } else false
+       case GreaterThan(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr)
+         } else false
+       case GreaterThanOrEqual(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr)
+         } else false
+       case _ => true
+     }
+
+     checkAttribute(exp)
+  }
+
+}
 
 private[spinach] class DataSourceMetaBuilder {
   val fileMetas = ArrayBuffer.empty[FileMeta]

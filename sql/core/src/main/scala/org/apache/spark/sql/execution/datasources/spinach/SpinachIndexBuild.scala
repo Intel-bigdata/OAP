@@ -72,6 +72,9 @@ private[spinach] case class SpinachIndexBuild(
       val serializableConfiguration =
         new SerializableConfiguration(hadoopConf)
       val confBroadcast = sparkSession.sparkContext.broadcast(serializableConfiguration)
+
+      // data with no element means that there are no data files lacking related index files
+      // so in that case we just return empty seq to avoid duplicate refresh
       if (data.length > 0) {
         sparkSession.sparkContext.parallelize(data, data.length).map(dataString => {
           val d = new Path(dataString)

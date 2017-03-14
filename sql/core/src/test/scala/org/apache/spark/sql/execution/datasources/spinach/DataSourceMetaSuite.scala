@@ -19,15 +19,18 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.io.File
 
+import scala.collection.mutable
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfter
 
 import org.apache.spark.sql.{Row, SaveMode}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, Descending}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
+
 
 class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
   import testImplicits._
@@ -331,5 +334,146 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(fileMetas.length === 3)
     assert(fileMetas.map(_.recordCount).sum === 17)
     assert(fileMetas(0).dataFileName.endsWith(SpinachFileFormat.SPINACH_DATA_EXTENSION))
+  }
+
+  test("test hasAvailableIndex from Meta") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i + 100, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val spnDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
+    spnDf.createOrReplaceTempView("spnt1")
+
+    sql("create sindex indexA on spnt1 (a)")
+    sql("create sindex indexC on spnt1 (c)")
+    sql("create sindex indexABC on spnt1 (a,b,c)")
+
+    val path = new Path(
+      new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)
+    val meta = DataSourceMeta.initialize(path, new Configuration())
+
+    val bTreeIndexAttrSet = new mutable.HashSet[String]()
+    val bloomIndexAttrSet = new mutable.HashSet[String]()
+    for (idxMeta <- meta.indexMetas) {
+      idxMeta.indexType match {
+        case BTreeIndex(entries) =>
+          bTreeIndexAttrSet.add(meta.schema(entries(0).ordinal).name)
+        case BloomFilterIndex(entries) =>
+          entries.map(ordinal => meta.schema(ordinal).name).foreach(bloomIndexAttrSet.add)
+        case _ => // we don't support other types of index
+      }
+    }
+    val eq = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)))
+    val eq2 = Seq(EqualTo(AttributeReference("b", IntegerType)(), Literal(1)))
+    val lt = Seq(LessThan(AttributeReference("a", IntegerType)(), Literal(1)))
+    val gt = Seq(GreaterThan(AttributeReference("a", IntegerType)(), Literal(1)))
+    val gt2 = Seq(GreaterThan(AttributeReference("c", StringType)(), Literal("A Row")))
+    val lte = Seq(LessThanOrEqual(AttributeReference("a", IntegerType)(), Literal(1)))
+    val gte = Seq(GreaterThanOrEqual(AttributeReference("a", IntegerType)(), Literal(1)))
+    val or1 = Seq(Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(15)),
+      EqualTo(AttributeReference("a", IntegerType)(), Literal(1))) )
+    val or2 = Seq(Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(15)),
+      LessThan(AttributeReference("a", IntegerType)(), Literal(3))) )
+
+    val or3 = Seq(Or(GreaterThan(AttributeReference("c", StringType)(), Literal("A row")),
+      LessThan(AttributeReference("c", StringType)(), Literal("A row"))) )
+
+    val or4 = Seq(Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(3)),
+      LessThan(AttributeReference("c", StringType)(), Literal("A row"))) )
+
+    val complicated_Or = Seq(Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(50)),
+      And(GreaterThan(AttributeReference("a", IntegerType)(), Literal(3)),
+        LessThan(AttributeReference("a", IntegerType)(), Literal(24)))) )
+
+    val moreComplicated_Or =
+      Seq(Or(And(GreaterThan(AttributeReference("a", IntegerType)(), Literal(56)),
+        LessThan(AttributeReference("a", IntegerType)(), Literal(97))),
+      And(GreaterThan(AttributeReference("a", IntegerType)(), Literal(3)),
+        LessThan(AttributeReference("a", IntegerType)(), Literal(24)))) )
+
+    // ************** Muliti-Column Search Queries**********
+    val multi_column1 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
+      EqualTo(AttributeReference("b", IntegerType)(), Literal(56)),
+      LessThan(AttributeReference("c", StringType)(), Literal("A row")))
+
+    val multi_column2 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
+      GreaterThan(AttributeReference("b", IntegerType)(), Literal(56)),
+      LessThan(AttributeReference("c", StringType)(), Literal("A row")))
+
+    val multi_column3 = Seq(GreaterThan(AttributeReference("a", IntegerType)(), Literal(1)),
+      GreaterThan(AttributeReference("b", IntegerType)(), Literal(56)),
+      LessThan(AttributeReference("c", StringType)(), Literal("A row")))
+
+    val multi_column4 = Seq(LessThan(AttributeReference("a", IntegerType)(), Literal(1)),
+      GreaterThan(AttributeReference("b", IntegerType)(), Literal(56)),
+      LessThan(AttributeReference("c", StringType)(), Literal("A row")))
+
+    val multi_column5 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
+      LessThan(AttributeReference("c", StringType)(), Literal("A row")))
+
+    val multi_column6 = Seq(GreaterThan(AttributeReference("a", IntegerType)(), Literal(1)),
+      LessThan(AttributeReference("c", StringType)(), Literal("A row")))
+
+    val multi_column7 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
+      GreaterThan(AttributeReference("b", IntegerType)(), Literal(56)) )
+
+    val multi_column8 = Seq(LessThan(AttributeReference("a", IntegerType)(), Literal(1)),
+      GreaterThan(AttributeReference("b", IntegerType)(), Literal(56)) )
+
+    val multi_column9 = Seq(EqualTo(AttributeReference("b", IntegerType)(), Literal(1)),
+      GreaterThan(AttributeReference("c", StringType)(), Literal("a Row")) )
+
+    val multi_column10 = Seq(LessThan(AttributeReference("b", IntegerType)(), Literal(1)),
+      GreaterThan(AttributeReference("c", StringType)(), Literal("a Row")) )
+
+    val multi_column11 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
+      EqualTo(AttributeReference("b", IntegerType)(), Literal(56)),
+      EqualTo(AttributeReference("c", StringType)(), Literal("A row")))
+
+    val multi_column12 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
+      EqualTo(AttributeReference("b", IntegerType)(), Literal(56)),
+      Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(15)),
+        EqualTo(AttributeReference("a", IntegerType)(), Literal(18))))
+
+    val multi_column13 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
+      EqualTo(AttributeReference("b", IntegerType)(), Literal(56)),
+      Or(GreaterThan(AttributeReference("c", StringType)(), Literal("a row")),
+        EqualTo(AttributeReference("c", StringType)(), Literal("a row"))))
+
+    // a contradictory SQL condition
+    val multi_column14 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
+      EqualTo(AttributeReference("b", IntegerType)(), Literal(56)),
+      EqualTo(AttributeReference("c", StringType)(), Literal("A row")),
+      GreaterThan(AttributeReference("a", IntegerType)(), Literal(10)))
+
+    assert(eq.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(lt.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(gt.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(gt2.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(lte.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(gte.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(! eq2.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(or1.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(or2.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(or3.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(! or4.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(complicated_Or.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(
+      moreComplicated_Or.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet))
+    )
+    assert(multi_column1.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column2.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column3.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column4.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column5.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column6.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column7.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column8.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column9.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column10.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column11.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column12.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column13.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column14.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
   }
 }
