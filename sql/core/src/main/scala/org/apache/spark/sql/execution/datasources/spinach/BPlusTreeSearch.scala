@@ -204,12 +204,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
   protected var keySchema: StructType = _
 
   def meta: IndexMeta = idxMeta
-//  def start: Key = null // the start node
 
-//  val startArray = new ArrayBuffer[Key]()
-//  val endArray = new ArrayBuffer[Key]()
-//  val stInclude = new ArrayBuffer[Boolean]()
-//  val endInclude = new ArrayBuffer[Boolean]()
   var currentKeyIdx = 0
 
   def exist(dataPath: Path, conf: Configuration): Boolean = {
@@ -263,11 +258,6 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
           currentKeyArray(i).moveNextKey
         }
     }
-
-//    // filter the useless conditions(useless search ranges)
-//    currentKeyArray = currentKeyArray.filter(
-//      key => !(key.isEnd || shouldStop(key)))
-
     this
   }
 
@@ -386,8 +376,7 @@ override def hasNext: Boolean = {
     this.keySchema = schema
     this
   }
-//  def withNewStart(key: Key, include: Boolean): RangeScanner
-//  def withNewEnd(key: Key, include: Boolean): RangeScanner
+
 }
 
 private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScanner(me) {
@@ -616,42 +605,6 @@ private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
 
   private val order = GenerateOrdering.create(keySchema)
 
-//  def withStart(s: Key, include: Boolean): ScannerBuilder = {
-//    if (scanner == null) {
-//      if (include) {
-//        scanner = LeftCloseRangeSearch(meta, s)
-//      } else {
-//        scanner = LeftOpenRangeSearch(meta, s)
-//      }
-//    } else {
-//      scanner = scanner.withNewStart(s, include)
-//    }
-//
-//    startArrayBuffer(startArrayBuffer.length - 1) =
-//      if (startArrayBuffer.last == RangeScanner.DUMMY_KEY_START
-//        || order.compare(s, startArrayBuffer.last) > 0) {s} else startArrayBuffer.last
-//
-//    this
-//  }
-//
-//  def withEnd(e: Key, include: Boolean): ScannerBuilder = {
-// //    if (scanner == null) {
-// //      if (include) {
-// //        scanner = RightCloseRangeSearch(meta, e)
-// //      } else {
-// //        scanner = RightOpenRangeSearch(meta, e)
-// //      }
-// //    } else {
-// //      scanner = scanner.withNewEnd(e, include)
-// //    }
-//
-//    endArrayBuffer(endArrayBuffer.length - 1) =
-//      if (endArrayBuffer.last == RangeScanner.DUMMY_KEY_END
-//        || order.compare(e, endArrayBuffer.last) < 0) {e} else endArrayBuffer.last
-//
-//    this
-//  }
-
   def buildScanner(intervalArray: ArrayBuffer[RangeInterval]): Unit = {
 //    intervalArray.sortWith(compare)
     scanner = meta.indexType match {
@@ -873,12 +826,6 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
             else intervalMap(attributes(attrIdx)).head.end )
           val compositeEndKey = endKeys.reduce((key1, key2) => new JoinedRow(key1, key2))
 
-//          var nullIdx = lastIdx + 1
-//          while(nullIdx<entries.length) {
-//            compositeStartKey = new JoinedRow(compositeStartKey, null)
-//            compositeEndKey = new JoinedRow(compositeEndKey, null)
-//            nullIdx += 1
-//          }
           scanner.intervalArray.append(
             RangeInterval(compositeStartKey, compositeEndKey,
             intervalMap(attributes.last)(i).startInclude,
@@ -1025,7 +972,7 @@ private[spinach] object BPlusTreeSearch extends Logging {
       case LessThan(attribute, ic(key)) =>
         val ranger = new RangeInterval(RangeScanner.DUMMY_KEY_START, key, true, false)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
-      case _ => null// new mutable.HashMap[String, ArrayBuffer[RangeInterval]]()
+      case _ => null
     }
   }
 
@@ -1042,30 +989,8 @@ private[spinach] object BPlusTreeSearch extends Logging {
       case _ => false
     }
   }
-  // TODO support multiple scanner & And / Or
-  def build(filters: Array[Filter], ic: IndexContext): Array[Filter] = {
-//    def buildScannerBound2(filter: Filter, k: Int): Boolean = {
-//      filter match {
-//        case EqualTo(attribute, ic(key)) =>
-//          val ic(sBuilder) = attribute
-//          sBuilder.withStart(key, true).withEnd(key, true)
-//          false
-//        case GreaterThanOrEqual(ic(indexer), ic(key)) =>
-//          indexer.withStart(key, true)
-//          false
-//        case GreaterThan(ic(indexer), ic(key)) =>
-//          indexer.withStart(key, false)
-//          false
-//        case LessThanOrEqual(ic(indexer), ic(key)) =>
-//          indexer.withEnd(key, true)
-//          false
-//        case LessThan(ic(indexer), ic(key)) =>
-//          indexer.withEnd(key, false)
-//          false
-//        case _ => true
-//      }
-//    }
 
+  def build(filters: Array[Filter], ic: IndexContext): Array[Filter] = {
     if (filters == null || filters.isEmpty) return filters
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
     // reduce multiple hashMap to one hashMap(AND operation)
@@ -1097,23 +1022,13 @@ private[spinach] object BPlusTreeSearch extends Logging {
         }
       }
     )
-    // need to be modified to traverse indexes ****************************
+
     if (intervalMap != null) {
       ic.selectAvailableIndex(intervalMap)
       val (num, idxMeta) = ic.getBestIndexer(intervalMap.size)
       ic.buildScanner(num, idxMeta, intervalMap)
     }
-//    for((attribute, intervalArray) <- intervalMap) {
-//      attribute match {
-//        case ic(scannerBuilder) =>
-//          scannerBuilder.buildScanner(intervalArray)
-//        case _ => // this attribute is not index, do nothing
-//      }
-//    }
-    // ********************************************************************
-//    val retFilters = filters.filter(f => buildScannerBound2(f, 1))
-// //  ic.getScannerBuilder.foreach(_.updateBound)
-//    retFilters
+
     filters.filterNot(canSupport(_, ic))
   }
 
