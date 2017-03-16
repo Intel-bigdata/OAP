@@ -30,7 +30,9 @@ private[sql] case class IndexColumn(columnName: String, isAscending: Boolean) {
 
 private[sql] object IndexColumn {
   def apply(columnName: String, order: String): IndexColumn = order match {
-    case "ASC" => new IndexColumn(columnName, true)
-    case "DESC" => new IndexColumn(columnName, false)
+    case "ASC" => new IndexColumn(columnName, isAscending = true)
+    case "DESC" => new IndexColumn(columnName, isAscending = false)
   }
+
+  def apply(columnName: String): IndexColumn = new IndexColumn(columnName, isAscending = true)
 }
