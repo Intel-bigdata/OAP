@@ -207,12 +207,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
   protected var keySchema: StructType = _
 
   def meta: IndexMeta = idxMeta
-//  def start: Key = null // the start node
 
-//  val startArray = new ArrayBuffer[Key]()
-//  val endArray = new ArrayBuffer[Key]()
-//  val stInclude = new ArrayBuffer[Boolean]()
-//  val endInclude = new ArrayBuffer[Boolean]()
   var currentKeyIdx = 0
 
   def exist(dataPath: Path, conf: Configuration): Boolean = {
@@ -266,11 +261,6 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
           currentKeyArray(i).moveNextKey
         }
     }
-
-//    // filter the useless conditions(useless search ranges)
-//    currentKeyArray = currentKeyArray.filter(
-//      key => !(key.isEnd || shouldStop(key)))
-
     this
   }
 
@@ -389,8 +379,7 @@ override def hasNext: Boolean = {
     this.keySchema = schema
     this
   }
-//  def withNewStart(key: Key, include: Boolean): RangeScanner
-//  def withNewEnd(key: Key, include: Boolean): RangeScanner
+
 }
 
 private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScanner(me) {
@@ -614,110 +603,8 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
     intervalArray.filter(validate)
   }
 }
-private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
-  private var scanner: RangeScanner = _
 
-  private val order = GenerateOrdering.create(keySchema)
-
-//  def withStart(s: Key, include: Boolean): ScannerBuilder = {
-//    if (scanner == null) {
-//      if (include) {
-//        scanner = LeftCloseRangeSearch(meta, s)
-//      } else {
-//        scanner = LeftOpenRangeSearch(meta, s)
-//      }
-//    } else {
-//      scanner = scanner.withNewStart(s, include)
-//    }
-//
-//    startArrayBuffer(startArrayBuffer.length - 1) =
-//      if (startArrayBuffer.last == RangeScanner.DUMMY_KEY_START
-//        || order.compare(s, startArrayBuffer.last) > 0) {s} else startArrayBuffer.last
-//
-//    this
-//  }
-//
-//  def withEnd(e: Key, include: Boolean): ScannerBuilder = {
-// //    if (scanner == null) {
-// //      if (include) {
-// //        scanner = RightCloseRangeSearch(meta, e)
-// //      } else {
-// //        scanner = RightOpenRangeSearch(meta, e)
-// //      }
-// //    } else {
-// //      scanner = scanner.withNewEnd(e, include)
-// //    }
-//
-//    endArrayBuffer(endArrayBuffer.length - 1) =
-//      if (endArrayBuffer.last == RangeScanner.DUMMY_KEY_END
-//        || order.compare(e, endArrayBuffer.last) < 0) {e} else endArrayBuffer.last
-//
-//    this
-//  }
-
-  def buildScanner(intervalArray: ArrayBuffer[RangeInterval]): Unit = {
-//    intervalArray.sortWith(compare)
-    scanner = meta.indexType match {
-      case BloomFilterIndex(entries) =>
-        BloomFilterScanner(meta)
-      case BitMapIndex(_) =>
-        BitMapScanner(meta)
-      case _ =>
-        new RangeScanner(meta)
-    }
-    scanner.intervalArray = intervalArray
-  }
-
-  def build: RangeScanner = {
-    assert(scanner ne null, "Scanner is not set")
-    scanner.withKeySchema(keySchema)
-  }
-}
-
-private[spinach] object ScannerBuilder {
-  /**
-   * Build the scanner builder with multiple keys
-   *
-   * @param fields
-   * @param meta
-   * @param dirs
-   * @return
-   */
-  def apply(fields: Seq[StructField], meta: IndexMeta, dirs: Seq[SortDirection])
-  : ScannerBuilder = {
-    // TODO default we use the Ascending order
-    // val ordering = GenerateOrdering.create(StructType(fields))
-    val keySchema = StructType(fields)
-    new ScannerBuilder(meta, keySchema)
-  }
-
-  /**
-   * For scanner with no direction
-   * @param field to build a schema
-   * @param meta meta info
-   * @return
-   */
-  def apply(field: StructField, meta: IndexMeta): ScannerBuilder = {
-    val keySchema = new StructType().add(field)
-    new ScannerBuilder(meta, keySchema)
-  }
-
-  /**
-   * Build the scanner builder while indexed field contains only a single key
-   *
-   * @param field the indexed field with name & data type
-   * @param meta the index meta info
-   * @param dir the direction of the index data (Ascending or Descending)
-   * @return the Scanner Builder
-   */
-  def apply(field: StructField, meta: IndexMeta, dir: SortDirection): ScannerBuilder = {
-    apply(new StructType().add(field), meta, dir :: Nil)
-  }
-}
-
-// TODO currently only a single attribute index supported.
 private[spinach] class IndexContext(meta: DataSourceMeta) {
-  private val map = new scala.collection.mutable.HashMap[String, ScannerBuilder]()
   // availableIndexes keeps the available indexes for the current SQL query statement
   // (Int, IndexMeta):
   // if indexType is BloomFilter, then the Int represents the indice of the Index entries;
@@ -729,23 +616,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
   private val filterMap = new mutable.HashMap[String, FilterOptimizer]()
   private var scanner: RangeScanner = _
 
-  def clear(): IndexContext = {
-    map.clear()
-    this
-  }
-
-  def getScannerBuilder: Option[ScannerBuilder] = {
-    if (map.size == 0) {
-      None
-    } else if (map.size == 1) {
-      Some(map.iterator.next()._2)
-    } else {
-      throw new UnsupportedOperationException("currently only a single index supported")
-    }
-  }
-
   def getScanner: Option[RangeScanner] = Option(scanner)
-
 
   def selectAvailableIndex(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]])
   : Unit = {
@@ -782,13 +653,22 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
           }
         case BloomFilterIndex(entries) =>
           // traverse all attributes that are in the bloomIndex,
-          // and return the first one which matches
+          // return indexMeta and the first one's index which matches
           // TODO support multiple key in the index
           var flag = true
+          var attrName: String = null
           for (entry <- entries if flag) {
-            if (intervalMap.contains(meta.schema(entry).name)) {
-              availableIndexes.append( (entries.indexOf(entry), meta.indexMetas(idx)) )
-              flag = false
+            attrName = meta.schema(entry).name
+            if (intervalMap.contains(attrName) &&
+              intervalMap(attrName).length == 1) {
+              val ordering = unapply(attrName).get.order
+              val start = intervalMap(attrName).head.start
+              val end = intervalMap(attrName).head.end
+              if(start != RangeScanner.DUMMY_KEY_START &&
+                end != RangeScanner.DUMMY_KEY_END && ordering.compare(start, end) == 0) {
+                availableIndexes.append((entries.indexOf(entry), meta.indexMetas(idx)))
+                flag = false
+              }
             }
           }
         case BitMapIndex(entries) =>
@@ -875,12 +755,6 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
             else intervalMap(attributes(attrIdx)).head.end )
           val compositeEndKey = endKeys.reduce((key1, key2) => new JoinedRow(key1, key2))
 
-//          var nullIdx = lastIdx + 1
-//          while(nullIdx<entries.length) {
-//            compositeStartKey = new JoinedRow(compositeStartKey, null)
-//            compositeEndKey = new JoinedRow(compositeEndKey, null)
-//            nullIdx += 1
-//          }
           scanner.intervalArray.append(
             RangeInterval(compositeStartKey, compositeEndKey,
             intervalMap(attributes.last)(i).startInclude,
@@ -908,16 +782,6 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
     scanner.withKeySchema(keySchema)
   }
 
-//  def unapply(attribute: String): Option[ScannerBuilder] = {
-//    if (!map.contains(attribute)) {
-//      findIndexer(attribute) match {
-//        case Some(scannerBuilder) => map.update(attribute, scannerBuilder)
-//        case None =>
-//      }
-//    }
-//    map.get(attribute)
-//  }
-
   def unapply(attribute: String): Option[FilterOptimizer] = {
     if (!filterMap.contains(attribute)) {
       val ordinal = meta.schema.fieldIndex(attribute)
@@ -928,38 +792,10 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
 
   def unapply(value: Any): Option[Key] =
     Some(InternalRow(CatalystTypeConverters.convertToCatalyst(value)))
-
-  private def findIndexer(attribute: String): Option[ScannerBuilder] = {
-    val ordinal = meta.schema.fieldIndex(attribute)
-
-    var idx = 0
-    while (idx < meta.indexMetas.length) {
-      meta.indexMetas(idx).indexType match {
-        case BTreeIndex(entries) if (entries.length == 1 && entries(0).ordinal == ordinal) =>
-          // assert(dir == Ascending, "we assume the data are sorted in ascending")
-          // TODO currently we are only support the Ascending
-          return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx), Ascending))
-        case BTreeIndex(entries) => entries.map { entry =>
-          // TODO support multiple key in the index
-        }
-        case BloomFilterIndex(entries) if entries.indexOf(ordinal) >= 0 =>
-          // TODO support muliple key in the index
-          return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx)))
-        case BitMapIndex(entries) if entries.indexOf(ordinal) >= 0 =>
-          return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx)))
-        case other => // we don't support other types of index
-        // TODO support the other types of index
-      }
-
-      idx += 1
-    }
-
-    None
-  }
 }
 
 private[spinach] object DummyIndexContext extends IndexContext(null) {
-  override def getScannerBuilder: Option[ScannerBuilder] = None
+  override def getScanner: Option[RangeScanner] = None
   override def unapply(attribute: String): Option[FilterOptimizer] = None
   override def unapply(value: Any): Option[Key] = None
 }
@@ -1036,7 +872,7 @@ private[spinach] object BPlusTreeSearch extends Logging {
       case LessThan(attribute, ic(key)) =>
         val ranger = new RangeInterval(RangeScanner.DUMMY_KEY_START, key, true, false)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
-      case _ => null// new mutable.HashMap[String, ArrayBuffer[RangeInterval]]()
+      case _ => null
     }
   }
 
@@ -1053,30 +889,8 @@ private[spinach] object BPlusTreeSearch extends Logging {
       case _ => false
     }
   }
-  // TODO support multiple scanner & And / Or
-  def build(filters: Array[Filter], ic: IndexContext): Array[Filter] = {
-//    def buildScannerBound2(filter: Filter, k: Int): Boolean = {
-//      filter match {
-//        case EqualTo(attribute, ic(key)) =>
-//          val ic(sBuilder) = attribute
-//          sBuilder.withStart(key, true).withEnd(key, true)
-//          false
-//        case GreaterThanOrEqual(ic(indexer), ic(key)) =>
-//          indexer.withStart(key, true)
-//          false
-//        case GreaterThan(ic(indexer), ic(key)) =>
-//          indexer.withStart(key, false)
-//          false
-//        case LessThanOrEqual(ic(indexer), ic(key)) =>
-//          indexer.withEnd(key, true)
-//          false
-//        case LessThan(ic(indexer), ic(key)) =>
-//          indexer.withEnd(key, false)
-//          false
-//        case _ => true
-//      }
-//    }
 
+  def build(filters: Array[Filter], ic: IndexContext): Array[Filter] = {
     if (filters == null || filters.isEmpty) return filters
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
     // reduce multiple hashMap to one hashMap(AND operation)
@@ -1108,23 +922,13 @@ private[spinach] object BPlusTreeSearch extends Logging {
         }
       }
     )
-    // need to be modified to traverse indexes ****************************
+
     if (intervalMap != null) {
       ic.selectAvailableIndex(intervalMap)
       val (num, idxMeta) = ic.getBestIndexer(intervalMap.size)
       ic.buildScanner(num, idxMeta, intervalMap)
     }
-//    for((attribute, intervalArray) <- intervalMap) {
-//      attribute match {
-//        case ic(scannerBuilder) =>
-//          scannerBuilder.buildScanner(intervalArray)
-//        case _ => // this attribute is not index, do nothing
-//      }
-//    }
-    // ********************************************************************
-//    val retFilters = filters.filter(f => buildScannerBound2(f, 1))
-// //  ic.getScannerBuilder.foreach(_.updateBound)
-//    retFilters
+
     filters.filterNot(canSupport(_, ic))
   }
 

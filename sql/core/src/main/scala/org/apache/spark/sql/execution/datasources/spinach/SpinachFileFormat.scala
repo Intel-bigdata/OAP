@@ -35,8 +35,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjectio
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.sources.{And, DataSourceRegister, EqualTo, Filter,
-GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual, Or}
+import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.SerializableConfiguration
 
