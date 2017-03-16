@@ -600,72 +600,7 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
   }
 }
 
-private[spinach] class ScannerBuilder(meta: IndexMeta, keySchema: StructType) {
-  private var scanner: RangeScanner = _
-
-  private val order = GenerateOrdering.create(keySchema)
-
-  def buildScanner(intervalArray: ArrayBuffer[RangeInterval]): Unit = {
-//    intervalArray.sortWith(compare)
-    scanner = meta.indexType match {
-      case BloomFilterIndex(entries) =>
-        BloomFilterScanner(meta)
-      case _ =>
-        new RangeScanner(meta)
-    }
-    scanner.intervalArray = intervalArray
-  }
-
-  def build: RangeScanner = {
-    assert(scanner ne null, "Scanner is not set")
-    scanner.withKeySchema(keySchema)
-  }
-}
-
-private[spinach] object ScannerBuilder {
-  /**
-   * Build the scanner builder with multiple keys
-   *
-   * @param fields
-   * @param meta
-   * @param dirs
-   * @return
-   */
-  def apply(fields: Seq[StructField], meta: IndexMeta, dirs: Seq[SortDirection])
-  : ScannerBuilder = {
-    // TODO default we use the Ascending order
-    // val ordering = GenerateOrdering.create(StructType(fields))
-    val keySchema = StructType(fields)
-    new ScannerBuilder(meta, keySchema)
-  }
-
-  /**
-   * For scanner with no direction
-   * @param field to build a schema
-   * @param meta meta info
-   * @return
-   */
-  def apply(field: StructField, meta: IndexMeta): ScannerBuilder = {
-    val keySchema = new StructType().add(field)
-    new ScannerBuilder(meta, keySchema)
-  }
-
-  /**
-   * Build the scanner builder while indexed field contains only a single key
-   *
-   * @param field the indexed field with name & data type
-   * @param meta the index meta info
-   * @param dir the direction of the index data (Ascending or Descending)
-   * @return the Scanner Builder
-   */
-  def apply(field: StructField, meta: IndexMeta, dir: SortDirection): ScannerBuilder = {
-    apply(new StructType().add(field), meta, dir :: Nil)
-  }
-}
-
-// TODO currently only a single attribute index supported.
 private[spinach] class IndexContext(meta: DataSourceMeta) {
-  private val map = new scala.collection.mutable.HashMap[String, ScannerBuilder]()
   // availableIndexes keeps the available indexes for the current SQL query statement
   // (Int, IndexMeta):
   // if indexType is BloomFilter, then the Int represents the indice of the Index entries;
@@ -677,23 +612,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
   private val filterMap = new mutable.HashMap[String, FilterOptimizer]()
   private var scanner: RangeScanner = _
 
-  def clear(): IndexContext = {
-    map.clear()
-    this
-  }
-
-  def getScannerBuilder: Option[ScannerBuilder] = {
-    if (map.size == 0) {
-      None
-    } else if (map.size == 1) {
-      Some(map.iterator.next()._2)
-    } else {
-      throw new UnsupportedOperationException("currently only a single index supported")
-    }
-  }
-
   def getScanner: Option[RangeScanner] = Option(scanner)
-
 
   def selectAvailableIndex(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]])
   : Unit = {
@@ -846,16 +765,6 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
     scanner.withKeySchema(keySchema)
   }
 
-//  def unapply(attribute: String): Option[ScannerBuilder] = {
-//    if (!map.contains(attribute)) {
-//      findIndexer(attribute) match {
-//        case Some(scannerBuilder) => map.update(attribute, scannerBuilder)
-//        case None =>
-//      }
-//    }
-//    map.get(attribute)
-//  }
-
   def unapply(attribute: String): Option[FilterOptimizer] = {
     if (!filterMap.contains(attribute)) {
       val ordinal = meta.schema.fieldIndex(attribute)
@@ -867,35 +776,10 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
   def unapply(value: Any): Option[Key] =
     Some(InternalRow(CatalystTypeConverters.convertToCatalyst(value)))
 
-  private def findIndexer(attribute: String): Option[ScannerBuilder] = {
-    val ordinal = meta.schema.fieldIndex(attribute)
-
-    var idx = 0
-    while (idx < meta.indexMetas.length) {
-      meta.indexMetas(idx).indexType match {
-        case BTreeIndex(entries) if (entries.length == 1 && entries(0).ordinal == ordinal) =>
-          // assert(dir == Ascending, "we assume the data are sorted in ascending")
-          // TODO currently we are only support the Ascending
-          return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx), Ascending))
-        case BTreeIndex(entries) => entries.map { entry =>
-          // TODO support multiple key in the index
-        }
-        case BloomFilterIndex(entries) if entries.indexOf(ordinal) >= 0 =>
-          // TODO support muliple key in the index
-          return Some(ScannerBuilder(meta.schema(ordinal), meta.indexMetas(idx)))
-        case other => // we don't support other types of index
-        // TODO support the other types of index
-      }
-
-      idx += 1
-    }
-
-    None
-  }
 }
 
 private[spinach] object DummyIndexContext extends IndexContext(null) {
-  override def getScannerBuilder: Option[ScannerBuilder] = None
+  override def getScanner: Option[RangeScanner] = None
   override def unapply(attribute: String): Option[FilterOptimizer] = None
   override def unapply(value: Any): Option[Key] = None
 }
