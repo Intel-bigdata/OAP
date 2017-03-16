@@ -20,17 +20,16 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 
-import scala.collection.mutable.{ArrayBuffer, BitSet}
-import scala.collection.mutable
+import scala.collection.mutable.{ArrayBuffer, BitSet, HashMap, HashSet}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
-
 
 /**
  * The Spinach meta file is organized in the following format.
@@ -54,11 +53,17 @@ import org.apache.spark.util.SerializableConfiguration
  *    .
  * IndexMeta N
  * Schema           -- Variable Length -- The table schema in json format.
+ * Statistics 1
+ *     Id           -- 4 bytes   -- Statistics type id
+ *     contentLen   -- 4 bytes   -- The length of content array, used to check
+ *     StatsMeta    -- Varible Length
+ * Statistics 2
  * Data Reader Class Name -- Variable Length -- The associated data reader class name.
  * FileHeader       --  32 bytes
  *     RecordCount  --   8 bytes -- The number of all of the records in the same folder.
  *     DataFileCount--   8 bytes -- The number of the data files.
  *     IndexCount   --   8 bytes -- The number of the index.
+ *     StatisCount  --   8 bytes -- The types of the statistics applying in metafile.
  *     Version      --   3 bytes -- Each bytes represents Major, Minor and Revision.
  *     MagicNumber  --   5 bytes -- The magic number of the meta file which is always "FIBER".
  *
@@ -237,29 +242,30 @@ private[spinach] object IndexMeta {
   }
 }
 
-private[spinach] class StatsMeta(
-     var stats_id: Int, var statistics: Statistics = null) extends Serializable {
-  def write(out: FSDataOutputStream): Unit = {
-    statistics.write(out)
+private[spinach] class StatsMeta(val stats_id: Int, schema: StructType,
+                                 var statistics: Statistics = null) extends Serializable {
+  def write(out: FSDataOutputStream): Int = {
+    statistics.write(out, schema)
   }
-  def read(in: FSDataInputStream, stats_id: Int): Unit = {
+
+  def read(in: FSDataInputStream, fileCount: Long, fullSize: Int): Unit = {
     statistics = stats_id match {
       case StatsMeta.MINMAX =>
-        new MinMaxStatistics()
+        val content: Array[InternalRow] = new Array[InternalRow](fileCount.toInt * 2)
+        new MinMaxStatistics(content)
       case StatsMeta.SAMPLE =>
         new SampleBasedStatistics()
       case _ =>
         new SampleBasedStatistics()
     }
-    statistics.read(in)
-//    statistics.read(in)
+    statistics.read(in, schema, fullSize)
   }
 }
 
 private[spinach] object StatsMeta {
   final val MINMAX: Int = 0
   final val SAMPLE: Int = 1
-  final val stats_to_use: Seq[Int] = Seq(MINMAX, SAMPLE)
+  final val stats_to_use: Seq[Int] = Seq(MINMAX)
   var statsEnable: Boolean = true
 
   def build(sparkSession: SparkSession, statsMetas: Array[StatsMeta],
@@ -361,8 +367,8 @@ private[spinach] case class DataSourceMeta(
     this
   }
 
-   def isSupportedByIndex(exp: Expression, bTreeSet: mutable.HashSet[String],
-                          bloomSet: mutable.HashSet[String]): Boolean = {
+   def isSupportedByIndex(exp: Expression, bTreeSet: HashSet[String],
+                          bloomSet: HashSet[String]): Boolean = {
      var attr: String = null
      def checkAttribute(filter: Expression): Boolean = filter match {
        case Or(left, right) =>
@@ -457,7 +463,7 @@ private[spinach] class DataSourceMetaBuilder {
     // build statstics with sparkSession
     if (sparkSession != null && StatsMeta.statsEnable) {
       println("start building statistics")
-      StatsMeta.stats_to_use.foreach(stat => addStatsMeta(new StatsMeta(stat)))
+      StatsMeta.stats_to_use.foreach(stat => addStatsMeta(new StatsMeta(stat, schema)))
       val statsMetaArray: Array[StatsMeta] = statsMetas.toArray
       StatsMeta.build(sparkSession, statsMetaArray, parentPath, meta)
       meta.withStatsMetas(statsMetaArray)
@@ -489,11 +495,8 @@ private[spinach] object DataSourceMeta {
   final val INDEX_META_TYPE_LENGTH = 1
   final val INDEX_META_KEY_LENGTH = 256
 
-  private def readFileHeader(file: FileStatus, in: FSDataInputStream): FileHeader = {
-    if (file.getLen < FILE_HEAD_LEN) {
-      throw new IOException(s" ${file.getPath} is not a valid Spinach meta file.")
-    }
-    in.seek(file.getLen - FILE_HEAD_LEN)
+  private def readFileHeader(headerOffset: Long, in: FSDataInputStream): FileHeader = {
+    in.seek(headerOffset)
     val fileHeader = FileHeader()
     fileHeader.read(in)
     fileHeader
@@ -549,34 +552,53 @@ private[spinach] object DataSourceMeta {
     }
   }
 
-  private def readStatsMeta(fileHeader: FileHeader, in: FSDataInputStream): Array[StatsMeta] = {
+  private def readSizeMap(offset: Long, statsTypes: Int,
+                          in: FSDataInputStream): Array[Int] = {
+    val sizeArray: Array[Int] = new Array[Int](statsTypes)
+
+    in.seek(offset)
+    for (i <- 0 until(statsTypes)) {
+      sizeArray(i) = in.readInt()
+    }
+
+    sizeArray
+  }
+
+  private def readStatsMeta(fileHeader: FileHeader, schema: StructType,
+                            statsStartOffset: Long,
+                            sizeArray: Array[Int],
+                            in: FSDataInputStream): Array[StatsMeta] = {
     val stats_count = fileHeader.statsCount.toInt
-    if (stats_count == 0) return null
     val stats_ids = new Array[Int](stats_count)
     val statsMetas = new Array[StatsMeta](stats_count)
 
-    for (i <- stats_ids.indices) {
-      stats_ids(i) = in.readInt()
-    }
-    println("ssssss: " + stats_ids(0) + "    " + stats_ids(1))
-//    stats_ids(0) = in.readInt()
-//    stats_ids(1) = in.readInt()
+    in.seek(statsStartOffset)
 
     for (i <- stats_ids.indices) {
-      statsMetas(i) = new StatsMeta(stats_ids(i))
-      statsMetas(i).read(in, stats_ids(i))
+      stats_ids(i) = in.readInt()
+      statsMetas(i) = new StatsMeta(stats_ids(i), schema)
+      statsMetas(i).read(in, fileHeader.dataFileCount, sizeArray(i))
     }
-//    statsMetas.foreach(stats => stats.read(in))
+
     statsMetas
   }
+
   private def writeStatsMeta(fileHeader: FileHeader,
-                             statsMetas: Array[StatsMeta], out: FSDataOutputStream): Unit = {
-    if (fileHeader.statsCount == 0) return
+                             statsMetas: Array[StatsMeta],
+                             out: FSDataOutputStream): HashMap[Int, Int] = {
+    if (fileHeader.statsCount == 0) return null
+
+    val sizeMap: HashMap[Int, Int] = new HashMap[Int, Int]()
+
     for (i <- 0 until fileHeader.statsCount.toInt) {
       val statsMeta: StatsMeta = statsMetas(i)
       out.writeInt(statsMeta.stats_id)
+      if (statsMetas != null && statsMetas(i) != null) {
+        sizeMap.put(statsMeta.stats_id, statsMetas(i).write(out))
+      }
     }
-    statsMetas.foreach(_.write(out))
+
+    sizeMap
   }
 
   def initialize(path: Path, jobConf: Configuration): DataSourceMeta = {
@@ -584,12 +606,34 @@ private[spinach] object DataSourceMeta {
     val file = fs.getFileStatus(path)
     val in = fs.open(path)
 
-    val fileHeader = readFileHeader(file, in)
+    if (file.getLen < FILE_HEAD_LEN) {
+      throw new IOException(s" ${file.getPath} is not a valid Spinach meta file.")
+    }
+
+    val headerOffset = file.getLen - FILE_HEAD_LEN
+
+    val fileHeader = readFileHeader(headerOffset, in)
     val fileMetas = readFileMetas(fileHeader, in)
     val indexMetas = readIndexMetas(fileHeader, in)
     val schema = readSchema(fileHeader, in)
-    val statsMetas = readStatsMeta(fileHeader, in)
+
+    val statsStartOffset = in.getPos
+    val statsTypes = fileHeader.statsCount.toInt
+
+    // just if the meta file has statsMeta already, we should read them out
+    val statsMetas =
+      if (statsTypes > 0) {
+        val map = readSizeMap(headerOffset - 4 * statsTypes, statsTypes, in)
+        val res = readStatsMeta(fileHeader, schema, statsStartOffset, map, in)
+        // here 8 means two Interger
+        // one is for statistic id
+        // the other is a check int used in reading
+        in.seek(statsStartOffset + 8 * statsTypes + map.sum)
+        res
+      } else null
+
     val dataReaderClassName = in.readUTF()
+
     in.close()
     DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader, statsMetas)
   }
@@ -611,8 +655,13 @@ private[spinach] object DataSourceMeta {
     meta.fileMetas.foreach(_.write(out))
     meta.indexMetas.foreach(_.write(out))
     writeSchema(meta.schema, out)
-    writeStatsMeta(meta.fileHeader, meta.statsMetas, out)
+    val sizeMap = writeStatsMeta(meta.fileHeader, meta.statsMetas, out)
     out.writeUTF(meta.dataReaderClassName)
+    if (sizeMap != null) {
+      meta.statsMetas.foreach(st =>
+        out.writeInt(sizeMap.get(st.stats_id).get)
+      )
+    }
     meta.fileHeader.write(out)
     out.close()
 
