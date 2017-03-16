@@ -123,7 +123,7 @@ case class CreateIndex(
     bAndP.foreach(bp => DataSourceMeta.write(
       new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
       sparkSession.sparkContext.hadoopConfiguration,
-      bp._1.build(),
+      bp._1.build(sparkSession, bp._2),
       deleteIfExits = true))
     Seq.empty
   }

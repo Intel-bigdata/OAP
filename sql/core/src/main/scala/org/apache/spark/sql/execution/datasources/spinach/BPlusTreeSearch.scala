@@ -131,6 +131,12 @@ private[spinach] case class UnsafeIndexNode(
     s"[Signs(${keys.map(_.getInt(0)).mkString(",")}) " + children.mkString(" ") + "]"
 }
 
+private[spinach] object UnsafeRangeNode {
+  lazy val row = new ThreadLocal[UnsafeRow] {
+    override def initialValue = new UnsafeRow
+  }
+}
+
 private[spinach] object UnsafeIndexNode {
   lazy val row = new ThreadLocal[UnsafeRow] {
     override def initialValue = new UnsafeRow
