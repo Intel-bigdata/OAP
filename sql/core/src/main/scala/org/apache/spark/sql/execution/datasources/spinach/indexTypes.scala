@@ -28,3 +28,7 @@ case object BTreeIndexType extends AnyIndexType {
 case object BloomFilterIndexType extends AnyIndexType {
   override def toString: String = "BLOOM"
 }
+
+case object BitMapIndexType extends AnyIndexType {
+  override def toString: String = "BITMAP"
+}
