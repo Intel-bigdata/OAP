@@ -144,6 +144,7 @@ indexCol
 indexType
     : BTREE
     | BLOOM
+    | BITMAP
     ;
 
 unsupportedHiveNativeCommands
@@ -895,6 +896,7 @@ INPATH: 'INPATH';
 SINDEX: 'SINDEX';
 BTREE: 'BTREE';
 BLOOM: 'BLOOM';
+BITMAP: 'BITMAP';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''

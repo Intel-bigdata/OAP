@@ -93,6 +93,12 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
               }
             }
           }
+        case BitMapIndex(entries) =>
+          for (entry <- entries) {
+            if (intervalMap.contains(meta.schema(entry).name)) {
+              availableIndexes.append((entries.indexOf(entry), meta.indexMetas(idx)) )
+            }
+          }
         case other => // TODO support other types of index
       }
       idx += 1
@@ -181,6 +187,13 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
       case BloomFilterIndex(entries) =>
         keySchema = new StructType().add(meta.schema(entries(lastIdx)))
         scanner = BloomFilterScanner(bestIndexer)
+        val attribute = meta.schema(entries(lastIdx)).name
+        val filterOptimizer = unapply(attribute).get
+        scanner.intervalArray =
+          intervalMap(attribute).sortWith(filterOptimizer.compareRangeInterval)
+      case BitMapIndex(entries) =>
+        keySchema = new StructType().add(meta.schema(entries(lastIdx)))
+        scanner = BitMapScanner(bestIndexer)
         val attribute = meta.schema(entries(lastIdx)).name
         val filterOptimizer = unapply(attribute).get
         scanner.intervalArray =

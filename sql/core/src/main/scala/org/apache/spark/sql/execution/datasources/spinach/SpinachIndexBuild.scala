@@ -17,15 +17,15 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayOutputStream, ObjectOutputStream}
 import java.util.Comparator
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
@@ -33,6 +33,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
+import org.apache.spark.util.collection.BitSet
 
 private[spinach] case class SpinachIndexBuild(
     @transient sparkSession: SparkSession,
@@ -213,6 +214,52 @@ private[spinach] case class SpinachIndexBuild(
             IndexUtils.writeLong(fileOut, offset) // rootOffset
             fileOut.close()
             IndexBuildResult(d.getName, elemCnt, "", d.getParent.toString)
+          case BitMapIndexType =>
+            // Current impl just for fast proving the effect of BitMap Index,
+            // we can do the optimize below:
+            // 1. each bitset in hashmap value has same length, we can save the
+            //    hash map in raw bits in file, like B+ Index above
+            // 2. use the BitMap with bit compress like javaewah
+            // TODO: BitMap Index storage format optimize
+            // get the tmpMap and total rowCnt in first travers
+            val tmpMap = new mutable.HashMap[InternalRow, mutable.ListBuffer[Int]]()
+            var rowCnt = 0
+            while (it.hasNext) {
+              val v = it.next().copy()
+              if (!tmpMap.contains(v)) {
+                val list = new mutable.ListBuffer[Int]()
+                list += rowCnt
+                tmpMap.put(v, list)
+              } else {
+                tmpMap.get(v).get += rowCnt
+              }
+              rowCnt += 1
+            }
+            // generate the bitset hashmap
+            val hashMap = new mutable.HashMap[InternalRow, BitSet]()
+            tmpMap.foreach(kv => {
+              val bs = new BitSet(rowCnt)
+              kv._2.foreach(bs.set)
+              hashMap.put(kv._1, bs)
+            })
+            // get index file handler
+            val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
+            val fs = indexFile.getFileSystem(hadoopConf)
+            val fileOut = fs.create(indexFile, true)
+            // serialize hashMap and get length
+            val writeBuf = new ByteArrayOutputStream()
+            val out = new ObjectOutputStream(writeBuf)
+            out.writeObject(hashMap)
+            out.flush()
+            val objLen = writeBuf.size()
+            // write byteArray length and byteArray
+            IndexUtils.writeInt(fileOut, objLen)
+            fileOut.write(writeBuf.toByteArray)
+            // write dataEnd
+            IndexUtils.writeLong(fileOut, 4 + objLen)
+            out.close()
+            fileOut.close()
+            IndexBuildResult(d.getName, rowCnt, "", d.getParent.toString)
           case _ => throw new Exception("unsupported index type")
         }
       }).collect().toSeq

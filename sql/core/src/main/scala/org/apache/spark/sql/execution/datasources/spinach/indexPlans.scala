@@ -98,6 +98,9 @@ case class CreateIndex(
         case BloomFilterIndexType =>
           val entries = indexColumns.map(col => s.map(_.name).toIndexedSeq.indexOf(col.columnName))
           metaBuilder.addIndexMeta(new IndexMeta(indexName, BloomFilterIndex(entries)))
+        case BitMapIndexType =>
+          val entries = indexColumns.map(col => s.map(_.name).toIndexedSeq.indexOf(col.columnName))
+          metaBuilder.addIndexMeta(new IndexMeta(indexName, BitMapIndex(entries)))
         case _ =>
           sys.error(s"Not supported index type $indexType")
       }

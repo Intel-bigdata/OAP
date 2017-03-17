@@ -289,8 +289,11 @@ private[spinach] case class DataSourceMeta(
     dataReaderClassName: String,
     @transient fileHeader: FileHeader) extends Serializable {
 
-   def isSupportedByIndex(exp: Expression, bTreeSet: mutable.HashSet[String],
-                          bloomSet: mutable.HashSet[String]): Boolean = {
+   def isSupportedByIndex(exp: Expression,
+                          hashSetList: mutable.ListBuffer[mutable.HashSet[String]]): Boolean = {
+     val bTreeSet: mutable.HashSet[String] = hashSetList(0)
+     val bloomSet: mutable.HashSet[String] = hashSetList(1)
+     val bitmapSet: mutable.HashSet[String] = hashSetList(2)
      var attr: String = null
      def checkAttribute(filter: Expression): Boolean = filter match {
        case Or(left, right) =>
@@ -300,34 +303,33 @@ private[spinach] case class DataSourceMeta(
        case EqualTo(attrRef: AttributeReference, _) =>
          if (attr ==  null || attr == attrRef.name) {
            attr = attrRef.name
-           bTreeSet.contains(attr) || bloomSet.contains(attr)
+           bTreeSet.contains(attr) || bloomSet.contains(attr) || bitmapSet.contains(attr)
          } else false
        case LessThan(attrRef: AttributeReference, _) =>
          if (attr ==  null || attr == attrRef.name) {
            attr = attrRef.name
-           bTreeSet.contains(attr)
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
          } else false
        case LessThanOrEqual(attrRef: AttributeReference, _) =>
          if (attr ==  null || attr == attrRef.name) {
            attr = attrRef.name
-           bTreeSet.contains(attr)
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
          } else false
        case GreaterThan(attrRef: AttributeReference, _) =>
          if (attr ==  null || attr == attrRef.name) {
            attr = attrRef.name
-           bTreeSet.contains(attr)
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
          } else false
        case GreaterThanOrEqual(attrRef: AttributeReference, _) =>
          if (attr ==  null || attr == attrRef.name) {
            attr = attrRef.name
-           bTreeSet.contains(attr)
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
          } else false
        case _ => true
      }
 
      checkAttribute(exp)
   }
-
 }
 
 private[spinach] class DataSourceMetaBuilder {

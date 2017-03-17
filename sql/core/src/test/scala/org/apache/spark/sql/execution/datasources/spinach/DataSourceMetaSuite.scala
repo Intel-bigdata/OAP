@@ -354,15 +354,23 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
     val bTreeIndexAttrSet = new mutable.HashSet[String]()
     val bloomIndexAttrSet = new mutable.HashSet[String]()
+    val bitmapIndexAttrSet = new mutable.HashSet[String]()
     for (idxMeta <- meta.indexMetas) {
       idxMeta.indexType match {
         case BTreeIndex(entries) =>
           bTreeIndexAttrSet.add(meta.schema(entries(0).ordinal).name)
         case BloomFilterIndex(entries) =>
           entries.map(ordinal => meta.schema(ordinal).name).foreach(bloomIndexAttrSet.add)
+        case BitMapIndex(entries) =>
+          entries.map(ordinal => meta.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
         case _ => // we don't support other types of index
       }
     }
+    val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
+    hashSetList.append(bTreeIndexAttrSet)
+    hashSetList.append(bloomIndexAttrSet)
+    hashSetList.append(bitmapIndexAttrSet)
+
     val eq = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)))
     val eq2 = Seq(EqualTo(AttributeReference("b", IntegerType)(), Literal(1)))
     val lt = Seq(LessThan(AttributeReference("a", IntegerType)(), Literal(1)))
@@ -446,34 +454,34 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       EqualTo(AttributeReference("c", StringType)(), Literal("A row")),
       GreaterThan(AttributeReference("a", IntegerType)(), Literal(10)))
 
-    assert(eq.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(lt.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(gt.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(gt2.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(lte.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(gte.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(! eq2.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(or1.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(or2.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(or3.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(! or4.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(complicated_Or.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(eq.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(lt.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(gt.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(gt2.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(lte.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(gte.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(! eq2.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(or1.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(or2.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(or3.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(! or4.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(complicated_Or.exists(meta.isSupportedByIndex(_, hashSetList)))
     assert(
-      moreComplicated_Or.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet))
+      moreComplicated_Or.exists(meta.isSupportedByIndex(_, hashSetList))
     )
-    assert(multi_column1.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column2.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column3.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column4.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column5.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column6.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column7.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column8.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column9.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column10.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column11.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column12.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column13.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
-    assert(multi_column14.exists(meta.isSupportedByIndex(_, bTreeIndexAttrSet, bloomIndexAttrSet)))
+    assert(multi_column1.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column2.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column3.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column4.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column5.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column6.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column7.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column8.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column9.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column10.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column11.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column12.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column13.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column14.exists(meta.isSupportedByIndex(_, hashSetList)))
   }
 }
