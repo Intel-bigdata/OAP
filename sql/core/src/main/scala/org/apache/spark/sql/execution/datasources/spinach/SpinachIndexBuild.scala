@@ -24,7 +24,6 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
@@ -34,6 +33,8 @@ import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, Spi
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.util.collection.BitSet
+
+import scala.collection.mutable.ArrayBuffer
 
 private[spinach] case class SpinachIndexBuild(
     @transient sparkSession: SparkSession,
@@ -163,15 +164,17 @@ private[spinach] case class SpinachIndexBuild(
           case BloomFilterIndexType =>
             val bf_index = new BloomFilter()
             var elemCnt = 0 // element count
+          val boundReference = keySchema.zipWithIndex.map(x =>
+            BoundReference(x._2, x._1.dataType, nullable = true))
             // for multi-column index, add all subsets into bloom filter
             // For example, a column with a = 1, b = 2, a and b are index columns
             // then three records: a = 1, b = 2, a = 1 b = 2, are inserted to bf
-            val projector = keySchema.toSet.subsets().filter(_.nonEmpty).map(s =>
-              UnsafeProjection.create(StructType(s.toArray))).toArray
+            val projector = boundReference.toSet.subsets().filter(_.nonEmpty).map(s =>
+              UnsafeProjection.create(s.toArray)).toArray
             while (it.hasNext) {
               val row = it.next()
               elemCnt += 1
-              projector.foreach(p => bf_index.addValue(p(row).copy().getBytes))
+              projector.foreach(p => bf_index.addValue(p(row).getBytes))
             }
             val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
             val fs = indexFile.getFileSystem(hadoopConf)

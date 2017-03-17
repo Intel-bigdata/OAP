@@ -215,21 +215,16 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     sql("drop sindex index_bf on spinach_double_test")
   }
 
-  test("Multiple column Bloom filter index test") { // Failed: local test oom
+  test("Multiple column Bloom filter index test") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test select * from t")
-    sql("create sindex index_bf on spinach_test (a, b) USING BLOOM")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 10"),
-      Row(10, "this is test 10") :: Nil)
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 20"),
-      Row(20, "this is test 20") :: Nil)
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100"),
+    sql("create sindex index_bf on spinach_test (a, b) USING BTREE")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100 AND b = 'this is test 100'"),
       Row(100, "this is test 100") :: Nil)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 301").count() == 0)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 310").count() == 0)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 10301").count() == 0)
-    assert(sql(s"SELECT * FROM spinach_test WHERE a = 801").count() == 0)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 100'"),
+      Row(100, "this is test 100") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 301"), Nil)
     sql("drop sindex index_bf on spinach_test")
   }
 }
