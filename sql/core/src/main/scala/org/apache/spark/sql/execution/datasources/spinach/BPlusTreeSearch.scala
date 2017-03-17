@@ -210,7 +210,7 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
 
   var currentKeyIdx = 0
 
-  def exist(dataPath: Path, conf: Configuration): Boolean = {
+  def existRelatedIndexFile(dataPath: Path, conf: Configuration): Boolean = {
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
     path.getFileSystem(conf).exists(path)
   }
