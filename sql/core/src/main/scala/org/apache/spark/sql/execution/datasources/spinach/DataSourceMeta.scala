@@ -55,11 +55,18 @@ import org.apache.spark.util.SerializableConfiguration
  * Schema           -- Variable Length -- The table schema in json format.
  * Statistics 1
  *     Id           -- 4 bytes   -- Statistics type id
- *     contentLen   -- 4 bytes   -- The length of content array, used to check
  *     StatsMeta    -- Varible Length
  * Statistics 2
+ *    .
+ *    .
+ * Statistics N
  * Data Reader Class Name -- Variable Length -- The associated data reader class name.
- * FileHeader       --  32 bytes
+ * Statistics 1 content length
+ * Statistics 2 content length
+ *    .
+ *    .
+ * Statistics N content length
+ * FileHeader       --  40 bytes
  *     RecordCount  --   8 bytes -- The number of all of the records in the same folder.
  *     DataFileCount--   8 bytes -- The number of the data files.
  *     IndexCount   --   8 bytes -- The number of the index.
@@ -289,10 +296,15 @@ private[spinach] object StatsMeta {
       val me = metaBroadCast.value
       val hConf = confBroadCase.value.value
       val reader = new SpinachDataReader(path, me, None, me.schema.indices.toArray)
-      val internalRows = reader.initialize(hConf).toArray
+      val iter = reader.initialize(hConf)
+      val internalRows = new ArrayBuffer[InternalRow]()
+
+      while (iter.hasNext) {
+        internalRows += iter.next.copy()
+      }
 
       val ids = statsIds.value
-      ids.map(Statistics.buildLocalStatstics(internalRows, _))
+      ids.map(Statistics.buildLocalStatstics(me.schema, internalRows.toArray, _))
     }).collect()
 
     for (i <- statsMetas.indices) {
@@ -625,10 +637,8 @@ private[spinach] object DataSourceMeta {
       if (statsTypes > 0) {
         val map = readSizeMap(headerOffset - 4 * statsTypes, statsTypes, in)
         val res = readStatsMeta(fileHeader, schema, statsStartOffset, map, in)
-        // here 8 means two Interger
-        // one is for statistic id
-        // the other is a check int used in reading
-        in.seek(statsStartOffset + 8 * statsTypes + map.sum)
+        // 4 * statsTypes refers to the length of ids stored as int
+        in.seek(statsStartOffset + 4 * statsTypes + map.sum)
         res
       } else null
 

@@ -25,12 +25,12 @@ import scala.collection.JavaConverters._
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
 
@@ -53,6 +53,11 @@ private[spinach] case class SpinachIndexBuild(
     } else {
       // TODO use internal scan
       val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
+
+      // TODO just add fsrate in hadoop conf now
+      hadoopConf.setDouble(Statistics.thresName,
+        sparkSession.conf.get(SQLConf.SPINACH_FULL_SCAN_THRESHOLD))
+
       val fs = paths.head.getFileSystem(hadoopConf)
       val fileIters = paths.map(fs.listFiles(_, false))
       val dataPaths = fileIters.flatMap(fileIter => new Iterator[Path] {

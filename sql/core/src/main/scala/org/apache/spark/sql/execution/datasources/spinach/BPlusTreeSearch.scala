@@ -201,6 +201,7 @@ private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
 // we scan the index from the smallest to the greatest, this is the root class
 // of scanner, which will scan the B+ Tree (index) leaf node.
 private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] with Serializable {
+  def canBeOptimizedByStatistics: Boolean = true
   // TODO this is a temp work around
   override def toString(): String = "RangeScanner"
 //  @transient protected var currentKey: CurrentKey = _
@@ -218,11 +219,14 @@ private[spinach] class RangeScanner(idxMeta: IndexMeta) extends Iterator[Long] w
 //  val endInclude = new ArrayBuffer[Boolean]()
   var currentKeyIdx = 0
 
-  def exist(dataPath: Path, conf: Configuration): Boolean = {
+  def existRelatedIndexFile(dataPath: Path, conf: Configuration): Boolean = {
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
     path.getFileSystem(conf).exists(path)
   }
 
+  def getSchema(): StructType = {
+    keySchema
+  }
 
   def initialize(dataPath: Path, conf: Configuration): RangeScanner = {
     assert(keySchema ne null)
@@ -397,6 +401,8 @@ override def hasNext: Boolean = {
 }
 
 private[spinach] case class BloomFilterScanner(me: IndexMeta) extends RangeScanner(me) {
+  override def canBeOptimizedByStatistics: Boolean = false
+
   var stopFlag: Boolean = _
 
   var bloomFilter: BloomFilter = _

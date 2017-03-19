@@ -106,12 +106,56 @@ private[spinach] class SpinachDataReader(
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
 
     filterScanner match {
-      case Some(fs) if fs.exist(path, conf) => fs.initialize(path, conf)
-        // total Row count can be get from the filter scanner
-        val rowIDs = fs.toArray.sorted
-        fileScanner.iterator(conf, requiredIds, rowIDs)
+      case Some(fs) if fs.existRelatedIndexFile(path, conf) => fs.initialize(path, conf)
+
+        // should find the index of the file in this path
+        // so that we could find related statistics info
+        val fileIndex = meta.fileMetas.indexWhere(_.dataFileName == path.getName)
+        AnalyzeFromStatistics(fileIndex, fs, conf) match {
+          case StaticsAnalysisResult.FULL_SCAN =>
+            fileScanner.iterator(conf, requiredIds)
+          case StaticsAnalysisResult.USE_INDEX =>
+            // total Row count can be get from the filter scanner
+            val rowIDs = fs.toArray.sorted
+            fileScanner.iterator(conf, requiredIds, rowIDs)
+          case StaticsAnalysisResult.SKIP_INDEX =>
+            Iterator.empty
+        }
       case _ =>
         fileScanner.iterator(conf, requiredIds)
+    }
+  }
+
+  def AnalyzeFromStatistics(fileIndex: Int, fs: RangeScanner, conf: Configuration): Int = {
+    if (!fs.canBeOptimizedByStatistics) {
+      StaticsAnalysisResult.USE_INDEX
+    } else if (fs.intervalArray.length == 0 || meta.statsMetas.length == 0) {
+      StaticsAnalysisResult.SKIP_INDEX
+    } else {
+      var resCollect: Double = 0
+      var i = 0
+
+      while (i < meta.statsMetas.length && resCollect != StaticsAnalysisResult.SKIP_INDEX) {
+        val res = meta.statsMetas(i).statistics.analyze(fileIndex, requiredIds,
+          fs.getSchema(), fs.intervalArray.toArray)
+
+        if (res == StaticsAnalysisResult.SKIP_INDEX) {
+          resCollect = StaticsAnalysisResult.SKIP_INDEX
+        } else {
+          resCollect += res
+        }
+        i += 1
+      }
+
+      val fs_rate = conf.get(Statistics.thresName).toDouble
+
+      if (resCollect == StaticsAnalysisResult.SKIP_INDEX) {
+        StaticsAnalysisResult.SKIP_INDEX
+      } else if (resCollect / meta.statsMetas.length <= fs_rate) {
+        StaticsAnalysisResult.USE_INDEX
+      } else {
+        StaticsAnalysisResult.FULL_SCAN
+      }
     }
   }
 }
