@@ -581,6 +581,13 @@ object SQLConf {
       .stringConf
       .createWithDefault("0,1,2")
 
+  val SPINACH_STATISTICS_SAMPLE_RATE =
+    SQLConfigBuilder("spark.sql.spinach.Statistics.sampleRate")
+    .internal()
+    .doc("Sample rate for sample based statistics, default value 0.05")
+    .doubleConf
+    .createWithDefault(0.05)
+
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
   }

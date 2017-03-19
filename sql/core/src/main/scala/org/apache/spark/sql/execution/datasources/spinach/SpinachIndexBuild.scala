@@ -57,6 +57,8 @@ private[spinach] case class SpinachIndexBuild(
       // TODO just add fsrate in hadoop conf now
       hadoopConf.setDouble(Statistics.thresName,
         sparkSession.conf.get(SQLConf.SPINACH_FULL_SCAN_THRESHOLD))
+      hadoopConf.setDouble(Statistics.sampleRate,
+        sparkSession.conf.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE))
 
       val fs = paths.head.getFileSystem(hadoopConf)
       val fileIters = paths.map(fs.listFiles(_, false))

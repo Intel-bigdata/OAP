@@ -98,7 +98,7 @@ private[spinach] case class HashIndex(entries: Seq[Int] = Nil) extends IndexType
   def appendEntry(entry: Int): HashIndex = HashIndex(entries :+ entry)
 }
 
-private[spinach] class FileMeta {
+private[spinach] class FileMeta extends Serializable {
   import DataSourceMeta._
 
   var fingerprint: String = _
@@ -272,7 +272,7 @@ private[spinach] class StatsMeta(val stats_id: Int, schema: StructType,
 private[spinach] object StatsMeta {
   final val MINMAX: Int = 0
   final val SAMPLE: Int = 1
-  final val stats_to_use: Seq[Int] = Seq(MINMAX)
+  final val stats_to_use: Seq[Int] = Seq(MINMAX, SAMPLE)
   var statsEnable: Boolean = true
 
   def build(sparkSession: SparkSession, statsMetas: Array[StatsMeta],
@@ -303,8 +303,9 @@ private[spinach] object StatsMeta {
         internalRows += iter.next.copy()
       }
 
+      val options = Map[String, String](Statistics.sampleRate -> hConf.get(Statistics.sampleRate))
       val ids = statsIds.value
-      ids.map(Statistics.buildLocalStatstics(me.schema, internalRows.toArray, _))
+      ids.map(Statistics.buildLocalStatstics(me.schema, internalRows.toArray, _, options))
     }).collect()
 
     for (i <- statsMetas.indices) {
@@ -367,7 +368,7 @@ private[spinach] object FileHeader {
 }
 
 private[spinach] case class DataSourceMeta(
-    @transient fileMetas: Array[FileMeta],
+    fileMetas: Array[FileMeta],
     indexMetas: Array[IndexMeta],
     schema: StructType,
     dataReaderClassName: String,
@@ -635,6 +636,7 @@ private[spinach] object DataSourceMeta {
     // just if the meta file has statsMeta already, we should read them out
     val statsMetas =
       if (statsTypes > 0) {
+        // size map reading error
         val map = readSizeMap(headerOffset - 4 * statsTypes, statsTypes, in)
         val res = readStatsMeta(fileHeader, schema, statsStartOffset, map, in)
         // 4 * statsTypes refers to the length of ids stored as int

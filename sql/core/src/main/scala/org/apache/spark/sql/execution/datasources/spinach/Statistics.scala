@@ -20,15 +20,15 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.io.ByteArrayOutputStream
 
 import scala.collection.mutable.ArrayBuffer
-
+import scala.util.Random
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.catalyst.expressions.codegen.{BaseOrdering, GenerateOrdering}
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
-import org.apache.spark.sql.types.{DateType, StringType, TimestampType, _}
+import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
+
 
 abstract class Statistics extends Serializable {
   // there is no need to need actually data file path when reading from metafile.
@@ -116,31 +116,73 @@ class MinMaxStatistics(var content: Array[InternalRow] = null,
       }
     }
 
-    0
+    if (result) StaticsAnalysisResult.SKIP_INDEX
+    else StaticsAnalysisResult.UNSURE
   }
 }
 
 class SampleBasedStatistics(var content: Array[Array[InternalRow]] = null,
                             var pathName: Array[String] = null) extends Statistics {
   private var schema: StructType = _
+  @transient private lazy val converter = UnsafeProjection.create(schema)
 
   override def read(in: FSDataInputStream, schema: StructType, fullSize: Int): Unit = {
     this.schema = schema
-
-    val temp = in.readInt()
-    assert(temp == 2)
     println("sample based read")
+
+    val content_len = in.readInt()
+    if (content == null) content = new Array[Array[InternalRow]](content_len)
+    val contentSizes = new Array[Int](content_len)
+
+    for (i <- 0 until content_len) {
+      contentSizes(i) = in.readInt()
+    }
+
+    val bytesArray = new Array[Byte](fullSize - 4 - 4 * content_len)
+    in.readFully(in.getPos, bytesArray)
+    var offset = 0L
+
+    for (i <- content.indices) {
+      val temp_array = new ArrayBuffer[InternalRow]
+
+      for (_ <- 0 until contentSizes(i)) {
+        val internalRow = Statistics.getUnsafeRow(schema.length, bytesArray, offset).copy()
+        offset += internalRow.getSizeInBytes + 4
+        temp_array += internalRow
+      }
+      content(i) = temp_array.toArray
+    }
+
   }
 
   override def write(out: FSDataOutputStream, schema: StructType): Int = {
-    out.writeInt(2)
+    if (content == null) return 0
+    this.schema = schema
+    var fullSize = 0
     println("sample based write")
-    2
+
+    out.writeInt(content.length)
+    // write out all content length
+    content.foreach(rows => out.writeInt(rows.length))
+    out.flush()
+    fullSize += 4 + content.length * 4
+
+    content.foreach(rows => {
+//      out.writeInt(rows.length)
+//      fullSize += 4
+      rows.foreach{
+        fullSize += Statistics.writeInternalRow(converter, _, out)
+      }
+    })
+    fullSize
   }
 
   override def analyze(fileIndex: Int, ids: Array[Int], schema: StructType,
                        intervalArray: Array[RangeInterval]): Double = {
-    0
+    assert(fileIndex < content.length, "fileIndex out of bound")
+    val ordering = GenerateOrdering.create(schema)
+    content(fileIndex).count(row =>
+      Statistics.rowInIntervalArray(row, intervalArray, ordering)) / content(fileIndex).length
   }
 }
 
@@ -156,22 +198,58 @@ object MinMaxStatistics {
     minMaxStatistics
   }
 
-  def buildLocalStatistics(internalRows: Array[InternalRow]): StatisticsLocalResult = {
-    StatisticsLocalResult(internalRows.take(10).map(_.copy()))
+  def fromLocalResult1(localResults: Array[StatisticsLocalResult],
+                       fileNames: Array[String]): MinMaxStatistics = {
+    val collectResults: Array[InternalRow] = new Array(2 * localResults.length)
+    for (i <- localResults.indices) {
+      collectResults(i * 2) = localResults(i).rows.head.copy()
+      collectResults(i * 2 + 1) = localResults(i).rows.last.copy()
+    }
+    new MinMaxStatistics(collectResults, fileNames)
   }
-  def fromLocalResult(localResults: Array[StatisticsLocalResult],
-          fileNames: Array[String]): MinMaxStatistics = {
-    new MinMaxStatistics(localResults.head.rows, fileNames)
+
+  def buildLocalStatistics1(schema: StructType,
+                            internalRows: Array[InternalRow]): StatisticsLocalResult = {
+    // TODO here can be optimized
+    val minAB = new ArrayBuffer[Any]()
+    val maxAB = new ArrayBuffer[Any]()
+
+    for (i <- 0 until schema.length) {
+      val field = schema(i)
+      var min = internalRows(0)
+      var max = internalRows(0)
+
+      val order = SortOrder(BoundReference(i, field.dataType, nullable = true), Ascending)
+
+      val ordering = GenerateOrdering.generate(order :: Nil,
+        StructType(field :: Nil).toAttributes)
+
+      for (row <- internalRows) {
+        min = if (ordering.compare(row, min) < 0) row else min
+        max = if (ordering.compare(row, max) > 0) row else max
+      }
+      minAB += min.get(i, field.dataType)
+      maxAB += max.get(i, field.dataType)
+    }
+
+    val minRow = InternalRow.fromSeq(minAB)
+    val maxRow = InternalRow.fromSeq(maxAB)
+
+    StatisticsLocalResult(Array(minRow, maxRow))
   }
 }
 
 object SampleBasedStatistics {
-  def buildLocalStatistics(internalRows: Array[InternalRow]): StatisticsLocalResult = {
-    StatisticsLocalResult(internalRows.take(10).map(_.copy()))
-  }
-  def fromLocalResult(localResults: Array[StatisticsLocalResult],
-                      fileNames: Array[String]): SampleBasedStatistics = {
+  def fromLocalResult2(localResults: Array[StatisticsLocalResult],
+                       fileNames: Array[String]): SampleBasedStatistics = {
     new SampleBasedStatistics(localResults.map(_.rows), fileNames)
+  }
+  def buildLocalStatistics2(internalRows: Array[InternalRow],
+                            sampleRate: Double): StatisticsLocalResult = {
+    StatisticsLocalResult(
+      Random.shuffle(internalRows.indices.toList)
+        .take((internalRows.length * sampleRate).toInt)
+        .map(internalRows(_)).toArray)
   }
 }
 
@@ -179,6 +257,7 @@ case class StatisticsLocalResult(rows: Array[InternalRow])
 
 object Statistics {
   val thresName = "spn_fsthreshold"
+  val sampleRate = "spn_sampleRate"
 
   def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long): UnsafeRow = {
     val size = Platform.getInt(array, Platform.BYTE_ARRAY_OFFSET + offset)
@@ -215,39 +294,12 @@ object Statistics {
     4 + value.getSizeInBytes
   }
 
-  def buildLocalStatistics1(schema: StructType,
-                            internalRows: Array[InternalRow]): StatisticsLocalResult = {
-    // TODO here can be optimized
-    val minAB = new ArrayBuffer[Any]()
-    val maxAB = new ArrayBuffer[Any]()
-
-    for (i <- 0 until schema.length) {
-      val field = schema(i)
-      var min = internalRows(0)
-      var max = internalRows(0)
-
-      val order = SortOrder(BoundReference(i, field.dataType, nullable = true), Ascending)
-
-      val ordering = GenerateOrdering.generate(order :: Nil,
-        StructType(field :: Nil).toAttributes)
-
-      for (row <- internalRows) {
-        min = if (ordering.compare(row, min) < 0) row else min
-        max = if (ordering.compare(row, max) > 0) row else max
-      }
-      minAB += min.get(i, field.dataType)
-      maxAB += max.get(i, field.dataType)
-    }
-
-    val minRow = InternalRow.fromSeq(minAB)
-    val maxRow = InternalRow.fromSeq(maxAB)
-
-    StatisticsLocalResult(Array(minRow, maxRow))
-  }
-
-  def buildLocalStatistics2(internalRows: Array[InternalRow]): StatisticsLocalResult = {
-
-    StatisticsLocalResult(internalRows.take(2).map(_.copy()))
+  def buildLocalStatistics2(internalRows: Array[InternalRow],
+                            sampleRate: Double): StatisticsLocalResult = {
+    StatisticsLocalResult(
+      Random.shuffle(internalRows.indices.toList)
+      .take((internalRows.length * sampleRate).toInt)
+      .map(internalRows(_)).toArray)
   }
 
   def fromLocalResult2(localResults: Array[StatisticsLocalResult],
@@ -255,26 +307,19 @@ object Statistics {
     new SampleBasedStatistics(localResults.map(_.rows), fileNames)
   }
 
-  def fromLocalResult1(localResults: Array[StatisticsLocalResult],
-                       fileNames: Array[String]): MinMaxStatistics = {
-    val collectResults: Array[InternalRow] = new Array(2 * localResults.length)
-    for (i <- localResults.indices) {
-      collectResults(i * 2) = localResults(i).rows.head.copy()
-      collectResults(i * 2 + 1) = localResults(i).rows.last.copy()
-    }
-    new MinMaxStatistics(collectResults, fileNames)
-  }
-
   def buildLocalStatstics(schema: StructType,
                           internalRows: Array[InternalRow],
-                          stats_id: Int): StatisticsLocalResult = {
+                          stats_id: Int,
+                          options: Map[String, String] = null): StatisticsLocalResult = {
     stats_id match {
       case StatsMeta.MINMAX =>
 //        MinMaxStatistics.buildLocalStatistics(internalRows)
-        Statistics.buildLocalStatistics1(schema, internalRows)
+        MinMaxStatistics.buildLocalStatistics1(schema, internalRows)
+//        Statistics.buildLocalStatistics1(schema, internalRows)
       case StatsMeta.SAMPLE =>
 //        SampleBasedStatistics.buildLocalStatistics(internalRows)
-        Statistics.buildLocalStatistics2(internalRows)
+        SampleBasedStatistics.buildLocalStatistics2(internalRows,
+          options.getOrElse(Statistics.sampleRate, "0.8").toDouble)
       case _ =>
         throw new Exception("unsupported statistics type")
     }
@@ -284,19 +329,49 @@ object Statistics {
       fileNames: Array[String], stats_type: Int): Statistics = {
     stats_type match {
       case StatsMeta.MINMAX =>
-//        MinMaxStatistics.fromLocalResult(localresults, fileNames)
-        Statistics.fromLocalResult1(localresults, fileNames)
+        MinMaxStatistics.fromLocalResult1(localresults, fileNames)
       case StatsMeta.SAMPLE =>
 //        SampleBasedStatistics.fromLocalResult(localresults, fileNames)
-        Statistics.fromLocalResult2(localresults, fileNames)
+        SampleBasedStatistics.fromLocalResult2(localresults, fileNames)
       case _ =>
         throw new Exception("unsupported statistics type")
     }
   }
+  // logic is complex, needs to be refactored :(
+  def rowInSingleInterval(row: InternalRow, interval: RangeInterval,
+                          order: BaseOrdering): Boolean = {
+    if (interval.start == RangeScanner.DUMMY_KEY_START) {
+      if (interval.end == RangeScanner.DUMMY_KEY_END) true
+      else {
+        if (order.lt(row, interval.end)) true
+        else if (order.equiv(row, interval.end) && interval.endInclude) true
+        else false
+      }
+    } else {
+      if (order.lt(row, interval.start)) false
+      else if (order.equiv(row, interval.start)) {
+        if (interval.startInclude) {
+          if (interval.end != RangeScanner.DUMMY_KEY_END &&
+            order.equiv(interval.start, interval.end) && !interval.endInclude) {false}
+          else true
+        } else interval.end == RangeScanner.DUMMY_KEY_END || order.gt(interval.end, row)
+      }
+      else if (interval.end != RangeScanner.DUMMY_KEY_END && (order.gt(row, interval.end) ||
+        (order.equiv(row, interval.end) && !interval.endInclude))) {false}
+      else true
+    }
+  }
+  def rowInIntervalArray(row: InternalRow, intervalArray: Array[RangeInterval],
+                         order: BaseOrdering): Boolean = {
+    if (intervalArray == null || intervalArray.isEmpty) false
+    else intervalArray.exists(interval => rowInSingleInterval(row, interval, order))
+  }
+
 }
 
 object StaticsAnalysisResult {
   val FULL_SCAN = 1
   val SKIP_INDEX = -1
+  val UNSURE = -2
   val USE_INDEX = 0
 }

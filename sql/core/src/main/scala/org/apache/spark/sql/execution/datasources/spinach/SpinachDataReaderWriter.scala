@@ -133,6 +133,7 @@ private[spinach] class SpinachDataReader(
       StaticsAnalysisResult.SKIP_INDEX
     } else {
       var resCollect: Double = 0
+      var resStatCount: Int = 0
       var i = 0
 
       while (i < meta.statsMetas.length && resCollect != StaticsAnalysisResult.SKIP_INDEX) {
@@ -141,8 +142,9 @@ private[spinach] class SpinachDataReader(
 
         if (res == StaticsAnalysisResult.SKIP_INDEX) {
           resCollect = StaticsAnalysisResult.SKIP_INDEX
-        } else {
+        } else if (res != StaticsAnalysisResult.UNSURE) {
           resCollect += res
+          resStatCount += 1
         }
         i += 1
       }
@@ -151,7 +153,7 @@ private[spinach] class SpinachDataReader(
 
       if (resCollect == StaticsAnalysisResult.SKIP_INDEX) {
         StaticsAnalysisResult.SKIP_INDEX
-      } else if (resCollect / meta.statsMetas.length <= fs_rate) {
+      } else if (resStatCount != 0 && resCollect / resStatCount <= fs_rate) {
         StaticsAnalysisResult.USE_INDEX
       } else {
         StaticsAnalysisResult.FULL_SCAN
