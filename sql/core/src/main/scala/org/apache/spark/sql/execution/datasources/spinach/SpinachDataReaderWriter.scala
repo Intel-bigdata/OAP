@@ -137,8 +137,10 @@ private[spinach] class SpinachDataReader(
       var i = 0
 
       while (i < meta.statsMetas.length && resCollect != StaticsAnalysisResult.SKIP_INDEX) {
-        val res = meta.statsMetas(i).statistics.analyze(fileIndex, requiredIds,
-          fs.getSchema(), fs.intervalArray.toArray)
+        val keySchema = fs.getSchema()
+        val ids = keySchema.map(field => meta.schema.indexWhere(_ == field))
+        val res = meta.statsMetas(i).statistics.analyze(fileIndex, ids.toArray,
+          keySchema, fs.intervalArray.toArray)
 
         if (res == StaticsAnalysisResult.SKIP_INDEX) {
           resCollect = StaticsAnalysisResult.SKIP_INDEX
