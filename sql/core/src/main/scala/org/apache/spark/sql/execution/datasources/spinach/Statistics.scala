@@ -47,8 +47,6 @@ class MinMaxStatistics(var content: Array[InternalRow] = null,
 
   override def read(in: FSDataInputStream, schema: StructType, fullSize: Int): Unit = {
     if (content == null) return
-
-    println("min max read")
     this.schema = schema
 
     val contentSize = in.readInt()
@@ -70,7 +68,6 @@ class MinMaxStatistics(var content: Array[InternalRow] = null,
 
   override def write(out: FSDataOutputStream, schema: StructType): Int = {
     if (content == null) return 0
-    println("min max write")
     this.schema = schema
 
     out.writeInt(content.length)
@@ -129,7 +126,6 @@ class SampleBasedStatistics(var content: Array[Array[InternalRow]] = null,
 
   override def read(in: FSDataInputStream, schema: StructType, fullSize: Int): Unit = {
     this.schema = schema
-    println("sample based read")
 
     val content_len = in.readInt()
     if (content == null) content = new Array[Array[InternalRow]](content_len)
@@ -142,7 +138,7 @@ class SampleBasedStatistics(var content: Array[Array[InternalRow]] = null,
     val bytesArray = new Array[Byte](fullSize - 4 - 4 * content_len)
     val start_offset = in.getPos
     in.readFully(start_offset, bytesArray)
-    in.seek(start_offset + bytesArray.size) // seek needed after readFully
+    in.seek(start_offset + bytesArray.length) // seek needed after readFully
     var offset = 0L
 
     for (i <- content.indices) {
@@ -162,7 +158,6 @@ class SampleBasedStatistics(var content: Array[Array[InternalRow]] = null,
     if (content == null) return 0
     this.schema = schema
     var fullSize = 0
-    println("sample based write")
 
     out.writeInt(content.length)
     // write out all content length
@@ -171,8 +166,6 @@ class SampleBasedStatistics(var content: Array[Array[InternalRow]] = null,
     fullSize += 4 + content.length * 4
 
     content.foreach(rows => {
-//      out.writeInt(rows.length)
-//      fullSize += 4
       rows.foreach{
         fullSize += Statistics.writeInternalRow(converter, _, out)
       }
@@ -201,8 +194,8 @@ object MinMaxStatistics {
     minMaxStatistics
   }
 
-  def fromLocalResult1(localResults: Array[StatisticsLocalResult],
-                       fileNames: Array[String]): MinMaxStatistics = {
+  def fromLocalResult(localResults: Array[StatisticsLocalResult],
+                      fileNames: Array[String]): MinMaxStatistics = {
     val collectResults: Array[InternalRow] = new Array(2 * localResults.length)
     for (i <- localResults.indices) {
       collectResults(i * 2) = localResults(i).rows.head.copy()
@@ -211,8 +204,8 @@ object MinMaxStatistics {
     new MinMaxStatistics(collectResults, fileNames)
   }
 
-  def buildLocalStatistics1(schema: StructType,
-                            internalRows: Array[InternalRow]): StatisticsLocalResult = {
+  def buildLocalStatistics(schema: StructType,
+                           internalRows: Array[InternalRow]): StatisticsLocalResult = {
     // TODO here can be optimized
     val minAB = new ArrayBuffer[Any]()
     val maxAB = new ArrayBuffer[Any]()
@@ -243,12 +236,12 @@ object MinMaxStatistics {
 }
 
 object SampleBasedStatistics {
-  def fromLocalResult2(localResults: Array[StatisticsLocalResult],
-                       fileNames: Array[String]): SampleBasedStatistics = {
+  def fromLocalResult(localResults: Array[StatisticsLocalResult],
+                      fileNames: Array[String]): SampleBasedStatistics = {
     new SampleBasedStatistics(localResults.map(_.rows), fileNames)
   }
-  def buildLocalStatistics2(internalRows: Array[InternalRow],
-                            sampleRate: Double): StatisticsLocalResult = {
+  def buildLocalStatistics(internalRows: Array[InternalRow],
+                           sampleRate: Double): StatisticsLocalResult = {
     StatisticsLocalResult(
       Random.shuffle(internalRows.indices.toList)
         .take((internalRows.length * sampleRate).toInt)
@@ -297,31 +290,15 @@ object Statistics {
     4 + value.getSizeInBytes
   }
 
-  def buildLocalStatistics2(internalRows: Array[InternalRow],
-                            sampleRate: Double): StatisticsLocalResult = {
-    StatisticsLocalResult(
-      Random.shuffle(internalRows.indices.toList)
-      .take((internalRows.length * sampleRate).toInt)
-      .map(internalRows(_)).toArray)
-  }
-
-  def fromLocalResult2(localResults: Array[StatisticsLocalResult],
-                      fileNames: Array[String]): SampleBasedStatistics = {
-    new SampleBasedStatistics(localResults.map(_.rows), fileNames)
-  }
-
   def buildLocalStatstics(schema: StructType,
                           internalRows: Array[InternalRow],
                           stats_id: Int,
                           options: Map[String, String] = null): StatisticsLocalResult = {
     stats_id match {
       case StatsMeta.MINMAX =>
-//        MinMaxStatistics.buildLocalStatistics(internalRows)
-        MinMaxStatistics.buildLocalStatistics1(schema, internalRows)
-//        Statistics.buildLocalStatistics1(schema, internalRows)
+        MinMaxStatistics.buildLocalStatistics(schema, internalRows)
       case StatsMeta.SAMPLE =>
-//        SampleBasedStatistics.buildLocalStatistics(internalRows)
-        SampleBasedStatistics.buildLocalStatistics2(internalRows,
+        SampleBasedStatistics.buildLocalStatistics(internalRows,
           options.getOrElse(Statistics.sampleRate, "0.8").toDouble)
       case _ =>
         throw new Exception("unsupported statistics type")
@@ -332,14 +309,14 @@ object Statistics {
       fileNames: Array[String], stats_type: Int): Statistics = {
     stats_type match {
       case StatsMeta.MINMAX =>
-        MinMaxStatistics.fromLocalResult1(localresults, fileNames)
+        MinMaxStatistics.fromLocalResult(localresults, fileNames)
       case StatsMeta.SAMPLE =>
-//        SampleBasedStatistics.fromLocalResult(localresults, fileNames)
-        SampleBasedStatistics.fromLocalResult2(localresults, fileNames)
+        SampleBasedStatistics.fromLocalResult(localresults, fileNames)
       case _ =>
         throw new Exception("unsupported statistics type")
     }
   }
+
   // logic is complex, needs to be refactored :(
   def rowInSingleInterval(row: InternalRow, interval: RangeInterval,
                           order: BaseOrdering): Boolean = {

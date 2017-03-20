@@ -475,12 +475,10 @@ private[spinach] class DataSourceMetaBuilder {
 
     // build statstics with sparkSession
     if (sparkSession != null && StatsMeta.statsEnable) {
-      println("start building statistics")
       StatsMeta.stats_to_use.foreach(stat => addStatsMeta(new StatsMeta(stat, schema)))
       val statsMetaArray: Array[StatsMeta] = statsMetas.toArray
       StatsMeta.build(sparkSession, statsMetaArray, parentPath, meta)
       meta.withStatsMetas(statsMetaArray)
-      println("hello world " +statsMetaArray.head.statistics)
     }
 
     meta
@@ -636,7 +634,6 @@ private[spinach] object DataSourceMeta {
     // just if the meta file has statsMeta already, we should read them out
     val statsMetas =
       if (statsTypes > 0) {
-        // size map reading error
         val map = readSizeMap(headerOffset - 4 * statsTypes, statsTypes, in)
         val res = readStatsMeta(fileHeader, schema, statsStartOffset, map, in)
         // 4 * statsTypes refers to the length of ids stored as int
