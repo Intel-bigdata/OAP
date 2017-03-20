@@ -129,6 +129,10 @@ private[sql] class SpinachFileFormat extends FileFormat
     // SpinachFileFormat.deserializeDataSourceMeta(hadoopConf) match {
     meta match {
       case Some(m) =>
+        logDebug("Building SpinachDataReader with "
+          + m.dataReaderClassName.substring(m.dataReaderClassName.lastIndexOf(".") + 1)
+          + " ...")
+
         def canTriggerIndex(filter: Filter): Boolean = {
           var attr: String = null
           def checkAttribute(filter: Filter): Boolean = filter match {
@@ -155,6 +159,7 @@ private[sql] class SpinachFileFormat extends FileFormat
         val ic = new IndexContext(m)
 
         if (m.indexMetas.nonEmpty) { // check and use index
+          logDebug("Supported Filters by Spinach:")
           // filter out the "filters" on which we can use the B+ tree index
           val supportFilters = filters.toArray.filter(canTriggerIndex)
           // After filtered, supportFilter only contains:
@@ -162,6 +167,7 @@ private[sql] class SpinachFileFormat extends FileFormat
           // 2. Some atomic predicates, such as LessThan, EqualTo, etc.
           if (supportFilters.nonEmpty) {
             // determine whether we can use B+ tree index
+            supportFilters.foreach(filter => logDebug("\t" + filter.toString))
             ScannerBuilder.build(supportFilters, ic)
           }
         }

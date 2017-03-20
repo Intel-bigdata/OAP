@@ -99,19 +99,39 @@ private[spinach] class SpinachDataReader(
   path: Path,
   meta: DataSourceMeta,
   filterScanner: Option[RangeScanner],
-  requiredIds: Array[Int]) {
+  requiredIds: Array[Int]) extends Logging {
 
   def initialize(conf: Configuration): Iterator[InternalRow] = {
+    logDebug("Initializing SpinachDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
 
+    val start = System.currentTimeMillis()
     filterScanner match {
-      case Some(fs) if fs.existRelatedIndexFile(path, conf) => fs.initialize(path, conf)
+      case Some(fs) if fs.existRelatedIndexFile(path, conf) =>
+        fs.initialize(path, conf)
+        val initFinished = System.currentTimeMillis()
+
         // total Row count can be get from the filter scanner
         val rowIDs = fs.toArray.sorted
-        fileScanner.iterator(conf, requiredIds, rowIDs)
+        val filterFinished = System.currentTimeMillis()
+
+        val iter = fileScanner.iterator(conf, requiredIds, rowIDs)
+        val iteratorFinished = System.currentTimeMillis()
+
+        logDebug("Load Index: " + (initFinished - start) + "ms")
+        logDebug("Filter RowIDs: " + (filterFinished - initFinished) + "ms")
+        logDebug("Construct Iterator: " + (iteratorFinished - filterFinished) + "ms")
+
+        iter
       case _ =>
-        fileScanner.iterator(conf, requiredIds)
+        logDebug("No index file exist for data file: " + path)
+
+        val iter = fileScanner.iterator(conf, requiredIds)
+        val iteratorFinished = System.currentTimeMillis()
+        logDebug("Construct Iterator: " + (iteratorFinished - start) + "ms")
+
+        iter
     }
   }
 }

@@ -20,13 +20,13 @@ package org.apache.spark.sql.execution.datasources.spinach
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.types.StructType
 
-
-private[spinach] class IndexContext(meta: DataSourceMeta) {
+private[spinach] class IndexContext(meta: DataSourceMeta) extends Logging {
   // availableIndexes keeps the available indexes for the current SQL query statement
   // (Int, IndexMeta):
   // if indexType is BloomFilter, then the Int represents the indice of the Index entries;
@@ -42,6 +42,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
 
   def selectAvailableIndex(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]])
   : Unit = {
+    logDebug("Selecting Available Index:")
     var idx = 0
     while (idx < meta.indexMetas.length) {
       meta.indexMetas(idx).indexType match {
@@ -103,6 +104,8 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
       }
       idx += 1
     } // end while
+    availableIndexes.foreach(indices =>
+      logDebug("\t" + indices._2.toString + "; lastIdx: " + indices._1))
   }
 
   /**
@@ -124,6 +127,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
     var bestIndexer: IndexMeta = null
     var ratio: Double = 0.0
     var isFirst = true
+    logDebug("Get Best Index:")
     for ((idx, indexMeta) <- availableIndexes) {
       indexMeta.indexType match {
         case BTreeIndex(entries) =>
@@ -142,12 +146,15 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
       lastIdx = availableIndexes.head._1
       bestIndexer = availableIndexes.head._2
     }
+    logDebug("\t" + bestIndexer.toString + "; lastIdx: " + lastIdx)
     (lastIdx, bestIndexer)
   }
 
   def buildScanner(lastIdx: Int, bestIndexer: IndexMeta, intervalMap:
   mutable.HashMap[String, ArrayBuffer[RangeInterval]]): Unit = {
     //    intervalArray.sortWith(compare)
+    logDebug("Building Index Scanner with IndexMeta and IntervalMap ...")
+
     if (lastIdx == -1 && bestIndexer == null) return
     var keySchema: StructType = null
     bestIndexer.indexType match {
@@ -201,6 +208,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
       case _ =>
     }
 
+    logDebug("Index Scanner Intervals: " + scanner.intervalArray.mkString(", "))
     scanner.withKeySchema(keySchema)
   }
 

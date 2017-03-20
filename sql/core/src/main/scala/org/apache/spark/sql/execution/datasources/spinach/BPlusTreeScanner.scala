@@ -38,6 +38,8 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends RangeScanner
     assert(keySchema ne null)
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
+    logDebug("Loading Index File: " + path)
+    logDebug("\tFile Szie: " + path.getFileSystem(conf).getFileStatus(path).getLen)
     val indexScanner = IndexFiber(IndexFile(path))
     val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
     val root = meta.open(indexData, keySchema)
