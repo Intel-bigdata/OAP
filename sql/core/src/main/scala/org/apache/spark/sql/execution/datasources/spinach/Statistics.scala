@@ -38,7 +38,7 @@ abstract class Statistics extends Serializable {
 
   def write(out: FSDataOutputStream, schema: StructType): Int
 
-  def analyze(fileIndex: Int, ids: Array[Int], schema: StructType,
+  def analyze(fileIndex: Int, ids: Array[Int], Keyschema: StructType,
               intervalArray: Array[RangeInterval]): Double
 }
 
