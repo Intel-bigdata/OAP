@@ -301,7 +301,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sql("create sindex index1 on spinach_test (a)")
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100"), Nil)
     sql("insert into table spinach_test select * from t where key = 100")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100"),
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100"), // not pass during refreshing
       Row(100, "this is test 100") :: Nil)
 
     sql("insert overwrite table parquet_test select * from t where key > 100")

@@ -42,8 +42,7 @@ abstract class Statistics extends Serializable {
               intervalArray: Array[RangeInterval]): Double
 }
 
-class MinMaxStatistics(var content: Array[InternalRow] = null,
-                       var pathName: Array[String] = null) extends Statistics {
+class MinMaxStatistics(var content: Array[InternalRow] = null) extends Statistics {
   private var schema: StructType = _
   @transient private lazy val converter = UnsafeProjection.create(schema)
 
@@ -121,8 +120,7 @@ class MinMaxStatistics(var content: Array[InternalRow] = null,
   }
 }
 
-class SampleBasedStatistics(var content: Array[Array[InternalRow]] = null,
-                            var pathName: Array[String] = null) extends Statistics {
+class SampleBasedStatistics(var content: Array[Array[InternalRow]] = null) extends Statistics {
   private var schema: StructType = _
   @transient private lazy val converter = UnsafeProjection.create(schema)
 
@@ -187,23 +185,21 @@ class SampleBasedStatistics(var content: Array[Array[InternalRow]] = null,
 object MinMaxStatistics {
   def apply(): MinMaxStatistics = new MinMaxStatistics()
 
-  def apply(fileCount: Long, pathName: Array[String] = null): MinMaxStatistics = {
+  def apply(fileCount: Long): MinMaxStatistics = {
     val minMaxStatistics = new MinMaxStatistics()
 
     minMaxStatistics.content = new Array[InternalRow](fileCount.toInt * 2)
-    minMaxStatistics.pathName = pathName
 
     minMaxStatistics
   }
 
-  def fromLocalResult(localResults: Array[StatisticsLocalResult],
-                      fileNames: Array[String]): MinMaxStatistics = {
+  def fromLocalResult(localResults: Array[StatisticsLocalResult]): MinMaxStatistics = {
     val collectResults: Array[InternalRow] = new Array(2 * localResults.length)
     for (i <- localResults.indices) {
       collectResults(i * 2) = localResults(i).rows.head.copy()
       collectResults(i * 2 + 1) = localResults(i).rows.last.copy()
     }
-    new MinMaxStatistics(collectResults, fileNames)
+    new MinMaxStatistics(collectResults)
   }
 
   def buildLocalStatistics(schema: StructType,
@@ -238,9 +234,8 @@ object MinMaxStatistics {
 }
 
 object SampleBasedStatistics {
-  def fromLocalResult(localResults: Array[StatisticsLocalResult],
-                      fileNames: Array[String]): SampleBasedStatistics = {
-    new SampleBasedStatistics(localResults.map(_.rows), fileNames)
+  def fromLocalResult(localResults: Array[StatisticsLocalResult]): SampleBasedStatistics = {
+    new SampleBasedStatistics(localResults.map(_.rows))
   }
   def buildLocalStatistics(internalRows: Array[InternalRow],
                            sampleRate: Double): StatisticsLocalResult = {
@@ -307,13 +302,12 @@ object Statistics {
     }
   }
 
-  def fromLocalResult(localresults: Array[StatisticsLocalResult],
-      fileNames: Array[String], stats_type: Int): Statistics = {
+  def fromLocalResult(localresults: Array[StatisticsLocalResult], stats_type: Int): Statistics = {
     stats_type match {
       case StatsMeta.MINMAX =>
-        MinMaxStatistics.fromLocalResult(localresults, fileNames)
+        MinMaxStatistics.fromLocalResult(localresults)
       case StatsMeta.SAMPLE =>
-        SampleBasedStatistics.fromLocalResult(localresults, fileNames)
+        SampleBasedStatistics.fromLocalResult(localresults)
       case _ =>
         throw new Exception("unsupported statistics type")
     }

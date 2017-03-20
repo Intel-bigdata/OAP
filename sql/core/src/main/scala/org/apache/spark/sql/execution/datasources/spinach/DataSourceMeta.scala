@@ -278,15 +278,9 @@ private[spinach] object StatsMeta {
   def build(sparkSession: SparkSession, statsMetas: Array[StatsMeta],
             parentPath: Path, meta: DataSourceMeta): Unit = {
     val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
-    val fs = parentPath.getFileSystem(hadoopConf)
-    val fileIter = fs.listFiles(parentPath, false)
-    val dataPathString = new Iterator[Path] {
-      override def hasNext: Boolean = fileIter.hasNext
-      override def next(): Path = fileIter.next().getPath
-    }.toSeq.filter(path => !path.getName.startsWith(".") && !path.getName.startsWith("_"))
-      .map(_.toString).toArray
+    val dataPathString = meta.fileMetas.map(fm => new Path(parentPath, fm.dataFileName).toString)
     val metaBroadCast = sparkSession.sparkContext.broadcast(meta)
-    val confBroadCase = sparkSession.sparkContext.broadcast(
+    val confBroadCast = sparkSession.sparkContext.broadcast(
       new SerializableConfiguration(hadoopConf))
     val statsIds = sparkSession.sparkContext.broadcast(statsMetas.map(_.stats_id).toSeq)
 
@@ -294,7 +288,7 @@ private[spinach] object StatsMeta {
       dataPathString.length).map(str => {
       val path = new Path(str)
       val me = metaBroadCast.value
-      val hConf = confBroadCase.value.value
+      val hConf = confBroadCast.value.value
       val reader = new SpinachDataReader(path, me, None, me.schema.indices.toArray)
       val iter = reader.initialize(hConf)
       val internalRows = new ArrayBuffer[InternalRow]()
@@ -310,7 +304,7 @@ private[spinach] object StatsMeta {
 
     for (i <- statsMetas.indices) {
       statsMetas(i).statistics = Statistics.fromLocalResult(
-        local_res.map(_(i)), dataPathString, statsMetas(i).stats_id)
+        local_res.map(_(i)), statsMetas(i).stats_id)
     }
   }
 }
