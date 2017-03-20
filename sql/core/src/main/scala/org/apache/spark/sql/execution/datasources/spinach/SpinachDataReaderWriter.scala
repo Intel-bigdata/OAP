@@ -129,7 +129,8 @@ private[spinach] class SpinachDataReader(
   def AnalyzeFromStatistics(fileIndex: Int, fs: RangeScanner, conf: Configuration): Int = {
     if (!fs.canBeOptimizedByStatistics) {
       StaticsAnalysisResult.USE_INDEX
-    } else if (fs.intervalArray.length == 0 || meta.statsMetas.length == 0) {
+    } else if (fs.intervalArray == null || fs.intervalArray.isEmpty
+      || meta.statsMetas == null || meta.statsMetas.isEmpty) {
       StaticsAnalysisResult.SKIP_INDEX
     } else {
       var resCollect: Double = 0
