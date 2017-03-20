@@ -57,7 +57,8 @@ class MinMaxStatistics(var content: Array[InternalRow] = null,
     val bytesArray = new Array[Byte](fullSize - 4)
 
     val startPos = in.getPos
-    in.readFully(startPos, bytesArray)
+    in.readFully(startPos, bytesArray) // seek needed after readFully
+    in.seek(startPos + bytesArray.length)
     var offset = 0
 
     for (i <- content.indices) {
@@ -139,7 +140,9 @@ class SampleBasedStatistics(var content: Array[Array[InternalRow]] = null,
     }
 
     val bytesArray = new Array[Byte](fullSize - 4 - 4 * content_len)
-    in.readFully(in.getPos, bytesArray)
+    val start_offset = in.getPos
+    in.readFully(start_offset, bytesArray)
+    in.seek(start_offset + bytesArray.size) // seek needed after readFully
     var offset = 0L
 
     for (i <- content.indices) {
