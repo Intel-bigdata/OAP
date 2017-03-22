@@ -325,7 +325,7 @@ private[spinach] case class DataSourceMeta(
            attr = attrRef.name
            bTreeSet.contains(attr) || bitmapSet.contains(attr)
          } else false
-       case _ => true
+       case _ => false
      }
 
      checkAttribute(exp)
