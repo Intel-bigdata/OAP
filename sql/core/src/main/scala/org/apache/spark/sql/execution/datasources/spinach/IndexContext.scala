@@ -153,7 +153,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
     bestIndexer.indexType match {
       case BTreeIndex(entries) if entries.length == 1 =>
         keySchema = new StructType().add(meta.schema(entries(lastIdx).ordinal))
-        scanner = new RangeScanner(bestIndexer)
+        scanner = new BPlusTreeScanner(bestIndexer)
         val attribute = meta.schema(entries(lastIdx).ordinal).name
         val filterOptimizer = unapply(attribute).get
         scanner.intervalArray =
@@ -162,7 +162,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
         val indexFields = for (idx <- entries.map(_.ordinal)) yield meta.schema(idx)
         val fields = indexFields.slice(0, lastIdx + 1)
         keySchema = StructType(fields)
-        scanner = new RangeScanner(bestIndexer)
+        scanner = new BPlusTreeScanner(bestIndexer)
         val attributes = fields.map(_.name) // get column names in the composite index
         scanner.intervalArray = new ArrayBuffer[RangeInterval](intervalMap(attributes.last).length)
 

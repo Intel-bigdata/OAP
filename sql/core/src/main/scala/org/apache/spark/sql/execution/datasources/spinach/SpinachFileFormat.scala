@@ -162,7 +162,7 @@ private[sql] class SpinachFileFormat extends FileFormat
           // 2. Some atomic predicates, such as LessThan, EqualTo, etc.
           if (supportFilters.nonEmpty) {
             // determine whether we can use B+ tree index
-            BPlusTreeSearch.build(supportFilters, ic)
+            ScannerBuilder.build(supportFilters, ic)
           }
         }
 //        val filterScanner = ic.getScannerBuilder.map(_.build)

@@ -94,10 +94,10 @@ private[spinach] class BPlusTreeMultiColumnSearchSuite
                              expectedUnHandleredFilter: Array[Filter],
                              expectedIds: Set[Int]): Unit = {
     val ic = new IndexContext(meta)
-    val unHandledFilters = BPlusTreeSearch.build(filters, ic)
+    val unHandledFilters = ScannerBuilder.build(filters, ic)
     assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
     ic.getScanner match {
-      case Some(scanner) =>
+      case Some(scanner: BPlusTreeScanner) =>
         assert(scanner._init(
           BPlusTreeMultiColumnSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")
