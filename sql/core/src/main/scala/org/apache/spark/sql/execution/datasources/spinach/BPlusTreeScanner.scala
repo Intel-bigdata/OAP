@@ -100,22 +100,22 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends RangeScanner
   }
 
   /**
-    * search the key that equals to candidate in the IndexNode of B+ tree
-    * @param node: the node where binary search is executed
-    * @param candidate: the candidate key
-    * @param findFirst: indicates whether the goal is to find the
-    *                  first appeared key that equals to candidate
-    * @param order: the ordering that used to compare two keys
-    * @return the CurrentKey object that points to the target key
-    * findFirst == true -> find the first appeared key that equals to candidate, this is used
-    * to determine the start key that begins the scan.
-    * In this case, the first identical key(if found) or
-    * the first key greater than the specified one on the right(if not found) is returned;
-    * findFirst == false -> find the last appeared key that equals to candidate, this is used
-    * to determine the end key that terminates the scan.
-    * In this case, the last identical key(if found) or
-    * the last key less than the specified one on the left(if not found) is returned.
-    */
+   * search the key that equals to candidate in the IndexNode of B+ tree
+   * @param node: the node where binary search is executed
+   * @param candidate: the candidate key
+   * @param findFirst: indicates whether the goal is to find the
+   *                  first appeared key that equals to candidate
+   * @param order: the ordering that used to compare two keys
+   * @return the CurrentKey object that points to the target key
+   * findFirst == true -> find the first appeared key that equals to candidate, this is used
+   * to determine the start key that begins the scan.
+   * In this case, the first identical key(if found) or
+   * the first key greater than the specified one on the right(if not found) is returned;
+   * findFirst == false -> find the last appeared key that equals to candidate, this is used
+   * to determine the end key that terminates the scan.
+   * In this case, the last identical key(if found) or
+   * the last key less than the specified one on the left(if not found) is returned.
+   */
   protected def moveTo(node: IndexNode, candidate: Key, findFirst: Boolean, order: Ordering[Key])
   : CurrentKey = {
     var s = 0
