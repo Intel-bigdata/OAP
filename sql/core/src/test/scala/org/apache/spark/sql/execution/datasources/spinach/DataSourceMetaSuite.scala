@@ -371,10 +371,8 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     hashSetList.append(bloomIndexAttrSet)
     hashSetList.append(bitmapIndexAttrSet)
 
-    // This is identical to query "select * from t where b == 1"
-    val isNotNull = Seq(IsNotNull(AttributeReference("b", IntegerType)()),
-      EqualTo(AttributeReference("b", IntegerType)(), Literal(1)))
-
+    // Query "select * from t where b == 1" will generate IsNotNull expr which is unsupportted
+    val isNotNull = Seq(IsNotNull(AttributeReference("b", IntegerType)()))
     val eq = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)))
     val eq2 = Seq(EqualTo(AttributeReference("b", IntegerType)(), Literal(1)))
     val lt = Seq(LessThan(AttributeReference("a", IntegerType)(), Literal(1)))
