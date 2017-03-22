@@ -130,7 +130,6 @@ private[sql] class SpinachFileFormat extends FileFormat
         BPlusTreeSearch.build(filters.toArray, ic)
         val filterScanner = ic.getScannerBuilder.map(_.build)
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
-
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 

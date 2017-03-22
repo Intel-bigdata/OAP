@@ -142,14 +142,8 @@ class MinMaxStatistics extends Statistics {
 
 }
 
-class SampleBasedStatistics extends Statistics {
+class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
   override val id: Int = 1
-
-  private var sampleRate = 0.1
-
-  def setSampleRate(rate: Double): Unit = {
-    sampleRate = rate
-  }
 
   // for SampleBasedStatistics, input keys should be the whole file
   // instead of uniqueKeys, can be refactor later
@@ -346,6 +340,9 @@ class PartedByValueStatistics extends Statistics {
 
 object Statistics {
   val thresName = "spn_fsthreshold"
+
+  val Statistics_Type_Name = "spark.sql.spinach.StatisticsType"
+  val Sample_Based_SampleRate = "spark.sql.spinach.Statistics.sampleRate"
 
   def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
     val row = UnsafeRangeNode.row.get
