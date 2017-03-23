@@ -28,7 +28,7 @@ import org.apache.spark.sql.types.StructType
 // we scan the index from the smallest to the largest,
 // this will scan the B+ Tree (index) leaf node.
 private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends RangeScanner(idxMeta) {
-  override def toString(): String = "RangeScanner"
+  override def toString(): String = "BPlusTreeScanner"
   //  @transient protected var currentKey: CurrentKey = _
   @transient protected var currentKeyArray: Array[CurrentKey] = _
 
