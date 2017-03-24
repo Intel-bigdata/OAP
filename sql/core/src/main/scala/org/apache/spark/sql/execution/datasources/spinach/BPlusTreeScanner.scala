@@ -27,14 +27,14 @@ import org.apache.spark.sql.types.StructType
 
 // we scan the index from the smallest to the largest,
 // this will scan the B+ Tree (index) leaf node.
-private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends RangeScanner(idxMeta) {
+private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
   override def toString(): String = "BPlusTreeScanner"
   //  @transient protected var currentKey: CurrentKey = _
   @transient protected var currentKeyArray: Array[CurrentKey] = _
 
   var currentKeyIdx = 0
 
-  def initialize(dataPath: Path, conf: Configuration): RangeScanner = {
+  def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
@@ -45,7 +45,7 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends RangeScanner
     _init(root)
   }
 
-  def _init(root : IndexNode): RangeScanner = {
+  def _init(root : IndexNode): IndexScanner = {
     assert(intervalArray ne null, "intervalArray is null!")
     this.ordering = GenerateOrdering.create(keySchema)
     currentKeyArray = new Array[CurrentKey](intervalArray.length)
@@ -53,7 +53,7 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends RangeScanner
     intervalArray.zipWithIndex.foreach {
       case(interval: RangeInterval, i: Int) =>
         var order: Ordering[Key] = null
-        if (interval.start == RangeScanner.DUMMY_KEY_START) {
+        if (interval.start == IndexScanner.DUMMY_KEY_START) {
           // find the first key in the left-most leaf node
           var tmpNode = root
           while (!tmpNode.isLeaf) tmpNode = tmpNode.childAt(0)
@@ -73,7 +73,7 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends RangeScanner
         }
         // process the LeftOpen condition
         while (!interval.startInclude &&
-          currentKeyArray(i).currentKey != RangeScanner.DUMMY_KEY_END &&
+          currentKeyArray(i).currentKey != IndexScanner.DUMMY_KEY_END &&
           ordering.compare(interval.start, currentKeyArray(i).currentKey) == 0) {
           // find exactly the key, since it's LeftOpen, skip the equivalent key(s)
           currentKeyArray(i).moveNextKey
@@ -84,7 +84,7 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends RangeScanner
 
   // i: the interval index
   def intervalShouldStop(i: Int): Boolean = { // detect if we need to stop scanning
-    if (intervalArray(i).end == RangeScanner.DUMMY_KEY_END) { // Left-Only search
+    if (intervalArray(i).end == IndexScanner.DUMMY_KEY_END) { // Left-Only search
       return false
     }
     if (intervalArray(i).endInclude) { // RightClose

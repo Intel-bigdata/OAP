@@ -141,7 +141,7 @@ private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
   }
 
   def currentKey: Key = if (currentKeyIdx == CurrentKey.INVALID_KEY_INDEX) {
-    RangeScanner.DUMMY_KEY_END
+    IndexScanner.DUMMY_KEY_END
   } else {
     currentNode.keyAt(currentKeyIdx)
   }
@@ -173,7 +173,7 @@ private[spinach] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int) {
     }
   }
 
-  def isEnd: Boolean = currentNode == null || (currentKey == RangeScanner.DUMMY_KEY_END)
+  def isEnd: Boolean = currentNode == null || (currentKey == IndexScanner.DUMMY_KEY_END)
 }
 
 private [spinach] class RangeInterval(s: Key, e: Key, includeStart: Boolean, includeEnd: Boolean)

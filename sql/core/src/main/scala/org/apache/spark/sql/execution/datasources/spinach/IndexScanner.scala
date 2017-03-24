@@ -30,12 +30,12 @@ import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
 
 
-private[spinach] object RangeScanner {
+private[spinach] object IndexScanner {
   val DUMMY_KEY_START: Key = InternalRow(Array[Any](): _*) // we compare the ref not the value
   val DUMMY_KEY_END: Key = InternalRow(Array[Any](): _*) // we compare the ref not the value
 }
 
-private[spinach] abstract class RangeScanner(idxMeta: IndexMeta)
+private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
   extends Iterator[Long] with Serializable {
   @transient protected var ordering: Ordering[Key] = _
   var intervalArray: ArrayBuffer[RangeInterval] = _
@@ -48,19 +48,19 @@ private[spinach] abstract class RangeScanner(idxMeta: IndexMeta)
     path.getFileSystem(conf).exists(path)
   }
 
-  def withKeySchema(schema: StructType): RangeScanner = {
+  def withKeySchema(schema: StructType): IndexScanner = {
     this.keySchema = schema
     this
   }
 
-  def initialize(dataPath: Path, conf: Configuration): RangeScanner
+  def initialize(dataPath: Path, conf: Configuration): IndexScanner
 }
 
 // A dummy scanner will actually not do any scanning
-private[spinach] object DUMMY_SCANNER extends RangeScanner(null) {
+private[spinach] object DUMMY_SCANNER extends IndexScanner(null) {
   //  override def shouldStop(key: CurrentKey): Boolean = true
 //  override def intervalShouldStop(i: Int): Boolean = true
-  override def initialize(path: Path, configuration: Configuration): RangeScanner = { this }
+  override def initialize(path: Path, configuration: Configuration): IndexScanner = { this }
   override def hasNext: Boolean = false
   override def next(): Long = throw new NoSuchElementException("end of iterating.")
   //  override def withNewStart(key: Key, include: Boolean): RangeScanner = this
@@ -118,16 +118,16 @@ private[spinach] object ScannerBuilder extends Logging {
         val ranger = new RangeInterval(key, key, true, true)
         scala.collection.mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case GreaterThanOrEqual(attribute, ic(key)) =>
-        val ranger = new RangeInterval(key, RangeScanner.DUMMY_KEY_END, true, true)
+        val ranger = new RangeInterval(key, IndexScanner.DUMMY_KEY_END, true, true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case GreaterThan(attribute, ic(key)) =>
-        val ranger = new RangeInterval(key, RangeScanner.DUMMY_KEY_END, false, true)
+        val ranger = new RangeInterval(key, IndexScanner.DUMMY_KEY_END, false, true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case LessThanOrEqual(attribute, ic(key)) =>
-        val ranger = new RangeInterval(RangeScanner.DUMMY_KEY_START, key, true, true)
+        val ranger = new RangeInterval(IndexScanner.DUMMY_KEY_START, key, true, true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case LessThan(attribute, ic(key)) =>
-        val ranger = new RangeInterval(RangeScanner.DUMMY_KEY_START, key, true, false)
+        val ranger = new RangeInterval(IndexScanner.DUMMY_KEY_START, key, true, false)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case _ => null
     }

@@ -30,7 +30,7 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.collection.BitSet
 
 
-private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends RangeScanner(idxMeta) {
+private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
 
   @transient var internalItr: Iterator[Int] = Iterator[Int]()
   var empty: Boolean = _
@@ -40,7 +40,7 @@ private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends RangeScann
 
   override def next(): Long = internalItr.next().toLong
 
-  override def initialize(dataPath: Path, conf: Configuration): RangeScanner = {
+  override def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
     val indexScanner = IndexFiber(IndexFile(path))
@@ -66,7 +66,7 @@ private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends RangeScann
     // get sorted key list and generate final bitset
     val sortedKeyList = hashMap.keySet.toList.sorted(this.ordering)
     val bitMapArray = intervalArray.flatMap(range => {
-      val startIdx = if (range.start == RangeScanner.DUMMY_KEY_START) {
+      val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
         // diff from which startIdx not found, so here startIdx = -2
         -2
       } else {
@@ -77,7 +77,7 @@ private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends RangeScann
           sortedKeyList.indexWhere(ordering.compare(range.start, _) < 0)
         }
       }
-      val endIdx = if (range.end == RangeScanner.DUMMY_KEY_END) {
+      val endIdx = if (range.end == IndexScanner.DUMMY_KEY_END) {
         sortedKeyList.size
       } else {
         // find last key which <= end key, can't find return -1

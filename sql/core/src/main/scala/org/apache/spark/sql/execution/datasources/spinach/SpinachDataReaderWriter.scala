@@ -96,10 +96,10 @@ private[spinach] class SpinachDataWriter(
 }
 
 private[spinach] class SpinachDataReader(
-  path: Path,
-  meta: DataSourceMeta,
-  filterScanner: Option[RangeScanner],
-  requiredIds: Array[Int]) {
+                                          path: Path,
+                                          meta: DataSourceMeta,
+                                          filterScanner: Option[IndexScanner],
+                                          requiredIds: Array[Int]) {
 
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     // TODO how to save the additional FS operation to get the Split size

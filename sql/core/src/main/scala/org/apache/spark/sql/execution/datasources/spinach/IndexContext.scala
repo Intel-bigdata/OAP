@@ -36,9 +36,9 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
   // then the Int represents the last matched column indice of the Index entries
   private val availableIndexes = new mutable.ArrayBuffer[(Int, IndexMeta)]()
   private val filterMap = new mutable.HashMap[String, FilterOptimizer]()
-  private var scanner: RangeScanner = _
+  private var scanner: IndexScanner = _
 
-  def getScanner: Option[RangeScanner] = Option(scanner)
+  def getScanner: Option[IndexScanner] = Option(scanner)
 
   def selectAvailableIndex(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]])
   : Unit = {
@@ -61,8 +61,8 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
               val start = intervalMap(attribute).head.start
               val end = intervalMap(attribute).head.end
               val ordering = unapply(attribute).get.order
-              if(start != RangeScanner.DUMMY_KEY_START &&
-                end != RangeScanner.DUMMY_KEY_END &&
+              if(start != IndexScanner.DUMMY_KEY_START &&
+                end != IndexScanner.DUMMY_KEY_END &&
                 ordering.compare(start, end) == 0) {num += 1} else flag = 1
             }
             else {
@@ -86,8 +86,8 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
               val ordering = unapply(attrName).get.order
               val start = intervalMap(attrName).head.start
               val end = intervalMap(attrName).head.end
-              if(start != RangeScanner.DUMMY_KEY_START &&
-                end != RangeScanner.DUMMY_KEY_END && ordering.compare(start, end) == 0) {
+              if(start != IndexScanner.DUMMY_KEY_START &&
+                end != IndexScanner.DUMMY_KEY_END && ordering.compare(start, end) == 0) {
                 availableIndexes.append((entries.indexOf(entry), meta.indexMetas(idx)))
                 flag = false
               }
@@ -218,7 +218,7 @@ private[spinach] class IndexContext(meta: DataSourceMeta) {
 }
 
 private[spinach] object DummyIndexContext extends IndexContext(null) {
-  override def getScanner: Option[RangeScanner] = None
+  override def getScanner: Option[IndexScanner] = None
   override def unapply(attribute: String): Option[FilterOptimizer] = None
   override def unapply(value: Any): Option[Key] = None
 }
@@ -228,11 +228,11 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
 
   // compare two intervals
   def compareRangeInterval(interval1: RangeInterval, interval2: RangeInterval): Boolean = {
-    if ((interval1.start eq RangeScanner.DUMMY_KEY_START) &&
-      (interval2.start ne RangeScanner.DUMMY_KEY_START)) {
+    if ((interval1.start eq IndexScanner.DUMMY_KEY_START) &&
+      (interval2.start ne IndexScanner.DUMMY_KEY_START)) {
       return true
     }
-    if(interval2.start eq RangeScanner.DUMMY_KEY_START) {
+    if(interval2.start eq IndexScanner.DUMMY_KEY_START) {
       return false
     }
     order.compare(interval1.start, interval2.start) < 0
@@ -241,7 +241,7 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
   // return: if two intervals is unioned
   def intervalUnion(base: RangeInterval, extra: RangeInterval): Boolean = {
     def union: Boolean = {// union two intervals
-      if ((extra.end eq RangeScanner.DUMMY_KEY_END) || order.compare(extra.end, base.end)>0) {
+      if ((extra.end eq IndexScanner.DUMMY_KEY_END) || order.compare(extra.end, base.end)>0) {
         base.end = extra.end
         base.endInclude = extra.endInclude
         return true
@@ -252,11 +252,11 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
       true
     }// end def union
 
-    if (base.start eq RangeScanner.DUMMY_KEY_START) {
-      if (base.end eq RangeScanner.DUMMY_KEY_END) {
+    if (base.start eq IndexScanner.DUMMY_KEY_START) {
+      if (base.end eq IndexScanner.DUMMY_KEY_END) {
         return true
       }
-      if (extra.start ne RangeScanner.DUMMY_KEY_START) {
+      if (extra.start ne IndexScanner.DUMMY_KEY_START) {
         val cmp = order.compare(extra.start, base.end)
         if(cmp>0 || (cmp == 0 && !extra.startInclude && !base.endInclude)) {
           return false // cannot union
@@ -269,7 +269,7 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
       if (order.compare(extra.start, base.start)==0) {
         base.startInclude = base.startInclude || extra.startInclude
       }
-      if (base.end eq RangeScanner.DUMMY_KEY_END) {
+      if (base.end eq IndexScanner.DUMMY_KEY_END) {
         return true
       }
       val cmp = order.compare(extra.start, base.end)
@@ -294,7 +294,7 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
     val result = ArrayBuffer(sortedArray.head)
     for(i <- 1 until sortedArray.length) {
       val interval = result.last
-      if ((interval.end eq RangeScanner.DUMMY_KEY_END) && interval.startInclude) {
+      if ((interval.end eq IndexScanner.DUMMY_KEY_END) && interval.startInclude) {
         return result
       }
       if(!intervalUnion(interval, sortedArray(i))) {
@@ -308,11 +308,11 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
   // merge two key and their include identifiers
   def intersect(key1: Key, key2: Key, include1: Boolean, include2: Boolean,
                 isEndKey: Boolean): (Key, Boolean) = {
-    if (key1 == RangeScanner.DUMMY_KEY_START) {
+    if (key1 == IndexScanner.DUMMY_KEY_START) {
       (key2, include2)
     }
     else {
-      if (key2 == RangeScanner.DUMMY_KEY_START) {
+      if (key2 == IndexScanner.DUMMY_KEY_START) {
         (key1, include1)
       }
       else { // both key1 and key2 are not Dummy
@@ -331,8 +331,8 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
 
   // verify non-empty intervals
   def validate(interval: RangeInterval): Boolean = {
-    if ((interval.start ne RangeScanner.DUMMY_KEY_START)
-      && (interval.end ne RangeScanner.DUMMY_KEY_END)) {
+    if ((interval.start ne IndexScanner.DUMMY_KEY_START)
+      && (interval.end ne IndexScanner.DUMMY_KEY_END)) {
       if (order.compare(interval.start, interval.end)>0) {
         return false
       }
@@ -352,7 +352,7 @@ private[spinach] class FilterOptimizer(keySchema: StructType) {
       interval2 <- intervalArray2
     } yield {
       val interval = new RangeInterval(
-        RangeScanner.DUMMY_KEY_START, RangeScanner.DUMMY_KEY_END, true, true)
+        IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END, true, true)
 
       val re1 = intersect(interval1.start, interval2.start,
         interval1.startInclude, interval2.startInclude, false)
