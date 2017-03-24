@@ -64,24 +64,34 @@ import org.apache.spark.sql.types._
 
 private[spinach] trait IndexType
 
-private[spinach] case class BTreeIndexEntry(ordinal: Int, dir: SortDirection = Ascending)
+private[spinach] case class BTreeIndexEntry(ordinal: Int, dir: SortDirection = Ascending) {
+  override def toString: String = ordinal + " " + (if (dir == Ascending) "ASC" else "DESC")
+}
 
 private[spinach] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends IndexType {
   def appendEntry(entry: BTreeIndexEntry): BTreeIndex = BTreeIndex(entries :+ entry)
+
+  override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BTREE"
 }
 
 private[spinach] case class BloomFilterIndex(entries: Seq[Int] = Nil)
   extends IndexType {
   def appendEntry(entry: Int): BloomFilterIndex =
     BloomFilterIndex(entries :+ entry)
+
+  override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BLOOM"
 }
 
 private[spinach] case class BitMapIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): BitMapIndex = BitMapIndex(entries :+ entry)
+
+  override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BITMAP"
 }
 
 private[spinach] case class HashIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): HashIndex = HashIndex(entries :+ entry)
+
+  override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BITMAP"
 }
 
 private[spinach] class FileMeta {
@@ -124,6 +134,8 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
     extends Serializable {
   import DataSourceMeta._
   import IndexMeta._
+
+  override def toString: String = name + ": " + indexType
 
   def open(data: IndexFiberCacheData, keySchema: StructType): IndexNode = {
     UnsafeIndexNode(DataFiberCache(data.fiberData), data.rootOffset, data.dataEnd, keySchema)

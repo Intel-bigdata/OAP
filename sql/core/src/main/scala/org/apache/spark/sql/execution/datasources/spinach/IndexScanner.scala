@@ -35,8 +35,9 @@ private[spinach] object IndexScanner {
   val DUMMY_KEY_END: Key = InternalRow(Array[Any](): _*) // we compare the ref not the value
 }
 
+
 private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
-  extends Iterator[Long] with Serializable {
+  extends Iterator[Long] with Serializable with Logging{
   @transient protected var ordering: Ordering[Key] = _
   var intervalArray: ArrayBuffer[RangeInterval] = _
   protected var keySchema: StructType = _
@@ -149,6 +150,7 @@ private[spinach] object ScannerBuilder extends Logging {
 
   def build(filters: Array[Filter], ic: IndexContext): Array[Filter] = {
     if (filters == null || filters.isEmpty) return filters
+    logDebug("Transform filters into Intervals:")
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
     // reduce multiple hashMap to one hashMap(AND operation)
     val intervalMap = intervalMapArray.reduce(
@@ -181,6 +183,9 @@ private[spinach] object ScannerBuilder extends Logging {
     )
 
     if (intervalMap != null) {
+      intervalMap.foreach(intervals =>
+        logDebug("\t" + intervals._1 + ": " + intervals._2.mkString(" - ")))
+
       ic.selectAvailableIndex(intervalMap)
       val (num, idxMeta) = ic.getBestIndexer(intervalMap.size)
       ic.buildScanner(num, idxMeta, intervalMap)
