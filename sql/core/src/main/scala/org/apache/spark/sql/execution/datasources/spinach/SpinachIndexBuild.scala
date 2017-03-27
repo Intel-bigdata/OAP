@@ -163,22 +163,23 @@ private[spinach] case class SpinachIndexBuild(
             val treeOffset = writeTreeToOut(treeShape, fileOut, offsetMap,
               fileOffset, uniqueKeysList, keySchema, 0, -1L)
 
-            // TODO add `StatisticsManager` to manage Statistics information
-            val stTypes = hadoopConf.getStrings(Statistics.Statistics_Type_Name).head.split(",")
-            stTypes.foreach(stType => {
-              val t = stType.trim
-              if (t.length > 0) {
-                val st = t match {
-                  case "0" => new MinMaxStatistics
-                  case "1" => new SampleBasedStatistics(
-                    hadoopConf.get(Statistics.Sample_Based_SampleRate).toDouble)
-                  case "2" => new PartedByValueStatistics
-                  case _ =>
-                    throw new UnsupportedOperationException(s"non-supported statistic in id $t")
+            val stTypes = hadoopConf.getStrings(Statistics.Statistics_Type_Name)
+            if (stTypes != null && stTypes.length > 0) {
+              stTypes.foreach(stType => {
+                val t = stType.trim
+                if (t.length > 0) {
+                  val st = t match {
+                    case "0" => new MinMaxStatistics
+                    case "1" => new SampleBasedStatistics(
+                      hadoopConf.get(Statistics.Sample_Based_SampleRate).toDouble)
+                    case "2" => new PartedByValueStatistics
+                    case _ =>
+                      throw new UnsupportedOperationException(s"non-supported statistic in id $t")
+                  }
+                  st.write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
                 }
-                st.write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
-              }
-            })
+              })
+            }
 
             assert(uniqueKeysList.size == 1)
             IndexUtils.writeLong(fileOut, dataEnd + treeOffset._1)
