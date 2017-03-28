@@ -15,25 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.io
 
 import java.util.{Map => JMap}
 
+import scala.collection.JavaConverters._
+
 import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.hadoop.api.{InitContext, ReadSupport}
+import org.apache.parquet.hadoop.api.{InitContext, ReadSupport, SpinachReadSupport}
 import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
-import org.apache.parquet.hadoop.api.SpinachReadSupport
 import org.apache.parquet.hadoop.api.SpinachReadSupport.SpinachReadContext
 import org.apache.parquet.io.api.RecordMaterializer
 import org.apache.parquet.schema._
-import scala.collection.JavaConverters._
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportHelper, UnsafeRowParquetRecordMaterializer}
 import org.apache.spark.sql.types._
-
 
 
 /**

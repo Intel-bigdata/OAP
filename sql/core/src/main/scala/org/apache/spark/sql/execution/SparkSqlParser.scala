@@ -32,6 +32,8 @@ import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, OneRowRelation,
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.{CreateTempViewUsing, _}
 import org.apache.spark.sql.execution.datasources.spinach._
+import org.apache.spark.sql.execution.datasources.spinach.ddl.{CreateIndex, DropIndex, RefreshIndex, SpinachShowIndex}
+import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.internal.{HiveSerDe, SQLConf, VariableSubstitution}
 import org.apache.spark.sql.types.DataType
 

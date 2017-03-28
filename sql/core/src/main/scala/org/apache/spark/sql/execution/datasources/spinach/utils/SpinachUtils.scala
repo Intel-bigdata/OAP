@@ -21,7 +21,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.execution.datasources.{FileCatalog, Partition}
-import org.apache.spark.sql.execution.datasources.spinach.{DataSourceMeta, SpinachFileFormat}
+import org.apache.spark.sql.execution.datasources.spinach.DataSourceMeta
+import org.apache.spark.sql.execution.datasources.spinach.io.SpinachFileFormat
+
 
 /**
  * Utils for Spinach

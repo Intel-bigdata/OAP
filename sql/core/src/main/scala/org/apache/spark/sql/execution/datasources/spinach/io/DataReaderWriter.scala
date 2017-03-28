@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.io
 
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 
@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.MutableRow
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
+
 
 private[spinach] abstract class DataReaderWriter(val cardinal: Int) {
   def write(out: FSDataOutputStream, row: InternalRow): Unit = {

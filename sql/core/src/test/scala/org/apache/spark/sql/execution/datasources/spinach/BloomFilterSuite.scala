@@ -17,6 +17,7 @@
 package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.spark.SparkFunSuite
+import org.apache.spark.sql.execution.datasources.spinach.index.BloomFilter
 
 /**
  * Bloom filter test suit

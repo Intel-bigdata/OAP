@@ -15,13 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.spinach.DataSourceMeta
+import org.apache.spark.sql.execution.datasources.spinach.cache.DataFiberBuilder
+import org.apache.spark.sql.execution.datasources.spinach.index.IndexScanner
 import org.apache.spark.sql.types.StructType
 
 private[spinach] class SpinachDataWriter(

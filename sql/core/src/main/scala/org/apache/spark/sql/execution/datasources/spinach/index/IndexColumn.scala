@@ -15,20 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.index
 
-sealed abstract class AnyIndexType {
-  def toString: String
+/**
+ * Identify a column for index definition, including column name and order
+ */
+private[sql] case class IndexColumn(columnName: String, isAscending: Boolean) {
+  override def toString: String = quotedString
+
+  def quotedString: String = s"`$columnName` ${if (isAscending) "ASC" else "DESC"}"
+
+  def unquotedString: String = s"$columnName ${if (isAscending) "ASC" else "DESC"}"
 }
 
-case object BTreeIndexType extends AnyIndexType {
-  override def toString: String = "BTREE"
-}
-
-case object BloomFilterIndexType extends AnyIndexType {
-  override def toString: String = "BLOOM"
-}
-
-case object BitMapIndexType extends AnyIndexType {
-  override def toString: String = "BITMAP"
+private[sql] object IndexColumn {
+  def apply(columnName: String, order: String): IndexColumn = order match {
+    case "ASC" => new IndexColumn(columnName, true)
+    case "DESC" => new IndexColumn(columnName, false)
+  }
 }

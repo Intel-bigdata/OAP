@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.index
 
 import java.io.{ByteArrayOutputStream, ObjectOutputStream}
 import java.util.Comparator
@@ -30,10 +30,13 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
+import org.apache.spark.sql.execution.datasources.spinach.io.SpinachDataReader
+import org.apache.spark.sql.execution.datasources.spinach.utils._
+import org.apache.spark.sql.execution.datasources.spinach.DataSourceMetaBuilder
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.util.collection.BitSet
+
 
 private[spinach] case class SpinachIndexBuild(
     @transient sparkSession: SparkSession,

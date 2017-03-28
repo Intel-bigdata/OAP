@@ -31,7 +31,7 @@ import org.apache.spark.sql.execution.DataSourceScanExec
 import org.apache.spark.sql.execution.DataSourceScanExec.{INPUT_PATHS, PUSHED_FILTERS}
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.execution.datasources.spinach.SpinachFileFormat
+import org.apache.spark.sql.execution.datasources.spinach.io.SpinachFileFormat
 import org.apache.spark.sql.internal.SQLConf
 
 /**
