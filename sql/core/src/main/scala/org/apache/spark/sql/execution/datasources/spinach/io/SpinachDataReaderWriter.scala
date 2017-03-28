@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.DataSourceMeta
-import org.apache.spark.sql.execution.datasources.spinach.cache.DataFiberBuilder
+import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.spinach.index.IndexScanner
 import org.apache.spark.sql.types.StructType
 

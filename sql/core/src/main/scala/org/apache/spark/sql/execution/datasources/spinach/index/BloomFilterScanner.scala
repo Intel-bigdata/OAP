@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach._
-import org.apache.spark.sql.execution.datasources.spinach.cache._
+import org.apache.spark.sql.execution.datasources.spinach.filecache._
 import org.apache.spark.sql.execution.datasources.spinach.io.IndexFile
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.unsafe.Platform

@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.spinach
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
-import org.apache.spark.sql.execution.datasources.spinach.cache.DataFiberCache
+import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberCache
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}

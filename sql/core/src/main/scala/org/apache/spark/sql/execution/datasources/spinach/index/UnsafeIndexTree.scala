@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.spinach.index
 
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.spinach._
-import org.apache.spark.sql.execution.datasources.spinach.cache.DataFiberCache
+import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberCache
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 

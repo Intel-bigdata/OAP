@@ -24,7 +24,7 @@ import org.apache.hadoop.fs.FSDataInputStream
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.SpinachException
-import org.apache.spark.sql.execution.datasources.spinach.cache.DataFiberCache
+import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberCache
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
 

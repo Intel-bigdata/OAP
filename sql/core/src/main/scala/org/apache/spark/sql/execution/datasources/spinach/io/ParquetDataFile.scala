@@ -27,7 +27,7 @@ import org.apache.parquet.hadoop.SpinachRecordReader
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
-import org.apache.spark.sql.execution.datasources.spinach.cache.DataFiberCache
+import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberCache
 import org.apache.spark.sql.types.StructType
 
 private[spinach] case class ParquetDataFile(path: String, schema: StructType) extends DataFile {
