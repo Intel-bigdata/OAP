@@ -1,4 +1,4 @@
-org.apache.spark.sql.execution.datasources.spinach.io.SpinachFileFormat
+org.apache.spark.sql.execution.datasources.spinach.SpinachFileFormat
 org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
 org.apache.spark.sql.execution.datasources.jdbc.JdbcRelationProvider
 org.apache.spark.sql.execution.datasources.json.JsonFileFormat

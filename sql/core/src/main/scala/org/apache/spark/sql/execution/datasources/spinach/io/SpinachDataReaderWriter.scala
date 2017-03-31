@@ -27,6 +27,7 @@ import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberBui
 import org.apache.spark.sql.execution.datasources.spinach.index.IndexScanner
 import org.apache.spark.sql.types.StructType
 
+
 private[spinach] class SpinachDataWriter(
     isCompressed: Boolean,
     out: FSDataOutputStream,

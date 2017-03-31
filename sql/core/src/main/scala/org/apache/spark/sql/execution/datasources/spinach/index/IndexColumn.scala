@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.index
 
+
 /**
  * Identify a column for index definition, including column name and order
  */

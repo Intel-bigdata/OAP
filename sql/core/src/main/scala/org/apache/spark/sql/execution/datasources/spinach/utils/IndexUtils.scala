@@ -21,7 +21,7 @@ import java.io.OutputStream
 
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql.execution.datasources.spinach.io.SpinachFileFormat
+import org.apache.spark.sql.execution.datasources.spinach.SpinachFileFormat
 
 
 /**

@@ -34,6 +34,7 @@ import org.apache.parquet.schema.MessageTypeParser.parseMessageType
 import org.apache.spark.sql.execution.datasources.spinach.io.ParquetDataFile
 import org.apache.spark.sql.types.StructType
 
+
 class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
   with org.scalatest.BeforeAndAfterAll with org.apache.spark.internal.Logging {
 

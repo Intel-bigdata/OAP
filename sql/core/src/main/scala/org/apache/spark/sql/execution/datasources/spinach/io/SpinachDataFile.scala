@@ -27,6 +27,7 @@ import org.apache.spark.sql.execution.datasources.spinach.filecache._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
+
 private[spinach] case class SpinachDataFile(path: String, schema: StructType) extends DataFile {
 
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {

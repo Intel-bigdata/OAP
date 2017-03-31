@@ -25,7 +25,6 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.filecache.IndexFiberCacheData
 import org.apache.spark.sql.execution.datasources.spinach.index._
-import org.apache.spark.sql.execution.datasources.spinach.io.SpinachFileFormat
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 

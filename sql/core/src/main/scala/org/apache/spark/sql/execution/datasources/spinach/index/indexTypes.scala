@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.index
 
+
 sealed abstract class AnyIndexType {
   def toString: String
 }
