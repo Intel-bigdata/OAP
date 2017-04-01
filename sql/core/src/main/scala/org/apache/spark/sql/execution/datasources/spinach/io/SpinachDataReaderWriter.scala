@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.DataSourceMeta
@@ -149,10 +150,10 @@ private[spinach] class SpinachDataReader(
   }
 
   /**
-    * Through getting statistics from related index file,
-    * judging if we should bypass this datafile or full scan or by index.
-    * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
-    */
+   * Through getting statistics from related index file,
+   * judging if we should bypass this datafile or full scan or by index.
+   * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
+   */
   private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
     if (!filterScanner.get.canBeOptimizedByStatistics) {
       StaticsAnalysisResult.USE_INDEX

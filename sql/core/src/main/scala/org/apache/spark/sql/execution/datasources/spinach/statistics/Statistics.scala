@@ -60,11 +60,11 @@ object Statistics {
   }
 
   /**
-    * This method help spinach convert InternalRow type to UnsafeRow type
-    * @param internalRow
-    * @param keyBuf
-    * @return unsafeRow
-    */
+   * This method help spinach convert InternalRow type to UnsafeRow type
+   * @param internalRow
+   * @param keyBuf
+   * @return unsafeRow
+   */
   def convertHelper(converter: UnsafeProjection,
                     internalRow: InternalRow,
                     keyBuf: ByteArrayOutputStream): UnsafeRow = {
