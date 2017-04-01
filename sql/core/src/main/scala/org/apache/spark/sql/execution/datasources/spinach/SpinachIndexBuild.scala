@@ -31,6 +31,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.util.collection.BitSet
@@ -54,6 +55,15 @@ private[spinach] case class SpinachIndexBuild(
     } else {
       // TODO use internal scan
       val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
+
+      // TODO just add fsrate in hadoop conf
+      hadoopConf.setDouble(Statistics.thresName,
+        sparkSession.conf.get(SQLConf.SPINACH_FULL_SCAN_THRESHOLD))
+      hadoopConf.setStrings(Statistics.Statistics_Type_Name,
+        sparkSession.conf.get(SQLConf.SPINACH_STATISTICS_TYPES))
+      hadoopConf.setDouble(Statistics.Sample_Based_SampleRate,
+        sparkSession.conf.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE))
+
       val fs = paths.head.getFileSystem(hadoopConf)
       val fileIters = paths.map(fs.listFiles(_, false))
       val dataPaths = fileIters.flatMap(fileIter => new Iterator[Path] {
@@ -152,14 +162,35 @@ private[spinach] case class SpinachIndexBuild(
             val uniqueKeysList = new java.util.LinkedList[InternalRow]()
             import scala.collection.JavaConverters._
             uniqueKeysList.addAll(uniqueKeys.toSeq.asJava)
-            writeTreeToOut(treeShape, fileOut, offsetMap,
+
+            val treeOffset = writeTreeToOut(treeShape, fileOut, offsetMap,
               fileOffset, uniqueKeysList, keySchema, 0, -1L)
+
+            val stTypes = hadoopConf.getStrings(Statistics.Statistics_Type_Name)
+            if (stTypes != null && stTypes.length > 0) {
+              stTypes.foreach(stType => {
+                val t = stType.trim
+                if (t.length > 0) {
+                  val st = t match {
+                    case "0" => new MinMaxStatistics
+                    case "1" => new SampleBasedStatistics(
+                      hadoopConf.get(Statistics.Sample_Based_SampleRate).toDouble)
+                    case "2" => new PartedByValueStatistics
+                    case _ =>
+                      throw new UnsupportedOperationException(s"non-supported statistic in id $t")
+                  }
+                  st.write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
+                }
+              })
+            }
+
             assert(uniqueKeysList.size == 1)
+            IndexUtils.writeLong(fileOut, dataEnd + treeOffset._1)
             IndexUtils.writeLong(fileOut, dataEnd)
             IndexUtils.writeLong(fileOut, offsetMap.get(uniqueKeysList.getFirst))
+
             fileOut.close()
-            indexFile.toString
-            IndexBuildResult(d.getName, cnt, "", d.getParent.toString)
+            IndexBuildResult(dataString, cnt, "", d.getParent.toString)
           case BloomFilterIndexType =>
             val bf_index = new BloomFilter()
             var elemCnt = 0 // element count

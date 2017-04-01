@@ -559,6 +559,35 @@ object SQLConf {
       .booleanConf
       .createWithDefault(true)
 
+  val SPINACH_FULL_SCAN_THRESHOLD =
+    SQLConfigBuilder("spark.sql.spinach.fsthreshold")
+      .internal()
+      .doc("Define the full scan threshold based on spinach statistics in index file. " +
+        "If the analysis result is above this threshold, it will full scan data file, " +
+        "otherwise, follow index way.")
+      .doubleConf
+      .createWithDefault(0.8)
+
+  val SPINACH_STATISTICS_TYPES =
+    SQLConfigBuilder("spark.sql.spinach.StatisticsType")
+      .internal()
+      .doc("Which types of pre-defined statistics are added in index file. " +
+        "And here you should just write the statistics' IDs. " +
+        "Now, three types statistics are supported. " +
+        "0 for MinMaxStatistics, " +
+        "1 for SampleBasedStatistics, " +
+        "2 for PartedByValueStatistics. " +
+        "If you want to add more than one type, just use comma to separate.")
+      .stringConf
+      .createWithDefault("0,1,2")
+
+  val SPINACH_STATISTICS_SAMPLE_RATE =
+    SQLConfigBuilder("spark.sql.spinach.Statistics.sampleRate")
+      .internal()
+      .doc("Sample rate for sample based statistics, default value 0.05")
+      .doubleConf
+      .createWithDefault(0.05)
+
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
   }
