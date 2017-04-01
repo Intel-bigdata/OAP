@@ -19,7 +19,10 @@ package org.apache.spark.sql.execution.datasources.spinach.statistics
 
 import java.io.ByteArrayOutputStream
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.fs.FSDataOutputStream
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.BaseOrdering
@@ -28,7 +31,6 @@ import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
-import scala.collection.mutable.ArrayBuffer
 
 abstract class Statistics{
   val id: Int
