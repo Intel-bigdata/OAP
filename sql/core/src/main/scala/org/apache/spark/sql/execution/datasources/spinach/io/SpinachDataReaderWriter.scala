@@ -118,7 +118,11 @@ private[spinach] class SpinachDataReader(
         fs.initialize(path, conf)
         val indexPath = IndexUtils.indexFileFromDataFile(path, fs.meta.name)
 
-        tryToReadStatistics(indexPath, conf) match {
+        val initFinished = System.currentTimeMillis()
+        val statsAnalyseResult = tryToReadStatistics(indexPath, conf)
+        val statsAnalyseFinsihed = System.currentTimeMillis()
+
+        val iter = statsAnalyseResult match {
           case StaticsAnalysisResult.FULL_SCAN =>
             fileScanner.iterator(conf, requiredIds)
           case StaticsAnalysisResult.USE_INDEX =>
@@ -128,21 +132,11 @@ private[spinach] class SpinachDataReader(
           case StaticsAnalysisResult.SKIP_INDEX =>
             Iterator.empty
         }
-//        fs.initialize(path, conf)
-//        val initFinished = System.currentTimeMillis()
-//
-//         total Row count can be get from the filter scanner
-//        val rowIDs = fs.toArray.sorted
-//        val filterFinished = System.currentTimeMillis()
-//
-//        val iter = fileScanner.iterator(conf, requiredIds, rowIDs)
-//        val iteratorFinished = System.currentTimeMillis()
-//
-//        logDebug("Load Index: " + (initFinished - start) + "ms")
-//        logDebug("Filter RowIDs: " + (filterFinished - initFinished) + "ms")
-//        logDebug("Construct Iterator: " + (iteratorFinished - filterFinished) + "ms")
-//
-//        iter
+        val iteratorFinished = System.currentTimeMillis()
+        logDebug("Load Index: " + (initFinished - start) + "ms")
+        logDebug("Load Stats: " + (statsAnalyseFinsihed - initFinished) + "ms")
+        logDebug("Construct Iterator: " + (iteratorFinished - statsAnalyseFinsihed) + "ms")
+        iter
       case _ =>
         logDebug("No index file exist for data file: " + path)
 
