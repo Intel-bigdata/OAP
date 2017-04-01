@@ -27,7 +27,8 @@ import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, RangeInterval, Statistics}
+import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, RangeInterval}
+import org.apache.spark.sql.execution.datasources.spinach.statistics.Statistics
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
