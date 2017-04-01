@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.index
 
 import java.io.{ByteArrayInputStream, ObjectInputStream}
 
@@ -23,8 +23,11 @@ import scala.collection.mutable
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.execution.datasources.spinach._
+import org.apache.spark.sql.execution.datasources.spinach.filecache._
+import org.apache.spark.sql.execution.datasources.spinach.io.IndexFile
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.collection.BitSet

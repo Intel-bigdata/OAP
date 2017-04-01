@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.execution.datasources.spinach.SpinachFileFormat
 
+
 /**
  * Utils for Index read/write
  */

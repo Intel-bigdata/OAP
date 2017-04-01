@@ -23,6 +23,7 @@ import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 
+
 /**
  * Index suite for Bloom filter
  */

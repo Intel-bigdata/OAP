@@ -27,6 +27,7 @@ import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, RangeInterval, Statistics}
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
@@ -41,7 +42,7 @@ class StatisticsSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    schema = StructType(StructField("test", DoubleType) :: Nil)
+    schema = StructType(StructField("test", DoubleType, nullable = true) :: Nil)
   }
 
   // an adapter from internalRow to unsafeRow
@@ -83,7 +84,6 @@ class StatisticsSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row3),
       RangeInterval(IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END, false, false),
       ordering), "3.0 is in (-inf, +inf)")
-
   }
 
   test("rowInSingleInterval: bound test") {

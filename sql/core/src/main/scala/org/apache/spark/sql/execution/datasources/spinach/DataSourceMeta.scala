@@ -27,6 +27,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.execution.datasources.spinach.filecache.{DataFiberCache, IndexFiberCacheData}
+import org.apache.spark.sql.execution.datasources.spinach.index.{IndexNode, UnsafeIndexNode}
+import org.apache.spark.sql.execution.datasources.spinach.io.SpinachDataFile
 import org.apache.spark.sql.types._
 
 

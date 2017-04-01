@@ -26,6 +26,7 @@ import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
 
+
 class SpinachSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
   import testImplicits._
   private var path: File = null

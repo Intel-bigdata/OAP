@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.filecache
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -24,6 +24,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.collection.BitSet
+
 
 /**
  * Used to build fiber on-heap

@@ -15,15 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.io
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
 
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.spinach.{BatchColumn, ColumnValues}
+import org.apache.spark.sql.execution.datasources.spinach.filecache._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
+
 
 private[spinach] case class SpinachDataFile(path: String, schema: StructType) extends DataFile {
 

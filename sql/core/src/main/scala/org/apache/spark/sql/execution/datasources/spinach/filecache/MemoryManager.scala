@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.filecache
 
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
+
 
 // TODO: make it an alias of MemoryBlock
 trait FiberCache {

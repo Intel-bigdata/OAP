@@ -15,7 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.index
+
 
 /**
  * Identify a column for index definition, including column name and order

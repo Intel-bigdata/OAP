@@ -15,25 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.filecache
 
 import java.util.concurrent.TimeUnit
 
-import scala.util.{Failure, Success, Try}
-
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, FSDataInputStream, Path}
-import org.apache.hadoop.util.StringUtils
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.SpinachException
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.util.Utils
+import org.apache.spark.sql.execution.datasources.spinach.io.{DataFile, DataFileHandle, IndexFile}
 
 
-private sealed case class ConfigurationCache[T](key: T, conf: Configuration) {
+private[spinach] sealed case class ConfigurationCache[T](key: T, conf: Configuration) {
   override def hashCode: Int = key.hashCode()
   override def equals(other: Any): Boolean = other match {
     case cc: ConfigurationCache[_] => cc.key == key
@@ -87,15 +81,7 @@ object FiberCacheManager extends AbstractFiberCacheManger {
   }
 }
 
-/**
- * The data file handle, will be cached for performance purpose, as we don't want to open the
- * specified file again and again to get its data meta, the data file extension can have its own
- * implementation.
- */
-abstract class DataFileHandle {
-  def fin: FSDataInputStream
-  def len: Long
-}
+
 
 private[spinach] object DataFileHandleCacheManager extends Logging {
   type ENTRY = ConfigurationCache[DataFile]
@@ -124,33 +110,6 @@ private[spinach] object DataFileHandleCacheManager extends Logging {
   }
 }
 
-abstract class DataFile {
-  def path: String
-  def schema: StructType
-
-  def createDataFileHandle(conf: Configuration): DataFileHandle
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache
-  def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
-  def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
-  : Iterator[InternalRow]
-}
-
-private[spinach] object DataFile {
-  def apply(path: String, schema: StructType, dataFileClassName: String): DataFile = {
-    Try(Utils.classForName(dataFileClassName).getDeclaredConstructor(
-      classOf[String], classOf[StructType])).toOption match {
-      case Some(ctor) =>
-        Try (ctor.newInstance(path, schema).asInstanceOf[DataFile]) match {
-          case Success(e) => e
-          case Failure(e) =>
-            throw new SpinachException(s"Cannot instantiate class $dataFileClassName", e)
-        }
-      case None => throw new SpinachException(
-        s"Cannot find constructor of signature like:" +
-          s" (String, StructType) for class $dataFileClassName")
-    }
-  }
-}
 
 private[spinach] trait Fiber
 

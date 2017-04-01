@@ -23,8 +23,11 @@ import org.scalatest.BeforeAndAfterAll
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.spinach.filecache.IndexFiberCacheData
+import org.apache.spark.sql.execution.datasources.spinach.index.{BPlusTreeScanner, IndexContext, IndexNode, ScannerBuilder}
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StringType, StructType}
+
 
 private [spinach] object BPlusTreeMultiColumnSearchSuite extends Serializable {
 //  implicit def transformToInternalRow(array: Array[Seq[Any]]): Array[Key]

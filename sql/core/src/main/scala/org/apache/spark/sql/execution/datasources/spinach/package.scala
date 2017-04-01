@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources
 
 import org.apache.spark.sql.catalyst.InternalRow
 
+
 package object spinach {
   type Key = InternalRow
 }

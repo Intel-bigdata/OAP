@@ -15,11 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.io
 
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
+
 
 //  Meta Part Format
 //  ..

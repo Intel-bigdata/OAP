@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.ddl
 
 import org.apache.hadoop.fs.Path
 
@@ -26,8 +26,11 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, SpinachException}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.execution.datasources.spinach._
+import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.types.{IntegerType, StringType}
+
 
 /**
  * Creates an index for table on indexColumns

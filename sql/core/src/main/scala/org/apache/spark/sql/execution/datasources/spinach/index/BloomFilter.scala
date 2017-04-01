@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach
+package org.apache.spark.sql.execution.datasources.spinach.index
 
 import scala.collection.mutable
 import scala.util.hashing.{MurmurHash3 => MH3}

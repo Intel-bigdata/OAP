@@ -27,9 +27,11 @@ import org.scalatest.BeforeAndAfterAll
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
+import org.apache.spark.sql.execution.datasources.spinach.io.DataReaderWriter
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
+
 
 class DataSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   private var file: File = null
