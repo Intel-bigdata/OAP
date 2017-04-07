@@ -218,7 +218,8 @@ private[spinach] case class SpinachIndexBuild(
               // Bloom filter index file format:
               // numOfLong            4 Bytes, Int, record the total number of Longs in bit array
               // numOfHashFunction    4 Bytes, Int, record the total number of Hash Functions
-              // elementCount         4 Bytes, Int, number of elements stored in the related DataFile
+              // elementCount         4 Bytes, Int, number of elements stored in the
+              //                      related DataFile
               //
               // long 1               8 Bytes, Long, the first element in bit array
               // long 2               8 Bytes, Long, the second element in bit array
