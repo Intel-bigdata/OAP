@@ -18,8 +18,8 @@
 package org.apache.spark.sql.execution.datasources.spinach.io
 
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
+import org.apache.parquet.format.Encoding
 
 
 //  Meta Part Format
@@ -33,6 +33,14 @@ import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 //      Fiber #2 Length                 4
 //      ...
 //      Fiber #N Length                 4
+//      Fiber #1 Uncompressed Length    4
+//      Fiber #2 Uncompressed Length    4
+//      ...
+//      Fiber #N Uncompressed Length    4
+//      Fiber #1 Encoding               4
+//      Fiber #2 Encoding               4
+//      ...
+//      Fiber #N Encoding               4
 //    RowGroup Meta #2                  16 + 4 * Field Count In Each Row
 //    RowGroup Meta #3                  16 + 4 * Field Count In Each Row
 //    ..                                16 + 4 * Field Count In Each Row
@@ -43,9 +51,12 @@ import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 //    Field Count In each Row           4
 
 private[spinach] class RowGroupMeta {
+
   var start: Long = _
   var end: Long = _
   var fiberLens: Array[Int] = _
+  var fiberCompressedLens: Array[Int] = _
+  var fiberEncodings: Array[Encoding] = _
 
   def withNewStart(newStart: Long): RowGroupMeta = {
     this.start = newStart
@@ -62,12 +73,34 @@ private[spinach] class RowGroupMeta {
     this
   }
 
+  def withNewFiberCompressedLens(fiberCompressedLens: Array[Int]): RowGroupMeta = {
+    this.fiberCompressedLens = fiberCompressedLens
+    this
+  }
+
+  def withNewFiberEncodings(newFiberEncodings: Array[Encoding]): RowGroupMeta = {
+    this.fiberEncodings = newFiberEncodings
+    this
+  }
+
   def write(os: FSDataOutputStream): RowGroupMeta = {
     os.writeLong(start)
     os.writeLong(end)
     var i = 0
     while (i < fiberLens.length) {
       os.writeInt(fiberLens(i))
+      i += 1
+    }
+
+    i = 0
+    while (i < fiberCompressedLens.length) {
+      os.writeInt(fiberCompressedLens(i))
+      i += 1
+    }
+
+    i = 0
+    while (i < fiberEncodings.length) {
+      os.writeInt(fiberEncodings(i).getValue)
       i += 1
     }
 
@@ -78,10 +111,24 @@ private[spinach] class RowGroupMeta {
     start = is.readLong()
     end = is.readLong()
     fiberLens = new Array[Int](fieldCount)
+    fiberCompressedLens = new Array[Int](fieldCount)
+    fiberEncodings = new Array[Encoding](fieldCount)
 
     var idx = 0
     while(idx < fieldCount) {
       fiberLens(idx) = is.readInt()
+      idx += 1
+    }
+
+    idx = 0
+    while(idx < fieldCount) {
+      fiberCompressedLens(idx) = is.readInt()
+      idx += 1
+    }
+
+    idx = 0
+    while (idx < fieldCount) {
+      fiberEncodings(idx) = Encoding.findByValue(is.readInt())
       idx += 1
     }
 
@@ -156,7 +203,7 @@ private[spinach] class SpinachDataFileHandle(
     this.fieldCount = is.readInt()
 
     // seek to the start position of Meta
-    val rowGroupMetaPos = fileLen - 16  - groupCount * (16 + 4 * fieldCount)
+    val rowGroupMetaPos = fileLen - 16  - groupCount * (16 + 4 * fieldCount * 3)
     is.seek(rowGroupMetaPos)
     var i = 0
     while(i < groupCount) {

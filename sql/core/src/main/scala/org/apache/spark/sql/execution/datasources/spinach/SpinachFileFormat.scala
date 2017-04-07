@@ -273,6 +273,7 @@ private[spinach] class SpinachOutputWriterFactory(
         existsIndexes.foreach(builder.addIndexMeta(_))
       }
       builder.withNewSchema(oldMeta.schema)
+      builder.withNewCodecString(oldMeta.codec)
     } else {
       builder.withNewSchema(dataSchema)
     }
@@ -292,6 +293,7 @@ private[spinach] class SpinachOutputWriterFactory(
       // The file fingerprint is not used at the moment.
       case s: SpinachWriteResult =>
         builder.addFileMeta(FileMeta("", s.rowsWritten, s.fileName))
+        builder.withNewCodecString(s.codecString)
         (s.partitionString, (s.fileName, s.rowsWritten))
       case _ => throw new SpinachException("Unexpected Spinach write result.")
     }.groupBy(_._1)
@@ -321,7 +323,7 @@ private[spinach] class SpinachOutputWriterFactory(
 
 
 private[spinach] case class SpinachWriteResult(
-    fileName: String, rowsWritten: Int, partitionString: String)
+    fileName: String, rowsWritten: Int, partitionString: String, codecString: String)
 
 private[spinach] class SpinachOutputWriter(
                                             path: String,
@@ -338,8 +340,7 @@ private[spinach] class SpinachOutputWriter(
     val file: Path = new Path(path, getFileName(SpinachFileFormat.SPINACH_DATA_EXTENSION))
     val fs: FileSystem = file.getFileSystem(sc.value)
     val fileOut: FSDataOutputStream = fs.create(file, false)
-
-    new SpinachDataWriter(isCompressed, fileOut, dataSchema)
+    new SpinachDataWriter(isCompressed, fileOut, dataSchema, sc.value)
   }
 
   override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
@@ -350,7 +351,7 @@ private[spinach] class SpinachOutputWriter(
 
   override def close(): WriteResult = {
     writer.close()
-    SpinachWriteResult(dataFileName, rowCount, partitionString)
+    SpinachWriteResult(dataFileName, rowCount, partitionString, writer.getCodecString())
   }
 
   private def getFileName(extension: String): String = {

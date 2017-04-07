@@ -30,8 +30,9 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelp
 import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberCache
 import org.apache.spark.sql.types.StructType
 
-
-private[spinach] case class ParquetDataFile(path: String, schema: StructType) extends DataFile {
+private[spinach] case class ParquetDataFile(path: String,
+                                            schema: StructType,
+                                            codecString: String) extends DataFile {
 
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
     throw new UnsupportedOperationException("Not support getFiberData Operation.")

@@ -17,8 +17,14 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.filecache
 
-import scala.collection.mutable.ArrayBuffer
+import java.io.ByteArrayOutputStream
 
+import org.apache.parquet.Ints
+import org.apache.parquet.bytes.BytesInput
+import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridEncoder
+import org.apache.parquet.format.Encoding
+
+import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
@@ -64,6 +70,8 @@ private[spinach] trait DataFiberBuilder {
     currentRowId = 0
     bitStream.clear()
   }
+
+  def getEncoding(): Encoding = Encoding.PLAIN
 }
 
 private[spinach] case class FixedSizeTypeFiberBuilder(
@@ -279,13 +287,56 @@ private[spinach] case class StringFiberBuilder(
   }
 }
 
+// TODO: Need Implement other FiberBuilder: DICT, DELTA, etc
+// Refer: https://github.com/Parquet/parquet-format/blob/master/Encodings.md
+private[spinach] case class RunLengthBitPackingHybridFiberBuilder(
+  bitWidth: Int,
+  defaultRowGroupRowCount: Int,
+  ordinal: Int,
+  dataType: DataType) extends DataFiberBuilder {
+
+  private val encoder = new RunLengthBitPackingHybridEncoder(bitWidth, 32, 1048576)
+
+  override def appendInternal(row: InternalRow): Unit = {
+    dataType match {
+      case BooleanType => encoder.writeInt(if (row.getBoolean(ordinal)) 1 else 0)
+      case IntegerType => encoder.writeInt(row.getInt(ordinal))
+    }
+  }
+
+  override def appendNull(): Unit = {}
+
+  override def build(): FiberByteData = {
+    val rle = encoder.toBytes
+
+    val bits = new Array[Byte](bitStream.toLongArray().length * 8)
+
+    Platform.copyMemory(bitStream.toLongArray(), Platform.LONG_ARRAY_OFFSET,
+      bits, Platform.BYTE_ARRAY_OFFSET, bitStream.toLongArray().length * 8)
+
+    // TODO: is (Ints.checkedCast(rle.size)) really needed?
+    val bytes = BytesInput.concat(BytesInput.from(bits),
+      BytesInput.fromInt(Ints.checkedCast(rle.size)),
+      rle).toByteArray
+
+    FiberByteData(bytes)
+  }
+
+  override def getEncoding(): Encoding = Encoding.RLE
+
+  override def clear(): Unit = {
+    super.clear()
+    encoder.reset()
+  }
+}
+
 object DataFiberBuilder {
   def apply(dataType: DataType, ordinal: Int, defaultRowGroupRowCount: Int): DataFiberBuilder = {
     dataType match {
       case BinaryType =>
         new BinaryFiberBuilder(defaultRowGroupRowCount, ordinal)
       case BooleanType =>
-        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, BooleanType)
+        new RunLengthBitPackingHybridFiberBuilder(1, defaultRowGroupRowCount, ordinal, BooleanType)
       case ByteType =>
         new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ByteType)
       case DateType =>

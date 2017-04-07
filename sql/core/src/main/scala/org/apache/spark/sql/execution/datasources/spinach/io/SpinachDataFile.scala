@@ -17,38 +17,81 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.io
 
+import java.io.ByteArrayInputStream
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
+import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridDecoder
+import org.apache.parquet.format.Encoding
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.spinach.filecache._
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{BooleanType, StructType}
 import org.apache.spark.unsafe.Platform
+import org.apache.spark.util.collection.BitSet
 
-
-private[spinach] case class SpinachDataFile(path: String, schema: StructType) extends DataFile {
+private[spinach] case class SpinachDataFile(path: String,
+                                            schema: StructType,
+                                            codecString: String) extends DataFile {
 
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
     val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
     val groupMeta = meta.rowGroupsMeta(groupId)
+    val codecFactory = new CodecFactory(conf)
+    val decompressor: BytesDecompressor = codecFactory.getDecompressor(codecString)
+
     // get the fiber data start position
     // TODO: update the meta to store the fiber start pos
     var i = 0
     var fiberStart = groupMeta.start
     while (i < fiberId) {
-      fiberStart += groupMeta.fiberLens(i)
+      fiberStart += groupMeta.fiberCompressedLens(i)
       i += 1
     }
-    val len = groupMeta.fiberLens(fiberId)
+    val len = groupMeta.fiberCompressedLens(fiberId)
+    val uncompressedLen = groupMeta.fiberLens(fiberId)
+    val encoding = groupMeta.fiberEncodings(fiberId)
     val bytes = new Array[Byte](len)
 
     val is = meta.fin
     is.synchronized {
       is.seek(fiberStart)
       is.readFully(bytes)
-      putToFiberCache(bytes)
+    }
+
+    val decompressed = decompressor.decompress(bytes, uncompressedLen)
+    // TODO: Create a Decoder class for decoding and construct FiberCache.
+    // TODO: What is a Fiber? Compressed data or Encoded data or Raw data?
+    encoding match {
+      case Encoding.RLE =>
+        val rowCount = meta.rowCountInEachGroup
+        val typeDefaultSize = BooleanType.defaultSize
+        val fiberBytes = new Array[Byte](rowCount / 8 + rowCount * typeDefaultSize)
+        val baseOffset = Platform.BYTE_ARRAY_OFFSET + rowCount / 8
+
+        val bs = new BitSet(rowCount)
+        Platform.copyMemory(decompressed, Platform.BYTE_ARRAY_OFFSET,
+          bs.toLongArray(), Platform.LONG_ARRAY_OFFSET, bs.toLongArray().length * 8)
+
+        Platform.copyMemory(decompressed, Platform.BYTE_ARRAY_OFFSET,
+          fiberBytes, Platform.LONG_ARRAY_OFFSET, rowCount / 8)
+
+        val in = new ByteArrayInputStream(decompressed, bs.toLongArray().length * 8 + 4,
+          decompressed.length - bs.toLongArray().length * 8 - 4)
+
+        val decoder = new RunLengthBitPackingHybridDecoder(1, in)
+
+        (0 until rowCount).foreach{i =>
+          if (bs.get(i)) {
+            Platform.putBoolean(fiberBytes,
+              baseOffset + i * typeDefaultSize, decoder.readInt() == 1)
+          }
+        }
+        putToFiberCache(fiberBytes)
+
+      case _ => putToFiberCache(decompressed)
     }
   }
 

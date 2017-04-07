@@ -41,11 +41,12 @@ abstract class DataFile {
 }
 
 private[spinach] object DataFile {
-  def apply(path: String, schema: StructType, dataFileClassName: String): DataFile = {
+  def apply(path: String, schema: StructType,
+            dataFileClassName: String, codecString: String): DataFile = {
     Try(Utils.classForName(dataFileClassName).getDeclaredConstructor(
-      classOf[String], classOf[StructType])).toOption match {
+      classOf[String], classOf[StructType], classOf[String])).toOption match {
       case Some(ctor) =>
-        Try (ctor.newInstance(path, schema).asInstanceOf[DataFile]) match {
+        Try (ctor.newInstance(path, schema, codecString).asInstanceOf[DataFile]) match {
           case Success(e) => e
           case Failure(e) =>
             throw new SpinachException(s"Cannot instantiate class $dataFileClassName", e)

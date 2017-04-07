@@ -17,9 +17,11 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.io
 
+import java.io.ByteArrayOutputStream
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
-
+import org.apache.parquet.format.Encoding
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.DataSourceMeta
@@ -34,13 +36,15 @@ import org.apache.spark.unsafe.Platform
 private[spinach] class SpinachDataWriter(
     isCompressed: Boolean,
     out: FSDataOutputStream,
-    schema: StructType) extends Logging {
+    schema: StructType,
+    conf: Configuration) extends Logging {
   // Using java options to config
   // NOTE: java options should not start with spark (e.g. "spark.xxx.xxx"), or it cannot pass
   // the config validation of SparkConf
   // TODO make it configuration via SparkContext / Table Properties
   private def DEFAULT_ROW_GROUP_SIZE = System.getProperty("spinach.rowgroup.size",
     "1024").toInt
+  private def COMPRESSION_CODEC_NAME = System.getProperty("spinach.compression", "GZIP")
   logDebug(s"spinach.rowgroup.size setting to ${DEFAULT_ROW_GROUP_SIZE}")
   private var rowCount: Int = 0
   private var rowGroupCount: Int = 0
@@ -50,6 +54,11 @@ private[spinach] class SpinachDataWriter(
 
   private val fiberMeta = new SpinachDataFileHandle(
     rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE, fieldCount = schema.length)
+
+  private val codecFactory = new CodecFactory(conf)
+  val compressor: BytesCompressor = codecFactory.getCompressor(COMPRESSION_CODEC_NAME)
+
+  def getCodecString(): String = COMPRESSION_CODEC_NAME
 
   def write(row: InternalRow) {
     var idx = 0
@@ -66,17 +75,25 @@ private[spinach] class SpinachDataWriter(
   private def writeRowGroup(): Unit = {
     rowGroupCount += 1
     val fiberLens = new Array[Int](rowGroup.length)
+    val fiberCompressedLens = new Array[Int](rowGroup.length)
+    val fiberEncodings = new Array[Encoding](rowGroup.length)
     var idx: Int = 0
     var totalDataSize = 0L
     val rowGroupMeta = new RowGroupMeta()
 
-    rowGroupMeta.withNewStart(out.getPos).withNewFiberLens(fiberLens)
+    rowGroupMeta.withNewStart(out.getPos)
+      .withNewFiberLens(fiberLens)
+      .withNewFiberCompressedLens(fiberCompressedLens)
+      .withNewFiberEncodings(fiberEncodings)
     while (idx < rowGroup.length) {
       val fiberByteData = rowGroup(idx).build()
       val newFiberData = fiberByteData.fiberData
-      totalDataSize += newFiberData.length
+      val compressedFiberdata = compressor.compress(newFiberData)
+      totalDataSize += compressedFiberdata.length
       fiberLens(idx) = newFiberData.length
-      out.write(newFiberData)
+      fiberCompressedLens(idx) = compressedFiberdata.length
+      fiberEncodings(idx) = rowGroup(idx).getEncoding()
+      out.write(compressedFiberdata)
       rowGroup(idx).clear()
       idx += 1
     }
@@ -111,7 +128,7 @@ private[spinach] class SpinachDataReader(
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     logDebug("Initializing SpinachDataReader...")
     // TODO how to save the additional FS operation to get the Split size
-    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
+    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, meta.codec)
 
     val start = System.currentTimeMillis()
     filterScanner match {
