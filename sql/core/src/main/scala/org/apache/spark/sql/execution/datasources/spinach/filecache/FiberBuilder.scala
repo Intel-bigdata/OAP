@@ -21,8 +21,11 @@ import java.io.ByteArrayOutputStream
 
 import org.apache.parquet.Ints
 import org.apache.parquet.bytes.BytesInput
+import org.apache.parquet.column.values.delta.DeltaBinaryPackingValuesWriter
+import org.apache.parquet.column.values.deltalengthbytearray.DeltaLengthByteArrayValuesWriter
 import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridEncoder
 import org.apache.parquet.format.Encoding
+import org.apache.parquet.io.api.Binary
 
 import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.catalyst.InternalRow
@@ -330,6 +333,55 @@ private[spinach] case class RunLengthBitPackingHybridFiberBuilder(
   }
 }
 
+private[spinach] case class DeltaByteArrayFiberBuilder(
+   defaultRowGroupRowCount: Int,
+   ordinal: Int) extends DataFiberBuilder {
+
+  private val suffixWriter = new DeltaLengthByteArrayValuesWriter(32, 1048576)
+  private val prefixLengthWriter = new DeltaBinaryPackingValuesWriter(128, 4, 32, 1048576)
+  private var previous = new Array[Byte](0)
+  private var totalStringDataLengthInByte: Int = 0
+
+  override def getEncoding(): Encoding = Encoding.DELTA_BYTE_ARRAY
+  override def appendNull(): Unit = super.appendNull()
+
+  override def appendInternal(row: InternalRow): Unit = {
+
+    val v = Binary.fromConstantByteArray(row.getUTF8String(ordinal).getBytes)
+    val vb = v.getBytes
+    val length = if (previous.length < vb.length) previous.length else vb.length
+    var i = 0
+    while ( i < length && previous(i) == vb(i) ) { i = i + 1 }
+    prefixLengthWriter.writeInteger(i)
+    suffixWriter.writeBytes(v.slice(i, vb.length - i))
+    previous = vb
+
+    totalStringDataLengthInByte += vb.length
+  }
+
+  override def build(): FiberByteData = {
+
+    val bits = new Array[Byte](bitStream.toLongArray().length * 8)
+
+    Platform.copyMemory(bitStream.toLongArray(), Platform.LONG_ARRAY_OFFSET,
+      bits, Platform.BYTE_ARRAY_OFFSET, bitStream.toLongArray().length * 8)
+
+    val bytes = BytesInput.concat(BytesInput.from(bits),
+      BytesInput.fromInt(totalStringDataLengthInByte),
+      prefixLengthWriter.getBytes, suffixWriter.getBytes).toByteArray
+
+    FiberByteData(bytes)
+  }
+
+  override def clear(): Unit = {
+    prefixLengthWriter.reset()
+    suffixWriter.reset()
+    previous = new Array[Byte](0)
+    totalStringDataLengthInByte = 0
+  }
+
+}
+
 object DataFiberBuilder {
   def apply(dataType: DataType, ordinal: Int, defaultRowGroupRowCount: Int): DataFiberBuilder = {
     dataType match {
@@ -352,7 +404,7 @@ object DataFiberBuilder {
       case ShortType =>
         new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ShortType)
       case StringType =>
-        new StringFiberBuilder(defaultRowGroupRowCount, ordinal)
+        new DeltaByteArrayFiberBuilder(defaultRowGroupRowCount, ordinal)
       case _ => throw new NotImplementedError("not implemented type for fiber builder")
     }
   }

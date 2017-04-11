@@ -22,13 +22,13 @@ import java.io.ByteArrayInputStream
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
+import org.apache.parquet.column.values.deltastrings.DeltaByteArrayReader
 import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridDecoder
 import org.apache.parquet.format.Encoding
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.spinach.filecache._
-import org.apache.spark.sql.types.{BooleanType, StructType}
+import org.apache.spark.sql.types.{BooleanType, IntegerType, StructType}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.collection.BitSet
 
@@ -89,6 +89,43 @@ private[spinach] case class SpinachDataFile(path: String,
               baseOffset + i * typeDefaultSize, decoder.readInt() == 1)
           }
         }
+        putToFiberCache(fiberBytes)
+
+      case Encoding.DELTA_BYTE_ARRAY =>
+
+        val rowCount =
+          if (groupId == meta.groupCount - 1) meta.rowCountInLastGroup
+          else meta.rowCountInEachGroup
+        val baseOffset = Platform.BYTE_ARRAY_OFFSET + meta.rowCountInEachGroup / 8
+        var startValueOffset = meta.rowCountInEachGroup / 8 + rowCount * IntegerType.defaultSize * 2
+        val fiberSize = meta.rowCountInEachGroup / 8 + rowCount * 8 +
+          Platform.getInt(decompressed, baseOffset)
+
+        val fiberBytes = new Array[Byte](fiberSize)
+
+        val bs = new BitSet(meta.rowCountInEachGroup)
+        Platform.copyMemory(decompressed, Platform.BYTE_ARRAY_OFFSET,
+          bs.toLongArray(), Platform.LONG_ARRAY_OFFSET, bs.toLongArray().length * 8)
+
+        Platform.copyMemory(decompressed, Platform.BYTE_ARRAY_OFFSET,
+          fiberBytes, Platform.LONG_ARRAY_OFFSET, bs.toLongArray().length * 8)
+
+        val reader = new DeltaByteArrayReader()
+        reader.initFromPage(rowCount, decompressed, bs.toLongArray().length * 8 + 4)
+
+        (0 until rowCount).foreach{i =>
+          if (bs.get(i)) {
+            val value = reader.readBytes().getBytes()
+            Platform.putInt(fiberBytes,
+              baseOffset + IntegerType.defaultSize * i * 2, value.length)
+            Platform.putInt(fiberBytes,
+              baseOffset + IntegerType.defaultSize * (i * 2 + 1), startValueOffset)
+            Platform.copyMemory(value, Platform.BYTE_ARRAY_OFFSET, fiberBytes,
+              Platform.BYTE_ARRAY_OFFSET + startValueOffset, value.length)
+            startValueOffset += value.length
+          }
+        }
+
         putToFiberCache(fiberBytes)
 
       case _ => putToFiberCache(decompressed)
