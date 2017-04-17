@@ -21,17 +21,18 @@ import java.lang.{Long => JLong}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.parquet.column.Dictionary
 import org.apache.parquet.hadoop.api.RecordReader
 import org.apache.parquet.hadoop.SpinachRecordReader
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberCache
 import org.apache.spark.sql.types.StructType
 
-
-private[spinach] case class ParquetDataFile(path: String, schema: StructType) extends DataFile {
+private[spinach] case class ParquetDataFile(path: String,
+                                            schema: StructType,
+                                            codecString: String) extends DataFile {
 
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
     throw new UnsupportedOperationException("Not support getFiberData Operation.")
@@ -100,4 +101,6 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
   override def createDataFileHandle(conf: Configuration): DataFileHandle = {
     throw new UnsupportedOperationException("Not support initialize Operation.")
   }
+
+  override def initDict(conf: Configuration, ordinal: Int): Dictionary = ???
 }

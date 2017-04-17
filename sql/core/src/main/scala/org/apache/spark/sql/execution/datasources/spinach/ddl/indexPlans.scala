@@ -87,6 +87,7 @@ case class CreateIndex(
           existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
         }
         metaBuilder.withNewSchema(oldMeta.schema)
+        metaBuilder.withNewCodecString(oldMeta.codec)
       } else {
         metaBuilder.withNewSchema(s)
       }
@@ -177,6 +178,7 @@ case class DropIndex(
               existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
             }
             metaBuilder.withNewDataReaderClassName(oldMeta.dataReaderClassName)
+            metaBuilder.withNewCodecString(oldMeta.codec)
             DataSourceMeta.write(
               new Path(parent.toString, SpinachFileFormat.SPINACH_META_FILE),
               sparkSession.sparkContext.hadoopConfiguration,
@@ -253,6 +255,7 @@ case class RefreshIndex(
         oldMeta.fileMetas.foreach(metaBuilder.addFileMeta)
         // TODO for now we only support data file adding before updating index
         metaBuilder.withNewSchema(oldMeta.schema)
+        metaBuilder.withNewCodecString(oldMeta.codec)
       } else {
         metaBuilder.withNewSchema(s)
       }

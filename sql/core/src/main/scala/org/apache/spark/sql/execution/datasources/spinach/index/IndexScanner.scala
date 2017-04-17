@@ -62,7 +62,25 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
   }
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner
-}
+
+  def transformIntervals(): Unit = {
+    def transformKey(key: Key): Key = {
+      val values = key.toSeq(getSchema).zipWithIndex.map { value =>
+        // 1. Get Encoding for each column
+        // 2. Get Dict if Encoding is DICTIONARY
+        // 3. Transform value to DICT ID
+        value._1
+      }
+      InternalRow.fromSeq(values)
+    }
+
+    intervalArray = intervalArray.map { interval =>
+      RangeInterval(transformKey(interval.start),
+        transformKey(interval.end),
+        interval.startInclude,
+        interval.endInclude)
+    }
+  }
 
 // A dummy scanner will actually not do any scanning
 private[spinach] object DUMMY_SCANNER extends IndexScanner(null) {

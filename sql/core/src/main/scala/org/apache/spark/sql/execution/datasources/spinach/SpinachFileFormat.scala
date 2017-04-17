@@ -20,17 +20,16 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.net.URI
 
 import scala.collection.mutable
-
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, FSDataOutputStream, Path}
+import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
+import org.apache.parquet.format.Encoding
 import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Expression, JoinedRow}
+import org.apache.spark.sql.catalyst.expressions.{Expression, GenericInternalRow, JoinedRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.spinach.index.{IndexContext, ScannerBuilder}
@@ -39,6 +38,7 @@ import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.SerializableConfiguration
 
 
@@ -184,15 +184,31 @@ private[sql] class SpinachFileFormat extends FileFormat
         (file: PartitionedFile) => {
           assert(file.partitionValues.numFields == partitionSchema.size)
 
-          val iter = new SpinachDataReader(
+          val reader = new SpinachDataReader(
             new Path(new URI(file.filePath)), m, filterScanner, requiredIds)
-            .initialize(broadcastedHadoopConf.value.value)
 
+          val iter = reader.initialize(broadcastedHadoopConf.value.value)
+          // Get Meta for each file
+          val fileMeta = reader.getFileMeta()
+          // Get Encoding for each column
+          // Translate Value for Dict Encoding
           val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
           val joinedRow = new JoinedRow()
           val appendPartitionColumns = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
 
-          iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+          iter.map{d =>
+            val values = d.toSeq(requiredSchema).zipWithIndex.map{value =>
+              val encoding = fileMeta.rowGroupsMeta(0).fiberEncodings(requiredIds(value._2))
+              if (encoding == Encoding.PLAIN_DICTIONARY) {
+                val dict = reader.initDict(broadcastedHadoopConf.value.value, requiredIds(value._2))
+                UTF8String.fromBytes(dict.decodeToBinary(value._1.asInstanceOf[Int]).getBytes)
+              }
+              else value._1
+            }
+
+            val row = InternalRow.fromSeq(values)
+            appendPartitionColumns(joinedRow(row, file.partitionValues))
+          }
         }
       case None => (_: PartitionedFile) => {
         // TODO need to think about when there is no spinach.meta file at all
@@ -273,6 +289,7 @@ private[spinach] class SpinachOutputWriterFactory(
         existsIndexes.foreach(builder.addIndexMeta(_))
       }
       builder.withNewSchema(oldMeta.schema)
+      builder.withNewCodecString(oldMeta.codec)
     } else {
       builder.withNewSchema(dataSchema)
     }
@@ -292,6 +309,7 @@ private[spinach] class SpinachOutputWriterFactory(
       // The file fingerprint is not used at the moment.
       case s: SpinachWriteResult =>
         builder.addFileMeta(FileMeta("", s.rowsWritten, s.fileName))
+        builder.withNewCodecString(s.codecString)
         (s.partitionString, (s.fileName, s.rowsWritten))
       case _ => throw new SpinachException("Unexpected Spinach write result.")
     }.groupBy(_._1)
@@ -321,7 +339,7 @@ private[spinach] class SpinachOutputWriterFactory(
 
 
 private[spinach] case class SpinachWriteResult(
-    fileName: String, rowsWritten: Int, partitionString: String)
+    fileName: String, rowsWritten: Int, partitionString: String, codecString: String)
 
 private[spinach] class SpinachOutputWriter(
                                             path: String,
@@ -338,8 +356,7 @@ private[spinach] class SpinachOutputWriter(
     val file: Path = new Path(path, getFileName(SpinachFileFormat.SPINACH_DATA_EXTENSION))
     val fs: FileSystem = file.getFileSystem(sc.value)
     val fileOut: FSDataOutputStream = fs.create(file, false)
-
-    new SpinachDataWriter(isCompressed, fileOut, dataSchema)
+    new SpinachDataWriter(isCompressed, fileOut, dataSchema, sc.value)
   }
 
   override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
@@ -350,7 +367,7 @@ private[spinach] class SpinachOutputWriter(
 
   override def close(): WriteResult = {
     writer.close()
-    SpinachWriteResult(dataFileName, rowCount, partitionString)
+    SpinachWriteResult(dataFileName, rowCount, partitionString, writer.getCodecString())
   }
 
   private def getFileName(extension: String): String = {

@@ -25,6 +25,7 @@ import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
+import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.datasources.spinach.filecache.{DataFiberCache, IndexFiberCacheData}
@@ -56,6 +57,7 @@ import org.apache.spark.sql.types._
  * IndexMeta N
  * Schema           -- Variable Length -- The table schema in json format.
  * Data Reader Class Name -- Variable Length -- The associated data reader class name.
+ * Codec String -- Variable Length -- UNCOMPRESSED, GZIP, SNAPPY ...
  * FileHeader       --  32 bytes
  *     RecordCount  --   8 bytes -- The number of all of the records in the same folder.
  *     DataFileCount--   8 bytes -- The number of the data files.
@@ -302,7 +304,8 @@ private[spinach] case class DataSourceMeta(
     indexMetas: Array[IndexMeta],
     schema: StructType,
     dataReaderClassName: String,
-    @transient fileHeader: FileHeader) extends Serializable {
+    @transient fileHeader: FileHeader,
+    codec: String = CompressionCodecName.UNCOMPRESSED.name()) extends Serializable {
 
    def isSupportedByIndex(exp: Expression,
                           hashSetList: mutable.ListBuffer[mutable.HashSet[String]]): Boolean = {
@@ -352,6 +355,7 @@ private[spinach] class DataSourceMetaBuilder {
   val indexMetas = ArrayBuffer.empty[IndexMeta]
   var schema: StructType = new StructType()
   var dataReaderClassName: String = classOf[SpinachDataFile].getCanonicalName
+  var codec: String = CompressionCodecName.UNCOMPRESSED.name()
 
   def addFileMeta(fileMeta: FileMeta): this.type = {
     fileMetas += fileMeta
@@ -385,9 +389,15 @@ private[spinach] class DataSourceMetaBuilder {
     this
   }
 
+  def withNewCodecString(codec: String): this.type = {
+    this.codec = codec
+    this
+  }
+
   def build(): DataSourceMeta = {
     val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size, indexMetas.size)
-    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, dataReaderClassName, fileHeader)
+    DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, dataReaderClassName,
+      fileHeader, codec)
   }
 }
 
@@ -476,8 +486,9 @@ private[spinach] object DataSourceMeta {
     val indexMetas = readIndexMetas(fileHeader, in)
     val schema = readSchema(fileHeader, in)
     val dataReaderClassName = in.readUTF()
+    val codec = in.readUTF()
     in.close()
-    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
+    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader, codec)
   }
 
   def write(
@@ -498,6 +509,7 @@ private[spinach] object DataSourceMeta {
     meta.indexMetas.foreach(_.write(out))
     writeSchema(meta.schema, out)
     out.writeUTF(meta.dataReaderClassName)
+    out.writeUTF(meta.codec)
     meta.fileHeader.write(out)
     out.close()
 

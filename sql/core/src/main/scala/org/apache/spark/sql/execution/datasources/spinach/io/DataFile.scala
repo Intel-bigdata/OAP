@@ -18,10 +18,9 @@
 package org.apache.spark.sql.execution.datasources.spinach.io
 
 import scala.util.{Failure, Success, Try}
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FSDataInputStream
-
+import org.apache.parquet.column.Dictionary
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.SpinachException
 import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberCache
@@ -38,14 +37,16 @@ abstract class DataFile {
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
   : Iterator[InternalRow]
+  def initDict(conf: Configuration, ordinal: Int): Dictionary
 }
 
 private[spinach] object DataFile {
-  def apply(path: String, schema: StructType, dataFileClassName: String): DataFile = {
+  def apply(path: String, schema: StructType,
+            dataFileClassName: String, codecString: String): DataFile = {
     Try(Utils.classForName(dataFileClassName).getDeclaredConstructor(
-      classOf[String], classOf[StructType])).toOption match {
+      classOf[String], classOf[StructType], classOf[String])).toOption match {
       case Some(ctor) =>
-        Try (ctor.newInstance(path, schema).asInstanceOf[DataFile]) match {
+        Try (ctor.newInstance(path, schema, codecString).asInstanceOf[DataFile]) match {
           case Success(e) => e
           case Failure(e) =>
             throw new SpinachException(s"Cannot instantiate class $dataFileClassName", e)

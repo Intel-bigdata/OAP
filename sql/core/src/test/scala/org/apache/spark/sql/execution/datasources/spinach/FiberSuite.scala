@@ -99,7 +99,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     for (i <- 0 until rowCounts.length) {
       val path = new Path(file.getAbsolutePath, rowCounts(i).toString)
       writeData(path, schema, rowCounts(i))
-      val meta = SpinachDataFile(path.toString, schema).createDataFileHandle(conf)
+      val meta = SpinachDataFile(path.toString, schema, "UNCOMPRESSED").createDataFileHandle(conf)
       assert(meta.totalRowCount() === rowCounts(i))
       assert(meta.rowCountInLastGroup === rowCountInLastGroups(i))
       assert(meta.rowGroupsMeta.length === rowGroupCounts(i))
@@ -119,7 +119,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     val path = new Path(file.getAbsolutePath, 10.toString)
     writeData(path, schema, 10)
 
-    val meta = SpinachDataFile(path.toString, schema).createDataFileHandle(conf)
+    val meta = SpinachDataFile(path.toString, schema, "UNCOMPRESSED").createDataFileHandle(conf)
     assert(meta.totalRowCount() === 10)
     assert(meta.rowCountInEachGroup === 12345)
     assert(meta.rowCountInLastGroup === 10)
@@ -137,7 +137,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       path: Path,
       schema: StructType, count: Int): Unit = {
     val out = FileSystem.get(conf).create(path, true)
-    val writer = new SpinachDataWriter(false, out, schema)
+    val writer = new SpinachDataWriter(false, out, schema, conf)
     val row = new GenericMutableRow(schema.fields.length)
     for(i <- 0 until count) {
       schema.fields.zipWithIndex.foreach { entry =>

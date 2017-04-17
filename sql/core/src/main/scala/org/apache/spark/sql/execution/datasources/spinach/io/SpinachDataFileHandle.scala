@@ -18,34 +18,57 @@
 package org.apache.spark.sql.execution.datasources.spinach.io
 
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
+import org.apache.parquet.format.Encoding
 
 
 //  Meta Part Format
 //  ..
 //  Field                               Length In Byte
 //  Meta
-//    RowGroup Meta #1                  16 + 4 * Field Count In Each Row
+//    RowGroup Meta #1                  16 + 4 * Field Count In Each Row * 2
 //      RowGroup StartPosition          8
 //      RowGroup EndPosition            8
 //      Fiber #1 Length                 4
 //      Fiber #2 Length                 4
 //      ...
 //      Fiber #N Length                 4
-//    RowGroup Meta #2                  16 + 4 * Field Count In Each Row
-//    RowGroup Meta #3                  16 + 4 * Field Count In Each Row
-//    ..                                16 + 4 * Field Count In Each Row
-//    RowGroup Meta #N                  16 + 4 * Field Count In Each Row
+//      Fiber #1 Uncompressed Length    4
+//      Fiber #2 Uncompressed Length    4
+//      ...
+//      Fiber #N Uncompressed Length    4
+//    RowGroup Meta #2                  16 + 4 * Field Count In Each Row * 2
+//    RowGroup Meta #3                  16 + 4 * Field Count In Each Row * 2
+//    ..                                16 + 4 * Field Count In Each Row * 2
+//    RowGroup Meta #N                  16 + 4 * Field Count In Each Row * 2
+//    Column Encoding                   4 * Field Count In Each Row
+//      Column #1 Encoding              4
+//      Column #2 Encoding              4
+//      ...
+//      Column #N Encoding              4
+//    Column Dict Data Length           4 * Field Count In Each Row
+//      Column #1 Dict Data Length      4
+//      Column #2 Dict Data Length      4
+//      ...
+//      Column #N Dict Data Length      4
+//    Column Dict Size                  4 * Field Count In Each Row
+//      Column #1 Dict Size             4
+//      Column #2 Dict Size             4
+//      ...
+//      Column #N Dict Size             4
+//    Compression Codec                 4
 //    Row Count In Each Row Group       4
 //    Row Count In Last Row Group       4
 //    Row Group Count                   4
 //    Field Count In each Row           4
 
 private[spinach] class RowGroupMeta {
+
   var start: Long = _
   var end: Long = _
   var fiberLens: Array[Int] = _
+  var fiberCompressedLens: Array[Int] = _
+  var fiberEncodings: Array[Encoding] = _
 
   def withNewStart(newStart: Long): RowGroupMeta = {
     this.start = newStart
@@ -62,12 +85,34 @@ private[spinach] class RowGroupMeta {
     this
   }
 
+  def withNewFiberCompressedLens(fiberCompressedLens: Array[Int]): RowGroupMeta = {
+    this.fiberCompressedLens = fiberCompressedLens
+    this
+  }
+
+  def withNewFiberEncodings(newFiberEncodings: Array[Encoding]): RowGroupMeta = {
+    this.fiberEncodings = newFiberEncodings
+    this
+  }
+
   def write(os: FSDataOutputStream): RowGroupMeta = {
     os.writeLong(start)
     os.writeLong(end)
     var i = 0
     while (i < fiberLens.length) {
       os.writeInt(fiberLens(i))
+      i += 1
+    }
+
+    i = 0
+    while (i < fiberCompressedLens.length) {
+      os.writeInt(fiberCompressedLens(i))
+      i += 1
+    }
+
+    i = 0
+    while (i < fiberEncodings.length) {
+      os.writeInt(fiberEncodings(i).getValue)
       i += 1
     }
 
@@ -78,10 +123,24 @@ private[spinach] class RowGroupMeta {
     start = is.readLong()
     end = is.readLong()
     fiberLens = new Array[Int](fieldCount)
+    fiberCompressedLens = new Array[Int](fieldCount)
+    fiberEncodings = new Array[Encoding](fieldCount)
 
     var idx = 0
     while(idx < fieldCount) {
       fiberLens(idx) = is.readInt()
+      idx += 1
+    }
+
+    idx = 0
+    while(idx < fieldCount) {
+      fiberCompressedLens(idx) = is.readInt()
+      idx += 1
+    }
+
+    idx = 0
+    while (idx < fieldCount) {
+      fiberEncodings(idx) = Encoding.findByValue(is.readInt())
       idx += 1
     }
 
@@ -95,6 +154,10 @@ private[spinach] class SpinachDataFileHandle(
    var rowCountInLastGroup: Int = 0,
    var groupCount: Int = 0,
    var fieldCount: Int = 0) extends DataFileHandle {
+
+  var dictDataLens: Array[Int] = _
+  var dictSizes: Array[Int] = _
+
   private var _fin: FSDataInputStream = null
   private var _len: Long = 0
 
@@ -124,6 +187,16 @@ private[spinach] class SpinachDataFileHandle(
     this
   }
 
+  def withDictDataLens(dictDataLengths: Array[Int]): SpinachDataFileHandle = {
+    this.dictDataLens = dictDataLengths
+    this
+  }
+
+  def withDictSizes(dictSizes: Array[Int]): SpinachDataFileHandle = {
+    this.dictSizes = dictSizes
+    this
+  }
+
   private def validateConsistency(): Unit = {
     require(rowGroupsMeta.length == groupCount,
       s"Row Group Meta Count isn't equals to $groupCount")
@@ -135,6 +208,18 @@ private[spinach] class SpinachDataFileHandle(
     var i = 0
     while (i < this.groupCount) {
       rowGroupsMeta(i).write(os)
+      i += 1
+    }
+
+    i = 0
+    while (i < fieldCount) {
+      os.writeInt(dictDataLens(i))
+      i += 1
+    }
+
+    i = 0
+    while (i < fieldCount) {
+      os.writeInt(dictSizes(i))
       i += 1
     }
 
@@ -155,10 +240,23 @@ private[spinach] class SpinachDataFileHandle(
     this.groupCount = is.readInt()
     this.fieldCount = is.readInt()
 
-    // seek to the start position of Meta
-    val rowGroupMetaPos = fileLen - 16  - groupCount * (16 + 4 * fieldCount)
-    is.seek(rowGroupMetaPos)
+    is.seek(fileLen - 16L - this.fieldCount * 8)
+    this.dictDataLens = new Array[Int](fieldCount)
+    this.dictSizes = new Array[Int](fieldCount)
     var i = 0
+    while (i < fieldCount) {
+      this.dictDataLens(i) = is.readInt()
+      i += 1
+    }
+    i = 0
+    while (i < fieldCount) {
+      this.dictSizes(i) = is.readInt()
+      i += 1
+    }
+    // seek to the start position of Meta
+    val rowGroupMetaPos = fileLen - 16  - this.fieldCount * 8 - groupCount * (16 + 4 * fieldCount * 3)
+    is.seek(rowGroupMetaPos)
+    i = 0
     while(i < groupCount) {
       rowGroupsMeta.append(new RowGroupMeta().read(is, this.fieldCount))
       i += 1

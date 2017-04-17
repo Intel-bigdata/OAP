@@ -17,38 +17,178 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.io
 
+import java.io.ByteArrayInputStream
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
-
+import org.apache.parquet.bytes.{BytesInput, BytesUtils}
+import org.apache.parquet.column.Dictionary
+import org.apache.parquet.column.page.DictionaryPage
+import org.apache.parquet.column.values.deltastrings.DeltaByteArrayReader
+import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.PlainBinaryDictionary
+import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridDecoder
+import org.apache.parquet.format.Encoding
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.spinach.filecache._
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{BooleanType, IntegerType, StructType}
 import org.apache.spark.unsafe.Platform
+import org.apache.spark.unsafe.types.UTF8String
+import org.apache.spark.util.collection.BitSet
 
+private[spinach] case class SpinachDataFile(path: String,
+                                            schema: StructType,
+                                            codecString: String) extends DataFile {
 
-private[spinach] case class SpinachDataFile(path: String, schema: StructType) extends DataFile {
-
+  def initDict(conf: Configuration, ordinal: Int): Dictionary = {
+    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
+    val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)
+    val dictDataLens = meta.dictDataLens
+    var dictStart = lastGroupMeta.end
+    var i = 0
+    while (i < ordinal) {
+      dictStart += dictDataLens(i)
+      i += 1
+    }
+    val dataLen = dictDataLens(ordinal)
+    val dictSize = meta.dictSizes(ordinal)
+    val bytes = new Array[Byte](dataLen)
+    val is = meta.fin
+    is.synchronized{
+      is.seek(dictStart)
+      is.readFully(bytes)
+    }
+    val dictionaryPage = new DictionaryPage(BytesInput.from(bytes), dictSize,
+                            org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
+    new PlainBinaryDictionary(dictionaryPage)
+  }
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
     val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
     val groupMeta = meta.rowGroupsMeta(groupId)
+    val codecFactory = new CodecFactory(conf)
+    val decompressor: BytesDecompressor = codecFactory.getDecompressor(codecString)
+
     // get the fiber data start position
     // TODO: update the meta to store the fiber start pos
     var i = 0
     var fiberStart = groupMeta.start
     while (i < fiberId) {
-      fiberStart += groupMeta.fiberLens(i)
+      fiberStart += groupMeta.fiberCompressedLens(i)
       i += 1
     }
-    val len = groupMeta.fiberLens(fiberId)
+    val len = groupMeta.fiberCompressedLens(fiberId)
+    val uncompressedLen = groupMeta.fiberLens(fiberId)
+    val encoding = groupMeta.fiberEncodings(fiberId)
     val bytes = new Array[Byte](len)
 
     val is = meta.fin
     is.synchronized {
       is.seek(fiberStart)
       is.readFully(bytes)
-      putToFiberCache(bytes)
+    }
+
+    val decompressed = decompressor.decompress(bytes, uncompressedLen)
+    // TODO: Create a Decoder class for decoding and construct FiberCache.
+    // TODO: What is a Fiber? Compressed data or Encoded data or Raw data?
+    encoding match {
+      case Encoding.RLE =>
+        val rowCount = meta.rowCountInEachGroup
+        val typeDefaultSize = BooleanType.defaultSize
+        val fiberBytes = new Array[Byte](rowCount / 8 + rowCount * typeDefaultSize)
+        val baseOffset = Platform.BYTE_ARRAY_OFFSET + rowCount / 8
+
+        val bs = new BitSet(rowCount)
+        Platform.copyMemory(decompressed, Platform.BYTE_ARRAY_OFFSET,
+          bs.toLongArray(), Platform.LONG_ARRAY_OFFSET, bs.toLongArray().length * 8)
+
+        Platform.copyMemory(decompressed, Platform.BYTE_ARRAY_OFFSET,
+          fiberBytes, Platform.LONG_ARRAY_OFFSET, rowCount / 8)
+
+        val in = new ByteArrayInputStream(decompressed, bs.toLongArray().length * 8 + 4,
+          decompressed.length - bs.toLongArray().length * 8 - 4)
+
+        val decoder = new RunLengthBitPackingHybridDecoder(1, in)
+
+        (0 until rowCount).foreach{i =>
+          if (bs.get(i)) {
+            Platform.putBoolean(fiberBytes,
+              baseOffset + i * typeDefaultSize, decoder.readInt() == 1)
+          }
+        }
+        putToFiberCache(fiberBytes)
+
+      case Encoding.DELTA_BYTE_ARRAY =>
+
+        val rowCount =
+          if (groupId == meta.groupCount - 1) meta.rowCountInLastGroup
+          else meta.rowCountInEachGroup
+        val baseOffset = Platform.BYTE_ARRAY_OFFSET + meta.rowCountInEachGroup / 8
+        var startValueOffset = meta.rowCountInEachGroup / 8 + rowCount * IntegerType.defaultSize * 2
+        val fiberSize = meta.rowCountInEachGroup / 8 + rowCount * 8 +
+          Platform.getInt(decompressed, baseOffset)
+
+        val fiberBytes = new Array[Byte](fiberSize)
+
+        val bs = new BitSet(meta.rowCountInEachGroup)
+        Platform.copyMemory(decompressed, Platform.BYTE_ARRAY_OFFSET,
+          bs.toLongArray(), Platform.LONG_ARRAY_OFFSET, bs.toLongArray().length * 8)
+
+        Platform.copyMemory(decompressed, Platform.BYTE_ARRAY_OFFSET,
+          fiberBytes, Platform.LONG_ARRAY_OFFSET, bs.toLongArray().length * 8)
+
+        val reader = new DeltaByteArrayReader()
+        reader.initFromPage(rowCount, decompressed, bs.toLongArray().length * 8 + 4)
+
+        (0 until rowCount).foreach{i =>
+          if (bs.get(i)) {
+            val value = reader.readBytes().getBytes()
+            Platform.putInt(fiberBytes,
+              baseOffset + IntegerType.defaultSize * i * 2, value.length)
+            Platform.putInt(fiberBytes,
+              baseOffset + IntegerType.defaultSize * (i * 2 + 1), startValueOffset)
+            Platform.copyMemory(value, Platform.BYTE_ARRAY_OFFSET, fiberBytes,
+              Platform.BYTE_ARRAY_OFFSET + startValueOffset, value.length)
+            startValueOffset += value.length
+          }
+        }
+
+        putToFiberCache(fiberBytes)
+
+      case Encoding.PLAIN_DICTIONARY =>
+
+        val rowCount =
+          if (groupId == meta.groupCount - 1) meta.rowCountInLastGroup
+          else meta.rowCountInEachGroup
+        val baseOffset = Platform.BYTE_ARRAY_OFFSET + meta.rowCountInEachGroup / 8
+        var startValueOffset = meta.rowCountInEachGroup / 8 + rowCount * IntegerType.defaultSize * 2
+        val fiberSize = meta.rowCountInEachGroup / 8 + rowCount * 8 +
+          Platform.getInt(decompressed, baseOffset)
+
+        val fiberBytes = new Array[Byte](fiberSize)
+
+        val bs = new BitSet(meta.rowCountInEachGroup)
+        Platform.copyMemory(decompressed, Platform.BYTE_ARRAY_OFFSET,
+          bs.toLongArray(), Platform.LONG_ARRAY_OFFSET, bs.toLongArray().length * 8)
+
+        Platform.copyMemory(decompressed, Platform.BYTE_ARRAY_OFFSET,
+          fiberBytes, Platform.LONG_ARRAY_OFFSET, bs.toLongArray().length * 8)
+
+        val in = new ByteArrayInputStream(decompressed, bs.toLongArray().length * 8 + 4,
+          decompressed.length - bs.toLongArray().length * 8 - 4)
+
+        val bitWidth = BytesUtils.readIntLittleEndianOnOneByte(in)
+
+        val decoder = new RunLengthBitPackingHybridDecoder(bitWidth, in)
+        (0 until rowCount).foreach{i =>
+          if (bs.get(i)) {
+            Platform.putInt(fiberBytes,
+              baseOffset + IntegerType.defaultSize * i, decoder.readInt())
+          }
+        }
+        putToFiberCache(fiberBytes)
+
+      case _ => putToFiberCache(decompressed)
     }
   }
 
@@ -67,11 +207,16 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     (0 until meta.groupCount).iterator.flatMap { groupId =>
+      val groupMeta = meta.rowGroupsMeta(groupId)
       var i = 0
       while (i < columns.length) {
+        val encoding = groupMeta.fiberEncodings(i)
+        val dataType =
+          if (encoding == Encoding.PLAIN_DICTIONARY) IntegerType
+          else schema(requiredIds(i)).dataType
         columns(i) = new ColumnValues(
           meta.rowCountInEachGroup,
-          schema(requiredIds(i)).dataType,
+          dataType,
           FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
         i += 1
       }
@@ -98,12 +243,17 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
       val rowIdxInGroup = (rowId % meta.rowCountInEachGroup).toInt
 
       if (lastGroupId != groupId) {
+        val groupMeta = meta.rowGroupsMeta(groupId)
         // if we move to another row group, or the first row group
         var i = 0
         while (i < columns.length) {
+          val encoding = groupMeta.fiberEncodings(i)
+          val dataType =
+            if (encoding == Encoding.PLAIN_DICTIONARY) IntegerType
+            else schema(requiredIds(i)).dataType
           columns(i) = new ColumnValues(
             meta.rowCountInEachGroup,
-            schema(requiredIds(i)).dataType,
+            dataType,
             FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
           i += 1
         }
