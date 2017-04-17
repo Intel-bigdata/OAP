@@ -21,8 +21,10 @@ import java.io.ByteArrayOutputStream
 
 import org.apache.parquet.Ints
 import org.apache.parquet.bytes.BytesInput
+import org.apache.parquet.column.page.DictionaryPage
 import org.apache.parquet.column.values.delta.DeltaBinaryPackingValuesWriter
 import org.apache.parquet.column.values.deltalengthbytearray.DeltaLengthByteArrayValuesWriter
+import org.apache.parquet.column.values.dictionary.DictionaryValuesWriter.{PlainBinaryDictionaryValuesWriter, PlainFixedLenArrayDictionaryValuesWriter}
 import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridEncoder
 import org.apache.parquet.format.Encoding
 import org.apache.parquet.io.api.Binary
@@ -75,6 +77,9 @@ private[spinach] trait DataFiberBuilder {
   }
 
   def getEncoding(): Encoding = Encoding.PLAIN
+
+  def buildDictionary(): Array[Byte] = Array.empty[Byte]
+  def getDictionarySize: Int = 0
 }
 
 private[spinach] case class FixedSizeTypeFiberBuilder(
@@ -379,7 +384,52 @@ private[spinach] case class DeltaByteArrayFiberBuilder(
     previous = new Array[Byte](0)
     totalStringDataLengthInByte = 0
   }
+}
 
+private[spinach] case class PlainBinaryDictionaryFiberBuilder(
+  defaultRowGroupRowCount: Int,
+  ordinal: Int) extends DataFiberBuilder {
+
+  private var totalStringDataLengthInByte: Int = 0
+  private val valueWriter = new PlainBinaryDictionaryValuesWriter(1048576,
+    org.apache.parquet.column.Encoding.PLAIN_DICTIONARY,
+    org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
+
+  override protected def appendInternal(row: InternalRow): Unit = {
+    val v = Binary.fromConstantByteArray(row.getUTF8String(ordinal).getBytes)
+    val vb = v.getBytes
+    valueWriter.writeBytes(v)
+
+    totalStringDataLengthInByte += vb.length
+  }
+
+  override def getEncoding(): Encoding = Encoding.PLAIN_DICTIONARY
+
+  override def appendNull(): Unit = super.appendNull()
+
+  override def build(): FiberByteData = {
+    val bits = new Array[Byte](bitStream.toLongArray().length * 8)
+
+    Platform.copyMemory(bitStream.toLongArray(), Platform.LONG_ARRAY_OFFSET,
+      bits, Platform.BYTE_ARRAY_OFFSET, bitStream.toLongArray().length * 8)
+
+    val bytes = BytesInput.concat(BytesInput.from(bits),
+      BytesInput.fromInt(totalStringDataLengthInByte),
+      valueWriter.getBytes).toByteArray
+
+    FiberByteData(bytes)
+  }
+
+  override def buildDictionary(): Array[Byte] = {
+    valueWriter.createDictionaryPage().getBytes.toByteArray
+  }
+
+  override def getDictionarySize: Int = {
+    valueWriter.getDictionarySize
+  }
+  override def clear(): Unit = {
+    valueWriter.reset()
+  }
 }
 
 object DataFiberBuilder {
@@ -404,7 +454,11 @@ object DataFiberBuilder {
       case ShortType =>
         new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ShortType)
       case StringType =>
-        new DeltaByteArrayFiberBuilder(defaultRowGroupRowCount, ordinal)
+        if (true) { // TODO: add statistics condition
+          new PlainBinaryDictionaryFiberBuilder(defaultRowGroupRowCount, ordinal)
+        } else {
+          new DeltaByteArrayFiberBuilder(defaultRowGroupRowCount, ordinal)
+        }
       case _ => throw new NotImplementedError("not implemented type for fiber builder")
     }
   }

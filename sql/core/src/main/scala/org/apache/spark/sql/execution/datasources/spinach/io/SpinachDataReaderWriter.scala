@@ -21,11 +21,12 @@ import java.io.ByteArrayOutputStream
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
+import org.apache.parquet.column.Dictionary
 import org.apache.parquet.format.Encoding
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.DataSourceMeta
-import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberBuilder
+import org.apache.spark.sql.execution.datasources.spinach.filecache.{DataFiberBuilder, DataFileHandleCacheManager}
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
@@ -108,11 +109,23 @@ private[spinach] class SpinachDataWriter(
       writeRowGroup()
     }
 
+    val dictDataLens = new Array[Int](rowGroup.length)
+    val dictSizes = new Array[Int](rowGroup.length)
+    var idx: Int = 0
+    while (idx < rowGroup.length) {
+      val dictByteData = rowGroup(idx).buildDictionary()
+      dictDataLens(idx) = dictByteData.length
+      dictSizes(idx) = rowGroup(idx).getDictionarySize
+      if (dictByteData.length > 0) out.write(dictByteData)
+      idx += 1
+    }
     // and update the group count and row count in the last group
     fiberMeta
       .withGroupCount(rowGroupCount)
       .withRowCountInLastGroup(
         if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else DEFAULT_ROW_GROUP_SIZE)
+      .withDictDataLens(dictDataLens)
+      .withDictSizes(dictSizes)
 
     fiberMeta.write(out)
     out.close()
@@ -125,10 +138,18 @@ private[spinach] class SpinachDataReader(
   filterScanner: Option[IndexScanner],
   requiredIds: Array[Int]) extends Logging {
 
+  private var fileMeta: SpinachDataFileHandle = _
+  private var fileScanner: DataFile = _
+
+  def initDict(conf: Configuration, ordinal: Int): Dictionary = {
+    fileScanner.initDict(conf, ordinal)
+  }
+  def getFileMeta(): SpinachDataFileHandle = fileMeta
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     logDebug("Initializing SpinachDataReader...")
     // TODO how to save the additional FS operation to get the Split size
-    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, meta.codec)
+    fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, meta.codec)
+    fileMeta = DataFileHandleCacheManager(fileScanner, conf)
 
     val start = System.currentTimeMillis()
     filterScanner match {
