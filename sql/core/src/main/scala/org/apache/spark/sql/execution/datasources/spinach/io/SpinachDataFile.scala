@@ -33,6 +33,10 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
     val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
     val groupMeta = meta.rowGroupsMeta(groupId)
+
+    val codecFactory = new CodecFactory(conf)
+    val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
+
     // get the fiber data start position
     // TODO: update the meta to store the fiber start pos
     var i = 0
@@ -42,14 +46,16 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
       i += 1
     }
     val len = groupMeta.fiberLens(fiberId)
+    val uncompressedLen = groupMeta.fiberUncompressedLens(fiberId)
+
     val bytes = new Array[Byte](len)
 
     val is = meta.fin
     is.synchronized {
       is.seek(fiberStart)
       is.readFully(bytes)
-      putToFiberCache(bytes)
     }
+    putToFiberCache(decompressor.decompress(bytes, uncompressedLen))
   }
 
   private def putToFiberCache(buf: Array[Byte]): DataFiberCache = {

@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
+import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
@@ -35,7 +36,8 @@ import org.apache.spark.unsafe.Platform
 private[spinach] class SpinachDataWriter(
     isCompressed: Boolean,
     out: FSDataOutputStream,
-    schema: StructType) extends Logging {
+    schema: StructType,
+    conf: Configuration) extends Logging {
   // Using java options to config
   // NOTE: java options should not start with spark (e.g. "spark.xxx.xxx"), or it cannot pass
   // the config validation of SparkConf
@@ -43,6 +45,8 @@ private[spinach] class SpinachDataWriter(
   private def DEFAULT_ROW_GROUP_SIZE = System.getProperty("spinach.rowgroup.size",
     "1024").toInt
   logDebug(s"spinach.rowgroup.size setting to ${DEFAULT_ROW_GROUP_SIZE}")
+  private def COMPRESSION_CODEC_NAME = System.getProperty("spinach.compression.codec", "GZIP")
+  logDebug(s"spinach.compression.codec setting to ${COMPRESSION_CODEC_NAME}")
   private var rowCount: Int = 0
   private var rowGroupCount: Int = 0
 
@@ -50,7 +54,13 @@ private[spinach] class SpinachDataWriter(
     DataFiberBuilder.initializeFromSchema(schema, DEFAULT_ROW_GROUP_SIZE)
 
   private val fiberMeta = new SpinachDataFileHandle(
-    rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE, fieldCount = schema.length)
+    rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE,
+    fieldCount = schema.length,
+    codec = CompressionCodec.valueOf(COMPRESSION_CODEC_NAME))
+
+  private val codecFactory = new CodecFactory(conf)
+  private val compressor: BytesCompressor =
+    codecFactory.getCompressor(CompressionCodec.valueOf(COMPRESSION_CODEC_NAME))
 
   def write(row: InternalRow) {
     var idx = 0
@@ -67,18 +77,21 @@ private[spinach] class SpinachDataWriter(
   private def writeRowGroup(): Unit = {
     rowGroupCount += 1
     val fiberLens = new Array[Int](rowGroup.length)
+    val fiberUncompressedLens = new Array[Int](rowGroup.length)
     var idx: Int = 0
     var totalDataSize = 0L
     val rowGroupMeta = new RowGroupMeta()
 
     rowGroupMeta.withNewStart(out.getPos)
       .withNewFiberLens(fiberLens)
-      .withNewUncompressedFiberLens(fiberLens)
+      .withNewUncompressedFiberLens(fiberUncompressedLens)
     while (idx < rowGroup.length) {
       val fiberByteData = rowGroup(idx).build()
-      val newFiberData = fiberByteData.fiberData
+      val newUncompressedFiberData = fiberByteData.fiberData
+      val newFiberData = compressor.compress(newUncompressedFiberData)
       totalDataSize += newFiberData.length
       fiberLens(idx) = newFiberData.length
+      fiberUncompressedLens(idx) = newUncompressedFiberData.length
       out.write(newFiberData)
       rowGroup(idx).clear()
       idx += 1
