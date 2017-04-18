@@ -70,7 +70,9 @@ private[spinach] class SpinachDataWriter(
     var totalDataSize = 0L
     val rowGroupMeta = new RowGroupMeta()
 
-    rowGroupMeta.withNewStart(out.getPos).withNewFiberLens(fiberLens)
+    rowGroupMeta.withNewStart(out.getPos)
+      .withNewFiberLens(fiberLens)
+      .withNewUncompressedFiberLens(fiberLens)
     while (idx < rowGroup.length) {
       val fiberByteData = rowGroup(idx).build()
       val newFiberData = fiberByteData.fiberData
