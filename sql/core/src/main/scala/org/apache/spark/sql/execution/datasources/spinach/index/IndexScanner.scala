@@ -19,16 +19,19 @@ package org.apache.spark.sql.execution.datasources.spinach.index
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
+import org.apache.parquet.format.Encoding
+import org.apache.parquet.io.api.Binary
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach._
-import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
+import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFileHandleCacheManager
+import org.apache.spark.sql.execution.datasources.spinach.io.{DataFile, SpinachDataFileHandle}
+import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.unsafe.types.UTF8String
 
 
 private[spinach] object IndexScanner {
@@ -38,7 +41,7 @@ private[spinach] object IndexScanner {
 
 
 private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
-  extends Iterator[Long] with Serializable with Logging{
+  extends Iterator[Long] with Serializable with Logging {
 
   // TODO Currently, only B+ tree supports indexs, so this flag is toggled only in
   // BPlusTreeScanner we can add other index-aware stats for other type of index later
@@ -47,8 +50,10 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
   @transient protected var ordering: Ordering[Key] = _
   var intervalArray: ArrayBuffer[RangeInterval] = _
   protected var keySchema: StructType = _
+  protected var castedSchema: StructType = _
 
   def meta: IndexMeta = idxMeta
+
   def getSchema: StructType = keySchema
 
   def existRelatedIndexFile(dataPath: Path, conf: Configuration): Boolean = {
@@ -63,13 +68,52 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner
 
-  def transformIntervals(): Unit = {
+  def transformIntervals(dataPath: Path, conf: Configuration): Unit = {
+
+    val dataSourceMeta = SpinachUtils.getMeta(conf, dataPath.getParent) match {
+      case Some(m) => m
+    }
+
+    val dataFile = DataFile(dataPath.toString, dataSourceMeta.schema,
+      dataSourceMeta.dataReaderClassName, dataSourceMeta.codec)
+
+    val fileMeta: SpinachDataFileHandle = DataFileHandleCacheManager(dataFile, conf)
+
+    val keySchema = getSchema
+    val keyDicts = keySchema.map { field =>
+      val ordinal = dataSourceMeta.schema.fields.indexOf(field)
+      fileMeta.rowGroupsMeta(0).fiberEncodings(ordinal) match {
+        case Encoding.PLAIN_DICTIONARY => Some(dataFile.initDict(conf, ordinal))
+        case _ => None
+      }
+    }
+
+    castedSchema = StructType(keySchema.zipWithIndex.map { value =>
+      keyDicts(value._2) match {
+        case Some(_) =>
+          StructField(value._1.name, IntegerType, value._1.nullable, value._1.metadata)
+        case None => value._1
+      }
+    })
+
     def transformKey(key: Key): Key = {
-      val values = key.toSeq(getSchema).zipWithIndex.map { value =>
-        // 1. Get Encoding for each column
-        // 2. Get Dict if Encoding is DICTIONARY
-        // 3. Transform value to DICT ID
-        value._1
+      val values = keySchema.zipWithIndex.map{ value =>
+        keyDicts(value._2) match {
+          case Some(dict) =>
+            value._1.dataType match {
+              case StringType =>
+                (0 to dict.getMaxId).filter{i =>
+                  UTF8String.fromBytes(dict.decodeToBinary(i).getBytes)
+                    .equals(key.getUTF8String(value._2))
+                }.headOption match {
+                  case Some(v) => v
+                  case None => -1
+                }
+
+              case _ => key.get(value._2, value._1.dataType)
+            }
+          case _ => key.get(value._2, value._1.dataType)
+        }
       }
       InternalRow.fromSeq(values)
     }
@@ -81,6 +125,7 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
         interval.endInclude)
     }
   }
+}
 
 // A dummy scanner will actually not do any scanning
 private[spinach] object DUMMY_SCANNER extends IndexScanner(null) {

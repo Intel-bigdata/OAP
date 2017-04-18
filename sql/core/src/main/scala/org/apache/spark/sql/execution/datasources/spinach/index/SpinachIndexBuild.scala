@@ -100,6 +100,15 @@ private[spinach] case class SpinachIndexBuild(
         val hadoopConf = confBroadcast.value.value
         val it = reader.initialize(confBroadcast.value.value)
 
+        val dictLens = reader.getFileMeta().dictDataLens
+        val castedSchema = StructType(keySchema.zipWithIndex.map { value =>
+          dictLens(ids(value._2)) match {
+            case 0 =>
+              value._1
+            case _ =>
+              StructField(value._1.name, IntegerType, value._1.nullable, value._1.metadata)
+          }
+        })
         indexType match {
           case BTreeIndexType =>
             // key -> RowIDs list
@@ -167,7 +176,7 @@ private[spinach] case class SpinachIndexBuild(
             uniqueKeysList.addAll(uniqueKeys.toSeq.asJava)
 
             val treeOffset = writeTreeToOut(treeShape, fileOut, offsetMap,
-              fileOffset, uniqueKeysList, keySchema, 0, -1L)
+              fileOffset, uniqueKeysList, castedSchema, 0, -1L)
 
             val stTypes = hadoopConf.getStrings(Statistics.Statistics_Type_Name)
             if (stTypes != null && stTypes.length > 0) {
@@ -182,7 +191,7 @@ private[spinach] case class SpinachIndexBuild(
                     case _ =>
                       throw new UnsupportedOperationException(s"non-supported statistic in id $t")
                   }
-                  st.write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
+                  st.write(castedSchema, fileOut, uniqueKeys, hashMap, offsetMap)
                 }
               })
             }
@@ -197,7 +206,7 @@ private[spinach] case class SpinachIndexBuild(
           case BloomFilterIndexType =>
             val bf_index = new BloomFilter()
             var elemCnt = 0 // element count
-          val boundReference = keySchema.zipWithIndex.map(x =>
+          val boundReference = castedSchema.zipWithIndex.map(x =>
             BoundReference(x._2, x._1.dataType, nullable = true))
             // for multi-column index, add all subsets into bloom filter
             // For example, a column with a = 1, b = 2, a and b are index columns
@@ -207,7 +216,10 @@ private[spinach] case class SpinachIndexBuild(
             while (it.hasNext) {
               val row = it.next()
               elemCnt += 1
-              projector.foreach(p => bf_index.addValue(p(row).getBytes))
+              projector.foreach{ p =>
+                val v = p(row).getBytes
+                bf_index.addValue(v)
+              }
             }
             val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
             val fs = indexFile.getFileSystem(hadoopConf)

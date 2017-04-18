@@ -19,8 +19,7 @@ package org.apache.spark.sql.execution.datasources.spinach.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
-import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
+import org.apache.spark.sql.catalyst.expressions.{BoundReference, UnsafeProjection}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach._
 import org.apache.spark.sql.execution.datasources.spinach.filecache._
@@ -49,14 +48,15 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta) extends IndexScann
   lazy val equalValues: Array[Key] = { // get equal value from intervalArray
     if (intervalArray.nonEmpty) {
       // should not use ordering.compare here
-      intervalArray.filter(interval => (interval.start eq interval.end)
+      intervalArray.filter(interval => (interval.start equals interval.end)
         && interval.startInclude && interval.endInclude).map(_.start).toArray
     } else null
   }
 
   override def initialize(inputPath: Path, configuration: Configuration): IndexScanner = {
     assert(keySchema ne null)
-    this.ordering = GenerateOrdering.create(keySchema)
+    transformIntervals(inputPath, configuration)
+    this.ordering = GenerateOrdering.create(castedSchema)
 
     val path = IndexUtils.indexFileFromDataFile(inputPath, meta.name)
     val indexScanner = IndexFiber(IndexFile(path))
@@ -76,13 +76,14 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta) extends IndexScann
     }).toArray
 
     bloomFilter = BloomFilter(bitSetLongArr, numOfHashFunc)
-
-    val projector = UnsafeProjection.create(keySchema)
+    val projector = UnsafeProjection.create(castedSchema)
 
     // TODO need optimization while considering multi-column
     stopFlag = if (equalValues != null && equalValues.length > 0) {
-      !equalValues.map(value => bloomFilter
-        .checkExist(projector(value).getBytes))
+      !equalValues.map{value =>
+        val v = projector(value).getBytes
+        bloomFilter
+        .checkExist(v)}
         .reduceOption(_ || _).getOrElse(false)
     } else false
     curIdx = 0
