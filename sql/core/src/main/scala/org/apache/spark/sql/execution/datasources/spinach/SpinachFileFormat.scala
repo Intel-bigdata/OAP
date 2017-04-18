@@ -339,7 +339,7 @@ private[spinach] class SpinachOutputWriter(
     val fs: FileSystem = file.getFileSystem(sc.value)
     val fileOut: FSDataOutputStream = fs.create(file, false)
 
-    new SpinachDataWriter(isCompressed, fileOut, dataSchema)
+    new SpinachDataWriter(isCompressed, fileOut, dataSchema, sc.value)
   }
 
   override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
