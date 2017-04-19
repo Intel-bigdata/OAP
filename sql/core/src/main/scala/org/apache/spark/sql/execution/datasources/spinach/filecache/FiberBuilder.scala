@@ -22,6 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.parquet.format.Encoding
 
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.spinach.io.DeltaByteArrayFiberBuilder
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
@@ -71,7 +72,7 @@ private[spinach] trait DataFiberBuilder {
 
   def buildDictionary: Array[Byte] = Array.empty[Byte]
   def getDictionarySize: Int = 0
-  def resetDictionary: Unit = {}
+  def resetDictionary(): Unit = {}
 }
 
 private[spinach] case class FixedSizeTypeFiberBuilder(
@@ -290,26 +291,24 @@ private[spinach] case class StringFiberBuilder(
 object DataFiberBuilder {
   def apply(dataType: DataType, ordinal: Int, defaultRowGroupRowCount: Int): DataFiberBuilder = {
     dataType match {
-      case BinaryType =>
-        new BinaryFiberBuilder(defaultRowGroupRowCount, ordinal)
+      case BinaryType | StringType =>
+        DeltaByteArrayFiberBuilder(defaultRowGroupRowCount, ordinal, dataType)
       case BooleanType =>
-        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, BooleanType)
+        FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, BooleanType)
       case ByteType =>
-        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ByteType)
+        FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ByteType)
       case DateType =>
-        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, DateType)
+        FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, DateType)
       case DoubleType =>
-        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, DoubleType)
+        FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, DoubleType)
       case FloatType =>
-        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, FloatType)
+        FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, FloatType)
       case IntegerType =>
-        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, IntegerType)
+        FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, IntegerType)
       case LongType =>
-        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, LongType)
+        FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, LongType)
       case ShortType =>
-        new FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ShortType)
-      case StringType =>
-        new StringFiberBuilder(defaultRowGroupRowCount, ordinal)
+        FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ShortType)
       case _ => throw new NotImplementedError("not implemented type for fiber builder")
     }
   }
