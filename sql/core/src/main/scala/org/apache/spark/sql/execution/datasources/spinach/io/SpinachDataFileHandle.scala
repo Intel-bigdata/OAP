@@ -120,9 +120,9 @@ private[spinach] class SpinachDataFileHandle(
 
   // TODO: [Linhong] Dummy Value since these 3 arrays are not assigned for now.
   // TODO: [Linhong] Change to "_" after Encoding Code is ready
-  private var encodings = Array.fill(fieldCount)(Encoding.PLAIN)
-  private var dictionaryDataLens = new Array[Int](fieldCount)
-  private var dictionaryIdSizes = new Array[Int](fieldCount)
+  var encodings = Array.fill(fieldCount)(Encoding.PLAIN)
+  var dictionaryDataLens = new Array[Int](fieldCount)
+  var dictionaryIdSizes = new Array[Int](fieldCount)
 
   def fin: FSDataInputStream = _fin
   def len: Long = _len
