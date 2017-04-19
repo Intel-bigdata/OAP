@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
-import org.apache.parquet.format.CompressionCodec
+import org.apache.parquet.format.{CompressionCodec, Encoding}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
@@ -32,7 +32,7 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
-
+// TODO: [linhong] Let's remove the `isCompressed` argument
 private[spinach] class SpinachDataWriter(
     isCompressed: Boolean,
     out: FSDataOutputStream,
@@ -107,11 +107,15 @@ private[spinach] class SpinachDataWriter(
       writeRowGroup()
     }
 
+    val columnEncodings = new Array[Encoding](rowGroup.length)
+    (0 until rowGroup.length).foreach(i => columnEncodings(i) = rowGroup(i).getEncoding)
+
     // and update the group count and row count in the last group
     fiberMeta
       .withGroupCount(rowGroupCount)
       .withRowCountInLastGroup(
         if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else DEFAULT_ROW_GROUP_SIZE)
+      .withEncodings(columnEncodings)
 
     fiberMeta.write(out)
     out.close()

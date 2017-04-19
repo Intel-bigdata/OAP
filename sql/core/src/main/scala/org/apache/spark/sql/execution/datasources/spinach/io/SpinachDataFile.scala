@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
+import org.apache.parquet.format.Encoding
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.{BatchColumn, ColumnValues}
@@ -47,6 +48,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     }
     val len = groupMeta.fiberLens(fiberId)
     val uncompressedLen = groupMeta.fiberUncompressedLens(fiberId)
+    val encoding = meta.encodings(fiberId)
 
     val bytes = new Array[Byte](len)
 
@@ -55,7 +57,14 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
       is.seek(fiberStart)
       is.readFully(bytes)
     }
-    putToFiberCache(decompressor.decompress(bytes, uncompressedLen))
+
+    val dataType = schema(fiberId).dataType
+    val fiberParser = DataFiberParser(encoding, meta, dataType)
+    val rowCount =
+      if (groupId == meta.groupCount) meta.rowCountInLastGroup
+      else meta.rowCountInEachGroup
+
+    putToFiberCache(fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount))
   }
 
   private def putToFiberCache(buf: Array[Byte]): DataFiberCache = {
