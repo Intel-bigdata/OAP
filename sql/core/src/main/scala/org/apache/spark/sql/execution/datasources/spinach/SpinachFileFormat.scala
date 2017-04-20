@@ -35,6 +35,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjectio
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.spinach.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.spinach.io._
+import org.apache.spark.sql.execution.datasources.spinach.statistics.Statistics
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
@@ -178,6 +179,8 @@ private[sql] class SpinachFileFormat extends FileFormat
 
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
+        hadoopConf.setDouble(Statistics.thresName,
+          sparkSession.conf.get(SQLConf.SPINACH_FULL_SCAN_THRESHOLD))
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
