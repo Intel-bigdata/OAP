@@ -21,6 +21,7 @@ import scala.util.{Failure, Success, Try}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FSDataInputStream
+import org.apache.parquet.column.Dictionary
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.SpinachException
@@ -38,6 +39,7 @@ abstract class DataFile {
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
   : Iterator[InternalRow]
+  def getDictionaries(requiredIds: Array[Int], conf: Configuration): Array[Dictionary]
 }
 
 private[spinach] object DataFile {
