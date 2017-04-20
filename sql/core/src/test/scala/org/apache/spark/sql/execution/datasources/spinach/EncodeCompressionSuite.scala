@@ -41,14 +41,34 @@ class EncodeCompressionSuite extends QueryTest with SharedSQLContext with Before
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("spinach_test")
   }
-  test("filtering by string") {
+  test("encoding test") {
     val data: Seq[(Int, String, Double, Boolean)] = (1 to 300).map { i =>
       (i, s"this is test $i", i.toDouble, i % 13 == 0)
     }
-    data.toDF("int", "string", "double", "boolean").registerTempTable("t")
+    val df = data.toDF("a", "b", "c", "d")
+    df.createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
-    checkAnswer(sql("SELECT * FROM spinach_test"), data.toDF())
+    checkAnswer(sql("SELECT * FROM spinach_test"), df)
 
+    sql("create sindex index1 on spinach_test (a) USING BTREE")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
+      df.filter("a = 1"))
+    sql("drop sindex index1 on spinach_test")
+
+    sql("create sindex index2 on spinach_test (b) USING BTREE")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 1'"),
+      df.filter("b = 'this is test 1'"))
+    sql("drop sindex index2 on spinach_test")
+
+    sql("create sindex index3 on spinach_test (c) USING BITMAP")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE c = 1"),
+      df.filter("c = 1"))
+    sql("drop sindex index3 on spinach_test")
+
+    sql("create sindex index4 on spinach_test (d) USING BLOOM")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE d = true"),
+      df.filter("d = true"))
+    sql("drop sindex index4 on spinach_test")
   }
 }

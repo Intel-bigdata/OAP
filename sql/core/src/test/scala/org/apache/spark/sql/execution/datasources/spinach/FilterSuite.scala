@@ -282,15 +282,15 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test select * from t")
-    sql("create sindex index1 on spinach_test (a) using btree")
+    sql("create sindex index1 on spinach_test (b) using btree")
 
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 1'"),
       Row(1, "this is test 1") :: Nil)
 
     sql("insert into table spinach_test select * from t")
     sql("refresh sindex on spinach_test")
 
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 1'"),
       Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
   }
 

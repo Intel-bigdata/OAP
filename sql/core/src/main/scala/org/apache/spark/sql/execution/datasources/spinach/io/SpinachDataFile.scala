@@ -50,12 +50,16 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
         is.seek(dictStart)
         is.readFully(bytes)
       }
-      val dictionaryPage = new DictionaryPage(BytesInput.from(bytes), dictSize,
-        org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
-      schema(ordinal).dataType match {
-        case StringType | BinaryType => new PlainBinaryDictionary(dictionaryPage)
-        case IntegerType => new PlainIntegerDictionary(dictionaryPage)
-        case _ => null
+      if (dataLen == 0) {
+        null
+      } else {
+        val dictionaryPage = new DictionaryPage(BytesInput.from(bytes), dictSize,
+          org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
+        schema(ordinal).dataType match {
+          case StringType | BinaryType => new PlainBinaryDictionary(dictionaryPage)
+          case IntegerType => new PlainIntegerDictionary(dictionaryPage)
+          case _ => null
+        }
       }
     }
   }
@@ -113,7 +117,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     (0 until meta.groupCount).iterator.flatMap { groupId =>
       var i = 0
       while (i < columns.length) {
-        val encoding = meta.encodings(i)
+        val encoding = meta.encodings(requiredIds(i))
         val dataType =
           if (encoding == Encoding.PLAIN_DICTIONARY) IntegerType
           else schema(requiredIds(i)).dataType

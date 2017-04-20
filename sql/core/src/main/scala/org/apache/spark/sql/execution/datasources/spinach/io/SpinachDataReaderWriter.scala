@@ -29,7 +29,7 @@ import org.apache.spark.sql.execution.datasources.spinach.filecache.{DataFiberBu
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.types.{StructType, _}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
 
@@ -45,9 +45,9 @@ private[spinach] class SpinachDataWriter(
   // TODO make it configuration via SparkContext / Table Properties
   private def DEFAULT_ROW_GROUP_SIZE = System.getProperty("spinach.rowgroup.size",
     "1024").toInt
-  logDebug(s"spinach.rowgroup.size setting to ${DEFAULT_ROW_GROUP_SIZE}")
+  logDebug(s"spinach.rowgroup.size setting to $DEFAULT_ROW_GROUP_SIZE")
   private def COMPRESSION_CODEC_NAME = System.getProperty("spinach.compression.codec", "GZIP")
-  logDebug(s"spinach.compression.codec setting to ${COMPRESSION_CODEC_NAME}")
+  logDebug(s"spinach.compression.codec setting to $COMPRESSION_CODEC_NAME")
   private var rowCount: Int = 0
   private var rowGroupCount: Int = 0
 
@@ -117,6 +117,7 @@ private[spinach] class SpinachDataWriter(
       dictDataLens(i) = dictByteData.length
       dictSizes(i) = rowGroup(i).getDictionarySize
       if (dictDataLens(i) > 0) out.write(dictByteData)
+      rowGroup(i).resetDictionary()
     }
 
     // and update the group count and row count in the last group
@@ -141,6 +142,22 @@ private[spinach] class SpinachDataReader(
 
   private var fileScanner: DataFile = _
 
+  def getEncodedSchema(conf: Configuration, schema: StructType): StructType = {
+    if (fileScanner == null) sys.error("need initialize first")
+    if (meta.dataReaderClassName != classOf[SpinachDataFile].getCanonicalName) {
+      return schema
+    }
+    val fileMeta: SpinachDataFileHandle = DataFileHandleCacheManager(fileScanner, conf)
+
+    val encodedFields = schema.zipWithIndex.map {
+      case (field, ordinal)
+        if fileMeta.encodings(requiredIds(ordinal)) == Encoding.PLAIN_DICTIONARY =>
+        StructField(field.name, IntegerType, field.nullable)
+      case (field, _) => field
+    }
+    StructType(encodedFields)
+  }
+
   def hasDecodedColumn(conf: Configuration): Boolean = {
     if (fileScanner == null) sys.error("need initialize first")
     val fileMeta: SpinachDataFileHandle = DataFileHandleCacheManager(fileScanner, conf)
@@ -153,14 +170,11 @@ private[spinach] class SpinachDataReader(
                      requiredSchema: StructType): Iterator[InternalRow] = {
 
     if (fileScanner == null) sys.error("need initialize first")
+    if (iterator.isEmpty) return iterator
+
     val fileMeta: SpinachDataFileHandle = DataFileHandleCacheManager(fileScanner, conf)
 
-    val encodedFields = requiredSchema.zipWithIndex.map {
-      case (field, ordinal) if fileMeta.encodings(ordinal) == Encoding.PLAIN_DICTIONARY =>
-        StructField(field.name, field.dataType, field.nullable)
-      case (field, _) => field
-    }
-    val encodedSchema = StructType(encodedFields)
+    val encodedSchema = getEncodedSchema(conf, requiredSchema)
 
     val dictionaries = fileScanner.getDictionaries(requiredIds, conf)
 
@@ -238,7 +252,7 @@ private[spinach] class SpinachDataReader(
   private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
     if (!filterScanner.get.canBeOptimizedByStatistics) {
       StaticsAnalysisResult.USE_INDEX
-    } else if (filterScanner.get.intervalArray.length == 0) {
+    } else if (filterScanner.get.intervalArray.isEmpty) {
       StaticsAnalysisResult.SKIP_INDEX
     } else {
       val fs = indexPath.getFileSystem(conf)
@@ -269,8 +283,8 @@ private[spinach] class SpinachDataReader(
           case 2 => new PartedByValueStatistics
           case _ => throw new UnsupportedOperationException(s"non-supported statistic in id $id")
         }
-        val res = st.read(filterScanner.get.getSchema,
-          filterScanner.get.intervalArray, stsArray, arrayOffset)
+        val res = st.read(filterScanner.get.getEncodedSchema,
+          filterScanner.get.encodedIntervalArray, stsArray, arrayOffset)
         arrayOffset = st.arrayOffset
 
         if (res == StaticsAnalysisResult.SKIP_INDEX) {
