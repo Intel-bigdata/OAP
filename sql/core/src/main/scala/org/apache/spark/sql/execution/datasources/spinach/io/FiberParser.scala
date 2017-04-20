@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution.datasources.spinach.io
 
 import org.apache.parquet.column.values.deltastrings.DeltaByteArrayReader
+import org.apache.parquet.column.values.dictionary.DictionaryValuesReader
 import org.apache.parquet.format.Encoding
 
 import org.apache.spark.sql.types._
@@ -36,6 +37,7 @@ object DataFiberParser {
     encoding match {
       case Encoding.PLAIN => PlainDataFiberParser(meta)
       case Encoding.DELTA_BYTE_ARRAY => DeltaByteArrayDataFiberParser(meta, dataType)
+      case Encoding.PLAIN_DICTIONARY => PlainDictionaryFiberParser(meta, dataType)
       case _ => sys.error(s"Not support encoding type: $encoding")
     }
   }
@@ -86,6 +88,42 @@ private[spinach] case class DeltaByteArrayDataFiberParser(
             Platform.copyMemory(value, Platform.BYTE_ARRAY_OFFSET, fiberBytes,
               Platform.BYTE_ARRAY_OFFSET + startValueOffset, value.length)
             startValueOffset += value.length
+          }
+        }
+        fiberBytes
+      case _ => sys.error(s"Not support data type: $dataType")
+    }
+  }
+}
+
+private[spinach] case class PlainDictionaryFiberParser(
+  meta: SpinachDataFileHandle, dataType: DataType) extends DataFiberParser {
+
+  // TODO: [linhong] Trick! We don't need decode dictionary here. so null is OK
+  val valuesReader = new DictionaryValuesReader(null)
+
+  override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = {
+    val bits = new BitSet(meta.rowCountInEachGroup)
+    Platform.copyMemory(bytes, Platform.BYTE_ARRAY_OFFSET,
+      bits.toLongArray(), Platform.LONG_ARRAY_OFFSET, bits.toLongArray().length * 8)
+
+    val baseOffset = Platform.BYTE_ARRAY_OFFSET + bits.toLongArray().length * 8
+
+    dataType match {
+      case BinaryType | StringType | IntegerType =>
+        val fiberBytesLength = bits.toLongArray().length * 8 +
+          meta.rowCountInEachGroup * IntegerType.defaultSize
+        val fiberBytes = new Array[Byte](fiberBytesLength)
+
+        Platform.copyMemory(bytes, Platform.BYTE_ARRAY_OFFSET,
+          fiberBytes, Platform.LONG_ARRAY_OFFSET, bits.toLongArray().length * 8)
+
+        valuesReader.initFromPage(rowCount, bytes, bits.toLongArray().length * 8 + 4)
+
+        (0 until rowCount).foreach { i =>
+          if (bits.get(i)) {
+            Platform.putInt(fiberBytes,
+              baseOffset + IntegerType.defaultSize * i, valuesReader.readValueDictionaryId())
           }
         }
         fiberBytes

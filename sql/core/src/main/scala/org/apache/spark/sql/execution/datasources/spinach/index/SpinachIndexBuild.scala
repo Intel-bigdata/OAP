@@ -104,6 +104,11 @@ private[spinach] case class SpinachIndexBuild(
           val hadoopConf = confBroadcast.value.value
           val it = reader.initialize(confBroadcast.value.value)
 
+          // TODO: [linhong] Temp check here. Remove this after build index on encoded column
+          if (reader.hasDecodedColumn(confBroadcast.value.value)) {
+            sys.error("Not support build index for encoded column")
+          }
+
           indexType match {
             case BTreeIndexType =>
               // key -> RowIDs list

@@ -22,7 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.parquet.format.Encoding
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.spinach.io.DeltaByteArrayFiberBuilder
+import org.apache.spark.sql.execution.datasources.spinach.io.{DeltaByteArrayFiberBuilder, PlainBinaryDictionaryFiberBuilder, PlainIntegerDictionaryFiberBuilder}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
@@ -290,9 +290,17 @@ private[spinach] case class StringFiberBuilder(
 
 object DataFiberBuilder {
   def apply(dataType: DataType, ordinal: Int, defaultRowGroupRowCount: Int): DataFiberBuilder = {
+
+    // TODO: [linhong] Plan to determine dictionaryEnable by statistics
+    val dictionaryEnabled = System.getProperty("spinach.encoding.dictionaryEnabled", "false").toBoolean
+
     dataType match {
       case BinaryType | StringType =>
-        DeltaByteArrayFiberBuilder(defaultRowGroupRowCount, ordinal, dataType)
+        if (dictionaryEnabled) {
+          PlainBinaryDictionaryFiberBuilder(defaultRowGroupRowCount, ordinal, dataType)
+        } else {
+          DeltaByteArrayFiberBuilder(defaultRowGroupRowCount, ordinal, dataType)
+        }
       case BooleanType =>
         FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, BooleanType)
       case ByteType =>
@@ -304,7 +312,11 @@ object DataFiberBuilder {
       case FloatType =>
         FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, FloatType)
       case IntegerType =>
-        FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, IntegerType)
+        if (dictionaryEnabled) {
+          PlainIntegerDictionaryFiberBuilder(defaultRowGroupRowCount, ordinal, dataType)
+        } else {
+          FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, IntegerType)
+        }
       case LongType =>
         FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, LongType)
       case ShortType =>

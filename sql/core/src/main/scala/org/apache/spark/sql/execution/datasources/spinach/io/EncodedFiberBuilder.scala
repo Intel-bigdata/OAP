@@ -19,12 +19,13 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 
 import org.apache.parquet.bytes.BytesInput
 import org.apache.parquet.column.values.deltastrings.DeltaByteArrayWriter
+import org.apache.parquet.column.values.dictionary.DictionaryValuesWriter.{PlainBinaryDictionaryValuesWriter, PlainIntegerDictionaryValuesWriter}
 import org.apache.parquet.format.Encoding
 import org.apache.parquet.io.api.Binary
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.filecache.{DataFiberBuilder, FiberByteData}
-import org.apache.spark.sql.types.{BinaryType, DataType, StringType}
+import org.apache.spark.sql.types.{BinaryType, DataType, IntegerType, StringType}
 import org.apache.spark.unsafe.Platform
 
 private[spinach] case class DeltaByteArrayFiberBuilder (
@@ -66,6 +67,106 @@ private[spinach] case class DeltaByteArrayFiberBuilder (
 
   override def clear(): Unit = {
 
+    super.clear()
+    valuesWriter.reset()
+    dataLengthInBytes = 0
+  }
+}
+
+// TODO: [linhong] Code is similar to DeltaByteArrayFiberBuilder. Need abstract
+private[spinach] case class PlainBinaryDictionaryFiberBuilder(
+  defaultRowGroupRowCount: Int,
+  ordinal: Int,
+  dataType: DataType) extends DataFiberBuilder {
+
+  private val valuesWriter = new PlainBinaryDictionaryValuesWriter(1048576,
+    org.apache.parquet.column.Encoding.PLAIN_DICTIONARY,
+    org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
+
+  private var dataLengthInBytes: Int = _
+
+  override def getEncoding: Encoding = Encoding.PLAIN_DICTIONARY
+
+  override protected def appendInternal(row: InternalRow) = {
+
+    val value = dataType match {
+      case StringType => Binary.fromConstantByteArray(row.getUTF8String(ordinal).getBytes)
+      case BinaryType => Binary.fromConstantByteArray(row.getBinary(ordinal))
+      case _ => sys.error(s"Not support data type: $dataType")
+    }
+    valuesWriter.writeBytes(value)
+
+    dataLengthInBytes += value.getBytes.length
+  }
+
+  override def build(): FiberByteData = {
+
+    val bits = new Array[Byte](bitStream.toLongArray().length * 8)
+
+    Platform.copyMemory(bitStream.toLongArray(), Platform.LONG_ARRAY_OFFSET,
+      bits, Platform.BYTE_ARRAY_OFFSET, bitStream.toLongArray().length * 8)
+
+    val bytes = BytesInput.concat(BytesInput.from(bits),
+      BytesInput.fromInt(dataLengthInBytes),
+      valuesWriter.getBytes).toByteArray
+
+    FiberByteData(bytes)
+  }
+
+  override def buildDictionary: Array[Byte] =
+    valuesWriter.createDictionaryPage().getBytes.toByteArray
+
+  override def getDictionarySize: Int = valuesWriter.getDictionarySize
+
+  override def clear(): Unit = {
+    super.clear()
+    valuesWriter.reset()
+    dataLengthInBytes = 0
+  }
+}
+
+private[spinach] case class PlainIntegerDictionaryFiberBuilder(
+  defaultRowGroupRowCount: Int,
+  ordinal: Int,
+  dataType: DataType) extends DataFiberBuilder {
+
+  private val valuesWriter = new PlainIntegerDictionaryValuesWriter(1048576,
+    org.apache.parquet.column.Encoding.PLAIN_DICTIONARY,
+    org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
+
+  private var dataLengthInBytes: Int = _
+
+  override def getEncoding: Encoding = Encoding.PLAIN_DICTIONARY
+
+  override protected def appendInternal(row: InternalRow) = {
+
+    val value = dataType match {
+      case IntegerType => row.getInt(ordinal)
+      case _ => sys.error(s"Not support data type: $dataType")
+    }
+    valuesWriter.writeInteger(value)
+  }
+
+  override def build(): FiberByteData = {
+
+    val bits = new Array[Byte](bitStream.toLongArray().length * 8)
+
+    Platform.copyMemory(bitStream.toLongArray(), Platform.LONG_ARRAY_OFFSET,
+      bits, Platform.BYTE_ARRAY_OFFSET, bitStream.toLongArray().length * 8)
+
+    val bytes = BytesInput.concat(BytesInput.from(bits),
+      BytesInput.fromInt(currentRowId),
+      valuesWriter.getBytes).toByteArray
+
+    FiberByteData(bytes)
+  }
+
+  override def buildDictionary: Array[Byte] =
+    valuesWriter.createDictionaryPage().getBytes.toByteArray
+
+  override def getDictionarySize: Int = valuesWriter.getDictionarySize
+
+  override def clear(): Unit = {
     super.clear()
     valuesWriter.reset()
     dataLengthInBytes = 0
