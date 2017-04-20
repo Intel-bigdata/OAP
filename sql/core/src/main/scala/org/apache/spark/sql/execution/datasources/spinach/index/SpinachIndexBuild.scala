@@ -67,6 +67,12 @@ private[spinach] case class SpinachIndexBuild(
       hadoopConf.setDouble(Statistics.Sample_Based_SampleRate,
         sparkSession.conf.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE))
 
+      // bloom filter parameter
+      hadoopConf.setInt(SQLConf.SPINACH_BLOOMFILTER_MAXBITS.toString,
+        sparkSession.conf.get(SQLConf.SPINACH_BLOOMFILTER_MAXBITS))
+      hadoopConf.setInt(SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.toString,
+        sparkSession.conf.get(SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC))
+
       val fs = paths.head.getFileSystem(hadoopConf)
       val fileIters = paths.map(fs.listFiles(_, false))
       val dataPaths = fileIters.flatMap(fileIter => new Iterator[Path] {
@@ -199,9 +205,16 @@ private[spinach] case class SpinachIndexBuild(
               fileOut.close()
               IndexBuildResult(dataString, cnt, "", d.getParent.toString)
             case BloomFilterIndexType =>
-              val bf_index = new BloomFilter()
+              val bfMaxBits = hadoopConf.getInt(
+                SQLConf.SPINACH_BLOOMFILTER_MAXBITS.toString, 1 << 30)
+              val bfNumOfHashFunc = hadoopConf.getInt(
+                SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.toString, 3)
+              println(" " + bfMaxBits + " " + bfNumOfHashFunc)
+              logDebug("Building bloom with paratemeter: maxBits = "
+                + bfMaxBits + " numHashFunc = " + bfNumOfHashFunc)
+              val bfIndex = new BloomFilter(bfMaxBits, bfNumOfHashFunc)()
               var elemCnt = 0 // element count
-            val boundReference = keySchema.zipWithIndex.map(x =>
+              val boundReference = keySchema.zipWithIndex.map(x =>
                 BoundReference(x._2, x._1.dataType, nullable = true))
               // for multi-column index, add all subsets into bloom filter
               // For example, a column with a = 1, b = 2, a and b are index columns
@@ -211,7 +224,7 @@ private[spinach] case class SpinachIndexBuild(
               while (it.hasNext) {
                 val row = it.next()
                 elemCnt += 1
-                projector.foreach(p => bf_index.addValue(p(row).getBytes))
+                projector.foreach(p => bfIndex.addValue(p(row).getBytes))
               }
               val indexFile = IndexUtils.indexFileFromDataFile(d, indexName)
               val fs = indexFile.getFileSystem(hadoopConf)
@@ -229,8 +242,8 @@ private[spinach] case class SpinachIndexBuild(
               // dataEndOffset        8 Bytes, Long, data end offset
               // rootOffset           8 Bytes, Long, root Offset
               val fileOut = fs.create(indexFile, true) // overwrite index file
-            val bitArray = bf_index.getBitMapLongArray
-              val numHashFunc = bf_index.getNumOfHashFunc
+              val bitArray = bfIndex.getBitMapLongArray
+              val numHashFunc = bfIndex.getNumOfHashFunc
               IndexUtils.writeInt(fileOut, bitArray.length)
               IndexUtils.writeInt(fileOut, numHashFunc)
               IndexUtils.writeInt(fileOut, elemCnt)

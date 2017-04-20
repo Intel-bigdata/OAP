@@ -245,4 +245,19 @@ class BloomFilterIndexSuite extends QueryTest with SharedSQLContext with BeforeA
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 301"), Nil)
     sql("drop sindex index_bf on spinach_test")
   }
+
+  test("bloom filter parameter testing") {
+    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 25).toString)
+    spark.conf.set("spark.sql.spinach.Bloomfilter.numHashFunc", 4.toString)
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("create sindex index_bf on spinach_test (a, b) USING BLOOM")
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 100 AND b = 'this is test 100'"),
+      Row(100, "this is test 100") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 100'"),
+      Row(100, "this is test 100") :: Nil)
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 301"), Nil)
+    sql("drop sindex index_bf on spinach_test")
+  }
 }

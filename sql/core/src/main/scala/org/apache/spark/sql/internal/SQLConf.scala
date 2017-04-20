@@ -588,6 +588,21 @@ object SQLConf {
       .doubleConf
       .createWithDefault(0.05)
 
+  val SPINACH_BLOOMFILTER_MAXBITS =
+    SQLConfigBuilder("spark.sql.spinach.Bloomfilter.maxBits")
+      .internal()
+      .doc("set the max bit count for bloom filter index, default 1 << 30")
+      .intConf
+      .createWithDefault(1 << 30)
+
+  val SPINACH_BLOOMFILTER_NUMHASHFUNC =
+    SQLConfigBuilder("spark.sql.spinach.Bloomfilter.numHashFunc")
+      .internal()
+      .doc("set the number of hash functions used in bloom filter, default 3")
+      .intConf
+      .createWithDefault(3)
+
+
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
   }
