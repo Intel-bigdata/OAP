@@ -209,7 +209,6 @@ private[spinach] case class SpinachIndexBuild(
                 SQLConf.SPINACH_BLOOMFILTER_MAXBITS.toString, 1 << 30)
               val bfNumOfHashFunc = hadoopConf.getInt(
                 SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.toString, 3)
-              println(" " + bfMaxBits + " " + bfNumOfHashFunc)
               logDebug("Building bloom with paratemeter: maxBits = "
                 + bfMaxBits + " numHashFunc = " + bfNumOfHashFunc)
               val bfIndex = new BloomFilter(bfMaxBits, bfNumOfHashFunc)()
