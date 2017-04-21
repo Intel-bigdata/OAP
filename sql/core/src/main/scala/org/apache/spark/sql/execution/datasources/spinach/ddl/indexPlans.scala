@@ -370,6 +370,9 @@ case class SpinachShowIndex(relation: LogicalPlan) extends RunnableCommand with 
         // using "A" for collation as MySQL does since it is ignored.
         entries.zipWithIndex.map(ei =>
           Row(identifier.get.table, i.name, ei._2, s(ei._1).name, "A", "BLOOM"))
+      case BitMapIndex(entries) =>
+        entries.zipWithIndex.map(ei =>
+          Row(identifier.get.table, i.name, ei._2, s(ei._1).name, "A", "BITMAP"))
       case t => sys.error(s"not support index type $t for index ${i.name}")
     })
   }
