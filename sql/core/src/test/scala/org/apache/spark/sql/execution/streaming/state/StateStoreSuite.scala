@@ -358,7 +358,7 @@ class StateStoreSuite extends SparkFunSuite with BeforeAndAfter with PrivateMeth
     }
   }
 
-  test("maintenance") {
+  ignore("maintenance") {
     val conf = new SparkConf()
       .setMaster("local")
       .setAppName("test")
