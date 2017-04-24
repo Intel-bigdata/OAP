@@ -241,13 +241,13 @@ private[spinach] case class SpinachIndexBuild(
               // dataEndOffset        8 Bytes, Long, data end offset
               // rootOffset           8 Bytes, Long, root Offset
               val fileOut = fs.create(indexFile, true) // overwrite index file
-              val bitArray = bfIndex.getBitMapLongArray
-              val numHashFunc = bfIndex.getNumOfHashFunc
-              IndexUtils.writeInt(fileOut, bitArray.length)
-              IndexUtils.writeInt(fileOut, numHashFunc)
+              val bfBitArray = bfIndex.getBitMapLongArray
+              var offset = 0L
+              IndexUtils.writeInt(fileOut, bfBitArray.length) // bfBitArray length
+              IndexUtils.writeInt(fileOut, bfIndex.getNumOfHashFunc) // numOfHashFunc
               IndexUtils.writeInt(fileOut, elemCnt)
-              var offset = 12L
-              bitArray.foreach(l => {
+              offset += 12
+              bfBitArray.foreach(l => {
                 IndexUtils.writeLong(fileOut, l)
                 offset += 8
               })

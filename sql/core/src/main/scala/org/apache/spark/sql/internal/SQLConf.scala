@@ -591,14 +591,15 @@ object SQLConf {
   val SPINACH_BLOOMFILTER_MAXBITS =
     SQLConfigBuilder("spark.sql.spinach.Bloomfilter.maxBits")
       .internal()
-      .doc("set the max bit count for bloom filter index, default 1 << 30")
+      .doc("Define the max bit count parameter used in bloom " +
+        "filter, default 1073741824")
       .intConf
-      .createWithDefault(1 << 30)
+      .createWithDefault(1073741824)
 
   val SPINACH_BLOOMFILTER_NUMHASHFUNC =
     SQLConfigBuilder("spark.sql.spinach.Bloomfilter.numHashFunc")
       .internal()
-      .doc("set the number of hash functions used in bloom filter, default 3")
+      .doc("Define the number of hash functions used in bloom filter, default 3")
       .intConf
       .createWithDefault(3)
 
