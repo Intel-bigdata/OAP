@@ -59,12 +59,11 @@ private[spinach] case class SpinachIndexBuild(
       // TODO use internal scan
       val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
 
-      // TODO just add fsrate in hadoop conf
-      hadoopConf.setDouble(Statistics.thresName,
+      hadoopConf.setDouble(SQLConf.SPINACH_FULL_SCAN_THRESHOLD.key,
         sparkSession.conf.get(SQLConf.SPINACH_FULL_SCAN_THRESHOLD))
-      hadoopConf.setStrings(Statistics.Statistics_Type_Name,
+      hadoopConf.setStrings(SQLConf.SPINACH_STATISTICS_TYPES.key,
         sparkSession.conf.get(SQLConf.SPINACH_STATISTICS_TYPES))
-      hadoopConf.setDouble(Statistics.Sample_Based_SampleRate,
+      hadoopConf.setDouble(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.key,
         sparkSession.conf.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE))
 
       // bloom filter parameter
@@ -179,7 +178,7 @@ private[spinach] case class SpinachIndexBuild(
               val treeOffset = writeTreeToOut(treeShape, fileOut, offsetMap,
                 fileOffset, uniqueKeysList, keySchema, 0, -1L)
 
-              val stTypes = hadoopConf.getStrings(Statistics.Statistics_Type_Name)
+              val stTypes = hadoopConf.getStrings(SQLConf.SPINACH_STATISTICS_TYPES.key)
               if (stTypes != null && stTypes.length > 0) {
                 stTypes.foreach(stType => {
                   val t = stType.trim
@@ -187,7 +186,7 @@ private[spinach] case class SpinachIndexBuild(
                     val st = t match {
                       case "0" => new MinMaxStatistics
                       case "1" => new SampleBasedStatistics(
-                        hadoopConf.get(Statistics.Sample_Based_SampleRate).toDouble)
+                        hadoopConf.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.key).toDouble)
                       case "2" => new PartedByValueStatistics
                       case _ =>
                         throw new UnsupportedOperationException(s"non-supported statistic in id $t")

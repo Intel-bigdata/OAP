@@ -47,11 +47,6 @@ abstract class Statistics{
 }
 
 object Statistics {
-  val thresName = "spn_fsthreshold"
-
-  val Statistics_Type_Name = "spark.sql.spinach.StatisticsType"
-  val Sample_Based_SampleRate = "spark.sql.spinach.Statistics.sampleRate"
-
   def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
     val row = UnsafeIndexNode.row.get
     row.setNumFields(schemaLen)

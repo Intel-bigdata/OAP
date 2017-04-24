@@ -27,6 +27,7 @@ import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberBui
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
@@ -200,7 +201,7 @@ private[spinach] class SpinachDataReader(
         }
       }
 
-      val fs_rate = conf.get(Statistics.thresName).toDouble
+      val fs_rate = conf.get(SQLConf.SPINACH_FULL_SCAN_THRESHOLD.key).toDouble
 
       if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
         StaticsAnalysisResult.SKIP_INDEX
