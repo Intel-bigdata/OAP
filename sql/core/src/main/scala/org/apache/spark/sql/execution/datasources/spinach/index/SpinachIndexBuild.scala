@@ -67,9 +67,9 @@ private[spinach] case class SpinachIndexBuild(
         sparkSession.conf.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE))
 
       // bloom filter parameter
-      hadoopConf.setInt(SQLConf.SPINACH_BLOOMFILTER_MAXBITS.toString,
+      hadoopConf.setInt(SQLConf.SPINACH_BLOOMFILTER_MAXBITS.key,
         sparkSession.conf.get(SQLConf.SPINACH_BLOOMFILTER_MAXBITS))
-      hadoopConf.setInt(SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.toString,
+      hadoopConf.setInt(SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.key,
         sparkSession.conf.get(SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC))
 
       val fs = paths.head.getFileSystem(hadoopConf)
@@ -205,9 +205,9 @@ private[spinach] case class SpinachIndexBuild(
               IndexBuildResult(dataString, cnt, "", d.getParent.toString)
             case BloomFilterIndexType =>
               val bfMaxBits = hadoopConf.getInt(
-                SQLConf.SPINACH_BLOOMFILTER_MAXBITS.toString, 1 << 30)
+                SQLConf.SPINACH_BLOOMFILTER_MAXBITS.key, 1073741824) // default 1 << 30
               val bfNumOfHashFunc = hadoopConf.getInt(
-                SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.toString, 3)
+                SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.key, 3)
               logDebug("Building bloom with paratemeter: maxBits = "
                 + bfMaxBits + " numHashFunc = " + bfNumOfHashFunc)
               val bfIndex = new BloomFilter(bfMaxBits, bfNumOfHashFunc)()
