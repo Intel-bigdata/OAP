@@ -29,7 +29,7 @@ import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
-class MinMaxStatistics extends Statistics {
+class MinMaxStatistics(var content: Seq[StatisticsEntry] = null) extends Statistics {
   override val id: Int = 0
   private var keySchema: StructType = _
   @transient private lazy val converter = UnsafeProjection.create(keySchema)

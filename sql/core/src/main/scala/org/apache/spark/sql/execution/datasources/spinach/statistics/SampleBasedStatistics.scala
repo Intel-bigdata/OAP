@@ -30,7 +30,8 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
 
-class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
+class SampleBasedStatistics(var content: Seq[StatisticsEntry] = null,
+                            sampleRate: Double = 0.1) extends Statistics {
   override val id: Int = 1
 
   // for SampleBasedStatistics, input keys should be the whole file
@@ -77,7 +78,8 @@ class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
       // read UnsafeRow, calculate hit_count without storing a single row
       val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
       val row = Statistics.getUnsafeRow(schema.length, stsArray, offset + 4, size)
-      offset = offset + 4 + size
+      val off = Platform.getLong(stsArray, Platform.BYTE_ARRAY_OFFSET + offset) // redundant offset
+      offset = offset + 12 + size
 
       if (Statistics.rowInIntervalArray(row, intervalArray, ordering)) hit_count += 1
     }

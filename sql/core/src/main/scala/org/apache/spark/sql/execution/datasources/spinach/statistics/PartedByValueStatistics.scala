@@ -29,12 +29,23 @@ import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
-class PartedByValueStatistics extends Statistics {
+class PartedByValueStatistics(var content: Seq[StatisticsEntry] = null,
+                              partNum: Int = 1, total_size: Int = 0) extends Statistics {
   override val id: Int = 2
   private val maxPartNum: Int = 5
   private var keySchema: StructType = _
   @transient private lazy val converter = UnsafeProjection.create(keySchema)
   var arrayOffset = 0L
+
+  override def write(fileOut: FSDataOutputStream): Unit = {
+    IndexUtils.writeInt(fileOut, id)
+    IndexUtils.writeInt(fileOut, total_size) // not content length
+    IndexUtils.writeInt(fileOut, partNum + 1)
+    fileOut.flush()
+
+    writeContent(fileOut)
+    fileOut.flush()
+  }
 
   override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
                     stsArray: Array[Byte], offset: Long): Double = {
@@ -86,18 +97,12 @@ class PartedByValueStatistics extends Statistics {
     }
   }
 
-  //  private def isBetween(obj: InternalRow, min: InternalRow, max: InternalRow,
-  //                        ordering: BaseOrdering): Boolean = {
-  //    (min == IndexScanner.DUMMY_KEY_START || ordering.gteq(obj, min)) &&
-  //      (max == IndexScanner.DUMMY_KEY_END || ordering.lteq(obj, max))
-  //  }
-
   private def getStatistics(stsArray: Array[Byte],
                             offset: Long): ArrayBuffer[(Int, UnsafeRow, Int, Int)] = {
     val sts = ArrayBuffer[(Int, UnsafeRow, Int, Int)]()
-    val partNum = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset + 4)
+    val partNum = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset + 8)
     var i = 0
-    var base = offset + 8
+    var base = offset + 12
 
     while (i < partNum) {
       val now = extractSts(base, stsArray)
@@ -113,7 +118,7 @@ class PartedByValueStatistics extends Statistics {
 
   private def extractSts(base: Long, stsArray: Array[Byte]): (Int, UnsafeRow, Int, Int) = {
     val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base)
-    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size).copy()
+    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base + 4, size).copy()
     val index = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
     val count = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 8 + size)
     (size + 12, value, index, count)

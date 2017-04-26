@@ -31,10 +31,25 @@ import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
-
-abstract class Statistics{
+abstract class Statistics {
   val id: Int
   var arrayOffset: Long
+  var content: Seq[StatisticsEntry]
+
+  def write(fileOut: FSDataOutputStream): Unit = {
+    // write statistics header
+    IndexUtils.writeInt(fileOut, id)
+    IndexUtils.writeInt(fileOut, content.length)
+    fileOut.flush()
+
+    // write statistics content
+    writeContent(fileOut)
+    fileOut.flush()
+  }
+
+  protected def writeContent(fileOut: FSDataOutputStream): Unit = {
+    content.foreach(entry => entry.writeToOutputStream(fileOut))
+  }
 
   // TODO write function parameters need to be optimized
   def write(schema: StructType, fileOut: FSDataOutputStream, uniqueKeys: Array[InternalRow],
@@ -44,6 +59,35 @@ abstract class Statistics{
   // TODO parameter needs to be optimized
   def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
            stsArray: Array[Byte], offset: Long): Double
+}
+
+abstract class StatisticsEntry {
+  var schema: StructType = _
+  lazy val converter: UnsafeProjection = UnsafeProjection.create(schema)
+
+  def writeToOutputStream(out: FSDataOutputStream): Unit
+
+  def withSchema(schema: StructType): StatisticsEntry = {
+    this.schema = schema
+    this
+  }
+}
+
+// TODO Maybe offset can be useless here, kept for read function
+case class InternalRowEntry(row: InternalRow, offset: Long) extends StatisticsEntry {
+  override def writeToOutputStream(out: FSDataOutputStream): Unit = {
+    Statistics.writeInternalRow(converter, row, out)
+    IndexUtils.writeLong(out, offset)
+  }
+}
+
+// TODO Maybe offset can be useless here, kept for read function
+case class PartByValueEntry(row: InternalRow, offset: Long, count: Int) extends StatisticsEntry {
+  override def writeToOutputStream(out: FSDataOutputStream): Unit = {
+    Statistics.writeInternalRow(converter, row, out)
+    IndexUtils.writeInt(out, count) // write index, not used, can be optimized later
+    IndexUtils.writeInt(out, count)
+  }
 }
 
 object Statistics {
