@@ -111,7 +111,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   }
 
   test("filtering with statistics") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "2")
+    spark.conf.set("spark.sql.spinach.StatisticsType", "0,1,2")
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
     sql("insert overwrite table spinach_test select * from t")
