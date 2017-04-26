@@ -19,20 +19,15 @@ package org.apache.spark.sql.execution.datasources.spinach.statistics
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.hadoop.fs.FSDataOutputStream
-
-import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, RangeInterval}
-import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
 class MinMaxStatistics(var content: Seq[StatisticsEntry] = null) extends Statistics {
   override val id: Int = 0
   private var keySchema: StructType = _
-  @transient private lazy val converter = UnsafeProjection.create(keySchema)
   var arrayOffset = 0L
 
   override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
@@ -68,25 +63,6 @@ class MinMaxStatistics(var content: Seq[StatisticsEntry] = null) extends Statist
     if (result) -1 else 0
   }
 
-  override def write(schema: StructType, fileOut: FSDataOutputStream,
-                     uniqueKeys: Array[InternalRow],
-                     hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
-                     offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
-    keySchema = schema
-
-    // write statistic id
-    IndexUtils.writeInt(fileOut, id)
-
-    // write stats size
-    IndexUtils.writeInt(fileOut, 2)
-
-    // write minval
-    writeStatistic(uniqueKeys.head, offsetMap, fileOut)
-
-    // write maxval
-    writeStatistic(uniqueKeys.last, offsetMap, fileOut)
-  }
-
   private def getSimpleStatistics(stsArray: Array[Byte],
                                   offset: Long): ArrayBuffer[(Int, UnsafeRow, Long)] = {
     val sts = ArrayBuffer[(Int, UnsafeRow, Long)]()
@@ -111,16 +87,5 @@ class MinMaxStatistics(var content: Seq[StatisticsEntry] = null) extends Statist
     val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size).copy()
     val offset = Platform.getLong(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
     (size + 4, value, offset)
-  }
-
-  // write min and max value at the beginning of index file
-  // the statistics is like
-  // | value[Bytes] | offset[Long] |
-  private def writeStatistic(row: InternalRow,
-                             offsetMap: java.util.HashMap[InternalRow, Long],
-                             fileOut: FSDataOutputStream) = {
-    Statistics.writeInternalRow(converter, row, fileOut)
-    IndexUtils.writeLong(fileOut, offsetMap.get(row))
-    fileOut.flush()
   }
 }

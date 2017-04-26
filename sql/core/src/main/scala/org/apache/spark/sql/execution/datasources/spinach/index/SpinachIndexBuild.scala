@@ -41,8 +41,6 @@ import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.util.collection.BitSet
 
-
-
 private[spinach] case class SpinachIndexBuild(
     @transient sparkSession: SparkSession,
     indexName: String,

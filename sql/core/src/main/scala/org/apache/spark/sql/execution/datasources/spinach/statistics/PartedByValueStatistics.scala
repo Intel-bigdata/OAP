@@ -21,8 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.fs.FSDataOutputStream
 
-import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, RangeInterval}
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
@@ -32,9 +31,7 @@ import org.apache.spark.unsafe.Platform
 class PartedByValueStatistics(var content: Seq[StatisticsEntry] = null,
                               partNum: Int = 1, total_size: Int = 0) extends Statistics {
   override val id: Int = 2
-  private val maxPartNum: Int = 5
   private var keySchema: StructType = _
-  @transient private lazy val converter = UnsafeProjection.create(keySchema)
   var arrayOffset = 0L
 
   override def write(fileOut: FSDataOutputStream): Unit = {
@@ -122,54 +119,5 @@ class PartedByValueStatistics(var content: Seq[StatisticsEntry] = null,
     val index = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
     val count = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 8 + size)
     (size + 12, value, index, count)
-  }
-
-  override def write(schema: StructType, fileOut: FSDataOutputStream,
-                     uniqueKeys: Array[InternalRow],
-                     hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
-                     offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
-    keySchema = schema
-
-    // first write statistic id
-    IndexUtils.writeInt(fileOut, id)
-
-    val size = hashMap.size()
-    if (size > 0) {
-      val partNum = if (size > maxPartNum) maxPartNum else size
-      val perSize = size / partNum
-
-      // first write part number
-      IndexUtils.writeInt(fileOut, partNum + 1)
-
-      var i = 0
-      var count = 0
-      var index = 0
-      while (i < partNum) {
-        index = i * perSize
-        var begin = Math.max(index - perSize + 1, 0)
-        while (begin <= index) {
-          count += hashMap.get(uniqueKeys(begin)).size()
-          begin += 1
-        }
-        writeEntry(fileOut, uniqueKeys(index), index, count)
-        i += 1
-      }
-
-      index += 1
-      while (index < uniqueKeys.size) {
-        count += hashMap.get(uniqueKeys(index)).size()
-        index += 1
-      }
-      writeEntry(fileOut, uniqueKeys.last, size - 1, count)
-    }
-  }
-
-  private def writeEntry(fileOut: FSDataOutputStream,
-                         internalRow: InternalRow,
-                         index: Int, count: Int): Unit = {
-    Statistics.writeInternalRow(converter, internalRow, fileOut)
-    IndexUtils.writeInt(fileOut, index)
-    IndexUtils.writeInt(fileOut, count)
-    fileOut.flush()
   }
 }

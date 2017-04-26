@@ -51,11 +51,6 @@ abstract class Statistics {
     content.foreach(entry => entry.writeToOutputStream(fileOut))
   }
 
-  // TODO write function parameters need to be optimized
-  def write(schema: StructType, fileOut: FSDataOutputStream, uniqueKeys: Array[InternalRow],
-            hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
-            offsetMap: java.util.HashMap[InternalRow, Long]): Unit
-
   // TODO parameter needs to be optimized
   def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
            stsArray: Array[Byte], offset: Long): Double
