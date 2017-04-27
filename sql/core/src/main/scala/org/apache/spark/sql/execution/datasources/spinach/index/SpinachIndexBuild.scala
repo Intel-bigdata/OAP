@@ -22,6 +22,8 @@ import java.util.Comparator
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+import scala.util.Random
 
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
@@ -178,15 +180,63 @@ private[spinach] case class SpinachIndexBuild(
                 stTypes.foreach(stType => {
                   val t = stType.trim
                   if (t.length > 0) {
-                    val st = t match {
-                      case "0" => new MinMaxStatistics
-                      case "1" => new SampleBasedStatistics(
-                        hadoopConf.get(Statistics.Sample_Based_SampleRate).toDouble)
-                      case "2" => new PartedByValueStatistics
+                    t match {
+                      case "0" =>
+                        val minRowEntry = InternalRowEntry(uniqueKeys.head,
+                          offsetMap.get(uniqueKeys.head)).withSchema(keySchema)
+                        val maxRowEntry = InternalRowEntry(uniqueKeys.last,
+                          offsetMap.get(uniqueKeys.last)).withSchema(keySchema)
+                        new MinMaxStatistics(Seq(minRowEntry, maxRowEntry)).write(fileOut)
+
+                      case "1" =>
+                        val sampleRate = hadoopConf.get(Statistics.Sample_Based_SampleRate).toDouble
+                        val sampleSize = (uniqueKeys.length * sampleRate).toInt
+                        val content = Random.shuffle(uniqueKeys.indices.toList)
+                          .take(sampleSize).map(i => {
+                          InternalRowEntry(uniqueKeys(i), offsetMap.get(uniqueKeys(i)))
+                            .withSchema(keySchema)
+                        })
+                        new SampleBasedStatistics(content).write(fileOut)
+
+                      case "2" =>
+                        val maxPartNum = 50
+                        val size = hashMap.size()
+                        val entryBuffer: ArrayBuffer[StatisticsEntry] =
+                          new ArrayBuffer[StatisticsEntry]()
+                        var partNum = maxPartNum
+                        if (size > 0) {
+                          if (size < maxPartNum) partNum = size
+                          val perSize = size / partNum
+                          var i = 0
+                          var count = 0
+                          var index = 0
+                          while (i < partNum) {
+                            index = i * perSize
+                            var begin = Math.max(index - perSize + 1, 0)
+                            while (begin <= index) {
+                              count += hashMap.get(uniqueKeys(begin)).size()
+                              begin += 1
+                            }
+                            entryBuffer.append(PartByValueEntry(uniqueKeys(index),
+                              index, count).withSchema(keySchema))
+                            i += 1
+                          }
+
+                          index += 1
+                          while (index < uniqueKeys.size) {
+                            count += hashMap.get(uniqueKeys(index)).size()
+                            index += 1
+                          }
+                          entryBuffer.append(PartByValueEntry(uniqueKeys.last,
+                            size - 1, count).withSchema(keySchema))
+                        }
+
+                        new PartedByValueStatistics(entryBuffer, partNum + 1,
+                          hashMap.size()).write(fileOut)
+
                       case _ =>
                         throw new UnsupportedOperationException(s"non-supported statistic in id $t")
                     }
-                    st.write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
                   }
                 })
               }

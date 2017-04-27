@@ -110,6 +110,27 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sql("drop sindex index1 on spinach_test")
   }
 
+  test("filtering with statistics") {
+    spark.conf.set("spark.sql.spinach.StatisticsType", "0,1,2")
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("create sindex index1 on spinach_test (a)")
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
+      Row(1, "this is test 1") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 1 AND a <= 3"),
+      Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 201"),
+      Row(201, "this is test 201") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 201 AND a <= 203"),
+      Row(202, "this is test 202") :: Row(203, "this is test 203") :: Nil)
+    sql("drop sindex index1 on spinach_test")
+  }
+
   test("filtering parquet") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
