@@ -19,20 +19,16 @@ package org.apache.spark.sql.execution.datasources.spinach.statistics
 
 sealed abstract class StatisticsType {
   val name: String
-  def toString: String
 }
 
 case object MinMaxStatisticsType extends StatisticsType {
   val name: String = "MINMAX"
-  override def toString: String = "MINMAX"
 }
 
 case object SampleBasedStatisticsType extends StatisticsType {
   val name: String = "SAMPLE"
-  override def toString: String = "SAMPLE"
 }
 
 case object PartByValueStatisticsType extends StatisticsType {
   val name: String = "PARTBYVALUE"
-  override def toString: String = "PARTBYVALUE"
 }

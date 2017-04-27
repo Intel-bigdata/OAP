@@ -183,7 +183,6 @@ private[spinach] case class SpinachIndexBuild(
                 stTypes.foreach(stType => {
                   val t = stType.trim
                   if (t.length > 0) {
-                    println("stat: " + t)
                     val st = t match {
                       case MinMaxStatisticsType.name => new MinMaxStatistics
                       case SampleBasedStatisticsType.name => new SampleBasedStatistics(
