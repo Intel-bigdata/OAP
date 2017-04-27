@@ -22,13 +22,16 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.parquet.column.Dictionary
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach._
-import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
+import org.apache.spark.sql.execution.datasources.spinach.io.{DataFile, SpinachDataFile}
+import org.apache.spark.sql.execution.datasources.spinach.utils.{IndexUtils, SpinachUtils}
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.UTF8String
 
 
 private[spinach] object IndexScanner {
@@ -48,8 +51,12 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
   var intervalArray: ArrayBuffer[RangeInterval] = _
   protected var keySchema: StructType = _
 
+  var encodedIntervalArray: ArrayBuffer[RangeInterval] = _
+  protected var encodedKeySchema: StructType = _
+
   def meta: IndexMeta = idxMeta
   def getSchema: StructType = keySchema
+  def getEncodedSchema: StructType = encodedKeySchema
 
   def existRelatedIndexFile(dataPath: Path, conf: Configuration): Boolean = {
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
@@ -62,6 +69,63 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
   }
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner
+
+  protected def encodeKey(dictionaries: Array[Dictionary])(key: Key): Key = {
+
+    val values = keySchema.zipWithIndex.map {
+      case (field, ordinal) =>
+        val dict = dictionaries(ordinal)
+        if (dict != null) {
+          (0 until dictionaries(ordinal).getMaxId).find { i =>
+            field.dataType match {
+              case StringType =>
+                UTF8String.fromBytes(dict.decodeToBinary(i).getBytes)
+                  .equals(key.getUTF8String(ordinal))
+              case IntegerType =>
+                dict.decodeToInt(i) == key.getInt(ordinal)
+              case dataType => sys.error(s"not support data type: $dataType")
+            }
+          } match {
+            case Some(value) => value
+            case None => -1
+          }
+        } else {
+          key.get(ordinal, field.dataType)
+        }
+    }
+    InternalRow.fromSeq(values)
+  }
+
+  // This function will modify intervalArray and keySchema
+  protected def encodeIntervals(dataPath: Path, conf: Configuration): Unit = {
+    val dataSourceMeta = SpinachUtils.getMeta(conf, dataPath.getParent) match {
+      case Some(m) => m
+    }
+    if (dataSourceMeta.dataReaderClassName != classOf[SpinachDataFile].getCanonicalName) {
+      encodedIntervalArray = intervalArray
+      encodedKeySchema = keySchema
+      return
+    }
+    val dataFile = DataFile(dataPath.toString, dataSourceMeta.schema,
+      dataSourceMeta.dataReaderClassName)
+    val requiredIds = keySchema.map(dataSourceMeta.schema.fields.indexOf(_)).toArray
+
+    val dictionaries = dataFile.getDictionaries(requiredIds, conf)
+
+    val fields = keySchema.zipWithIndex.map{
+      case (field, ordinal) =>
+        if (dictionaries(ordinal) == null) field
+        else StructField(field.name, IntegerType, field.nullable)
+    }
+
+    def encoder = encodeKey(dictionaries)(_)
+
+    encodedIntervalArray =
+      intervalArray.map(interval => RangeInterval(encoder(interval.start),
+        encoder(interval.end), interval.startInclude, interval.endInclude))
+
+    encodedKeySchema = StructType(fields)
+  }
 }
 
 // A dummy scanner will actually not do any scanning

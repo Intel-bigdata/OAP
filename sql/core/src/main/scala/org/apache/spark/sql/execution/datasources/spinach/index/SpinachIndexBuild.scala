@@ -51,6 +51,7 @@ private[spinach] case class SpinachIndexBuild(
   private lazy val ids =
     indexColumns.map(c => schema.map(_.name).toIndexedSeq.indexOf(c.columnName))
   private lazy val keySchema = StructType(ids.map(schema.toIndexedSeq(_)))
+  private var encodedSchema: StructType = _
   def execute(): Seq[IndexBuildResult] = {
     if (paths.isEmpty) {
       // the input path probably be pruned, do nothing
@@ -83,7 +84,6 @@ private[spinach] case class SpinachIndexBuild(
           dp => fs.exists(IndexUtils.indexFileFromDataFile(dp, indexName)))
       }).map(_.toString)
       assert(!ids.exists(id => id < 0), "Index column not exists in schema.")
-      lazy val ordering = buildOrdering(keySchema)
       val serializableConfiguration =
         new SerializableConfiguration(hadoopConf)
       val confBroadcast = sparkSession.sparkContext.broadcast(serializableConfiguration)
@@ -103,6 +103,9 @@ private[spinach] case class SpinachIndexBuild(
           val reader = new SpinachDataReader(d, meta, None, ids)
           val hadoopConf = confBroadcast.value.value
           val it = reader.initialize(confBroadcast.value.value)
+
+          encodedSchema = reader.getEncodedSchema(confBroadcast.value.value, keySchema)
+          lazy val ordering = buildOrdering(encodedSchema)
 
           indexType match {
             case BTreeIndexType =>
@@ -171,7 +174,7 @@ private[spinach] case class SpinachIndexBuild(
               uniqueKeysList.addAll(uniqueKeys.toSeq.asJava)
 
               val treeOffset = writeTreeToOut(treeShape, fileOut, offsetMap,
-                fileOffset, uniqueKeysList, keySchema, 0, -1L)
+                fileOffset, uniqueKeysList, encodedSchema, 0, -1L)
 
               val stTypes = hadoopConf.getStrings(Statistics.Statistics_Type_Name)
               if (stTypes != null && stTypes.length > 0) {
@@ -186,7 +189,7 @@ private[spinach] case class SpinachIndexBuild(
                       case _ =>
                         throw new UnsupportedOperationException(s"non-supported statistic in id $t")
                     }
-                    st.write(keySchema, fileOut, uniqueKeys, hashMap, offsetMap)
+                    st.write(encodedSchema, fileOut, uniqueKeys, hashMap, offsetMap)
                   }
                 })
               }
@@ -201,7 +204,7 @@ private[spinach] case class SpinachIndexBuild(
             case BloomFilterIndexType =>
               val bf_index = new BloomFilter()
               var elemCnt = 0 // element count
-            val boundReference = keySchema.zipWithIndex.map(x =>
+            val boundReference = encodedSchema.zipWithIndex.map(x =>
                 BoundReference(x._2, x._1.dataType, nullable = true))
               // for multi-column index, add all subsets into bloom filter
               // For example, a column with a = 1, b = 2, a and b are index columns
@@ -347,7 +350,7 @@ private[spinach] case class SpinachIndexBuild(
     }
   }
 
-  @transient private lazy val converter = UnsafeProjection.create(keySchema)
+  @transient private lazy val converter = UnsafeProjection.create(encodedSchema)
 
   /**
    * write file correspond to [[UnsafeIndexNode]]

@@ -19,29 +19,35 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
+import org.apache.parquet.column.Dictionary
+import org.apache.parquet.format.{CompressionCodec, Encoding}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.DataSourceMeta
-import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberBuilder
+import org.apache.spark.sql.execution.datasources.spinach.filecache.{DataFiberBuilder, DataFileHandleCacheManager}
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StructType, _}
 import org.apache.spark.unsafe.Platform
+import org.apache.spark.unsafe.types.UTF8String
 
-
+// TODO: [linhong] Let's remove the `isCompressed` argument
 private[spinach] class SpinachDataWriter(
     isCompressed: Boolean,
     out: FSDataOutputStream,
-    schema: StructType) extends Logging {
+    schema: StructType,
+    conf: Configuration) extends Logging {
   // Using java options to config
   // NOTE: java options should not start with spark (e.g. "spark.xxx.xxx"), or it cannot pass
   // the config validation of SparkConf
   // TODO make it configuration via SparkContext / Table Properties
   private def DEFAULT_ROW_GROUP_SIZE = System.getProperty("spinach.rowgroup.size",
     "1024").toInt
-  logDebug(s"spinach.rowgroup.size setting to ${DEFAULT_ROW_GROUP_SIZE}")
+  logDebug(s"spinach.rowgroup.size setting to $DEFAULT_ROW_GROUP_SIZE")
+  private def COMPRESSION_CODEC_NAME = System.getProperty("spinach.compression.codec", "GZIP")
+  logDebug(s"spinach.compression.codec setting to $COMPRESSION_CODEC_NAME")
   private var rowCount: Int = 0
   private var rowGroupCount: Int = 0
 
@@ -49,7 +55,13 @@ private[spinach] class SpinachDataWriter(
     DataFiberBuilder.initializeFromSchema(schema, DEFAULT_ROW_GROUP_SIZE)
 
   private val fiberMeta = new SpinachDataFileHandle(
-    rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE, fieldCount = schema.length)
+    rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE,
+    fieldCount = schema.length,
+    codec = CompressionCodec.valueOf(COMPRESSION_CODEC_NAME))
+
+  private val codecFactory = new CodecFactory(conf)
+  private val compressor: BytesCompressor =
+    codecFactory.getCompressor(CompressionCodec.valueOf(COMPRESSION_CODEC_NAME))
 
   def write(row: InternalRow) {
     var idx = 0
@@ -66,16 +78,21 @@ private[spinach] class SpinachDataWriter(
   private def writeRowGroup(): Unit = {
     rowGroupCount += 1
     val fiberLens = new Array[Int](rowGroup.length)
+    val fiberUncompressedLens = new Array[Int](rowGroup.length)
     var idx: Int = 0
     var totalDataSize = 0L
     val rowGroupMeta = new RowGroupMeta()
 
-    rowGroupMeta.withNewStart(out.getPos).withNewFiberLens(fiberLens)
+    rowGroupMeta.withNewStart(out.getPos)
+      .withNewFiberLens(fiberLens)
+      .withNewUncompressedFiberLens(fiberUncompressedLens)
     while (idx < rowGroup.length) {
       val fiberByteData = rowGroup(idx).build()
-      val newFiberData = fiberByteData.fiberData
+      val newUncompressedFiberData = fiberByteData.fiberData
+      val newFiberData = compressor.compress(newUncompressedFiberData)
       totalDataSize += newFiberData.length
       fiberLens(idx) = newFiberData.length
+      fiberUncompressedLens(idx) = newUncompressedFiberData.length
       out.write(newFiberData)
       rowGroup(idx).clear()
       idx += 1
@@ -91,11 +108,26 @@ private[spinach] class SpinachDataWriter(
       writeRowGroup()
     }
 
+    val columnEncodings = new Array[Encoding](rowGroup.length)
+    val dictDataLens = new Array[Int](rowGroup.length)
+    val dictSizes = new Array[Int](rowGroup.length)
+    rowGroup.indices.foreach{i =>
+      val dictByteData = rowGroup(i).buildDictionary
+      columnEncodings(i) = rowGroup(i).getEncoding
+      dictDataLens(i) = dictByteData.length
+      dictSizes(i) = rowGroup(i).getDictionarySize
+      if (dictDataLens(i) > 0) out.write(dictByteData)
+      rowGroup(i).resetDictionary()
+    }
+
     // and update the group count and row count in the last group
     fiberMeta
       .withGroupCount(rowGroupCount)
       .withRowCountInLastGroup(
         if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else DEFAULT_ROW_GROUP_SIZE)
+      .withEncodings(columnEncodings)
+      .withDictionaryDataLens(dictDataLens)
+      .withDictionaryIdSizes(dictSizes)
 
     fiberMeta.write(out)
     out.close()
@@ -108,10 +140,73 @@ private[spinach] class SpinachDataReader(
   filterScanner: Option[IndexScanner],
   requiredIds: Array[Int]) extends Logging {
 
+  private var fileScanner: DataFile = _
+
+  def getEncodedSchema(conf: Configuration, schema: StructType): StructType = {
+    if (fileScanner == null) sys.error("need initialize first")
+    if (meta.dataReaderClassName != classOf[SpinachDataFile].getCanonicalName) {
+      return schema
+    }
+    val fileMeta: SpinachDataFileHandle = DataFileHandleCacheManager(fileScanner, conf)
+
+    val encodedFields = schema.zipWithIndex.map {
+      case (field, ordinal)
+        if fileMeta.encodings(requiredIds(ordinal)) == Encoding.PLAIN_DICTIONARY =>
+        StructField(field.name, IntegerType, field.nullable)
+      case (field, _) => field
+    }
+    StructType(encodedFields)
+  }
+
+  def hasDecodedColumn(conf: Configuration): Boolean = {
+    if (fileScanner == null) sys.error("need initialize first")
+    val fileMeta: SpinachDataFileHandle = DataFileHandleCacheManager(fileScanner, conf)
+
+    requiredIds.exists(fileMeta.encodings(_) == Encoding.PLAIN_DICTIONARY)
+  }
+
+  def decodeIterator(conf: Configuration,
+                     iterator: Iterator[InternalRow],
+                     requiredSchema: StructType): Iterator[InternalRow] = {
+
+    if (fileScanner == null) sys.error("need initialize first")
+    if (iterator.isEmpty) return iterator
+
+    val fileMeta: SpinachDataFileHandle = DataFileHandleCacheManager(fileScanner, conf)
+
+    val encodedSchema = getEncodedSchema(conf, requiredSchema)
+
+    val dictionaries = fileScanner.getDictionaries(requiredIds, conf)
+
+    iterator.map{row =>
+      val values = row.toSeq(encodedSchema).zipWithIndex.map {
+        case (value: Int, ordinal)
+          if fileMeta.encodings(ordinal) == Encoding.PLAIN_DICTIONARY =>
+            decodeValue(dictionaries(ordinal), requiredSchema(ordinal).dataType, value)
+        case (value, _) =>
+          value
+      }
+      InternalRow.fromSeq(values)
+    }
+  }
+
+  private def decodeValue(dictionary: Dictionary, dataType: DataType, id: Int): Any = {
+    // TODO: [linhong] Need add other data types
+    dataType match {
+      case StringType => UTF8String.fromBytes(dictionary.decodeToBinary(id).getBytes)
+      case BinaryType => dictionary.decodeToBinary(id)
+      case IntegerType => dictionary.decodeToInt(id)
+      case LongType => dictionary.decodeToLong(id)
+      case FloatType => dictionary.decodeToFloat(id)
+      case DoubleType => dictionary.decodeToDouble(id)
+      case BooleanType => dictionary.decodeToBoolean(id)
+    }
+  }
+
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     logDebug("Initializing SpinachDataReader...")
     // TODO how to save the additional FS operation to get the Split size
-    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
+    fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
 
     val start = System.currentTimeMillis()
     filterScanner match {
@@ -157,7 +252,7 @@ private[spinach] class SpinachDataReader(
   private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
     if (!filterScanner.get.canBeOptimizedByStatistics) {
       StaticsAnalysisResult.USE_INDEX
-    } else if (filterScanner.get.intervalArray.length == 0) {
+    } else if (filterScanner.get.intervalArray.isEmpty) {
       StaticsAnalysisResult.SKIP_INDEX
     } else {
       val fs = indexPath.getFileSystem(conf)
@@ -188,8 +283,8 @@ private[spinach] class SpinachDataReader(
           case 2 => new PartedByValueStatistics
           case _ => throw new UnsupportedOperationException(s"non-supported statistic in id $id")
         }
-        val res = st.read(filterScanner.get.getSchema,
-          filterScanner.get.intervalArray, stsArray, arrayOffset)
+        val res = st.read(filterScanner.get.getEncodedSchema,
+          filterScanner.get.encodedIntervalArray, stsArray, arrayOffset)
         arrayOffset = st.arrayOffset
 
         if (res == StaticsAnalysisResult.SKIP_INDEX) {

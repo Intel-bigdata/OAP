@@ -20,23 +20,41 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
+import org.apache.parquet.format.{CompressionCodec, Encoding}
 
 
 //  Meta Part Format
 //  ..
 //  Field                               Length In Byte
 //  Meta
-//    RowGroup Meta #1                  16 + 4 * Field Count In Each Row
+//    RowGroup Meta #1                  16 + 4 * Field Count In Each Row * 2
 //      RowGroup StartPosition          8
 //      RowGroup EndPosition            8
-//      Fiber #1 Length                 4
-//      Fiber #2 Length                 4
-//      ...
-//      Fiber #N Length                 4
-//    RowGroup Meta #2                  16 + 4 * Field Count In Each Row
-//    RowGroup Meta #3                  16 + 4 * Field Count In Each Row
-//    ..                                16 + 4 * Field Count In Each Row
-//    RowGroup Meta #N                  16 + 4 * Field Count In Each Row
+//      Fiber #1 Length (Compressed)    4
+//      Fiber #2 Length (Compressed)    4
+//      ...                             4
+//      Fiber #N Length (Compressed)    4
+//      Fiber #1 Uncompressed Length    4
+//      Fiber #2 Uncompressed Length    4
+//      ...                             4
+//      Fiber #N Uncompressed Length    4
+//    RowGroup Meta #2                  16 + 4 * Field Count In Each Row * 2
+//    RowGroup Meta #3                  16 + 4 * Field Count In Each Row * 2
+//    ..                                16 + 4 * Field Count In Each Row * 2
+//    RowGroup Meta #N                  16 + 4 * Field Count In Each Row * 2
+//    Encoding                          4 * Field Count In Each Row
+//      Column #1 Encoding              4
+//      ...                             4
+//      Column #N Encoding              4
+//    Dictionary Bytes Length           4 * Field Count In Each Row
+//      Column #1 Dict Bytes Length     4
+//      ...                             4
+//      Column #N Dict Bytes Length     4
+//    Dictionary ID Size                4 * Field Count In Each Row
+//      Column #1 Dict ID Size          4
+//      ...                             4
+//      Column #N Dict ID Size          4
+//    Compression Codec                 4
 //    Row Count In Each Row Group       4
 //    Row Count In Last Row Group       4
 //    Row Group Count                   4
@@ -46,6 +64,7 @@ private[spinach] class RowGroupMeta {
   var start: Long = _
   var end: Long = _
   var fiberLens: Array[Int] = _
+  var fiberUncompressedLens: Array[Int] = _
 
   def withNewStart(newStart: Long): RowGroupMeta = {
     this.start = newStart
@@ -62,14 +81,16 @@ private[spinach] class RowGroupMeta {
     this
   }
 
+  def withNewUncompressedFiberLens(newUncompressedFiberLens: Array[Int]): RowGroupMeta = {
+    this.fiberUncompressedLens = newUncompressedFiberLens
+    this
+  }
+
   def write(os: FSDataOutputStream): RowGroupMeta = {
     os.writeLong(start)
     os.writeLong(end)
-    var i = 0
-    while (i < fiberLens.length) {
-      os.writeInt(fiberLens(i))
-      i += 1
-    }
+    fiberLens.foreach(os.writeInt)
+    fiberUncompressedLens.foreach(os.writeInt)
 
     this
   }
@@ -78,12 +99,10 @@ private[spinach] class RowGroupMeta {
     start = is.readLong()
     end = is.readLong()
     fiberLens = new Array[Int](fieldCount)
+    fiberUncompressedLens = new Array[Int](fieldCount)
 
-    var idx = 0
-    while(idx < fieldCount) {
-      fiberLens(idx) = is.readInt()
-      idx += 1
-    }
+    (0 until fiberLens.length).foreach(fiberLens(_) = is.readInt())
+    (0 until fiberUncompressedLens.length).foreach(fiberUncompressedLens(_) = is.readInt())
 
     this
   }
@@ -94,9 +113,16 @@ private[spinach] class SpinachDataFileHandle(
    var rowCountInEachGroup: Int = 0,
    var rowCountInLastGroup: Int = 0,
    var groupCount: Int = 0,
-   var fieldCount: Int = 0) extends DataFileHandle {
+   var fieldCount: Int = 0,
+   var codec: CompressionCodec = CompressionCodec.UNCOMPRESSED) extends DataFileHandle {
   private var _fin: FSDataInputStream = null
   private var _len: Long = 0
+
+  // TODO: [Linhong] Dummy Value since these 3 arrays are not assigned for now.
+  // TODO: [Linhong] Change to "_" after Encoding Code is ready
+  var encodings = Array.fill(fieldCount)(Encoding.PLAIN)
+  var dictionaryDataLens = new Array[Int](fieldCount)
+  var dictionaryIdSizes = new Array[Int](fieldCount)
 
   def fin: FSDataInputStream = _fin
   def len: Long = _len
@@ -124,6 +150,21 @@ private[spinach] class SpinachDataFileHandle(
     this
   }
 
+  def withEncodings(encodings: Array[Encoding]): SpinachDataFileHandle = {
+    this.encodings = encodings
+    this
+  }
+
+  def withDictionaryDataLens(dictionaryDataLens: Array[Int]): SpinachDataFileHandle = {
+    this.dictionaryDataLens = dictionaryDataLens
+    this
+  }
+
+  def withDictionaryIdSizes(dictionaryIdSizes: Array[Int]): SpinachDataFileHandle = {
+    this.dictionaryIdSizes = dictionaryIdSizes
+    this
+  }
+
   private def validateConsistency(): Unit = {
     require(rowGroupsMeta.length == groupCount,
       s"Row Group Meta Count isn't equals to $groupCount")
@@ -132,12 +173,13 @@ private[spinach] class SpinachDataFileHandle(
   def write(os: FSDataOutputStream): Unit = {
     validateConsistency()
 
-    var i = 0
-    while (i < this.groupCount) {
-      rowGroupsMeta(i).write(os)
-      i += 1
-    }
+    rowGroupsMeta.foreach(_.write(os))
 
+    encodings.foreach(encoding => os.writeInt(encoding.getValue))
+    dictionaryDataLens.foreach(os.writeInt)
+    dictionaryIdSizes.foreach(os.writeInt)
+
+    os.writeInt(this.codec.getValue)
     os.writeInt(this.rowCountInEachGroup)
     os.writeInt(this.rowCountInLastGroup)
     os.writeInt(this.groupCount)
@@ -149,14 +191,25 @@ private[spinach] class SpinachDataFileHandle(
     this._len = fileLen
 
     // seek to the end of the end position of Meta
-    is.seek(fileLen - 16L)
+    is.seek(fileLen - 20L)
+    this.codec = CompressionCodec.findByValue(is.readInt())
     this.rowCountInEachGroup = is.readInt()
     this.rowCountInLastGroup = is.readInt()
     this.groupCount = is.readInt()
     this.fieldCount = is.readInt()
 
+    // seek to the start position of column meta
+    is.seek(fileLen - 20L - fieldCount * 12)
+    encodings = new Array[Encoding](fieldCount)
+    dictionaryDataLens = new Array[Int](fieldCount)
+    dictionaryIdSizes = new Array[Int](fieldCount)
+    (0 until fieldCount).foreach(encodings(_) = Encoding.findByValue(is.readInt()))
+    (0 until fieldCount).foreach(dictionaryDataLens(_) = is.readInt())
+    (0 until fieldCount).foreach(dictionaryIdSizes(_) = is.readInt())
+
+    // TODO: [Linhong] Lets' change this to some readable expression
     // seek to the start position of Meta
-    val rowGroupMetaPos = fileLen - 16  - groupCount * (16 + 4 * fieldCount)
+    val rowGroupMetaPos = fileLen - 20 - groupCount * (16 + 8 * fieldCount) - fieldCount * 12
     is.seek(rowGroupMetaPos)
     var i = 0
     while(i < groupCount) {

@@ -20,19 +20,57 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
+import org.apache.parquet.bytes.BytesInput
+import org.apache.parquet.column.Dictionary
+import org.apache.parquet.column.page.DictionaryPage
+import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.{PlainBinaryDictionary, PlainIntegerDictionary}
+import org.apache.parquet.format.Encoding
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.spinach.filecache._
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
 
 private[spinach] case class SpinachDataFile(path: String, schema: StructType) extends DataFile {
 
+  def getDictionaries(requiredIds: Array[Int], conf: Configuration): Array[Dictionary] = {
+    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
+    val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)
+    val dictDataLens = meta.dictionaryDataLens
+
+    requiredIds.map{ ordinal =>
+      val dictStart = lastGroupMeta.end + dictDataLens.slice(0, ordinal).sum
+      val dataLen = dictDataLens(ordinal)
+      val dictSize = meta.dictionaryIdSizes(ordinal)
+      val bytes = new Array[Byte](dataLen)
+      val is = meta.fin
+      is.synchronized {
+        is.seek(dictStart)
+        is.readFully(bytes)
+      }
+      if (dataLen == 0) {
+        null
+      } else {
+        val dictionaryPage = new DictionaryPage(BytesInput.from(bytes), dictSize,
+          org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
+        schema(ordinal).dataType match {
+          case StringType | BinaryType => new PlainBinaryDictionary(dictionaryPage)
+          case IntegerType => new PlainIntegerDictionary(dictionaryPage)
+          case _ => null
+        }
+      }
+    }
+  }
+
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
     val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
     val groupMeta = meta.rowGroupsMeta(groupId)
+
+    val codecFactory = new CodecFactory(conf)
+    val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
+
     // get the fiber data start position
     // TODO: update the meta to store the fiber start pos
     var i = 0
@@ -42,14 +80,24 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
       i += 1
     }
     val len = groupMeta.fiberLens(fiberId)
+    val uncompressedLen = groupMeta.fiberUncompressedLens(fiberId)
+    val encoding = meta.encodings(fiberId)
+
     val bytes = new Array[Byte](len)
 
     val is = meta.fin
     is.synchronized {
       is.seek(fiberStart)
       is.readFully(bytes)
-      putToFiberCache(bytes)
     }
+
+    val dataType = schema(fiberId).dataType
+    val fiberParser = DataFiberParser(encoding, meta, dataType)
+    val rowCount =
+      if (groupId == meta.groupCount - 1) meta.rowCountInLastGroup
+      else meta.rowCountInEachGroup
+
+    putToFiberCache(fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount))
   }
 
   private def putToFiberCache(buf: Array[Byte]): DataFiberCache = {
@@ -69,9 +117,13 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     (0 until meta.groupCount).iterator.flatMap { groupId =>
       var i = 0
       while (i < columns.length) {
+        val encoding = meta.encodings(requiredIds(i))
+        val dataType =
+          if (encoding == Encoding.PLAIN_DICTIONARY) IntegerType
+          else schema(requiredIds(i)).dataType
         columns(i) = new ColumnValues(
           meta.rowCountInEachGroup,
-          schema(requiredIds(i)).dataType,
+          dataType,
           FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
         i += 1
       }
@@ -101,9 +153,13 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
         // if we move to another row group, or the first row group
         var i = 0
         while (i < columns.length) {
+          val encoding = meta.encodings(i)
+          val dataType =
+            if (encoding == Encoding.PLAIN_DICTIONARY) IntegerType
+            else schema(requiredIds(i)).dataType
           columns(i) = new ColumnValues(
             meta.rowCountInEachGroup,
-            schema(requiredIds(i)).dataType,
+            dataType,
             FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
           i += 1
         }
