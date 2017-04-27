@@ -183,11 +183,12 @@ private[spinach] case class SpinachIndexBuild(
                 stTypes.foreach(stType => {
                   val t = stType.trim
                   if (t.length > 0) {
+                    println("stat: " + t)
                     val st = t match {
-                      case "0" => new MinMaxStatistics
-                      case "1" => new SampleBasedStatistics(
+                      case MinMaxStatisticsType.name => new MinMaxStatistics
+                      case SampleBasedStatisticsType.name => new SampleBasedStatistics(
                         hadoopConf.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.key).toDouble)
-                      case "2" => new PartedByValueStatistics
+                      case PartByValueStatisticsType.name => new PartedByValueStatistics
                       case _ =>
                         throw new UnsupportedOperationException(s"non-supported statistic in id $t")
                     }
