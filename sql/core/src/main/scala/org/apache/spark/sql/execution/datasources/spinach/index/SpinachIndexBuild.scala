@@ -60,8 +60,6 @@ private[spinach] case class SpinachIndexBuild(
       val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
 
       // TODO just add fsrate in hadoop conf
-      hadoopConf.setDouble(Statistics.thresName,
-        sparkSession.conf.get(SQLConf.SPINACH_FULL_SCAN_THRESHOLD))
       hadoopConf.setStrings(Statistics.Statistics_Type_Name,
         sparkSession.conf.get(SQLConf.SPINACH_STATISTICS_TYPES))
       hadoopConf.setDouble(Statistics.Sample_Based_SampleRate,
