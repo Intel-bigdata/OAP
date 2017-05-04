@@ -26,13 +26,14 @@ import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
 // This is a simple version of parquet's CodeFactory.
 // TODO: [linhong] Need change this into Scala Code style
+// TODO: [linhong] Need add release() function
 private[spinach] class CodecFactory(conf: Configuration) {
 
-  private def getCodec(codecString: String): CompressionCodec = {
+  private def getCodec(codecString: String): Option[CompressionCodec] = {
     val codecName = CompressionCodecName.valueOf(codecString)
     val codecClass = codecName.getHadoopCompressionCodecClass
-    if (codecClass == null) null
-    else ReflectionUtils.newInstance(codecClass, conf).asInstanceOf[CompressionCodec]
+    if (codecClass == null) None
+    else Some(ReflectionUtils.newInstance(codecClass, conf).asInstanceOf[CompressionCodec])
   }
 
   def getCompressor(codec: org.apache.parquet.format.CompressionCodec): BytesCompressor = {
@@ -46,39 +47,40 @@ private[spinach] class CodecFactory(conf: Configuration) {
   }
 }
 
-private[spinach] class BytesCompressor(codec: CompressionCodec) {
+private[spinach] class BytesCompressor(compressionCodec: Option[CompressionCodec]) {
 
-  private val compressor = if (codec == null) null else CodecPool.getCompressor(codec)
-  private val compressedOutBuffer = if (codec == null) null else new ByteArrayOutputStream()
+  private lazy val compressor = CodecPool.getCompressor(compressionCodec.get)
+  private lazy val compressedOutBuffer = new ByteArrayOutputStream()
 
   def compress(bytes: Array[Byte]): Array[Byte] = {
-    if (codec == null) {
-      bytes
-    } else {
-      compressedOutBuffer.reset()
-      if (compressor != null) compressor.reset()
-      val cos = codec.createOutputStream(compressedOutBuffer, compressor)
-      cos.write(bytes)
-      cos.finish()
-      cos.close()
-      compressedOutBuffer.toByteArray
+    compressionCodec match {
+      case Some(codec) =>
+        compressedOutBuffer.reset()
+        // null compressor for non-native gzip
+        if (compressor != null) compressor.reset()
+        val cos = codec.createOutputStream(compressedOutBuffer, compressor)
+        cos.write(bytes)
+        cos.finish()
+        cos.close()
+        compressedOutBuffer.toByteArray
+      case None => bytes
     }
   }
 }
 
-private[spinach] class BytesDecompressor(codec: CompressionCodec) {
+private[spinach] class BytesDecompressor(compressionCodec: Option[CompressionCodec]) {
 
-  private val decompressor = if (codec == null) null else CodecPool.getDecompressor(codec)
+  private lazy val decompressor = CodecPool.getDecompressor(compressionCodec.get)
 
   def decompress(bytes: Array[Byte], uncompressedSize: Int): Array[Byte] = {
-    if (codec == null) {
-      bytes
-    } else {
-      decompressor.reset()
-      val cis = codec.createInputStream(new ByteArrayInputStream(bytes), decompressor)
-      val decompressed = new Array[Byte](uncompressedSize)
-      cis.read(decompressed)
-      decompressed
+    compressionCodec match {
+      case Some(codec) =>
+        decompressor.reset()
+        val cis = codec.createInputStream(new ByteArrayInputStream(bytes), decompressor)
+        val decompressed = new Array[Byte](uncompressedSize)
+        cis.read(decompressed)
+        decompressed
+      case None => bytes
     }
   }
 }
