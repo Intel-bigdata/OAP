@@ -577,7 +577,8 @@ object SQLConf {
         "\"MINMAX\" MinMaxStatistics, " +
         "\"SAMPLE\" for SampleBasedStatistics, " +
         "\"PARTBYVALUE\" for PartedByValueStatistics. " +
-        "If you want to add more than one type, just use comma to separate, eg. \"MINMAX, SAMPLE, PARTBYVALUE\"")
+        "If you want to add more than one type, just use comma " +
+        "to separate, eg. \"MINMAX, SAMPLE, PARTBYVALUE\"")
       .stringConf
       .createWithDefault("MINMAX, SAMPLE, PARTBYVALUE")
 
