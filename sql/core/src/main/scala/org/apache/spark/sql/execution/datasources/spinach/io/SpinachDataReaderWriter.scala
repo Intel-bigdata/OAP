@@ -108,7 +108,15 @@ private[spinach] class SpinachDataWriter(
     }
 
     val columnEncodings = new Array[Encoding](rowGroup.length)
-    (0 until rowGroup.length).foreach(i => columnEncodings(i) = rowGroup(i).getEncoding)
+    val dictDataLens = new Array[Int](rowGroup.length)
+    val dictSizes = new Array[Int](rowGroup.length)
+    rowGroup.indices.foreach { i =>
+      val dictByteData = rowGroup(i).buildDictionary
+      columnEncodings(i) = rowGroup(i).getEncoding
+      dictDataLens(i) = dictByteData.length
+      dictSizes(i) = rowGroup(i).getDictionarySize
+      if (dictDataLens(i) > 0) out.write(dictByteData)
+    }
 
     // and update the group count and row count in the last group
     fiberMeta
@@ -116,6 +124,8 @@ private[spinach] class SpinachDataWriter(
       .withRowCountInLastGroup(
         if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else DEFAULT_ROW_GROUP_SIZE)
       .withEncodings(columnEncodings)
+      .withDictionaryDataLens(dictDataLens)
+      .withDictionaryIdSizes(dictSizes)
 
     fiberMeta.write(out)
     out.close()
