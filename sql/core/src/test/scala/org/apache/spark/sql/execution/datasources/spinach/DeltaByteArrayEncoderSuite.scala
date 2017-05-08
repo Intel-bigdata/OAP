@@ -60,7 +60,7 @@ class DeltaByteArrayEncoderCheck extends Properties("DeltaByteArrayEncoder") {
                 .append(InternalRow(UTF8String.fromString(values(row % values.length))))
             }
             val bytes = fiberBuilder.build().fiberData
-            val parsedBytes = fiberParser.parse(bytes, rowCount)
+            val parsedBytes = fiberParser.parse(bytes, count)
             val referenceBytes = referenceFiberBuilder.build().fiberData
             referenceFiberBuilder.clear()
             fiberBuilder.clear()
