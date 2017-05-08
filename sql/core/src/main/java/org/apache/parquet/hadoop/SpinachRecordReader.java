@@ -34,6 +34,8 @@ import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
 import com.google.common.collect.Lists;
+import org.apache.parquet.it.unimi.dsi.fastutil.longs.LongArrayList;
+import org.apache.parquet.it.unimi.dsi.fastutil.longs.LongList;
 
 public class SpinachRecordReader<T> implements RecordReader<T> {
 
@@ -84,7 +86,7 @@ public class SpinachRecordReader<T> implements RecordReader<T> {
 
         List<BlockMetaData> inputBlockList = Lists.newArrayList();
 
-        List<List<Long>> rowIdsList = Lists.newArrayList();
+        List<LongList> rowIdsList = Lists.newArrayList();
 
         long nextRowGroupStartRowId = 0;
         int totalCount = globalRowIds.length;
@@ -93,7 +95,7 @@ public class SpinachRecordReader<T> implements RecordReader<T> {
         for (BlockMetaData block : blocks) {
             long currentRowGroupStartRowId = nextRowGroupStartRowId;
             nextRowGroupStartRowId += block.getRowCount();
-            List<Long> rowIdList = Lists.newArrayList();
+            LongList rowIdList = new LongArrayList();
             while (index < totalCount) {
                 long globalRowGroupId = globalRowIds[index];
                 if (globalRowGroupId < nextRowGroupStartRowId) {

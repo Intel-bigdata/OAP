@@ -15,6 +15,7 @@ import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.io.*;
 import org.apache.parquet.io.api.RecordMaterializer;
+import org.apache.parquet.it.unimi.dsi.fastutil.longs.LongList;
 import org.apache.parquet.schema.MessageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +46,7 @@ public class InternalSpinachRecordReader<T> {
 
     private RecordReader<T> recordReader;
 
-    private Iterator<List<Long>> rowIdsIter;
+    private Iterator<LongList> rowIdsIter;
 
     private String createdBy;
 
@@ -74,7 +75,7 @@ public class InternalSpinachRecordReader<T> {
             }
             MessageColumnIO columnIO =
                     columnIOFactory.getColumnIO(requestedSchema, fileSchema, strictTypeChecking);
-            List<Long> rowIdList = rowIdsIter.next();
+            LongList rowIdList = rowIdsIter.next();
             this.recordReader = getRecordReader(columnIO,pages,rowIdList);
             metrics.startRecordAssemblyTime();
             totalCountLoadedSoFar += rowIdList.size();
@@ -82,7 +83,7 @@ public class InternalSpinachRecordReader<T> {
         }
     }
 
-    private RecordReader<T> getRecordReader(MessageColumnIO columnIO, PageReadStore pages, List<Long> rowIdList) {
+    private RecordReader<T> getRecordReader(MessageColumnIO columnIO, PageReadStore pages, LongList rowIdList) {
         return RecordReaderFactory.getRecordReader(columnIO, pages, recordConverter, createdBy, rowIdList);
     }
 
@@ -107,9 +108,9 @@ public class InternalSpinachRecordReader<T> {
         this.recordConverter = readSupport.prepareForRead(
                 configuration, fileMetadata, fileSchema, readContext);
         this.strictTypeChecking = configuration.getBoolean(STRICT_TYPE_CHECKING, true);
-        List<List<Long>> rowIdsList = ((IndexedParquetMetadata)parquetFileReader.getFooter()).getRowIdsList();
+        List<LongList> rowIdsList = ((IndexedParquetMetadata)parquetFileReader.getFooter()).getRowIdsList();
         this.rowIdsIter = rowIdsList.iterator();
-        for (List<Long> rowIdList : rowIdsList) {
+        for (LongList rowIdList : rowIdsList) {
             total += rowIdList.size();
         }
         this.reader.setRequestedSchema(requestedSchema);

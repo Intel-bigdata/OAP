@@ -4,34 +4,34 @@ import org.apache.parquet.Preconditions;
 import org.apache.parquet.column.ColumnReader;
 import org.apache.parquet.column.impl.ColumnReadStoreImpl;
 import org.apache.parquet.io.api.RecordMaterializer;
-
-import java.util.Iterator;
-import java.util.List;
+import org.apache.parquet.it.unimi.dsi.fastutil.longs.LongList;
 
 public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<T> {
 
-    protected final long recordMaxCount;
+    private final long recordMaxCount;
 
     private long recordsRead = 0;
 
-    protected Long currentRowId = -1L;
+    private Long currentRowId = -1L;
 
-    private Iterator<Long> rowIdIter = null;
+    private LongList rowIdList = null;
+
+    private int currentIndex = 0;
 
     public PositionableRecordReaderImpl(MessageColumnIO root,
                                         RecordMaterializer<T> recordMaterializer,
                                         ColumnReadStoreImpl columnStore,
                                         long recordCount,
-                                        List<Long> rowIdList) {
+                                        LongList rowIdList) {
         super(root, recordMaterializer, false, columnStore);
         Preconditions.checkNotNull(rowIdList,"rowIdList can not be null.");
         Preconditions.checkArgument(!rowIdList.isEmpty(), "rowIdList must has item.");
         this.recordMaxCount = recordCount;
-        this.rowIdIter = rowIdList.iterator();
+        this.rowIdList = rowIdList;
     }
 
     public T read() {
-        currentRowId = rowIdIter.next();
+        currentRowId = rowIdList.getLong(currentIndex);
         seek(currentRowId);
 
         if (recordsRead == recordMaxCount) {
@@ -39,6 +39,7 @@ public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<
         }
 
         ++recordsRead;
+        ++currentIndex;
         return super.read();
     }
 
