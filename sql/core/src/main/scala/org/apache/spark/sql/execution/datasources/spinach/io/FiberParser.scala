@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.io
 
+import org.apache.parquet.column.Dictionary
 import org.apache.parquet.column.values.deltastrings.DeltaByteArrayReader
 import org.apache.parquet.column.values.dictionary.DictionaryValuesReader
 import org.apache.parquet.format.Encoding
@@ -37,7 +38,19 @@ object DataFiberParser {
     encoding match {
       case Encoding.PLAIN => PlainDataFiberParser(meta)
       case Encoding.DELTA_BYTE_ARRAY => DeltaByteArrayDataFiberParser(meta, dataType)
-      case Encoding.PLAIN_DICTIONARY => PlainDictionaryFiberParser(meta, dataType)
+      case _ => sys.error(s"Not support encoding type: $encoding")
+    }
+  }
+}
+
+object DictionaryBasedDataFiberParser {
+
+  def apply(encoding: Encoding,
+            meta: SpinachDataFileHandle,
+            dictionary: Dictionary,
+            dataType: DataType): DataFiberParser = {
+    encoding match {
+      case Encoding.PLAIN_DICTIONARY => PlainDictionaryFiberParser(meta, dictionary, dataType)
       case _ => sys.error(s"Not support encoding type: $encoding")
     }
   }
@@ -99,33 +112,56 @@ private[spinach] case class DeltaByteArrayDataFiberParser(
 }
 
 private[spinach] case class PlainDictionaryFiberParser(
-  meta: SpinachDataFileHandle, dataType: DataType) extends DataFiberParser {
-
-  // TODO: [linhong] Trick! We don't need decode dictionary here. so null is OK
-  val valuesReader = new DictionaryValuesReader(null)
+  meta: SpinachDataFileHandle,
+  dictionary: Dictionary,
+  dataType: DataType) extends DataFiberParser {
 
   override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = {
+    val valuesReader = new DictionaryValuesReader(dictionary)
+
     val bits = new BitSet(meta.rowCountInEachGroup)
     Platform.copyMemory(bytes, Platform.BYTE_ARRAY_OFFSET,
       bits.toLongArray(), Platform.LONG_ARRAY_OFFSET, bits.toLongArray().length * 8)
 
     val baseOffset = Platform.BYTE_ARRAY_OFFSET + bits.toLongArray().length * 8
+    val bitsDataLength = bits.toLongArray().length * 8
+
+    valuesReader.initFromPage(rowCount, bytes, bits.toLongArray().length * 8 + 4)
 
     dataType match {
-      case BinaryType | StringType | IntegerType =>
+      case IntegerType =>
         val fiberBytesLength = bits.toLongArray().length * 8 +
           meta.rowCountInEachGroup * IntegerType.defaultSize
         val fiberBytes = new Array[Byte](fiberBytesLength)
 
         Platform.copyMemory(bytes, Platform.BYTE_ARRAY_OFFSET,
           fiberBytes, Platform.LONG_ARRAY_OFFSET, bits.toLongArray().length * 8)
-
-        valuesReader.initFromPage(rowCount, bytes, bits.toLongArray().length * 8 + 4)
-
         (0 until rowCount).foreach { i =>
           if (bits.get(i)) {
             Platform.putInt(fiberBytes,
-              baseOffset + IntegerType.defaultSize * i, valuesReader.readValueDictionaryId())
+              baseOffset + IntegerType.defaultSize * i, valuesReader.readInteger())
+          }
+        }
+        fiberBytes
+      case BinaryType | StringType =>
+        val valueDataLength = Platform.getInt(bytes, baseOffset)
+        val offsetDataLength = rowCount * IntegerType.defaultSize * 2
+        val fiberBytesLength = bits.toLongArray().length * 8 + offsetDataLength + valueDataLength
+        val fiberBytes = new Array[Byte](fiberBytesLength)
+
+        Platform.copyMemory(bytes, Platform.BYTE_ARRAY_OFFSET,
+          fiberBytes, Platform.LONG_ARRAY_OFFSET, bits.toLongArray().length * 8)
+        var startValueOffset = bitsDataLength + offsetDataLength
+        (0 until rowCount).foreach{i =>
+          if (bits.get(i)) {
+            val value = valuesReader.readBytes().getBytes
+            Platform.putInt(fiberBytes,
+              baseOffset + IntegerType.defaultSize * i * 2, value.length)
+            Platform.putInt(fiberBytes,
+              baseOffset + IntegerType.defaultSize * (i * 2 + 1), startValueOffset)
+            Platform.copyMemory(value, Platform.BYTE_ARRAY_OFFSET, fiberBytes,
+              Platform.BYTE_ARRAY_OFFSET + startValueOffset, value.length)
+            startValueOffset += value.length
           }
         }
         fiberBytes

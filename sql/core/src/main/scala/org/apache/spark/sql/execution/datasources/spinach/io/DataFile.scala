@@ -39,7 +39,7 @@ abstract class DataFile {
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
   : Iterator[InternalRow]
-  def getDictionaries(requiredIds: Array[Int], conf: Configuration): Array[Dictionary]
+  def getDictionary(fiberId: Int, meta: SpinachDataFileHandle): Dictionary
 }
 
 private[spinach] object DataFile {

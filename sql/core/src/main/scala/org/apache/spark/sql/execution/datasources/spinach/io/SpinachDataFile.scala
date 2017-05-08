@@ -24,7 +24,6 @@ import org.apache.parquet.bytes.BytesInput
 import org.apache.parquet.column.Dictionary
 import org.apache.parquet.column.page.DictionaryPage
 import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.{PlainBinaryDictionary, PlainIntegerDictionary}
-import org.apache.parquet.format.Encoding
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.{BatchColumn, ColumnValues}
@@ -35,15 +34,16 @@ import org.apache.spark.unsafe.Platform
 
 private[spinach] case class SpinachDataFile(path: String, schema: StructType) extends DataFile {
 
-  def getDictionaries(requiredIds: Array[Int], conf: Configuration): Array[Dictionary] = {
-    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
+  private val dictionaries = new Array[Dictionary](schema.length)
+
+  def getDictionary(fiberId: Int, meta: SpinachDataFileHandle): Dictionary = {
     val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)
     val dictDataLens = meta.dictionaryDataLens
 
-    requiredIds.map{ ordinal =>
-      val dictStart = lastGroupMeta.end + dictDataLens.slice(0, ordinal).sum
-      val dataLen = dictDataLens(ordinal)
-      val dictSize = meta.dictionaryIdSizes(ordinal)
+    val dictStart = lastGroupMeta.end + dictDataLens.slice(0, fiberId).sum
+    val dataLen = dictDataLens(fiberId)
+    val dictSize = meta.dictionaryIdSizes(fiberId)
+    if (dictionaries(fiberId) == null && dataLen != 0) {
       val bytes = new Array[Byte](dataLen)
       val is = meta.fin
       is.synchronized {
@@ -52,12 +52,12 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
       }
       val dictionaryPage = new DictionaryPage(BytesInput.from(bytes), dictSize,
         org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
-      schema(ordinal).dataType match {
+      schema(fiberId).dataType match {
         case StringType | BinaryType => new PlainBinaryDictionary(dictionaryPage)
         case IntegerType => new PlainIntegerDictionary(dictionaryPage)
-        case _ => null
+        case other => sys.error(s"not support data type: $other")
       }
-    }
+    } else dictionaries(fiberId)
   }
 
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
@@ -88,7 +88,14 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     }
 
     val dataType = schema(fiberId).dataType
-    val fiberParser = DataFiberParser(encoding, meta, dataType)
+    val dictionary = getDictionary(fiberId, meta)
+    val fiberParser =
+      if (dictionary != null) {
+        DictionaryBasedDataFiberParser(encoding, meta, dictionary, dataType)
+      } else {
+        DataFiberParser(encoding, meta, dataType)
+      }
+
     val rowCount =
       if (groupId == meta.groupCount - 1) meta.rowCountInLastGroup
       else meta.rowCountInEachGroup
@@ -113,13 +120,9 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     (0 until meta.groupCount).iterator.flatMap { groupId =>
       var i = 0
       while (i < columns.length) {
-        val encoding = meta.encodings(i)
-        val dataType =
-          if (encoding == Encoding.PLAIN_DICTIONARY) IntegerType
-          else schema(requiredIds(i)).dataType
         columns(i) = new ColumnValues(
           meta.rowCountInEachGroup,
-          dataType,
+          schema(requiredIds(i)).dataType,
           FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
         i += 1
       }
@@ -149,13 +152,9 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
         // if we move to another row group, or the first row group
         var i = 0
         while (i < columns.length) {
-          val encoding = meta.encodings(i)
-          val dataType =
-            if (encoding == Encoding.PLAIN_DICTIONARY) IntegerType
-            else schema(requiredIds(i)).dataType
           columns(i) = new ColumnValues(
             meta.rowCountInEachGroup,
-            dataType,
+            schema(requiredIds(i)).dataType,
             FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
           i += 1
         }

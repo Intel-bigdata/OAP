@@ -186,22 +186,15 @@ private[sql] class SpinachFileFormat extends FileFormat
         (file: PartitionedFile) => {
           assert(file.partitionValues.numFields == partitionSchema.size)
 
-          val reader = new SpinachDataReader(
+          val iter = new SpinachDataReader(
             new Path(new URI(file.filePath)), m, filterScanner, requiredIds)
-          val iter = reader.initialize(broadcastedHadoopConf.value.value)
+            .initialize(broadcastedHadoopConf.value.value)
 
           val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
           val joinedRow = new JoinedRow()
           val appendPartitionColumns = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
 
-          if (m.dataReaderClassName == classOf[SpinachDataFile].getCanonicalName) {
-            // Convert iter's Dictionary Encoded value
-            reader.decodeIterator(broadcastedHadoopConf.value.value, iter, requiredSchema).map(d =>
-              appendPartitionColumns(joinedRow(d, file.partitionValues))
-            )
-          } else {
-            iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
-          }
+          iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
         }
       case None => (_: PartitionedFile) => {
         // TODO need to think about when there is no spinach.meta file at all

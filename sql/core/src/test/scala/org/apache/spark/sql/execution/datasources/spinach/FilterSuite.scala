@@ -110,6 +110,27 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sql("drop sindex index1 on spinach_test")
   }
 
+  test("filtering with dictionary encoding enabled") {
+    System.setProperty("spinach.encoding.dictionaryEnabled", "true")
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").registerTempTable("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("create sindex index1 on spinach_test (a)")
+    sql("create sindex index2 on spinach_test (b)")
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
+      Row(1, "this is test 1") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE b = 'this is test 1'"),
+      Row(1, "this is test 1") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 1 AND a <= 3"),
+      Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+    sql("drop sindex index1 on spinach_test")
+    sql("drop sindex index2 on spinach_test")
+    System.clearProperty("spinach.encoding.dictionaryEnabled")
+  }
+
   test("filtering parquet") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")
