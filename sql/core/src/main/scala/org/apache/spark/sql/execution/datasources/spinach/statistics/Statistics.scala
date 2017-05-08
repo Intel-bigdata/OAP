@@ -21,13 +21,10 @@ import java.io.ByteArrayOutputStream
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.hadoop.fs.FSDataOutputStream
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.BaseOrdering
-import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, RangeInterval, UnsafeIndexNode}
-import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
+import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
@@ -37,7 +34,7 @@ abstract class Statistics{
   var arrayOffset: Long
 
   // TODO write function parameters need to be optimized
-  def write(schema: StructType, fileOut: FSDataOutputStream, uniqueKeys: Array[InternalRow],
+  def write(schema: StructType, writer: IndexOutputWriter, uniqueKeys: Array[InternalRow],
             hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
             offsetMap: java.util.HashMap[InternalRow, Long]): Unit
 
@@ -70,13 +67,12 @@ object Statistics {
 
   def writeInternalRow(converter: UnsafeProjection,
                        internalRow: InternalRow,
-                       fileOut: FSDataOutputStream): Unit = {
+                       writer: IndexOutputWriter): Unit = {
     val keyBuf = new ByteArrayOutputStream()
     val value = convertHelper(converter, internalRow, keyBuf)
     value.writeToStream(keyBuf, null)
 
-    keyBuf.writeTo(fileOut)
-    fileOut.flush()
+    writer.write(keyBuf.toByteArray)
     keyBuf.close()
   }
 

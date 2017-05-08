@@ -16,20 +16,17 @@
  */
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.io.File
-
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterAll
 
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, RangeInterval}
+import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, IndexUtils, RangeInterval}
 import org.apache.spark.sql.execution.datasources.spinach.statistics.Statistics
-import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
+import org.apache.spark.sql.execution.datasources.spinach.utils.TestIndexOutputWriter
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
 import org.apache.spark.unsafe.Platform
@@ -123,17 +120,12 @@ class StatisticsSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
   }
 
   test("Statistics.writeInternalRow function") {
-    // environment setup
-    val temp_file = File.createTempFile("spark-5566", ".txt")
-    val hadoopConf = spark.sparkContext.hadoopConfiguration
-    val path = new Path(temp_file.getParent, temp_file.getName)
-    val fs = path.getFileSystem(hadoopConf)
-    val fileOut = fs.create(path, true)
+    val out = new TestIndexOutputWriter
 
     // write internalRows out
     val internalRowsToWrite = (0 to 10).map(i => InternalRow(i + 0.0))
-    internalRowsToWrite.foreach(Statistics.writeInternalRow(converter, _, fileOut))
-    fileOut.close() // writing finished
+    internalRowsToWrite.foreach(Statistics.writeInternalRow(converter, _, out))
+    out.close() // writing finished
 
     // construct expected answer
     // write all content into a ByteArray
@@ -147,10 +139,7 @@ class StatisticsSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
     byte_array_buffer.close()
 
     // start reading & checking
-    val fin = fs.open(path)
-    val length = fs.getContentSummary(path).getLength.toInt
-    val readContent = new Array[Byte](length)
-    fin.readFully(0, readContent)
+    val readContent = out.buf.toByteArray
     assert(checkByteArray(expectedAnswer, readContent))
   }
 

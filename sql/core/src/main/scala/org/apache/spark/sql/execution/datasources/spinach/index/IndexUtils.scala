@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach.utils
+package org.apache.spark.sql.execution.datasources.spinach.index
 
 import java.io.OutputStream
 
@@ -28,22 +28,12 @@ import org.apache.spark.sql.execution.datasources.spinach.SpinachFileFormat
  * Utils for Index read/write
  */
 object IndexUtils {
+  // TODO remove this and corresponding test
   def writeInt(out: OutputStream, v: Int): Unit = {
     out.write((v >>>  0) & 0xFF)
     out.write((v >>>  8) & 0xFF)
     out.write((v >>> 16) & 0xFF)
     out.write((v >>> 24) & 0xFF)
-  }
-
-  def writeLong(out: OutputStream, v: Long): Unit = {
-    out.write((v >>>  0).toInt & 0xFF)
-    out.write((v >>>  8).toInt & 0xFF)
-    out.write((v >>> 16).toInt & 0xFF)
-    out.write((v >>> 24).toInt & 0xFF)
-    out.write((v >>> 32).toInt & 0xFF)
-    out.write((v >>> 40).toInt & 0xFF)
-    out.write((v >>> 48).toInt & 0xFF)
-    out.write((v >>> 56).toInt & 0xFF)
   }
 
   def indexFileFromDataFile(dataFile: Path, name: String): Path = {
@@ -56,5 +46,23 @@ object IndexUtils {
       dataFileName
     }
     new Path(dataFile.getParent, "." + indexFileName + "." + name + SPINACH_INDEX_EXTENSION)
+  }
+
+  def writeInt(writer: IndexOutputWriter, v: Int): Unit = {
+    writer.write((v >>>  0) & 0xFF)
+    writer.write((v >>>  8) & 0xFF)
+    writer.write((v >>> 16) & 0xFF)
+    writer.write((v >>> 24) & 0xFF)
+  }
+
+  def writeLong(writer: IndexOutputWriter, v: Long): Unit = {
+    writer.write((v >>>  0).toInt & 0xFF)
+    writer.write((v >>>  8).toInt & 0xFF)
+    writer.write((v >>> 16).toInt & 0xFF)
+    writer.write((v >>> 24).toInt & 0xFF)
+    writer.write((v >>> 32).toInt & 0xFF)
+    writer.write((v >>> 40).toInt & 0xFF)
+    writer.write((v >>> 48).toInt & 0xFF)
+    writer.write((v >>> 56).toInt & 0xFF)
   }
 }

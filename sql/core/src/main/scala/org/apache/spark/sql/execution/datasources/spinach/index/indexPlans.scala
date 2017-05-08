@@ -15,21 +15,23 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.spinach.ddl
+package org.apache.spark.sql.execution.datasources.spinach.index
 
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.mapreduce.Job
 
+import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
+import org.apache.spark.sql.{AnalysisException, Dataset, Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.SQLExecution
 import org.apache.spark.sql.execution.command.RunnableCommand
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, SpinachException}
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach._
-import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
-import org.apache.spark.sql.types.{IntegerType, StringType}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
 
 /**
@@ -117,14 +119,53 @@ case class CreateIndex(
       // p.files.foreach(f => builder.addFileMeta(FileMeta("", 0, f.getPath.toString)))
       (metaBuilder, parent, existOld)
     })
-    val ret = SpinachIndexBuild(sparkSession, indexName,
-      indexColumns, s, bAndP.map(_._2), readerClassName, indexType).execute()
-    val retMap = ret.groupBy(_.parent)
+    val job = Job.getInstance(sparkSession.sparkContext.hadoopConfiguration)
+    val queryExecution = Dataset.ofRows(sparkSession, relation).queryExecution
+    val indexFileFormat = new SpinachIndexFileFormat
+    val ids =
+      indexColumns.map(c => s.map(_.name).toIndexedSeq.indexOf(c.columnName))
+    val keySchema = StructType(ids.map(s.toIndexedSeq(_)))
+    val retVal = SQLExecution.withNewExecutionId(sparkSession, queryExecution) {
+      val indexRelation =
+        WriteIndexRelation(
+          sparkSession,
+          keySchema,
+          indexFileFormat.prepareWrite(sparkSession, _, null, keySchema))
+
+      val writerContainer = {
+        // TODO Partition and bucket TBD
+        IndexWriterFactory.getIndexWriter(indexRelation,
+          job,
+          indexColumns,
+          keySchema,
+          indexName,
+          isAppend = false,
+          indexType)
+      }
+
+      // This call shouldn't be put into the `try` block below because it only initializes and
+      // prepares the job, any exception thrown from here shouldn't cause abortJob() to be called.
+      writerContainer.driverSideSetup()
+
+      try {
+        val results = sparkSession.sparkContext.runJob(
+          queryExecution.toRdd, writerContainer.writeIndexFromRows _)
+        writerContainer.commitJob(results.flatten)
+        results.flatten
+      } catch { case cause: Throwable =>
+        logError("Aborting job.", cause)
+        writerContainer.abortJob()
+        throw new SparkException("Job aborted.", cause)
+      }
+    }.toSeq
+//    val ret = SpinachIndexBuild(sparkSession, indexName,
+//      indexColumns, s, bAndP.map(_._2), readerClassName, indexType).execute()
+    val retMap = retVal.groupBy(_.parent)
     bAndP.foreach(bp =>
       retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
         if (!bp._3) bp._1.addFileMeta(
-            FileMeta(r.fingerprint, r.rowCount, r.dataFile))
-    ))
+          FileMeta(r.fingerprint, r.rowCount, r.dataFile))
+      ))
     // write updated metas down
     bAndP.foreach(bp => DataSourceMeta.write(
       new Path(bp._2.toString, SpinachFileFormat.SPINACH_META_FILE),
@@ -281,8 +322,45 @@ case class RefreshIndex(
           entries.map(e => IndexColumn(s(e).name))
         case it => sys.error(s"Not implemented index type $it")
       }
-      SpinachIndexBuild(sparkSession, i.name, indexColumns.toArray, s, bAndP.map(
-        _._2), readerClassName, indexType, overwrite = false).execute()
+      val job = Job.getInstance(sparkSession.sparkContext.hadoopConfiguration)
+      val queryExecution = Dataset.ofRows(sparkSession, relation).queryExecution
+      val indexFileFormat = new SpinachIndexFileFormat
+      val ids =
+        indexColumns.map(c => s.map(_.name).toIndexedSeq.indexOf(c.columnName))
+      val keySchema = StructType(ids.map(s.toIndexedSeq(_)))
+      SQLExecution.withNewExecutionId(sparkSession, queryExecution) {
+        val indexRelation =
+          WriteIndexRelation(
+            sparkSession,
+            keySchema,
+            indexFileFormat.prepareWrite(sparkSession, _, null, keySchema))
+
+        val writerContainer = {
+          // TODO Partition and bucket TBD
+          IndexWriterFactory.getIndexWriter(indexRelation,
+            job,
+            indexColumns.toArray,
+            keySchema,
+            i.name,
+            isAppend = true,
+            indexType)
+        }
+
+        // This call shouldn't be put into the `try` block below because it only initializes and
+        // prepares the job, any exception thrown from here shouldn't cause abortJob() to be called.
+        writerContainer.driverSideSetup()
+
+        try {
+          val results = sparkSession.sparkContext.runJob(
+            queryExecution.toRdd, writerContainer.writeIndexFromRows _)
+          writerContainer.commitJob(results.flatten)
+          results.flatten
+        } catch { case cause: Throwable =>
+          logError("Aborting job.", cause)
+          writerContainer.abortJob()
+          throw new SparkException("Job aborted.", cause)
+        }
+      }.toSeq
     })
     if (!buildrst.isEmpty) {
       val ret = buildrst.head

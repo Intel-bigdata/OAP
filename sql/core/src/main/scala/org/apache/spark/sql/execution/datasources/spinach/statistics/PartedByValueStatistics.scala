@@ -19,13 +19,10 @@ package org.apache.spark.sql.execution.datasources.spinach.statistics
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.hadoop.fs.FSDataOutputStream
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, RangeInterval}
-import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
+import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
@@ -119,14 +116,14 @@ class PartedByValueStatistics extends Statistics {
     (size + 12, value, index, count)
   }
 
-  override def write(schema: StructType, fileOut: FSDataOutputStream,
+  override def write(schema: StructType, writer: IndexOutputWriter,
                      uniqueKeys: Array[InternalRow],
                      hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
                      offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
     keySchema = schema
 
     // first write statistic id
-    IndexUtils.writeInt(fileOut, id)
+    IndexUtils.writeInt(writer, id)
 
     val size = hashMap.size()
     if (size > 0) {
@@ -134,7 +131,7 @@ class PartedByValueStatistics extends Statistics {
       val perSize = size / partNum
 
       // first write part number
-      IndexUtils.writeInt(fileOut, partNum + 1)
+      IndexUtils.writeInt(writer, partNum + 1)
 
       var i = 0
       var count = 0
@@ -146,7 +143,7 @@ class PartedByValueStatistics extends Statistics {
           count += hashMap.get(uniqueKeys(begin)).size()
           begin += 1
         }
-        writeEntry(fileOut, uniqueKeys(index), index, count)
+        writeEntry(writer, uniqueKeys(index), index, count)
         i += 1
       }
 
@@ -155,16 +152,15 @@ class PartedByValueStatistics extends Statistics {
         count += hashMap.get(uniqueKeys(index)).size()
         index += 1
       }
-      writeEntry(fileOut, uniqueKeys.last, size - 1, count)
+      writeEntry(writer, uniqueKeys.last, size - 1, count)
     }
   }
 
-  private def writeEntry(fileOut: FSDataOutputStream,
+  private def writeEntry(writer: IndexOutputWriter,
                          internalRow: InternalRow,
                          index: Int, count: Int): Unit = {
-    Statistics.writeInternalRow(converter, internalRow, fileOut)
-    IndexUtils.writeInt(fileOut, index)
-    IndexUtils.writeInt(fileOut, count)
-    fileOut.flush()
+    Statistics.writeInternalRow(converter, internalRow, writer)
+    IndexUtils.writeInt(writer, index)
+    IndexUtils.writeInt(writer, count)
   }
 }

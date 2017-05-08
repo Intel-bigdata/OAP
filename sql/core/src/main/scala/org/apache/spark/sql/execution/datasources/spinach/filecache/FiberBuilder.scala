@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.spinach.filecache
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.parquet.format.Encoding
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
@@ -64,6 +66,12 @@ private[spinach] trait DataFiberBuilder {
     currentRowId = 0
     bitStream.clear()
   }
+
+  def getEncoding: Encoding = Encoding.PLAIN
+
+  def buildDictionary: Array[Byte] = Array.empty[Byte]
+  def getDictionarySize: Int = 0
+  def resetDictionary: Unit = {}
 }
 
 private[spinach] case class FixedSizeTypeFiberBuilder(

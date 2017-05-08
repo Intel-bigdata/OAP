@@ -20,12 +20,25 @@ package org.apache.spark.sql.execution.datasources.spinach.utils
 import java.io.{ByteArrayOutputStream, DataOutputStream}
 
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.junit.Assert._
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.spinach.index.{IndexOutputWriter, IndexUtils}
 import org.apache.spark.unsafe.Platform
 
+class TestIndexOutputWriter extends IndexOutputWriter(bucketId = None, context = null) {
+  val buf = new ByteArrayOutputStream(8)
+  override protected lazy val writer: RecordWriter[Void, Any] =
+    new RecordWriter[Void, Any] {
+      override def close(context: TaskAttemptContext) = buf.close()
+      override def write(key: Void, value: Any) = value match {
+        case bytes: Array[Byte] => buf.write(bytes)
+        case i: Int => buf.write(i) // this will only write a byte
+      }
+    }
+}
 
 class IndexUtilsSuite extends SparkFunSuite with Logging {
   test("write int to unsafe") {
@@ -38,14 +51,24 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
     assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + 4) == 4321)
   }
 
-  test("write long to unsafe") {
-    val buf = new ByteArrayOutputStream(8)
-    val out = new DataOutputStream(buf)
+  test("write int to IndexOutputWriter") {
+    val out = new TestIndexOutputWriter
+    IndexUtils.writeInt(out, -19)
+    IndexUtils.writeInt(out, 4321)
+    out.close()
+    val bytes = out.buf.toByteArray
+    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET) == -19)
+    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + 4) == 4321)
+  }
+
+  test("write long to IndexOutputWriter") {
+    val out = new TestIndexOutputWriter
     IndexUtils.writeLong(out, -19)
     IndexUtils.writeLong(out, 4321)
     IndexUtils.writeLong(out, 43210912381723L)
     IndexUtils.writeLong(out, -99128917321912L)
-    val bytes = buf.toByteArray
+    out.close()
+    val bytes = out.buf.toByteArray
     assert(Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET) == -19)
     assert(Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + 8) == 4321)
     assert(Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + 16) == 43210912381723L)

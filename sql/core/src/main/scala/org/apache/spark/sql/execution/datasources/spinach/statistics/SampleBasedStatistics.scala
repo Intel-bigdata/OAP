@@ -19,13 +19,10 @@ package org.apache.spark.sql.execution.datasources.spinach.statistics
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
-import org.apache.hadoop.fs.FSDataOutputStream
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.spinach.index.RangeInterval
-import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
+import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
@@ -35,7 +32,7 @@ class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
 
   // for SampleBasedStatistics, input keys should be the whole file
   // instead of uniqueKeys, can be refactor later
-  def write(schema: StructType, fileOut: FSDataOutputStream, uniqueKeys: Array[InternalRow],
+  def write(schema: StructType, writer: IndexOutputWriter, uniqueKeys: Array[InternalRow],
             hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
             offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
     // SampleBasedStatistics file structure
@@ -51,12 +48,12 @@ class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
     val converter = UnsafeProjection.create(schema)
     val sample_size = (uniqueKeys.length * sampleRate).toInt
 
-    IndexUtils.writeInt(fileOut, id)
-    IndexUtils.writeInt(fileOut, sample_size)
+    IndexUtils.writeInt(writer, id)
+    IndexUtils.writeInt(writer, sample_size)
 
     val sample_array_index = Random.shuffle(uniqueKeys.indices.toList).take(sample_size)
     sample_array_index.foreach(idx =>
-      Statistics.writeInternalRow(converter, uniqueKeys(idx), fileOut))
+      Statistics.writeInternalRow(converter, uniqueKeys(idx), writer))
   }
 
   override var arrayOffset: Long = _

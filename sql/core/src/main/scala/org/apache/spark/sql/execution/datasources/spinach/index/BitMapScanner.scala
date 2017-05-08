@@ -28,10 +28,8 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach._
 import org.apache.spark.sql.execution.datasources.spinach.filecache._
 import org.apache.spark.sql.execution.datasources.spinach.io.IndexFile
-import org.apache.spark.sql.execution.datasources.spinach.utils.IndexUtils
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.collection.BitSet
-
 
 private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
 
