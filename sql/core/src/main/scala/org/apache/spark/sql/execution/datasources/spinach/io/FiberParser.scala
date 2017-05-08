@@ -49,9 +49,10 @@ private[spinach] case class PlainDataFiberParser(
 private[spinach] case class DeltaByteArrayDataFiberParser(
   meta: SpinachDataFileHandle, dataType: DataType) extends DataFiberParser{
 
-  val valuesReader = new DeltaByteArrayReader()
 
   override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = {
+
+    val valuesReader = new DeltaByteArrayReader()
 
     val bits = new BitSet(meta.rowCountInEachGroup)
     Platform.copyMemory(bytes, Platform.BYTE_ARRAY_OFFSET,
