@@ -137,7 +137,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       path: Path,
       schema: StructType, count: Int): Unit = {
     val out = FileSystem.get(conf).create(path, true)
-    val writer = new SpinachDataWriter(false, out, schema)
+    val writer = new SpinachDataWriter(false, out, schema, conf)
     val row = new GenericMutableRow(schema.fields.length)
     for(i <- 0 until count) {
       schema.fields.zipWithIndex.foreach { entry =>
