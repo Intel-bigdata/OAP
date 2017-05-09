@@ -110,7 +110,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sql("drop sindex index1 on spinach_test")
   }
 
-  test("filtering with dictionary encoding enabled") {
+  ignore("filtering with dictionary encoding enabled") {
     System.setProperty("spinach.encoding.dictionaryEnabled", "true")
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").registerTempTable("t")

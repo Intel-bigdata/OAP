@@ -113,8 +113,11 @@ private[spinach] case class PlainBinaryDictionaryFiberBuilder(
     FiberByteData(bytes)
   }
 
-  override def buildDictionary: Array[Byte] =
-    valuesWriter.createDictionaryPage().getBytes.toByteArray
+  override def buildDictionary: Array[Byte] = {
+    val dictionary = valuesWriter.createDictionaryPage()
+    if (dictionary != null) dictionary.getBytes.toByteArray
+    else Array.empty[Byte]
+  }
 
   override def getDictionarySize: Int = valuesWriter.getDictionarySize
 
@@ -161,8 +164,11 @@ private[spinach] case class PlainIntegerDictionaryFiberBuilder(
     FiberByteData(bytes)
   }
 
-  override def buildDictionary: Array[Byte] =
-    valuesWriter.createDictionaryPage().getBytes.toByteArray
+  override def buildDictionary: Array[Byte] = {
+    val dictionary = valuesWriter.createDictionaryPage()
+    if (dictionary != null) dictionary.getBytes.toByteArray
+    else Array.empty[Byte]
+  }
 
   override def getDictionarySize: Int = valuesWriter.getDictionarySize
 
