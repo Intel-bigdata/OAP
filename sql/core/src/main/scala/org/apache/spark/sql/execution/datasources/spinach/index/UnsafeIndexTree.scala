@@ -114,7 +114,8 @@ private[spinach] case class UnsafeIndexNode(
   private def children: Seq[UnsafeIndexTree] = (0 until length).map(treeChildAt)
   private def keys: Seq[Key] = (0 until length).map(keyAt)
   override def toString: String =
-    s"[Signs(${keys.map(_.getInt(0)).mkString(",")}) " + children.mkString(" ") + "]"
+    s"[Signs(${keys.map(_.toSeq(schema).mkString("(", ",", ")")).mkString(",")}) " +
+      children.mkString(" ") + "]"
 }
 
 private[spinach] object UnsafeIndexNode {
