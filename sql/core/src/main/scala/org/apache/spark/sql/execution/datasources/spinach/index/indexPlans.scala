@@ -208,7 +208,7 @@ case class DropIndex(
             if (!existsIndexes.exists(_.name == indexName)) {
               if (!allowNotExists) {
                 throw new AnalysisException(
-                  s"""Index $indexName exists on ${identifier.getOrElse(parent)}""")
+                  s"""Index $indexName does not exist on ${identifier.getOrElse(parent)}""")
               } else {
                 logWarning(s"drop non-exists index $indexName")
               }
