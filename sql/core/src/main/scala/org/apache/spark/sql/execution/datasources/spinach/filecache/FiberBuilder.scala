@@ -292,7 +292,8 @@ object DataFiberBuilder {
   def apply(dataType: DataType, ordinal: Int, defaultRowGroupRowCount: Int): DataFiberBuilder = {
 
     // TODO: [linhong] Plan to determine dictionaryEnable by statistics
-    val dictionaryEnabled = System.getProperty("spinach.encoding.dictionaryEnabled", "false").toBoolean
+    val dictionaryEnabled =
+      System.getProperty("spinach.encoding.dictionaryEnabled", "false").toBoolean
 
     dataType match {
       case BinaryType | StringType =>
