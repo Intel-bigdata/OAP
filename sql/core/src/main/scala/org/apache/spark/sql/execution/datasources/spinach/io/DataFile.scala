@@ -139,12 +139,13 @@ private[spinach] object DataFile {
     }
 
     val index = schema.length - 1
+    val dataType = schema.last.dataType
     if (dictionaries.last != null) {
       intervalArray.flatMap { interval =>
         rangeToEncodedValues(
           dictionaries.last, schema.last,
-          InternalRow(interval.start.get(index, schema.last.dataType)),
-          InternalRow(interval.end.get(index, schema.last.dataType)),
+          InternalRow(interval.start.get(index, dataType)),
+          InternalRow(interval.end.get(index, dataType)),
           interval.startInclude, interval.endInclude).map { r =>
           val key = InternalRow.fromSeq(prefixValues :+ r)
           RangeInterval(key, key, includeStart = true, includeEnd = true)
@@ -152,8 +153,8 @@ private[spinach] object DataFile {
       }
     } else {
       intervalArray.map { interval =>
-        val start = InternalRow(prefixValues :+ interval.start.get(index, schema.last.dataType))
-        val end = InternalRow(prefixValues :+ interval.end.get(index, schema.last.dataType))
+        val start = InternalRow.fromSeq(prefixValues :+ interval.start.get(index, dataType))
+        val end = InternalRow.fromSeq(prefixValues :+ interval.end.get(index, dataType))
         RangeInterval(start, end, interval.startInclude, interval.endInclude)
       }
     }
