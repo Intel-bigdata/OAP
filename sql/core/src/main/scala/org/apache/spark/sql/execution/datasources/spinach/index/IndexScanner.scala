@@ -78,49 +78,45 @@ private[spinach] object DUMMY_SCANNER extends IndexScanner(null) {
 
 // The building of Search Scanner according to the filter and indices,
 private[spinach] object ScannerBuilder extends Logging {
+
+  type IntervalArrayMap = mutable.HashMap[String, ArrayBuffer[RangeInterval]]
+
+  def combineIntervalMaps(leftMap: IntervalArrayMap,
+                          rightMap: IntervalArrayMap,
+                          ic: IndexContext,
+                          needMerge: Boolean): IntervalArrayMap = {
+
+    for ((attribute, intervals) <- rightMap) {
+      if (leftMap.contains(attribute)) {
+        attribute match {
+          case ic (filterOptimizer) => // extract the corresponding scannerBuilder
+            // combine all intervals of the same attribute of leftMap and rightMap
+            if (needMerge) leftMap.put(attribute,
+              filterOptimizer.mergeBound(leftMap.getOrElseUpdate (attribute, null), intervals) )
+            // add bound of the same attribute to the left map
+            else leftMap.put(attribute,
+              filterOptimizer.addBound(leftMap.getOrElse (attribute, null), intervals) )
+          case _ => // this attribute does not exist, do nothing
+        }
+      }
+      else {
+        leftMap.put(attribute, intervals)
+      }
+    }
+    leftMap
+  }
+
   def optimizeFilterBound(filter: Filter, ic: IndexContext)
   : mutable.HashMap[String, ArrayBuffer[RangeInterval]] = {
     filter match {
       case And(leftFilter, rightFilter) =>
         val leftMap = optimizeFilterBound(leftFilter, ic)
         val rightMap = optimizeFilterBound(rightFilter, ic)
-        for((attribute, intervals) <- rightMap) {
-          if (leftMap.contains(attribute)) {
-            attribute match {
-              case ic (filterOptimizer) => // extract the corresponding scannerBuilder
-                // combine all intervals of the same attribute of leftMap and rightMap
-                leftMap.put(attribute,
-                  filterOptimizer.mergeBound(leftMap.getOrElseUpdate (attribute, null), intervals) )
-              case _ => // this attribute does not exist, do nothing
-            }
-          }
-          else {
-            leftMap.put(attribute, intervals)
-          }
-        }// end for
-        // rightMap.clear()
-        leftMap
+        combineIntervalMaps(leftMap, rightMap, ic, needMerge = true)
       case Or(leftFilter, rightFilter) =>
         val leftMap = optimizeFilterBound(leftFilter, ic)
         val rightMap = optimizeFilterBound(rightFilter, ic)
-        for((attribute, intervals) <- rightMap) {
-          if (leftMap.contains(attribute)) {
-            attribute match {
-              case ic (filterOptimizer) => // extract the corresponding scannerBuilder
-                // add bound of the same attribute to the left map
-                leftMap.put(attribute,
-                  filterOptimizer.addBound(leftMap.getOrElse (attribute, null), intervals) )
-              case _ => // this attribute does not exist, do nothing
-            }
-          }
-          else {
-            leftMap.put(attribute, intervals)
-          }
-
-        }// end for
-        //        rightMap.clear()
-        leftMap
-
+        combineIntervalMaps(leftMap, rightMap, ic, needMerge = false)
       case EqualTo(attribute, ic(key)) =>
         val ranger = new RangeInterval(key, key, true, true)
         scala.collection.mutable.HashMap(attribute -> ArrayBuffer(ranger))
@@ -160,32 +156,10 @@ private[spinach] object ScannerBuilder extends Logging {
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
     // reduce multiple hashMap to one hashMap(AND operation)
     val intervalMap = intervalMapArray.reduce(
-      (leftMap, rightMap) => {
-        if (leftMap == null || leftMap.isEmpty) {
-          rightMap
-        }
-        else if (rightMap == null || rightMap.isEmpty) {
-          leftMap
-        }
-        else {
-          for ((attribute, intervals) <- rightMap) {
-            if (leftMap.contains(attribute)) {
-              attribute match {
-                case ic (filterOptimizer) => // extract the corresponding scannerBuilder
-                  // combine all intervals of the same attribute of leftMap and rightMap
-                  leftMap.put(attribute,
-                    filterOptimizer.mergeBound(leftMap(attribute), intervals) )
-                case _ => // this attribute is not index, do nothing
-              }
-            }
-            else {
-              leftMap.put(attribute, intervals)
-            }
-          } // end for
-          // rightMap.clear()
-          leftMap
-        }
-      }
+      (leftMap, rightMap) =>
+        if (leftMap == null || leftMap.isEmpty) rightMap
+        else if (rightMap == null || rightMap.isEmpty) leftMap
+        else combineIntervalMaps(leftMap, rightMap, ic, needMerge = true)
     )
 
     if (intervalMap != null) {
