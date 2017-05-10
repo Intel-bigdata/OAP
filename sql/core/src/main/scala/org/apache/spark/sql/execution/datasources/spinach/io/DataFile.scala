@@ -99,6 +99,8 @@ private[spinach] object DataFile {
                      schema: StructType,
                      intervalArray: ArrayBuffer[RangeInterval]): ArrayBuffer[RangeInterval] = {
 
+    if (intervalArray.isEmpty) return ArrayBuffer.empty
+
     val num = intervalArray.head.start.numFields
     val keys = intervalArray.head.start
     val prefixValues: Seq[Any] = schema.dropRight(1).zipWithIndex.map {

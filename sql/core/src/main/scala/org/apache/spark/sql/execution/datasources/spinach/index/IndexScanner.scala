@@ -19,16 +19,17 @@ package org.apache.spark.sql.execution.datasources.spinach.index
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach._
-import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFileHandleCacheManager
-import org.apache.spark.sql.execution.datasources.spinach.io.{DataFile, SpinachDataFile, SpinachDataFileHandle}
+import org.apache.spark.sql.execution.datasources.spinach.io.{DataFile, SpinachDataFile}
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
+import org.apache.spark.sql.types.StructType
 
 
 private[spinach] object IndexScanner {

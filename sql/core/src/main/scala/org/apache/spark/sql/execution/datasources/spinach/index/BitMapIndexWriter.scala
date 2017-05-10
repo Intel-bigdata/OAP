@@ -20,14 +20,15 @@ package org.apache.spark.sql.execution.datasources.spinach.index
 import java.io.{ByteArrayOutputStream, ObjectOutputStream}
 
 import scala.collection.mutable
+
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapreduce.Job
+
 import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.WriteResult
-import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFileHandleCacheManager
-import org.apache.spark.sql.execution.datasources.spinach.io.{DataFile, SpinachDataFileHandle}
+import org.apache.spark.sql.execution.datasources.spinach.io.DataFile
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet

@@ -20,12 +20,13 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.sql.Date
 
 import org.scalatest.BeforeAndAfterEach
+import scala.util.Random
+
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 
-import scala.util.Random
 
 
 class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
@@ -113,8 +114,8 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("filtering with dictionary encoding enabled") {
     System.setProperty("spinach.encoding.dictionaryEnabled", "true")
-    // val data: Seq[(Int, String)]
     val data = (1 to 300).map { i => (i, s"this is test $i") }.toArray
+    // Shuffle this array
     val rnd = new Random(0)
     data.indices.reverse.foreach{i =>
       val index = rnd.nextInt(i + 1)

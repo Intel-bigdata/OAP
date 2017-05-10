@@ -21,17 +21,17 @@ import java.io.ByteArrayOutputStream
 import java.util.Comparator
 
 import scala.collection.JavaConverters._
+
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapreduce.Job
-import org.apache.parquet.column.Dictionary
+
 import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.WriteResult
-import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFileHandleCacheManager
-import org.apache.spark.sql.execution.datasources.spinach.io.{DataFile, SpinachDataFileHandle}
+import org.apache.spark.sql.execution.datasources.spinach.io.DataFile
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.sql.execution.datasources.spinach.utils.{BTreeNode, BTreeUtils}
 import org.apache.spark.sql.internal.SQLConf
