@@ -27,6 +27,8 @@ import org.apache.spark.sql.types.StructType
 case class WriteIndexRelation(
     sparkSession: SparkSession,
     keySchema: StructType,
+    dataSchema: StructType,
+    readerClassName: String,
     prepareJobForWrite: Job => IndexOutputWriterFactory) {
   def toWriteRelation: WriteRelation = WriteRelation(
     sparkSession, keySchema, null, prepareJobForWrite, None)

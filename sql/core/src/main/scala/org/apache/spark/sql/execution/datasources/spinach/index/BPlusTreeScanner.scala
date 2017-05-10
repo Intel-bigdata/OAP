@@ -39,23 +39,24 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
+    encodeIntervalAndSchema(dataPath, conf)
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
     logDebug("Loading Index File: " + path)
     logDebug("\tFile Szie: " + path.getFileSystem(conf).getFileStatus(path).getLen)
     val indexScanner = IndexFiber(IndexFile(path))
     val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
-    val root = meta.open(indexData, keySchema)
+    val root = meta.open(indexData, encodedKeySchema)
 
     _init(root)
   }
 
   def _init(root : IndexNode): IndexScanner = {
     assert(intervalArray ne null, "intervalArray is null!")
-    this.ordering = GenerateOrdering.create(keySchema)
-    currentKeyArray = new Array[CurrentKey](intervalArray.length)
+    this.ordering = GenerateOrdering.create(encodedKeySchema)
+    currentKeyArray = new Array[CurrentKey](encodedIntervalArray.length)
     currentKeyIdx = 0 // reset to initialized value for this thread
-    intervalArray.zipWithIndex.foreach {
+    encodedIntervalArray.zipWithIndex.foreach {
       case(interval: RangeInterval, i: Int) =>
         var order: Ordering[Key] = null
         if (interval.start == IndexScanner.DUMMY_KEY_START) {
@@ -65,14 +66,14 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
           currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0)
         } else {
           // find the first identical key or the first key right greater than the specified one
-          if (keySchema.size > interval.start.numFields) { // exists Dummy_Key
-            order = GenerateOrdering.create(StructType(keySchema.dropRight(1)))
+          if (encodedKeySchema.size > interval.start.numFields) { // exists Dummy_Key
+            order = GenerateOrdering.create(StructType(encodedKeySchema.dropRight(1)))
           } else order = this.ordering
           currentKeyArray(i) = moveTo(root, interval.start, true, order)
-          if (keySchema.size > interval.end.numFields) { // exists Dummy_Key
-            order = GenerateOrdering.create(StructType(keySchema.dropRight(1)))
+          if (encodedKeySchema.size > interval.end.numFields) { // exists Dummy_Key
+            order = GenerateOrdering.create(StructType(encodedKeySchema.dropRight(1)))
             // find the last identical key or the last key less than the specified one on the left
-            this.intervalArray(i).end = moveTo(root, interval.end, false, order).currentKey
+            this.encodedIntervalArray(i).end = moveTo(root, interval.end, false, order).currentKey
           }
 
         }
@@ -89,17 +90,17 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
 
   // i: the interval index
   def intervalShouldStop(i: Int): Boolean = { // detect if we need to stop scanning
-    if (intervalArray(i).end == IndexScanner.DUMMY_KEY_END) { // Left-Only search
+    if (encodedIntervalArray(i).end == IndexScanner.DUMMY_KEY_END) { // Left-Only search
       return false
     }
-    if (intervalArray(i).endInclude) { // RightClose
+    if (encodedIntervalArray(i).endInclude) { // RightClose
       ordering.compare(
-        currentKeyArray(i).currentKey, intervalArray(i).end) > 0
+        currentKeyArray(i).currentKey, encodedIntervalArray(i).end) > 0
     }
     else { // RightOpen
       //      val k = currentKeyArray(i).currentKey
       ordering.compare(
-        currentKeyArray(i).currentKey, intervalArray(i).end) >= 0
+        currentKeyArray(i).currentKey, encodedIntervalArray(i).end) >= 0
     }
 
   }
@@ -180,7 +181,7 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
   override def hasNext: Boolean = {
     //  intervalArray.nonEmpty && !(currentKeyIdx == currentKeyArray.length-1 &&
     //    (currentKeyArray(currentKeyIdx).isEnd || intervalShouldStop(currentKeyIdx)) )
-    if (intervalArray.isEmpty) return false
+    if (encodedIntervalArray.isEmpty) return false
     for(i <- currentKeyIdx until currentKeyArray.length) {
       if (!currentKeyArray(i).isEnd && !intervalShouldStop(i)) {
         return true

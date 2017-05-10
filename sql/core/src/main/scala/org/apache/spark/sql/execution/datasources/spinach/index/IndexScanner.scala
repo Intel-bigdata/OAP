@@ -19,15 +19,16 @@ package org.apache.spark.sql.execution.datasources.spinach.index
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach._
+import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFileHandleCacheManager
+import org.apache.spark.sql.execution.datasources.spinach.io.{DataFile, SpinachDataFile, SpinachDataFileHandle}
+import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 
 
 private[spinach] object IndexScanner {
@@ -46,9 +47,12 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
   @transient protected var ordering: Ordering[Key] = _
   var intervalArray: ArrayBuffer[RangeInterval] = _
   protected var keySchema: StructType = _
+  var encodedIntervalArray: ArrayBuffer[RangeInterval] = _
+  protected var encodedKeySchema: StructType = _
 
   def meta: IndexMeta = idxMeta
   def getSchema: StructType = keySchema
+  def getEncodedSchema: StructType = encodedKeySchema
 
   def existRelatedIndexFile(dataPath: Path, conf: Configuration): Boolean = {
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
@@ -61,6 +65,28 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
   }
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner
+
+  def encodeIntervalAndSchema(dataPath: Path, conf: Configuration): Unit = {
+    val dataSourceMeta = SpinachUtils.getMeta(conf, dataPath.getParent) match {
+      case Some(m) => m
+      case None => sys.error("DataSourceMeta not exist")
+    }
+    if (dataSourceMeta.dataReaderClassName != classOf[SpinachDataFile].getCanonicalName) {
+      encodedIntervalArray = intervalArray
+      encodedKeySchema = keySchema
+      return
+    }
+    val dataFile = DataFile(dataPath.toString, dataSourceMeta.schema,
+      dataSourceMeta.dataReaderClassName)
+    val requiredIds = keySchema.map(dataSourceMeta.schema.fields.indexOf(_)).toArray
+
+    val dictionaries = requiredIds
+      .map(ordinal => dataFile.getDictionary(ordinal, conf))
+
+    encodedIntervalArray = DataFile.encodeInterval(dictionaries, keySchema, intervalArray)
+
+    encodedKeySchema = DataFile.encodeSchema(dictionaries, keySchema)
+  }
 }
 
 // A dummy scanner will actually not do any scanning

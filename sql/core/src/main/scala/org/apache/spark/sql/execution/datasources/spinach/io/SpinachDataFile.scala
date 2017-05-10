@@ -36,7 +36,8 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
 
   private val dictionaries = new Array[Dictionary](schema.length)
 
-  def getDictionary(fiberId: Int, meta: SpinachDataFileHandle): Dictionary = {
+  def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
+    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
     val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)
     val dictDataLens = meta.dictionaryDataLens
 
@@ -88,7 +89,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     }
 
     val dataType = schema(fiberId).dataType
-    val dictionary = getDictionary(fiberId, meta)
+    val dictionary = getDictionary(fiberId, conf)
     val fiberParser =
       if (dictionary != null) {
         DictionaryBasedDataFiberParser(encoding, meta, dictionary, dataType)

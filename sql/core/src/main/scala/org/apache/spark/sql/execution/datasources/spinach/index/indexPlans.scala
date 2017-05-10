@@ -131,6 +131,8 @@ case class CreateIndex(
         WriteIndexRelation(
           sparkSession,
           keySchema,
+          s,
+          readerClassName,
           indexFileFormat.prepareWrite(sparkSession, _, null, keySchema))
 
       val writerContainer = {
@@ -334,6 +336,8 @@ case class RefreshIndex(
           WriteIndexRelation(
             sparkSession,
             keySchema,
+            s,
+            readerClassName,
             indexFileFormat.prepareWrite(sparkSession, _, null, keySchema))
 
         val writerContainer = {

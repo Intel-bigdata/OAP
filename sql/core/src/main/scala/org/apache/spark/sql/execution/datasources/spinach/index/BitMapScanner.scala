@@ -43,6 +43,7 @@ private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScann
 
   override def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
+    encodeIntervalAndSchema(dataPath, conf)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
     val indexScanner = IndexFiber(IndexFile(path))
     val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
@@ -62,11 +63,11 @@ private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScann
     val inputStream = new ByteArrayInputStream(byteArray)
     val in = new ObjectInputStream(inputStream)
     val hashMap = in.readObject().asInstanceOf[mutable.HashMap[InternalRow, BitSet]]
-    this.ordering = GenerateOrdering.create(keySchema)
+    this.ordering = GenerateOrdering.create(encodedKeySchema)
 
     // get sorted key list and generate final bitset
     val sortedKeyList = hashMap.keySet.toList.sorted(this.ordering)
-    val bitMapArray = intervalArray.flatMap(range => {
+    val bitMapArray = encodedIntervalArray.flatMap(range => {
       val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
         // diff from which startIdx not found, so here startIdx = -2
         -2

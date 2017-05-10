@@ -102,7 +102,7 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
     throw new UnsupportedOperationException("Not support initialize Operation.")
   }
 
-  override def getDictionary(fiberId: Int, meta: SpinachDataFileHandle): Dictionary = {
-    sys.error("ParquetDataFile doesn't have dictionary")
+  override def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
+    null
   }
 }

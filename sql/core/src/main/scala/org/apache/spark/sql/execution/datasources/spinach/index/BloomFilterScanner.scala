@@ -45,16 +45,17 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta) extends IndexScann
   }
 
   lazy val equalValues: Array[Key] = { // get equal value from intervalArray
-    if (intervalArray.nonEmpty) {
+    if (encodedIntervalArray.nonEmpty) {
       // should not use ordering.compare here
-      intervalArray.filter(interval => (interval.start eq interval.end)
+      encodedIntervalArray.filter(interval => (interval.start eq interval.end)
         && interval.startInclude && interval.endInclude).map(_.start).toArray
     } else null
   }
 
   override def initialize(inputPath: Path, configuration: Configuration): IndexScanner = {
     assert(keySchema ne null)
-    this.ordering = GenerateOrdering.create(keySchema)
+    encodeIntervalAndSchema(inputPath, configuration)
+    this.ordering = GenerateOrdering.create(encodedKeySchema)
 
     val path = IndexUtils.indexFileFromDataFile(inputPath, meta.name)
     val indexScanner = IndexFiber(IndexFile(path))
@@ -75,7 +76,7 @@ private[spinach] case class BloomFilterScanner(me: IndexMeta) extends IndexScann
 
     bloomFilter = BloomFilter(bitSetLongArr, numOfHashFunc)
 
-    val projector = UnsafeProjection.create(keySchema)
+    val projector = UnsafeProjection.create(encodedKeySchema)
 
     // TODO need optimization while considering multi-column
     stopFlag = if (equalValues != null && equalValues.length > 0) {
