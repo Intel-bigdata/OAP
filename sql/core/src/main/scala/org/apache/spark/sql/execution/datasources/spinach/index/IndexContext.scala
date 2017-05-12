@@ -48,11 +48,6 @@ private[spinach] class IndexContext(meta: DataSourceMeta) extends Logging {
     var idx = 0
     while (idx < meta.indexMetas.length) {
       meta.indexMetas(idx).indexType match {
-        case BTreeIndex(entries) if entries.length == 1 =>
-          val attribute = meta.schema(entries(0).ordinal).name
-          if (intervalMap.contains(attribute)) {
-            availableIndexes.append((0, meta.indexMetas(idx)) )
-          }
         case BTreeIndex(entries) =>
           var num = 0 // the number of matched column
           var flag = 0
@@ -154,22 +149,13 @@ private[spinach] class IndexContext(meta: DataSourceMeta) extends Logging {
 
   def buildScanner(lastIdx: Int, bestIndexer: IndexMeta, intervalMap:
   mutable.HashMap[String, ArrayBuffer[RangeInterval]]): Unit = {
-    //    intervalArray.sortWith(compare)
     logDebug("Building Index Scanner with IndexMeta and IntervalMap ...")
 
     if (lastIdx == -1 && bestIndexer == null) return
     var keySchema: StructType = null
     bestIndexer.indexType match {
-      case BTreeIndex(entries) if entries.length == 1 =>
-        keySchema = new StructType().add(meta.schema(entries(lastIdx).ordinal))
-        scanner = new BPlusTreeScanner(bestIndexer)
-        val attribute = meta.schema(entries(lastIdx).ordinal).name
-        val filterOptimizer = unapply(attribute).get
-        scanner.intervalArray =
-          intervalMap(attribute).sortWith(filterOptimizer.compareRangeInterval)
       case BTreeIndex(entries) =>
-        val indexFields = for (idx <- entries.map(_.ordinal)) yield meta.schema(idx)
-        val fields = indexFields.slice(0, lastIdx + 1)
+        val fields = entries.slice(0, lastIdx + 1).map(entry => meta.schema(entry.ordinal))
         keySchema = StructType(fields)
         scanner = new BPlusTreeScanner(bestIndexer)
         val attributes = fields.map(_.name) // get column names in the composite index
@@ -197,16 +183,12 @@ private[spinach] class IndexContext(meta: DataSourceMeta) extends Logging {
         keySchema = new StructType().add(meta.schema(entries(lastIdx)))
         scanner = BloomFilterScanner(bestIndexer)
         val attribute = meta.schema(entries(lastIdx)).name
-        val filterOptimizer = unapply(attribute).get
-        scanner.intervalArray =
-          intervalMap(attribute).sortWith(filterOptimizer.compareRangeInterval)
+        scanner.intervalArray = intervalMap(attribute)
       case BitMapIndex(entries) =>
         keySchema = new StructType().add(meta.schema(entries(lastIdx)))
         scanner = BitMapScanner(bestIndexer)
         val attribute = meta.schema(entries(lastIdx)).name
-        val filterOptimizer = unapply(attribute).get
-        scanner.intervalArray =
-          intervalMap(attribute).sortWith(filterOptimizer.compareRangeInterval)
+        scanner.intervalArray = intervalMap(attribute)
       case _ =>
     }
 
