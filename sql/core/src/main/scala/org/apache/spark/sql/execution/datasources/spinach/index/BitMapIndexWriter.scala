@@ -158,7 +158,8 @@ private[spinach] class BitMapIndexWriter(
         SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.key, 3)
       val statistics = new BloomFilterStatistics()
       statistics.initialize(bfMaxBits, bfNumOfHashFunc)
-      statistics.write(dataSchema, writer, hashMap.keySet.toArray, null, null)
+      val encodedSchema = DataFile.encodeSchema(dictionaries, keySchema)
+      statistics.write(encodedSchema, writer, hashMap.keySet.toArray, null, null)
 
 
       // write index file footer
