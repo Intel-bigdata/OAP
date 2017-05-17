@@ -1,4 +1,4 @@
-/*
+1/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -110,7 +110,7 @@ class PartedByValueStatistics extends Statistics {
 
   private def extractSts(base: Long, stsArray: Array[Byte]): (Int, UnsafeRow, Int, Int) = {
     val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base)
-    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size).copy()
+    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size)
     val index = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
     val count = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 8 + size)
     (size + 12, value, index, count)

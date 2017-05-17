@@ -45,10 +45,7 @@ abstract class Statistics{
 
 object Statistics {
   def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
-    val row = UnsafeIndexNode.row.get
-    row.setNumFields(schemaLen)
-    row.pointTo(array, Platform.BYTE_ARRAY_OFFSET + offset + 4, size)
-    row
+    UnsafeIndexNode.getUnsafeRow(schemaLen, array, Platform.BYTE_ARRAY_OFFSET + offset + 4, size)
   }
 
   /**
@@ -60,9 +57,7 @@ object Statistics {
   def convertHelper(converter: UnsafeProjection,
                     internalRow: InternalRow,
                     keyBuf: ByteArrayOutputStream): UnsafeRow = {
-    val writeRow = converter.apply(internalRow)
-    IndexUtils.writeInt(keyBuf, writeRow.getSizeInBytes)
-    writeRow
+    converter.apply(internalRow)
   }
 
   def writeInternalRow(converter: UnsafeProjection,
@@ -70,8 +65,9 @@ object Statistics {
                        writer: IndexOutputWriter): Unit = {
     val keyBuf = new ByteArrayOutputStream()
     val value = convertHelper(converter, internalRow, keyBuf)
-    value.writeToStream(keyBuf, null)
 
+    IndexUtils.writeInt(keyBuf, value.getSizeInBytes)
+    value.writeToStream(keyBuf, null)
     writer.write(keyBuf.toByteArray)
     keyBuf.close()
   }
