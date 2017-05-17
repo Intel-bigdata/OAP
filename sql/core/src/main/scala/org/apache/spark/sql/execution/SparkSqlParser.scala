@@ -1416,8 +1416,6 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
     withOrigin(ctx) {
       if (ctx.BTREE != null) {
         BTreeIndexType
-      } else if (ctx.BLOOM != null) {
-        BloomFilterIndexType
       } else {
         BitMapIndexType
       }

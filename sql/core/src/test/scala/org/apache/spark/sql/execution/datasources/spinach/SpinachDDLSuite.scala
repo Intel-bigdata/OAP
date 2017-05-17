@@ -55,7 +55,7 @@ class SpinachDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
     checkAnswer(sql("show sindex from spinach_test_2"), Nil)
     sql("create sindex index2 on spinach_test_1 (b desc)")
     sql("create sindex index3 on spinach_test_1 (b asc, a desc)")
-    sql("create sindex index4 on spinach_test_2 (a) using bloom")
+    sql("create sindex index4 on spinach_test_2 (a) using btree")
     sql("create sindex index5 on spinach_test_2 (b desc)")
     sql("create sindex index6 on spinach_test_2 (a) using bitmap")
     sql("create sindex index1 on spinach_test_2 (a desc, b desc)")
@@ -67,7 +67,7 @@ class SpinachDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
         Row("spinach_test_1", "index3", 1, "a", "D", "BTREE") :: Nil)
 
     checkAnswer(sql("show sindex in spinach_test_2"),
-      Row("spinach_test_2", "index4", 0, "a", "A", "BLOOM") ::
+      Row("spinach_test_2", "index4", 0, "a", "A", "BTREE") ::
         Row("spinach_test_2", "index5", 0, "b", "D", "BTREE") ::
         Row("spinach_test_2", "index6", 0, "a", "A", "BITMAP") ::
         Row("spinach_test_2", "index1", 0, "a", "D", "BTREE") ::

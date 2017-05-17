@@ -353,14 +353,11 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     val meta = DataSourceMeta.initialize(path, new Configuration())
 
     val bTreeIndexAttrSet = new mutable.HashSet[String]()
-    val bloomIndexAttrSet = new mutable.HashSet[String]()
     val bitmapIndexAttrSet = new mutable.HashSet[String]()
     for (idxMeta <- meta.indexMetas) {
       idxMeta.indexType match {
         case BTreeIndex(entries) =>
           bTreeIndexAttrSet.add(meta.schema(entries(0).ordinal).name)
-        case BloomFilterIndex(entries) =>
-          entries.map(ordinal => meta.schema(ordinal).name).foreach(bloomIndexAttrSet.add)
         case BitMapIndex(entries) =>
           entries.map(ordinal => meta.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
         case _ => // we don't support other types of index
@@ -368,7 +365,6 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     }
     val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
     hashSetList.append(bTreeIndexAttrSet)
-    hashSetList.append(bloomIndexAttrSet)
     hashSetList.append(bitmapIndexAttrSet)
 
     // Query "select * from t where b == 1" will generate IsNotNull expr which is unsupportted

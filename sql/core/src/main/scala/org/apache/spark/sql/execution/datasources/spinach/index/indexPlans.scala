@@ -100,9 +100,6 @@ case class CreateIndex(
             BTreeIndexEntry(s.map(_.name).toIndexedSeq.indexOf(c.columnName), dir)
           })
           metaBuilder.addIndexMeta(new IndexMeta(indexName, BTreeIndex(entries)))
-        case BloomFilterIndexType =>
-          val entries = indexColumns.map(col => s.map(_.name).toIndexedSeq.indexOf(col.columnName))
-          metaBuilder.addIndexMeta(new IndexMeta(indexName, BloomFilterIndex(entries)))
         case BitMapIndexType =>
           val entries = indexColumns.map(col => s.map(_.name).toIndexedSeq.indexOf(col.columnName))
           metaBuilder.addIndexMeta(new IndexMeta(indexName, BitMapIndex(entries)))
@@ -317,9 +314,6 @@ case class RefreshIndex(
       val indexColumns = i.indexType match {
         case BTreeIndex(entries) =>
           entries.map(e => IndexColumn(s(e.ordinal).name, e.dir == Ascending))
-        case BloomFilterIndex(entries) =>
-          indexType = BloomFilterIndexType
-          entries.map(e => IndexColumn(s(e).name))
         case BitMapIndex(entries) =>
           indexType = BitMapIndexType
           entries.map(e => IndexColumn(s(e).name))
@@ -449,10 +443,6 @@ case class SpinachShowIndex(relation: LogicalPlan) extends RunnableCommand with 
         entries.zipWithIndex.map(ei => {
           val dir = if (ei._1.dir == Ascending) "A" else "D"
           Row(identifier.get.table, i.name, ei._2, s(ei._1.ordinal).name, dir, "BTREE")})
-      case BloomFilterIndex(entries) =>
-        // using "A" for collation as MySQL does since it is ignored.
-        entries.zipWithIndex.map(ei =>
-          Row(identifier.get.table, i.name, ei._2, s(ei._1).name, "A", "BLOOM"))
       case BitMapIndex(entries) =>
         entries.zipWithIndex.map(ei =>
           Row(identifier.get.table, i.name, ei._2, s(ei._1).name, "A", "BITMAP"))

@@ -135,13 +135,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       df.filter("a = 293 AND b >= 'this is test 291' AND b < 'this is test 299'"))
     sql("drop sindex index1 on spinach_test")
 
-    sql("create sindex index2 on spinach_test (a, b) using bloom")
-    checkAnswer(
-      sql("SELECT * FROM spinach_test" +
-        " WHERE a = 293 AND b >= 'this is test 291' AND b < 'this is test 299'"),
-      df.filter("a = 293 AND b >= 'this is test 291' AND b < 'this is test 299'"))
-    sql("drop sindex index2 on spinach_test")
-
     sql("create sindex index3 on spinach_test (a, b) using bitmap")
     checkAnswer(
       sql("SELECT * FROM spinach_test" +
