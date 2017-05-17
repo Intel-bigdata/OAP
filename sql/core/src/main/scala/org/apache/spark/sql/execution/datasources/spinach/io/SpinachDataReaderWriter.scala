@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberBui
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
 // TODO: [linhong] Let's remove the `isCompressed` argument
@@ -186,7 +186,7 @@ private[spinach] class SpinachDataReader(
   private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
     if (!filterScanner.get.canBeOptimizedByStatistics) {
       StaticsAnalysisResult.USE_INDEX
-    } else if (filterScanner.get.intervalArray.length == 0) {
+    } else if (filterScanner.get.encodedIntervalArray.isEmpty) {
       StaticsAnalysisResult.SKIP_INDEX
     } else {
       val fs = indexPath.getFileSystem(conf)
@@ -219,8 +219,8 @@ private[spinach] class SpinachDataReader(
           case 10 => new BloomFilterStatistics
           case _ => throw new UnsupportedOperationException(s"non-supported statistic in id $id")
         }
-        val res = st.read(filterScanner.get.getSchema,
-          filterScanner.get.intervalArray, stsArray, arrayOffset)
+        val res = st.read(filterScanner.get.getEncodedSchema,
+          filterScanner.get.encodedIntervalArray, stsArray, arrayOffset)
         arrayOffset = st.arrayOffset
 
         if (res == StaticsAnalysisResult.SKIP_INDEX) {

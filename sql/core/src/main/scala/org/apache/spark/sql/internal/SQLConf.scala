@@ -572,14 +572,15 @@ object SQLConf {
     SQLConfigBuilder("spark.sql.spinach.StatisticsType")
       .internal()
       .doc("Which types of pre-defined statistics are added in index file. " +
-        "And here you should just write the statistics' IDs. " +
+        "And here you should just write the statistics name. " +
         "Now, three types statistics are supported. " +
-        "0 for MinMaxStatistics, " +
-        "1 for SampleBasedStatistics, " +
-        "2 for PartedByValueStatistics. " +
-        "If you want to add more than one type, just use comma to separate, eg. \"0,1,2\"")
+        "\"MINMAX\" MinMaxStatistics, " +
+        "\"SAMPLE\" for SampleBasedStatistics, " +
+        "\"PARTBYVALUE\" for PartedByValueStatistics. " +
+        "If you want to add more than one type, just use comma " +
+        "to separate, eg. \"MINMAX, SAMPLE, PARTBYVALUE\"")
       .stringConf
-      .createWithDefault("0") // can be set to "0,1,2"
+      .createWithDefault("MINMAX, SAMPLE, PARTBYVALUE")
 
   val SPINACH_STATISTICS_SAMPLE_RATE =
     SQLConfigBuilder("spark.sql.spinach.Statistics.sampleRate")

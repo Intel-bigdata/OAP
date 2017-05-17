@@ -59,10 +59,10 @@ private[sql] class SpinachFileFormat extends FileFormat
     // 2. We need to pass down the spinach meta file and its associated partition path
 
     // TODO we support partitions, but this only read meta from one of the partitions
-    val partition2Meta = fileCatalog.allFiles().map(_.getPath.getParent).map { parent =>
+    val partition2Meta = fileCatalog.allFiles().map(_.getPath.getParent).distinct.map { parent =>
       (parent, new Path(parent, SpinachFileFormat.SPINACH_META_FILE))
     }
-      .filter(pair => pair._2.getFileSystem(hadoopConf).exists(pair._2))
+      .find(pair => pair._2.getFileSystem(hadoopConf).exists(pair._2))
       .toMap
     meta = partition2Meta.values.headOption.map {
       DataSourceMeta.initialize(_, hadoopConf)

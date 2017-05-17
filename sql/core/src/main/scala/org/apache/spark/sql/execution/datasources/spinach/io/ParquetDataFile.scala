@@ -21,6 +21,7 @@ import java.lang.{Long => JLong}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.parquet.column.Dictionary
 import org.apache.parquet.hadoop.api.RecordReader
 import org.apache.parquet.hadoop.SpinachRecordReader
 
@@ -99,5 +100,9 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
 
   override def createDataFileHandle(conf: Configuration): DataFileHandle = {
     throw new UnsupportedOperationException("Not support initialize Operation.")
+  }
+
+  override def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
+    null
   }
 }

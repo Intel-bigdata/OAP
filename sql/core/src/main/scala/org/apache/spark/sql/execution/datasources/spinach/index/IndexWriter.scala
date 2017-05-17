@@ -27,6 +27,8 @@ private[index] abstract class IndexWriter (
     relation: WriteIndexRelation,
     job: Job,
     isAppend: Boolean) extends BaseWriterContainer(relation.toWriteRelation, job, isAppend) {
+  protected val dataFileSchema = relation.dataSchema
+  protected val readerClassName = relation.readerClassName
   // TODO figure out right way to deal with bucket
   protected def newIndexOutputWriter(bucketId: Option[Int] = None): IndexOutputWriter = {
     try {

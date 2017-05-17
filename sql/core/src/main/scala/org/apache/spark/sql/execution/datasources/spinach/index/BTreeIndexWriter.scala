@@ -31,6 +31,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.WriteResult
+import org.apache.spark.sql.execution.datasources.spinach.io.DataFile
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.sql.execution.datasources.spinach.utils.{BTreeNode, BTreeUtils}
 import org.apache.spark.sql.internal.SQLConf
@@ -47,6 +48,8 @@ private[spinach] class BTreeIndexWriter(
     isAppend: Boolean) extends IndexWriter(relation, job, isAppend) {
   // TODO we can improve this
   @transient val driverConf = relation.sparkSession.conf
+  private var encodedSchema: StructType = _
+
   job.getConfiguration.setStrings(
     SQLConf.SPINACH_STATISTICS_TYPES.key, driverConf.get(SQLConf.SPINACH_STATISTICS_TYPES))
   job.getConfiguration.setDouble(
@@ -79,6 +82,13 @@ private[spinach] class BTreeIndexWriter(
     val filename = InputFileNameHolder.getInputFileName().toString
     configuration.set(IndexWriter.INPUT_FILE_NAME, filename)
     configuration.set(IndexWriter.INDEX_NAME, indexName)
+    val dataFile = DataFile(filename, dataFileSchema, readerClassName)
+    val dictionaries = keySchema.map(field => dataFileSchema.indexOf(field))
+      .map(ordinal => dataFile.getDictionary(ordinal, configuration))
+      .toArray
+    encodedSchema = DataFile.encodeSchema(dictionaries, keySchema)
+
+    // val s = relation.keySchema.fields.length
     // TODO deal with partition
     // configuration.set(FileOutputFormat.OUTDIR, getWorkPath)
     var writer = newIndexOutputWriter()
@@ -94,7 +104,7 @@ private[spinach] class BTreeIndexWriter(
 
       GenerateOrdering.generate(order, keySchema.toAttributes)
     }
-    lazy val ordering = buildOrdering(keySchema)
+    lazy val ordering = buildOrdering(encodedSchema)
 
     def commitTask(): Seq[WriteResult] = {
       try {
@@ -133,7 +143,7 @@ private[spinach] class BTreeIndexWriter(
           taskReturn = taskReturn ++: writeIndexFromRows(taskContext, iterator)
           writeNewFile = true
         } else {
-          val v = iterator.next().copy()
+          val v = DataFile.encodeKey(dictionaries, keySchema, iterator.next().copy())
           if (!hashMap.containsKey(v)) {
             val list = new java.util.ArrayList[Long]()
             list.add(cnt)
@@ -195,7 +205,7 @@ private[spinach] class BTreeIndexWriter(
       uniqueKeysList.addAll(uniqueKeys.toSeq.asJava)
 
       val treeOffset = writeTreeToOut(treeShape, writer, offsetMap,
-        fileOffset, uniqueKeysList, keySchema, 0, -1L)
+        fileOffset, uniqueKeysList, encodedSchema, 0, -1L)
 
       val stTypes = configuration.getStrings(SQLConf.SPINACH_STATISTICS_TYPES.key)
       if (stTypes != null && stTypes.length > 0) {
@@ -203,14 +213,14 @@ private[spinach] class BTreeIndexWriter(
           val t = stType.trim
           if (t.length > 0) {
             val st = t match {
-              case "0" => new MinMaxStatistics
-              case "1" => new SampleBasedStatistics(
+              case MinMaxStatisticsType.name => new MinMaxStatistics
+              case SampleBasedStatisticsType.name => new SampleBasedStatistics(
                 configuration.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.key).toDouble)
-              case "2" => new PartedByValueStatistics
+              case PartByValueStatisticsType.name => new PartedByValueStatistics
               case _ =>
                 throw new UnsupportedOperationException(s"non-supported statistic in id $t")
             }
-            st.write(keySchema, writer, uniqueKeys, hashMap, offsetMap)
+            st.write(encodedSchema, writer, uniqueKeys, hashMap, offsetMap)
           }
         })
       }
@@ -276,7 +286,7 @@ private[spinach] class BTreeIndexWriter(
     }
   }
 
-  @transient private lazy val projector = UnsafeProjection.create(keySchema)
+  @transient private lazy val projector = UnsafeProjection.create(encodedSchema)
 
   /**
    * write file correspond to [[UnsafeIndexNode]]

@@ -14,22 +14,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.parquet.io;
 
-public class CounterRecordReaderImpl<T> extends PositionableRecordReaderImpl<T> {
+package org.apache.spark.sql.execution.datasources.spinach.statistics
 
-    public CounterRecordReaderImpl(RecordReader<T> recordReader, long recordCount) {
-        super(recordReader, recordCount);
-    }
+sealed abstract class StatisticsType {
+  val name: String
+}
 
-    @Override
-    protected Long nextRowId() {
-        return ++currentRowId;
-    }
+case object MinMaxStatisticsType extends StatisticsType {
+  val name: String = "MINMAX"
+}
 
-    @Override
-    public long getRecordCount() {
-        return recordMaxCount;
-    }
+case object SampleBasedStatisticsType extends StatisticsType {
+  val name: String = "SAMPLE"
+}
 
+case object PartByValueStatisticsType extends StatisticsType {
+  val name: String = "PARTBYVALUE"
 }

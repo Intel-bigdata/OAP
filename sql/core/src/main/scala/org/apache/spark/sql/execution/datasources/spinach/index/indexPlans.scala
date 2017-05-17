@@ -24,7 +24,7 @@ import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Dataset, Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.SQLExecution
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources._
@@ -120,16 +120,19 @@ case class CreateIndex(
       (metaBuilder, parent, existOld)
     })
     val job = Job.getInstance(sparkSession.sparkContext.hadoopConfiguration)
-    val queryExecution = Dataset.ofRows(sparkSession, relation).queryExecution
     val indexFileFormat = new SpinachIndexFileFormat
     val ids =
       indexColumns.map(c => s.map(_.name).toIndexedSeq.indexOf(c.columnName))
     val keySchema = StructType(ids.map(s.toIndexedSeq(_)))
+    val queryExecution =
+      Dataset.ofRows(sparkSession, Project(ids.map(relation.output), relation)).queryExecution
     val retVal = SQLExecution.withNewExecutionId(sparkSession, queryExecution) {
       val indexRelation =
         WriteIndexRelation(
           sparkSession,
           keySchema,
+          s,
+          readerClassName,
           indexFileFormat.prepareWrite(sparkSession, _, null, keySchema))
 
       val writerContainer = {
@@ -208,7 +211,7 @@ case class DropIndex(
             if (!existsIndexes.exists(_.name == indexName)) {
               if (!allowNotExists) {
                 throw new AnalysisException(
-                  s"""Index $indexName exists on ${identifier.getOrElse(parent)}""")
+                  s"""Index $indexName does not exist on ${identifier.getOrElse(parent)}""")
               } else {
                 logWarning(s"drop non-exists index $indexName")
               }
@@ -333,6 +336,8 @@ case class RefreshIndex(
           WriteIndexRelation(
             sparkSession,
             keySchema,
+            s,
+            readerClassName,
             indexFileFormat.prepareWrite(sparkSession, _, null, keySchema))
 
         val writerContainer = {

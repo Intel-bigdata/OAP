@@ -25,6 +25,7 @@ import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.datasources.WriteResult
+import org.apache.spark.sql.execution.datasources.spinach.io.DataFile
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
@@ -63,6 +64,11 @@ private[spinach] class BloomFilterIndexWriter(
     val filename = InputFileNameHolder.getInputFileName().toString
     configuration.set(IndexWriter.INPUT_FILE_NAME, filename)
     configuration.set(IndexWriter.INDEX_NAME, indexName)
+    val dataFile = DataFile(filename, dataFileSchema, readerClassName)
+    val dictionaries = keySchema.map(field => dataFileSchema.indexOf(field))
+      .map(ordinal => dataFile.getDictionary(ordinal, configuration))
+      .toArray
+    val encodedSchema = DataFile.encodeSchema(dictionaries, keySchema)
     // TODO deal with partition
     var writer = newIndexOutputWriter()
     writer.initConverter(dataSchema)
@@ -103,7 +109,7 @@ private[spinach] class BloomFilterIndexWriter(
         + bfMaxBits + " numHashFunc = " + bfNumOfHashFunc)
       val bfIndex = new BloomFilter(bfMaxBits, bfNumOfHashFunc)()
       var elemCnt = 0 // element count
-      val boundReference = keySchema.zipWithIndex.map(x =>
+      val boundReference = encodedSchema.zipWithIndex.map(x =>
         BoundReference(x._2, x._1.dataType, nullable = true))
       // for multi-column index, add all subsets into bloom filter
       // For example, a column with a = 1, b = 2, a and b are index columns
@@ -116,7 +122,7 @@ private[spinach] class BloomFilterIndexWriter(
           taskReturn = taskReturn ++: writeIndexFromRows(taskContext, iterator)
           writeNewFile = true
         } else {
-          val row = iterator.next()
+          val row = DataFile.encodeKey(dictionaries, keySchema, iterator.next().copy())
           elemCnt += 1
           projector.foreach(p => bfIndex.addValue(p(row).getBytes))
         }
