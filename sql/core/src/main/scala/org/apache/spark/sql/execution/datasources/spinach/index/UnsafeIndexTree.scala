@@ -132,12 +132,6 @@ private[spinach] object UnsafeIndexNode {
     }
   }
 
-  def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int) : UnsafeRow = {
-    val curRow = getCorrectUnsafeRow(schemaLen)
-    curRow.pointTo(array, offset, size)
-    curRow
-  }
-
   def getUnsafeRow(schemaLen: Int, baseObj : Object, baseOffset: Long, sizeInBytes : Int)
     : UnsafeRow = {
     val curRow = getCorrectUnsafeRow(schemaLen)
