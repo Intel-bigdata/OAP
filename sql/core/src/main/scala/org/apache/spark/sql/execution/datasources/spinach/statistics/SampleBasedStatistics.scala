@@ -28,7 +28,7 @@ import org.apache.spark.unsafe.Platform
 
 
 class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
-  override val id: Int = 1
+  override val id: Int = SampleBasedStatisticsType.id
 
   // for SampleBasedStatistics, input keys should be the whole file
   // instead of uniqueKeys, can be refactor later

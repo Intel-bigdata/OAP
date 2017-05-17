@@ -26,7 +26,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
 class BloomFilterStatistics extends Statistics {
-  override val id: Int = 10
+  override val id: Int = BloomFilterStatisticsType.id
   override var arrayOffset: Long = _
   var schema: StructType = _
 
