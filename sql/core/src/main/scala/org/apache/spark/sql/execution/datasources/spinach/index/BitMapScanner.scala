@@ -33,6 +33,8 @@ import org.apache.spark.util.collection.BitSet
 
 private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
 
+  override def canBeOptimizedByStatistics: Boolean = true
+
   @transient var internalItr: Iterator[Int] = Iterator[Int]()
   var empty: Boolean = _
   var internalBitSet: BitSet = _

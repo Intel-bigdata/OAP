@@ -197,6 +197,7 @@ private[spinach] class SpinachDataReader(
       val startPosArray = new Array[Byte](8)
 
       fin.readFully(fileLength - 24, startPosArray)
+
       val stBase = Platform.getLong(startPosArray, Platform.BYTE_ARRAY_OFFSET).toInt
 
       val stsArray = new Array[Byte](fileLength - stBase)
@@ -215,6 +216,7 @@ private[spinach] class SpinachDataReader(
           case 0 => new MinMaxStatistics
           case 1 => new SampleBasedStatistics
           case 2 => new PartedByValueStatistics
+          case 10 => new BloomFilterStatistics
           case _ => throw new UnsupportedOperationException(s"non-supported statistic in id $id")
         }
         val res = st.read(filterScanner.get.getSchema,

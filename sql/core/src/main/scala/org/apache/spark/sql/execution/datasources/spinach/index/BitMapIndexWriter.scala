@@ -28,6 +28,8 @@ import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.WriteResult
+import org.apache.spark.sql.execution.datasources.spinach.statistics.BloomFilterStatistics
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
@@ -140,9 +142,26 @@ private[spinach] class BitMapIndexWriter(
       // write byteArray length and byteArray
       IndexUtils.writeInt(writer, objLen)
       writer.write(writeBuf.toByteArray)
-      // write dataEnd
-      IndexUtils.writeLong(writer, 4 + objLen)
       out.close()
+      val indexEnd = 4 + objLen
+
+      // write bloom filter statistics
+      // TODO Statistics type selection can be added here
+      val bfMaxBits = configuration.getInt(
+        SQLConf.SPINACH_BLOOMFILTER_MAXBITS.key, 1073741824) // default 1 << 30
+      val bfNumOfHashFunc = configuration.getInt(
+        SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.key, 3)
+      val statistics = new BloomFilterStatistics()
+      statistics.initialize(bfMaxBits, bfNumOfHashFunc)
+      statistics.write(dataSchema, writer, hashMap.keySet.toArray, null, null)
+
+
+      // write index file footer
+      IndexUtils.writeLong(writer, indexEnd) // statistics start pos
+      IndexUtils.writeLong(writer, indexEnd + statistics.arrayOffset) // index file end offset
+      IndexUtils.writeLong(writer, indexEnd) // dataEnd
+
+
       // writer.close()
       taskReturn :+ IndexBuildResult(filename, rowCnt, "", new Path(filename).getParent.toString)
     }
