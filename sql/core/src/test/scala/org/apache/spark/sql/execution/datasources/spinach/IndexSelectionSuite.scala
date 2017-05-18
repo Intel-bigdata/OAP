@@ -143,31 +143,31 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
     ScannerBuilder.build(filters, ic)
     assertIndexer(ic, 2, "idxABC", 1)
 
-    ic.clear
+    ic.clear()
     val filters2: Array[Filter] = Array(
       EqualTo("a", 8), GreaterThanOrEqual("b", 10), EqualTo("c", 3))
     ScannerBuilder.build(filters2, ic)
     assertIndexer(ic, 3, "idxABC", 1)
 
-    ic.clear
+    ic.clear()
     val filters3: Array[Filter] = Array(
       EqualTo("a", 8), EqualTo("b", 10), EqualTo("c", 3))
     ScannerBuilder.build(filters3, ic)
     assertIndexer(ic, 3, "idxABC", 2)
 
-    ic.clear
+    ic.clear()
     val filters4: Array[Filter] = Array(
       EqualTo("a", 8), EqualTo("b", 10), LessThanOrEqual("c", 3))
     ScannerBuilder.build(filters4, ic)
     assertIndexer(ic, 3, "idxABC", 2)
 
-    ic.clear
+    ic.clear()
     val filters5: Array[Filter] = Array(
       EqualTo("a", 8), EqualTo("b", 10), Or(EqualTo("c", 3), GreaterThan("c", 90)))
     ScannerBuilder.build(filters5, ic)
     assertIndexer(ic, 3, "idxABC", 2)
 
-    ic.clear
+    ic.clear()
     val filters6: Array[Filter] = Array(
       GreaterThan("a", 8), LessThan("a", 20),
       EqualTo("b", 10), Or(EqualTo("c", 3), GreaterThan("c", 90)))

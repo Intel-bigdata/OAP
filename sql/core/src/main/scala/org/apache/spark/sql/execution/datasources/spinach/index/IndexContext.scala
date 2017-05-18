@@ -42,7 +42,10 @@ private[spinach] class IndexContext(meta: DataSourceMeta) extends Logging {
 
   def getScanner: Option[IndexScanner] = Option(scanner)
 
-  def clear: Unit = {
+  /**
+   * clear the available indexes and filter info, reset index scanner
+   */
+  def clear(): Unit = {
     availableIndexes.clear()
     filterMap.clear()
     scanner = null
