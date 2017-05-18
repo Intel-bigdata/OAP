@@ -110,7 +110,7 @@ class PartedByValueStatistics extends Statistics {
 
   private def extractSts(base: Long, stsArray: Array[Byte]): (Int, UnsafeRow, Int, Int) = {
     val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base)
-    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size)
+    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size).copy()
     val index = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
     val count = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 8 + size)
     (size + 12, value, index, count)
