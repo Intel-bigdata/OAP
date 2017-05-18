@@ -32,7 +32,6 @@ import org.apache.spark.sql.types.StructType
 private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
   override def canBeOptimizedByStatistics: Boolean = true
   override def toString(): String = "BPlusTreeScanner"
-  //  @transient protected var currentKey: CurrentKey = _
   @transient protected var currentKeyArray: Array[CurrentKey] = _
 
   var currentKeyIdx = 0
@@ -77,7 +76,7 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
           }
 
         }
-        // process the LeftOpen condition
+        // to deal with the LeftOpen condition
         while (!interval.startInclude &&
           currentKeyArray(i).currentKey != IndexScanner.DUMMY_KEY_END &&
           ordering.compare(interval.start, currentKeyArray(i).currentKey) == 0) {
@@ -98,7 +97,6 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
         currentKeyArray(i).currentKey, encodedIntervalArray(i).end) > 0
     }
     else { // RightOpen
-      //      val k = currentKeyArray(i).currentKey
       ordering.compare(
         currentKeyArray(i).currentKey, encodedIntervalArray(i).end) >= 0
     }
@@ -160,14 +158,12 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
     if (node.isLeaf) {
       // here currentKey is equal to candidate or the last key on the left side
       // which is less than the candidate
-      //      currentKeyArray(keyIdx) = new CurrentKey(node, m, 0)
       val currentKey = new CurrentKey(node, m, 0)
 
       if (notFind && findFirst) {
         // if not found and the goal is to find the start key, then let's move forward a key
         // if the goal is to find the end key, no need to move next
         if (order.compare(node.keyAt(m), candidate) < 0) {// if current key < candidate
-          //          currentKeyArray(keyIdx).moveNextKey
           currentKey.moveNextKey
         }
       }
@@ -177,10 +173,8 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
     }
   }
 
-  //  override def hasNext: Boolean = !(currentKey.isEnd || shouldStop(currentKey))
+
   override def hasNext: Boolean = {
-    //  intervalArray.nonEmpty && !(currentKeyIdx == currentKeyArray.length-1 &&
-    //    (currentKeyArray(currentKeyIdx).isEnd || intervalShouldStop(currentKeyIdx)) )
     if (encodedIntervalArray.isEmpty) return false
     for(i <- currentKeyIdx until currentKeyArray.length) {
       if (!currentKeyArray(i).isEnd && !intervalShouldStop(i)) {
