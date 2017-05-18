@@ -105,7 +105,7 @@ class MinMaxStatistics extends Statistics {
 
   private def extractSts(base: Long, stsArray: Array[Byte]): (Int, UnsafeRow, Long) = {
     val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base)
-    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size)
+    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size).copy()
     val offset = Platform.getLong(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
     (size + 4, value, offset)
   }
