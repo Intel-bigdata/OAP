@@ -73,7 +73,7 @@ class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
     for (_ <- 0 until size_from_file) {
       // read UnsafeRow, calculate hit_count without storing a single row
       val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
-      val row = Statistics.getUnsafeRow(schema.length, stsArray, offset + 4, size)
+      val row = Statistics.getUnsafeRow(schema.length, stsArray, offset, size)
       offset = offset + 4 + size
 
       if (Statistics.rowInIntervalArray(row, intervalArray, ordering)) hit_count += 1
