@@ -45,7 +45,7 @@ def determine_modules_for_files(filenames):
     file to belong to the 'root' module.
 
     >>> sorted(x.name for x in determine_modules_for_files(["python/pyspark/a.py", "sql/core/foo"]))
-    ['pyspark-core', 'sql']
+    ['pyspark-core', 'root']
     >>> [x.name for x in determine_modules_for_files(["file_not_matched_by_any_subproject"])]
     ['root']
     """
@@ -110,8 +110,7 @@ def determine_modules_to_test(changed_modules):
     ['graphx', 'examples']
     >>> x = [x.name for x in determine_modules_to_test([modules.sql])]
     >>> x # doctest: +NORMALIZE_WHITESPACE
-    ['sql', 'hive', 'mllib', 'examples', 'hive-thriftserver',
-     'pyspark-sql', 'sparkr', 'pyspark-mllib', 'pyspark-ml']
+    ['examples', 'hive', 'hive-thriftserver', 'mllib', 'pyspark-ml', 'pyspark-mllib', 'pyspark-sql', 'sparkr', 'sql']
     """
     modules_to_test = set()
     for module in changed_modules:
@@ -523,7 +522,7 @@ def main():
         changed_modules = determine_modules_for_files(changed_files)
         excluded_tags = determine_tags_to_exclude(changed_modules)
     if not changed_modules:
-        changed_modules = [modules.root]
+        changed_modules = [modules.sql]
         excluded_tags = []
     print("[info] Found the following changed modules:",
           ", ".join(x.name for x in changed_modules))
