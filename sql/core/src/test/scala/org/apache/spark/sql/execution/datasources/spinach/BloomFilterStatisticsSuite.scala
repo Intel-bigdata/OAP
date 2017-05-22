@@ -17,207 +17,128 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
-import java.sql.Date
+import java.io.ByteArrayOutputStream
 
-import org.scalatest.BeforeAndAfterEach
+import scala.collection.mutable.ArrayBuffer
 
-import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.catalyst.util.DateTimeUtils
-import org.apache.spark.sql.test.SharedSQLContext
-import org.apache.spark.util.Utils
+import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 
-class BloomFilterStatisticsSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
-  import testImplicits._
+import org.apache.spark.SparkFunSuite
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.{BoundReference, UnsafeProjection}
+import org.apache.spark.sql.execution.datasources.spinach.index.{BloomFilter, IndexOutputWriter, IndexUtils, RangeInterval}
+import org.apache.spark.sql.execution.datasources.spinach.statistics.{BloomFilterStatistics, BloomFilterStatisticsType, StaticsAnalysisResult}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.unsafe.Platform
+import org.apache.spark.unsafe.types.UTF8String
 
-  override def beforeEach(): Unit = {
-    System.setProperty("spinach.rowgroup.size", "1024")
-    val path = Utils.createTempDir().getAbsolutePath
+class TestIndexOutputWriter extends IndexOutputWriter(bucketId = None, context = null) {
+  val buf = new ByteArrayOutputStream(8000)
+  override protected lazy val writer: RecordWriter[Void, Any] =
+    new RecordWriter[Void, Any] {
+      override def close(context: TaskAttemptContext) = buf.close()
+      override def write(key: Void, value: Any) = value match {
+        case bytes: Array[Byte] => buf.write(bytes)
+        case i: Int => buf.write(i) // this will only write a byte
+      }
+    }
+}
 
-    sql(s"""CREATE TEMPORARY TABLE spinach_test
-           | (attr_int INT, attr_str STRING, attr_double DOUBLE,
-           |     attr_float FLOAT, attr_date DATE)
-           | USING spn
-           | OPTIONS (path '$path')""".stripMargin)
+class BloomFilterStatisticsSuite extends SparkFunSuite {
+  def rowGen(i: Int): InternalRow = InternalRow(i, UTF8String.fromString(s"test#$i"))
+
+  test("write function test") {
+    val out = new TestIndexOutputWriter
+    val schema = StructType(StructField("a", IntegerType) :: StructField("b", StringType) :: Nil)
+
+    val keys = (1 to 300).map(i => rowGen(i)).toArray
+
+    val boundReference = schema.zipWithIndex.map(x =>
+      BoundReference(x._2, x._1.dataType, nullable = true))
+    val projector = boundReference.toSet.subsets().filter(_.nonEmpty).map(s =>
+      UnsafeProjection.create(s.toArray)).toArray
+
+    var elementCnt = 0
+    val bfIndex = new BloomFilter(1 << 20, 3)()
+
+    keys.foreach(key => {
+      elementCnt += 1
+      projector.foreach(p => bfIndex.addValue(p(key).getBytes))
+    })
+    val bfLongArray = bfIndex.getBitMapLongArray
+
+    val statistics = new BloomFilterStatistics
+    statistics.initialize(1 << 20, 3)
+    statistics.write(schema, out, keys, null, null)
+
+    val bytes = out.buf.toByteArray
+
+    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET) == BloomFilterStatisticsType.id)
+    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + 4) == bfLongArray.length)
+    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + 8) == 3)
+    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + 12) == elementCnt)
+
+    var offset = 16
+
+    for (i <- bfLongArray.indices) {
+      val longFromFile = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
+      assert(longFromFile == bfLongArray(i))
+      offset += 8
+    }
   }
 
-  override def afterEach(): Unit = {
-    sqlContext.dropTempTable("spinach_test")
+  test("read function test") {
+    val out = new TestIndexOutputWriter
+    val schema = StructType(StructField("a", IntegerType) :: StructField("b", StringType) :: Nil)
+
+    val keys = (1 to 300).map(i => rowGen(i)).toArray
+
+    val boundReference = schema.zipWithIndex.map(x =>
+      BoundReference(x._2, x._1.dataType, nullable = true))
+    val projector = boundReference.toSet.subsets().filter(_.nonEmpty).map(s =>
+      UnsafeProjection.create(s.toArray)).toArray
+
+    var elementCnt = 0
+    val bfIndex = new BloomFilter(1 << 20, 3)()
+
+    keys.foreach(key => {
+      elementCnt += 1
+      projector.foreach(p => bfIndex.addValue(p(key).getBytes))
+    })
+    val bfLongArray = bfIndex.getBitMapLongArray
+
+    IndexUtils.writeInt(out, BloomFilterStatisticsType.id)
+    IndexUtils.writeInt(out, bfLongArray.length)
+    IndexUtils.writeInt(out, bfIndex.getNumOfHashFunc)
+    IndexUtils.writeInt(out, elementCnt)
+
+    bfLongArray.foreach(l => IndexUtils.writeLong(out, l))
+
+    val intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()
+    intervalArray.append(new RangeInterval(rowGen(-101), rowGen(-101),
+      includeStart = true, includeEnd = true))
+
+    val statistics = new BloomFilterStatistics
+    val res = statistics.read(schema, intervalArray, out.buf.toByteArray, 0)
+
+    assert(res == StaticsAnalysisResult.SKIP_INDEX)
   }
 
-  def rowGen(i: Int): (Int, String, Double, Float, Date) =
-    (i, s"test#$i", i + 0.0d, i + 0.0f, DateTimeUtils.toJavaDate(i))
+  test("read AND write test") {
+    val out = new TestIndexOutputWriter
+    val schema = StructType(StructField("a", IntegerType) :: StructField("b", StringType) :: Nil)
 
-  test("test without index") {
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_int = 1"),
-      Row.fromTuple(rowGen(1)) :: Nil)
-  }
+    val keys = (1 to 300).map(i => rowGen(i)).toArray
 
-  test("btree with bloom statistics, data type int") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "BLOOM")
-    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 20).toString)
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
+    val statistics = new BloomFilterStatistics
+    statistics.initialize(1 << 20, 3)
+    statistics.write(schema, out, keys, null, null)
 
+    val intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()
+    intervalArray.append(new RangeInterval(rowGen(-101), rowGen(-101),
+      includeStart = true, includeEnd = true))
 
-    sql("create sindex index1 on spinach_test (attr_int)")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_int = 1"),
-      Row.fromTuple(rowGen(1)) :: Nil)
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_int >= 249 AND attr_int < 261"),
-      (249 until 261).map(i => Row.fromTuple(rowGen(i))))
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_int > 495 AND attr_int < 510"),
-      (496 to 500).map(i => Row.fromTuple(rowGen(i))))
-    sql("drop sindex index1 on spinach_test")
-  }
-
-  test("btree with bloom statistics, data type string") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "BLOOM")
-    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 20).toString)
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-
-    sql("create sindex index2 on spinach_test (attr_str)")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_str = \"test#1\""),
-      Row.fromTuple(rowGen(1)) :: Nil)
-    sql("drop sindex index2 on spinach_test")
-  }
-
-  test("btree with bloom statistics, data type double") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "BLOOM")
-    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 20).toString)
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-
-
-    sql("create sindex index3 on spinach_test (attr_double)")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_double = 1.0"),
-      Row.fromTuple(rowGen(1)) :: Nil)
-    sql("drop sindex index3 on spinach_test")
-  }
-
-  test("btree with bloom statistics, data type float") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "BLOOM")
-    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 20).toString)
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-
-    sql("create sindex index4 on spinach_test (attr_float)")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_float = 1.0"),
-      Row.fromTuple(rowGen(1)) :: Nil)
-    sql("drop sindex index4 on spinach_test")
-  }
-
-  test("btree with bloom statistics, data type date") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "BLOOM")
-    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 20).toString)
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-
-    sql("create sindex index5 on spinach_test (attr_date)")
-    checkAnswer(sql(s"SELECT * FROM spinach_test " +
-      s"WHERE attr_date = '${DateTimeUtils.toJavaDate(1).toString}'"),
-      Row.fromTuple(rowGen(1)) :: Nil)
-    sql("drop sindex index5 on spinach_test")
-  }
-
-  test("bitmap with bloom statistics, data type int") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "BLOOM")
-    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 20).toString)
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-
-
-    sql("create sindex index1 on spinach_test (attr_int) USING BITMAP")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_int = 1"),
-      Row.fromTuple(rowGen(1)) :: Nil)
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_int >= 249 AND attr_int < 261"),
-      (249 until 261).map(i => Row.fromTuple(rowGen(i))))
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_int > 495 AND attr_int < 510"),
-      (496 to 500).map(i => Row.fromTuple(rowGen(i))))
-    sql("drop sindex index1 on spinach_test")
-  }
-
-  test("bitmap with bloom statistics, data type string") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "BLOOM")
-    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 20).toString)
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-
-    sql("create sindex index2 on spinach_test (attr_str) USING BITMAP")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_str = \"test#1\""),
-      Row.fromTuple(rowGen(1)) :: Nil)
-    sql("drop sindex index2 on spinach_test")
-  }
-
-  test("bitmap with bloom statistics, data type double") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "BLOOM")
-    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 20).toString)
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-
-
-    sql("create sindex index3 on spinach_test (attr_double) USING BITMAP")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_double = 1.0"),
-      Row.fromTuple(rowGen(1)) :: Nil)
-    sql("drop sindex index3 on spinach_test")
-  }
-
-  test("bitmap with bloom statistics, data type float") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "BLOOM")
-    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 20).toString)
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-
-    sql("create sindex index4 on spinach_test (attr_float) USING BITMAP")
-    checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_float = 1.0"),
-      Row.fromTuple(rowGen(1)) :: Nil)
-    sql("drop sindex index4 on spinach_test")
-  }
-
-  test("bitmap with bloom statistics, data type date") {
-    spark.conf.set("spark.sql.spinach.StatisticsType", "BLOOM")
-    spark.conf.set("spark.sql.spinach.Bloomfilter.maxBits", (1 << 20).toString)
-    val data: Seq[(Int, String, Double, Float, Date)] =
-      (1 to 500).map(i => rowGen(i))
-    data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
-    sql("insert overwrite table spinach_test select * from t")
-
-    sql("create sindex index5 on spinach_test (attr_date) USING BITMAP")
-    checkAnswer(sql(s"SELECT * FROM spinach_test " +
-      s"WHERE attr_date = '${DateTimeUtils.toJavaDate(1).toString}'"),
-      Row.fromTuple(rowGen(1)) :: Nil)
-    sql("drop sindex index5 on spinach_test")
+    val res = statistics.read(schema, intervalArray, out.buf.toByteArray, 0)
+    assert(res == StaticsAnalysisResult.SKIP_INDEX)
   }
 }

@@ -21,6 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
@@ -28,15 +29,15 @@ import org.apache.spark.unsafe.Platform
 class BloomFilterStatistics extends Statistics {
   override val id: Int = BloomFilterStatisticsType.id
   override var arrayOffset: Long = _
-  var schema: StructType = _
+  private var schema: StructType = _
 
-  var bfIndex: BloomFilter = _
+  private var bfIndex: BloomFilter = _
 
   def initialize(maxBits: Int, numOfHashFunc: Int): Unit = {
     bfIndex = new BloomFilter(maxBits, numOfHashFunc)()
   }
 
-  def buildBloomFilter(uniqueKeys: Array[InternalRow]): Int = {
+  private def buildBloomFilter(uniqueKeys: Array[InternalRow]): Int = {
     var elemCnt = 0 // element count
     val boundReference = schema.zipWithIndex.map(x =>
       BoundReference(x._2, x._1.dataType, nullable = true))
@@ -88,7 +89,7 @@ class BloomFilterStatistics extends Statistics {
     arrayOffset += offset
   }
 
-  def readBloomFilter(bytes: Array[Byte], startOffset: Long): Long = {
+  private def readBloomFilter(bytes: Array[Byte], startOffset: Long): Long = {
     var offset = startOffset
     val bitLength = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
     val numHashFunc = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset + 4)
@@ -117,11 +118,13 @@ class BloomFilterStatistics extends Statistics {
 
     val projector = UnsafeProjection.create(schema)
 
+    val order = GenerateOrdering.create(schema)
+
     // extract equal condition from intervalArray
     val equalValues: Array[InternalRow] =
       if (intervalArray.nonEmpty) {
         // should not use ordering.compare here
-        intervalArray.filter(interval => (interval.start eq interval.end)
+        intervalArray.filter(interval => order.compare(interval.start, interval.end) == 0
           && interval.startInclude && interval.endInclude).map(_.start).toArray
       } else null
     val skipFlag = if (equalValues != null && equalValues.length > 0) {
