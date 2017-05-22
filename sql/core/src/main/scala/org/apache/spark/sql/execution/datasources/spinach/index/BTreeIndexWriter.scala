@@ -217,8 +217,16 @@ private[spinach] class BTreeIndexWriter(
               case SampleBasedStatisticsType.name => new SampleBasedStatistics(
                 configuration.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.key).toDouble)
               case PartByValueStatisticsType.name => new PartedByValueStatistics
+              case BloomFilterStatisticsType.name =>
+                val bfMaxBits = configuration.getInt(
+                  SQLConf.SPINACH_BLOOMFILTER_MAXBITS.key, 1073741824) // default 1 << 30
+                val bfNumOfHashFunc = configuration.getInt(
+                  SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.key, 3)
+                val statistics = new BloomFilterStatistics()
+                statistics.initialize(bfMaxBits, bfNumOfHashFunc)
+                statistics
               case _ =>
-                throw new UnsupportedOperationException(s"non-supported statistic in id $t")
+                throw new UnsupportedOperationException(s"non-supported statistic type $t")
             }
             st.write(encodedSchema, writer, uniqueKeys, hashMap, offsetMap)
           }

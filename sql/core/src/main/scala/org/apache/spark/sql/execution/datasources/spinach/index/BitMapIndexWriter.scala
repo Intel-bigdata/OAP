@@ -29,7 +29,7 @@ import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.WriteResult
 import org.apache.spark.sql.execution.datasources.spinach.io.DataFile
-import org.apache.spark.sql.execution.datasources.spinach.statistics.BloomFilterStatistics
+import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
@@ -43,6 +43,13 @@ private[spinach] class BitMapIndexWriter(
     keySchema: StructType,
     indexName: String,
     isAppend: Boolean) extends IndexWriter(relation, job, isAppend) {
+
+  @transient val driverConf = relation.sparkSession.conf
+  job.getConfiguration.setStrings(
+    SQLConf.SPINACH_STATISTICS_TYPES.key, driverConf.get(SQLConf.SPINACH_STATISTICS_TYPES))
+  job.getConfiguration.setDouble(
+    SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.key,
+    driverConf.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE))
 
   override def writeIndexFromRows(
       taskContext: TaskContext, iterator: Iterator[InternalRow]): Seq[IndexBuildResult] = {
@@ -149,22 +156,34 @@ private[spinach] class BitMapIndexWriter(
       writer.write(writeBuf.toByteArray)
       out.close()
       val indexEnd = 4 + objLen
+      var offset: Long = indexEnd
 
-      // write bloom filter statistics
-      // TODO Statistics type selection can be added here
-      val bfMaxBits = configuration.getInt(
-        SQLConf.SPINACH_BLOOMFILTER_MAXBITS.key, 1073741824) // default 1 << 30
-      val bfNumOfHashFunc = configuration.getInt(
-        SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.key, 3)
-      val statistics = new BloomFilterStatistics()
-      statistics.initialize(bfMaxBits, bfNumOfHashFunc)
-      val encodedSchema = DataFile.encodeSchema(dictionaries, keySchema)
-      statistics.write(encodedSchema, writer, hashMap.keySet.toArray, null, null)
-
+      val stTypes = configuration.getStrings(SQLConf.SPINACH_STATISTICS_TYPES.key)
+      if (stTypes != null && stTypes.length > 0) {
+        stTypes.foreach(stType => {
+          stType.trim match {
+            case BloomFilterStatisticsType.name =>
+              val bfMaxBits = configuration.getInt(
+                SQLConf.SPINACH_BLOOMFILTER_MAXBITS.key, 1073741824) // default 1 << 30
+              val bfNumOfHashFunc = configuration.getInt(
+              SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.key, 3)
+              val statistics = new BloomFilterStatistics()
+              statistics.initialize(bfMaxBits, bfNumOfHashFunc)
+              offset += statistics.arrayOffset
+              statistics
+            // TODO the following three type is not support yet
+            case MinMaxStatisticsType.name =>
+            case SampleBasedStatisticsType.name =>
+            case PartByValueStatisticsType.name =>
+            case _ =>
+              throw new UnsupportedOperationException(s"non-supported statistic type")
+            }
+        })
+      }
 
       // write index file footer
       IndexUtils.writeLong(writer, indexEnd) // statistics start pos
-      IndexUtils.writeLong(writer, indexEnd + statistics.arrayOffset) // index file end offset
+      IndexUtils.writeLong(writer, offset) // index file end offset
       IndexUtils.writeLong(writer, indexEnd) // dataEnd
 
 

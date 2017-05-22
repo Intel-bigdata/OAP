@@ -38,6 +38,6 @@ case object PartByValueStatisticsType extends StatisticsType {
 }
 
 case object BloomFilterStatisticsType extends StatisticsType {
-  val name: String = "BLOOMFILTER"
+  val name: String = "BLOOM"
   val id: Int = 3
 }
