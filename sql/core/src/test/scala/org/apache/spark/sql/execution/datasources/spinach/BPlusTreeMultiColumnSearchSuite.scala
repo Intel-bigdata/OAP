@@ -82,8 +82,8 @@ private [spinach] object BPlusTreeMultiColumnSearchSuite extends Serializable {
   }
 }
 
-private[spinach] class BPlusTreeMultiColumnSearchSuite
-  extends SparkFunSuite with Logging with BeforeAndAfterAll {
+class BPlusTreeMultiColumnSearchSuite extends SparkFunSuite
+  with Logging with BeforeAndAfterAll {
   val conf: Configuration = new Configuration()
 
   val meta = new DataSourceMeta(
@@ -101,6 +101,9 @@ private[spinach] class BPlusTreeMultiColumnSearchSuite
     assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
     ic.getScanner match {
       case Some(scanner: BPlusTreeScanner) =>
+        // this is only for test
+        scanner.encodedIntervalArray = scanner.intervalArray
+        scanner.setEncodedSchema(scanner.getSchema)
         assert(scanner._init(
           BPlusTreeMultiColumnSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")

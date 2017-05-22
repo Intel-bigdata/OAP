@@ -102,8 +102,8 @@ private[spinach] object BPlusTreeSingleColumnSearchSuite extends Serializable {
   }
 }
 
-private[spinach] class BPlusTreeSingleColumnSearchSuite
-    extends SparkFunSuite with Logging with BeforeAndAfterAll {
+class BPlusTreeSingleColumnSearchSuite extends SparkFunSuite
+  with Logging with BeforeAndAfterAll {
   val conf: Configuration = new Configuration()
 
   val meta = new DataSourceMeta(
@@ -286,16 +286,13 @@ private[spinach] class BPlusTreeSingleColumnSearchSuite
     assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
     ic.getScanner match {
       case Some(scanner: BPlusTreeScanner) =>
+        // this is only for test
+        scanner.encodedIntervalArray = scanner.intervalArray
+        scanner.setEncodedSchema(scanner.getSchema)
         assert(scanner._init(
           BPlusTreeSingleColumnSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")
     }
-//    ic.getScannerBuilder match {
-//      case Some(builder) =>
-//        val scanner = builder.build
-//        assert(scanner._init(
-//          BPlusTreeSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
-//      case None => throw new Exception(s"expect scanner, but got None")
-//    }
+
   }
 }
