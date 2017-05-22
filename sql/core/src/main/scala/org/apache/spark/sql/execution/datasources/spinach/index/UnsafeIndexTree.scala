@@ -77,10 +77,8 @@ private[spinach] case class UnsafeIndexNode(
     // 16 <- value5, 12(4 + 8) <- value3 + value4
     val keyOffset = Platform.getLong(baseObj, baseOffset + offset + 12 + idx * 16)
     val len = Platform.getInt(baseObj, baseOffset + keyOffset)
-//     val row = new UnsafeRow(schema.length) // this is for debug use
-    val row = UnsafeIndexNode.row.get
-    row.setNumFields(schema.length)
-    row.pointTo(baseObj, baseOffset + keyOffset + 4, len)
+//  val row = new UnsafeRow(schema.length) // this is for debug use
+    val row = UnsafeIndexNode.getUnsafeRow(schema.length, baseObj, baseOffset + keyOffset + 4, len)
     row
   }
 
@@ -121,6 +119,24 @@ private[spinach] case class UnsafeIndexNode(
 private[spinach] object UnsafeIndexNode {
   lazy val row = new ThreadLocal[UnsafeRow] {
     override def initialValue = new UnsafeRow
+  }
+
+  private def getCorrectUnsafeRow(fieldNum : Int) : UnsafeRow = {
+    val curRow = row.get
+    if (curRow.numFields() != fieldNum) {
+      val newRow = new UnsafeRow(fieldNum)
+      UnsafeIndexNode.row.set(newRow)
+      newRow
+    } else {
+      curRow
+    }
+  }
+
+  def getUnsafeRow(schemaLen: Int, baseObj : Object, baseOffset: Long, sizeInBytes : Int)
+    : UnsafeRow = {
+    val curRow = getCorrectUnsafeRow(schemaLen)
+    curRow.pointTo(baseObj, baseOffset, sizeInBytes)
+    curRow
   }
 }
 

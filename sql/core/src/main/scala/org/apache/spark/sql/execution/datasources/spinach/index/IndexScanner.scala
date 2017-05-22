@@ -92,15 +92,10 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
 
 // A dummy scanner will actually not do any scanning
 private[spinach] object DUMMY_SCANNER extends IndexScanner(null) {
-  //  override def shouldStop(key: CurrentKey): Boolean = true
-//  override def intervalShouldStop(i: Int): Boolean = true
   override def initialize(path: Path, configuration: Configuration): IndexScanner = { this }
   override def hasNext: Boolean = false
   override def next(): Long = throw new NoSuchElementException("end of iterating.")
-  //  override def withNewStart(key: Key, include: Boolean): RangeScanner = this
-  //  override def withNewEnd(key: Key, include: Boolean): RangeScanner = this
   override def meta: IndexMeta = throw new NotImplementedError()
-  //  override def start: Key = throw new NotImplementedError()
 }
 
 // The building of Search Scanner according to the filter and indices,

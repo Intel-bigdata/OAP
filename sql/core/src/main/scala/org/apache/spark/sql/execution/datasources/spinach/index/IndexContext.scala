@@ -42,6 +42,15 @@ private[spinach] class IndexContext(meta: DataSourceMeta) extends Logging {
 
   def getScanner: Option[IndexScanner] = Option(scanner)
 
+  /**
+   * clear the available indexes and filter info, reset index scanner
+   */
+  def clear(): Unit = {
+    availableIndexes.clear()
+    filterMap.clear()
+    scanner = null
+  }
+
   def selectAvailableIndex(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]])
   : Unit = {
     logDebug("Selecting Available Index:")
