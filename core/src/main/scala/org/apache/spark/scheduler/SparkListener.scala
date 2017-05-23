@@ -137,6 +137,12 @@ case class SparkListenerApplicationEnd(time: Long) extends SparkListenerEvent
  */
 private[spark] case class SparkListenerLogStart(sparkVersion: String) extends SparkListenerEvent
 
+@DeveloperApi
+case class SparkListenerCustomInfoUpdate(
+    hostName: String,
+    executorId: String,
+    customizedInfo: String) extends SparkListenerEvent
+
 /**
  * Interface for creating history listeners defined in other modules like SQL, which are used to
  * rebuild the history UI.
@@ -247,6 +253,11 @@ private[spark] trait SparkListenerInterface {
    * Called when other events like SQL-specific events are posted.
    */
   def onOtherEvent(event: SparkListenerEvent): Unit
+
+  /**
+   * Called when the driver receives some user customized info.
+   */
+  def onCustomInfoUpdate(customInfoUpdate: SparkListenerCustomInfoUpdate) { }
 }
 
 
