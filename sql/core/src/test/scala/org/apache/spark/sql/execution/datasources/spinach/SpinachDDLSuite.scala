@@ -32,10 +32,10 @@ class SpinachDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
     val path1 = Utils.createTempDir().getAbsolutePath
     val path2 = Utils.createTempDir().getAbsolutePath
 
-    sql(s"""CREATE TEMPORARY TABLE spinach_test_1 (a INT, b STRING)
+    sql(s"""CREATE TEMPORARY VIEW spinach_test_1 (a INT, b STRING)
            | USING parquet
            | OPTIONS (path '$path1')""".stripMargin)
-    sql(s"""CREATE TEMPORARY TABLE spinach_test_2 (a INT, b STRING)
+    sql(s"""CREATE TEMPORARY VIEW spinach_test_2 (a INT, b STRING)
            | USING spn
            | OPTIONS (path '$path2')""".stripMargin)
   }
@@ -47,7 +47,7 @@ class SpinachDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
 
   test("show index") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     checkAnswer(sql("show sindex from spinach_test_1"), Nil)
     sql("insert overwrite table spinach_test_1 select * from t")
     sql("insert overwrite table spinach_test_2 select * from t")

@@ -33,16 +33,16 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
   override def beforeEach(): Unit = {
     System.setProperty("spinach.rowgroup.size", "1024")
     val path = Utils.createTempDir().getAbsolutePath
-    sql(s"""CREATE TEMPORARY TABLE spinach_test (a INT, b STRING)
+    sql(s"""CREATE TEMPORARY VIEW spinach_test (a INT, b STRING)
             | USING spn
             | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY TABLE spinach_test_date (a INT, b DATE)
+    sql(s"""CREATE TEMPORARY VIEW spinach_test_date (a INT, b DATE)
             | USING spn
             | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY TABLE parquet_test (a INT, b STRING)
+    sql(s"""CREATE TEMPORARY VIEW parquet_test (a INT, b STRING)
             | USING parquet
             | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY TABLE parquet_test_date (a INT, b DATE)
+    sql(s"""CREATE TEMPORARY VIEW parquet_test_date (a INT, b DATE)
             | USING parquet
             | OPTIONS (path '$path')""".stripMargin)
     sql(s"""CREATE TABLE t_refresh (a int, b int)
@@ -64,7 +64,7 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
 
   test("filtering without index") { // not passed for RangeInterval must be built with an index
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
@@ -76,7 +76,7 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
 
   test("Single BitMap index single equal value test") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     // sql("select * from t").show(500, false)
     sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index_bf on spinach_test (a) USING BITMAP")
@@ -95,7 +95,7 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
 
   test("Single BitMap index multiple equal value test") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index_bf on spinach_test (a) USING BITMAP")
     assert(sql(s"SELECT * FROM spinach_test WHERE a = 10 AND a = 11").count() == 0)
@@ -107,7 +107,7 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
 
   test("BitMap index for range predicate which over multi partitions") {
     val data: Seq[(Int, String)] = (1 to 200).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index_bf on spinach_test (a) USING BITMAP")
     val result: Seq[(Int, String)] = (46 to 150).map { i => (i, s"this is test $i") }

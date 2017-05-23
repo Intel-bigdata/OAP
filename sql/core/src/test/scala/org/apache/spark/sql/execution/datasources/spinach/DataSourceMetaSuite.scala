@@ -140,7 +140,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       .toDF("a", "b", "c")
     df.write.format("spn").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
     val spnDf = sqlContext.read.format("spn").load(tmpDir.getAbsolutePath)
-    spnDf.registerTempTable("spnt1")
+    spnDf.createOrReplaceTempView("spnt1")
 
     val path = new Path(
       new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)
@@ -186,7 +186,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       .toDF("a", "b", "c")
     df.write.format("spn").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
     val spnDf = sqlContext.read.format("spn").load(tmpDir.getAbsolutePath)
-    spnDf.registerTempTable("spnt1")
+    spnDf.createOrReplaceTempView("spnt1")
 
     val path = new Path(
       new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)
@@ -213,7 +213,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       .toDF("a", "b", "c")
     df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
     val spnDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
-    spnDf.registerTempTable("spnt1")
+    spnDf.createOrReplaceTempView("spnt1")
 
     val path = new Path(
       new File(tmpDir.getAbsolutePath, SpinachFileFormat.SPINACH_META_FILE).getAbsolutePath)

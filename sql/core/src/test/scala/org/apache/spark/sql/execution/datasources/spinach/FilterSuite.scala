@@ -36,16 +36,16 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     System.setProperty("spinach.rowgroup.size", "1024")
     val path = Utils.createTempDir().getAbsolutePath
 
-    sql(s"""CREATE TEMPORARY TABLE spinach_test (a INT, b STRING)
+    sql(s"""CREATE TEMPORARY VIEW spinach_test (a INT, b STRING)
            | USING spn
            | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY TABLE spinach_test_date (a INT, b DATE)
+    sql(s"""CREATE TEMPORARY VIEW spinach_test_date (a INT, b DATE)
            | USING spn
            | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY TABLE parquet_test (a INT, b STRING)
+    sql(s"""CREATE TEMPORARY VIEW parquet_test (a INT, b STRING)
            | USING parquet
            | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY TABLE parquet_test_date (a INT, b DATE)
+    sql(s"""CREATE TEMPORARY VIEW parquet_test_date (a INT, b DATE)
            | USING parquet
            | OPTIONS (path '$path')""".stripMargin)
     sql(s"""CREATE TABLE t_refresh (a int, b int)
@@ -71,7 +71,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("insert into table") {
     val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     checkAnswer(sql("SELECT * FROM spinach_test"), Seq.empty[Row])
     sql("insert overwrite table spinach_test select * from t")
     checkAnswer(sql("SELECT * FROM spinach_test"), data.map { row => Row(row._1, row._2) })
@@ -83,7 +83,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     // change default row group size
     System.setProperty("spinach.rowgroup.size", "1025")
     val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     checkAnswer(sql("SELECT * FROM spinach_test"), Seq.empty[Row])
     sql("insert overwrite table spinach_test select * from t")
     checkAnswer(sql("SELECT * FROM spinach_test"), data.map { row => Row(row._1, row._2) })
@@ -93,14 +93,14 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("test date type") {
     val data: Seq[(Int, Date)] = (1 to 3000).map { i => (i, DateTimeUtils.toJavaDate(i)) }
-    data.toDF("key", "value").registerTempTable("d")
+    data.toDF("key", "value").createOrReplaceTempView("d")
     sql("insert overwrite table spinach_test_date select * from d")
     checkAnswer(sql("SELECT * FROM spinach_test_date"), data.map {row => Row(row._1, row._2)})
   }
 
   test("filtering") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index1 on spinach_test (a)")
 
@@ -125,7 +125,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     }
 
     val df = data.toSeq.toDF("a", "b")
-    df.registerTempTable("t")
+    df.createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
     sql("create sindex index1 on spinach_test (a, b) using btree")
@@ -147,7 +147,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("filtering parquet") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
     sql("create sindex index1 on parquet_test (a)")
 
@@ -160,7 +160,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("test refresh in parquet format on same partition") {
     val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
 
     sql(
       """
@@ -189,7 +189,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("test refresh in parquet format on different partition") {
     val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
 
     sql(
       """
@@ -218,7 +218,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("test refresh in spn format on same partition") {
     val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
 
     sql(
       """
@@ -247,7 +247,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("test refresh in spn format on different partition") {
     val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
 
     sql(
       """
@@ -283,7 +283,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("refresh table of spinach format without partition") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index1 on spinach_test (a)")
 
@@ -299,7 +299,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("refresh table of parquet format without partition") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
     sql("create sindex index1 on parquet_test (a)")
 
@@ -315,7 +315,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("filtering by string") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index1 on spinach_test (a) using btree")
 
@@ -331,7 +331,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("support data append without refresh") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
 
     sql("insert overwrite table spinach_test select * from t where key > 100")
     sql("create sindex index1 on spinach_test (a)")
@@ -350,7 +350,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("filtering by string with duplicate refresh") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index1 on spinach_test (a) using btree")
 
@@ -371,7 +371,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
   test("filtering with string type index") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
     sql("create sindex index1 on spinach_test (b)")
 

@@ -41,7 +41,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
     val df = sparkContext.parallelize(data, 3).toDF("a", "b", "c", "d", "e")
     df.write.format("spn").mode(SaveMode.Overwrite).save(tempDir.getAbsolutePath)
     val spnDf = sqlContext.read.format("spn").load(tempDir.getAbsolutePath)
-    spnDf.registerTempTable("spn_test")
+    spnDf.createOrReplaceTempView("spn_test")
   }
 
   override def afterEach(): Unit = {
