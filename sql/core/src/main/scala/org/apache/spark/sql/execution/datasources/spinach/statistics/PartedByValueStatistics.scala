@@ -57,15 +57,15 @@ class PartedByValueStatistics extends Statistics {
       i += 1
     }
     val left = i
-    if (left == partNum + 1) {
-      -1
+    while (i <= partNum &&
+      Statistics.rowInIntervalArray(stats(i)._2, intervalArray, ordering)) {
+      i += 1
+    }
+    val right = i
+    if (left == partNum + 1 || right == 0) {
+      // interval.min > partition.max || interval.max < partition.min
+      StaticsAnalysisResult.SKIP_INDEX
     } else {
-      while (i <= partNum &&
-        Statistics.rowInIntervalArray(stats(i)._2, intervalArray, ordering)) {
-        i += 1
-      }
-      val right = i
-
       var cover: Double = if (right <= partNum) stats(right)._4 else stats.last._4
 
       if (start.start != IndexScanner.DUMMY_KEY_START && left > 0 &&

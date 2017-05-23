@@ -16,23 +16,21 @@
  */
 package org.apache.spark.sql.execution.datasources.spinach
 
+import org.scalatest.BeforeAndAfterAll
 import scala.collection.mutable.ArrayBuffer
 
-import org.scalatest.BeforeAndAfterAll
-
-import org.apache.spark.sql.QueryTest
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, IndexUtils, RangeInterval}
 import org.apache.spark.sql.execution.datasources.spinach.statistics.Statistics
 import org.apache.spark.sql.execution.datasources.spinach.utils.TestIndexOutputWriter
-import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.ByteBufferOutputStream
 
-class StatisticsSuite extends QueryTest with SharedSQLContext with BeforeAndAfterAll{
+class StatisticsSuite extends SparkFunSuite with BeforeAndAfterAll {
 
   var schema: StructType = _
   private lazy val converter = UnsafeProjection.create(schema)
