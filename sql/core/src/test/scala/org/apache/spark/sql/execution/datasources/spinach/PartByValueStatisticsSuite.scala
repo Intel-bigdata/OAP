@@ -96,6 +96,9 @@ class PartByValueStatisticsSuite extends StatisticsTest{
     generateInterval(rowGen(-10), rowGen(10), true, true)
     assert(statistics.read(schema, intervalArray, bytes, 0) == 31.0 / 300)
 
+    generateInterval(rowGen(-10), rowGen(0), true, true)
+    assert(statistics.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.SKIP_INDEX)
+
     generateInterval(rowGen(310), rowGen(400), true, true)
     assert(statistics.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.SKIP_INDEX)
 
@@ -131,7 +134,7 @@ class PartByValueStatisticsSuite extends StatisticsTest{
     assert(statisticsRead.read(schema, intervalArray, bytes, 0) == 31.0 / 300)
 
     generateInterval(rowGen(-10), rowGen(0), true, true)
-    assert(statisticsRead.read(schema, intervalArray, bytes, 0) == 0)
+    assert(statisticsRead.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.SKIP_INDEX)
 
     generateInterval(rowGen(310), rowGen(400), true, true)
     assert(statisticsRead.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.SKIP_INDEX)
