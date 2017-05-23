@@ -19,9 +19,10 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.io.ByteArrayOutputStream
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.scalatest.BeforeAndAfterEach
-import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
