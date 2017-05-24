@@ -133,29 +133,32 @@ class StatisticsManager {
     var resSum: Double = 0.0
     var resNum: Int = 0
 
-    for (stat <- stats) {
-      val res = stat.analyse(intervalArray)
+    if (invaildStatistics) StaticsAnalysisResult.USE_INDEX // use index if no statistics
+    else {
+      for (stat <- stats) {
+        val res = stat.analyse(intervalArray)
 
-      if (res == StaticsAnalysisResult.SKIP_INDEX) {
-        resSum = StaticsAnalysisResult.SKIP_INDEX
-      } else {
-        resSum += res
-        resNum += 1
+        if (res == StaticsAnalysisResult.SKIP_INDEX) {
+          resSum = StaticsAnalysisResult.SKIP_INDEX
+        } else {
+          resSum += res
+          resNum += 1
+        }
       }
-    }
 
-    if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
-      StaticsAnalysisResult.SKIP_INDEX
-    } else if (resNum == 0 || resSum / resNum <= StatisticsManager.FULLSCANTHRESHOLD) {
-      StaticsAnalysisResult.USE_INDEX
-    } else {
-      StaticsAnalysisResult.FULL_SCAN
+      if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
+        StaticsAnalysisResult.SKIP_INDEX
+      } else if (resNum == 0 || resSum / resNum <= StatisticsManager.FULLSCANTHRESHOLD) {
+        StaticsAnalysisResult.USE_INDEX
+      } else {
+        StaticsAnalysisResult.FULL_SCAN
+      }
     }
   }
 }
 
 object StatisticsManager {
-  val STATISTICSMASK: Long = 1111111L
+  val STATISTICSMASK: Long = 0x20170524abcdefabL // a random mask for statistics begin
 
   val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[StatisticsType]] =
     scala.collection.mutable.Map(BTreeIndexType -> Array(MinMaxStatisticsType),

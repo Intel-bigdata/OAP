@@ -27,8 +27,10 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
 
-class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
+class SampleBasedStatistics extends Statistics {
   override val id: Int = SampleBasedStatisticsType.id
+
+  var sampleRate: Double = 0.1
 
   protected def takeSample(keys: Array[InternalRow], size: Int): Array[InternalRow] =
     Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
