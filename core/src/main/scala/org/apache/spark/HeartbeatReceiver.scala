@@ -36,7 +36,8 @@ import org.apache.spark.util._
 private[spark] case class Heartbeat(
     executorId: String,
     accumUpdates: Array[(Long, Seq[AccumulatorV2[_, _]])], // taskId -> accumulator updates
-    blockManagerId: BlockManagerId)
+    blockManagerId: BlockManagerId,
+    customizedInfo: Option[String] = None)
 
 /**
  * An event that SparkContext uses to notify HeartbeatReceiver that SparkContext.taskScheduler is
@@ -119,7 +120,7 @@ private[spark] class HeartbeatReceiver(sc: SparkContext, clock: Clock)
       context.reply(true)
 
     // Messages received from executors
-    case heartbeat @ Heartbeat(executorId, accumUpdates, blockManagerId) =>
+    case heartbeat @ Heartbeat(executorId, accumUpdates, blockManagerId, customizedInfo) =>
       if (scheduler != null) {
         if (executorLastSeen.contains(executorId)) {
           executorLastSeen(executorId) = clock.getTimeMillis()
@@ -146,6 +147,9 @@ private[spark] class HeartbeatReceiver(sc: SparkContext, clock: Clock)
         logWarning(s"Dropping $heartbeat because TaskScheduler is not ready yet")
         context.reply(HeartbeatResponse(reregisterBlockManager = true))
       }
+
+      customizedInfo.foreach { info =>
+        sc.listenerBus.post(SparkListenerCustomInfoUpdate(blockManagerId.host, executorId, info))}
   }
 
   /**

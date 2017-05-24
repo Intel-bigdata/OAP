@@ -31,6 +31,7 @@ import scala.util.control.NonFatal
 
 import org.apache.spark._
 import org.apache.spark.deploy.SparkHadoopUtil
+import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.TaskMemoryManager
 import org.apache.spark.rpc.RpcTimeout
@@ -132,6 +133,11 @@ private[spark] class Executor(
    * successful heartbeat will reset it to 0.
    */
   private var heartbeatFailures = 0
+
+  // get the singleton instance that user configured
+  private val customInfoClassName = conf.getOption("spark.executor.customInfoClass")
+  private val customManager: Option[CustomManager] = customInfoClassName
+    .map(cIC => Utils.classForName(cIC).newInstance().asInstanceOf[CustomManager])
 
   startDriverHeartbeater()
 
@@ -513,7 +519,13 @@ private[spark] class Executor(
       }
     }
 
-    val message = Heartbeat(executorId, accumUpdates.toArray, env.blockManager.blockManagerId)
+//    val message = Heartbeat(executorId, accumUpdates.toArray, env.blockManager.blockManagerId)
+    val message = Heartbeat(
+      executorId,
+      accumUpdates.toArray,
+      env.blockManager.blockManagerId,
+      customManager.map(_.status(conf)))
+
     try {
       val response = heartbeatReceiverRef.askWithRetry[HeartbeatResponse](
           message, RpcTimeout(conf, "spark.executor.heartbeatInterval", "10s"))
