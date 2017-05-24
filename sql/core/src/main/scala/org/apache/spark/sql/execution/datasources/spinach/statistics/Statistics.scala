@@ -24,6 +24,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.BaseOrdering
+import org.apache.spark.sql.execution.datasources.spinach.Key
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
@@ -32,6 +33,31 @@ import org.apache.spark.unsafe.Platform
 abstract class Statistics{
   val id: Int
   var arrayOffset: Long
+  protected var schema: StructType = _
+
+  def initialize(schema: StructType): Unit = {
+    this.schema = schema
+  }
+
+  def addSpinachKey(key: Key): Unit = { // spinach.Key == InternalRow
+    // do nothing for most of cases
+  }
+
+  // return: number of bytes written into writer
+  def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
+    IndexUtils.writeInt(writer, id)
+    4L
+  }
+
+  // return number of bytes read from `bytes` array
+  def read(bytes: Array[Byte], baseOffset: Long): Long = {
+    val idFromFile = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + baseOffset)
+    assert(idFromFile == id)
+    4L
+  }
+
+  def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double =
+    StaticsAnalysisResult.USE_INDEX
 
   // TODO write function parameters need to be optimized
   def write(schema: StructType, writer: IndexOutputWriter, uniqueKeys: Array[InternalRow],
@@ -42,6 +68,7 @@ abstract class Statistics{
   def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
            stsArray: Array[Byte], offset: Long): Double
 }
+
 
 object Statistics {
   def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
@@ -62,7 +89,7 @@ object Statistics {
 
   def writeInternalRow(converter: UnsafeProjection,
                        internalRow: InternalRow,
-                       writer: IndexOutputWriter): Unit = {
+                       writer: IndexOutputWriter): Int = {
     val keyBuf = new ByteArrayOutputStream()
     val value = convertHelper(converter, internalRow, keyBuf)
 
@@ -70,6 +97,7 @@ object Statistics {
     value.writeToStream(keyBuf, null)
     writer.write(keyBuf.toByteArray)
     keyBuf.close()
+    4 + value.getSizeInBytes
   }
 
   // logic is complex, needs to be refactored :(

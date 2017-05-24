@@ -134,6 +134,8 @@ private[spinach] class BTreeIndexWriter(
     }
 
     def writeTask(): Seq[IndexBuildResult] = {
+      val statisticsManager = new StatisticsManager
+      statisticsManager.initialize(BTreeIndexType, encodedSchema)
       // key -> RowIDs list
       val hashMap = new java.util.HashMap[InternalRow, java.util.ArrayList[Long]]()
       var cnt = 0L
@@ -144,6 +146,7 @@ private[spinach] class BTreeIndexWriter(
           writeNewFile = true
         } else {
           val v = DataFile.encodeKey(dictionaries, keySchema, iterator.next().copy())
+          statisticsManager.addSpinachKey(v)
           if (!hashMap.containsKey(v)) {
             val list = new java.util.ArrayList[Long]()
             list.add(cnt)
@@ -207,23 +210,7 @@ private[spinach] class BTreeIndexWriter(
       val treeOffset = writeTreeToOut(treeShape, writer, offsetMap,
         fileOffset, uniqueKeysList, encodedSchema, 0, -1L)
 
-      val stTypes = configuration.getStrings(SQLConf.SPINACH_STATISTICS_TYPES.key)
-      if (stTypes != null && stTypes.length > 0) {
-        stTypes.foreach(stType => {
-          val t = stType.trim
-          if (t.length > 0) {
-            val st = t match {
-              case MinMaxStatisticsType.name => new MinMaxStatistics
-              case SampleBasedStatisticsType.name => new SampleBasedStatistics(
-                configuration.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.key).toDouble)
-              case PartByValueStatisticsType.name => new PartedByValueStatistics
-              case _ =>
-                throw new UnsupportedOperationException(s"non-supported statistic in id $t")
-            }
-            st.write(encodedSchema, writer, uniqueKeys, hashMap, offsetMap)
-          }
-        })
-      }
+      statisticsManager.write(writer)
 
       assert(uniqueKeysList.size == 1)
       IndexUtils.writeLong(writer, dataEnd + treeOffset._1)

@@ -203,41 +203,9 @@ private[spinach] class SpinachDataReader(
       fin.readFully(stBase, stsArray)
       fin.close()
 
-      var arrayOffset = 0L
-
-      val stsEndOffset = fileLength - stBase - 24
-      var resSum: Double = 0
-      var resNum = 0
-
-      while (arrayOffset < stsEndOffset && resSum != StaticsAnalysisResult.SKIP_INDEX) {
-        val id = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + arrayOffset)
-        val st = id match {
-          case 0 => new MinMaxStatistics
-          case 1 => new SampleBasedStatistics
-          case 2 => new PartedByValueStatistics
-          case _ => throw new UnsupportedOperationException(s"non-supported statistic in id $id")
-        }
-        val res = st.read(filterScanner.get.getEncodedSchema,
-          filterScanner.get.encodedIntervalArray, stsArray, arrayOffset)
-        arrayOffset = st.arrayOffset
-
-        if (res == StaticsAnalysisResult.SKIP_INDEX) {
-          resSum = StaticsAnalysisResult.SKIP_INDEX
-        } else {
-          resSum += res
-          resNum += 1
-        }
-      }
-
-      val fs_rate = conf.get(SQLConf.SPINACH_FULL_SCAN_THRESHOLD.key).toDouble
-
-      if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
-        StaticsAnalysisResult.SKIP_INDEX
-      } else if (resNum == 0 || resSum / resNum <= fs_rate) {
-        StaticsAnalysisResult.USE_INDEX
-      } else {
-        StaticsAnalysisResult.FULL_SCAN
-      }
+      val statisticsManager = new StatisticsManager
+      statisticsManager.read(stsArray, filterScanner.get.getEncodedSchema)
+      statisticsManager.analyse(filterScanner.get.encodedIntervalArray)
     }
   }
 }

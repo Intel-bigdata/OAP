@@ -19,26 +19,89 @@ package org.apache.spark.sql.execution.datasources.spinach.statistics
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.execution.datasources.spinach.Key
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
 class MinMaxStatistics extends Statistics {
   override val id: Int = 0
-  private var keySchema: StructType = _
-  @transient private lazy val converter = UnsafeProjection.create(keySchema)
+  @transient private lazy val converter = UnsafeProjection.create(schema)
+  @transient private lazy val ordering = GenerateOrdering.create(schema)
   var arrayOffset = 0L
 
-  var min: InternalRow = _
-  var max: InternalRow = _
+  protected var min: Key = _
+  protected var max: Key = _
+
+  override def initialize(schema: StructType): Unit = {
+    super.initialize(schema)
+    min = null
+    max = null
+  }
+
+  override def addSpinachKey(key: Key): Unit = {
+    if (min == null || max == null) {
+      min = key
+      max = key
+    } else {
+      if (ordering.compare(key, min) < 0) min = key
+      if (ordering.compare(key, max) > 0) max = key
+    }
+  }
+
+  override def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
+    var offset = super.write(writer, sortedKeys)
+    offset += Statistics.writeInternalRow(converter, min, writer)
+    offset += Statistics.writeInternalRow(converter, max, writer)
+    offset
+  }
+
+  override def read(bytes: Array[Byte], baseOffset: Long): Long = {
+    var offset = super.read(bytes, baseOffset) + baseOffset // offset after super.read
+
+    val minSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
+    min = Statistics.getUnsafeRow(schema.length, bytes, offset, minSize)
+    offset += (4 + minSize)
+
+    val maxSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
+    max = Statistics.getUnsafeRow(schema.length, bytes, offset, maxSize)
+    offset += (4 + maxSize)
+
+    offset - baseOffset
+  }
+
+  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
+    val start = intervalArray.head
+    val end = intervalArray.last
+    var result = false
+
+    val ordering = GenerateOrdering.create(schema)
+
+    if (start.start != IndexScanner.DUMMY_KEY_START) {
+      // > or >= start
+      if (start.startInclude) {
+        result |= ordering.gt(start.start, max)
+      } else {
+        result |= ordering.gteq(start.start, max)
+      }
+    }
+    if (end.end != IndexScanner.DUMMY_KEY_END) {
+      // < or <= end
+      if (end.endInclude) {
+        result |= ordering.lt(end.end, min)
+      } else {
+        result |= ordering.lteq(end.end, min)
+      }
+    }
+
+    if (result) StaticsAnalysisResult.SKIP_INDEX else StaticsAnalysisResult.USE_INDEX
+  }
+
 
   override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
                     stsArray: Array[Byte], offset: Long): Double = {
-    keySchema = schema
-
     val stats = getSimpleStatistics(stsArray, offset)
 
     min = stats.head._2 // UnsafeRow
@@ -48,16 +111,18 @@ class MinMaxStatistics extends Statistics {
     val end = intervalArray.last
     var result = false
 
-    val ordering = GenerateOrdering.create(keySchema)
+    val ordering = GenerateOrdering.create(schema)
 
-    if (start.start != IndexScanner.DUMMY_KEY_START) { // > or >= start
+    if (start.start != IndexScanner.DUMMY_KEY_START) {
+      // > or >= start
       if (start.startInclude) {
         result |= ordering.gt(start.start, max)
       } else {
         result |= ordering.gteq(start.start, max)
       }
     }
-    if (end.end != IndexScanner.DUMMY_KEY_END) { // < or <= end
+    if (end.end != IndexScanner.DUMMY_KEY_END) {
+      // < or <= end
       if (end.endInclude) {
         result |= ordering.lt(end.end, min)
       } else {
@@ -69,10 +134,9 @@ class MinMaxStatistics extends Statistics {
   }
 
   override def write(schema: StructType, writer: IndexOutputWriter,
-                     uniqueKeys: Array[InternalRow],
-                     hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
-                     offsetMap: java.util.HashMap[InternalRow, Long]): Unit = {
-    keySchema = schema
+                     uniqueKeys: Array[Key],
+                     hashMap: java.util.HashMap[Key, java.util.ArrayList[Long]],
+                     offsetMap: java.util.HashMap[Key, Long]): Unit = {
 
     // write statistic id
     IndexUtils.writeInt(writer, id)
@@ -111,7 +175,7 @@ class MinMaxStatistics extends Statistics {
 
   private def extractSts(base: Long, stsArray: Array[Byte]): (Int, UnsafeRow, Long) = {
     val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base)
-    val value = Statistics.getUnsafeRow(keySchema.length, stsArray, base, size).copy()
+    val value = Statistics.getUnsafeRow(schema.length, stsArray, base, size).copy()
     val offset = Platform.getLong(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
     (size + 4, value, offset)
   }
@@ -119,8 +183,8 @@ class MinMaxStatistics extends Statistics {
   // write min and max value at the beginning of index file
   // the statistics is like
   // | value[Bytes] | offset[Long] |
-  private def writeStatistic(row: InternalRow,
-                             offsetMap: java.util.HashMap[InternalRow, Long],
+  private def writeStatistic(row: Key,
+                             offsetMap: java.util.HashMap[Key, Long],
                              writer: IndexOutputWriter) = {
     Statistics.writeInternalRow(converter, row, writer)
     IndexUtils.writeLong(writer, offsetMap.get(row))
