@@ -65,6 +65,8 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
     this
   }
 
+  def setEncodedSchema(schema: StructType): Unit = {encodedKeySchema = schema}
+
   def initialize(dataPath: Path, conf: Configuration): IndexScanner
 
   def encodeIntervalAndSchema(dataPath: Path, conf: Configuration): Unit = {
@@ -74,7 +76,7 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
     }
     if (dataSourceMeta.dataReaderClassName != classOf[SpinachDataFile].getCanonicalName) {
       encodedIntervalArray = intervalArray
-      encodedKeySchema = keySchema
+      setEncodedSchema(keySchema)
       return
     }
     val dataFile = DataFile(dataPath.toString, dataSourceMeta.schema,
@@ -86,7 +88,7 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
 
     encodedIntervalArray = DataFile.encodeInterval(dictionaries, keySchema, intervalArray)
 
-    encodedKeySchema = DataFile.encodeSchema(dictionaries, keySchema)
+    setEncodedSchema(DataFile.encodeSchema(dictionaries, keySchema))
   }
 }
 

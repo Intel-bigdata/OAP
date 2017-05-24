@@ -197,6 +197,7 @@ private[spinach] class SpinachDataReader(
       val startPosArray = new Array[Byte](8)
 
       fin.readFully(fileLength - 24, startPosArray)
+
       val stBase = Platform.getLong(startPosArray, Platform.BYTE_ARRAY_OFFSET).toInt
 
       val stsArray = new Array[Byte](fileLength - stBase)

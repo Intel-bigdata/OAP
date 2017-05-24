@@ -19,16 +19,25 @@ package org.apache.spark.sql.execution.datasources.spinach.statistics
 
 sealed abstract class StatisticsType {
   val name: String
+  val id: Int
 }
 
 case object MinMaxStatisticsType extends StatisticsType {
   val name: String = "MINMAX"
+  val id: Int = 0
 }
 
 case object SampleBasedStatisticsType extends StatisticsType {
   val name: String = "SAMPLE"
+  val id: Int = 1
 }
 
 case object PartByValueStatisticsType extends StatisticsType {
   val name: String = "PARTBYVALUE"
+  val id: Int = 2
+}
+
+case object BloomFilterStatisticsType extends StatisticsType {
+  val name: String = "BLOOM"
+  val id: Int = 3
 }

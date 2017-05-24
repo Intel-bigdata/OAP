@@ -207,15 +207,12 @@ private[sql] class SpinachFileFormat extends FileFormat
     meta match {
       case Some(m) =>
         val bTreeIndexAttrSet = new mutable.HashSet[String]()
-        val bloomIndexAttrSet = new mutable.HashSet[String]()
         val bitmapIndexAttrSet = new mutable.HashSet[String]()
         var idx = 0
         while(idx < m.indexMetas.length) {
           m.indexMetas(idx).indexType match {
             case BTreeIndex(entries) =>
               bTreeIndexAttrSet.add(m.schema(entries(0).ordinal).name)
-            case BloomFilterIndex(entries) =>
-              entries.map(ordinal => m.schema(ordinal).name).foreach(bloomIndexAttrSet.add)
             case BitMapIndex(entries) =>
               entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
             case _ => // we don't support other types of index
@@ -224,7 +221,6 @@ private[sql] class SpinachFileFormat extends FileFormat
         }
         val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
         hashSetList.append(bTreeIndexAttrSet)
-        hashSetList.append(bloomIndexAttrSet)
         hashSetList.append(bitmapIndexAttrSet)
         expressions.exists(m.isSupportedByIndex(_, hashSetList))
       case None => false

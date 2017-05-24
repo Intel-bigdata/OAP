@@ -85,26 +85,6 @@ private[spinach] class IndexContext(meta: DataSourceMeta) extends Logging {
           if (num>0) {
             availableIndexes.append( (num-1, meta.indexMetas(idx)) )
           }
-        case BloomFilterIndex(entries) =>
-          // traverse all attributes that are in the bloomIndex,
-          // return indexMeta and the first one's index which matches
-          // TODO support multiple key in the index
-          var flag = true
-          var attrName: String = null
-          for (entry <- entries if flag) {
-            attrName = meta.schema(entry).name
-            if (intervalMap.contains(attrName) &&
-              intervalMap(attrName).length == 1) {
-              val ordering = unapply(attrName).get.order
-              val start = intervalMap(attrName).head.start
-              val end = intervalMap(attrName).head.end
-              if(start != IndexScanner.DUMMY_KEY_START &&
-                end != IndexScanner.DUMMY_KEY_END && ordering.compare(start, end) == 0) {
-                availableIndexes.append((entries.indexOf(entry), meta.indexMetas(idx)))
-                flag = false
-              }
-            }
-          }
         case BitMapIndex(entries) =>
           for (entry <- entries) {
             if (intervalMap.contains(meta.schema(entry).name)) {
@@ -202,13 +182,6 @@ private[spinach] class IndexContext(meta: DataSourceMeta) extends Logging {
           )
 
         } // end for
-      case BloomFilterIndex(entries) =>
-        keySchema = new StructType().add(meta.schema(entries(lastIdx)))
-        scanner = BloomFilterScanner(bestIndexer)
-        val attribute = meta.schema(entries(lastIdx)).name
-        val filterOptimizer = unapply(attribute).get
-        scanner.intervalArray =
-          intervalMap(attribute).sortWith(filterOptimizer.compareRangeInterval)
       case BitMapIndex(entries) =>
         keySchema = new StructType().add(meta.schema(entries(lastIdx)))
         scanner = BitMapScanner(bestIndexer)

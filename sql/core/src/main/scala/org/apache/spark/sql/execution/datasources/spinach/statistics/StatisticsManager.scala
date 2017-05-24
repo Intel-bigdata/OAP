@@ -114,9 +114,10 @@ class StatisticsManager {
 
       for (i <- 0 until numOfStats) {
         Platform.getInt(bytes, offset) match {
-          case 0 => stats(i) = new MinMaxStatistics
-          case 1 => stats(i) = new SampleBasedStatistics
-          case 2 => stats(i) = new PartedByValueStatistics
+          case MinMaxStatisticsType.id => stats(i) = new MinMaxStatistics
+          case SampleBasedStatisticsType.id => stats(i) = new SampleBasedStatistics
+          case PartByValueStatisticsType.id => stats(i) = new PartedByValueStatistics
+          case BloomFilterStatisticsType.id => stats(i) = new BloomFilterStatistics
           case _ => throw new UnsupportedOperationException("unsupport statistics id")
         }
         offset += 4

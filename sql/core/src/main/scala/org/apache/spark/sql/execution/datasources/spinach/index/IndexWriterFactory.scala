@@ -33,8 +33,6 @@ private[index] object IndexWriterFactory {
     indexType match {
       case BTreeIndexType =>
         new BTreeIndexWriter(relation, job, indexColumns, keySchema, indexName, isAppend)
-      case BloomFilterIndexType =>
-        new BloomFilterIndexWriter(relation, job, indexColumns, keySchema, indexName, isAppend)
       case BitMapIndexType =>
         new BitMapIndexWriter(relation, job, indexColumns, keySchema, indexName, isAppend)
     }

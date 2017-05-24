@@ -143,7 +143,6 @@ indexCol
 
 indexType
     : BTREE
-    | BLOOM
     | BITMAP
     ;
 

@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
 class MinMaxStatistics extends Statistics {
-  override val id: Int = 0
+  override val id: Int = MinMaxStatisticsType.id
   @transient private lazy val converter = UnsafeProjection.create(schema)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
   var arrayOffset = 0L
