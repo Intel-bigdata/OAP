@@ -30,6 +30,9 @@ import org.apache.spark.unsafe.Platform
 class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
   override val id: Int = 1
 
+  protected def takeSample(keys: Array[InternalRow], size: Int): Array[InternalRow] =
+    Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
+
   // for SampleBasedStatistics, input keys should be the whole file
   // instead of uniqueKeys, can be refactor later
   def write(schema: StructType, writer: IndexOutputWriter, uniqueKeys: Array[InternalRow],
@@ -51,9 +54,8 @@ class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
     IndexUtils.writeInt(writer, id)
     IndexUtils.writeInt(writer, sample_size)
 
-    val sample_array_index = Random.shuffle(uniqueKeys.indices.toList).take(sample_size)
-    sample_array_index.foreach(idx =>
-      Statistics.writeInternalRow(converter, uniqueKeys(idx), writer))
+    val sampleArray = takeSample(uniqueKeys, sample_size)
+    sampleArray.foreach(row => Statistics.writeInternalRow(converter, row, writer))
   }
 
   override var arrayOffset: Long = _
@@ -73,7 +75,7 @@ class SampleBasedStatistics(sampleRate: Double = 0.1) extends Statistics {
     for (_ <- 0 until size_from_file) {
       // read UnsafeRow, calculate hit_count without storing a single row
       val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset)
-      val row = Statistics.getUnsafeRow(schema.length, stsArray, offset + 4, size)
+      val row = Statistics.getUnsafeRow(schema.length, stsArray, offset, size)
       offset = offset + 4 + size
 
       if (Statistics.rowInIntervalArray(row, intervalArray, ordering)) hit_count += 1

@@ -32,14 +32,17 @@ class MinMaxStatistics extends Statistics {
   @transient private lazy val converter = UnsafeProjection.create(keySchema)
   var arrayOffset = 0L
 
+  var min: InternalRow = _
+  var max: InternalRow = _
+
   override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
                     stsArray: Array[Byte], offset: Long): Double = {
     keySchema = schema
 
     val stats = getSimpleStatistics(stsArray, offset)
 
-    val min = stats.head._2
-    val max = stats.last._2
+    min = stats.head._2 // UnsafeRow
+    max = stats.last._2 // UnsafeRow
 
     val start = intervalArray.head
     val end = intervalArray.last
@@ -62,7 +65,7 @@ class MinMaxStatistics extends Statistics {
       }
     }
 
-    if (result) -1 else 0
+    if (result) StaticsAnalysisResult.SKIP_INDEX else StaticsAnalysisResult.USE_INDEX
   }
 
   override def write(schema: StructType, writer: IndexOutputWriter,
@@ -77,11 +80,14 @@ class MinMaxStatistics extends Statistics {
     // write stats size
     IndexUtils.writeInt(writer, 2)
 
+    min = uniqueKeys.head
+    max = uniqueKeys.last
+
     // write minval
-    writeStatistic(uniqueKeys.head, offsetMap, writer)
+    writeStatistic(min, offsetMap, writer)
 
     // write maxval
-    writeStatistic(uniqueKeys.last, offsetMap, writer)
+    writeStatistic(max, offsetMap, writer)
   }
 
   private def getSimpleStatistics(stsArray: Array[Byte],
