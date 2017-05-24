@@ -73,11 +73,11 @@ private[spinach] trait AbstractFiberSensor extends Logging {
   }
 
   /**
-    * get hosts that has fiber cached for fiber file.
-    * Current implementation only returns one host, but still using API name with [[getHosts]]
-    * @param filePath fiber file's path
-    * @return
-    */
+   * get hosts that has fiber cached for fiber file.
+   * Current implementation only returns one host, but still using API name with [[getHosts]]
+   * @param filePath fiber file's path
+   * @return
+   */
   def getHosts(filePath: String): Option[String] = {
     fileToHost.get(filePath) match {
       case HostFiberCache(host, status) => Some(host)
