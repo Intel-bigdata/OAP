@@ -104,7 +104,7 @@ class StatisticsManager {
   def read(bytes: Array[Byte], s: StructType): Unit = {
     var offset = 0L
     val mask = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    offset += 4
+    offset += 8
     if (mask != StatisticsManager.STATISTICSMASK) {
       invaildStatistics = true
     } else {
@@ -113,7 +113,7 @@ class StatisticsManager {
       stats = new Array[Statistics](numOfStats)
 
       for (i <- 0 until numOfStats) {
-        Platform.getInt(bytes, offset) match {
+        Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset) match {
           case MinMaxStatisticsType.id => stats(i) = new MinMaxStatistics
           case SampleBasedStatisticsType.id => stats(i) = new SampleBasedStatistics
           case PartByValueStatisticsType.id => stats(i) = new PartedByValueStatistics
@@ -161,8 +161,9 @@ object StatisticsManager {
   val STATISTICSMASK: Long = 0x20170524abcdefabL // a random mask for statistics begin
 
   val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[StatisticsType]] =
-    scala.collection.mutable.Map(BTreeIndexType -> Array(MinMaxStatisticsType),
-      BitMapIndexType -> Array(MinMaxStatisticsType))
+    scala.collection.mutable.Map(BTreeIndexType -> Array(MinMaxStatisticsType,
+      SampleBasedStatisticsType),
+      BitMapIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType))
 
   var sampleRate: Double = 0.1
   var partNumber: Int = 5

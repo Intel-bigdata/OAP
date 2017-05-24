@@ -62,11 +62,11 @@ class MinMaxStatistics extends Statistics {
     var offset = super.read(bytes, baseOffset) + baseOffset // offset after super.read
 
     val minSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    min = Statistics.getUnsafeRow(schema.length, bytes, offset, minSize)
+    min = Statistics.getUnsafeRow(schema.length, bytes, offset, minSize).copy()
     offset += (4 + minSize)
 
     val maxSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    max = Statistics.getUnsafeRow(schema.length, bytes, offset, maxSize)
+    max = Statistics.getUnsafeRow(schema.length, bytes, offset, maxSize).copy()
     offset += (4 + maxSize)
 
     offset - baseOffset
@@ -76,8 +76,6 @@ class MinMaxStatistics extends Statistics {
     val start = intervalArray.head
     val end = intervalArray.last
     var result = false
-
-    val ordering = GenerateOrdering.create(schema)
 
     if (start.start != IndexScanner.DUMMY_KEY_START) {
       // > or >= start
