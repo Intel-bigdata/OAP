@@ -101,7 +101,7 @@ object Statistics {
   }
 
   // logic is complex, needs to be refactored :(
-  def rowInSingleInterval(row: UnsafeRow, interval: RangeInterval,
+  def rowInSingleInterval(row: InternalRow, interval: RangeInterval,
                           order: BaseOrdering): Boolean = {
     if (interval.start == IndexScanner.DUMMY_KEY_START) {
       if (interval.end == IndexScanner.DUMMY_KEY_END) true
@@ -124,7 +124,7 @@ object Statistics {
       else true
     }
   }
-  def rowInIntervalArray(row: UnsafeRow, intervalArray: ArrayBuffer[RangeInterval],
+  def rowInIntervalArray(row: InternalRow, intervalArray: ArrayBuffer[RangeInterval],
                          order: BaseOrdering): Boolean = {
     if (intervalArray == null || intervalArray.isEmpty) false
     else intervalArray.exists(interval => rowInSingleInterval(row, interval, order))

@@ -22,6 +22,7 @@ import scala.util.Random
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.execution.datasources.spinach.Key
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
@@ -30,7 +31,53 @@ import org.apache.spark.unsafe.Platform
 class SampleBasedStatistics extends Statistics {
   override val id: Int = SampleBasedStatisticsType.id
 
-  var sampleRate: Double = 0.1
+  lazy val sampleRate: Double = StatisticsManager.sampleRate
+  @transient private lazy val converter = UnsafeProjection.create(schema)
+  @transient private lazy val ordering = GenerateOrdering.create(schema)
+
+  var sampleArray: Array[Key] = _
+
+  override def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
+    var offset = super.write(writer, sortedKeys)
+    val size = (sortedKeys.size * sampleRate).toInt
+    sampleArray = takeSample(sortedKeys.toArray, size)
+
+    IndexUtils.writeInt(writer, size)
+    offset += 4
+    sampleArray.foreach(key => {
+      offset += Statistics.writeInternalRow(converter, key, writer)
+    })
+    offset
+  }
+
+  override def read(bytes: Array[Byte], baseOffset: Long): Long = {
+    var offset = super.read(bytes, baseOffset) + baseOffset
+
+    val size = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
+    offset += 4
+
+    sampleArray = new Array[Key](size)
+
+    for (i <- 0 until size) {
+      val rowSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
+      sampleArray(i) = Statistics.getUnsafeRow(schema.length, bytes, offset, rowSize).copy()
+      offset += (4 + rowSize)
+    }
+    offset - baseOffset
+  }
+
+  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
+    if (sampleArray == null || sampleArray.length <= 0) {
+      StaticsAnalysisResult.USE_INDEX
+    } else {
+      var hitCnt = 0
+      for (row <- sampleArray) {
+        if (Statistics.rowInIntervalArray(row, intervalArray, ordering)) hitCnt += 1
+      }
+      hitCnt * 1.0 / sampleArray.length
+    }
+  }
+
 
   protected def takeSample(keys: Array[InternalRow], size: Int): Array[InternalRow] =
     Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
