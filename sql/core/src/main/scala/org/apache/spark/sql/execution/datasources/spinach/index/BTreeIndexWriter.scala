@@ -46,15 +46,7 @@ private[spinach] class BTreeIndexWriter(
     keySchema: StructType,
     indexName: String,
     isAppend: Boolean) extends IndexWriter(relation, job, isAppend) {
-  // TODO we can improve this
-  @transient val driverConf = relation.sparkSession.conf
   private var encodedSchema: StructType = _
-
-  job.getConfiguration.setStrings(
-    SQLConf.SPINACH_STATISTICS_TYPES.key, driverConf.get(SQLConf.SPINACH_STATISTICS_TYPES))
-  job.getConfiguration.setDouble(
-    SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.key,
-    driverConf.get(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE))
 
   override def writeIndexFromRows(
       taskContext: TaskContext, iterator: Iterator[InternalRow]): Seq[IndexBuildResult] = {

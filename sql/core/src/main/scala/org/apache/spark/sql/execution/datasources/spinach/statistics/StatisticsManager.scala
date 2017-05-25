@@ -60,6 +60,7 @@ class StatisticsManager {
       case MinMaxStatisticsType => new MinMaxStatistics
       case SampleBasedStatisticsType => new SampleBasedStatistics
       case PartByValueStatisticsType => new PartedByValueStatistics
+      case BloomFilterStatisticsType => new BloomFilterStatistics
       case _ => throw new UnsupportedOperationException(s"non-supported statistic type $t")
     })
     schema = s
@@ -161,18 +162,23 @@ object StatisticsManager {
   val STATISTICSMASK: Long = 0x20170524abcdefabL // a random mask for statistics begin
 
   val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[StatisticsType]] =
-    scala.collection.mutable.Map(BTreeIndexType -> Array(MinMaxStatisticsType,
-      SampleBasedStatisticsType),
-      BitMapIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType))
+    scala.collection.mutable.Map(
+      BTreeIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
+        BloomFilterStatisticsType, PartByValueStatisticsType),
+      BitMapIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
+        BloomFilterStatisticsType, PartByValueStatisticsType))
 
   var sampleRate: Double = 0.1
   var partNumber: Int = 5
+  var bloomFilterMaxBits: Int = 1 << 20
+  var bloomFilterHashFuncs: Int = 3
 
   var FULLSCANTHRESHOLD: Double = 0.8
 
+  // TODO we need to find better ways to configure these parameters
   def setStatisticsType(indexType: AnyIndexType, statisticsType: Array[StatisticsType]): Unit =
     statisticsTypeMap.update(indexType, statisticsType)
-  def setSamplerate(rate: Double): Unit = this.sampleRate = rate
+  def setSampleRate(rate: Double): Unit = this.sampleRate = rate
   def setPartNumber(num: Int): Unit = this.partNumber = num
   def setFullScanThreshold(rate: Double): Unit = this.FULLSCANTHRESHOLD = rate
 }

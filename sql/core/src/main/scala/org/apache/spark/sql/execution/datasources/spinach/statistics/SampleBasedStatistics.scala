@@ -40,7 +40,7 @@ class SampleBasedStatistics extends Statistics {
   override def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
     var offset = super.write(writer, sortedKeys)
     val size = (sortedKeys.size * sampleRate).toInt
-    sampleArray = takeSample(sortedKeys.toArray, size)
+    sampleArray = takeSample(sortedKeys, size)
 
     IndexUtils.writeInt(writer, size)
     offset += 4
@@ -56,6 +56,7 @@ class SampleBasedStatistics extends Statistics {
     val size = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
     offset += 4
 
+    // TODO is it ok to store all sample array in memory?
     sampleArray = new Array[Key](size)
 
     for (i <- 0 until size) {
@@ -78,6 +79,8 @@ class SampleBasedStatistics extends Statistics {
     }
   }
 
+  protected def takeSample(keys: ArrayBuffer[InternalRow], size: Int): Array[InternalRow] =
+    Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
 
   protected def takeSample(keys: Array[InternalRow], size: Int): Array[InternalRow] =
     Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
