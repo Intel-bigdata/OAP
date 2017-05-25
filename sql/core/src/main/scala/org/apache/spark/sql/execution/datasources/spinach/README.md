@@ -1,7 +1,11 @@
 # Spinach
 Spinach is an Optimized Analytics Package (OAP) for Spark Platform and is designed to accelerate Ad-hoc query.  Spinach defines a new parquet-like columnar storage data format and offering a fine-grained hierarchical cache mechanism in the unit of “Fiber” in memory. What’s more, Spinach has extended the Spark SQL DDL to allow user to define the customized indices based on relation.
 ## Building
+```
+mvn -DskipTests package
+```
 ## Use Spinach with Spark
+After `mvn package` you will find `spinach-<version>.jar` in `target/`. Update `spark.driver.extraClassPath` and `spark.executor.extraClassPath` to include this jar file, and you can use Spinach from `bin/spark-sql`, `bin/spark-shell` or `sbin/start-thriftserver` as you usually do.
 ## Example
 ```
 ./bin/spark-shell
@@ -16,6 +20,9 @@ Spinach is an Optimized Analytics Package (OAP) for Spark Platform and is design
 > spark.sql("drop sindex index on spinach_test")
 ```
 ## Running Test
+```
+mvn test
+```
 ## Features
 * Index - BTREE, BITMAP
 * Statistics - MinMax, Bloom Filter
