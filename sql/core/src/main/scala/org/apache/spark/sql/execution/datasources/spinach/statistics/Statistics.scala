@@ -32,7 +32,6 @@ import org.apache.spark.unsafe.Platform
 
 abstract class Statistics{
   val id: Int
-  var arrayOffset: Long
   protected var schema: StructType = _
 
   def initialize(schema: StructType): Unit = {
@@ -58,15 +57,6 @@ abstract class Statistics{
 
   def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double =
     StaticsAnalysisResult.USE_INDEX
-
-  // TODO write function parameters need to be optimized
-  def write(schema: StructType, writer: IndexOutputWriter, uniqueKeys: Array[InternalRow],
-            hashMap: java.util.HashMap[InternalRow, java.util.ArrayList[Long]],
-            offsetMap: java.util.HashMap[InternalRow, Long]): Unit
-
-  // TODO parameter needs to be optimized
-  def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
-           stsArray: Array[Byte], offset: Long): Double
 }
 
 

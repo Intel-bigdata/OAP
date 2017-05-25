@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.spinach.statistics
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.Key
 import org.apache.spark.sql.execution.datasources.spinach.index._
@@ -95,96 +95,5 @@ class MinMaxStatistics extends Statistics {
     }
 
     if (result) StaticsAnalysisResult.SKIP_INDEX else StaticsAnalysisResult.USE_INDEX
-  }
-
-
-  override def read(schema: StructType, intervalArray: ArrayBuffer[RangeInterval],
-                    stsArray: Array[Byte], offset: Long): Double = {
-    val stats = getSimpleStatistics(stsArray, offset)
-
-    min = stats.head._2 // UnsafeRow
-    max = stats.last._2 // UnsafeRow
-
-    val start = intervalArray.head
-    val end = intervalArray.last
-    var result = false
-
-    val ordering = GenerateOrdering.create(schema)
-
-    if (start.start != IndexScanner.DUMMY_KEY_START) {
-      // > or >= start
-      if (start.startInclude) {
-        result |= ordering.gt(start.start, max)
-      } else {
-        result |= ordering.gteq(start.start, max)
-      }
-    }
-    if (end.end != IndexScanner.DUMMY_KEY_END) {
-      // < or <= end
-      if (end.endInclude) {
-        result |= ordering.lt(end.end, min)
-      } else {
-        result |= ordering.lteq(end.end, min)
-      }
-    }
-
-    if (result) StaticsAnalysisResult.SKIP_INDEX else StaticsAnalysisResult.USE_INDEX
-  }
-
-  override def write(schema: StructType, writer: IndexOutputWriter,
-                     uniqueKeys: Array[Key],
-                     hashMap: java.util.HashMap[Key, java.util.ArrayList[Long]],
-                     offsetMap: java.util.HashMap[Key, Long]): Unit = {
-
-    // write statistic id
-    IndexUtils.writeInt(writer, id)
-
-    // write stats size
-    IndexUtils.writeInt(writer, 2)
-
-    min = uniqueKeys.head
-    max = uniqueKeys.last
-
-    // write minval
-    writeStatistic(min, offsetMap, writer)
-
-    // write maxval
-    writeStatistic(max, offsetMap, writer)
-  }
-
-  private def getSimpleStatistics(stsArray: Array[Byte],
-                                  offset: Long): ArrayBuffer[(Int, UnsafeRow, Long)] = {
-    val sts = ArrayBuffer[(Int, UnsafeRow, Long)]()
-    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + offset + 4)
-    var i = 0
-    var base = offset + 8
-
-    while (i < size) {
-      val now = extractSts(base, stsArray)
-      sts += now
-      i += 1
-      base += now._1 + 8
-    }
-
-    arrayOffset = base
-
-    sts
-  }
-
-  private def extractSts(base: Long, stsArray: Array[Byte]): (Int, UnsafeRow, Long) = {
-    val size = Platform.getInt(stsArray, Platform.BYTE_ARRAY_OFFSET + base)
-    val value = Statistics.getUnsafeRow(schema.length, stsArray, base, size).copy()
-    val offset = Platform.getLong(stsArray, Platform.BYTE_ARRAY_OFFSET + base + 4 + size)
-    (size + 4, value, offset)
-  }
-
-  // write min and max value at the beginning of index file
-  // the statistics is like
-  // | value[Bytes] | offset[Long] |
-  private def writeStatistic(row: Key,
-                             offsetMap: java.util.HashMap[Key, Long],
-                             writer: IndexOutputWriter) = {
-    Statistics.writeInternalRow(converter, row, writer)
-    IndexUtils.writeLong(writer, offsetMap.get(row))
   }
 }

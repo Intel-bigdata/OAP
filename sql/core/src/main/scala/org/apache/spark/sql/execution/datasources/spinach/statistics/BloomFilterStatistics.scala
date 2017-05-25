@@ -28,7 +28,6 @@ import org.apache.spark.unsafe.Platform
 
 class BloomFilterStatistics extends Statistics {
   override val id: Int = BloomFilterStatisticsType.id
-  override var arrayOffset: Long = _
 
   private var bfIndex: BloomFilter = _
 
@@ -69,9 +68,6 @@ class BloomFilterStatistics extends Statistics {
     // long 2               8 Bytes, Long, the second element in bit array
     // ...
     // long $numOfLong      8 Bytes, Long, the $numOfLong -th element in bit array
-    //
-    // dataEndOffset        8 Bytes, Long, data end offset
-    // rootOffset           8 Bytes, Long, root Offset
     val bfBitArray = bfIndex.getBitMapLongArray
     IndexUtils.writeInt(writer, bfBitArray.length) // bfBitArray length
     IndexUtils.writeInt(writer, bfIndex.getNumOfHashFunc) // numOfHashFunc
@@ -127,88 +123,5 @@ class BloomFilterStatistics extends Statistics {
 
   def initialize(maxBits: Int, numOfHashFunc: Int): Unit = {
     bfIndex = new BloomFilter(maxBits, numOfHashFunc)()
-  }
-
-  private def buildBloomFilter(uniqueKeys: Array[Key]): Int = {
-    var elemCnt = 0
-    // element count
-    val boundReference = schema.zipWithIndex.map(x =>
-      BoundReference(x._2, x._1.dataType, nullable = true))
-    // for multi-column index, add all subsets into bloom filter
-    // For example, a column with a = 1, b = 2, a and b are index columns
-    // then three records: a = 1, b = 2, a = 1 b = 2, are inserted to bf
-    val projector = boundReference.toSet.subsets().filter(_.nonEmpty).map(s =>
-      UnsafeProjection.create(s.toArray)).toArray
-    for (row <- uniqueKeys) {
-      elemCnt += 1
-      projector.foreach(p => bfIndex.addValue(p(row).getBytes))
-    }
-    elemCnt
-  }
-
-  // TODO write function parameters need to be optimized
-  def write(s: StructType, writer: IndexOutputWriter, uniqueKeys: Array[Key],
-            hashMap: java.util.HashMap[Key, java.util.ArrayList[Long]],
-            offsetMap: java.util.HashMap[Key, Long]): Unit = {
-    arrayOffset = 0
-    schema = s
-    IndexUtils.writeInt(writer, id)
-    arrayOffset += 4
-    val elemCnt = buildBloomFilter(uniqueKeys)
-
-    // Bloom filter index file format:
-    // numOfLong            4 Bytes, Int, record the total number of Longs in bit array
-    // numOfHashFunction    4 Bytes, Int, record the total number of Hash Functions
-    // elementCount         4 Bytes, Int, number of elements stored in the
-    //                      related DataFile
-    //
-    // long 1               8 Bytes, Long, the first element in bit array
-    // long 2               8 Bytes, Long, the second element in bit array
-    // ...
-    // long $numOfLong      8 Bytes, Long, the $numOfLong -th element in bit array
-    //
-    // dataEndOffset        8 Bytes, Long, data end offset
-    // rootOffset           8 Bytes, Long, root Offset
-    val bfBitArray = bfIndex.getBitMapLongArray
-    var offset = 0L
-    IndexUtils.writeInt(writer, bfBitArray.length) // bfBitArray length
-    IndexUtils.writeInt(writer, bfIndex.getNumOfHashFunc) // numOfHashFunc
-    IndexUtils.writeInt(writer, elemCnt)
-    offset += 12
-    bfBitArray.foreach(l => {
-      IndexUtils.writeLong(writer, l)
-      offset += 8
-    })
-    arrayOffset += offset
-  }
-
-  // TODO parameter needs to be optimized
-  def read(s: StructType, intervalArray: ArrayBuffer[RangeInterval],
-           bytes: Array[Byte], baseOffset: Long): Double = {
-    val idFromFile = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + baseOffset)
-    assert(idFromFile == this.id)
-    schema = s
-    arrayOffset = baseOffset + 4
-    arrayOffset += readBloomFilter(bytes, baseOffset + 4)
-
-    val projector = UnsafeProjection.create(schema)
-
-    val order = GenerateOrdering.create(schema)
-
-    // extract equal condition from intervalArray
-    val equalValues: Array[Key] =
-      if (intervalArray.nonEmpty) {
-        // should not use ordering.compare here
-        intervalArray.filter(interval => order.compare(interval.start, interval.end) == 0
-          && interval.startInclude && interval.endInclude).map(_.start).toArray
-      } else null
-    val skipFlag = if (equalValues != null && equalValues.length > 0) {
-      !equalValues.map(value => bfIndex
-        .checkExist(projector(value).getBytes))
-        .reduceOption(_ || _).getOrElse(false)
-    } else false
-
-    if (skipFlag) StaticsAnalysisResult.SKIP_INDEX
-    else StaticsAnalysisResult.FULL_SCAN
   }
 }
