@@ -43,6 +43,8 @@ private[spinach] class BitMapIndexWriter(
     keySchema: StructType,
     indexName: String,
     isAppend: Boolean) extends IndexWriter(relation, job, isAppend) {
+  private var encodedSchema: StructType = _
+
   override def writeIndexFromRows(
       taskContext: TaskContext, iterator: Iterator[InternalRow]): Seq[IndexBuildResult] = {
     var taskReturn: Seq[IndexBuildResult] = Nil
@@ -76,6 +78,7 @@ private[spinach] class BitMapIndexWriter(
     val dictionaries = keySchema.map(field => dataFileSchema.indexOf(field))
       .map(ordinal => dataFile.getDictionary(ordinal, configuration))
       .toArray
+    encodedSchema = DataFile.encodeSchema(dictionaries, keySchema)
     def commitTask(): Seq[WriteResult] = {
       try {
         var writeResults: Seq[WriteResult] = Nil
@@ -105,7 +108,7 @@ private[spinach] class BitMapIndexWriter(
 
     def writeTask(): Seq[IndexBuildResult] = {
       val statisticsManager = new StatisticsManager
-      statisticsManager.initialize(BitMapIndexType, dataSchema)
+      statisticsManager.initialize(BitMapIndexType, encodedSchema)
       // Current impl just for fast proving the effect of BitMap Index,
       // we can do the optimize below:
       // 1. each bitset in hashmap value has same length, we can save the
