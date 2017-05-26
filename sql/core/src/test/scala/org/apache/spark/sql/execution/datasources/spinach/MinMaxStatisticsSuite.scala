@@ -16,6 +16,8 @@
  */
 package org.apache.spark.sql.execution.datasources.spinach
 
+import scala.util.Random
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, IndexUtils}
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
@@ -29,7 +31,7 @@ class MinMaxStatisticsSuite extends StatisticsTest {
   }
 
   test("write function test") {
-    val keys = (1 to 300).map(i => rowGen(i)).toArray
+    val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
     val testMinMax = new TestMinMax
     testMinMax.initialize(schema)
@@ -50,21 +52,21 @@ class MinMaxStatisticsSuite extends StatisticsTest {
     offset += 4
     val minSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
     val minFromFile = Statistics.getUnsafeRow(schema.length, bytes, offset, minSize)
-    checkInternalRow(minFromFile, converter(keys.head))
+    checkInternalRow(minFromFile, converter(rowGen(1)))
     offset += (4 + minSize)
 
     val maxSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
     val maxFromFile = Statistics.getUnsafeRow(schema.length, bytes, offset, maxSize)
-    checkInternalRow(maxFromFile, converter(keys.last))
+    checkInternalRow(maxFromFile, converter(rowGen(300)))
     offset += (4 + minSize)
   }
 
   test("read function test") {
-    val keys = (1 to 300).map(i => rowGen(i)).toArray
+    val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
     IndexUtils.writeInt(out, MinMaxStatisticsType.id)
-    Statistics.writeInternalRow(converter, keys.head, out)
-    Statistics.writeInternalRow(converter, keys.last, out)
+    Statistics.writeInternalRow(converter, rowGen(1), out)
+    Statistics.writeInternalRow(converter, rowGen(300), out)
 
     val bytes = out.buf.toByteArray
 
@@ -80,12 +82,12 @@ class MinMaxStatisticsSuite extends StatisticsTest {
       assert(ordering.compare(key, max) <= 0)
     }
 
-    assert(ordering.compare(keys.head, min) == 0)
-    assert(ordering.compare(keys.last, max) == 0)
+    assert(ordering.compare(rowGen(1), min) == 0)
+    assert(ordering.compare(rowGen(300), max) == 0)
   }
 
   test("read and write") {
-    val keys = (1 to 300).map(i => rowGen(i)).toArray
+    val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
     val minmaxWrite = new TestMinMax
     minmaxWrite.initialize(schema)
@@ -105,12 +107,12 @@ class MinMaxStatisticsSuite extends StatisticsTest {
       assert(ordering.compare(key, max) <= 0)
     }
 
-    assert(ordering.compare(keys.head, min) == 0)
-    assert(ordering.compare(keys.last, max) == 0)
+    assert(ordering.compare(rowGen(1), min) == 0)
+    assert(ordering.compare(rowGen(300), max) == 0)
   }
 
   test("analyse function test") {
-    val keys = (1 to 300).map(i => rowGen(i)).toArray
+    val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
     val minmaxWrite = new TestMinMax
     minmaxWrite.initialize(schema)
