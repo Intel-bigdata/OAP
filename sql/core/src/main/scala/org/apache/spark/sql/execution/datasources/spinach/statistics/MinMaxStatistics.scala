@@ -30,7 +30,6 @@ class MinMaxStatistics extends Statistics {
   override val id: Int = MinMaxStatisticsType.id
   @transient private lazy val converter = UnsafeProjection.create(schema)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
-  var arrayOffset = 0L
 
   protected var min: Key = _
   protected var max: Key = _

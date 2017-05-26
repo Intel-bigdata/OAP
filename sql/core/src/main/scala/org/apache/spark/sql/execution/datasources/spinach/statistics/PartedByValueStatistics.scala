@@ -139,7 +139,6 @@ class PartedByValueStatistics extends Statistics {
     } else {
       var cover: Double =
         if (right <= partNum) metas(right).accumulatorCnt else metas.last.accumulatorCnt
-
       if (start.start != IndexScanner.DUMMY_KEY_START && left > 0 &&
         ordering.lteq(start.start, metas(left).row)) {
         cover -= metas(left - 1).accumulatorCnt

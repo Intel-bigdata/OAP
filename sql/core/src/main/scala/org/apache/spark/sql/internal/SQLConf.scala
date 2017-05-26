@@ -580,7 +580,7 @@ object SQLConf {
         "If you want to add more than one type, just use comma " +
         "to separate, eg. \"MINMAX, SAMPLE, PARTBYVALUE\"")
       .stringConf
-      .createWithDefault("MINMAX") // TODO add SAMPLE, PARTBYVALUE
+      .createWithDefault("MINMAX, SAMPLE, PARTBYVALUE")
 
   val SPINACH_STATISTICS_SAMPLE_RATE =
     SQLConfigBuilder("spark.sql.spinach.Statistics.sampleRate")
