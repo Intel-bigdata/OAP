@@ -35,6 +35,7 @@ class SampleBasedStatistics extends Statistics {
   @transient private lazy val converter = UnsafeProjection.create(schema)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
+
   protected var sampleArray: Array[Key] = _
 
   // SampleBasedStatistics file structure

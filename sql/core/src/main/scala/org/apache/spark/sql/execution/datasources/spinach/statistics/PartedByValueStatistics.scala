@@ -133,6 +133,7 @@ class PartedByValueStatistics extends Statistics {
     val left = getIntervalIdx(start.start, start.startInclude)
     val right = getIntervalIdx(end.end, end.endInclude)
 
+
     if (left == partNum + 1 || right == 0) {
       // interval.min > partition.max || interval.max < partition.min
       StaticsAnalysisResult.SKIP_INDEX

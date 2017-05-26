@@ -20,6 +20,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
 import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, IndexUtils}
+
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.unsafe.Platform
 
@@ -50,6 +51,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
       val row = Statistics.getUnsafeRow(schema.length, bytes, offset, rowSize).copy()
       assert(ordering.compare(row, keys(i)) == 0)
       offset += 4 + rowSize
+
     }
   }
 
