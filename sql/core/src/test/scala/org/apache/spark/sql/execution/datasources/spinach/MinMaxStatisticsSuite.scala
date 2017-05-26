@@ -17,121 +17,161 @@
 package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.spinach.index.IndexUtils
+import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, IndexUtils}
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.unsafe.Platform
 
 class MinMaxStatisticsSuite extends StatisticsTest {
+
+  private class TestMinMax extends MinMaxStatistics {
+    def getMin: InternalRow = min
+    def getMax: InternalRow = max
+  }
+
   test("write function test") {
     val keys = (1 to 300).map(i => rowGen(i)).toArray
 
-    val hashMap = new java.util.HashMap[InternalRow, Long]()
+    val testMinMax = new TestMinMax
+    testMinMax.initialize(schema)
+    for (key <- keys) testMinMax.addSpinachKey(key)
+    testMinMax.write(out, null) // MinMax does not need sortKeys parameter
 
-    keys.indices.foreach(i => {
-      hashMap.put(keys(i), i * 8L)
-    })
-
-    val minMax = new MinMaxStatistics
-    minMax.write(schema, out, keys, null, hashMap)
-
-    checkInternalRow(minMax.min, keys.head)
-    checkInternalRow(minMax.max, keys.last)
+    val min = testMinMax.getMin
+    val max = testMinMax.getMax
+    for (key <- keys) {
+      assert(ordering.compare(key, min) >= 0)
+      assert(ordering.compare(key, max) <= 0)
+    }
 
     val bytes = out.buf.toByteArray
-
     var offset = 0L
-    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET) == 0) // MinMaxStatisticsType.id
-    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + 4) == 2) // stat size
-    offset += 8
 
-    // read minRow
+    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET) == MinMaxStatisticsType.id)
+    offset += 4
     val minSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    val minKey = Statistics.getUnsafeRow(schema.length, bytes, offset, minSize)
-    val minOffset = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + offset + 4 + minSize)
-    checkInternalRow(minKey, converter(keys.head))
-    assert(minOffset == hashMap.get(keys.head))
+    val minFromFile = Statistics.getUnsafeRow(schema.length, bytes, offset, minSize)
+    checkInternalRow(minFromFile, converter(keys.head))
+    offset += (4 + minSize)
 
-    offset += 4 + minSize + 8
-
-    // read maxRow
     val maxSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    val maxKey = Statistics.getUnsafeRow(schema.length, bytes, offset, maxSize)
-    val maxOffset = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + offset + 4 + maxSize)
-    checkInternalRow(maxKey, converter(keys.last))
-    assert(maxOffset == hashMap.get(keys.last))
-
-    offset += 4 + maxSize + 8
+    val maxFromFile = Statistics.getUnsafeRow(schema.length, bytes, offset, maxSize)
+    checkInternalRow(maxFromFile, converter(keys.last))
+    offset += (4 + minSize)
   }
 
   test("read function test") {
     val keys = (1 to 300).map(i => rowGen(i)).toArray
 
-    val hashMap = new java.util.HashMap[InternalRow, Long]()
-
-    keys.indices.foreach(i => {
-      hashMap.put(keys(i), i * 8L)
-    })
-
-    // construct out buffer
-    IndexUtils.writeInt(out, 0) // MinMaxStatisticsType.id
-    IndexUtils.writeInt(out, 2) // stats size
+    IndexUtils.writeInt(out, MinMaxStatisticsType.id)
     Statistics.writeInternalRow(converter, keys.head, out)
-    IndexUtils.writeLong(out, hashMap.get(keys.head))
     Statistics.writeInternalRow(converter, keys.last, out)
-    IndexUtils.writeLong(out, hashMap.get(keys.last))
 
     val bytes = out.buf.toByteArray
-    val minMax = new MinMaxStatistics
 
-    generateInterval(rowGen(-10), rowGen(-1), startInclude = true, endInclude = true)
-    assert(minMax.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.SKIP_INDEX)
+    val testMinMax = new TestMinMax
+    testMinMax.initialize(schema)
+    testMinMax.read(bytes, 0)
 
-    generateInterval(rowGen(301), rowGen(400), startInclude = true, endInclude = true)
-    assert(minMax.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.SKIP_INDEX)
+    val min = testMinMax.getMin
+    val max = testMinMax.getMax
 
-    generateInterval(rowGen(300), rowGen(400), startInclude = true, endInclude = true)
-    assert(minMax.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.USE_INDEX)
+    for (key <- keys) {
+      assert(ordering.compare(key, min) >= 0)
+      assert(ordering.compare(key, max) <= 0)
+    }
 
-    generateInterval(rowGen(30), rowGen(40), startInclude = true, endInclude = true)
-    assert(minMax.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.USE_INDEX)
-
-    generateInterval(rowGen(-10), rowGen(1), startInclude = true, endInclude = true)
-    assert(minMax.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.USE_INDEX)
-
-    checkInternalRow(minMax.min, converter(keys.head))
-    checkInternalRow(minMax.max, converter(keys.last))
+    assert(ordering.compare(keys.head, min) == 0)
+    assert(ordering.compare(keys.last, max) == 0)
   }
 
   test("read and write") {
     val keys = (1 to 300).map(i => rowGen(i)).toArray
-    val hashMap = new java.util.HashMap[InternalRow, Long]()
-    keys.indices.foreach(i => {
-      hashMap.put(keys(i), i * 8L)
-    })
 
-    val minMax = new MinMaxStatistics
-    minMax.write(schema, out, keys, null, hashMap)
+    val minmaxWrite = new TestMinMax
+    minmaxWrite.initialize(schema)
+    for (key <- keys) minmaxWrite.addSpinachKey(key)
+    minmaxWrite.write(out, null) // MinMax does not need sortKeys parameter
 
     val bytes = out.buf.toByteArray
-    val minMaxRead = new MinMaxStatistics
+
+    val minmaxRead = new TestMinMax
+    minmaxRead.initialize(schema)
+    minmaxRead.read(bytes, 0)
+    val min = minmaxRead.getMin
+    val max = minmaxRead.getMax
+
+    for (key <- keys) {
+      assert(ordering.compare(key, min) >= 0)
+      assert(ordering.compare(key, max) <= 0)
+    }
+
+    assert(ordering.compare(keys.head, min) == 0)
+    assert(ordering.compare(keys.last, max) == 0)
+  }
+
+  test("analyse function test") {
+    val keys = (1 to 300).map(i => rowGen(i)).toArray
+
+    val minmaxWrite = new TestMinMax
+    minmaxWrite.initialize(schema)
+    for (key <- keys) minmaxWrite.addSpinachKey(key)
+    minmaxWrite.write(out, null) // MinMax does not need sortKeys parameter
+
+    val bytes = out.buf.toByteArray
+
+    val minmaxRead = new TestMinMax
+    minmaxRead.initialize(schema)
+    minmaxRead.read(bytes, 0)
 
     generateInterval(rowGen(-10), rowGen(-1), startInclude = true, endInclude = true)
-    assert(minMaxRead.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.SKIP_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
 
     generateInterval(rowGen(301), rowGen(400), startInclude = true, endInclude = true)
-    assert(minMaxRead.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.SKIP_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
 
     generateInterval(rowGen(300), rowGen(400), startInclude = true, endInclude = true)
-    assert(minMaxRead.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(30), rowGen(40), startInclude = true, endInclude = true)
-    assert(minMaxRead.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(-10), rowGen(1), startInclude = true, endInclude = true)
-    assert(minMaxRead.read(schema, intervalArray, bytes, 0) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
 
+    generateInterval(IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END,
+      startInclude = true, endInclude = true)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
 
-    checkInternalRow(minMaxRead.min, converter(keys.head))
-    checkInternalRow(minMaxRead.max, converter(keys.last))
+    generateInterval(IndexScanner.DUMMY_KEY_START, rowGen(1),
+      startInclude = true, endInclude = true)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+
+    generateInterval(IndexScanner.DUMMY_KEY_START, rowGen(0),
+      startInclude = true, endInclude = true)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
+
+    generateInterval(IndexScanner.DUMMY_KEY_START, rowGen(300),
+      startInclude = true, endInclude = true)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+
+    generateInterval(rowGen(0), IndexScanner.DUMMY_KEY_END,
+      startInclude = true, endInclude = true)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+
+    generateInterval(rowGen(1), IndexScanner.DUMMY_KEY_END,
+      startInclude = true, endInclude = true)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+
+    generateInterval(rowGen(150), IndexScanner.DUMMY_KEY_END,
+      startInclude = true, endInclude = true)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+
+    generateInterval(rowGen(300), IndexScanner.DUMMY_KEY_END,
+      startInclude = true, endInclude = true)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+
+    generateInterval(rowGen(301), IndexScanner.DUMMY_KEY_END,
+      startInclude = true, endInclude = true)
+    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
   }
 }

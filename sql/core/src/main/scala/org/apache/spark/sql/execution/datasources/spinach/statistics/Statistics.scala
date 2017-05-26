@@ -29,7 +29,6 @@ import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
-
 abstract class Statistics{
   val id: Int
   protected var schema: StructType = _
@@ -38,28 +37,52 @@ abstract class Statistics{
     this.schema = schema
   }
 
-  def addSpinachKey(key: Key): Unit = { // spinach.Key == InternalRow
-    // do nothing for most of cases
+  /**
+   * For MinMax & Bloom Filter, every time a key is inserted, then
+   * the info should be updated, for SampleBase and PartByValue statistics,
+   * nothing done in this function, a in-memory key array is stored in
+   * `StatisticsManager`. This function does nothing for most cases.
+   * @param key an InternalRow from index partition
+   */
+  def addSpinachKey(key: Key): Unit = {
   }
 
-  // return: number of bytes written into writer
+  /**
+   * Statistics write function, by default, only a Statistics id should be
+   * written into the writer.
+   * @param writer IndexOutputWrite, where to write the infomation
+   * @param sortedKeys sorted keys stored related to this statistics
+   * @return number of bytes written in writer
+   */
   def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
     IndexUtils.writeInt(writer, id)
     4L
   }
 
-  // return number of bytes read from `bytes` array
+  /**
+   * Statistics read function, by default, statistics id should be same with
+   * current statistics
+   * @param bytes bytes read from file
+   * @param baseOffset start offset to read the statistics
+   * @return number of bytes read from `bytes` array
+   */
   def read(bytes: Array[Byte], baseOffset: Long): Long = {
     val idFromFile = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + baseOffset)
     assert(idFromFile == id)
     4L
   }
 
+  /**
+   * Analyse the query `intervalArray` with `Statistics`, by default, if no content
+   * is in this Statistics, then we should use index for the correctness of this array.
+   * @param intervalArray query intervals from `IndexContext`
+   * @return the `StaticsAnalysisResult`
+   */
   def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double =
     StaticsAnalysisResult.USE_INDEX
 }
 
-
+// tool function for Statistics class
 object Statistics {
   def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
     UnsafeIndexNode.getUnsafeRow(schemaLen, array, Platform.BYTE_ARRAY_OFFSET + offset + 4, size)
@@ -121,6 +144,11 @@ object Statistics {
   }
 }
 
+/**
+ * StaticsAnalysisResult should be one of these following values,
+ * or a double value between 0 and 1, standing for the estimated
+ * coverage form this content.
+ */
 object StaticsAnalysisResult {
   val FULL_SCAN = 1
   val SKIP_INDEX = -1

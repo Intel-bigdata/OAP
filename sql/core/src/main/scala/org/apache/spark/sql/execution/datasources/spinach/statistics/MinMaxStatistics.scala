@@ -52,8 +52,10 @@ class MinMaxStatistics extends Statistics {
 
   override def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
     var offset = super.write(writer, sortedKeys)
-    offset += Statistics.writeInternalRow(converter, min, writer)
-    offset += Statistics.writeInternalRow(converter, max, writer)
+    if (min != null) {
+      offset += Statistics.writeInternalRow(converter, min, writer)
+      offset += Statistics.writeInternalRow(converter, max, writer)
+    }
     offset
   }
 

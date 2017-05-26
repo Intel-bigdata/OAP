@@ -27,10 +27,10 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
+import org.apache.spark.sql.catalyst.expressions.codegen.{BaseOrdering, GenerateOrdering}
 import org.apache.spark.sql.execution.datasources.spinach.index.{BloomFilter, IndexOutputWriter, RangeInterval}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.unsafe.types.UTF8String
-
 
 abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
   protected class TestIndexOutputWriter extends IndexOutputWriter(bucketId = None, context = null) {
@@ -51,6 +51,7 @@ abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
     :: StructField("b", StringType) :: Nil)
 
   @transient lazy protected val converter: UnsafeProjection = UnsafeProjection.create(schema)
+  @transient lazy protected val ordering: BaseOrdering = GenerateOrdering.create(schema)
   protected var out: TestIndexOutputWriter = _
 
   protected var intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()

@@ -25,20 +25,22 @@ import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
-// manage all statistics info, use case:
-// Statistics build:
-//
-//    val statisticsManager = new StatisticsManager
-//    statisticsManager.initialize(BTreeIndexType, schema)
-//    for (key <- keys) statisticsManager.addSpinachKey(key)
-//    statisticsManager.write(out)
-//
-// Statistics read:
-//
-//    val statisticsManager = new StatisticsManager
-//    statisticsManager.read(file)
-//    statisticsManager.analyse(intervalArray)
-//
+/**
+ * Manange all statistics info, use case:
+ * Statistics build:
+ * {{{
+ * val statisticsManager = new StatisticsManager
+ * statisticsManager.initialize(BTreeIndexType, schema)
+ * for (key <- keys) statisticsManager.addSpinachKey(key)
+ * statisticsManager.write(out)
+ * }}}
+ *
+ * Statistics read:
+ * {{{
+ * val statisticsManager = new StatisticsManager
+ * statisticsManager.read(file)
+ * }}}
+ */
 class StatisticsManager {
   protected var stats: Array[Statistics] = _
   protected var schema: StructType = _

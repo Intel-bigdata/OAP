@@ -19,23 +19,16 @@ package org.apache.spark.sql.execution.datasources.spinach
 import org.scalatest.BeforeAndAfterAll
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, IndexUtils, RangeInterval}
-import org.apache.spark.sql.execution.datasources.spinach.statistics.Statistics
-import org.apache.spark.sql.execution.datasources.spinach.utils.TestIndexOutputWriter
+import org.apache.spark.sql.execution.datasources.spinach.statistics.{StaticsAnalysisResult, Statistics}
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.ByteBufferOutputStream
 
-class StatisticsSuite extends SparkFunSuite with BeforeAndAfterAll {
-
-  var schema: StructType = _
-  private lazy val converter = UnsafeProjection.create(schema)
-  private lazy val ordering = GenerateOrdering.create(schema)
-
+class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
   override def beforeAll(): Unit = {
     super.beforeAll()
     schema = StructType(StructField("test", DoubleType, nullable = true) :: Nil)
@@ -47,6 +40,45 @@ class StatisticsSuite extends SparkFunSuite with BeforeAndAfterAll {
   val row1 = InternalRow(1.0)
   val row2 = InternalRow(2.0)
   val row3 = InternalRow(3.0)
+
+  class TestStatistics extends Statistics {
+    override val id: Int = 6662
+  }
+
+  test("Statistics write function test") {
+    val test = new TestStatistics
+    test.initialize(schema)
+    val writtenBytes = test.write(out, null)
+    assert(writtenBytes == 4L)
+
+    val bytes = out.buf.toByteArray
+    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET) == test.id)
+    out.close()
+  }
+
+  test("Statistics read function test") {
+    val test = new TestStatistics
+    IndexUtils.writeInt(out, test.id)
+
+    val bytes = out.buf.toByteArray
+
+    val readBytes = test.read(bytes, 0)
+    assert(readBytes == 4L)
+  }
+
+  test("Statistics default analyzer test") {
+    val test = new TestStatistics
+    IndexUtils.writeInt(out, test.id)
+
+    val bytes = out.buf.toByteArray
+
+    val readBytes = test.read(bytes, 0)
+    assert(readBytes == 4L)
+
+    val analyResult = test.analyse(new ArrayBuffer[RangeInterval]())
+    assert(analyResult == StaticsAnalysisResult.USE_INDEX)
+  }
+
 
   test("rowInSingleInterval: normal test") {
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
