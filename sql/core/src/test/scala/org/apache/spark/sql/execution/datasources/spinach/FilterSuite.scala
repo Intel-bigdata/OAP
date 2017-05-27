@@ -124,13 +124,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sql("drop sindex index1 on spinach_test")
   }
 
-  test("find bug") {
-    sql("create table hive_test (key int, value string)")
-    sql("LOAD DATA LOCAL INPATH 'data/files/small_kv.txt' OVERWRITE INTO TABLE hive_test")
-    sql("create table hive_test_spn (key int, value string) using spn")
-    sql("insert into hive_test_spn select * from hive_test")
-    sql("create sindex hive_test_spn_idx on hive_test_spn (key, value)")
-  }
   test("filtering with dictionary encoding enabled") {
     System.setProperty("spinach.encoding.dictionaryEnabled", "true")
     val data = (1 to 300).map { i => (i, s"this is test $i") }.toArray
