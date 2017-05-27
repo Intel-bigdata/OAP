@@ -21,7 +21,6 @@ import java.sql.Date
 
 import org.scalatest.BeforeAndAfterEach
 import scala.util.Random
-import scala.collection.immutable.Vector
 
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
