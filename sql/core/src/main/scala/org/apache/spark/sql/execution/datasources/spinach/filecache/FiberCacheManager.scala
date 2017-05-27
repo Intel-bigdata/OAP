@@ -41,7 +41,7 @@ private[spinach] sealed case class ConfigurationCache[T](key: T, conf: Configura
 private[spinach] sealed trait AbstractFiberCacheManger extends Logging {
   type ENTRY = ConfigurationCache[Fiber]
 
-  protected def fiber2Data(key: Fiber, conf: Configuration): FiberCache
+  protected def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache
 
   @transient protected val cache =
     CacheBuilder
@@ -59,13 +59,13 @@ private[spinach] sealed trait AbstractFiberCacheManger extends Logging {
         }
       })
       .build(new CacheLoader[ENTRY, FiberCache]() {
-        override def load(key: ENTRY): FiberCache = {
-          fiber2Data(key.key, key.conf)
+        override def load(entry: ENTRY): FiberCache = {
+          fiber2Data(entry.key, entry.conf)
         }
       })
 
-  def apply[T <: FiberCache](fiberCache: Fiber, conf: Configuration): T = {
-    cache.get(ConfigurationCache(fiberCache, conf)).asInstanceOf[T]
+  def apply[T <: FiberCache](fiber: Fiber, conf: Configuration): T = {
+    cache.get(ConfigurationCache(fiber, conf)).asInstanceOf[T]
   }
 }
 
@@ -73,7 +73,7 @@ private[spinach] sealed trait AbstractFiberCacheManger extends Logging {
  * Fiber Cache Manager
  */
 object FiberCacheManager extends AbstractFiberCacheManger {
-  override def fiber2Data(key: Fiber, conf: Configuration): FiberCache = key match {
+  override def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = fiber match {
     case DataFiber(file, columnIndex, rowGroupId) =>
       file.getFiberData(rowGroupId, columnIndex, conf)
     case IndexFiber(file) => file.getIndexFiberData(conf)
