@@ -45,8 +45,6 @@ spinach.compression.codec
 * Values: UNCOMPRESSED, SNAPPY, GZIP, LZO
 * Usage: `System.setProperty("spinach.compression.codec", "SNAPPY")`
 ## How to Contribute
-### How To Contribute
-
 If you are looking for some ideas on what to contribute, check out GitHub issues for this project labeled ["Pick me up!"](https://github.com/Intel-bigdata/Spinach/issues?labels=pick+me+up%21&state=open).
 Comment on the issue with your questions and ideas.
 
