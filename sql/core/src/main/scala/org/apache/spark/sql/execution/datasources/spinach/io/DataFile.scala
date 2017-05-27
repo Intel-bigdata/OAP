@@ -29,7 +29,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.SpinachException
 import org.apache.spark.sql.execution.datasources.spinach.Key
 import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberCache
-import org.apache.spark.sql.execution.datasources.spinach.index.RangeInterval
+import org.apache.spark.sql.execution.datasources.spinach.index.{DUMMY_SCANNER, IndexScanner, RangeInterval}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
@@ -109,9 +109,10 @@ private[spinach] object DataFile {
           case other => sys.error(s"not support data type: $other")
         })
 
-      (ordering.compare(value, start) > 0 && ordering.compare(value, end) < 0) ||
-        (startInclude && ordering.compare(value, start) == 0) ||
-        (endInclude && ordering.compare(value, end) == 0)
+      ((start == IndexScanner.DUMMY_KEY_START || ordering.compare(value, start) > 0) ||
+        (startInclude && ordering.compare(value, start) == 0)) &&
+      ((end == IndexScanner.DUMMY_KEY_END || ordering.compare(value, end) < 0) ||
+        (endInclude && ordering.compare(value, end) == 0))
     }
   }
 
@@ -121,6 +122,7 @@ private[spinach] object DataFile {
 
     if (intervalArray.isEmpty) return intervalArray
 
+    var exists = true
     val prefixValues = schema.dropRight(1).zipWithIndex.map {
       case (field, ordinal) =>
         if (dictionaries(ordinal) != null) {
@@ -128,14 +130,18 @@ private[spinach] object DataFile {
             dictionaries(ordinal), field,
             InternalRow(intervalArray.head.start.get(ordinal, field.dataType)),
             InternalRow(intervalArray.head.end.get(ordinal, field.dataType)),
-            intervalArray.head.startInclude, intervalArray.head.endInclude)
+            startInclude = true, endInclude = true)
             .headOption match {
             case Some(value) => value
-            case None => -1
+            case None => exists = false
+              -1
           }
         } else {
           intervalArray.head.start.get(ordinal, field.dataType)
         }
+    }
+    if (!exists) {
+      return ArrayBuffer.empty
     }
 
     val index = schema.length - 1
@@ -144,8 +150,10 @@ private[spinach] object DataFile {
       intervalArray.flatMap { interval =>
         rangeToEncodedValues(
           dictionaries.last, schema.last,
-          InternalRow(interval.start.get(index, dataType)),
-          InternalRow(interval.end.get(index, dataType)),
+          if (interval.start.numFields == index) IndexScanner.DUMMY_KEY_START
+          else InternalRow(interval.start.get(index, dataType)),
+          if (interval.end.numFields == index) IndexScanner.DUMMY_KEY_END
+          else InternalRow(interval.end.get(index, dataType)),
           interval.startInclude, interval.endInclude).map { r =>
           val key = InternalRow.fromSeq(prefixValues :+ r)
           RangeInterval(key, key, includeStart = true, includeEnd = true)
@@ -153,8 +161,10 @@ private[spinach] object DataFile {
       }
     } else {
       intervalArray.map { interval =>
-        val start = InternalRow.fromSeq(prefixValues :+ interval.start.get(index, dataType))
-        val end = InternalRow.fromSeq(prefixValues :+ interval.end.get(index, dataType))
+        val start = if (interval.start == IndexScanner.DUMMY_KEY_START) IndexScanner.DUMMY_KEY_START
+                    else InternalRow.fromSeq(prefixValues :+ interval.start.get(index, dataType))
+        val end = if (interval.end == IndexScanner.DUMMY_KEY_END) IndexScanner.DUMMY_KEY_END
+                  else InternalRow.fromSeq(prefixValues :+ interval.end.get(index, dataType))
         RangeInterval(start, end, interval.startInclude, interval.endInclude)
       }
     }

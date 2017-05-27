@@ -21,6 +21,7 @@ import java.sql.Date
 
 import org.scalatest.BeforeAndAfterEach
 import scala.util.Random
+import scala.collection.immutable.Vector
 
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
@@ -107,11 +108,30 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 1"),
       Row(1, "this is test 1") :: Nil)
 
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a < 2"),
+      Row(1, "this is test 1") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a <= 2"),
+      Row(1, "this is test 1") :: Row(2, "this is test 2") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 299"),
+      Row(300, "this is test 300") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a >= 299"),
+      Row(299, "this is test 299") :: Row(300, "this is test 300") :: Nil)
+
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 1 AND a <= 3"),
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
     sql("drop sindex index1 on spinach_test")
   }
 
+  test("find bug") {
+    sql("create table hive_test (key int, value string)")
+    sql("LOAD DATA LOCAL INPATH 'data/files/small_kv.txt' OVERWRITE INTO TABLE hive_test")
+    sql("create table hive_test_spn (key int, value string) using spn")
+    sql("insert into hive_test_spn select * from hive_test")
+    sql("create sindex hive_test_spn_idx on hive_test_spn (key, value)")
+  }
   test("filtering with dictionary encoding enabled") {
     System.setProperty("spinach.encoding.dictionaryEnabled", "true")
     val data = (1 to 300).map { i => (i, s"this is test $i") }.toArray
@@ -130,9 +150,8 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
     sql("create sindex index1 on spinach_test (a, b) using btree")
     checkAnswer(
-      sql("SELECT * FROM spinach_test" +
-        " WHERE a = 293 AND b >= 'this is test 291' AND b < 'this is test 299'"),
-      df.filter("a = 293 AND b >= 'this is test 291' AND b < 'this is test 299'"))
+      sql("SELECT * FROM spinach_test WHERE a = 293 AND b < 'this is test 299'"),
+      df.filter("a = 293 AND b < 'this is test 299'"))
     sql("drop sindex index1 on spinach_test")
 
     sql("create sindex index3 on spinach_test (a, b) using bitmap")
