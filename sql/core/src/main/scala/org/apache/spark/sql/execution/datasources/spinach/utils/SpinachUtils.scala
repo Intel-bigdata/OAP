@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.execution.datasources.{FileCatalog, Partition}
 import org.apache.spark.sql.execution.datasources.spinach.{DataSourceMeta, SpinachFileFormat}
 
+
 /**
  * Utils for Spinach
  */

@@ -21,12 +21,17 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.{ArrayBuffer, BitSet}
+import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.execution.datasources.spinach.filecache.{DataFiberCache, IndexFiberCacheData}
+import org.apache.spark.sql.execution.datasources.spinach.index.{IndexNode, UnsafeIndexNode}
+import org.apache.spark.sql.execution.datasources.spinach.io.SpinachDataFile
 import org.apache.spark.sql.types._
+
 
 /**
  * The Spinach meta file is organized in the following format.
@@ -62,24 +67,26 @@ import org.apache.spark.sql.types._
 
 private[spinach] trait IndexType
 
-private[spinach] case class BTreeIndexEntry(ordinal: Int, dir: SortDirection = Ascending)
+private[spinach] case class BTreeIndexEntry(ordinal: Int, dir: SortDirection = Ascending) {
+  override def toString: String = ordinal + " " + (if (dir == Ascending) "ASC" else "DESC")
+}
 
 private[spinach] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends IndexType {
   def appendEntry(entry: BTreeIndexEntry): BTreeIndex = BTreeIndex(entries :+ entry)
-}
 
-private[spinach] case class BloomFilterIndex(entries: Seq[Int] = Nil)
-  extends IndexType {
-  def appendEntry(entry: Int): BloomFilterIndex =
-    BloomFilterIndex(entries :+ entry)
+  override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BTREE"
 }
 
 private[spinach] case class BitMapIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): BitMapIndex = BitMapIndex(entries :+ entry)
+
+  override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BITMAP"
 }
 
 private[spinach] case class HashIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): HashIndex = HashIndex(entries :+ entry)
+
+  override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BITMAP"
 }
 
 private[spinach] class FileMeta {
@@ -122,6 +129,8 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
     extends Serializable {
   import DataSourceMeta._
   import IndexMeta._
+
+  override def toString: String = name + ": " + indexType
 
   def open(data: IndexFiberCacheData, keySchema: StructType): IndexNode = {
     UnsafeIndexNode(DataFiberCache(data.fiberData), data.rootOffset, data.dataEnd, keySchema)
@@ -179,11 +188,6 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
         entries.foreach(keyBits += _)
         writeBitSet(keyBits, INDEX_META_KEY_LENGTH, out)
         writeBitSet(dirBits, INDEX_META_KEY_LENGTH, out)
-      case BloomFilterIndex(entries) =>
-        out.writeByte(BLOOM_FILTER_INDEX_TYPE)
-        entries.foreach(keyBits += _)
-        writeBitSet(keyBits, INDEX_META_KEY_LENGTH, out)
-        writeBitSet(dirBits, INDEX_META_KEY_LENGTH, out)
     }
   }
 
@@ -212,7 +216,6 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
         flag match {
           case BITMAP_INDEX_TYPE => BitMapIndex(keyBits.toSeq)
           case HASH_INDEX_TYPE => HashIndex(keyBits.toSeq)
-          case BLOOM_FILTER_INDEX_TYPE => BloomFilterIndex(keyBits.toSeq)
         }
     }
   }
@@ -222,7 +225,6 @@ private[spinach] object IndexMeta {
   final val BTREE_INDEX_TYPE = 0
   final val BITMAP_INDEX_TYPE = 1
   final val HASH_INDEX_TYPE = 2
-  final val BLOOM_FILTER_INDEX_TYPE = 3
 
   def apply() : IndexMeta = new IndexMeta()
   def apply(name: String, indexType: IndexType): IndexMeta = {
@@ -285,7 +287,49 @@ private[spinach] case class DataSourceMeta(
     indexMetas: Array[IndexMeta],
     schema: StructType,
     dataReaderClassName: String,
-    @transient fileHeader: FileHeader) extends Serializable
+    @transient fileHeader: FileHeader) extends Serializable {
+
+   def isSupportedByIndex(exp: Expression,
+                          hashSetList: mutable.ListBuffer[mutable.HashSet[String]]): Boolean = {
+     val bTreeSet: mutable.HashSet[String] = hashSetList(0)
+     val bitmapSet: mutable.HashSet[String] = hashSetList(1)
+     var attr: String = null
+     def checkAttribute(filter: Expression): Boolean = filter match {
+       case Or(left, right) =>
+         checkAttribute(left) && checkAttribute(right)
+       case And(left, right) =>
+         checkAttribute(left) && checkAttribute(right)
+       case EqualTo(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
+         } else false
+       case LessThan(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
+         } else false
+       case LessThanOrEqual(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
+         } else false
+       case GreaterThan(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
+         } else false
+       case GreaterThanOrEqual(attrRef: AttributeReference, _) =>
+         if (attr ==  null || attr == attrRef.name) {
+           attr = attrRef.name
+           bTreeSet.contains(attr) || bitmapSet.contains(attr)
+         } else false
+       case _ => false
+     }
+
+     checkAttribute(exp)
+  }
+}
 
 private[spinach] class DataSourceMetaBuilder {
   val fileMetas = ArrayBuffer.empty[FileMeta]

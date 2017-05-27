@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.spinach.utils.BTreeUtils
+
 
 class BTreeUtilsSuite extends SparkFunSuite with Logging {
   test("height") {

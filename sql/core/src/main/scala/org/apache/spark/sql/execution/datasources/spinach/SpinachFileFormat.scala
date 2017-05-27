@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.spinach
 
 import java.net.URI
 
+import scala.collection.mutable
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, FSDataOutputStream, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
@@ -28,14 +30,17 @@ import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.JoinedRow
+import org.apache.spark.sql.catalyst.expressions.{Expression, JoinedRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.spinach.index.{IndexContext, ScannerBuilder}
+import org.apache.spark.sql.execution.datasources.spinach.io._
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.sources.{DataSourceRegister, Filter}
+import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.SerializableConfiguration
+
 
 private[sql] class SpinachFileFormat extends FileFormat
   with DataSourceRegister
@@ -54,10 +59,10 @@ private[sql] class SpinachFileFormat extends FileFormat
     // 2. We need to pass down the spinach meta file and its associated partition path
 
     // TODO we support partitions, but this only read meta from one of the partitions
-    val partition2Meta = fileCatalog.allFiles().map(_.getPath.getParent).map { parent =>
+    val partition2Meta = fileCatalog.allFiles().map(_.getPath.getParent).distinct.map { parent =>
       (parent, new Path(parent, SpinachFileFormat.SPINACH_META_FILE))
     }
-      .filter(pair => pair._2.getFileSystem(hadoopConf).exists(pair._2))
+      .find(pair => pair._2.getFileSystem(hadoopConf).exists(pair._2))
       .toMap
     meta = partition2Meta.values.headOption.map {
       DataSourceMeta.initialize(_, hadoopConf)
@@ -126,11 +131,55 @@ private[sql] class SpinachFileFormat extends FileFormat
     // SpinachFileFormat.deserializeDataSourceMeta(hadoopConf) match {
     meta match {
       case Some(m) =>
+        logDebug("Building SpinachDataReader with "
+          + m.dataReaderClassName.substring(m.dataReaderClassName.lastIndexOf(".") + 1)
+          + " ...")
+
+        def canTriggerIndex(filter: Filter): Boolean = {
+          var attr: String = null
+          def checkAttribute(filter: Filter): Boolean = filter match {
+              case Or(left, right) =>
+                checkAttribute(left) && checkAttribute(right)
+              case And(left, right) =>
+                checkAttribute(left) && checkAttribute(right)
+              case EqualTo(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case LessThan(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case LessThanOrEqual(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case GreaterThan(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case GreaterThanOrEqual(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case _ => true
+            }
+
+          checkAttribute(filter)
+        }
+
         val ic = new IndexContext(m)
-        BPlusTreeSearch.build(filters.toArray, ic)
-        val filterScanner = ic.getScannerBuilder.map(_.build)
+
+        if (m.indexMetas.nonEmpty) { // check and use index
+          logDebug("Supported Filters by Spinach:")
+          // filter out the "filters" on which we can use the B+ tree index
+          val supportFilters = filters.toArray.filter(canTriggerIndex)
+          // After filtered, supportFilter only contains:
+          // 1. Or predicate that contains only one attribute internally;
+          // 2. Some atomic predicates, such as LessThan, EqualTo, etc.
+          if (supportFilters.nonEmpty) {
+            // determine whether we can use B+ tree index
+            supportFilters.foreach(filter => logDebug("\t" + filter.toString))
+            ScannerBuilder.build(supportFilters, ic)
+          }
+        }
+//        val filterScanner = ic.getScannerBuilder.map(_.build)
+        val filterScanner = ic.getScanner
+
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
+        hadoopConf.setDouble(SQLConf.SPINACH_FULL_SCAN_THRESHOLD.key,
+          sparkSession.conf.get(SQLConf.SPINACH_FULL_SCAN_THRESHOLD))
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
@@ -151,6 +200,30 @@ private[sql] class SpinachFileFormat extends FileFormat
         // TODO need to think about when there is no spinach.meta file at all
         Iterator.empty
       }
+    }
+  }
+
+  def hasAvailableIndex(expressions: Seq[Expression]): Boolean = {
+    meta match {
+      case Some(m) =>
+        val bTreeIndexAttrSet = new mutable.HashSet[String]()
+        val bitmapIndexAttrSet = new mutable.HashSet[String]()
+        var idx = 0
+        while(idx < m.indexMetas.length) {
+          m.indexMetas(idx).indexType match {
+            case BTreeIndex(entries) =>
+              bTreeIndexAttrSet.add(m.schema(entries(0).ordinal).name)
+            case BitMapIndex(entries) =>
+              entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
+            case _ => // we don't support other types of index
+          }
+          idx += 1
+        }
+        val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
+        hashSetList.append(bTreeIndexAttrSet)
+        hashSetList.append(bitmapIndexAttrSet)
+        expressions.exists(m.isSupportedByIndex(_, hashSetList))
+      case None => false
     }
   }
 }
@@ -264,7 +337,7 @@ private[spinach] class SpinachOutputWriter(
     val fs: FileSystem = file.getFileSystem(sc.value)
     val fileOut: FSDataOutputStream = fs.create(file, false)
 
-    new SpinachDataWriter(isCompressed, fileOut, dataSchema)
+    new SpinachDataWriter(isCompressed, fileOut, dataSchema, sc.value)
   }
 
   override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")

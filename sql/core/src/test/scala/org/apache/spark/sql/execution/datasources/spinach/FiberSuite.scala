@@ -27,9 +27,11 @@ import org.scalatest.BeforeAndAfterAll
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
+import org.apache.spark.sql.execution.datasources.spinach.io._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
+
 
 class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   private var file: File = null
@@ -135,7 +137,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       path: Path,
       schema: StructType, count: Int): Unit = {
     val out = FileSystem.get(conf).create(path, true)
-    val writer = new SpinachDataWriter(false, out, schema)
+    val writer = new SpinachDataWriter(false, out, schema, conf)
     val row = new GenericMutableRow(schema.fields.length)
     for(i <- 0 until count) {
       schema.fields.zipWithIndex.foreach { entry =>

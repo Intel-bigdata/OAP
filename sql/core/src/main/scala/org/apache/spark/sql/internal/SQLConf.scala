@@ -554,10 +554,56 @@ object SQLConf {
 
   val SPINACH_PARQUET_ENABLED =
     SQLConfigBuilder("spark.sql.spinach.parquet.enable")
-    .internal()
-    .doc("Whether enable spinach file format when encounter parquet files")
-    .booleanConf
-    .createWithDefault(true)
+      .internal()
+      .doc("Whether enable spinach file format when encounter parquet files")
+      .booleanConf
+      .createWithDefault(true)
+
+  val SPINACH_FULL_SCAN_THRESHOLD =
+    SQLConfigBuilder("spark.sql.spinach.fsthreshold")
+      .internal()
+      .doc("Define the full scan threshold based on spinach statistics in index file. " +
+        "If the analysis result is above this threshold, it will full scan data file, " +
+        "otherwise, follow index way.")
+      .doubleConf
+      .createWithDefault(0.8)
+
+  val SPINACH_STATISTICS_TYPES =
+    SQLConfigBuilder("spark.sql.spinach.StatisticsType")
+      .internal()
+      .doc("Which types of pre-defined statistics are added in index file. " +
+        "And here you should just write the statistics name. " +
+        "Now, three types statistics are supported. " +
+        "\"MINMAX\" MinMaxStatistics, " +
+        "\"SAMPLE\" for SampleBasedStatistics, " +
+        "\"PARTBYVALUE\" for PartedByValueStatistics. " +
+        "If you want to add more than one type, just use comma " +
+        "to separate, eg. \"MINMAX, SAMPLE, PARTBYVALUE\"")
+      .stringConf
+      .createWithDefault("MINMAX, SAMPLE, PARTBYVALUE")
+
+  val SPINACH_STATISTICS_SAMPLE_RATE =
+    SQLConfigBuilder("spark.sql.spinach.Statistics.sampleRate")
+      .internal()
+      .doc("Sample rate for sample based statistics, default value 0.05")
+      .doubleConf
+      .createWithDefault(0.05)
+
+  val SPINACH_BLOOMFILTER_MAXBITS =
+    SQLConfigBuilder("spark.sql.spinach.Bloomfilter.maxBits")
+      .internal()
+      .doc("Define the max bit count parameter used in bloom " +
+        "filter, default 1073741824")
+      .intConf
+      .createWithDefault(1073741824)
+
+  val SPINACH_BLOOMFILTER_NUMHASHFUNC =
+    SQLConfigBuilder("spark.sql.spinach.Bloomfilter.numHashFunc")
+      .internal()
+      .doc("Define the number of hash functions used in bloom filter, default 3")
+      .intConf
+      .createWithDefault(3)
+
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
