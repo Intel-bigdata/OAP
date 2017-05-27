@@ -26,7 +26,7 @@ import org.apache.parquet.hadoop.api.RecordReader
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
-import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberCache
+import org.apache.spark.sql.execution.datasources.spinach.filecache._
 import org.apache.spark.sql.types.StructType
 
 
@@ -106,6 +106,10 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
   override def createDataFileHandle(conf: Configuration): ParquetDataFileHandle = {
     new ParquetDataFileHandle().read(conf, new Path(StringUtils.unEscapeString(path)))
   }
+
+  override def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
+    null
+  }
 }
 
 private[spinach] object  ParquetDataFile {
@@ -115,9 +119,5 @@ private[spinach] object  ParquetDataFile {
 
     override def next(): InternalRow =
       throw new java.util.NoSuchElementException("Input is Empty RowIds Array")
-  }
-
-  override def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
-    null
   }
 }
