@@ -38,3 +38,4 @@ private[spinach] class ParquetDataFileHandle(
   }
 
 }
+
