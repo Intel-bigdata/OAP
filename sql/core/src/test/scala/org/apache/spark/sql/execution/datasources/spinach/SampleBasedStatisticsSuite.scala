@@ -20,7 +20,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
 import org.apache.spark.sql.execution.datasources.spinach.index.{IndexScanner, IndexUtils}
-
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.unsafe.Platform
 
@@ -32,7 +31,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
   }
 
   test("test write function") {
-    val keys = (1 to 300).map(i => rowGen(i)).toArray
+    val keys = (1 to 300).map(i => rowGen(i)).toArray // keys needs to be sorted
 
     val testSample = new TestSample
     testSample.initialize(schema)
@@ -51,7 +50,6 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
       val row = Statistics.getUnsafeRow(schema.length, bytes, offset, rowSize).copy()
       assert(ordering.compare(row, keys(i)) == 0)
       offset += 4 + rowSize
-
     }
   }
 

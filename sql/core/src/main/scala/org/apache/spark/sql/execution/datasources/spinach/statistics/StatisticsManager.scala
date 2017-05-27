@@ -61,7 +61,7 @@ class StatisticsManager {
     stats = statsTypes.map(t => t match {
       case MinMaxStatisticsType => new MinMaxStatistics
       case SampleBasedStatisticsType => new SampleBasedStatistics
-      case PartByValueStatisticsType => new PartedByValueStatistics
+      case PartByValueStatisticsType => new PartByValueStatistics
       case BloomFilterStatisticsType => new BloomFilterStatistics
       case _ => throw new UnsupportedOperationException(s"non-supported statistic type $t")
     })
@@ -119,7 +119,7 @@ class StatisticsManager {
         Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset) match {
           case MinMaxStatisticsType.id => stats(i) = new MinMaxStatistics
           case SampleBasedStatisticsType.id => stats(i) = new SampleBasedStatistics
-          case PartByValueStatisticsType.id => stats(i) = new PartedByValueStatistics
+          case PartByValueStatisticsType.id => stats(i) = new PartByValueStatistics
           case BloomFilterStatisticsType.id => stats(i) = new BloomFilterStatistics
           case _ => throw new UnsupportedOperationException("unsupport statistics id")
         }

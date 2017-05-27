@@ -39,16 +39,16 @@ import org.apache.spark.unsafe.Platform
 // (241,  "test#241")   240            241
 // (300,  "test#300")   299            300
 
-class PartedByValueStatistics extends Statistics {
+class PartByValueStatistics extends Statistics {
   override val id: Int = PartByValueStatisticsType.id
-  private var keySchema: StructType = _ // delete
   @transient private lazy val converter = UnsafeProjection.create(schema)
-  var arrayOffset = 0L
 
   private lazy val maxPartNum: Int = StatisticsManager.partNumber
   @transient private lazy val ordering = GenerateOrdering.create(schema)
-  case class PartedByValueMeta(idx: Int, row: InternalRow, curMaxId: Int, accumulatorCnt: Int)
-  private lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
+
+  protected case class PartedByValueMeta(idx: Int, row: InternalRow,
+                                         curMaxId: Int, accumulatorCnt: Int)
+  protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
 
   override def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
     var offset = super.write(writer, sortedKeys)
@@ -111,11 +111,11 @@ class PartedByValueStatistics extends Statistics {
   //  meta id:             0       1       2       3       4       5
   //                       |_______|_______|_______|_______|_______|
   // interval id:        0     1       2       3       4       5      6
-  // value array:(-inf, r0) [r0,r1) [r1,r2) [r2,r3) [r3,r4) [r4,r5]  (r6, +inf)
+  // value array:(-inf, r0) [r0,r1) [r1,r2) [r2,r3) [r3,r4) [r4,r5]  (r5, +inf)
   protected def getIntervalIdx(row: Key, include: Boolean): Int = {
     var i = 0
-    if (row == IndexScanner.DUMMY_KEY_START) 0 // -inf
-    else if (row == IndexScanner.DUMMY_KEY_END) metas.length + 1 // +inf
+    if (row eq IndexScanner.DUMMY_KEY_START) 0 // -inf
+    else if (row eq IndexScanner.DUMMY_KEY_END) metas.length + 1 // +inf
     else {
       while (i < metas.length && (include && ordering.gteq(row, metas(i).row)
         || !include && ordering.gt(row, metas(i).row))) i += 1
@@ -151,7 +151,9 @@ class PartedByValueStatistics extends Statistics {
         cover -= 0.5 * (metas(right).accumulatorCnt - metas(right - 1).accumulatorCnt)
       }
 
-      cover / wholeCount
+      if (cover > wholeCount) 1.0
+      else if (cover < 0) 0.0
+      else cover / wholeCount
     }
   }
 

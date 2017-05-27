@@ -29,7 +29,7 @@ import org.apache.spark.unsafe.Platform
 class BloomFilterStatistics extends Statistics {
   override val id: Int = BloomFilterStatisticsType.id
 
-  private var bfIndex: BloomFilter = _
+  protected var bfIndex: BloomFilter = _
 
   private lazy val bfMaxBits: Int = StatisticsManager.bloomFilterMaxBits
   private lazy val bfHashFuncs: Int = StatisticsManager.bloomFilterHashFuncs
@@ -117,11 +117,6 @@ class BloomFilterStatistics extends Statistics {
     } else false
 
     if (skipFlag) StaticsAnalysisResult.SKIP_INDEX
-    else StaticsAnalysisResult.FULL_SCAN
-  }
-
-
-  def initialize(maxBits: Int, numOfHashFunc: Int): Unit = {
-    bfIndex = new BloomFilter(maxBits, numOfHashFunc)()
+    else StaticsAnalysisResult.USE_INDEX
   }
 }
