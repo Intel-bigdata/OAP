@@ -54,7 +54,7 @@ class StatisticsManager {
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
   // for read with incorrect mask, the statistics is invalid
-  private var invaildStatistics: Boolean = false
+  private var invalidStatistics: Boolean = false
 
   def initialize(indexType: AnyIndexType, s: StructType): Unit = {
     val statsTypes = StatisticsManager.statisticsTypeMap(indexType)
@@ -109,7 +109,7 @@ class StatisticsManager {
     val mask = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
     offset += 8
     if (mask != StatisticsManager.STATISTICSMASK) {
-      invaildStatistics = true
+      invalidStatistics = true
     } else {
       val numOfStats = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
       offset += 4
@@ -136,7 +136,7 @@ class StatisticsManager {
     var resSum: Double = 0.0
     var resNum: Int = 0
 
-    if (invaildStatistics) StaticsAnalysisResult.USE_INDEX // use index if no statistics
+    if (invalidStatistics) StaticsAnalysisResult.USE_INDEX // use index if no statistics
     else {
       for (stat <- stats) {
         val res = stat.analyse(intervalArray)

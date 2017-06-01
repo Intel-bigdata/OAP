@@ -28,7 +28,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
 
-class SampleBasedStatistics extends Statistics {
+private[spinach] class SampleBasedStatistics extends Statistics {
   override val id: Int = SampleBasedStatisticsType.id
 
   lazy val sampleRate: Double = StatisticsManager.sampleRate

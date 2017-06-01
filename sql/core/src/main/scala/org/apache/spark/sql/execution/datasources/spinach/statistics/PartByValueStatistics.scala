@@ -39,7 +39,7 @@ import org.apache.spark.unsafe.Platform
 // (241,  "test#241")   240            241
 // (300,  "test#300")   299            300
 
-class PartByValueStatistics extends Statistics {
+private[spinach] class PartByValueStatistics extends Statistics {
   override val id: Int = PartByValueStatisticsType.id
   @transient private lazy val converter = UnsafeProjection.create(schema)
 

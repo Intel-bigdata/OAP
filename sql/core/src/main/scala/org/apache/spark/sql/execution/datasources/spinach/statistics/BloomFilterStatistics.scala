@@ -26,7 +26,7 @@ import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
-class BloomFilterStatistics extends Statistics {
+private[spinach] class BloomFilterStatistics extends Statistics {
   override val id: Int = BloomFilterStatisticsType.id
 
   protected var bfIndex: BloomFilter = _
