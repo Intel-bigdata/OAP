@@ -1378,28 +1378,30 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
    * Create an index. Create a [[CreateIndex]] command.
    *
    * {{{
-   *   CREATE INDEX [IF NOT EXISTS] indexName ON tableName (col1 [ASC | DESC], col2, ...)
-   *   [USING (BTREE | BLOOM | BITMAP)]
+   *   CREATE SINDEX [IF NOT EXISTS] indexName ON tableName (col1 [ASC | DESC], col2, ...)
+   *   [USING (BTREE | BLOOM | BITMAP)] [PARTITION (partcol1=val1, partcol2=val2 ...)]
    * }}}
    */
   override def visitSpinachCreateIndex(ctx: SpinachCreateIndexContext): LogicalPlan =
     withOrigin(ctx) {
       CreateIndex(
         ctx.IDENTIFIER.getText, UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier())),
-        visitIndexCols(ctx.indexCols), ctx.EXISTS != null, visitIndexType(ctx.indexType))
+        visitIndexCols(ctx.indexCols), ctx.EXISTS != null, visitIndexType(ctx.indexType),
+        Option(ctx.partitionSpec).map(visitNonOptionalPartitionSpec))
     }
 
   /**
    * Drop an index. Create a [[DropIndex]] command.
    *
    * {{{
-   *   DROP INDEX [IF EXISTS] indexName on tableName
+   *   DROP INDEX [IF EXISTS] indexName on tableName [PARTITION (partcol1=val1, partcol2=val2 ...)]
    * }}}
    */
   override def visitSpinachDropIndex(ctx: SpinachDropIndexContext): LogicalPlan = withOrigin(ctx) {
     DropIndex(
       ctx.IDENTIFIER.getText,
-      UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier)), ctx.EXISTS != null)
+      UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier)), ctx.EXISTS != null,
+      Option(ctx.partitionSpec).map(visitNonOptionalPartitionSpec))
   }
 
   override def visitIndexCols(ctx: IndexColsContext): Array[IndexColumn] = withOrigin(ctx) {

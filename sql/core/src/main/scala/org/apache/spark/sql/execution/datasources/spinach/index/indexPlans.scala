@@ -23,6 +23,7 @@ import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Dataset, Row, SparkSession}
+import org.apache.spark.sql.catalyst.catalog.CatalogTypes._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.SQLExecution
@@ -42,7 +43,8 @@ case class CreateIndex(
     relation : LogicalPlan,
     indexColumns: Array[IndexColumn],
     allowExists: Boolean,
-    indexType: AnyIndexType) extends RunnableCommand with Logging {
+    indexType: AnyIndexType,
+    partitionSpec: Option[TablePartitionSpec]) extends RunnableCommand with Logging {
   override def children: Seq[LogicalPlan] = Seq(relation)
 
   override val output: Seq[Attribute] = Seq.empty
@@ -60,7 +62,7 @@ case class CreateIndex(
     }
 
     logInfo(s"Creating index $indexName")
-    val partitions = SpinachUtils.getPartitions(fileCatalog)
+    val partitions = SpinachUtils.getPartitions(fileCatalog, partitionSpec)
     // TODO currently we ignore empty partitions, so each partition may have different indexes,
     // this may impact index updating. It may also fail index existence check. Should put index
     // info at table level also.
@@ -182,7 +184,8 @@ case class CreateIndex(
 case class DropIndex(
     indexName: String,
     relation: LogicalPlan,
-    allowNotExists: Boolean) extends RunnableCommand {
+    allowNotExists: Boolean,
+    partitionSpec: Option[TablePartitionSpec]) extends RunnableCommand {
 
   override def children: Seq[LogicalPlan] = Seq(relation)
 
@@ -193,7 +196,7 @@ case class DropIndex(
       case LogicalRelation(HadoopFsRelation(_, fileCatalog, _, _, _, format, _), _, identifier)
           if format.isInstanceOf[SpinachFileFormat] || format.isInstanceOf[ParquetFileFormat] =>
         logInfo(s"Dropping index $indexName")
-        val partitions = SpinachUtils.getPartitions(fileCatalog)
+        val partitions = SpinachUtils.getPartitions(fileCatalog, partitionSpec)
         partitions.filter(_.files.nonEmpty).foreach(p => {
           val parent = p.files.head.getPath.getParent
           // TODO get `fs` outside of foreach() to boost
@@ -260,7 +263,7 @@ case class RefreshIndex(
         throw new SpinachException(s"We don't support index refreshing for ${other.simpleString}")
     }
 
-    val partitions = SpinachUtils.getPartitions(fileCatalog).filter(_.files.nonEmpty)
+    val partitions = SpinachUtils.getPartitions(fileCatalog, Option.empty).filter(_.files.nonEmpty)
     // TODO currently we ignore empty partitions, so each partition may have different indexes,
     // this may impact index updating. It may also fail index existence check. Should put index
     // info at table level also.
@@ -419,7 +422,7 @@ case class SpinachShowIndex(relation: LogicalPlan) extends RunnableCommand with 
         throw new SpinachException(s"We don't support index refreshing for ${other.simpleString}")
     }
 
-    val partitions = SpinachUtils.getPartitions(fileCatalog).filter(_.files.nonEmpty)
+    val partitions = SpinachUtils.getPartitions(fileCatalog, Option.empty).filter(_.files.nonEmpty)
     // TODO currently we ignore empty partitions, so each partition may have different indexes,
     // this may impact index updating. It may also fail index existence check. Should put index
     // info at table level also.
