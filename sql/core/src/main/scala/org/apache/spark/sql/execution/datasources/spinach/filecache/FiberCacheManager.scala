@@ -58,7 +58,7 @@ private[spinach] sealed trait AbstractFiberCacheManger extends Logging {
           MemoryManager.free(n.getValue)
         }
       })
-      .build(new CacheLoader[ENTRY, FiberCache]() {
+      .build[ENTRY, FiberCache](new CacheLoader[ENTRY, FiberCache]() {
         override def load(entry: ENTRY): FiberCache = {
           fiber2Data(entry.key, entry.conf)
         }
@@ -97,7 +97,7 @@ private[spinach] object DataFileHandleCacheManager extends Logging {
           n.getValue.fin.close()
         }
       })
-      .build(new CacheLoader[ENTRY, DataFileHandle]() {
+      .build[ENTRY, DataFileHandle](new CacheLoader[ENTRY, DataFileHandle]() {
         override def load(entry: ENTRY)
         : DataFileHandle = {
           logDebug(s"Loading Data File Handle ${entry.key.path}")
