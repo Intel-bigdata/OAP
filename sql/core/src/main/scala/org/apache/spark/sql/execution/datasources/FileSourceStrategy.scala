@@ -32,6 +32,7 @@ import org.apache.spark.sql.execution.DataSourceScanExec.{INPUT_PATHS, PUSHED_FI
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach.SpinachFileFormat
+import org.apache.spark.sql.execution.datasources.spinach.filecache.FiberSensor
 import org.apache.spark.sql.internal.SQLConf
 
 /**
@@ -200,9 +201,10 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
                     partition.values, file.getPath.toUri.toString, offset, size, hosts)
                 }
               } else {
-                val hosts = getBlockHosts(blockLocations, 0, file.getLen)
+                val cachedHosts = FiberSensor.getHosts(file.getPath.toString)
+                val hosts = cachedHosts.toBuffer ++ getBlockHosts(blockLocations, 0, file.getLen)
                 Seq(PartitionedFile(
-                  partition.values, file.getPath.toUri.toString, 0, file.getLen, hosts))
+                  partition.values, file.getPath.toUri.toString, 0, file.getLen, hosts.toArray))
               }
             }
           }.toArray.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
