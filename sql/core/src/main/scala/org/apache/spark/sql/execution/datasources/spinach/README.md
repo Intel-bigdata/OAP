@@ -1,23 +1,23 @@
 # OAP - Optimized Analytics Package for Spark Platform
-OAP - Optimized Analytics Package (Spinach as code name) is designed to accelerate Ad-hoc query. Spinach defines a new parquet-like columnar storage data format and offering a fine-grained hierarchical cache mechanism in the unit of “Fiber” in memory. What’s more, Spinach has extended the Spark SQL DDL to allow user to define the customized indices based on relation.
+OAP - Optimized Analytics Package (Spinach as code name) is designed to accelerate Ad-hoc query. OAP defines a new parquet-like columnar storage data format and offering a fine-grained hierarchical cache mechanism in the unit of “Fiber” in memory. What’s more, OAP has extended the Spark SQL DDL to allow user to define the customized indices based on relation.
 ## Building
 ```
 mvn -DskipTests package
 ```
-## Use Spinach with Spark
-After `mvn package` you will find `spinach-<version>.jar` in `target/`. Update `spark.driver.extraClassPath` and `spark.executor.extraClassPath` to include this jar file, and you can use Spinach from `bin/spark-sql`, `bin/spark-shell` or `sbin/start-thriftserver` as you usually do.
+## Use OAP with Spark
+After `mvn package` you will find `oap-<version>.jar` in `target/`. Update `spark.driver.extraClassPath` and `spark.executor.extraClassPath` to include this jar file, and you can use Spinach from `bin/spark-sql`, `bin/spark-shell` or `sbin/start-thriftserver` as you usually do.
 ## Example
 ```
 ./bin/spark-shell
-> spark.sql(s"""CREATE TEMPORARY TABLE spinach_test (a INT, b STRING)
+> spark.sql(s"""CREATE TEMPORARY TABLE oap_test (a INT, b STRING)
            | USING spn
-           | OPTIONS (path 'hdfs:///spinach-data-dir/')""".stripMargin)
+           | OPTIONS (path 'hdfs:///oap-data-dir/')""".stripMargin)
 > val data = (1 to 300).map { i => (i, s"this is test $i") }.toDF().createOrReplaceTempView("t")
-> spark.sql("insert overwrite table spinach_test select * from t")
-> spark.sql("create sindex index1 on spinach_test (a)")
-> spark.sql("show sindex from spinach_test")
-> spark.sql("SELECT * FROM spinach_test WHERE a = 1").show()
-> spark.sql("drop sindex index on spinach_test")
+> spark.sql("insert overwrite table oap_test select * from t")
+> spark.sql("create sindex index1 on oap_test (a)")
+> spark.sql("show sindex from oap_test")
+> spark.sql("SELECT * FROM oap_test WHERE a = 1").show()
+> spark.sql("drop sindex index on oap_test")
 ```
 ## Running Test
 ```
