@@ -25,12 +25,21 @@ import collection.JavaConverters._
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
 
+import org.apache.spark.SparkConf
+import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.SpinachException
 import org.apache.spark.sql.execution.datasources.spinach.io._
 import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
 
+
+// TODO need to register within the SparkContext
+class SpinachHeartBeatMessager extends CustomManager with Logging {
+  override def status(conf: SparkConf): String = {
+    FiberCacheManager.status
+  }
+}
 
 private[spinach] sealed case class ConfigurationCache[T](key: T, conf: Configuration) {
   override def hashCode: Int = key.hashCode()
