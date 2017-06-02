@@ -19,12 +19,17 @@ package org.apache.spark.sql.execution.datasources.spinach.filecache
 
 import java.util.concurrent.TimeUnit
 
+import scala.collection.mutable
+
+import collection.JavaConverters._
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.SpinachException
-import org.apache.spark.sql.execution.datasources.spinach.io.{DataFile, DataFileHandle, IndexFile}
+import org.apache.spark.sql.execution.datasources.spinach.io._
+import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
+import org.apache.spark.util.collection.BitSet
 
 
 private[spinach] sealed case class ConfigurationCache[T](key: T, conf: Configuration) {
@@ -78,6 +83,38 @@ object FiberCacheManager extends AbstractFiberCacheManger {
       file.getFiberData(rowGroupId, columnIndex, conf)
     case IndexFiber(file) => file.getIndexFiberData(conf)
     case other => throw new SpinachException(s"Cannot identify what's $other")
+  }
+
+  def status: String = {
+    val dataFiberConfPairs = this.cache.asMap().keySet().asScala.map {
+      case entry @ ConfigurationCache(key: DataFiber, conf) => (key, conf)
+    }
+
+    val fiberFileToFiberMap = new mutable.HashMap[String, mutable.Buffer[DataFiber]]()
+    dataFiberConfPairs.foreach { case (dataFiber, _) =>
+      fiberFileToFiberMap.getOrElseUpdate(
+        dataFiber.file.path, new mutable.ArrayBuffer[DataFiber]) += dataFiber
+    }
+
+
+    val filePathSet = new mutable.HashSet[String]()
+    val statusRawData = dataFiberConfPairs.map {
+      case (dataFiber @ DataFiber(dataFile : SpinachDataFile, _, _), conf)
+        if !filePathSet.contains(dataFile.path) =>
+        val fileMeta =
+          DataFileHandleCacheManager(dataFile, conf).asInstanceOf[SpinachDataFileHandle]
+        val fiberBitSet = new BitSet(fileMeta.groupCount * fileMeta.fieldCount)
+        val fiberCachedList: Seq[DataFiber] =
+          fiberFileToFiberMap.getOrElse(dataFile.path, Seq.empty)
+        fiberCachedList.foreach { fiber =>
+          fiberBitSet.set(fiber.columnIndex + fileMeta.fieldCount * fiber.rowGroupId)
+        }
+        filePathSet.add(dataFile.path)
+        FiberCacheStatus(dataFile.path, fiberBitSet, fileMeta)
+    }.toSeq
+
+    val retStatus = CacheStatusSerDe.serialize(statusRawData)
+    retStatus
   }
 }
 
