@@ -2095,7 +2095,9 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     // Use reflection to instantiate listeners specified via `spark.extraListeners`
     try {
       val listenerClassNames: Seq[String] =
-        conf.get("spark.extraListeners", "").split(',').map(_.trim).filter(_ != "")
+        conf.get("spark.extraListeners",
+          "org.apache.spark.sql.execution.datasources.spinach.listener.FiberInfoListener")
+          .split(',').map(_.trim).filter(_ != "")
       for (className <- listenerClassNames) {
         // Use reflection to find the right constructor
         val constructors = {
