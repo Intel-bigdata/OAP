@@ -95,7 +95,7 @@ object FiberCacheManager extends AbstractFiberCacheManger {
   }
 
   def status: String = {
-    val dataFiberConfPairs = this.cache.asMap().keySet().asScala.map {
+    val dataFiberConfPairs = this.cache.asMap().keySet().asScala.collect {
       case entry @ ConfigurationCache(key: DataFiber, conf) => (key, conf)
     }
 
