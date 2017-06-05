@@ -107,7 +107,7 @@ object FiberCacheManager extends AbstractFiberCacheManger {
 
 
     val filePathSet = new mutable.HashSet[String]()
-    val statusRawData = dataFiberConfPairs.map {
+    val statusRawData = dataFiberConfPairs.collect {
       case (dataFiber @ DataFiber(dataFile : SpinachDataFile, _, _), conf)
         if !filePathSet.contains(dataFile.path) =>
         val fileMeta =
