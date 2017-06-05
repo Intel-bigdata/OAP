@@ -22,6 +22,7 @@ import java.io.PrintStream
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SpinachSession, SQLContext}
+import org.apache.spark.sql.execution.datasources.spinach.listener.FiberInfoListener
 import org.apache.spark.sql.hive.{HiveUtils, SpinachSessionState}
 import org.apache.spark.util.Utils
 
@@ -61,6 +62,10 @@ private[hive] object SpinachEnv extends Logging {
       sessionState.metadataHive.setError(new PrintStream(System.err, true, "UTF-8"))
       sparkSession.conf.set("spark.sql.hive.version", HiveUtils.hiveExecutionVersion)
     }
+
+    logDebug("register FiberInfoListener")
+    sparkContext.addSparkListener(new FiberInfoListener)
+
     SparkSQLEnv.sparkContext = sparkContext
     SparkSQLEnv.sqlContext = sqlContext
   }
