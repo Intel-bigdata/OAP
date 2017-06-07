@@ -23,7 +23,7 @@ import org.apache.parquet.format.{CompressionCodec, Encoding}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.spinach.DataSourceMeta
+import org.apache.spark.sql.execution.datasources.spinach.{DataSourceMeta, SpinachFileFormat}
 import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
@@ -37,29 +37,29 @@ private[spinach] class SpinachDataWriter(
     out: FSDataOutputStream,
     schema: StructType,
     conf: Configuration) extends Logging {
-  // Using java options to config
-  // NOTE: java options should not start with spark (e.g. "spark.xxx.xxx"), or it cannot pass
-  // the config validation of SparkConf
-  // TODO make it configuration via SparkContext / Table Properties
-  private def DEFAULT_ROW_GROUP_SIZE = System.getProperty("spinach.rowgroup.size",
-    "1024").toInt
-  logDebug(s"spinach.rowgroup.size setting to ${DEFAULT_ROW_GROUP_SIZE}")
-  private def COMPRESSION_CODEC_NAME = System.getProperty("spinach.compression.codec", "GZIP")
-  logDebug(s"spinach.compression.codec setting to ${COMPRESSION_CODEC_NAME}")
+
+  private val ROW_GROUP_SIZE =
+    conf.get(SpinachFileFormat.ROW_GROUP_SIZE, SpinachFileFormat.DEFAULT_ROW_GROUP_SIZE).toInt
+  logDebug(s"${SpinachFileFormat.ROW_GROUP_SIZE} setting to $ROW_GROUP_SIZE")
+
+  private val COMPRESSION_CODEC = CompressionCodec.valueOf(
+    conf.get(SpinachFileFormat.COMPRESSION, SpinachFileFormat.DEFAULT_COMPRESSION))
+  logDebug(s"${SpinachFileFormat.COMPRESSION} setting to ${COMPRESSION_CODEC.name()}")
+
   private var rowCount: Int = 0
   private var rowGroupCount: Int = 0
 
   private val rowGroup: Array[DataFiberBuilder] =
-    DataFiberBuilder.initializeFromSchema(schema, DEFAULT_ROW_GROUP_SIZE)
+    DataFiberBuilder.initializeFromSchema(schema, ROW_GROUP_SIZE)
 
   private val fiberMeta = new SpinachDataFileHandle(
-    rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE,
+    rowCountInEachGroup = ROW_GROUP_SIZE,
     fieldCount = schema.length,
-    codec = CompressionCodec.valueOf(COMPRESSION_CODEC_NAME))
+    codec = COMPRESSION_CODEC)
 
   private val codecFactory = new CodecFactory(conf)
   private val compressor: BytesCompressor =
-    codecFactory.getCompressor(CompressionCodec.valueOf(COMPRESSION_CODEC_NAME))
+    codecFactory.getCompressor(COMPRESSION_CODEC)
 
   def write(row: InternalRow) {
     var idx = 0
@@ -68,7 +68,7 @@ private[spinach] class SpinachDataWriter(
       idx += 1
     }
     rowCount += 1
-    if (rowCount % DEFAULT_ROW_GROUP_SIZE == 0) {
+    if (rowCount % ROW_GROUP_SIZE == 0) {
       writeRowGroup()
     }
   }
@@ -100,7 +100,7 @@ private[spinach] class SpinachDataWriter(
   }
 
   def close() {
-    val remainingRowCount = rowCount % DEFAULT_ROW_GROUP_SIZE
+    val remainingRowCount = rowCount % ROW_GROUP_SIZE
     if (remainingRowCount != 0) {
       // should be end of the insertion, put the row groups into the last row group
       writeRowGroup()
@@ -121,7 +121,7 @@ private[spinach] class SpinachDataWriter(
     fiberMeta
       .withGroupCount(rowGroupCount)
       .withRowCountInLastGroup(
-        if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else DEFAULT_ROW_GROUP_SIZE)
+        if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else ROW_GROUP_SIZE)
       .withEncodings(columnEncodings)
       .withDictionaryDataLens(dictDataLens)
       .withDictionaryIdSizes(dictSizes)

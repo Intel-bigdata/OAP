@@ -30,7 +30,6 @@ class SpinachDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
   import testImplicits._
 
   override def beforeEach(): Unit = {
-    System.setProperty("spinach.rowgroup.size", "1024")
     val path1 = Utils.createTempDir().getAbsolutePath
     val path2 = Utils.createTempDir().getAbsolutePath
 

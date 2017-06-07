@@ -31,7 +31,6 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
   import testImplicits._
 
   override def beforeEach(): Unit = {
-    System.setProperty("spinach.rowgroup.size", "1024")
     val path = Utils.createTempDir().getAbsolutePath
     sql(s"""CREATE TEMPORARY VIEW spinach_test (a INT, b STRING)
             | USING spn

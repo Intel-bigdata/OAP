@@ -37,7 +37,6 @@ class DataSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   val conf: Configuration = new Configuration()
 
   override def beforeAll(): Unit = {
-    System.setProperty("spinach.rowgroup.size", "1024")
     file = Utils.createTempDir()
     // file.delete()
   }

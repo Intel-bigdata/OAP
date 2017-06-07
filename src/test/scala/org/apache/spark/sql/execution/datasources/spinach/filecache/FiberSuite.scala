@@ -40,7 +40,6 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   val conf: Configuration = new Configuration()
 
   override def beforeAll(): Unit = {
-    System.setProperty("spinach.rowgroup.size", "1024")
     file = Utils.createTempDir()
     file.delete()
   }
@@ -109,10 +108,9 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   }
 
   test("test spinach row group configuration") {
-    val defaultRowGroupSize = System.getProperty("spinach.rowgroup.size")
-    assert(defaultRowGroupSize != null)
+    val previousRowGroupSize = conf.get(SpinachFileFormat.ROW_GROUP_SIZE)
     // change default row group size
-    System.setProperty("spinach.rowgroup.size", "12345")
+    conf.set(SpinachFileFormat.ROW_GROUP_SIZE, "12345")
     val schema = new StructType()
       .add("a", IntegerType)
       .add("b", StringType)
@@ -127,7 +125,8 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     assert(meta.rowCountInLastGroup === 10)
     assert(meta.rowGroupsMeta.length === 1)
     // set back to default value
-    System.setProperty("spinach.rowgroup.size", defaultRowGroupSize)
+    if (previousRowGroupSize == null) conf.unset(SpinachFileFormat.ROW_GROUP_SIZE)
+    else conf.set(SpinachFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
   }
 
   // a simple algorithm to check if it's should be null

@@ -81,8 +81,17 @@ private[sql] class SpinachFileFormat extends FileFormat
     sparkSession: SparkSession,
     job: Job, options: Map[String, String],
     dataSchema: StructType): OutputWriterFactory = {
-    // TODO pass down something via job conf
     val conf = job.getConfiguration
+
+    // TODO: Should we have our own config util instead of SqlConf?
+    // First use table option, if not, use SqlConf, else, use default value.
+    conf.set(SpinachFileFormat.COMPRESSION, options.getOrElse("compression",
+        sparkSession.conf.get(SQLConf.SPINACH_COMPRESSION.key,
+          SpinachFileFormat.DEFAULT_COMPRESSION)))
+
+    conf.set(SpinachFileFormat.ROW_GROUP_SIZE, options.getOrElse("rowgroup",
+      sparkSession.conf.get(SQLConf.SPINACH_ROW_GROUP_SIZE.key,
+      SpinachFileFormat.DEFAULT_ROW_GROUP_SIZE)))
 
     new SpinachOutputWriterFactory(sparkSession.sqlContext.conf,
       dataSchema,
@@ -372,6 +381,11 @@ private[sql] object SpinachFileFormat {
   val SPINACH_DATA_SOURCE_META = "spinach.meta.datasource"
   val SPINACH_DATA_FILE_CLASSNAME = classOf[SpinachDataFile].getCanonicalName
   val PARQUET_DATA_FILE_CLASSNAME = classOf[ParquetDataFile].getCanonicalName
+
+  val COMPRESSION = "spinach.compression"
+  val DEFAULT_COMPRESSION = "UNCOMPRESSED"
+  val ROW_GROUP_SIZE = "spinach.rowgroup.size"
+  val DEFAULT_ROW_GROUP_SIZE = "1024"
 
   def serializeDataSourceMeta(conf: Configuration, meta: Option[DataSourceMeta]): Unit = {
     SerializationUtil.writeObjectToConfAsBase64(SPINACH_DATA_SOURCE_META, meta, conf)

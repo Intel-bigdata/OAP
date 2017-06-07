@@ -31,7 +31,6 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
   import testImplicits._
 
   override def beforeEach(): Unit = {
-    System.setProperty("spinach.rowgroup.size", "1024")
     val path = Utils.createTempDir().getAbsolutePath
 
     sql(s"""CREATE TEMPORARY TABLE spinach_test

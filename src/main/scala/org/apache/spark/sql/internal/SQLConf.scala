@@ -618,6 +618,22 @@ object SQLConf {
       .booleanConf
       .createWithDefault(false)
 
+  val SPINACH_COMPRESSION = SQLConfigBuilder("spark.sql.spinach.compression.codec")
+    .internal()
+    .doc("Sets the compression codec use when writing Parquet files. Acceptable values include: " +
+      "uncompressed, snappy, gzip, lzo.")
+    .stringConf
+    .transform(_.toLowerCase())
+    .checkValues(Set("uncompressed", "snappy", "gzip", "lzo"))
+    .createWithDefault("uncompressed")
+
+  val SPINACH_ROW_GROUP_SIZE =
+    SQLConfigBuilder("spark.sql.spinach.rowgroup.size")
+      .internal()
+      .doc("Define the row number for each row group")
+      .intConf
+      .createWithDefault(1024)
+
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
