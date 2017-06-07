@@ -28,9 +28,7 @@ import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.WriteResult
-import org.apache.spark.sql.execution.datasources.spinach.io.DataFile
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
@@ -43,7 +41,6 @@ private[spinach] class BitMapIndexWriter(
     keySchema: StructType,
     indexName: String,
     isAppend: Boolean) extends IndexWriter(relation, job, isAppend) {
-  private var encodedSchema: StructType = _
 
   override def writeIndexFromRows(
       taskContext: TaskContext, iterator: Iterator[InternalRow]): Seq[IndexBuildResult] = {
@@ -70,15 +67,10 @@ private[spinach] class BitMapIndexWriter(
     val filename = InputFileNameHolder.getInputFileName().toString
     configuration.set(IndexWriter.INPUT_FILE_NAME, filename)
     configuration.set(IndexWriter.INDEX_NAME, indexName)
-
     // TODO deal with partition
     var writer = newIndexOutputWriter()
     writer.initConverter(dataSchema)
-    val dataFile = DataFile(filename, dataFileSchema, readerClassName)
-    val dictionaries = keySchema.map(field => dataFileSchema.indexOf(field))
-      .map(ordinal => dataFile.getDictionary(ordinal, configuration))
-      .toArray
-    encodedSchema = DataFile.encodeSchema(dictionaries, keySchema)
+
     def commitTask(): Seq[WriteResult] = {
       try {
         var writeResults: Seq[WriteResult] = Nil
@@ -108,7 +100,7 @@ private[spinach] class BitMapIndexWriter(
 
     def writeTask(): Seq[IndexBuildResult] = {
       val statisticsManager = new StatisticsManager
-      statisticsManager.initialize(BitMapIndexType, encodedSchema)
+      statisticsManager.initialize(BitMapIndexType, keySchema)
       // Current impl just for fast proving the effect of BitMap Index,
       // we can do the optimize below:
       // 1. each bitset in hashmap value has same length, we can save the
@@ -124,7 +116,7 @@ private[spinach] class BitMapIndexWriter(
           taskReturn = taskReturn ++: writeIndexFromRows(taskContext, iterator)
           writeNewFile = true
         } else {
-          val v = DataFile.encodeKey(dictionaries, keySchema, iterator.next().copy())
+          val v = iterator.next().copy()
           statisticsManager.addSpinachKey(v)
           if (!tmpMap.contains(v)) {
             val list = new mutable.ListBuffer[Int]()

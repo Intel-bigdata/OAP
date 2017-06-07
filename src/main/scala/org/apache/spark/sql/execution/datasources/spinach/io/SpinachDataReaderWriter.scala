@@ -186,7 +186,7 @@ private[spinach] class SpinachDataReader(
   private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
     if (!filterScanner.get.canBeOptimizedByStatistics) {
       StaticsAnalysisResult.USE_INDEX
-    } else if (filterScanner.get.encodedIntervalArray.isEmpty) {
+    } else if (filterScanner.get.intervalArray.length == 0) {
       StaticsAnalysisResult.SKIP_INDEX
     } else {
       val fs = indexPath.getFileSystem(conf)
@@ -205,8 +205,8 @@ private[spinach] class SpinachDataReader(
       fin.close()
 
       val statisticsManager = new StatisticsManager
-      statisticsManager.read(stsArray, filterScanner.get.getEncodedSchema)
-      statisticsManager.analyse(filterScanner.get.encodedIntervalArray)
+      statisticsManager.read(stsArray, filterScanner.get.getSchema)
+      statisticsManager.analyse(filterScanner.get.intervalArray)
     }
   }
 }

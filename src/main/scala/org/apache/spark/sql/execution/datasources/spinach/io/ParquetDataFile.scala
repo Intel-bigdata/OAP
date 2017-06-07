@@ -107,9 +107,7 @@ private[spinach] case class ParquetDataFile(path: String, schema: StructType) ex
     new ParquetDataFileHandle().read(conf, new Path(StringUtils.unEscapeString(path)))
   }
 
-  override def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
-    null
-  }
+  override def getDictionary(fiberId: Int, conf: Configuration): Dictionary = null
 }
 
 private[spinach] object  ParquetDataFile {

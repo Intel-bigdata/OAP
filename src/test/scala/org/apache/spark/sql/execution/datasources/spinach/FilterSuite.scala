@@ -20,13 +20,11 @@ package org.apache.spark.sql.execution.datasources.spinach
 import java.sql.Date
 
 import org.scalatest.BeforeAndAfterEach
-import scala.util.Random
 
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
-
 
 
 class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
@@ -110,39 +108,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 1 AND a <= 3"),
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
     sql("drop sindex index1 on spinach_test")
-  }
-
-  test("filtering with dictionary encoding enabled") {
-    System.setProperty("spinach.encoding.dictionaryEnabled", "true")
-    val data = (1 to 300).map { i => (i, s"this is test $i") }.toArray
-    // Shuffle this array
-    val rnd = new Random(0)
-    data.indices.reverse.foreach{i =>
-      val index = rnd.nextInt(i + 1)
-      val temp = data(i)
-      data(i) = data(index)
-      data(index) = temp
-    }
-
-    val df = data.toSeq.toDF("a", "b")
-    df.createOrReplaceTempView("t")
-    sql("insert overwrite table spinach_test select * from t")
-
-    sql("create sindex index1 on spinach_test (a, b) using btree")
-    checkAnswer(
-      sql("SELECT * FROM spinach_test" +
-        " WHERE a = 293 AND b >= 'this is test 291' AND b < 'this is test 299'"),
-      df.filter("a = 293 AND b >= 'this is test 291' AND b < 'this is test 299'"))
-    sql("drop sindex index1 on spinach_test")
-
-    sql("create sindex index3 on spinach_test (a, b) using bitmap")
-    checkAnswer(
-      sql("SELECT * FROM spinach_test" +
-        " WHERE a = 293 AND b >= 'this is test 291' AND b < 'this is test 299'"),
-      df.filter("a = 293 AND b >= 'this is test 291' AND b < 'this is test 299'"))
-    sql("drop sindex index3 on spinach_test")
-
-    System.clearProperty("spinach.encoding.dictionaryEnabled")
   }
 
   test("filtering parquet") {

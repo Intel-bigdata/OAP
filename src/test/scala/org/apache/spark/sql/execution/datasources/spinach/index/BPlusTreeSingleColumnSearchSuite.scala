@@ -286,9 +286,6 @@ class BPlusTreeSingleColumnSearchSuite extends SparkFunSuite
     assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
     ic.getScanner match {
       case Some(scanner: BPlusTreeScanner) =>
-        // this is only for test
-        scanner.encodedIntervalArray = scanner.intervalArray
-        scanner.setEncodedSchema(scanner.getSchema)
         assert(scanner._init(
           BPlusTreeSingleColumnSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")

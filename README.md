@@ -36,11 +36,6 @@ spinach.rowgroup.szie
 * Default: 1024
 * Usage: `System.setProperty("spinach.rowgroup.size", "1024")`
 
-spinach.encoding.dictionaryEnabled
-* To enable/disable dictionary encoding
-* Default: False
-* Usage: `System.setProperty("spinach.encoding.dictionaryEnabled", "true")`
-
 spinach.compression.codec
 * Choose compression type
 * Default: GZIP

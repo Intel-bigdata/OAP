@@ -31,7 +31,6 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.WriteResult
-import org.apache.spark.sql.execution.datasources.spinach.io.DataFile
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
 import org.apache.spark.sql.execution.datasources.spinach.utils.{BTreeNode, BTreeUtils}
 import org.apache.spark.sql.internal.SQLConf
@@ -46,7 +45,6 @@ private[spinach] class BTreeIndexWriter(
     keySchema: StructType,
     indexName: String,
     isAppend: Boolean) extends IndexWriter(relation, job, isAppend) {
-  private var encodedSchema: StructType = _
 
   override def writeIndexFromRows(
       taskContext: TaskContext, iterator: Iterator[InternalRow]): Seq[IndexBuildResult] = {
@@ -74,13 +72,6 @@ private[spinach] class BTreeIndexWriter(
     val filename = InputFileNameHolder.getInputFileName().toString
     configuration.set(IndexWriter.INPUT_FILE_NAME, filename)
     configuration.set(IndexWriter.INDEX_NAME, indexName)
-    val dataFile = DataFile(filename, dataFileSchema, readerClassName)
-    val dictionaries = keySchema.map(field => dataFileSchema.indexOf(field))
-      .map(ordinal => dataFile.getDictionary(ordinal, configuration))
-      .toArray
-    encodedSchema = DataFile.encodeSchema(dictionaries, keySchema)
-
-    // val s = relation.keySchema.fields.length
     // TODO deal with partition
     // configuration.set(FileOutputFormat.OUTDIR, getWorkPath)
     var writer = newIndexOutputWriter()
@@ -96,7 +87,7 @@ private[spinach] class BTreeIndexWriter(
 
       GenerateOrdering.generate(order, keySchema.toAttributes)
     }
-    lazy val ordering = buildOrdering(encodedSchema)
+    lazy val ordering = buildOrdering(keySchema)
 
     def commitTask(): Seq[WriteResult] = {
       try {
@@ -127,7 +118,7 @@ private[spinach] class BTreeIndexWriter(
 
     def writeTask(): Seq[IndexBuildResult] = {
       val statisticsManager = new StatisticsManager
-      statisticsManager.initialize(BTreeIndexType, encodedSchema)
+      statisticsManager.initialize(BTreeIndexType, keySchema)
       // key -> RowIDs list
       val hashMap = new java.util.HashMap[InternalRow, java.util.ArrayList[Long]]()
       var cnt = 0L
@@ -137,7 +128,7 @@ private[spinach] class BTreeIndexWriter(
           taskReturn = taskReturn ++: writeIndexFromRows(taskContext, iterator)
           writeNewFile = true
         } else {
-          val v = DataFile.encodeKey(dictionaries, keySchema, iterator.next().copy())
+          val v = iterator.next().copy()
           statisticsManager.addSpinachKey(v)
           if (!hashMap.containsKey(v)) {
             val list = new java.util.ArrayList[Long]()
@@ -200,7 +191,7 @@ private[spinach] class BTreeIndexWriter(
       uniqueKeysList.addAll(uniqueKeys.toSeq.asJava)
 
       val treeOffset = writeTreeToOut(treeShape, writer, offsetMap,
-        fileOffset, uniqueKeysList, encodedSchema, 0, -1L)
+        fileOffset, uniqueKeysList, keySchema, 0, -1L)
 
       statisticsManager.write(writer)
 
@@ -265,7 +256,7 @@ private[spinach] class BTreeIndexWriter(
     }
   }
 
-  @transient private lazy val projector = UnsafeProjection.create(encodedSchema)
+  @transient private lazy val projector = UnsafeProjection.create(keySchema)
 
   /**
    * write file correspond to [[UnsafeIndexNode]]
