@@ -24,6 +24,7 @@ import scala.collection.mutable
 import collection.JavaConverters._
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
@@ -87,6 +88,15 @@ private[spinach] sealed trait AbstractFiberCacheManger extends Logging {
  * Fiber Cache Manager
  */
 object FiberCacheManager extends AbstractFiberCacheManger {
+  def removeIndexFiberCacheData(idxPath: Path): Unit =
+    cache.asMap().keySet().asScala.foreach{
+      case entry @ ConfigurationCache(key: IndexFiber, _)
+        if key.file.file.toUri.compareTo(idxPath.toUri) == 0 =>
+        cache.invalidate(entry)
+      case _ =>
+    }
+
+
   override def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = fiber match {
     case DataFiber(file, columnIndex, rowGroupId) =>
       file.getFiberData(rowGroupId, columnIndex, conf)
