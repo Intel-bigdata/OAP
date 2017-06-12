@@ -92,13 +92,9 @@ object FiberCacheManager extends AbstractFiberCacheManger {
    * @param fiber:the fiber whose corresponding memory block(off -heap) that needs to be evicted
    */
   def evictFiberCacheData(fiber: Fiber): Unit = fiber match {
-    case IndexFiber(IndexFile(idxPath)) =>
-      cache.asMap().keySet().asScala.foreach{
-        case entry @ ConfigurationCache(key: IndexFiber, _)
-          if key.file.file.toUri.compareTo(idxPath.toUri) == 0 =>
-          cache.invalidate(entry)
-        case _ =>
-      }
+    case idxFiber: IndexFiber =>
+      val entry = ConfigurationCache[Fiber](idxFiber, new Configuration())
+      if(cache.asMap().asScala.contains(entry)) cache.invalidate(entry)
     case _ => // todo: consider whether we indeed need to evict DataFiberCachedData manually
   }
 
