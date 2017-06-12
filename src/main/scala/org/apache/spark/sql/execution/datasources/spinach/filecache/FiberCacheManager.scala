@@ -24,7 +24,6 @@ import scala.collection.mutable
 import collection.JavaConverters._
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
 
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
@@ -88,13 +87,20 @@ private[spinach] sealed trait AbstractFiberCacheManger extends Logging {
  * Fiber Cache Manager
  */
 object FiberCacheManager extends AbstractFiberCacheManger {
-  def removeIndexFiberCacheData(idxPath: Path): Unit =
-    cache.asMap().keySet().asScala.foreach{
-      case entry @ ConfigurationCache(key: IndexFiber, _)
-        if key.file.file.toUri.compareTo(idxPath.toUri) == 0 =>
-        cache.invalidate(entry)
-      case _ =>
-    }
+  /**
+   * evict Fiber -> FiberCache(MemoryBlock off-heap) data manually
+   * @param fiber:the fiber whose corresponding memory block(off -heap) that needs to be evicted
+   */
+  def evictFiberCacheData(fiber: Fiber): Unit = fiber match {
+    case IndexFiber(IndexFile(idxPath)) =>
+      cache.asMap().keySet().asScala.foreach{
+        case entry @ ConfigurationCache(key: IndexFiber, _)
+          if key.file.file.toUri.compareTo(idxPath.toUri) == 0 =>
+          cache.invalidate(entry)
+        case _ =>
+      }
+    case _ => // todo: consider whether we indeed need to evict DataFiberCachedData manually
+  }
 
 
   override def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = fiber match {

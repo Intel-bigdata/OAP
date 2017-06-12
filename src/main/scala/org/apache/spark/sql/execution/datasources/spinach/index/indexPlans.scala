@@ -30,7 +30,8 @@ import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach._
-import org.apache.spark.sql.execution.datasources.spinach.filecache.FiberCacheManager
+import org.apache.spark.sql.execution.datasources.spinach.filecache.{FiberCacheManager, IndexFiber}
+import org.apache.spark.sql.execution.datasources.spinach.io.IndexFile
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
@@ -231,7 +232,7 @@ case class DropIndex(
             }.toSeq
             filePaths.filter(_.toString.endsWith(
               "." + indexName + SpinachFileFormat.SPINACH_INDEX_EXTENSION)).foreach{idxPath =>
-              FiberCacheManager.removeIndexFiberCacheData(idxPath)
+              FiberCacheManager.evictFiberCacheData(IndexFiber(IndexFile(idxPath)))
               fs.delete(idxPath, true)}
           }
         })
