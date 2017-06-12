@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.spinach
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
@@ -38,11 +40,15 @@ class SpinachDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
     sql(s"""CREATE TEMPORARY VIEW spinach_test_2 (a INT, b STRING)
            | USING spn
            | OPTIONS (path '$path2')""".stripMargin)
+    sql(s"""CREATE TABLE spinach_partition_table (a int, b int, c STRING)
+            | USING parquet
+            | PARTITIONED by (b, c)""".stripMargin)
   }
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("spinach_test_1")
     sqlContext.dropTempTable("spinach_test_2")
+    sqlContext.dropTempTable("spinach_partition_table")
   }
 
   test("show index") {
@@ -72,6 +78,51 @@ class SpinachDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
         Row("spinach_test_2", "index6", 0, "a", "A", "BITMAP") ::
         Row("spinach_test_2", "index1", 0, "a", "D", "BTREE") ::
         Row("spinach_test_2", "index1", 1, "b", "D", "BTREE") :: Nil)
+  }
+
+  test("create and drop index with partition specify") {
+    val data: Seq[(Int, Int)] = (1 to 10).map { i => (i, i) }
+    data.toDF("key", "value").registerTempTable("t")
+
+    val path = new Path(spark.sqlContext.conf.warehousePath)
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE spinach_partition_table
+        |partition (b=1, c='c1')
+        |SELECT key from t where value < 4
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT INTO TABLE spinach_partition_table
+        |partition (b=2, c='c2')
+        |SELECT key from t where value == 4
+      """.stripMargin)
+
+    sql("create sindex index1 on spinach_partition_table (a) partition (b=1, c='c1')")
+
+    checkAnswer(sql("select * from spinach_partition_table where a < 4"),
+      Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Nil)
+
+    assert(path.getFileSystem(
+      new Configuration()).globStatus(new Path(path,
+        "spinach_partition_table/b=1/c=c1/*.index")).length != 0)
+    assert(path.getFileSystem(
+      new Configuration()).globStatus(new Path(path,
+        "spinach_partition_table/b=2/c=c2/*.index")).length == 0)
+
+    sql("create sindex index1 on spinach_partition_table (a) partition (b=2, c='c2')")
+    sql("drop sindex index1 on spinach_partition_table partition (b=1, c='c1')")
+
+    checkAnswer(sql("select * from spinach_partition_table"),
+      Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Row(4, 2, "c2") :: Nil)
+    assert(path.getFileSystem(
+      new Configuration()).globStatus(new Path(path,
+      "spinach_partition_table/b=1/c=c1/*.index")).length == 0)
+    assert(path.getFileSystem(
+      new Configuration()).globStatus(new Path(path,
+      "spinach_partition_table/b=2/c=c2/*.index")).length != 0)
   }
 }
 
