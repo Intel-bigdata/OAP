@@ -30,6 +30,8 @@ import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach._
+import org.apache.spark.sql.execution.datasources.spinach.filecache.{FiberCacheManager, IndexFiber}
+import org.apache.spark.sql.execution.datasources.spinach.io.IndexFile
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
@@ -227,8 +229,9 @@ case class DropIndex(
               override def next(): Path = allFile.next().getPath
             }.toSeq
             filePaths.filter(_.toString.endsWith(
-              "." + indexName + SpinachFileFormat.SPINACH_INDEX_EXTENSION)).foreach(
-              fs.delete(_, true))
+              "." + indexName + SpinachFileFormat.SPINACH_INDEX_EXTENSION)).foreach{idxPath =>
+              FiberCacheManager.evictFiberCacheData(IndexFiber(IndexFile(idxPath)))
+              fs.delete(idxPath, true)}
           }
         })
       case other => sys.error(s"We don't support index dropping for ${other.simpleString}")

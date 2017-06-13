@@ -87,6 +87,18 @@ private[spinach] sealed trait AbstractFiberCacheManger extends Logging {
  * Fiber Cache Manager
  */
 object FiberCacheManager extends AbstractFiberCacheManger {
+  /**
+   * evict Fiber -> FiberCache(MemoryBlock off-heap) data manually
+   * @param fiber:the fiber whose corresponding memory block(off -heap) that needs to be evicted
+   */
+  def evictFiberCacheData(fiber: Fiber): Unit = fiber match {
+    case idxFiber: IndexFiber =>
+      val entry = ConfigurationCache[Fiber](idxFiber, new Configuration())
+      if(cache.asMap().asScala.contains(entry)) cache.invalidate(entry)
+    case _ => // todo: consider whether we indeed need to evict DataFiberCachedData manually
+  }
+
+
   override def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = fiber match {
     case DataFiber(file, columnIndex, rowGroupId) =>
       file.getFiberData(rowGroupId, columnIndex, conf)
