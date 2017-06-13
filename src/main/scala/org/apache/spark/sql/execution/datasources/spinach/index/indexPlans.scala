@@ -124,7 +124,7 @@ case class CreateIndex(
       indexColumns.map(c => s.map(_.name).toIndexedSeq.indexOf(c.columnName))
     val keySchema = StructType(ids.map(s.toIndexedSeq(_)))
     var ds = Dataset.ofRows(sparkSession, Project(ids.map(relation.output), relation))
-    partitionSpec.get.foreach { case (k, v) =>
+    partitionSpec.getOrElse(Map.empty).foreach { case (k, v) =>
       ds = ds.filter(s"$k='$v'")
     }
     val queryExecution = ds.queryExecution
