@@ -124,7 +124,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
 
     generateInterval(IndexScanner.DUMMY_KEY_START, rowGen(0),
-      startInclude = true, endInclude = true)
+      startInclude = true, endInclude = false)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
 
     generateInterval(IndexScanner.DUMMY_KEY_START, rowGen(300),
@@ -140,7 +140,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
 
     generateInterval(rowGen(300), IndexScanner.DUMMY_KEY_END,
-      startInclude = true, endInclude = true)
+      startInclude = false, endInclude = true)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(301), IndexScanner.DUMMY_KEY_END,
