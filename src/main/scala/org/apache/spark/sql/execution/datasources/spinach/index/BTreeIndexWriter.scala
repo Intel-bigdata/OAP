@@ -128,7 +128,7 @@ private[spinach] class BTreeIndexWriter(
           taskReturn = taskReturn ++: writeIndexFromRows(taskContext, iterator)
           writeNewFile = true
         } else {
-          val v = iterator.next().copy()
+          val v = InternalRow.fromSeq(iterator.next().toSeq(keySchema))
           statisticsManager.addSpinachKey(v)
           if (!hashMap.containsKey(v)) {
             val list = new java.util.ArrayList[Long]()

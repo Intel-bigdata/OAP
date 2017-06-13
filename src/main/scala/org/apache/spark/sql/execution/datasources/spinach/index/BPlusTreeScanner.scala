@@ -73,7 +73,6 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
             // find the last identical key or the last key less than the specified one on the left
             this.intervalArray(i).end = moveTo(root, interval.end, false, order).currentKey
           }
-
         }
         // to deal with the LeftOpen condition
         while (!interval.startInclude &&
@@ -99,7 +98,6 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
       ordering.compare(
         currentKeyArray(i).currentKey, intervalArray(i).end) >= 0
     }
-
   }
 
   /**
