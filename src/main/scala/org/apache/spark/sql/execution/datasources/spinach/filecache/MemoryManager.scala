@@ -17,6 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.filecache
 
+import java.util.concurrent.atomic.AtomicLong
+
+import org.apache.spark.internal.Logging
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
 
 
@@ -32,20 +35,20 @@ case class DataFiberCache(fiberData: MemoryBlock) extends FiberCache
 private[spinach] case class IndexFiberCacheData(
     fiberData: MemoryBlock, dataEnd: Long, rootOffset: Long) extends FiberCache
 
-private[spinach] object MemoryManager {
-  private val indexCapacity: Long = Long.MaxValue / 2
-  private val dataCapacity: Long = Long.MaxValue / 2
+private[spinach] object MemoryManager extends Logging {
+
+  private val usage = new AtomicLong(0)
 
   def allocate(numOfBytes: Int): DataFiberCache = {
     val fiberData = MemoryAllocator.UNSAFE.allocate(numOfBytes)
+    logDebug(s"allocated $numOfBytes bytes." +
+      s"current usage: ${usage.addAndGet(numOfBytes)} bytes")
     DataFiberCache(fiberData)
   }
 
   def free(fiber: FiberCache): Unit = {
     MemoryAllocator.UNSAFE.free(fiber.fiberData)
+    logDebug(s"freed ${fiber.fiberData.size()} bytes. " +
+      s"current usage: ${usage.addAndGet(-fiber.fiberData.size())} bytes")
   }
-
-  def getCapacity(): Long = indexCapacity + dataCapacity
-  def getIndexCacheCapacity(): Long = indexCapacity
-  def getDataCacheCapacity(): Long = dataCapacity
 }

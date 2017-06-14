@@ -19,11 +19,10 @@ package org.apache.spark.sql.execution.datasources.spinach.filecache
 
 import java.util.concurrent.TimeUnit
 
-import scala.collection.mutable
-
-import collection.JavaConverters._
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
+import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
@@ -31,6 +30,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.SpinachException
 import org.apache.spark.sql.execution.datasources.spinach.io._
 import org.apache.spark.sql.execution.datasources.spinach.utils.CacheStatusSerDe
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.collection.BitSet
 
 
@@ -52,33 +52,63 @@ private[spinach] sealed case class ConfigurationCache[T](key: T, conf: Configura
 /**
  * The abstract class is for unit testing purpose.
  */
-private[spinach] sealed trait AbstractFiberCacheManger extends Logging {
+private[spinach] trait AbstractFiberCacheManger extends Logging {
   type ENTRY = ConfigurationCache[Fiber]
 
   protected def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache
+  protected def freeFiberData(fiberCache: FiberCache): Unit
 
-  @transient protected val cache =
-    CacheBuilder
-      .newBuilder()
+  @transient protected var cache: LoadingCache[ENTRY, FiberCache] = _
+
+  private def buildCache(conf: Configuration): LoadingCache[ENTRY, FiberCache] = {
+
+    val weight = conf.getLong(SQLConf.SPINACH_FIBERCACHE_SIZE.key,
+                              SQLConf.SPINACH_FIBERCACHE_SIZE.defaultValue.get)
+
+    if (weight >= 8 * 1024 * 1024 * 1024L) {
+      throw new SpinachException(s"${SQLConf.SPINACH_FIBERCACHE_SIZE.key} should be less than 8GB")
+    }
+
+    val builder = CacheBuilder.newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
       .weigher(new Weigher[ENTRY, FiberCache] {
-        override def weigh(key: ENTRY, value: FiberCache): Int = value.fiberData.size().toInt
-      })
-      .maximumWeight(MemoryManager.getDataCacheCapacity())
-      .removalListener(new RemovalListener[ENTRY, FiberCache] {
-        override def onRemoval(n: RemovalNotification[ENTRY, FiberCache]): Unit = {
-          // TODO cause exception while we removal the using data. we need an lock machanism
-          // to lock the allocate, using and the free
-          MemoryManager.free(n.getValue)
+        override def weigh(key: ENTRY, value: FiberCache): Int = {
+          // Use KB as Unit due to large weight will cause Guava overflow
+          val weight = value.fiberData.size() / 1024
+          if (weight > Int.MaxValue) {
+            throw new SpinachException(s"Too large fiber size $weight KB")
+          }
+          weight.toInt
         }
       })
-      .build[ENTRY, FiberCache](new CacheLoader[ENTRY, FiberCache]() {
-        override def load(entry: ENTRY): FiberCache = {
-          fiber2Data(entry.key, entry.conf)
+      .maximumWeight(weight)
+      .removalListener(new RemovalListener[ENTRY, FiberCache] {
+        override def onRemoval(n: RemovalNotification[ENTRY, FiberCache]): Unit = {
+          logDebug("Loading Fiber Cache" + (n.getKey.key match {
+            case DataFiber(file, group, fiber) => s"(Data: ${file.path}, $group, $fiber)"
+            case IndexFiber(file) => s"(Index: ${file.file.toString})"
+          }))
+          // TODO cause exception while we removal the using data. we need an lock machanism
+          // to lock the allocate, using and the free
+          freeFiberData(n.getValue)
         }
       })
 
+    if (conf.getBoolean(SQLConf.SPINACH_FIBERCACHE_STATS.key, false)) builder.recordStats()
+
+    builder.build[ENTRY, FiberCache](new CacheLoader[ENTRY, FiberCache]() {
+      override def load(entry: ENTRY): FiberCache = {
+        logDebug("Loading Fiber Cache" + (entry.key match {
+          case DataFiber(file, group, fiber) => s"(Data: ${file.path}, $group, $fiber)"
+          case IndexFiber(file) => s"(Index: ${file.file.toString})"
+        }))
+        fiber2Data(entry.key, entry.conf)
+      }
+    })
+  }
+
   def apply[T <: FiberCache](fiber: Fiber, conf: Configuration): T = {
+    if (cache == null) cache = buildCache(conf)
     cache.get(ConfigurationCache(fiber, conf)).asInstanceOf[T]
   }
 }
@@ -94,10 +124,9 @@ object FiberCacheManager extends AbstractFiberCacheManger {
   def evictFiberCacheData(fiber: Fiber): Unit = fiber match {
     case idxFiber: IndexFiber =>
       val entry = ConfigurationCache[Fiber](idxFiber, new Configuration())
-      if(cache.asMap().asScala.contains(entry)) cache.invalidate(entry)
+      if(cache != null && cache.asMap().asScala.contains(entry)) cache.invalidate(entry)
     case _ => // todo: consider whether we indeed need to evict DataFiberCachedData manually
   }
-
 
   override def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = fiber match {
     case DataFiber(file, columnIndex, rowGroupId) =>
@@ -106,17 +135,22 @@ object FiberCacheManager extends AbstractFiberCacheManger {
     case other => throw new SpinachException(s"Cannot identify what's $other")
   }
 
+  override def freeFiberData(fiberCache: FiberCache): Unit = MemoryManager.free(fiberCache)
+
   def status: String = {
-    val dataFiberConfPairs = this.cache.asMap().keySet().asScala.collect {
-      case entry @ ConfigurationCache(key: DataFiber, conf) => (key, conf)
-    }
+    val dataFiberConfPairs =
+      if (cache == null) Set.empty
+      else {
+        this.cache.asMap().keySet().asScala.collect {
+          case entry @ ConfigurationCache(key: DataFiber, conf) => (key, conf)
+        }
+      }
 
     val fiberFileToFiberMap = new mutable.HashMap[String, mutable.Buffer[DataFiber]]()
     dataFiberConfPairs.foreach { case (dataFiber, _) =>
       fiberFileToFiberMap.getOrElseUpdate(
         dataFiber.file.path, new mutable.ArrayBuffer[DataFiber]) += dataFiber
     }
-
 
     val filePathSet = new mutable.HashSet[String]()
     val statusRawData = dataFiberConfPairs.collect {
@@ -138,8 +172,6 @@ object FiberCacheManager extends AbstractFiberCacheManger {
     retStatus
   }
 }
-
-
 
 private[spinach] object DataFileHandleCacheManager extends Logging {
   type ENTRY = ConfigurationCache[DataFile]
@@ -167,7 +199,6 @@ private[spinach] object DataFileHandleCacheManager extends Logging {
     cache.get(ConfigurationCache(fiberCache, conf)).asInstanceOf[T]
   }
 }
-
 
 private[spinach] trait Fiber
 

@@ -604,6 +604,20 @@ object SQLConf {
       .intConf
       .createWithDefault(3)
 
+  val SPINACH_FIBERCACHE_SIZE =
+    SQLConfigBuilder("spark.sql.spinach.fiberCache.size")
+      .internal()
+      .doc("Define the size of fiber cache in KB, default 300 * 1024 KB")
+      .longConf
+      .createWithDefault(307200)
+
+  val SPINACH_FIBERCACHE_STATS =
+    SQLConfigBuilder("spark.sql.spinach.fiberCache.stats")
+      .internal()
+      .doc("Whether enable cach stats record, default false")
+      .booleanConf
+      .createWithDefault(false)
+
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
