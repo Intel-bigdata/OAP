@@ -84,7 +84,7 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
         }
         // to deal with the LeftOpen condition
         while (!interval.startInclude &&
-          currentKeyArray(i).currentKey != IndexScanner.DUMMY_KEY_END &&
+          !currentKeyArray(i).isEnd &&
           ordering.compare(interval.start, currentKeyArray(i).currentKey) == 0) {
           // find exactly the key, since it's LeftOpen, skip the equivalent key(s)
           currentKeyArray(i).moveNextKey

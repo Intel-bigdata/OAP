@@ -29,9 +29,7 @@ import scala.concurrent.duration._
 import scala.language.existentials
 import scala.language.postfixOps
 import scala.util.control.NonFatal
-
 import org.apache.commons.lang3.SerializationUtils
-
 import org.apache.spark._
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.executor.TaskMetrics
@@ -40,9 +38,11 @@ import org.apache.spark.network.util.JavaUtils
 import org.apache.spark.partial.{ApproximateActionListener, ApproximateEvaluator, PartialResult}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.rpc.RpcTimeout
+import org.apache.spark.scheduler.cluster.CoarseGrainedClusterMessages.GetExecutorLossReason
 import org.apache.spark.storage._
 import org.apache.spark.storage.BlockManagerMessages.BlockManagerHeartbeat
 import org.apache.spark.util._
+
 
 /**
  * The high-level scheduling layer that implements stage-oriented scheduling. It computes a DAG of
@@ -234,7 +234,7 @@ class DAGScheduler(
    * Called by TaskScheduler implementation when an executor fails.
    */
   def executorLost(execId: String): Unit = {
-    eventProcessLoop.post(ExecutorLost(execId))
+    eventProcessLoop.post(ExecutorLost(execId, new ExecutorLossReason("Executor Lost")))
   }
 
   /**
@@ -1672,7 +1672,7 @@ private[scheduler] class DAGSchedulerEventProcessLoop(dagScheduler: DAGScheduler
     case ExecutorAdded(execId, host) =>
       dagScheduler.handleExecutorAdded(execId, host)
 
-    case ExecutorLost(execId) =>
+    case ExecutorLost(execId, reason) =>
       dagScheduler.handleExecutorLost(execId, fetchFailed = false)
 
     case BeginEvent(task, taskInfo) =>
