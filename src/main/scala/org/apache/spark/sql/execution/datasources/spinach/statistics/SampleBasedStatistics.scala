@@ -86,10 +86,13 @@ private[spinach] class SampleBasedStatistics extends Statistics {
         if (Statistics.rowInIntervalArray(row, intervalArray, ordering)) hitCnt += 1
       }
 
-      if (hitCnt < sampleArray.length)
+      if (hitCnt < sampleArray.length) {
         StaticsAnalysisResult.USE_INDEX
+      }
       else
+      {
         StaticsAnalysisResult.FULL_SCAN
+      }
     }
   }
 
