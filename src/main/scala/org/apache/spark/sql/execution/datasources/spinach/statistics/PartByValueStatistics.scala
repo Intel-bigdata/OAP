@@ -114,8 +114,8 @@ private[spinach] class PartByValueStatistics extends Statistics {
   // value array:(-inf, r0) [r0,r1) [r1,r2) [r2,r3) [r3,r4) [r4,r5]  (r5, +inf)
   protected def getIntervalIdx(row: Key, include: Boolean): Int = {
     var i = 0
-    if (row eq IndexScanner.DUMMY_KEY_START) 0 // -inf
-    else if (row eq IndexScanner.DUMMY_KEY_END) metas.length + 1 // +inf
+    if (row == IndexScanner.DUMMY_KEY_START) 0 // -inf
+    else if (row == IndexScanner.DUMMY_KEY_END) metas.length + 1 // +inf
     else {
       while (i < metas.length && (include && ordering.gteq(row, metas(i).row)
         || !include && ordering.gt(row, metas(i).row))) i += 1

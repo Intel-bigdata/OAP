@@ -107,6 +107,13 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
     checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 1 AND a <= 3"),
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a <= 2"),
+      Row(1, "this is test 1") :: Row(2, "this is test 2") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a >= 300"),
+      Row(300, "this is test 300") :: Nil)
+
     sql("drop sindex index1 on spinach_test")
   }
 
