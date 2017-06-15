@@ -85,7 +85,14 @@ private[spinach] class SampleBasedStatistics extends Statistics {
       for (row <- sampleArray) {
         if (Statistics.rowInIntervalArray(row, intervalArray, ordering)) hitCnt += 1
       }
-      hitCnt * 1.0 / sampleArray.length
+
+      if (hitCnt < sampleArray.length) {
+        StaticsAnalysisResult.USE_INDEX
+      }
+      else
+      {
+        StaticsAnalysisResult.FULL_SCAN
+      }
     }
   }
 
