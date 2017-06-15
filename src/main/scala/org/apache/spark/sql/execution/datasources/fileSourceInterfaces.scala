@@ -195,7 +195,8 @@ trait FileFormat {
   def initialize(
     sparkSession: SparkSession,
     options: Map[String, String],
-    fileCatalog: FileCatalog): FileFormat = {
+    fileCatalog: FileCatalog,
+    readPartitions: Option[Seq[FilePartition]] = None): FileFormat = {
     this.sparkSession = sparkSession
     this.parameters = options
     this.catalog = fileCatalog
