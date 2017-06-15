@@ -127,7 +127,7 @@ private[spinach] object ScannerBuilder extends Logging {
       case LessThan(attribute, ic(key)) =>
         val ranger = new RangeInterval(IndexScanner.DUMMY_KEY_START, key, true, false)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
-      case _ => null
+      case _ => mutable.HashMap.empty
     }
   }
 

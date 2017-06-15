@@ -116,4 +116,22 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
       result.toDF("key", "value"))
     sql("drop sindex index_bf on spinach_test")
   }
+
+  test("BitMap index for or(like,like) bug") {
+    val data: Seq[(Int, String)] = (1 to 200).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("create sindex index_bf on spinach_test (a) USING BITMAP")
+    val result: Seq[(Int, String)] = (180 to 199).map { i => (i, s"this is test $i") }
+    val emptyResult : Seq[(Int, String)] = Seq.empty
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a >= 180 and a < 200 " +
+          "AND (b like '%22%' or b like '%21%')"),
+          emptyResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a >= 180 and a < 200 " +
+      "AND (b like '%18%' or b like '%19%')"),
+      result.toDF("key", "value"))
+    sql("drop sindex index_bf on spinach_test")
+  }
 }
