@@ -88,9 +88,9 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
           // Use KB as Unit due to large weight will cause Guava overflow
           val weight = math.ceil(value.fiberData.size() / 1024.0)
           if (weight > Int.MaxValue / 2) { // make sure totalWeight + fiberSize less than Int.Max
-            logWarning(s"Caching a fiber with 1TB size! Please make sure your memory is enough.")
+            throw new SpinachException(s"Fiber with more than 1TB size is not allowed.")
           }
-          math.min(weight, Int.MaxValue).toInt
+          weight.toInt
         }
       })
       .maximumWeight(weight)
