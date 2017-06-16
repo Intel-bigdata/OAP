@@ -69,10 +69,15 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
     val weight =
       if (weightConfig > 4L * Int.MaxValue) {
 
+        // In Guava 15.0, totalWeight is Int, so maximumWeight / concurrencyLevel should be
+        // less than Int.MaxValue. What's more, if one fiber cache is very large, it may cause
+        // totalWeight < Int.MaxValue < totalWeight + fiberSize. So the maximumWeight should
+        // also be *FAR* less than Int.MaxValue. If totalWeight > Int.MaxValue, overflow, then
+        // totalWeight will treated as a very small value, and never greater than maximumWeight.
         logWarning(s"${SQLConf.SPINACH_FIBERCACHE_SIZE.key}): $weightConfig is too large." +
-          s"Reducting to 8TB")
+          s"Reducing to 4TB")
 
-        4L * Int.MaxValue // The Unit here is KB. Int.MaxValue = 2G, 4 is Concurrency Level
+        4L * Int.MaxValue // The Unit here is KB. Int.MaxValue = 2G.
 
       } else weightConfig
 
@@ -82,8 +87,8 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
         override def weigh(key: ENTRY, value: FiberCache): Int = {
           // Use KB as Unit due to large weight will cause Guava overflow
           val weight = value.fiberData.size() / 1024
-          if (weight > Int.MaxValue) {
-            logWarning(s"Caching a fiber with 2TB size! Please make sure your memory is enough.")
+          if (weight > Int.MaxValue / 2) { // make sure totalWeight + fiberSize less than Int.Max
+            logWarning(s"Caching a fiber with 1TB size! Please make sure your memory is enough.")
           }
           math.min(weight, Int.MaxValue).toInt
         }
@@ -94,6 +99,7 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
           logDebug("Removing Fiber Cache" + (n.getKey.key match {
             case DataFiber(file, group, fiber) => s"(Data: ${file.path}, $group, $fiber)"
             case IndexFiber(file) => s"(Index: ${file.file.toString})"
+            case _ => s"Unknown Fiber"
           }))
           // TODO cause exception while we removal the using data. we need an lock machanism
           // to lock the allocate, using and the free
@@ -108,6 +114,7 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
         logDebug("Loading Fiber Cache" + (entry.key match {
           case DataFiber(file, group, fiber) => s"(Data: ${file.path}, $group, $fiber)"
           case IndexFiber(file) => s"(Index: ${file.file.toString})"
+          case _ => s"Unknown Fiber"
         }))
         fiber2Data(entry.key, entry.conf)
       }

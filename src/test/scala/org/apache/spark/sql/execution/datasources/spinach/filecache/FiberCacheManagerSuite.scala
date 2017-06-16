@@ -30,7 +30,7 @@ class FiberCacheManagerSuite extends SparkFunSuite {
     val configuration = new Configuration()
     configuration.setBoolean(SQLConf.SPINACH_FIBERCACHE_STATS.key, true)
 
-    TestFiberCacheManger.reset(configuration)
+    TestFiberCacheManger.reset()
     (0 until 150).foreach { i =>
       TestFiberCacheManger(TestFiber(i), configuration): DataFiberCache
     }
@@ -43,7 +43,7 @@ class FiberCacheManagerSuite extends SparkFunSuite {
     configuration.setBoolean(SQLConf.SPINACH_FIBERCACHE_STATS.key, true)
     configuration.setLong(SQLConf.SPINACH_FIBERCACHE_SIZE.key, 1024 * 1024)
 
-    TestFiberCacheManger.reset(configuration)
+    TestFiberCacheManger.reset()
     (0 until 512).foreach{ i =>
       TestFiberCacheManger(TestFiber(i), configuration): DataFiberCache
     }
@@ -56,7 +56,7 @@ class FiberCacheManagerSuite extends SparkFunSuite {
     configuration.setBoolean(SQLConf.SPINACH_FIBERCACHE_STATS.key, true)
     configuration.setLong(SQLConf.SPINACH_FIBERCACHE_SIZE.key, 8 * 1024 * 1024)
 
-    TestFiberCacheManger.reset(configuration)
+    TestFiberCacheManger.reset()
     (0 until 4 * 1024).foreach{ i =>
       TestFiberCacheManger(TestFiber(i), configuration): DataFiberCache
     }
@@ -69,12 +69,24 @@ class FiberCacheManagerSuite extends SparkFunSuite {
     configuration.setBoolean(SQLConf.SPINACH_FIBERCACHE_STATS.key, true)
     configuration.setLong(SQLConf.SPINACH_FIBERCACHE_SIZE.key, 1024 * 1024 * 1024)
 
-    TestFiberCacheManger.reset(configuration)
+    TestFiberCacheManger.reset()
     (0 until 512 * 1024).foreach{ i =>
       TestFiberCacheManger(TestFiber(i), configuration): DataFiberCache
     }
     assert(TestFiberCacheManger.getStat.evictionCount() > 0)
     assert(TestFiberCacheManger.getStat.evictionCount() < 1000)
+  }
+
+  test("4TB Size, Exceed the maximum memory limit") { // Weight 4G = 2M * 2 * 1024
+    val configuration = new Configuration()
+    configuration.setBoolean(SQLConf.SPINACH_FIBERCACHE_STATS.key, true)
+    configuration.setLong(SQLConf.SPINACH_FIBERCACHE_SIZE.key, 4 * 1024 * 1024 * 1024L)
+
+    TestFiberCacheManger.reset()
+    (0 until 2 * 1024 * 1024 + 1).foreach { i =>
+      TestFiberCacheManger(TestFiber(i), configuration): DataFiberCache
+    }
+    assert(TestFiberCacheManger.getStat.evictionCount() > 0)
   }
 }
 
@@ -95,5 +107,5 @@ object TestFiberCacheManger extends AbstractFiberCacheManger {
 
   def getStat: CacheStats = cache.stats()
 
-  def reset(configuration: Configuration): Unit = cache = null
+  def reset(): Unit = cache = null
 }
