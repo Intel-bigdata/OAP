@@ -63,12 +63,18 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
 
   private def buildCache(conf: Configuration): LoadingCache[ENTRY, FiberCache] = {
 
-    val weight = conf.getLong(SQLConf.SPINACH_FIBERCACHE_SIZE.key,
+    val weightConfig = conf.getLong(SQLConf.SPINACH_FIBERCACHE_SIZE.key,
                               SQLConf.SPINACH_FIBERCACHE_SIZE.defaultValue.get)
 
-    if (weight >= 8 * 1024 * 1024 * 1024L) {
-      throw new SpinachException(s"${SQLConf.SPINACH_FIBERCACHE_SIZE.key} should be less than 8GB")
-    }
+    val weight =
+      if (weightConfig > 4L * Int.MaxValue) {
+
+        logWarning(s"${SQLConf.SPINACH_FIBERCACHE_SIZE.key}): $weightConfig is too large." +
+          s"Reducting to 8TB")
+
+        4L * Int.MaxValue // The Unit here is KB. Int.MaxValue = 2G, 4 is Concurrency Level
+
+      } else weightConfig
 
     val builder = CacheBuilder.newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
@@ -77,9 +83,9 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
           // Use KB as Unit due to large weight will cause Guava overflow
           val weight = value.fiberData.size() / 1024
           if (weight > Int.MaxValue) {
-            throw new SpinachException(s"Too large fiber size $weight KB")
+            logWarning(s"Caching a fiber with 2TB size! Please make sure your memory is enough.")
           }
-          weight.toInt
+          math.min(weight, Int.MaxValue).toInt
         }
       })
       .maximumWeight(weight)
