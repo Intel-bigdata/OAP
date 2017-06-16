@@ -116,7 +116,7 @@ private[spinach] class BitMapIndexWriter(
           taskReturn = taskReturn ++: writeIndexFromRows(taskContext, iterator)
           writeNewFile = true
         } else {
-          val v = InternalRow.fromSeq(iterator.next().toSeq(keySchema))
+          val v = InternalRow.fromSeq(iterator.next().copy().toSeq(keySchema))
           statisticsManager.addSpinachKey(v)
           if (!tmpMap.contains(v)) {
             val list = new mutable.ListBuffer[Int]()
