@@ -86,7 +86,7 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
       .weigher(new Weigher[ENTRY, FiberCache] {
         override def weigh(key: ENTRY, value: FiberCache): Int = {
           // Use KB as Unit due to large weight will cause Guava overflow
-          val weight = value.fiberData.size() / 1024
+          val weight = math.ceil(value.fiberData.size() / 1024.0)
           if (weight > Int.MaxValue / 2) { // make sure totalWeight + fiberSize less than Int.Max
             logWarning(s"Caching a fiber with 1TB size! Please make sure your memory is enough.")
           }
