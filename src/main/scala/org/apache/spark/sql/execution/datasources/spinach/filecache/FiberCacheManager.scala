@@ -19,10 +19,11 @@ package org.apache.spark.sql.execution.datasources.spinach.filecache
 
 import java.util.concurrent.TimeUnit
 
-import com.google.common.cache._
-import org.apache.hadoop.conf.Configuration
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+
+import com.google.common.cache._
+import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
@@ -84,7 +85,7 @@ private[spinach] trait AbstractFiberCacheManger extends Logging {
       .maximumWeight(weight)
       .removalListener(new RemovalListener[ENTRY, FiberCache] {
         override def onRemoval(n: RemovalNotification[ENTRY, FiberCache]): Unit = {
-          logDebug("Loading Fiber Cache" + (n.getKey.key match {
+          logDebug("Removing Fiber Cache" + (n.getKey.key match {
             case DataFiber(file, group, fiber) => s"(Data: ${file.path}, $group, $fiber)"
             case IndexFiber(file) => s"(Index: ${file.file.toString})"
           }))
