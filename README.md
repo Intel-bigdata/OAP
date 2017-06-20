@@ -41,7 +41,7 @@ Fiber Cache Size - Total Memory size to cache Fiber. Unit: KB
 
 Full Scan Threshold - If the analysis result is above this threshold, it will full scan data file
 * Default: 0.8
-* Usage: `sqlContext.conf.setConfString(SQLConf.SPINACH_FULL_SCAN_THRESHOLD.key, s"{100 * 1024 * 1024}")`
+* Usage: `sqlContext.conf.setConfString(SQLConf.SPINACH_FULL_SCAN_THRESHOLD.key, "0.8")`
 
 Row Group Size - Row count for each row group
 * Default: 1024
