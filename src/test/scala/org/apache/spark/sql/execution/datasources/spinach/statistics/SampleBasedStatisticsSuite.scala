@@ -101,6 +101,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
   }
 
   test("test analyze function") {
+    // TODO: Give a seed to Random in here and in SampleBasedStatistics without losing coverage
     val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
     val sampleWrite = new TestSample
