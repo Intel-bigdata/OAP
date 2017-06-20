@@ -81,7 +81,7 @@ class SpinachDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
 
   test("create and drop index with partition specify") {
     val data: Seq[(Int, Int)] = (1 to 10).map { i => (i, i) }
-    data.toDF("key", "value").registerTempTable("t")
+    data.toDF("key", "value").createOrReplaceTempView("t")
 
     val path = new Path(spark.sqlContext.conf.warehousePath)
 

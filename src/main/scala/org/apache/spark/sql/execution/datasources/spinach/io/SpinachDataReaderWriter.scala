@@ -27,7 +27,6 @@ import org.apache.spark.sql.execution.datasources.spinach.{DataSourceMeta, Spina
 import org.apache.spark.sql.execution.datasources.spinach.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.spinach.index._
 import org.apache.spark.sql.execution.datasources.spinach.statistics._
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
@@ -186,7 +185,7 @@ private[spinach] class SpinachDataReader(
   private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
     if (!filterScanner.get.canBeOptimizedByStatistics) {
       StaticsAnalysisResult.USE_INDEX
-    } else if (filterScanner.get.intervalArray.length == 0) {
+    } else if (filterScanner.get.intervalArray.isEmpty) {
       StaticsAnalysisResult.SKIP_INDEX
     } else {
       val fs = indexPath.getFileSystem(conf)

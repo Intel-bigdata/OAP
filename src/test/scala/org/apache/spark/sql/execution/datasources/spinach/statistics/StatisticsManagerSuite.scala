@@ -51,7 +51,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
     checkAnswer(sql("SELECT * FROM spinach_test WHERE attr_int = 1"),
       Row.fromTuple(rowGen(1)) :: Nil)
@@ -61,7 +61,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
 
@@ -79,7 +79,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
     sql("create sindex index2 on spinach_test (attr_str)")
@@ -92,7 +92,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
 
@@ -106,7 +106,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
     sql("create sindex index4 on spinach_test (attr_float)")
@@ -119,7 +119,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
     sql("create sindex index5 on spinach_test (attr_date)")
@@ -133,7 +133,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
 
@@ -151,7 +151,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
     sql("create sindex index2 on spinach_test (attr_str) USING BITMAP")
@@ -164,7 +164,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
 
@@ -178,7 +178,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
     sql("create sindex index4 on spinach_test (attr_float) USING BITMAP")
@@ -191,7 +191,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
-      .registerTempTable("t")
+      .createOrReplaceTempView("t")
     sql("insert overwrite table spinach_test select * from t")
 
     sql("create sindex index5 on spinach_test (attr_date) USING BITMAP")

@@ -36,7 +36,7 @@ import org.apache.spark.util.Utils
 
 
 class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
-  private var file: File = null
+  private var file: File = _
   val conf: Configuration = new Configuration()
 
   override def beforeAll(): Unit = {
@@ -58,7 +58,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     val path = new Path(file.getAbsolutePath, "test1")
     writeData(path, schema, recordCount)
     val split = new FileSplit(
-      path, 0, FileSystem.get(conf).getFileStatus(path).getLen(), Array.empty[String])
+      path, 0, FileSystem.get(conf).getFileStatus(path).getLen, Array.empty[String])
     assertData(path, schema, Array(0, 1, 2), split, recordCount)
     assertData(path, schema, Array(0, 2, 1), split, recordCount)
     assertData(path, schema, Array(0, 1), split, recordCount)
@@ -83,7 +83,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       .add("j", StringType)
     writeData(childPath, schema, recordCount)
     val split = new FileSplit(
-      childPath, 0, FileSystem.get(conf).getFileStatus(childPath).getLen(), Array.empty[String])
+      childPath, 0, FileSystem.get(conf).getFileStatus(childPath).getLen, Array.empty[String])
     assertData(childPath, schema, Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), split,
       recordCount)
 
@@ -97,7 +97,7 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
     val rowCounts = Array(0, 1023, 1024, 1025)
     val rowCountInLastGroups = Array(0, 1023, 1024, 1)
     val rowGroupCounts = Array(0, 1, 1, 2)
-    for (i <- 0 until rowCounts.length) {
+    for (i <- rowCounts.indices) {
       val path = new Path(file.getAbsolutePath, rowCounts(i).toString)
       writeData(path, schema, rowCounts(i))
       val meta = SpinachDataFile(path.toString, schema).createDataFileHandle(conf)
