@@ -130,7 +130,7 @@ object Statistics {
           if (interval.end != IndexScanner.DUMMY_KEY_END &&
             order.equiv(interval.start, interval.end) && !interval.endInclude) {false}
           else true
-        } else interval.end == IndexScanner.DUMMY_KEY_END || order.gt(interval.end, row)
+        } else false
       }
       else if (interval.end != IndexScanner.DUMMY_KEY_END && (order.gt(row, interval.end) ||
         (order.equiv(row, interval.end) && !interval.endInclude))) {false}
