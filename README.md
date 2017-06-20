@@ -31,16 +31,29 @@ mvn test
 * Fine-grained cache
 * Parquet Data Adaptor
 ## Configuration
-spinach.rowgroup.szie
-* Row count for each row group
-* Default: 1024
-* Usage: `System.setProperty("spinach.rowgroup.size", "1024")`
+Parquet Support - Enable OAP support for parquet files
+* Default: true
+* Usage: `sqlContext.conf.setConfString(SQLConf.SPINACH_PARQUET_ENABLED.key, "false")`
 
-spinach.compression.codec
-* Choose compression type
-* Default: GZIP
+Fiber Cache Size - Total Memory size to cache Fiber. Unit: KB
+* Default: 307200
+* Usage: `sqlContext.conf.setConfString(SQLConf.SPINACH_FIBERCACHE_SIZE.key, s"{100 * 1024 * 1024}")`
+
+Full Scan Threshold - If the analysis result is above this threshold, it will full scan data file
+* Default: 0.8
+* Usage: `sqlContext.conf.setConfString(SQLConf.SPINACH_FULL_SCAN_THRESHOLD.key, s"{100 * 1024 * 1024}")`
+
+Row Group Size - Row count for each row group
+* Default: 1024
+* Usage1: `sqlContext.conf.setConfString(SQLConf.SPINACH_ROW_GROUP_SIZE.key, "1025")`
+* Usage2: `CREATE TABLE t USING spn OPTIONS ('rowgroup' '1024')` 
+
+Compression Codec - Choose compression type
+* Default: UNCOMPRESSED
 * Values: UNCOMPRESSED, SNAPPY, GZIP, LZO
-* Usage: `System.setProperty("spinach.compression.codec", "SNAPPY")`
+* Usage1: `sqlContext.conf.setConfString(SQLConf.SPINACH_COMPRESSION.key, "SNAPPY")`
+* Usage2: `CREATE TABLE t USING spn OPTIONS ('compression' 'SNAPPY')`
+
 ## How to Contribute
 If you are looking for some ideas on what to contribute, check out GitHub issues for this project labeled ["Pick me up!"](https://github.com/Intel-bigdata/Spinach/issues?labels=pick+me+up%21&state=open).
 Comment on the issue with your questions and ideas.
