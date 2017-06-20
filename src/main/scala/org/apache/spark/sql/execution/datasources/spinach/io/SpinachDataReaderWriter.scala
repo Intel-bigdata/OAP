@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.parquet.format.{CompressionCodec, Encoding}
-
+import org.apache.parquet.io.api.Binary
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.spinach.DataSourceMeta
@@ -52,6 +52,27 @@ private[spinach] class SpinachDataWriter(
   private val rowGroup: Array[DataFiberBuilder] =
     DataFiberBuilder.initializeFromSchema(schema, DEFAULT_ROW_GROUP_SIZE)
 
+  private val statisticsArray = ColumnStatistics.getStatsFromSchema(schema)
+
+  private def updateStats(stats: ColumnStatistics.ParquetStatistics,
+                          row: InternalRow, index: Int, dataType: DataType) = {
+    dataType match {
+      case BooleanType => stats.updateStats(row.getBoolean(index))
+      case IntegerType => stats.updateStats(row.getInt(index))
+      case ByteType => stats.updateStats(row.getByte(index))
+      case DateType => stats.updateStats(row.getInt(index))
+      case ShortType => stats.updateStats(row.getShort(index))
+      case StringType => stats.updateStats(
+        Binary.fromConstantByteArray(row.getString(index).getBytes))
+      case BinaryType => stats.updateStats(
+        Binary.fromConstantByteArray(row.getBinary(index)))
+      case FloatType => stats.updateStats(row.getFloat(index))
+      case DoubleType => stats.updateStats(row.getDouble(index))
+      case LongType => stats.updateStats(row.getLong(index))
+      case _ => sys.error(s"Not support data type: $dataType")
+    }
+  }
+
   private val fiberMeta = new SpinachDataFileHandle(
     rowCountInEachGroup = DEFAULT_ROW_GROUP_SIZE,
     fieldCount = schema.length,
@@ -65,6 +86,7 @@ private[spinach] class SpinachDataWriter(
     var idx = 0
     while (idx < rowGroup.length) {
       rowGroup(idx).append(row)
+      if (!row.isNullAt(idx)) updateStats(statisticsArray(idx), row, idx, schema(idx).dataType)
       idx += 1
     }
     rowCount += 1
@@ -106,15 +128,14 @@ private[spinach] class SpinachDataWriter(
       writeRowGroup()
     }
 
-    val columnEncodings = new Array[Encoding](rowGroup.length)
-    val dictDataLens = new Array[Int](rowGroup.length)
-    val dictSizes = new Array[Int](rowGroup.length)
     rowGroup.indices.foreach { i =>
       val dictByteData = rowGroup(i).buildDictionary
-      columnEncodings(i) = rowGroup(i).getEncoding
-      dictDataLens(i) = dictByteData.length
-      dictSizes(i) = rowGroup(i).getDictionarySize
-      if (dictDataLens(i) > 0) out.write(dictByteData)
+      val encoding = rowGroup(i).getEncoding
+      val dictionaryDataLength = dictByteData.length
+      val dictionaryIdSize = rowGroup(i).getDictionarySize
+      if (dictionaryDataLength > 0) out.write(dictByteData)
+      fiberMeta.appendColumnMeta(new ColumnMeta(encoding, dictionaryDataLength, dictionaryIdSize,
+        ColumnStatistics(statisticsArray(i))))
     }
 
     // and update the group count and row count in the last group
@@ -122,9 +143,6 @@ private[spinach] class SpinachDataWriter(
       .withGroupCount(rowGroupCount)
       .withRowCountInLastGroup(
         if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else DEFAULT_ROW_GROUP_SIZE)
-      .withEncodings(columnEncodings)
-      .withDictionaryDataLens(dictDataLens)
-      .withDictionaryIdSizes(dictSizes)
 
     fiberMeta.write(out)
     out.close()

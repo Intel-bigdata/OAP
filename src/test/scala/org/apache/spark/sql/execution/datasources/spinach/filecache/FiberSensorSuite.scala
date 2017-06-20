@@ -31,7 +31,8 @@ class FiberSensorSuite extends SparkFunSuite with AbstractFiberSensor with Loggi
 
   test("test get hosts from FiberSensor") {
     val filePath = "file1"
-    val dataFileMeta = new SpinachDataFileHandle(new ArrayBuffer[RowGroupMeta](), 10, 2, 30, 3)
+    val dataFileMeta = new SpinachDataFileHandle(
+      rowCountInEachGroup = 10, rowCountInLastGroup = 2, groupCount = 30, fieldCount = 3)
 
     // executor1 update
     val host1 = "host1"
