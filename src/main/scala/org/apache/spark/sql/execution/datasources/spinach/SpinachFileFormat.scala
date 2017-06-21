@@ -22,7 +22,7 @@ import java.net.URI
 import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, FSDataOutputStream, Path}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, FSDataOutputStream, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
@@ -51,14 +51,13 @@ private[sql] class SpinachFileFormat extends FileFormat
     sparkSession: SparkSession,
     options: Map[String, String],
     fileCatalog: FileCatalog,
-    readPartitions: Option[Seq[FilePartition]] = None): FileFormat = {
+    readFiles: Option[Seq[FileStatus]] = None): FileFormat = {
     super.initialize(sparkSession, options, fileCatalog)
 
     val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
 
-    val parents = readPartitions match {
-      case Some(partitions) => partitions.flatMap(f => f.files)
-        .map(file => new Path(file.filePath).getParent)
+    val parents = readFiles match {
+      case Some(files) => files.map(file => file.getPath.getParent)
       case _ => fileCatalog.allFiles().map(_.getPath.getParent)
     }
 
@@ -69,6 +68,7 @@ private[sql] class SpinachFileFormat extends FileFormat
     meta = partition2Meta.map {
       DataSourceMeta.initialize(_, hadoopConf)
     }
+
     // SpinachFileFormat.serializeDataSourceMeta(hadoopConf, meta)
     inferSchema = meta.map(_.schema)
 

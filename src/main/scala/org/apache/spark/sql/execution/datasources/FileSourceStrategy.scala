@@ -99,8 +99,74 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
 
       val selectedPartitions = _files.location.listFiles(partitionKeyFilters.toSeq)
 
-      val plannedPartitions = _files.bucketSpec match {
-        case Some(bucketing) if _files.sparkSession.sessionState.conf.bucketingEnabled =>
+      val files: HadoopFsRelation = _files.fileFormat match {
+        // TODO a better rule to check if we need to substitute the ParquetFileFormat
+        // as SpinachFileFormat
+        // add spark.sql.spinach.parquet.enable config
+        // if config true turn to SpinachFileFormat
+        // else turn to ParquetFileFormat
+        case a: ParquetFileFormat
+          if fileExists(_files) && _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLED) =>
+          val spinachFileFormat = new SpinachFileFormat
+          spinachFileFormat
+            .initialize(_files.sparkSession,
+              _files.options,
+              _files.location,
+              Some(selectedPartitions.flatMap(p => p.files)))
+
+          if (spinachFileFormat.hasAvailableIndex(normalizedFilters)) {
+            logInfo("hasAvailableIndex = true, will replace with SpinachFileFormat.")
+            _files.copy(fileFormat = spinachFileFormat)
+          } else {
+            logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
+            _files.fileFormat.initialize(_files.sparkSession, _files.options, _files.location)
+            _files
+          }
+
+        case _: FileFormat =>
+          _files.fileFormat.initialize(_files.sparkSession, _files.options, _files.location)
+          _files
+      }
+
+      val dataColumns =
+        l.resolve(files.dataSchema, files.sparkSession.sessionState.analyzer.resolver)
+
+      // Partition keys are not available in the statistics of the files.
+      val dataFilters = normalizedFilters.filter(_.references.intersect(partitionSet).isEmpty)
+
+      // Predicates with both partition keys and attributes need to be evaluated after the scan.
+      val afterScanFilters = filterSet -- partitionKeyFilters
+      logInfo(s"Post-Scan Filters: ${afterScanFilters.mkString(",")}")
+
+      val selectedPartitions = files.location.listFiles(partitionKeyFilters.toSeq)
+
+      val filterAttributes = AttributeSet(afterScanFilters)
+      val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
+      val requiredAttributes = AttributeSet(requiredExpressions)
+
+      val readDataColumns =
+        dataColumns
+          .filter(requiredAttributes.contains)
+          .filterNot(partitionColumns.contains)
+      val prunedDataSchema = readDataColumns.toStructType
+      logInfo(s"Pruned Data Schema: ${prunedDataSchema.simpleString(5)}")
+
+      val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
+      logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
+
+      // files.fileFormat.initialize(files.sparkSession, files.options, files.location)
+
+      val readFile = files.fileFormat.buildReaderWithPartitionValues(
+        sparkSession = files.sparkSession,
+        dataSchema = files.dataSchema,
+        partitionSchema = files.partitionSchema,
+        requiredSchema = prunedDataSchema,
+        filters = pushedDownFilters,
+        options = files.options,
+        hadoopConf = files.sparkSession.sessionState.newHadoopConfWithOptions(files.options))
+
+      val plannedPartitions = files.bucketSpec match {
+        case Some(bucketing) if files.sparkSession.sessionState.conf.bucketingEnabled =>
           logInfo(s"Planning with ${bucketing.numBuckets} buckets")
           val bucketed =
             selectedPartitions.flatMap { p =>
@@ -119,9 +185,9 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
           }
 
         case _ =>
-          val defaultMaxSplitBytes = _files.sparkSession.sessionState.conf.filesMaxPartitionBytes
-          val openCostInBytes = _files.sparkSession.sessionState.conf.filesOpenCostInBytes
-          val defaultParallelism = _files.sparkSession.sparkContext.defaultParallelism
+          val defaultMaxSplitBytes = files.sparkSession.sessionState.conf.filesMaxPartitionBytes
+          val openCostInBytes = files.sparkSession.sessionState.conf.filesOpenCostInBytes
+          val defaultParallelism = files.sparkSession.sparkContext.defaultParallelism
           val totalBytes = selectedPartitions.flatMap(_.files.map(_.getLen + openCostInBytes)).sum
           val bytesPerCore = totalBytes / defaultParallelism
           val maxSplitBytes = Math.min(defaultMaxSplitBytes,
@@ -132,8 +198,7 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
           val splitFiles = selectedPartitions.flatMap { partition =>
             partition.files.flatMap { file =>
               val blockLocations = getBlockLocations(file)
-              if (_files.fileFormat
-                .isSplitable(_files.sparkSession, _files.options, file.getPath)) {
+              if (files.fileFormat.isSplitable(files.sparkSession, files.options, file.getPath)) {
                 (0L until file.getLen by maxSplitBytes).map { offset =>
                   val remaining = file.getLen - offset
                   val size = if (remaining > maxSplitBytes) maxSplitBytes else remaining
@@ -184,68 +249,6 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
           closePartition()
           partitions
       }
-
-      val files: HadoopFsRelation = _files.fileFormat match {
-        // TODO a better rule to check if we need to substitute the ParquetFileFormat
-        // as SpinachFileFormat
-        // add spark.sql.spinach.parquet.enable config
-        // if config true turn to SpinachFileFormat
-        // else turn to ParquetFileFormat
-        case a: ParquetFileFormat
-          if fileExists(_files) && _files.sparkSession.conf.get(SQLConf.SPINACH_PARQUET_ENABLED) =>
-          val spinachFileFormat = new SpinachFileFormat
-          spinachFileFormat.initialize(_files.sparkSession,
-            _files.options, _files.location, Some(plannedPartitions))
-
-          if (spinachFileFormat.hasAvailableIndex(normalizedFilters)) {
-            logInfo("hasAvailableIndex = true, will replace with SpinachFileFormat.")
-            _files.copy(fileFormat = spinachFileFormat)
-          } else {
-            logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
-            _files.fileFormat.initialize(_files.sparkSession, _files.options, _files.location)
-            _files
-          }
-
-        case _: FileFormat =>
-          _files.fileFormat.initialize(_files.sparkSession, _files.options, _files.location)
-          _files
-      }
-
-      val dataColumns =
-        l.resolve(files.dataSchema, files.sparkSession.sessionState.analyzer.resolver)
-
-      // Partition keys are not available in the statistics of the files.
-      val dataFilters = normalizedFilters.filter(_.references.intersect(partitionSet).isEmpty)
-
-      // Predicates with both partition keys and attributes need to be evaluated after the scan.
-      val afterScanFilters = filterSet -- partitionKeyFilters
-      logInfo(s"Post-Scan Filters: ${afterScanFilters.mkString(",")}")
-
-      val filterAttributes = AttributeSet(afterScanFilters)
-      val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
-      val requiredAttributes = AttributeSet(requiredExpressions)
-
-      val readDataColumns =
-        dataColumns
-          .filter(requiredAttributes.contains)
-          .filterNot(partitionColumns.contains)
-      val prunedDataSchema = readDataColumns.toStructType
-      logInfo(s"Pruned Data Schema: ${prunedDataSchema.simpleString(5)}")
-
-      val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
-      logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
-
-      // files.fileFormat.initialize(files.sparkSession, files.options, files.location)
-
-      val readFile = files.fileFormat.buildReaderWithPartitionValues(
-        sparkSession = files.sparkSession,
-        dataSchema = files.dataSchema,
-        partitionSchema = files.partitionSchema,
-        requiredSchema = prunedDataSchema,
-        filters = pushedDownFilters,
-        options = files.options,
-        hadoopConf = files.sparkSession.sessionState.newHadoopConfWithOptions(files.options))
-
 
       val meta = Map(
         "Format" -> files.fileFormat.toString,
