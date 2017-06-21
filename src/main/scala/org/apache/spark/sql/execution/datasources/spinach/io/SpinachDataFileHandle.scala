@@ -20,9 +20,11 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, DataOutputStream}
 
 import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 import org.apache.parquet.column.statistics._
 import org.apache.parquet.format.{CompressionCodec, Encoding}
+
 import org.apache.spark.sql.execution.datasources.SpinachException
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String

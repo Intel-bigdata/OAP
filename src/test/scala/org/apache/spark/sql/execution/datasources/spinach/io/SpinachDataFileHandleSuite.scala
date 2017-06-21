@@ -26,6 +26,7 @@ import org.scalacheck._
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Prop._
 import org.scalatest.prop.Checkers
+
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.util.Utils
 

@@ -23,7 +23,7 @@ import org.json4s.jackson.JsonMethods._
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.execution.datasources.spinach.filecache.FiberCacheStatus
-import org.apache.spark.sql.execution.datasources.spinach.io.{RowGroupMeta, SpinachDataFileHandle}
+import org.apache.spark.sql.execution.datasources.spinach.io.SpinachDataFileHandle
 import org.apache.spark.util.collection.BitSet
 
 

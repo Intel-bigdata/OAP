@@ -144,7 +144,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     var lastGroupId = -1
-    (0 until rowIds.length).iterator.map { idx =>
+    rowIds.indices.iterator.map { idx =>
       val rowId = rowIds(idx)
       val groupId = ((rowId + 1) / meta.rowCountInEachGroup).toInt
       val rowIdxInGroup = (rowId % meta.rowCountInEachGroup).toInt
