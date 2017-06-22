@@ -212,6 +212,21 @@ private[spinach] object DataFileHandleCacheManager extends Logging {
   def apply[T <: DataFileHandle](fiberCache: DataFile, conf: Configuration): T = {
     cache.get(ConfigurationCache(fiberCache, conf)).asInstanceOf[T]
   }
+
+  /**
+   * close finStream and evict dataFile -> DataFileHandler manually
+   * @param dataFile: the dataFile whose finStream will be closed and
+   *                dataFileHandler will be evict out of memory
+   */
+  def evictDataFileHandler(dataFile: DataFile): Unit = {
+    val entry = ConfigurationCache(dataFile, new Configuration())
+    if(cache.asMap().asScala.contains(entry)) {
+      val fsDataInputStream = cache.asMap().asScala(entry).fin
+      if(fsDataInputStream != null) fsDataInputStream.close()
+
+      cache.invalidate(entry)
+    }
+  }
 }
 
 private[spinach] trait Fiber

@@ -35,9 +35,10 @@ import org.apache.spark.unsafe.Platform
 private[spinach] case class SpinachDataFile(path: String, schema: StructType) extends DataFile {
 
   private val dictionaries = new Array[Dictionary](schema.length)
+  private var meta: SpinachDataFileHandle = _
 
   def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
-    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
+    meta = DataFileHandleCacheManager(this, conf)
     val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)
     val dictDataLens = meta.dictionaryDataLens
 
@@ -62,7 +63,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
   }
 
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
-    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
+    meta = DataFileHandleCacheManager(this, conf)
     val groupMeta = meta.rowGroupsMeta(groupId)
 
     val codecFactory = new CodecFactory(conf)
@@ -115,10 +116,10 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
 
   // full file scan
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
-    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
+    meta = DataFileHandleCacheManager(this, conf)
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
-    (0 until meta.groupCount).iterator.flatMap { groupId =>
+    val iter = (0 until meta.groupCount).iterator.flatMap { groupId =>
       var i = 0
       while (i < columns.length) {
         columns(i) = new ColumnValues(
@@ -135,16 +136,25 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
         row.reset(meta.rowCountInLastGroup, columns).toIterator
       }
     }
+    new Iterator[InternalRow]() {
+      override def hasNext: Boolean = {
+        val hasNextRow = iter.hasNext
+        if (!hasNextRow) close()
+        hasNextRow
+      }
+
+      override def next(): InternalRow = iter.next()
+    }
   }
 
   // scan by given row ids, and we assume the rowIds are sorted
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
   : Iterator[InternalRow] = {
-    val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
+    meta = DataFileHandleCacheManager(this, conf)
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     var lastGroupId = -1
-    (0 until rowIds.length).iterator.map { idx =>
+    val iter = (0 until rowIds.length).iterator.map { idx =>
       val rowId = rowIds(idx)
       val groupId = ((rowId + 1) / meta.rowCountInEachGroup).toInt
       val rowIdxInGroup = (rowId % meta.rowCountInEachGroup).toInt
@@ -171,6 +181,16 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
 
       row.moveToRow(rowIdxInGroup)
     }
+
+    new Iterator[InternalRow]() {
+      override def hasNext: Boolean = {
+        val hasNextRow = iter.hasNext
+        if (!hasNextRow) close()
+        hasNextRow
+      }
+
+      override def next(): InternalRow = iter.next()
+    }
   }
 
   override def createDataFileHandle(conf: Configuration): SpinachDataFileHandle = {
@@ -179,5 +199,20 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     val fs = p.getFileSystem(conf)
 
     new SpinachDataFileHandle().read(fs.open(p), fs.getFileStatus(p).getLen)
+  }
+
+  /**
+   * close this SpinachDataFile and evict the corresponding data file handler out of memory
+   */
+  def close(): Unit = {
+    // close fileHandler's finStream and evict file handler out of memory
+    DataFileHandleCacheManager.evictDataFileHandler(this)
+
+    // close fileHandler's finStream if it is not cached in memory previously
+    if (meta != null) {
+      if (meta.fin != null) meta.fin.close()
+
+      meta = null
+    }
   }
 }
