@@ -36,7 +36,7 @@ object IndexUtils {
     out.write((v >>> 24) & 0xFF)
   }
 
-  def indexFileFromDataFile(dataFile: Path, name: String): Path = {
+  def indexFileFromDataFile(dataFile: Path, name: String, time: String): Path = {
     import SpinachFileFormat._
     val dataFileName = dataFile.getName
     val pos = dataFileName.lastIndexOf(".")
@@ -45,7 +45,8 @@ object IndexUtils {
     } else {
       dataFileName
     }
-    new Path(dataFile.getParent, "." + indexFileName + "." + name + SPINACH_INDEX_EXTENSION)
+    new Path(
+      dataFile.getParent, "." + indexFileName + "." + time + "." +  name + SPINACH_INDEX_EXTENSION)
   }
 
   def writeInt(writer: IndexOutputWriter, v: Int): Unit = {

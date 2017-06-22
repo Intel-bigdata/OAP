@@ -17,12 +17,13 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.io
 
-import java.io.File
+import java.io.{ByteArrayInputStream, DataInputStream, File}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.format.{CompressionCodec, Encoding}
 import org.scalacheck._
+import org.scalacheck.Arbitrary._
 import org.scalacheck.Prop._
 import org.scalatest.prop.Checkers
 
@@ -31,7 +32,6 @@ import org.apache.spark.util.Utils
 
 
 class SpinachDataFileHandleCheck extends Properties("SpinachDataFileHandle") {
-
   private val tmpDir = Utils.createTempDir()
   private val conf = new Configuration()
 
@@ -43,26 +43,18 @@ class SpinachDataFileHandleCheck extends Properties("SpinachDataFileHandle") {
       lastRowCount <- Gen.choose[Int](1, defaultRowCount)
       fiberLens <- Gen.listOfN(fieldCount, Gen.choose[Int](0, 1048576))
       uncompressedFiberLens <- Gen.listOfN(fieldCount, Gen.choose[Int](0, 1048576))
-      dictionaryDataLens <- Gen.listOfN(fieldCount, Gen.choose[Int](0, 1048576))
-      dictionaryIdSizes <- Gen.listOfN(fieldCount, Gen.choose[Int](0, 1048576))
-      encodings <- Gen.listOfN(fieldCount,
-        Gen.oneOf(Encoding.PLAIN,
-          Encoding.PLAIN_DICTIONARY,
-          Encoding.DELTA_BYTE_ARRAY,
-          Encoding.RLE))
       codec <- Gen.oneOf(CompressionCodec.GZIP,
         CompressionCodec.LZO,
         CompressionCodec.GZIP,
         CompressionCodec.UNCOMPRESSED)
+      columnsMeta <- Gen.listOfN(fieldCount, arbitrary[ColumnMeta])
     } yield generateSpinachDataFileHandle(rowGroupCount,
       defaultRowCount,
       fieldCount,
       lastRowCount,
       fiberLens.toArray,
       uncompressedFiberLens.toArray,
-      dictionaryDataLens.toArray,
-      dictionaryIdSizes.toArray,
-      encodings.toArray,
+      columnsMeta,
       codec)
   }
 
@@ -76,9 +68,7 @@ class SpinachDataFileHandleCheck extends Properties("SpinachDataFileHandle") {
                                             lastRowCount: Int,
                                             fiberLens: Array[Int],
                                             uncompressedFiberLens: Array[Int],
-                                            dictionaryDataLens: Array[Int],
-                                            dictionaryIdSizes: Array[Int],
-                                            encodings: Array[Encoding],
+                                            columnsMeta: Seq[ColumnMeta],
                                             codec: CompressionCodec): SpinachDataFileHandle = {
 
     val rowGroupMetaArray = new Array[RowGroupMeta](rowGroupCount)
@@ -99,53 +89,103 @@ class SpinachDataFileHandleCheck extends Properties("SpinachDataFileHandle") {
     spinachDataFileHandle
       .withGroupCount(rowGroupCount)
       .withRowCountInLastGroup(lastRowCount)
-      .withEncodings(encodings)
-      .withDictionaryDataLens(dictionaryDataLens)
-      .withDictionaryIdSizes(dictionaryIdSizes)
 
     rowGroupMetaArray.foreach(spinachDataFileHandle.appendRowGroupMeta)
+    columnsMeta.foreach(spinachDataFileHandle.appendColumnMeta)
 
     spinachDataFileHandle
   }
 
-  private def compareSpinachFileHandle(
-                                       meta1: SpinachDataFileHandle,
-                                       meta2: SpinachDataFileHandle): Unit = {
-
-    assert(meta1.rowCountInEachGroup == meta2.rowCountInEachGroup)
-    assert(meta1.rowCountInLastGroup == meta2.rowCountInLastGroup)
-    assert(meta1.groupCount == meta2.groupCount)
-    assert(meta1.fieldCount == meta2.fieldCount)
-    assert(meta1.codec == meta2.codec)
-    assert(meta1.encodings.length == meta2.encodings.length)
-    assert(meta1.dictionaryDataLens.length == meta2.dictionaryDataLens.length)
-    assert(meta1.dictionaryIdSizes.length == meta2.dictionaryIdSizes.length)
-    assert(meta1.rowGroupsMeta.length == meta2.rowGroupsMeta.length)
-
-    meta1.encodings.zip(meta2.encodings).foreach{
-      case (v1, v2) => assert(v1 == v2)
-    }
-    meta1.dictionaryDataLens.zip(meta2.dictionaryDataLens).foreach{
-      case (v1, v2) => assert(v1 == v2)
-    }
-    meta1.dictionaryIdSizes.zip(meta2.dictionaryIdSizes).foreach{
-      case (v1, v2) => assert(v1 == v2)
-    }
-
-    meta1.rowGroupsMeta.zip(meta2.rowGroupsMeta).foreach{
-      case (v1, v2) =>
-        assert(v1.start == v2.start)
-        assert(v1.end == v2.end)
-        v1.fiberLens.zip(v2.fiberLens).foreach{
-          case (vv1, vv2) => assert(vv1 == vv2)
-        }
-        v1.fiberUncompressedLens.zip(v2.fiberUncompressedLens).foreach{
-          case (vv1, vv2) => assert(vv1 == vv2)
-        }
+  private lazy val genColumnMeta: Gen[ColumnMeta] = {
+    for {
+      encoding <- Gen.oneOf(Encoding.PLAIN, Encoding.RLE, Encoding.RLE_DICTIONARY,
+        Encoding.DELTA_LENGTH_BYTE_ARRAY, Encoding.DELTA_BINARY_PACKED)
+      dictionaryDataLength <- Gen.posNum[Int]
+      dictionaryIdSize <- Gen.posNum[Int]
+      statistics <- arbitrary[ColumnStatistics]
+    } yield {
+      new ColumnMeta(encoding, dictionaryDataLength, dictionaryIdSize, statistics)
     }
   }
 
-  property("write/read") = forAll { (spinachDataFileHandle: SpinachDataFileHandle) =>
+  implicit lazy val arbColumnMeta: Arbitrary[ColumnMeta] = Arbitrary(genColumnMeta)
+
+  private lazy val genColumnStatistics: Gen[ColumnStatistics] = {
+    for { min <- arbitrary[Array[Byte]]
+          max <- arbitrary[Array[Byte]]
+    } yield {
+        if (min.isEmpty || max.isEmpty) new ColumnStatistics(null, null)
+        else new ColumnStatistics(min, max)
+      }
+  }
+
+  implicit lazy val arbColumnStatistics: Arbitrary[ColumnStatistics] = {
+    Arbitrary(genColumnStatistics)
+  }
+
+  private def isEqual(l: RowGroupMeta, r: RowGroupMeta): Boolean = {
+    l.start == r.start && l.end == r.end &&
+      (l.fiberLens sameElements r.fiberLens) &&
+      (l.fiberUncompressedLens sameElements r.fiberUncompressedLens)
+  }
+
+  private def isEqual(l: SpinachDataFileHandle, r: SpinachDataFileHandle): Boolean = {
+
+    l.rowCountInEachGroup == r.rowCountInEachGroup &&
+      l.rowCountInLastGroup == r.rowCountInLastGroup &&
+      l.groupCount == r.groupCount &&
+      l.fieldCount == r.fieldCount &&
+      l.codec == r.codec &&
+      l.rowGroupsMeta.length == r.rowGroupsMeta.length &&
+      l.columnsMeta.length == r.columnsMeta.length &&
+      !l.columnsMeta.zip(r.columnsMeta).exists{
+        case (left, right) => !isEqual(left, right)
+      } &&
+      !l.rowGroupsMeta.zip(r.rowGroupsMeta).exists{
+        case (left, right) => !isEqual(left, right)
+      }
+  }
+
+  def isEqual(l: ColumnMeta, r: ColumnMeta): Boolean = {
+
+    l.encoding == r.encoding &&
+      l.dictionaryDataLength == r.dictionaryDataLength &&
+    l.dictionaryIdSize == r.dictionaryIdSize &&
+    isEqual(l.statistics, r.statistics)
+  }
+
+  def isEqual(l: ColumnStatistics, r: ColumnStatistics): Boolean = {
+
+    // Equal conditions:
+    // Both have no Min Max data
+    // Both have Min Max data and they are same.
+    (!l.hasNonNullValue && !r.hasNonNullValue) ||
+      (l.max.sameElements(r.max) && l.min.sameElements(r.min))
+  }
+
+
+  property("read/write ColumnStatistics") = forAll { (columnStatistics: ColumnStatistics) =>
+    val columnStatistics2 = columnStatistics match {
+      case ColumnStatistics(bytes) =>
+        val in = new DataInputStream(new ByteArrayInputStream(bytes))
+        ColumnStatistics(in)
+    }
+
+    isEqual(columnStatistics, columnStatistics2)
+  }
+
+  property("read/write ColumnMeta") = forAll { (columnMeta: ColumnMeta) =>
+    val columnMeta2 = columnMeta match {
+      case ColumnMeta(bytes) =>
+        val in = new DataInputStream(new ByteArrayInputStream(bytes))
+        ColumnMeta(in)
+    }
+
+    isEqual(columnMeta, columnMeta2)
+  }
+
+  property("read/write SpinachDataFileHandle") =
+    forAll { (spinachDataFileHandle: SpinachDataFileHandle) =>
 
     val file = new Path(
       new File(tmpDir.getAbsolutePath, "testSpinachDataFileHandle.meta").getAbsolutePath)
@@ -155,16 +195,11 @@ class SpinachDataFileHandleCheck extends Properties("SpinachDataFileHandle") {
     spinachDataFileHandle.write(output)
     output.close()
 
-    val groupCount = spinachDataFileHandle.groupCount
-    val fieldCount = spinachDataFileHandle.fieldCount
-    val fileLen = 12 * fieldCount + 16 * groupCount + 8 * fieldCount * groupCount + 20
-    assert(fileLen == fs.getFileStatus(file).getLen)
-
     // Read SpinachDataFileHandle from file
     val fileHandle = new SpinachDataFileHandle().read(fs.open(file), fs.getFileStatus(file).getLen)
-
-    compareSpinachFileHandle(fileHandle, spinachDataFileHandle)
     fs.delete(file, false)
+
+    isEqual(fileHandle, spinachDataFileHandle)
   }
 }
 

@@ -23,7 +23,6 @@ import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
@@ -32,8 +31,6 @@ import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.spinach._
-import org.apache.spark.sql.execution.datasources.spinach.filecache.{FiberCacheManager, IndexFiber}
-import org.apache.spark.sql.execution.datasources.spinach.io.IndexFile
 import org.apache.spark.sql.execution.datasources.spinach.utils.SpinachUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
@@ -74,6 +71,7 @@ case class CreateIndex(
     // TODO currently we ignore empty partitions, so each partition may have different indexes,
     // this may impact index updating. It may also fail index existence check. Should put index
     // info at table level also.
+    val time = System.currentTimeMillis().toHexString
     val bAndP = partitions.filter(_.files.nonEmpty).map(p => {
       val metaBuilder = new DataSourceMetaBuilder()
       val parent = p.files.head.getPath.getParent
@@ -109,10 +107,10 @@ case class CreateIndex(
             val dir = if (c.isAscending) Ascending else Descending
             BTreeIndexEntry(s.map(_.name).toIndexedSeq.indexOf(c.columnName), dir)
           })
-          metaBuilder.addIndexMeta(new IndexMeta(indexName, BTreeIndex(entries)))
+          metaBuilder.addIndexMeta(new IndexMeta(indexName, time, BTreeIndex(entries)))
         case BitMapIndexType =>
           val entries = indexColumns.map(col => s.map(_.name).toIndexedSeq.indexOf(col.columnName))
-          metaBuilder.addIndexMeta(new IndexMeta(indexName, BitMapIndex(entries)))
+          metaBuilder.addIndexMeta(new IndexMeta(indexName, time, BitMapIndex(entries)))
         case _ =>
           sys.error(s"Not supported index type $indexType")
       }
@@ -150,8 +148,9 @@ case class CreateIndex(
           indexColumns,
           keySchema,
           indexName,
-          isAppend = false,
-          indexType)
+          time,
+          indexType,
+          isAppend = false)
       }
 
       // This call shouldn't be put into the `try` block below because it only initializes and
@@ -241,9 +240,8 @@ case class DropIndex(
               override def next(): Path = allFile.next().getPath
             }.toSeq
             filePaths.filter(_.toString.endsWith(
-              "." + indexName + SpinachFileFormat.SPINACH_INDEX_EXTENSION)).foreach{idxPath =>
-              FiberCacheManager.evictFiberCacheData(IndexFiber(IndexFile(idxPath)))
-              fs.delete(idxPath, true)}
+              "." + indexName + SpinachFileFormat.SPINACH_INDEX_EXTENSION)).foreach(idxPath =>
+              fs.delete(idxPath, true))
           }
         })
       case other => sys.error(s"We don't support index dropping for ${other.simpleString}")
@@ -352,8 +350,9 @@ case class RefreshIndex(
             indexColumns.toArray,
             keySchema,
             i.name,
-            isAppend = true,
-            indexType)
+            i.time,
+            indexType,
+            isAppend = true)
         }
 
         // This call shouldn't be put into the `try` block below because it only initializes and

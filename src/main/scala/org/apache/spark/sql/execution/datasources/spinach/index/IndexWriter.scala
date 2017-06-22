@@ -57,6 +57,7 @@ private[index] abstract class IndexWriter (
 private[index] object IndexWriter {
   val INPUT_FILE_NAME = "spark.sql.spinach.inputFileName"
   val INDEX_NAME = "spark.sql.spinach.indexName"
+  val INDEX_TIME = "spark.sql.spinach.indexTime"
 }
 
 case class IndexBuildResult(dataFile: String, rowCount: Long, fingerprint: String, parent: String)

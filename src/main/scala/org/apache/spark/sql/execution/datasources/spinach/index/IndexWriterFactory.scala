@@ -28,13 +28,14 @@ private[index] object IndexWriterFactory {
       indexColumns: Array[IndexColumn],
       keySchema: StructType,
       indexName: String,
-      isAppend: Boolean,
-      indexType: AnyIndexType): IndexWriter = {
+      time: String,
+      indexType: AnyIndexType,
+      isAppend: Boolean): IndexWriter = {
     indexType match {
       case BTreeIndexType =>
-        new BTreeIndexWriter(relation, job, indexColumns, keySchema, indexName, isAppend)
+        new BTreeIndexWriter(relation, job, indexColumns, keySchema, indexName, time, isAppend)
       case BitMapIndexType =>
-        new BitMapIndexWriter(relation, job, indexColumns, keySchema, indexName, isAppend)
+        new BitMapIndexWriter(relation, job, indexColumns, keySchema, indexName, time, isAppend)
     }
   }
 }

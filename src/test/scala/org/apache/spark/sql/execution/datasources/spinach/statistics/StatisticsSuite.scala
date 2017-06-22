@@ -104,9 +104,9 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
       RangeInterval(row2, IndexScanner.DUMMY_KEY_END, true, false), ordering),
       "2.0 is in [2, +inf)")
-    assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
+    assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
       RangeInterval(row2, IndexScanner.DUMMY_KEY_END, false, false), ordering),
-      "2.0 is in (2, +inf)")
+      "2.0 is not in (2, +inf)")
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row3),
       RangeInterval(row2, IndexScanner.DUMMY_KEY_END, true, false), ordering),
       "3.0 is in [2, +inf)")

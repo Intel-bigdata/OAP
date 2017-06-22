@@ -34,7 +34,7 @@ private [spinach] object BPlusTreeMultiColumnSearchSuite extends Serializable {
 //  = array.map(InternalRow.fromSeq)
   implicit def transform(values: Seq[Any]): Key = InternalRow.fromSeq(values)
 
-  val indexMeta: IndexMeta = new IndexMeta("idxABC",
+  val indexMeta: IndexMeta = new IndexMeta("idxABC", "",
     BTreeIndex(Seq(BTreeIndexEntry(0), BTreeIndexEntry(1), BTreeIndexEntry(2)))) {
 
     // B+ Tree structure:

@@ -39,11 +39,11 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
   def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
     val meta: SpinachDataFileHandle = DataFileHandleCacheManager(this, conf)
     val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)
-    val dictDataLens = meta.dictionaryDataLens
+    val dictDataLens = meta.columnsMeta.map(_.dictionaryDataLength)
 
     val dictStart = lastGroupMeta.end + dictDataLens.slice(0, fiberId).sum
     val dataLen = dictDataLens(fiberId)
-    val dictSize = meta.dictionaryIdSizes(fiberId)
+    val dictSize = meta.columnsMeta(fiberId).dictionaryIdSize
     if (dictionaries(fiberId) == null && dataLen != 0) {
       val bytes = new Array[Byte](dataLen)
       val is = meta.fin
@@ -78,7 +78,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     }
     val len = groupMeta.fiberLens(fiberId)
     val uncompressedLen = groupMeta.fiberUncompressedLens(fiberId)
-    val encoding = meta.encodings(fiberId)
+    val encoding = meta.columnsMeta(fiberId).encoding
 
     val bytes = new Array[Byte](len)
 
@@ -144,7 +144,7 @@ private[spinach] case class SpinachDataFile(path: String, schema: StructType) ex
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     var lastGroupId = -1
-    (0 until rowIds.length).iterator.map { idx =>
+    rowIds.indices.iterator.map { idx =>
       val rowId = rowIds(idx)
       val groupId = ((rowId + 1) / meta.rowCountInEachGroup).toInt
       val rowIdxInGroup = (rowId % meta.rowCountInEachGroup).toInt

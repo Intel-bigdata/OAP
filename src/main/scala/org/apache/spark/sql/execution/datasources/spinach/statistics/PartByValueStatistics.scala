@@ -114,14 +114,10 @@ private[spinach] class PartByValueStatistics extends Statistics {
   // value array:(-inf, r0) [r0,r1) [r1,r2) [r2,r3) [r3,r4) [r4,r5]  (r5, +inf)
   protected def getIntervalIdx(row: Key, include: Boolean): Int = {
     var i = 0
-    if (row eq IndexScanner.DUMMY_KEY_START) 0 // -inf
-    else if (row eq IndexScanner.DUMMY_KEY_END) metas.length + 1 // +inf
-    else {
-      while (i < metas.length && (include && ordering.gteq(row, metas(i).row)
-        || !include && ordering.gt(row, metas(i).row))) i += 1
-      if (include && ordering.compare(metas.last.row, row) == 0) metas.last.idx // for row == r5
-      else i
-    }
+    while (i < metas.length && (include && ordering.gteq(row, metas(i).row)
+      || !include && ordering.gt(row, metas(i).row))) i += 1
+    if (include && ordering.compare(metas.last.row, row) == 0) metas.last.idx // for row == r5
+    else i
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
@@ -130,9 +126,10 @@ private[spinach] class PartByValueStatistics extends Statistics {
 
     val start = intervalArray.head
     val end = intervalArray.last
-    val left = getIntervalIdx(start.start, start.startInclude)
-    val right = getIntervalIdx(end.end, end.endInclude)
-
+    val left = if (start.start == IndexScanner.DUMMY_KEY_START) 0
+      else getIntervalIdx(start.start, start.startInclude)
+    val right = if (end.end == IndexScanner.DUMMY_KEY_END) metas.length + 1
+      else getIntervalIdx(end.end, end.endInclude)
 
     if (left == partNum + 1 || right == 0) {
       // interval.min > partition.max || interval.max < partition.min

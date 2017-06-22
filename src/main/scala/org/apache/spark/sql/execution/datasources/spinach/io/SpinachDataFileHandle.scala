@@ -17,16 +17,40 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.io
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, DataOutputStream}
+
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
+import org.apache.parquet.column.statistics._
 import org.apache.parquet.format.{CompressionCodec, Encoding}
+
+import org.apache.spark.sql.execution.datasources.SpinachException
+import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.UTF8String
 
 
 //  Meta Part Format
 //  ..
 //  Field                               Length In Byte
 //  Meta
+//    Magic                             4
+//    Row Count In Each Row Group       4
+//    Row Count In Last Row Group       4
+//    Row Group Count                   4
+//    Field Count In each Row           4
+//    Compression Codec                 4
+//    Column Meta #1                    4 * 5 + Length of Min Max Value Data
+//      Encoding                        4
+//      Dictionary Data Length          4
+//      Dictionary Id Size              4
+//      Min Value Data Length           4
+//      Min Value Data                  Min Value Data Length
+//      Max Value Data Length           4
+//      Max Value Data                  Max Value Data Length
+//    Column Meta #2
+//    ..
+//    Column Meta #N
 //    RowGroup Meta #1                  16 + 4 * Field Count In Each Row * 2
 //      RowGroup StartPosition          8
 //      RowGroup EndPosition            8
@@ -42,23 +66,7 @@ import org.apache.parquet.format.{CompressionCodec, Encoding}
 //    RowGroup Meta #3                  16 + 4 * Field Count In Each Row * 2
 //    ..                                16 + 4 * Field Count In Each Row * 2
 //    RowGroup Meta #N                  16 + 4 * Field Count In Each Row * 2
-//    Encoding                          4 * Field Count In Each Row
-//      Column #1 Encoding              4
-//      ...                             4
-//      Column #N Encoding              4
-//    Dictionary Bytes Length           4 * Field Count In Each Row
-//      Column #1 Dict Bytes Length     4
-//      ...                             4
-//      Column #N Dict Bytes Length     4
-//    Dictionary ID Size                4 * Field Count In Each Row
-//      Column #1 Dict ID Size          4
-//      ...                             4
-//      Column #N Dict ID Size          4
-//    Compression Codec                 4
-//    Row Count In Each Row Group       4
-//    Row Count In Last Row Group       4
-//    Row Group Count                   4
-//    Field Count In each Row           4
+//    Meta Data Length                  4
 
 private[spinach] class RowGroupMeta {
   var start: Long = _
@@ -95,32 +103,139 @@ private[spinach] class RowGroupMeta {
     this
   }
 
-  def read(is: FSDataInputStream, fieldCount: Int): RowGroupMeta = {
+  def read(is: DataInputStream, fieldCount: Int): RowGroupMeta = {
     start = is.readLong()
     end = is.readLong()
     fiberLens = new Array[Int](fieldCount)
     fiberUncompressedLens = new Array[Int](fieldCount)
 
-    (0 until fiberLens.length).foreach(fiberLens(_) = is.readInt())
-    (0 until fiberUncompressedLens.length).foreach(fiberUncompressedLens(_) = is.readInt())
+    fiberLens.indices.foreach(fiberLens(_) = is.readInt())
+    fiberUncompressedLens.indices.foreach(fiberUncompressedLens(_) = is.readInt())
 
     this
+  }
+}
+private[spinach] class ColumnStatistics(
+                                         val min: Array[Byte],
+                                         val max: Array[Byte]
+                                       ) {
+
+  def hasNonNullValue: Boolean = min != null && max != null
+
+  def isEmpty: Boolean = !hasNonNullValue
+}
+
+private[spinach] object ColumnStatistics {
+
+  type ParquetStatistics = org.apache.parquet.column.statistics.Statistics[_ <: Comparable[_]]
+
+  def getStatsBasedOnType(dataType: DataType): ParquetStatistics = {
+    dataType match {
+      case BooleanType => new BooleanStatistics()
+      case IntegerType | ByteType | DateType | ShortType => new IntStatistics()
+      case StringType | BinaryType => new BinaryStatistics()
+      case FloatType => new FloatStatistics()
+      case DoubleType => new DoubleStatistics()
+      case LongType => new LongStatistics()
+      case _ => sys.error(s"Not support data type: $dataType")
+    }
+  }
+
+  def getStatsFromSchema(schema: StructType): Seq[ParquetStatistics] = {
+    schema.map{ field => getStatsBasedOnType(field.dataType)}
+  }
+
+  def apply(stat: ParquetStatistics): ColumnStatistics = {
+    if (!stat.hasNonNullValue) new ColumnStatistics(null, null)
+    else new ColumnStatistics(stat.getMinBytes, stat.getMaxBytes)
+  }
+
+  def apply(in: DataInputStream): ColumnStatistics = {
+
+    val minLength = in.readInt()
+    val min = if (minLength != 0) {
+      val bytes = new Array[Byte](minLength)
+      in.read(bytes)
+      bytes
+    } else null
+
+    val maxLength = in.readInt()
+    val max = if (maxLength != 0) {
+      val bytes = new Array[Byte](maxLength)
+      in.read(bytes)
+      bytes
+    } else null
+
+    new ColumnStatistics(min, max)
+  }
+
+  def unapply(statistics: ColumnStatistics): Option[Array[Byte]] = {
+    val buf = new ByteArrayOutputStream()
+    val out = new DataOutputStream(buf)
+
+    if (statistics.hasNonNullValue) {
+      out.writeInt(statistics.min.length)
+      out.write(statistics.min)
+      out.writeInt(statistics.max.length)
+      out.write(statistics.max)
+    } else {
+      out.writeInt(0)
+      out.writeInt(0)
+    }
+
+    Some(buf.toByteArray)
+  }
+}
+
+private[spinach] class ColumnMeta(
+                                 val encoding: Encoding,
+                                 val dictionaryDataLength: Int,
+                                 val dictionaryIdSize: Int,
+                                 val statistics: ColumnStatistics
+                                 ) {}
+
+private[spinach] object ColumnMeta {
+
+  def apply(in: DataInputStream): ColumnMeta = {
+
+    val encoding = Encoding.findByValue(in.readInt())
+    val dictionaryDataLength = in.readInt()
+    val dictionaryIdSize = in.readInt()
+
+    val statistics = ColumnStatistics(in)
+
+    new ColumnMeta(encoding, dictionaryDataLength, dictionaryIdSize, statistics)
+  }
+
+  def unapply(columnMeta: ColumnMeta): Option[Array[Byte]] = {
+    val buf = new ByteArrayOutputStream()
+    val out = new DataOutputStream(buf)
+
+    out.writeInt(columnMeta.encoding.getValue)
+    out.writeInt(columnMeta.dictionaryDataLength)
+    out.writeInt(columnMeta.dictionaryIdSize)
+
+    columnMeta.statistics match {
+      case ColumnStatistics(bytes) => out.write(bytes)
+    }
+
+    Some(buf.toByteArray)
   }
 }
 
 private[spinach] class SpinachDataFileHandle(
    var rowGroupsMeta: ArrayBuffer[RowGroupMeta] = new ArrayBuffer[RowGroupMeta](),
+   var columnsMeta: ArrayBuffer[ColumnMeta] = new ArrayBuffer[ColumnMeta](),
    var rowCountInEachGroup: Int = 0,
    var rowCountInLastGroup: Int = 0,
    var groupCount: Int = 0,
    var fieldCount: Int = 0,
    var codec: CompressionCodec = CompressionCodec.UNCOMPRESSED) extends DataFileHandle {
-  private var _fin: FSDataInputStream = null
+  private var _fin: FSDataInputStream = _
   private var _len: Long = 0
 
-  var encodings: Array[Encoding] = _
-  var dictionaryDataLens: Array[Int] = _
-  var dictionaryIdSizes: Array[Int] = _
+  // Please change this value when Data File Format is changed
+  private val MAGIC = "OAP1"
 
   def fin: FSDataInputStream = _fin
   def len: Long = _len
@@ -138,6 +253,11 @@ private[spinach] class SpinachDataFileHandle(
     this
   }
 
+  def appendColumnMeta(meta: ColumnMeta): SpinachDataFileHandle = {
+    this.columnsMeta.append(meta)
+    this
+  }
+
   def withRowCountInLastGroup(count: Int): SpinachDataFileHandle = {
     this.rowCountInLastGroup = count
     this
@@ -148,72 +268,66 @@ private[spinach] class SpinachDataFileHandle(
     this
   }
 
-  def withEncodings(encodings: Array[Encoding]): SpinachDataFileHandle = {
-    this.encodings = encodings
-    this
-  }
-
-  def withDictionaryDataLens(dictionaryDataLens: Array[Int]): SpinachDataFileHandle = {
-    this.dictionaryDataLens = dictionaryDataLens
-    this
-  }
-
-  def withDictionaryIdSizes(dictionaryIdSizes: Array[Int]): SpinachDataFileHandle = {
-    this.dictionaryIdSizes = dictionaryIdSizes
-    this
-  }
-
   private def validateConsistency(): Unit = {
     require(rowGroupsMeta.length == groupCount,
       s"Row Group Meta Count isn't equals to $groupCount")
+    require(columnsMeta.length == fieldCount,
+      s"Column Meta Count isn't equals to $fieldCount")
   }
 
   def write(os: FSDataOutputStream): Unit = {
     validateConsistency()
 
-    rowGroupsMeta.foreach(_.write(os))
-
-    encodings.foreach(encoding => os.writeInt(encoding.getValue))
-    dictionaryDataLens.foreach(os.writeInt)
-    dictionaryIdSizes.foreach(os.writeInt)
-
-    os.writeInt(this.codec.getValue)
+    val startPos = os.getPos
+    os.writeBytes(MAGIC)
     os.writeInt(this.rowCountInEachGroup)
     os.writeInt(this.rowCountInLastGroup)
     os.writeInt(this.groupCount)
     os.writeInt(this.fieldCount)
+    os.writeInt(this.codec.getValue)
+
+    columnsMeta.foreach{ case ColumnMeta(bytes) => os.write(bytes) }
+
+    rowGroupsMeta.foreach(_.write(os))
+    val endPos = os.getPos
+    // Write down the length of meta data
+    os.writeInt((endPos - startPos).toInt)
   }
 
   def read(is: FSDataInputStream, fileLen: Long): SpinachDataFileHandle = is.synchronized {
     this._fin = is
     this._len = fileLen
 
-    // seek to the end of the end position of Meta
-    is.seek(fileLen - 20L)
-    this.codec = CompressionCodec.findByValue(is.readInt())
-    this.rowCountInEachGroup = is.readInt()
-    this.rowCountInLastGroup = is.readInt()
-    this.groupCount = is.readInt()
-    this.fieldCount = is.readInt()
+    val spinachDataFileHandleLengthIndex = fileLen - 4
 
-    // seek to the start position of column meta
-    is.seek(fileLen - 20L - fieldCount * 12)
-    encodings = new Array[Encoding](fieldCount)
-    dictionaryDataLens = new Array[Int](fieldCount)
-    dictionaryIdSizes = new Array[Int](fieldCount)
-    (0 until fieldCount).foreach(encodings(_) = Encoding.findByValue(is.readInt()))
-    (0 until fieldCount).foreach(dictionaryDataLens(_) = is.readInt())
-    (0 until fieldCount).foreach(dictionaryIdSizes(_) = is.readInt())
+    // seek to the position of data file handle length
+    is.seek(spinachDataFileHandleLengthIndex)
+    val spianchDataFileHandleLength = is.readInt()
 
-    // TODO: [Linhong] Lets' change this to some readable expression
-    // seek to the start position of Meta
-    val rowGroupMetaPos = fileLen - 20 - groupCount * (16 + 8 * fieldCount) - fieldCount * 12
-    is.seek(rowGroupMetaPos)
-    var i = 0
-    while(i < groupCount) {
-      rowGroupsMeta.append(new RowGroupMeta().read(is, this.fieldCount))
-      i += 1
+    // read all bytes of data file handle
+    val metaBytes = new Array[Byte](spianchDataFileHandleLength)
+
+    is.readFully(spinachDataFileHandleLengthIndex - spianchDataFileHandleLength, metaBytes)
+
+    val in = new DataInputStream(new ByteArrayInputStream(metaBytes))
+
+    val buffer = new Array[Byte](MAGIC.length)
+    in.read(buffer)
+    val magic = UTF8String.fromBytes(buffer).toString
+    if (magic != MAGIC) {
+      throw new SpinachException("Not a valid Spinach Data File")
     }
+
+    this.rowCountInEachGroup = in.readInt()
+    this.rowCountInLastGroup = in.readInt()
+    this.groupCount = in.readInt()
+    this.fieldCount = in.readInt()
+    this.codec = CompressionCodec.findByValue(in.readInt())
+
+    (0 until fieldCount).foreach( _ => columnsMeta.append(ColumnMeta(in)))
+
+    (0 until groupCount).foreach( _ =>
+      rowGroupsMeta.append(new RowGroupMeta().read(in, this.fieldCount)))
 
     validateConsistency()
     this

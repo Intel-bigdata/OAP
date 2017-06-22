@@ -23,7 +23,7 @@ import org.json4s.jackson.JsonMethods._
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.execution.datasources.spinach.filecache.FiberCacheStatus
-import org.apache.spark.sql.execution.datasources.spinach.io.{RowGroupMeta, SpinachDataFileHandle}
+import org.apache.spark.sql.execution.datasources.spinach.io.SpinachDataFileHandle
 import org.apache.spark.util.collection.BitSet
 
 
@@ -45,7 +45,8 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
   }
 
   test("test data file meta") {
-    val dataFileMeta = new SpinachDataFileHandle(new ArrayBuffer[RowGroupMeta](), 3, 2, 3, 3)
+    val dataFileMeta = new SpinachDataFileHandle(
+      rowCountInEachGroup = 3, rowCountInLastGroup = 2, groupCount = 3, fieldCount = 3)
     val dataFileMetaStr = compact(render(CacheStatusSerDe.dataFileMetaToJson(dataFileMeta)))
     val newDataFileMeta = CacheStatusSerDe.dataFileMetaFromJson(parse(dataFileMetaStr))
     assertDataFileMetaEquals(dataFileMeta, newDataFileMeta)
@@ -56,7 +57,8 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
     val bitSet = new BitSet(90)
     bitSet.set(3)
     bitSet.set(8)
-    val dataFileMeta = new SpinachDataFileHandle(new ArrayBuffer[RowGroupMeta](), 3, 2, 30, 3)
+    val dataFileMeta = new SpinachDataFileHandle(
+      rowCountInEachGroup = 3, rowCountInLastGroup = 2, groupCount = 30, fieldCount = 3)
     val rawData = FiberCacheStatus(path, bitSet, dataFileMeta)
     val newRawData =
       CacheStatusSerDe.statusRawDataFromJson(CacheStatusSerDe.statusRawDataToJson(rawData))
@@ -73,8 +75,10 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
     bitSet1.set(8)
     bitSet2.set(5)
     bitSet2.set(6)
-    val dataFileMeta1 = new SpinachDataFileHandle(new ArrayBuffer[RowGroupMeta](), 3, 2, 30, 3)
-    val dataFileMeta2 = new SpinachDataFileHandle(new ArrayBuffer[RowGroupMeta](), 3, 1, 50, 3)
+    val dataFileMeta1 = new SpinachDataFileHandle(
+      rowCountInEachGroup = 3, rowCountInLastGroup = 2, groupCount = 30, fieldCount = 3)
+    val dataFileMeta2 = new SpinachDataFileHandle(
+      rowCountInEachGroup = 3, rowCountInLastGroup = 1, groupCount = 50, fieldCount = 3)
     rawDataArray += FiberCacheStatus(path1, bitSet1, dataFileMeta1)
     rawDataArray += FiberCacheStatus(path2, bitSet2, dataFileMeta2)
     val statusRawDataArrayStr = CacheStatusSerDe.serialize(rawDataArray)

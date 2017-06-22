@@ -39,7 +39,7 @@ private[spinach] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner
   def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
-    val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
+    val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     logDebug("Loading Index File: " + path)
     logDebug("\tFile Szie: " + path.getFileSystem(conf).getFileStatus(path).getLen)
     val indexScanner = IndexFiber(IndexFile(path))

@@ -101,11 +101,13 @@ private[index] class SpinachIndexOutputFormat[T] extends FileOutputFormat[Void, 
     // val codec = getCodec(taskAttemptContext)
     val extension = ".index"
     val input = conf.get(IndexWriter.INPUT_FILE_NAME)
+    val indexName = conf.get(IndexWriter.INDEX_NAME)
+    val time = conf.get(IndexWriter.INDEX_TIME)
     // TODO replace '/' with OS specific separator
     val simpleName = input.substring(input.lastIndexOf('/') + 1, input.lastIndexOf('.'))
     val directory = input.substring(0, input.lastIndexOf('/'))
     val outputName =
-      directory + "/." + simpleName + "." + conf.get(IndexWriter.INDEX_NAME) + extension
+      directory + "/." + simpleName + "." + time + "." + indexName + extension
     val file = this.getDefaultWorkFile(taskAttemptContext, outputName)
     val fs = file.getFileSystem(conf)
     // TODO maybe compression here

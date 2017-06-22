@@ -58,7 +58,7 @@ private[spinach] class LeafNode(keys: Array[Key], values: Array[IntValues], sibl
 private[spinach] object BPlusTreeSingleColumnSearchSuite extends Serializable {
   implicit def int2internalRow(keys: Array[Int]): Array[Key] = keys.map(InternalRow(_))
 
-  val indexMeta: IndexMeta = new IndexMeta("test", BTreeIndex(BTreeIndexEntry(1) :: Nil)) {
+  val indexMeta: IndexMeta = new IndexMeta("test", "", BTreeIndex(BTreeIndexEntry(1) :: Nil)) {
     // The data looks like:
     //              3            8            13              16 <-----Root Key
     //              |            |             |               |

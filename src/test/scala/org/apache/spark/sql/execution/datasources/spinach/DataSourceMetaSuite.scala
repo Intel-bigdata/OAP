@@ -53,13 +53,13 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     val spinachMeta = DataSourceMeta.newBuilder()
       .addFileMeta(FileMeta("SpinachFile1", 60, "file1"))
       .addFileMeta(FileMeta("SpinachFile2", 40, "file2"))
-      .addIndexMeta(IndexMeta("index1", BTreeIndex()
+      .addIndexMeta(IndexMeta("index1", "15cc47fb3d8", BTreeIndex()
         .appendEntry(BTreeIndexEntry(0, Descending))
         .appendEntry(BTreeIndexEntry(1, Ascending))))
-      .addIndexMeta(IndexMeta("index2", BitMapIndex()
+      .addIndexMeta(IndexMeta("index2", "15cc47fb3d9", BitMapIndex()
         .appendEntry(1)
         .appendEntry(2)))
-      .addIndexMeta(IndexMeta("index3", BTreeIndex()
+      .addIndexMeta(IndexMeta("index3", "15cc47fb3e0", BTreeIndex()
         .appendEntry(BTreeIndexEntry(1, Descending))
         .appendEntry(BTreeIndexEntry(0, Ascending))))
       .withNewSchema(new StructType()
@@ -93,6 +93,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     val indexMetas = spinachMeta.indexMetas
     assert(indexMetas.length === 3)
     assert(indexMetas(0).name === "index1")
+    assert(indexMetas(0).time === "15cc47fb3d8")
     assert(indexMetas(0).indexType.isInstanceOf[BTreeIndex])
     val index1 = indexMetas(0).indexType.asInstanceOf[BTreeIndex]
     assert(index1.entries.size === 2)
@@ -106,6 +107,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     assert(index3.entries(0).dir === Descending)
 
     assert(indexMetas(1).name === "index2")
+    assert(indexMetas(1).time === "15cc47fb3d9")
     assert(indexMetas(1).indexType.isInstanceOf[BitMapIndex])
     val index2 = indexMetas(1).indexType.asInstanceOf[BitMapIndex]
     assert(index2.entries.size === 2)

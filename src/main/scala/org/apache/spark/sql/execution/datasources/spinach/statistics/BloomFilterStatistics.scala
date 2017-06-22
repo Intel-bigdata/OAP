@@ -107,7 +107,10 @@ private[spinach] class BloomFilterStatistics extends Statistics {
     val equalValues: Array[Key] =
       if (intervalArray.nonEmpty) {
         // should not use ordering.compare here
-        intervalArray.filter(interval => ordering.compare(interval.start, interval.end) == 0
+        intervalArray.filter(interval =>
+          interval.start != IndexScanner.DUMMY_KEY_START
+            && interval.end != IndexScanner.DUMMY_KEY_END
+        ).filter(interval => ordering.compare(interval.start, interval.end) == 0
           && interval.startInclude && interval.endInclude).map(_.start).toArray
       } else null
     val skipFlag = if (equalValues != null && equalValues.length > 0) {

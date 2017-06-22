@@ -47,7 +47,7 @@ class SpinachDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfte
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("spinach_test_1")
     sqlContext.dropTempTable("spinach_test_2")
-    sqlContext.dropTempTable("spinach_partition_table")
+    sqlContext.sql("drop table spinach_partition_table")
   }
 
   test("show index") {

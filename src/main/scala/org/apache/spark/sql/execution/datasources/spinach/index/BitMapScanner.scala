@@ -45,7 +45,7 @@ private[spinach] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScann
 
   override def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
-    val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
+    val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     val indexScanner = IndexFiber(IndexFile(path))
     val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
 

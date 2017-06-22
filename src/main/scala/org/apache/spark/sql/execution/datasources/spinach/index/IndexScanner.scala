@@ -51,7 +51,7 @@ private[spinach] abstract class IndexScanner(idxMeta: IndexMeta)
   def getSchema: StructType = keySchema
 
   def existRelatedIndexFile(dataPath: Path, conf: Configuration): Boolean = {
-    val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name)
+    val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     path.getFileSystem(conf).exists(path)
   }
 

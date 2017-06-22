@@ -125,8 +125,10 @@ private[spinach] object FileMeta {
   }
 }
 
-private[spinach] class IndexMeta(var name: String = null, var indexType: IndexType = null)
-    extends Serializable {
+private[spinach] class IndexMeta(
+    var name: String = null,
+    var time: String = null,
+    var indexType: IndexType = null) extends Serializable {
   import DataSourceMeta._
   import IndexMeta._
 
@@ -172,6 +174,7 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
 
   def write(out: FSDataOutputStream): Unit = {
     writeString(name, INDEX_META_NAME_LENGTH, out)
+    writeString(time, INDEX_META_TIME_LENGTH, out)
     val keyBits = BitSet.empty
     val dirBits = BitSet.empty
     indexType match {
@@ -195,6 +198,9 @@ private[spinach] class IndexMeta(var name: String = null, var indexType: IndexTy
     var readPos = in.getPos
     name = in.readUTF()
     readPos += INDEX_META_NAME_LENGTH
+    in.seek(readPos)
+    time = in.readUTF()
+    readPos += INDEX_META_TIME_LENGTH
 
     in.seek(readPos)
     val indexTypeFlag = in.readByte()
@@ -227,9 +233,10 @@ private[spinach] object IndexMeta {
   final val HASH_INDEX_TYPE = 2
 
   def apply() : IndexMeta = new IndexMeta()
-  def apply(name: String, indexType: IndexType): IndexMeta = {
+  def apply(name: String, time: String, indexType: IndexType): IndexMeta = {
     val indexMeta = new IndexMeta()
     indexMeta.name = name
+    indexMeta.time = time
     indexMeta.indexType = indexType
     indexMeta
   }
@@ -386,7 +393,8 @@ private[spinach] object DataSourceMeta {
   final val FILE_META_DATA_FILE_NAME_LENGTH = 256
 
   final val INDEX_META_LENGTH = 768
-  final val INDEX_META_NAME_LENGTH = 255
+  final val INDEX_META_NAME_LENGTH = 240
+  final val INDEX_META_TIME_LENGTH = 15
   final val INDEX_META_TYPE_LENGTH = 1
   final val INDEX_META_KEY_LENGTH = 256
 
@@ -403,7 +411,6 @@ private[spinach] object DataSourceMeta {
   private def readFileMetas(fileHeader: FileHeader, in: FSDataInputStream): Array[FileMeta] = {
     val dataFileCount = fileHeader.dataFileCount.toInt
     val fileMetas = new Array[FileMeta](dataFileCount)
-    var readPos = FILE_META_START_OFFSET
 
     for (i <- 0 until dataFileCount) {
       val readPos = FILE_META_START_OFFSET + FILE_META_LENGTH * i

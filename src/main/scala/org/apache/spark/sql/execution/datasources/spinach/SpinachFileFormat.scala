@@ -249,18 +249,13 @@ private[spinach] class SpinachOutputWriterFactory(
     dataSchema: StructType,
     @transient protected val job: Job,
     options: Map[String, String]) extends OutputWriterFactory {
-  private val serializableConf: SerializableConfiguration = {
-    val conf = ContextUtil.getConfiguration(job)
-
-    new SerializableConfiguration(conf)
-  }
 
   override def newInstance(
                             path: String, bucketId: Option[Int],
                             dataSchema: StructType, context: TaskAttemptContext): OutputWriter = {
     // TODO we don't support bucket yet
     assert(bucketId.isDefined == false, "Spinach doesn't support bucket yet.")
-    new SpinachOutputWriter(path, dataSchema, context, serializableConf)
+    new SpinachOutputWriter(path, dataSchema, context)
   }
 
   def spnMetaFileExists(path: Path): Boolean = {
@@ -333,8 +328,7 @@ private[spinach] case class SpinachWriteResult(
 private[spinach] class SpinachOutputWriter(
                                             path: String,
                                             dataSchema: StructType,
-                                            context: TaskAttemptContext,
-                                            sc: SerializableConfiguration) extends OutputWriter {
+                                            context: TaskAttemptContext) extends OutputWriter {
   private var rowCount = 0
   private var partitionString: String = ""
   override def setPartitionString(ps: String): Unit = {
@@ -343,10 +337,10 @@ private[spinach] class SpinachOutputWriter(
   private val writer: SpinachDataWriter = {
     val isCompressed: Boolean = FileOutputFormat.getCompressOutput(context)
     val file: Path = new Path(path, getFileName(SpinachFileFormat.SPINACH_DATA_EXTENSION))
-    val fs: FileSystem = file.getFileSystem(sc.value)
+    val fs: FileSystem = file.getFileSystem(context.getConfiguration)
     val fileOut: FSDataOutputStream = fs.create(file, false)
 
-    new SpinachDataWriter(isCompressed, fileOut, dataSchema, sc.value)
+    new SpinachDataWriter(isCompressed, fileOut, dataSchema, context.getConfiguration)
   }
 
   override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
@@ -361,7 +355,7 @@ private[spinach] class SpinachOutputWriter(
   }
 
   private def getFileName(extension: String): String = {
-    val configuration = sc.value
+    val configuration = context.getConfiguration
     // this is the way how we pass down the uuid
     val uniqueWriteJobId = configuration.get("spark.sql.sources.writeJobUUID")
     val taskAttemptId = context.getTaskAttemptID
