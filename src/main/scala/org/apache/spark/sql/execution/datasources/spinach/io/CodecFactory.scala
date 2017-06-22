@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.spinach.io
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.io.compress.{CodecPool, CompressionCodec}
@@ -78,7 +78,7 @@ private[spinach] class BytesDecompressor(compressionCodec: Option[CompressionCod
         decompressor.reset()
         val cis = codec.createInputStream(new ByteArrayInputStream(bytes), decompressor)
         val decompressed = new Array[Byte](uncompressedSize)
-        cis.read(decompressed)
+        new DataInputStream(cis).readFully(decompressed)
         decompressed
       case None => bytes
     }
