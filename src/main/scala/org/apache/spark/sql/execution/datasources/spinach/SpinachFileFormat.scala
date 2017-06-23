@@ -55,6 +55,9 @@ private[sql] class SpinachFileFormat extends FileFormat
     super.initialize(sparkSession, options, fileCatalog)
 
     val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
+    // TODO
+    // 1. Make the scanning etc. as lazy loading, as inferSchema probably not be called
+    // 2. We need to pass down the spinach meta file and its associated partition path
 
     val parents = readFiles match {
       case Some(files) => files.map(file => file.getPath.getParent)
