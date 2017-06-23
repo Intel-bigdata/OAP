@@ -61,6 +61,7 @@ private[sql] class SpinachFileFormat extends FileFormat
       case _ => fileCatalog.allFiles().map(_.getPath.getParent)
     }
 
+    // TODO we support partitions, but this only read meta from one of the partitions
     val partition2Meta = parents.distinct.reverse.map { parent =>
       new Path(parent, SpinachFileFormat.SPINACH_META_FILE)
     }.find(metaPath => metaPath.getFileSystem(hadoopConf).exists(metaPath))
