@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.spinach.io
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.format.CompressionCodec
 import org.scalacheck.{Arbitrary, Gen, Properties}
-import org.scalacheck.Prop.forAll
+import org.scalacheck.Prop.forAllNoShrink
 import org.scalatest.prop.Checkers
 
 import org.apache.spark.SparkFunSuite
@@ -30,17 +30,25 @@ class CodecFactoryCheck extends Properties("CodecFactory") {
 
   private val codecFactory = new CodecFactory(new Configuration())
 
-  property("compress/decompress") = forAll {
+  private val gen = Gen.sized { size =>
+    for {
+      codec <- Arbitrary.arbitrary[CompressionCodec]
+      times <- Gen.posNum[Int]
+      bytes <- Gen.containerOfN[Array, Byte](size * 100, Arbitrary.arbitrary[Byte])
+    } yield (codec, times, bytes)
+  }
+
+  property("compress/decompress") = forAllNoShrink(gen) {
     // Array[Array[Byte]] means one group of fibers' data
-    (codec: CompressionCodec, bytesArray: Array[Array[Byte]]) =>
+    case (codec, times, bytes) =>
       val compressor = codecFactory.getCompressor(codec)
       val decompressor = codecFactory.getDecompressor(codec)
 
-      !bytesArray.exists(bytes =>
-        decompressor.decompress(compressor.compress(bytes), bytes.length)
-        .zip(bytes).exists(b => !(b._1 equals b._2))
-      )
+      !(0 until times).exists{ _ =>
+        !decompressor.decompress(compressor.compress(bytes), bytes.length).sameElements(bytes)
+      }
   }
+
   implicit lazy val arbCompressionCodec: Arbitrary[CompressionCodec] = {
     Arbitrary(genCompressionCodec)
   }
