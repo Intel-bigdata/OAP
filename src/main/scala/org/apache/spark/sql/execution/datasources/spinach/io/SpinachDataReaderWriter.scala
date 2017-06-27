@@ -202,7 +202,8 @@ private[spinach] class SpinachDataReader(
    * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
    */
   private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
-    if (!filterScanner.get.canBeOptimizedByStatistics) {
+    // [WORKAROUND] We have not supported multi-column index statistics yet
+    if (filterScanner.get.getSchema.length != 1 || !filterScanner.get.canBeOptimizedByStatistics) {
       StaticsAnalysisResult.USE_INDEX
     } else if (filterScanner.get.intervalArray.isEmpty) {
       StaticsAnalysisResult.SKIP_INDEX
