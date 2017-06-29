@@ -103,7 +103,7 @@ private[oap] class BitMapIndexWriter(
 
     def writeTask(): Seq[IndexBuildResult] = {
       val statisticsManager = new StatisticsManager
-      statisticsManager.initialize(BitMapIndexType, keySchema)
+      statisticsManager.initialize(BitMapIndexType, keySchema, configuration)
       // Current impl just for fast proving the effect of BitMap Index,
       // we can do the optimize below:
       // 1. each bitset in hashmap value has same length, we can save the

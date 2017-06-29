@@ -19,9 +19,12 @@ package org.apache.spark.sql.execution.datasources.oap.statistics
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.index._
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
@@ -56,15 +59,44 @@ class StatisticsManager {
   // for read with incorrect mask, the statistics is invalid
   private var invalidStatistics: Boolean = false
 
-  def initialize(indexType: AnyIndexType, s: StructType): Unit = {
-    val statsTypes = StatisticsManager.statisticsTypeMap(indexType)
-    stats = statsTypes.map(t => t match {
+  def initialize(indexType: AnyIndexType, s: StructType, conf: Configuration): Unit = {
+
+    StatisticsManager.setFullScanThreshold(
+      conf.getDouble(SQLConf.SPINACH_FULL_SCAN_THRESHOLD.key,
+        SQLConf.SPINACH_FULL_SCAN_THRESHOLD.defaultValue.get))
+
+    StatisticsManager.setPartNumber(
+      conf.getInt(SQLConf.SPINACH_STATISTICS_PART_NUM.key,
+        SQLConf.SPINACH_STATISTICS_PART_NUM.defaultValue.get)
+    )
+
+    StatisticsManager.setSampleRate(
+      conf.getDouble(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.key,
+        SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.defaultValue.get)
+    )
+
+    StatisticsManager.setBloomFilterMaxBits(
+      conf.getInt(SQLConf.SPINACH_BLOOMFILTER_MAXBITS.key,
+        SQLConf.SPINACH_BLOOMFILTER_MAXBITS.defaultValue.get)
+    )
+
+    StatisticsManager.setBloomFilterHashFuncs(
+      conf.getInt(SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.key,
+        SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.defaultValue.get)
+    )
+
+    val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter{ statType =>
+      val typeFromConfig = conf.get(SQLConf.SPINACH_STATISTICS_TYPES.key,
+        SQLConf.SPINACH_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
+      typeFromConfig.contains(statType.name)
+    }
+    stats = statsTypes.map {
       case MinMaxStatisticsType => new MinMaxStatistics
       case SampleBasedStatisticsType => new SampleBasedStatistics
       case PartByValueStatisticsType => new PartByValueStatistics
       case BloomFilterStatisticsType => new BloomFilterStatistics
-      case _ => throw new UnsupportedOperationException(s"non-supported statistic type $t")
-    })
+      case t => throw new UnsupportedOperationException(s"non-supported statistic type $t")
+    }
     schema = s
     sortFlag = false
     content = new ArrayBuffer[Key]()
@@ -170,12 +202,12 @@ object StatisticsManager {
       BitMapIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
         BloomFilterStatisticsType, PartByValueStatisticsType))
 
-  var sampleRate: Double = 0.1
-  var partNumber: Int = 5
-  var bloomFilterMaxBits: Int = 1 << 20
-  var bloomFilterHashFuncs: Int = 3
+  var sampleRate: Double = _
+  var partNumber: Int = _
+  var bloomFilterMaxBits: Int = _
+  var bloomFilterHashFuncs: Int = _
 
-  var FULLSCANTHRESHOLD: Double = 0.8
+  var FULLSCANTHRESHOLD: Double = _
 
   // TODO we need to find better ways to configure these parameters
   def setStatisticsType(indexType: AnyIndexType, statisticsType: Array[StatisticsType]): Unit =
@@ -183,4 +215,6 @@ object StatisticsManager {
   def setSampleRate(rate: Double): Unit = this.sampleRate = rate
   def setPartNumber(num: Int): Unit = this.partNumber = num
   def setFullScanThreshold(rate: Double): Unit = this.FULLSCANTHRESHOLD = rate
+  def setBloomFilterMaxBits(maxBits: Int): Unit = this.bloomFilterMaxBits = maxBits
+  def setBloomFilterHashFuncs(num: Int): Unit = this.bloomFilterHashFuncs = num
 }

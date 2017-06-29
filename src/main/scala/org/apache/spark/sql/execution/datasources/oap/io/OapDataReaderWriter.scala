@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
-import org.apache.parquet.format.{CompressionCodec, Encoding}
+import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.io.api.Binary
 
 import org.apache.spark.internal.Logging
@@ -163,7 +163,6 @@ private[oap] class OapDataReader(
     val start = System.currentTimeMillis()
     filterScanner match {
       case Some(fs) if fs.existRelatedIndexFile(path, conf) =>
-        fs.initialize(path, conf)
         val indexPath = IndexUtils.indexFileFromDataFile(path, fs.meta.name, fs.meta.time)
 
         val initFinished = System.currentTimeMillis()
@@ -174,6 +173,7 @@ private[oap] class OapDataReader(
           case StaticsAnalysisResult.FULL_SCAN =>
             fileScanner.iterator(conf, requiredIds)
           case StaticsAnalysisResult.USE_INDEX =>
+            fs.initialize(path, conf)
             // total Row count can be get from the filter scanner
             val rowIDs = fs.toArray.sorted
             fileScanner.iterator(conf, requiredIds, rowIDs)

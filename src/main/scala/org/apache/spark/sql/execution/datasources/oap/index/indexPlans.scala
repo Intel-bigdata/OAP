@@ -67,6 +67,7 @@ case class CreateIndex(
     }
 
     logInfo(s"Creating index $indexName")
+    val configuration = sparkSession.sessionState.newHadoopConf()
     val partitions = OapUtils.getPartitions(fileCatalog, partitionSpec)
     // TODO currently we ignore empty partitions, so each partition may have different indexes,
     // this may impact index updating. It may also fail index existence check. Should put index
@@ -76,7 +77,7 @@ case class CreateIndex(
       val metaBuilder = new DataSourceMetaBuilder()
       val parent = p.files.head.getPath.getParent
       // TODO get `fs` outside of map() to boost
-      val fs = parent.getFileSystem(sparkSession.sparkContext.hadoopConfiguration)
+      val fs = parent.getFileSystem(configuration)
       val existOld = fs.exists(new Path(parent, OapFileFormat.OAP_META_FILE))
       if (existOld) {
         val m = OapUtils.getMeta(sparkSession.sparkContext.hadoopConfiguration, parent)
@@ -124,7 +125,7 @@ case class CreateIndex(
       // p.files.foreach(f => builder.addFileMeta(FileMeta("", 0, f.getPath.toString)))
       (metaBuilder, parent, existOld)
     })
-    val job = Job.getInstance(sparkSession.sparkContext.hadoopConfiguration)
+    val job = Job.getInstance(configuration)
     val indexFileFormat = new OapIndexFileFormat
     val ids =
       indexColumns.map(c => s.map(_.name).toIndexedSeq.indexOf(c.columnName))
@@ -179,7 +180,7 @@ case class CreateIndex(
     // write updated metas down
     bAndP.foreach(bp => DataSourceMeta.write(
       new Path(bp._2.toString, OapFileFormat.OAP_META_FILE),
-      sparkSession.sparkContext.hadoopConfiguration,
+      configuration,
       bp._1.build(),
       deleteIfExits = true))
     Seq.empty

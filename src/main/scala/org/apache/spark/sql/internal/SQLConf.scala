@@ -578,9 +578,16 @@ object SQLConf {
         "\"SAMPLE\" for SampleBasedStatistics, " +
         "\"PARTBYVALUE\" for PartedByValueStatistics. " +
         "If you want to add more than one type, just use comma " +
-        "to separate, eg. \"MINMAX, SAMPLE, PARTBYVALUE\"")
+        "to separate, eg. \"MINMAX, SAMPLE, PARTBYVALUE, BLOOM\"")
       .stringConf
-      .createWithDefault("MINMAX, SAMPLE, PARTBYVALUE")
+      .createWithDefault("MINMAX, SAMPLE, PARTBYVALUE, BLOOM")
+
+  val SPINACH_STATISTICS_PART_NUM =
+    SQLConfigBuilder("spark.sql.spinach.Statistics.partNum")
+      .internal()
+      .doc("PartedByValueStatistics gives statistics with the value interval, default 5")
+      .intConf
+      .createWithDefault(5)
 
   val OAP_STATISTICS_SAMPLE_RATE =
     SQLConfigBuilder("spark.sql.oap.Statistics.sampleRate")
@@ -593,9 +600,9 @@ object SQLConf {
     SQLConfigBuilder("spark.sql.oap.Bloomfilter.maxBits")
       .internal()
       .doc("Define the max bit count parameter used in bloom " +
-        "filter, default 1073741824")
+        "filter, default 33554432")
       .intConf
-      .createWithDefault(1073741824)
+      .createWithDefault(1 << 25)
 
   val OAP_BLOOMFILTER_NUMHASHFUNC =
     SQLConfigBuilder("spark.sql.oap.Bloomfilter.numHashFunc")

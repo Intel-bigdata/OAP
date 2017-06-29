@@ -120,7 +120,7 @@ private[oap] class BTreeIndexWriter(
 
     def writeTask(): Seq[IndexBuildResult] = {
       val statisticsManager = new StatisticsManager
-      statisticsManager.initialize(BTreeIndexType, keySchema)
+      statisticsManager.initialize(BTreeIndexType, keySchema, configuration)
       // key -> RowIDs list
       val hashMap = new java.util.HashMap[InternalRow, java.util.ArrayList[Long]]()
       var cnt = 0L
