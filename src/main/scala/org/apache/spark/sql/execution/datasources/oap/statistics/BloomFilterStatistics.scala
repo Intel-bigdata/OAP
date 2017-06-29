@@ -35,7 +35,6 @@ private[oap] class BloomFilterStatistics extends Statistics {
   private lazy val bfHashFuncs: Int = StatisticsManager.bloomFilterHashFuncs
 
   @transient private var projectors: Array[UnsafeProjection] = _ // for write
-  @transient private lazy val convertor: UnsafeProjection = UnsafeProjection.create(schema)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
   override def initialize(schema: StructType): Unit = {
@@ -103,23 +102,33 @@ private[oap] class BloomFilterStatistics extends Statistics {
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
-    // extract equal condition from intervalArray
-    val equalValues: Array[Key] =
-      if (intervalArray.nonEmpty) {
-        // should not use ordering.compare here
-        intervalArray.filter(interval =>
-          interval.start != IndexScanner.DUMMY_KEY_START
-            && interval.end != IndexScanner.DUMMY_KEY_END
-        ).filter(interval => ordering.compare(interval.start, interval.end) == 0
-          && interval.startInclude && interval.endInclude).map(_.start).toArray
-      } else null
-    val skipFlag = if (equalValues != null && equalValues.length > 0) {
-      !equalValues.map(value => bfIndex
-        .checkExist(convertor(value).getBytes))
-        .reduceOption(_ || _).getOrElse(false)
-    } else false
 
-    if (skipFlag) StaticsAnalysisResult.SKIP_INDEX
-    else StaticsAnalysisResult.USE_INDEX
+    val converter = UnsafeProjection.create(schema)
+    val partialSchema = StructType(schema.slice(0, schema.length - 1))
+    val partialConverter = UnsafeProjection.create(partialSchema)
+    /**
+     * When to use Index? If any interval in intervalArray satisfies any of below:
+     * 1. If start or end is DUMMY_KEY
+     *      Means there is a range interval and bloom filter can't deal with it
+     * 2. If interval.start equals interval.end, and they are exists in bfIndex.
+     *      In this case, interval.start.numFields == interval.end.numFields
+     * 3. If not, Check (schema.length - 1) fields in start OR end exists in bfIndex.
+     *      In this case, first (schema.length -1) fields in start and end must be equal.
+     * Why?
+     * According index selection, if interval has multiple columns,
+     * the first (schema.length -1) fields in start and end must be equal.
+     */
+    val useIndex = intervalArray.isEmpty || intervalArray.exists { interval =>
+      val numFields = math.min(interval.start.numFields, interval.end.numFields)
+      if (numFields == 0) true
+      else if (numFields == schema.length && ordering.eq(interval.start, interval.end)) {
+        bfIndex.checkExist(converter(interval.start).getBytes)
+      } else {
+        bfIndex.checkExist(partialConverter(interval.start).getBytes)
+      }
+    }
+
+    if (useIndex) StaticsAnalysisResult.USE_INDEX
+    else StaticsAnalysisResult.SKIP_INDEX
   }
 }

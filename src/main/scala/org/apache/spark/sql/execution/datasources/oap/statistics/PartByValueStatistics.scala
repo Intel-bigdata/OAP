@@ -24,7 +24,6 @@ import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
 // PartedByValueStatistics gives statistics with the value interval.
@@ -112,39 +111,50 @@ private[oap] class PartByValueStatistics extends Statistics {
   //                       |_______|_______|_______|_______|_______|
   // interval id:        0     1       2       3       4       5      6
   // value array:(-inf, r0) [r0,r1) [r1,r2) [r2,r3) [r3,r4) [r4,r5]  (r5, +inf)
-  protected def getIntervalIdx(row: Key, include: Boolean): Int = {
-    var i = 0
-    while (i < metas.length && (include && ordering.gteq(row, metas(i).row)
-      || !include && ordering.gt(row, metas(i).row))) i += 1
-    if (include && ordering.compare(metas.last.row, row) == 0) metas.last.idx // for row == r5
-    else i
+  private def getIntervalIdx(row: Key, include: Boolean, isStart: Boolean): Int = {
+    metas.zipWithIndex.indexWhere {
+      case (meta, index) =>
+        try {
+          ordering.compare(row, meta.row)
+          if (include && index < metas.length - 1) ordering.compare(row, meta.row) < 0
+          else ordering.compare(row, meta.row) <= 0
+        } catch {
+          case _: ArrayIndexOutOfBoundsException => isStart
+        }
+    }
+  }
+
+  protected def getIntervalIdxForStart(start: Key, include: Boolean): Int = {
+    getIntervalIdx(start, include, isStart = true)
+  }
+
+  protected def getIntervalIdxForEnd(end: Key, include: Boolean): Int = {
+    getIntervalIdx(end, include, isStart = false)
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
     val wholeCount = metas.last.accumulatorCnt
-    val partNum = metas.length - 1
 
     val start = intervalArray.head
     val end = intervalArray.last
-    val left = if (start.start == IndexScanner.DUMMY_KEY_START) 0
-      else getIntervalIdx(start.start, start.startInclude)
-    val right = if (end.end == IndexScanner.DUMMY_KEY_END) metas.length + 1
-      else getIntervalIdx(end.end, end.endInclude)
 
-    if (left == partNum + 1 || right == 0) {
+    val left = getIntervalIdxForStart(start.start, start.startInclude)
+
+    val right = getIntervalIdxForEnd(end.end, end.endInclude)
+
+    if (left == -1 || right == 0) {
       // interval.min > partition.max || interval.max < partition.min
       StaticsAnalysisResult.SKIP_INDEX
     } else {
       var cover: Double =
-        if (right <= partNum) metas(right).accumulatorCnt else metas.last.accumulatorCnt
-      if (start.start != IndexScanner.DUMMY_KEY_START && left > 0 &&
-        ordering.lteq(start.start, metas(left).row)) {
+        if (right != -1) metas(right).accumulatorCnt else metas.last.accumulatorCnt
+
+      if (left > 0) {
         cover -= metas(left - 1).accumulatorCnt
         cover += 0.5 * (metas(left).accumulatorCnt - metas(left - 1).accumulatorCnt)
       }
 
-      if (end.end != IndexScanner.DUMMY_KEY_END && right <= partNum &&
-        ordering.gteq(end.end, metas(right - 1).row)) {
+      if (right != -1) {
         cover -= 0.5 * (metas(right).accumulatorCnt - metas(right - 1).accumulatorCnt)
       }
 

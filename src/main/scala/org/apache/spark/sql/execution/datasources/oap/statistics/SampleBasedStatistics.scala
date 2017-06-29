@@ -24,7 +24,6 @@ import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
 
 

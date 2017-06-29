@@ -135,6 +135,28 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sql("drop oindex index1 on oap_test")
   }
 
+  test("filtering multi index") {
+    sqlContext.conf.setConf(SQLConf.SPINACH_STATISTICS_TYPES, "PARTBYVALUE")
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table spinach_test select * from t")
+    sql("create sindex index1 on spinach_test (a, b)")
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 150 and b < 'this is test 3'"),
+      Row(150, "this is test 150") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 150 and b >= 'this is test 1'"),
+      Row(150, "this is test 150") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a = 150 and b = 'this is test 150'"),
+      Row(150, "this is test 150") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM spinach_test WHERE a > 299 and b < 'this is test 9'"),
+      Row(300, "this is test 300") :: Nil)
+
+    sql("drop sindex index1 on spinach_test")
+  }
+
   test("filtering parquet") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
