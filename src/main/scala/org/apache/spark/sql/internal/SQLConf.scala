@@ -582,8 +582,8 @@ object SQLConf {
       .stringConf
       .createWithDefault("MINMAX, SAMPLE, PARTBYVALUE, BLOOM")
 
-  val SPINACH_STATISTICS_PART_NUM =
-    SQLConfigBuilder("spark.sql.spinach.Statistics.partNum")
+  val OAP_STATISTICS_PART_NUM =
+    SQLConfigBuilder("spark.sql.oap.Statistics.partNum")
       .internal()
       .doc("PartedByValueStatistics gives statistics with the value interval, default 5")
       .intConf

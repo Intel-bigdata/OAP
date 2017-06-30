@@ -224,7 +224,7 @@ private[oap] class OapDataReader(
 
       val statisticsManager = new StatisticsManager
       statisticsManager.read(stsArray, filterScanner.get.getSchema)
-      statisticsManager.analyse(filterScanner.get.intervalArray)
+      statisticsManager.analyse(filterScanner.get.intervalArray, conf)
     }
   }
 }

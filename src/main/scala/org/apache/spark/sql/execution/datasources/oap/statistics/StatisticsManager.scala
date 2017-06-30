@@ -61,33 +61,29 @@ class StatisticsManager {
 
   def initialize(indexType: AnyIndexType, s: StructType, conf: Configuration): Unit = {
 
-    StatisticsManager.setFullScanThreshold(
-      conf.getDouble(SQLConf.SPINACH_FULL_SCAN_THRESHOLD.key,
-        SQLConf.SPINACH_FULL_SCAN_THRESHOLD.defaultValue.get))
-
     StatisticsManager.setPartNumber(
-      conf.getInt(SQLConf.SPINACH_STATISTICS_PART_NUM.key,
-        SQLConf.SPINACH_STATISTICS_PART_NUM.defaultValue.get)
+      conf.getInt(SQLConf.OAP_STATISTICS_PART_NUM.key,
+        SQLConf.OAP_STATISTICS_PART_NUM.defaultValue.get)
     )
 
     StatisticsManager.setSampleRate(
-      conf.getDouble(SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.key,
-        SQLConf.SPINACH_STATISTICS_SAMPLE_RATE.defaultValue.get)
+      conf.getDouble(SQLConf.OAP_STATISTICS_SAMPLE_RATE.key,
+        SQLConf.OAP_STATISTICS_SAMPLE_RATE.defaultValue.get)
     )
 
     StatisticsManager.setBloomFilterMaxBits(
-      conf.getInt(SQLConf.SPINACH_BLOOMFILTER_MAXBITS.key,
-        SQLConf.SPINACH_BLOOMFILTER_MAXBITS.defaultValue.get)
+      conf.getInt(SQLConf.OAP_BLOOMFILTER_MAXBITS.key,
+        SQLConf.OAP_BLOOMFILTER_MAXBITS.defaultValue.get)
     )
 
     StatisticsManager.setBloomFilterHashFuncs(
-      conf.getInt(SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.key,
-        SQLConf.SPINACH_BLOOMFILTER_NUMHASHFUNC.defaultValue.get)
+      conf.getInt(SQLConf.OAP_BLOOMFILTER_NUMHASHFUNC.key,
+        SQLConf.OAP_BLOOMFILTER_NUMHASHFUNC.defaultValue.get)
     )
 
     val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter{ statType =>
-      val typeFromConfig = conf.get(SQLConf.SPINACH_STATISTICS_TYPES.key,
-        SQLConf.SPINACH_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
+      val typeFromConfig = conf.get(SQLConf.OAP_STATISTICS_TYPES.key,
+        SQLConf.OAP_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
       typeFromConfig.contains(statType.name)
     }
     stats = statsTypes.map {
@@ -164,9 +160,13 @@ class StatisticsManager {
     }
   }
 
-  def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
+  def analyse(intervalArray: ArrayBuffer[RangeInterval], conf: Configuration): Double = {
     var resSum: Double = 0.0
     var resNum: Int = 0
+
+    StatisticsManager.setFullScanThreshold(
+      conf.getDouble(SQLConf.OAP_FULL_SCAN_THRESHOLD.key,
+        SQLConf.OAP_FULL_SCAN_THRESHOLD.defaultValue.get))
 
     if (invalidStatistics) StaticsAnalysisResult.USE_INDEX // use index if no statistics
     else {
@@ -202,12 +202,25 @@ object StatisticsManager {
       BitMapIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
         BloomFilterStatisticsType, PartByValueStatisticsType))
 
-  var sampleRate: Double = _
-  var partNumber: Int = _
-  var bloomFilterMaxBits: Int = _
-  var bloomFilterHashFuncs: Int = _
+  /**
+   * Using a static object to store parameter is not a good idea, some reasons:
+   * 1. In local mode, driver and worker will use one same object, but in cluster they are different
+   * 2. object.setXXX() then val a = object.XXX can be realized by Configuration.set and get
+   * But
+   * 1. current Statistics has no interface to set parameters by Configuration and many test suites
+   * depend on this static object.
+   * 2. the `initialize()` in each Statistics is depended by both `read` and `write` while `read`
+   * should get parameter from disk and doesn't need Configuration.
+   * 3. Some test suites only init specific Statistics and not init StatisticsManager, so remove
+   * this object will need interface change in every Statistics sub classes, this means more changes
+   * So, TODO: Let's address all of this latter.
+   */
+  var sampleRate: Double = SQLConf.OAP_STATISTICS_SAMPLE_RATE.defaultValue.get
+  var partNumber: Int = SQLConf.OAP_STATISTICS_PART_NUM.defaultValue.get
+  var bloomFilterMaxBits: Int = SQLConf.OAP_BLOOMFILTER_MAXBITS.defaultValue.get
+  var bloomFilterHashFuncs: Int = SQLConf.OAP_BLOOMFILTER_NUMHASHFUNC.defaultValue.get
 
-  var FULLSCANTHRESHOLD: Double = _
+  var FULLSCANTHRESHOLD: Double = SQLConf.OAP_FULL_SCAN_THRESHOLD.defaultValue.get
 
   // TODO we need to find better ways to configure these parameters
   def setStatisticsType(indexType: AnyIndexType, statisticsType: Array[StatisticsType]): Unit =

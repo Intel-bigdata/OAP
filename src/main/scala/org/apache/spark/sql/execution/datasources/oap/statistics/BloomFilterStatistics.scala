@@ -113,6 +113,7 @@ private[oap] class BloomFilterStatistics extends Statistics {
         ).filter(interval => ordering.compare(interval.start, interval.end) == 0
           && interval.startInclude && interval.endInclude).map(_.start).toArray
       } else null
+    val values = equalValues.map(value => convertor(value).getBytes)
     val skipFlag = if (equalValues != null && equalValues.length > 0) {
       !equalValues.map(value => bfIndex
         .checkExist(convertor(value).getBytes))
