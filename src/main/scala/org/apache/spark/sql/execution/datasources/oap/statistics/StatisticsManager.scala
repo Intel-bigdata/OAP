@@ -164,11 +164,10 @@ object StatisticsManager {
   val STATISTICSMASK: Long = 0x20170524abcdefabL // a random mask for statistics begin
 
   val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[StatisticsType]] =
+    // temporarily disable all statistics.
     scala.collection.mutable.Map(
-      BTreeIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
-        BloomFilterStatisticsType, PartByValueStatisticsType),
-      BitMapIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
-        BloomFilterStatisticsType, PartByValueStatisticsType))
+      BTreeIndexType -> Array(),
+      BitMapIndexType -> Array())
 
   var sampleRate: Double = 0.1
   var partNumber: Int = 5
