@@ -87,6 +87,7 @@ class StatisticsManager {
       offset += 4
     }
 
+    val sortedKeys = sortKeys
     stats.foreach(stat => {
       val off = stat.write(out, sortedKeys)
       assert(off >= 0)
@@ -95,7 +96,7 @@ class StatisticsManager {
     offset
   }
 
-  private def sortedKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
+  private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
 
   def read(bytes: Array[Byte], s: StructType): Unit = {
     var offset = 0L
