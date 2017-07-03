@@ -134,7 +134,9 @@ class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       val dfwithIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
       sql("drop sindex index1 on oap_test_1")
       val dfWithoutIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
+      val dfOriginal = sql("SELECT * FROM t WHERE key > 8 and key <= 200")
       assert(dfWithoutIdx.count == dfwithIdx.count)
+      assert(dfWithoutIdx.count == dfOriginal.count)
   }
 }
 
