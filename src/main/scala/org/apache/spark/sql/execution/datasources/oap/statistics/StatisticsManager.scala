@@ -78,7 +78,6 @@ class StatisticsManager {
   }
 
   def write(out: IndexOutputWriter): Long = {
-    if (!sortFlag) sortKeys()
     var offset = 0L
 
     IndexUtils.writeLong(out, StatisticsManager.STATISTICSMASK)
@@ -92,17 +91,21 @@ class StatisticsManager {
     }
 
     stats.foreach(stat => {
-      val off = stat.write(out, content)
+      val off = stat.write(out, sortKeys())
       assert(off >= 0)
       offset += off
     })
     offset
   }
 
-  private def sortKeys(): Unit = {
-    content.sortWith((l, r) => ordering.compare(l, r) < 0)
+  private def sortKeys(): ArrayBuffer[Key] = {
+    if (!sortFlag) {
+      sortFlag = true
+      content.sortWith((l, r) => ordering.compare(l, r) < 0)
+    } else {
+      content
+    }
   }
-
 
   def read(bytes: Array[Byte], s: StructType): Unit = {
     var offset = 0L
@@ -166,8 +169,10 @@ object StatisticsManager {
   val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[StatisticsType]] =
     // temporarily disable all statistics.
     scala.collection.mutable.Map(
-      BTreeIndexType -> Array(),
-      BitMapIndexType -> Array())
+      BTreeIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
+        BloomFilterStatisticsType, PartByValueStatisticsType),
+      BitMapIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
+        BloomFilterStatisticsType, PartByValueStatisticsType))
 
   var sampleRate: Double = 0.1
   var partNumber: Int = 5

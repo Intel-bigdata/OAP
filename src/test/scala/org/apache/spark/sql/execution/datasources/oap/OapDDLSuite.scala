@@ -123,5 +123,20 @@ class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       new Configuration()).globStatus(new Path(path,
       "oap_partition_table/b=2/c=c2/*.index")).length != 0)
   }
+
+  test("index integrity") {
+      val rand = new java.util.Random(System.currentTimeMillis())
+      val data: Seq[(Int, String)] = (1 to 300).map {
+        i => (rand.nextInt(300), s"this is test $i") }
+
+      data.toDF("key", "value").createOrReplaceTempView("t")
+      sql("insert overwrite table oap_test_1 select * from t")
+      sql("create sindex index1 on oap_test_1 (a) using bitmap")
+
+      val dfwithIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
+      sql("drop sindex index1 on oap_test_1")
+      val dfWithoutIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
+      assert(dfWithoutIdx.count == dfwithIdx.count)
+  }
 }
 

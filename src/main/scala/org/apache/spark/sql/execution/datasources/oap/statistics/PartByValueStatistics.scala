@@ -50,9 +50,7 @@ private[oap] class PartByValueStatistics extends Statistics {
                                          curMaxId: Int, accumulatorCnt: Int)
   protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
 
-  override def write(writer: IndexOutputWriter, keys: ArrayBuffer[Key]): Long = {
-    val sortedKeys = keys.sortWith(ordering.compare(_, _) < 0) // sort before do statistics.
-
+  override def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
     var offset = super.write(writer, sortedKeys)
     val hashMap = new java.util.HashMap[Key, Int]()
     val uniqueKeys: ArrayBuffer[Key] = new ArrayBuffer[Key]()
