@@ -101,10 +101,10 @@ class StatisticsManager {
   private def sortKeys(): ArrayBuffer[Key] = {
     if (!sortFlag) {
       sortFlag = true
-      content.sortWith((l, r) => ordering.compare(l, r) < 0)
-    } else {
-      content
+      content = content.sortWith((l, r) => ordering.compare(l, r) < 0)
     }
+
+    content
   }
 
   def read(bytes: Array[Byte], s: StructType): Unit = {
