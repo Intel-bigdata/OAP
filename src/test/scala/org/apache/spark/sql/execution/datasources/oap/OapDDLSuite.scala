@@ -125,10 +125,8 @@ class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   }
 
   test("index integrity") {
-      val rand = new java.util.Random(System.currentTimeMillis())
-      val data: Seq[(Int, String)] = (1 to 300).map {
-        i => (rand.nextInt(300), s"this is test $i") }
-
+      val data: Seq[(Int, String)] = scala.util.Random.shuffle(1 to 300).map{
+                                      i => (i, s"this is test $i") }.toSeq
       data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table oap_test_1 select * from t")
       sql("create sindex index1 on oap_test_1 (a) using bitmap")
