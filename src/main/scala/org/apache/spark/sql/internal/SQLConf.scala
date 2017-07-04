@@ -602,7 +602,7 @@ object SQLConf {
       .doc("Define the max bit count parameter used in bloom " +
         "filter, default 33554432")
       .intConf
-      .createWithDefault(1 << 25)
+      .createWithDefault(1 << 20)
 
   val OAP_BLOOMFILTER_NUMHASHFUNC =
     SQLConfigBuilder("spark.sql.oap.Bloomfilter.numHashFunc")
