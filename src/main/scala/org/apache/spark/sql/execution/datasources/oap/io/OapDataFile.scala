@@ -146,7 +146,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType) extends Da
     var lastGroupId = -1
     rowIds.indices.iterator.map { idx =>
       val rowId = rowIds(idx)
-      val groupId = ((rowId + 1) / meta.rowCountInEachGroup).toInt
+      val groupId = (rowId / meta.rowCountInEachGroup).toInt
       val rowIdxInGroup = (rowId % meta.rowCountInEachGroup).toInt
 
       if (lastGroupId != groupId) {

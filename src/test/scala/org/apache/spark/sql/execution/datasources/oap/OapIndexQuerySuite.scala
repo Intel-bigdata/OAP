@@ -32,7 +32,7 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
     val path1 = Utils.createTempDir().getAbsolutePath
 
     sql(s"""CREATE TEMPORARY VIEW oap_test_1 (a INT, b STRING)
-           | USING parquet
+           | USING oap
            | OPTIONS (path '$path1')""".stripMargin)
   }
 
@@ -67,5 +67,22 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
 
     sql("drop oindex index1 on oap_test_1")
   }
-}
 
+  test("index row boundary") {
+    val groupSize = spark.sparkContext.hadoopConfiguration
+      .get(OapFileFormat.ROW_GROUP_SIZE,
+        OapFileFormat.DEFAULT_ROW_GROUP_SIZE).toInt;
+
+    val testRowId = groupSize - 1
+    val data: Seq[(Int, String)] = (0 until groupSize * 3)
+                                    .map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test_1 select * from t")
+    sql("create oindex index1 on oap_test_1 (a)")
+
+    checkAnswer(sql(s"SELECT * FROM oap_test_1 WHERE a = $testRowId"),
+      Row(testRowId, s"this is test $testRowId") :: Nil)
+
+    sql("drop sindex oindex on oap_test_1")
+  }
+}
