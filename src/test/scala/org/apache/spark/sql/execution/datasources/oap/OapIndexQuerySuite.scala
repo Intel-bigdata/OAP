@@ -83,6 +83,6 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
     checkAnswer(sql(s"SELECT * FROM oap_test_1 WHERE a = $testRowId"),
       Row(testRowId, s"this is test $testRowId") :: Nil)
 
-    sql("drop sindex oindex on oap_test_1")
+    sql("drop oindex index1 on oap_test_1")
   }
 }
