@@ -17,12 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
@@ -59,12 +56,13 @@ class OapDDLIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeA
   }
 
   test("index row boundary") {
-    spark.sqlContext.conf.setConfString(SQLConf.OAP_STATISTICS_TYPES.key, "")
+    val groupSize = spark.sparkContext.hadoopConfiguration
+      .get(OapFileFormat.ROW_GROUP_SIZE,
+        OapFileFormat.DEFAULT_ROW_GROUP_SIZE).toInt;
 
-    val testRowId = spark.sparkContext.hadoopConfiguration
-                     .get(OapFileFormat.ROW_GROUP_SIZE,
-                          OapFileFormat.DEFAULT_ROW_GROUP_SIZE).toInt - 1
-    val data: Seq[(Int, String)] = (0 until 4096).map { i => (i, s"this is test $i") }
+    val testRowId = groupSize - 1
+    val data: Seq[(Int, String)] = (0 until groupSize * 3)
+                                    .map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test_1 select * from t")
     sql("create sindex index1 on oap_test_1 (a)")
