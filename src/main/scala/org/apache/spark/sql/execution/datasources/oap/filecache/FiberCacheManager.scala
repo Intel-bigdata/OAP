@@ -61,6 +61,16 @@ private[oap] trait AbstractFiberCacheManger extends Logging {
 
   @transient protected var cache: LoadingCache[ENTRY, FiberCache] = _
 
+  protected var maximumFiberSizeInBytes: Long = _
+
+  def getMaximumFiberSizeInBytes(conf: Configuration): Long = {
+    if (cache == null) {
+      cache = buildCache(conf)
+      maximumFiberSizeInBytes
+    }
+    else maximumFiberSizeInBytes
+  }
+
   private def buildCache(conf: Configuration): LoadingCache[ENTRY, FiberCache] = {
 
     val weightConfig = conf.getLong(SQLConf.OAP_FIBERCACHE_SIZE.key,
@@ -75,11 +85,13 @@ private[oap] trait AbstractFiberCacheManger extends Logging {
         // also be *FAR* less than Int.MaxValue. If totalWeight > Int.MaxValue, overflow, then
         // totalWeight will treated as a very small value, and never greater than maximumWeight.
         logWarning(s"${SQLConf.OAP_FIBERCACHE_SIZE.key}): $weightConfig is too large." +
-          s"Reducing to 4TB")
+          s"Reducing to 8TB")
 
         4L * Int.MaxValue // The Unit here is KB. Int.MaxValue = 2G.
 
       } else weightConfig
+
+    maximumFiberSizeInBytes = weight * 1024L / 4
 
     val builder = CacheBuilder.newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
@@ -153,7 +165,7 @@ object FiberCacheManager extends AbstractFiberCacheManger {
 
   def status: String = {
     val dataFiberConfPairs =
-      if (cache == null) Set.empty
+      if (cache == null) Set.empty[(DataFiber, Configuration)]
       else {
         this.cache.asMap().keySet().asScala.collect {
           case entry @ ConfigurationCache(key: DataFiber, conf) => (key, conf)

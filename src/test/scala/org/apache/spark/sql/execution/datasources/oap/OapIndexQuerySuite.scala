@@ -17,16 +17,15 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.sql.QueryTest
+import org.apache.spark.sql.{QueryTest, Row}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 
 
-class OapDDLIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
   import testImplicits._
 
   override def beforeEach(): Unit = {
@@ -46,14 +45,27 @@ class OapDDLIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeA
                                       i => (i, s"this is test $i") }.toSeq
       data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table oap_test_1 select * from t")
-      sql("create sindex index1 on oap_test_1 (a) using bitmap")
+      sql("create oindex index1 on oap_test_1 (a) using bitmap")
 
       val dfwithIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
-      sql("drop sindex index1 on oap_test_1")
+      sql("drop oindex index1 on oap_test_1")
       val dfWithoutIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
       val dfOriginal = sql("SELECT * FROM t WHERE key > 8 and key <= 200")
       assert(dfWithoutIdx.count == dfwithIdx.count)
       assert(dfWithoutIdx.count == dfOriginal.count)
+  }
+
+  test("Large Bloom Bit Size Cause JVM crash. Issue #278") {
+    sqlContext.conf.setConfString(SQLConf.OAP_BLOOMFILTER_MAXBITS.key, s"${1 << 30}")
+
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test_1 select * from t")
+    sql("create oindex index1 on oap_test_1 (a)")
+
+    checkAnswer(sql("SELECT * FROM oap_test_1 WHERE a = 1"), Row(1, "this is test 1") :: Nil)
+
+    sql("drop oindex index1 on oap_test_1")
   }
 }
 
