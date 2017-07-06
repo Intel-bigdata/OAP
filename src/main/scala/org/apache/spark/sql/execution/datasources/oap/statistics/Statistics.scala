@@ -113,29 +113,29 @@ object Statistics {
     4 + value.getSizeInBytes
   }
 
+  // logic is complex, needs to be refactored :(
   def rowInSingleInterval(row: InternalRow, interval: RangeInterval,
                           order: BaseOrdering): Boolean = {
-
-    val withinStart = try {
-      if (interval.startInclude) order.compare(row, interval.start) >= 0
-      else order.compare(row, interval.start) > 0
-    } catch {
-      // When this happen, here is the case:
-      // row = 1, start = DUMMY_KEY_START OR
-      // row = (1, 200, 4, "a"), start = (1, 200, 4, DUMMY_KEY_START)
-      // This means, the last field is DUMMY_KEY_START and others are same
-      // So, row is within start
-      case _: ArrayIndexOutOfBoundsException => true
+    if (interval.start == IndexScanner.DUMMY_KEY_START) {
+      if (interval.end == IndexScanner.DUMMY_KEY_END) true
+      else {
+        if (order.lt(row, interval.end)) true
+        else if (order.equiv(row, interval.end) && interval.endInclude) true
+        else false
+      }
+    } else {
+      if (order.lt(row, interval.start)) false
+      else if (order.equiv(row, interval.start)) {
+        if (interval.startInclude) {
+          if (interval.end != IndexScanner.DUMMY_KEY_END &&
+            order.equiv(interval.start, interval.end) && !interval.endInclude) {false}
+          else true
+        } else false
+      }
+      else if (interval.end != IndexScanner.DUMMY_KEY_END && (order.gt(row, interval.end) ||
+        (order.equiv(row, interval.end) && !interval.endInclude))) {false}
+      else true
     }
-
-    val withInEnd = try {
-      if (interval.endInclude) order.compare(row, interval.end) <= 0
-      else order.compare(row, interval.end) < 0
-    } catch {
-      case _: ArrayIndexOutOfBoundsException => true
-    }
-
-    withinStart && withInEnd
   }
   def rowInIntervalArray(row: InternalRow, intervalArray: ArrayBuffer[RangeInterval],
                          order: BaseOrdering): Boolean = {
