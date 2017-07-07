@@ -46,19 +46,25 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   override def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
-    val indexScanner = IndexFiber(IndexFile(path))
-    val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
+    val indexFile = IndexFile(path)
+    val indexFiber = IndexFiber(indexFile)
+    val indexData: IndexFiberCacheData = FiberCacheManager(indexFiber, conf)
+    open(indexData, indexFile.version(conf))
 
+    this
+  }
+
+  def open(indexData: IndexFiberCacheData, version: Int = IndexFile.INDEX_VERSION): Unit = {
     val buffer: DataFiberCache = DataFiberCache(indexData.fiberData)
     val baseObj = buffer.fiberData.getBaseObject
-    val baseOffset = buffer.fiberData.getBaseOffset
+    val baseOffset = buffer.fiberData.getBaseOffset + IndexFile.indexFileHeaderLength
 
     // get the byte number first
-    val objLenth = Platform.getInt(baseObj, baseOffset)
+    val objLength = Platform.getInt(baseObj, baseOffset)
     val byteArrayStart = baseOffset + 4
 
     // deserialize hashMap[Key: InternalRow, Value: BitSet] from index file
-    val byteArray = (0 until objLenth).map(i => {
+    val byteArray = (0 until objLength).map(i => {
       Platform.getByte(baseObj, byteArrayStart + i)
     }).toArray
     val inputStream = new ByteArrayInputStream(byteArray)
@@ -107,8 +113,6 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     } else {
       empty = true
     }
-
-    this
   }
 
   override def toString: String = "BitMapScanner"

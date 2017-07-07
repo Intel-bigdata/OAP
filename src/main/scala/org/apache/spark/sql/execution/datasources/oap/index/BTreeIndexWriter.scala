@@ -31,9 +31,9 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.WriteResult
+import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics._
 import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils}
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
 
@@ -164,6 +164,7 @@ private[oap] class BTreeIndexWriter(
       var i = 0
       var fileOffset = 0L
       val offsetMap = new java.util.HashMap[InternalRow, Long]()
+      fileOffset += writeHead(writer, IndexFile.INDEX_VERSION)
       // write data segment.
       while (i < partitionUniqueSize) {
         offsetMap.put(uniqueKeys(i), fileOffset)

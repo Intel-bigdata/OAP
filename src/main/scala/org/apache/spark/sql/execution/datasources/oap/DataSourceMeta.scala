@@ -27,8 +27,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.execution.datasources.oap.filecache.{DataFiberCache, IndexFiberCacheData}
-import org.apache.spark.sql.execution.datasources.oap.index.{IndexNode, UnsafeIndexNode}
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFile
 import org.apache.spark.sql.types._
 
@@ -133,10 +131,6 @@ private[oap] class IndexMeta(
   import IndexMeta._
 
   override def toString: String = name + ": " + indexType
-
-  def open(data: IndexFiberCacheData, keySchema: StructType): IndexNode = {
-    UnsafeIndexNode(DataFiberCache(data.fiberData), data.rootOffset, data.dataEnd, keySchema)
-  }
 
   private def writeBitSet(value: BitSet, totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {
     val sizeBefore = out.size

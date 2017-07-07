@@ -22,6 +22,7 @@ import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.{BaseWriterContainer, WriteResult}
+import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 
 private[index] abstract class IndexWriter (
     relation: WriteIndexRelation,
@@ -52,6 +53,14 @@ private[index] abstract class IndexWriter (
       taskContext: TaskContext, iterator: Iterator[InternalRow]): Seq[IndexBuildResult]
   def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): Seq[WriteResult] =
     writeIndexFromRows(taskContext, iterator)
+
+  protected def writeHead(writer: IndexOutputWriter, version: Int): Int = {
+    writer.write("OAPIDX".getBytes("UTF-8"))
+    assert(version <= 65535)
+    val data = Array((version >> 8).toByte, (version & 0xFF).toByte)
+    writer.write(data)
+    IndexFile.indexFileHeaderLength
+  }
 }
 
 private[index] object IndexWriter {

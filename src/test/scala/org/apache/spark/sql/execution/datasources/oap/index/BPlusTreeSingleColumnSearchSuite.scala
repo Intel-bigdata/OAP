@@ -58,48 +58,46 @@ private[oap] class LeafNode(keys: Array[Key], values: Array[IntValues], sibling:
 private[oap] object BPlusTreeSingleColumnSearchSuite extends Serializable {
   implicit def int2internalRow(keys: Array[Int]): Array[Key] = keys.map(InternalRow(_))
 
-  val indexMeta: IndexMeta = new IndexMeta("test", "", BTreeIndex(BTreeIndexEntry(1) :: Nil)) {
-    // The data looks like:
-    //              3            8            13              16 <-----Root Key
-    //              |            |             |               |
-    //            (3, 4, 5) -> (8, 9, 10) -> (13, 14, 15) -> (16, 17, 38)    <--- Second Level Key
-    //             |  |  |      |  |  |        |   |   |       |   |   |
-    //            30 40  50    80 90  100     130 140 150     160  170 180    <--- Values
-    //            31 41        81 91  101     131 141         161  171
-    //            32           82     102     132             162
-    //
-    def i14 = new LeafNode(
-      Array(16, 17, 38),
-      Array(new IntValues(Array(160, 161, 162)),
-        new IntValues(Array(170, 171)),
-        new IntValues(Array(180))),
-      null)
+  val indexMeta: IndexMeta = new IndexMeta("test", "", BTreeIndex(BTreeIndexEntry(1) :: Nil))
 
-    def i13 = new LeafNode(
-      Array(13, 14, 15),
-      Array(new IntValues(Array(130, 131, 132)),
-        new IntValues(Array(140, 141)),
-        new IntValues(Array(150))),
-      i14)
+  // The data looks like:
+  //              3            8            13              16 <-----Root Key
+  //              |            |             |               |
+  //            (3, 4, 5) -> (8, 9, 10) -> (13, 14, 15) -> (16, 17, 38)    <--- Second Level Key
+  //             |  |  |      |  |  |        |   |   |       |   |   |
+  //            30 40  50    80 90  100     130 140 150     160  170 180    <--- Values
+  //            31 41        81 91  101     131 141         161  171
+  //            32           82     102     132             162
+  //
+  def i14 = new LeafNode(
+    Array(16, 17, 38),
+    Array(new IntValues(Array(160, 161, 162)),
+      new IntValues(Array(170, 171)),
+      new IntValues(Array(180))),
+    null)
 
-    def i12 = new LeafNode(
-      Array(8, 9, 10),
-      Array(new IntValues(Array(80, 81, 82)),
-        new IntValues(Array(90, 91)),
-        new IntValues(Array(100, 101, 102))),
-      i13)
+  def i13 = new LeafNode(
+    Array(13, 14, 15),
+    Array(new IntValues(Array(130, 131, 132)),
+      new IntValues(Array(140, 141)),
+      new IntValues(Array(150))),
+    i14)
 
-    def i11 = new LeafNode(
-      Array(3, 4, 5),
-      Array(new IntValues(Array(30, 31, 32)),
-        new IntValues(Array(40, 41)),
-        new IntValues(Array(50))),
-      i12)
+  def i12 = new LeafNode(
+    Array(8, 9, 10),
+    Array(new IntValues(Array(80, 81, 82)),
+      new IntValues(Array(90, 91)),
+      new IntValues(Array(100, 101, 102))),
+    i13)
 
-    def root = new NonLeafNode(Array(3, 8, 13, 16), Array(i11, i12, i13, i14))
-    override def open(data: IndexFiberCacheData, schema: StructType): IndexNode =
-      root
-  }
+  def i11 = new LeafNode(
+    Array(3, 4, 5),
+    Array(new IntValues(Array(30, 31, 32)),
+      new IntValues(Array(40, 41)),
+      new IntValues(Array(50))),
+    i12)
+
+  def root = new NonLeafNode(Array(3, 8, 13, 16), Array(i11, i12, i13, i14))
 }
 
 class BPlusTreeSingleColumnSearchSuite extends SparkFunSuite
@@ -286,8 +284,7 @@ class BPlusTreeSingleColumnSearchSuite extends SparkFunSuite
     assert(unHandledFilters.sameElements(expectedUnHandleredFilter))
     ic.getScanner match {
       case Some(scanner: BPlusTreeScanner) =>
-        assert(scanner._init(
-          BPlusTreeSingleColumnSearchSuite.indexMeta.open(null, null)).toSet === expectedIds, "")
+        assert(scanner._init(BPlusTreeSingleColumnSearchSuite.root).toSet === expectedIds, "")
       case None => throw new Exception(s"expect scanner, but got None")
     }
 

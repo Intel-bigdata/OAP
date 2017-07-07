@@ -29,6 +29,7 @@ import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
 import org.apache.spark.sql.execution.datasources.WriteResult
+import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
@@ -138,6 +139,7 @@ private[oap] class BitMapIndexWriter(
         kv._2.foreach(bs.set)
         hashMap.put(kv._1, bs)
       })
+      val header = writeHead(writer, IndexFile.INDEX_VERSION)
       // serialize hashMap and get length
       val writeBuf = new ByteArrayOutputStream()
       val out = new ObjectOutputStream(writeBuf)
@@ -148,7 +150,7 @@ private[oap] class BitMapIndexWriter(
       IndexUtils.writeInt(writer, objLen)
       writer.write(writeBuf.toByteArray)
       out.close()
-      val indexEnd = 4 + objLen
+      val indexEnd = 4 + objLen + header
       var offset: Long = indexEnd
 
       statisticsManager.write(writer)

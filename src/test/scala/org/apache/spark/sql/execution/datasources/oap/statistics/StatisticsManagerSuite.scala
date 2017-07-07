@@ -64,7 +64,6 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
       .createOrReplaceTempView("t")
     sql("insert overwrite table oap_test select * from t")
 
-
     sql("create oindex index1 on oap_test (attr_int)")
     checkAnswer(sql("SELECT * FROM oap_test WHERE attr_int = 1"),
       Row.fromTuple(rowGen(1)) :: Nil)

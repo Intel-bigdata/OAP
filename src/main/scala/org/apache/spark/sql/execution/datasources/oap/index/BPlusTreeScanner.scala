@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.conf.Configuration
@@ -41,12 +40,21 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     logDebug("Loading Index File: " + path)
-    logDebug("\tFile Szie: " + path.getFileSystem(conf).getFileStatus(path).getLen)
-    val indexScanner = IndexFiber(IndexFile(path))
-    val indexData: IndexFiberCacheData = FiberCacheManager(indexScanner, conf)
-    val root = meta.open(indexData, keySchema)
+    logDebug("\tFile Size: " + path.getFileSystem(conf).getFileStatus(path).getLen)
+    val indexFile = IndexFile(path)
+    val indexFiber = IndexFiber(indexFile)
+    val indexData: IndexFiberCacheData = FiberCacheManager(indexFiber, conf)
+    val root = open(indexData, keySchema, indexFile.version(conf))
 
     _init(root)
+  }
+
+  def open(
+      data: IndexFiberCacheData,
+      keySchema: StructType,
+      version: Int = IndexFile.INDEX_VERSION): IndexNode = {
+    assert(version == IndexFile.INDEX_VERSION, "Unsupported version of index data!")
+    UnsafeIndexNode(DataFiberCache(data.fiberData), data.rootOffset, data.dataEnd, keySchema)
   }
 
   def _init(root : IndexNode): IndexScanner = {
