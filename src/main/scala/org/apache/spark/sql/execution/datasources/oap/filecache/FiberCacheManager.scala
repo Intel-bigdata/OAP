@@ -85,7 +85,7 @@ private[oap] trait AbstractFiberCacheManger extends Logging {
         // also be *FAR* less than Int.MaxValue. If totalWeight > Int.MaxValue, overflow, then
         // totalWeight will treated as a very small value, and never greater than maximumWeight.
         logWarning(s"${SQLConf.OAP_FIBERCACHE_SIZE.key}): $weightConfig is too large." +
-          s"Reducing to 8TB")
+          s"Please reduce to 8TB or less")
 
         4L * Int.MaxValue // The Unit here is KB. Int.MaxValue = 2G.
 
