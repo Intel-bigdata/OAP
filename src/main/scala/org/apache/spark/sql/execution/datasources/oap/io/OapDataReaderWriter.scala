@@ -174,7 +174,9 @@ private[oap] class OapDataReader(
          * [WORKAROUND] if index file is larger than cache.maximumWeight / cache.concurrencyLevel,
          * it will be removed immediately after loading and MemoryBlock in FiberCache is freed.
          * But the IndexFiberCache is still used by IndexScanner cause JVM crash. For now, we skip
-         * using index if index file is too large. To fix this, we need TODO:
+         * using index if index file is too large. Another case is index file size > data file
+         * size. There is no need to load index if so.
+         * To fix this, we need TODO:
          * 1. A better way to config cache.maximumWeight to maximize the use of off heap memory
          *    Currently, we let user to config this parameter and use a very small value in case
          *    off heap memory overhead.
@@ -185,10 +187,15 @@ private[oap] class OapDataReader(
          * 3. Handle the exception if FiberCache is larger than maximumWeight / concurrencyLevel
          */
         val indexFileSize = indexPath.getFileSystem(conf).getContentSummary(indexPath).getLength
+        val dataFileSize = path.getFileSystem(conf).getContentSummary(path).getLength
         val iter =
           if (indexFileSize > FiberCacheManager.getMaximumFiberSizeInBytes(conf)) {
             logWarning(s"Index File size $indexFileSize B is too large and couldn't be cached." +
               s"Please increase ${SQLConf.OAP_FIBERCACHE_SIZE.key} for better performance")
+            fileScanner.iterator(conf, requiredIds)
+          } else if (indexFileSize > dataFileSize * 0.7) {
+            logWarning(s"Index File size $indexFileSize B is too large comparing " +
+                        s"to Data File Size $dataFileSize. Using Data File Scan instead.")
             fileScanner.iterator(conf, requiredIds)
           } else {
             statsAnalyseResult match {
