@@ -50,7 +50,7 @@ abstract class Statistics{
   /**
    * Statistics write function, by default, only a Statistics id should be
    * written into the writer.
-   * @param writer IndexOutputWrite, where to write the infomation
+   * @param writer IndexOutputWrite, where to write the information
    * @param sortedKeys sorted keys stored related to this statistics
    * @return number of bytes written in writer
    */
@@ -115,32 +115,42 @@ object Statistics {
 
   // logic is complex, needs to be refactored :(
   def rowInSingleInterval(row: InternalRow, interval: RangeInterval,
-                          order: BaseOrdering): Boolean = {
-    if (interval.start == IndexScanner.DUMMY_KEY_START) {
-      if (interval.end == IndexScanner.DUMMY_KEY_END) true
-      else {
-        if (order.lt(row, interval.end)) true
-        else if (order.equiv(row, interval.end) && interval.endInclude) true
-        else false
+                          startOrder: BaseOrdering, endOrder: BaseOrdering): Boolean = {
+    // Only two cases are accepted, or something is wrong.
+    // 1. row = [1, "aaa"], start = [1, "bbb"] => row.numFields == start.numFields
+    // 2. row = [1, "aaa"], start = [1, DUMMY_KEY_START] => row.numFields -1 = start.numFields
+    assert(interval.start.numFields == row.numFields ||
+      interval.start.numFields == row.numFields - 1,
+      s"Can't compare row with interval.start. row: $row, interval: ${interval.start}")
+
+    assert(interval.end.numFields == row.numFields ||
+      interval.end.numFields == row.numFields - 1,
+      s"Can't compare row with interval.end. row: $row, interval: ${interval.end}")
+
+    val withinStart =
+      if (row.numFields == interval.start.numFields && !interval.startInclude) {
+        startOrder.compare(row, interval.start) > 0
+      } else {
+        startOrder.compare(row, interval.start) >= 0
       }
-    } else {
-      if (order.lt(row, interval.start)) false
-      else if (order.equiv(row, interval.start)) {
-        if (interval.startInclude) {
-          if (interval.end != IndexScanner.DUMMY_KEY_END &&
-            order.equiv(interval.start, interval.end) && !interval.endInclude) {false}
-          else true
-        } else false
+    val withinEnd =
+      if (row.numFields == interval.end.numFields && !interval.endInclude) {
+        endOrder.compare(row, interval.end) < 0
+      } else {
+        endOrder.compare(row, interval.end) <= 0
       }
-      else if (interval.end != IndexScanner.DUMMY_KEY_END && (order.gt(row, interval.end) ||
-        (order.equiv(row, interval.end) && !interval.endInclude))) {false}
-      else true
-    }
+    withinStart && withinEnd
   }
+
   def rowInIntervalArray(row: InternalRow, intervalArray: ArrayBuffer[RangeInterval],
-                         order: BaseOrdering): Boolean = {
+                         fullOrder: BaseOrdering, partialOrder: BaseOrdering): Boolean = {
     if (intervalArray == null || intervalArray.isEmpty) false
-    else intervalArray.exists(interval => rowInSingleInterval(row, interval, order))
+    else intervalArray.exists{interval =>
+      val startOrder =
+        if (interval.start.numFields == row.numFields) fullOrder else partialOrder
+      val endOrder =
+        if (interval.end.numFields == row.numFields) fullOrder else partialOrder
+      rowInSingleInterval(row, interval, startOrder, endOrder)}
   }
 }
 

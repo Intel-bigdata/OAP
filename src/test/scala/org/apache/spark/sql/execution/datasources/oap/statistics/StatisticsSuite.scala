@@ -83,70 +83,70 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
 
   test("rowInSingleInterval: normal test") {
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
-      RangeInterval(row1, row3, true, true), ordering), "2.0 is in [1.0, 3.0]")
+      RangeInterval(row1, row3, true, true), ordering, ordering), "2.0 is in [1.0, 3.0]")
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row3),
-      RangeInterval(row1, row2, true, true), ordering), "3.0 is not in [1.0, 2.0]")
+      RangeInterval(row1, row2, true, true), ordering, ordering), "3.0 is not in [1.0, 2.0]")
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row1),
-      RangeInterval(IndexScanner.DUMMY_KEY_START, row2, false, true), ordering),
+      RangeInterval(IndexScanner.DUMMY_KEY_START, row2, false, true), partialOrdering, ordering),
       "1.0 is in (-inf, 2.0]")
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
-      RangeInterval(IndexScanner.DUMMY_KEY_START, row2, false, true), ordering),
+      RangeInterval(IndexScanner.DUMMY_KEY_START, row2, false, true), partialOrdering, ordering),
       "2.0 is in (-inf, 2.0]")
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
-      RangeInterval(IndexScanner.DUMMY_KEY_START, row2, false, false), ordering),
+      RangeInterval(IndexScanner.DUMMY_KEY_START, row2, false, false), partialOrdering, ordering),
       "2.0 is not in (-inf, 2.0)")
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row3),
-      RangeInterval(IndexScanner.DUMMY_KEY_START, row2, false, true), ordering),
+      RangeInterval(IndexScanner.DUMMY_KEY_START, row2, false, true), partialOrdering, ordering),
       "3.0 is not in (-inf, 2.0]")
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row1),
-      RangeInterval(row2, IndexScanner.DUMMY_KEY_END, true, false), ordering),
+      RangeInterval(row2, IndexScanner.DUMMY_KEY_END, true, false), ordering, partialOrdering),
       "1.0 is in [2, +inf)")
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
-      RangeInterval(row2, IndexScanner.DUMMY_KEY_END, true, false), ordering),
+      RangeInterval(row2, IndexScanner.DUMMY_KEY_END, true, false), ordering, partialOrdering),
       "2.0 is in [2, +inf)")
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
-      RangeInterval(row2, IndexScanner.DUMMY_KEY_END, false, false), ordering),
+      RangeInterval(row2, IndexScanner.DUMMY_KEY_END, false, false), ordering, partialOrdering),
       "2.0 is not in (2, +inf)")
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row3),
-      RangeInterval(row2, IndexScanner.DUMMY_KEY_END, true, false), ordering),
+      RangeInterval(row2, IndexScanner.DUMMY_KEY_END, true, false), ordering, partialOrdering),
       "3.0 is in [2, +inf)")
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row3),
       RangeInterval(IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END, false, false),
-      ordering), "3.0 is in (-inf, +inf)")
+      partialOrdering, partialOrdering), "3.0 is in (-inf, +inf)")
   }
 
   test("rowInSingleInterval: bound test") {
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row1),
-      RangeInterval(row1, row1, false, false), ordering), "1.0 is not in (1.0, 1.0)")
+      RangeInterval(row1, row1, false, false), ordering, ordering), "1.0 is not in (1.0, 1.0)")
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row1),
-      RangeInterval(row1, row1, false, true), ordering), "1.0 is not in (1.0, 1.0]")
+      RangeInterval(row1, row1, false, true), ordering, ordering), "1.0 is not in (1.0, 1.0]")
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row1),
-      RangeInterval(row1, row1, true, false), ordering), "1.0 is not in [1.0, 1.0)")
+      RangeInterval(row1, row1, true, false), ordering, ordering), "1.0 is not in [1.0, 1.0)")
     assert(Statistics.rowInSingleInterval(internalRow2unsafeRow(row1),
-      RangeInterval(row1, row1, true, true), ordering), "1.0 is in [1.0, 1.0]")
+      RangeInterval(row1, row1, true, true), ordering, ordering), "1.0 is in [1.0, 1.0]")
   }
 
   test("rowInSingleInterval: wrong interval test") {
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
-      RangeInterval(row3, row2, false, false), ordering), "2.0 is not in (3.0, 2.0)")
+      RangeInterval(row3, row2, false, false), ordering, ordering), "2.0 is not in (3.0, 2.0)")
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
-      RangeInterval(row3, row2, false, true), ordering), "2.0 is not in (3.0, 2.0]")
+      RangeInterval(row3, row2, false, true), ordering, ordering), "2.0 is not in (3.0, 2.0]")
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
-      RangeInterval(row3, row2, true, false), ordering), "2.0 is not in [3.0, 2.0)")
+      RangeInterval(row3, row2, true, false), ordering, ordering), "2.0 is not in [3.0, 2.0)")
     assert(!Statistics.rowInSingleInterval(internalRow2unsafeRow(row2),
-      RangeInterval(row3, row2, true, true), ordering), "2.0 is not in [3.0, 2.0]")
+      RangeInterval(row3, row2, true, true), ordering, ordering), "2.0 is not in [3.0, 2.0]")
   }
 
   test("rowInIntervalArray") {
     assert(!Statistics.rowInIntervalArray(internalRow2unsafeRow(row1),
-      null, ordering), "intervalArray is null")
+      null, ordering, ordering), "intervalArray is null")
     assert(Statistics.rowInIntervalArray(internalRow2unsafeRow(InternalRow(1.5)),
       ArrayBuffer(RangeInterval(row1, row2, false, false),
-        RangeInterval(row2, row3, false, false)), ordering),
+        RangeInterval(row2, row3, false, false)), ordering, partialOrdering),
       "1.5 is in (1,2) union (2,3)")
     assert(!Statistics.rowInIntervalArray(internalRow2unsafeRow(InternalRow(-1.0)),
       ArrayBuffer(RangeInterval(row1, row2, false, false),
-        RangeInterval(row2, row3, false, false)), ordering),
+        RangeInterval(row2, row3, false, false)), ordering, partialOrdering),
       "-1.0 is not in (1,2) union (2,3)")
   }
 

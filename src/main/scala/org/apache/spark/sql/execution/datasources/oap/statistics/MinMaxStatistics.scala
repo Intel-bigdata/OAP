@@ -76,25 +76,21 @@ private[oap] class MinMaxStatistics extends Statistics {
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
     val start = intervalArray.head
     val end = intervalArray.last
-    var result = false
 
-    if (start.start != IndexScanner.DUMMY_KEY_START) {
-      // > or >= start
-      if (start.startInclude) {
-        result |= ordering.gt(start.start, max)
-      } else {
-        result |= ordering.gteq(start.start, max)
-      }
-    }
-    if (end.end != IndexScanner.DUMMY_KEY_END) {
-      // < or <= end
-      if (end.endInclude) {
-        result |= ordering.lt(end.end, min)
-      } else {
-        result |= ordering.lteq(end.end, min)
-      }
-    }
+    val startOrdering = GenerateOrdering.create(StructType(schema.slice(0, start.start.numFields)))
+    val endOrdering = GenerateOrdering.create(StructType(schema.slice(0, end.end.numFields)))
 
-    if (result) StaticsAnalysisResult.SKIP_INDEX else StaticsAnalysisResult.USE_INDEX
+    val startOutOfBound =
+      if (start.start.numFields == schema.length && !start.startInclude) {
+        startOrdering.gteq(start.start, max)
+      } else startOrdering.gt(start.start, max)
+
+    val endOutOfBound =
+      if (end.end.numFields == schema.length && !end.endInclude) {
+        endOrdering.lteq(end.end, min)
+      } else endOrdering.lt(end.end, min)
+
+    if (startOutOfBound || endOutOfBound) StaticsAnalysisResult.SKIP_INDEX
+    else StaticsAnalysisResult.USE_INDEX
   }
 }

@@ -20,6 +20,8 @@ package org.apache.spark.sql.execution.datasources.oap.statistics
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
 import org.apache.spark.unsafe.Platform
@@ -103,6 +105,8 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
   test("test analyze function") {
     // TODO: Give a seed to Random in here and in SampleBasedStatistics without losing coverage
     val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
+    val dummyStart = new JoinedRow(InternalRow(1), IndexScanner.DUMMY_KEY_START)
+    val dummyEnd = new JoinedRow(InternalRow(300), IndexScanner.DUMMY_KEY_END)
 
     val sampleWrite = new TestSample
     sampleWrite.initialize(schema)
@@ -120,31 +124,31 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     generateInterval(rowGen(301), rowGen(400), startInclude = true, endInclude = true)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
 
-    generateInterval(IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END,
+    generateInterval(dummyStart, dummyEnd,
       startInclude = true, endInclude = true)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
 
-    generateInterval(IndexScanner.DUMMY_KEY_START, rowGen(0),
+    generateInterval(dummyStart, rowGen(0),
       startInclude = true, endInclude = false)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
 
-    generateInterval(IndexScanner.DUMMY_KEY_START, rowGen(300),
+    generateInterval(dummyStart, rowGen(300),
       startInclude = true, endInclude = true)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
 
-    generateInterval(rowGen(0), IndexScanner.DUMMY_KEY_END,
+    generateInterval(rowGen(0), dummyEnd,
       startInclude = true, endInclude = true)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
 
-    generateInterval(rowGen(1), IndexScanner.DUMMY_KEY_END,
+    generateInterval(rowGen(1), dummyEnd,
       startInclude = true, endInclude = true)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
 
-    generateInterval(rowGen(300), IndexScanner.DUMMY_KEY_END,
+    generateInterval(rowGen(300), dummyEnd,
       startInclude = false, endInclude = true)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
 
-    generateInterval(rowGen(301), IndexScanner.DUMMY_KEY_END,
+    generateInterval(rowGen(301), dummyEnd,
       startInclude = true, endInclude = true)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
   }

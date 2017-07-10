@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.oap.statistics
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
 import org.apache.spark.unsafe.Platform
 
@@ -133,6 +135,8 @@ class PartByValueStatisticsSuite extends StatisticsTest{
 
   test("test analyze function") {
     val keys = (1 to 300).map(i => rowGen(i)).toArray // keys needs to be sorted
+    val dummyStart = new JoinedRow(InternalRow(1), IndexScanner.DUMMY_KEY_START)
+    val dummyEnd = new JoinedRow(InternalRow(300), IndexScanner.DUMMY_KEY_END)
 
     val partByCalueWrite = new TestPartByValue
     partByCalueWrite.initialize(schema)
@@ -144,7 +148,7 @@ class PartByValueStatisticsSuite extends StatisticsTest{
     partByValueRead.initialize(schema)
     partByValueRead.read(bytes, 0)
 
-    generateInterval(IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END, true, true)
+    generateInterval(dummyStart, dummyEnd, true, true)
     assert(partByValueRead.analyse(intervalArray) == 1.0)
 
     generateInterval(rowGen(1), rowGen(301), true, true)

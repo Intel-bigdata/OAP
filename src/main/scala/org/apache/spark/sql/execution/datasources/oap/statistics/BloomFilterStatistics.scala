@@ -35,7 +35,7 @@ private[oap] class BloomFilterStatistics extends Statistics {
   private lazy val bfHashFuncs: Int = StatisticsManager.bloomFilterHashFuncs
 
   @transient private var projectors: Array[UnsafeProjection] = _ // for write
-  @transient private lazy val convertor: UnsafeProjection = UnsafeProjection.create(schema)
+  @transient private lazy val converter: UnsafeProjection = UnsafeProjection.create(schema)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
   override def initialize(schema: StructType): Unit = {
@@ -103,23 +103,33 @@ private[oap] class BloomFilterStatistics extends Statistics {
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
-    // extract equal condition from intervalArray
-    val equalValues: Array[Key] =
-      if (intervalArray.nonEmpty) {
-        // should not use ordering.compare here
-        intervalArray.filter(interval =>
-          interval.start != IndexScanner.DUMMY_KEY_START
-            && interval.end != IndexScanner.DUMMY_KEY_END
-        ).filter(interval => ordering.compare(interval.start, interval.end) == 0
-          && interval.startInclude && interval.endInclude).map(_.start).toArray
-      } else null
-    val skipFlag = if (equalValues != null && equalValues.length > 0) {
-      !equalValues.map(value => bfIndex
-        .checkExist(convertor(value).getBytes))
-        .reduceOption(_ || _).getOrElse(false)
-    } else false
 
-    if (skipFlag) StaticsAnalysisResult.SKIP_INDEX
+    val partialSchema = StructType(schema.dropRight(1))
+    val partialConverter = UnsafeProjection.create(partialSchema)
+    /**
+     * When to skip Index? If any interval in intervalArray satisfies any of below:
+     * 1. schema.length > 1 means a multiple column index. First (schema.length-1) fields are same.
+     *    1.1 interval.start == interval.end (numFields == schema.length) and NOT exist in bfIndex
+     *    1.2 interval.start != interval.end (not equal or DUMMY_KEY) and first
+     *        (schema.length - 1) fields NOT exist in bfIndex.
+     * 2. schema.length = 1 means single column index. First (schema.length-1) fields are empty.
+     *    2.1 interval.start == interval.end (numFields == schema.length) and NOT exist in bfIndex
+     *    2.2 interval.start != interval.end (not equal or DUMMY_KEY). Just return false
+     */
+    val skipIndex = intervalArray.exists { interval =>
+      val numFields = math.min(interval.start.numFields, interval.end.numFields)
+      if (schema.length > 1) {
+        if (numFields == schema.length && ordering.compare(interval.start, interval.end) == 0) {
+            !bfIndex.checkExist(converter(interval.start).getBytes)
+        } else !bfIndex.checkExist(partialConverter(interval.start).getBytes)
+      } else {
+        if (numFields == 1 && ordering.compare(interval.start, interval.end) == 0) {
+          !bfIndex.checkExist(converter(interval.start).getBytes)
+        } else false
+      }
+    }
+
+    if (skipIndex) StaticsAnalysisResult.SKIP_INDEX
     else StaticsAnalysisResult.USE_INDEX
   }
 }

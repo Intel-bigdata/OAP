@@ -52,6 +52,8 @@ abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
 
   @transient lazy protected val converter: UnsafeProjection = UnsafeProjection.create(schema)
   @transient lazy protected val ordering: BaseOrdering = GenerateOrdering.create(schema)
+  @transient lazy protected val partialOrdering: BaseOrdering =
+    GenerateOrdering.create(StructType(schema.dropRight(1)))
   protected var out: TestIndexOutputWriter = _
 
   protected var intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()

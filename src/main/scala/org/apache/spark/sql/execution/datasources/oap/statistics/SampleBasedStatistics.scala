@@ -82,8 +82,9 @@ private[oap] class SampleBasedStatistics extends Statistics {
       StaticsAnalysisResult.USE_INDEX
     } else {
       var hitCnt = 0
+      val partialOrder = GenerateOrdering.create(StructType(schema.dropRight(1)))
       for (row <- sampleArray) {
-        if (Statistics.rowInIntervalArray(row, intervalArray, ordering)) hitCnt += 1
+        if (Statistics.rowInIntervalArray(row, intervalArray, ordering, partialOrder)) hitCnt += 1
       }
       hitCnt * 1.0 / sampleArray.length
     }
