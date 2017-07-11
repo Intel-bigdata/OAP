@@ -383,9 +383,9 @@ private[sql] object OapFileFormat {
   val PARQUET_DATA_FILE_CLASSNAME = classOf[ParquetDataFile].getCanonicalName
 
   val COMPRESSION = "oap.compression"
-  val DEFAULT_COMPRESSION = "UNCOMPRESSED"
+  val DEFAULT_COMPRESSION = SQLConf.OAP_COMPRESSION.defaultValueString
   val ROW_GROUP_SIZE = "oap.rowgroup.size"
-  val DEFAULT_ROW_GROUP_SIZE = "1024"
+  val DEFAULT_ROW_GROUP_SIZE = SQLConf.OAP_ROW_GROUP_SIZE.defaultValueString
 
   def serializeDataSourceMeta(conf: Configuration, meta: Option[DataSourceMeta]): Unit = {
     SerializationUtil.writeObjectToConfAsBase64(OAP_DATA_SOURCE_META, meta, conf)

@@ -630,16 +630,16 @@ object SQLConf {
     .doc("Sets the compression codec use when writing Parquet files. Acceptable values include: " +
       "uncompressed, snappy, gzip, lzo.")
     .stringConf
-    .transform(_.toLowerCase())
-    .checkValues(Set("uncompressed", "snappy", "gzip", "lzo"))
-    .createWithDefault("uncompressed")
+    .transform(_.toUpperCase())
+    .checkValues(Set("UNCOMPRESSED", "SNAPPY", "GZIP", "LZO"))
+    .createWithDefault("GZIP")
 
   val OAP_ROW_GROUP_SIZE =
     SQLConfigBuilder("spark.sql.oap.rowgroup.size")
       .internal()
       .doc("Define the row number for each row group")
       .intConf
-      .createWithDefault(1024)
+      .createWithDefault(1024 * 1024)
 
 
   object Deprecated {

@@ -25,13 +25,15 @@ import scala.collection.mutable
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
+import org.apache.spark.internal.config._
 import org.apache.spark.internal.Logging
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
 
 
@@ -73,8 +75,11 @@ private[oap] trait AbstractFiberCacheManger extends Logging {
 
   private def buildCache(conf: Configuration): LoadingCache[ENTRY, FiberCache] = {
 
-    val weightConfig = conf.getLong(SQLConf.OAP_FIBERCACHE_SIZE.key,
-                              SQLConf.OAP_FIBERCACHE_SIZE.defaultValue.get)
+    val KB = 1024L
+    val executorMemory = conf.get(EXECUTOR_MEMORY.key, EXECUTOR_MEMORY.defaultValueString)
+    val overhead = Utils.byteStringAsBytes(executorMemory) * 0.3 / KB
+
+    val weightConfig = conf.getLong(SQLConf.OAP_FIBERCACHE_SIZE.key, overhead.toLong)
 
     val weight =
       if (weightConfig > 4L * Int.MaxValue) {
@@ -90,8 +95,9 @@ private[oap] trait AbstractFiberCacheManger extends Logging {
         4L * Int.MaxValue // The Unit here is KB. Int.MaxValue = 2G.
 
       } else weightConfig
+    logDebug(s"${SQLConf.OAP_FIBERCACHE_SIZE.key} set to $weight KB")
 
-    maximumFiberSizeInBytes = weight * 1024L / 4
+    maximumFiberSizeInBytes = weight * KB / 4
 
     val builder = CacheBuilder.newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
