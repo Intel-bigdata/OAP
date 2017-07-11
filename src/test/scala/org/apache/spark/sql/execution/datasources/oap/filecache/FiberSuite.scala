@@ -90,6 +90,9 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
   }
 
   test("test data file meta") {
+    val previousRowGroupSize = conf.get(OapFileFormat.ROW_GROUP_SIZE)
+    // change default row group size
+    conf.set(OapFileFormat.ROW_GROUP_SIZE, "1024")
     val schema = new StructType()
       .add("a", IntegerType)
       .add("b", StringType)
@@ -105,6 +108,8 @@ class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
       assert(meta.rowCountInLastGroup === rowCountInLastGroups(i))
       assert(meta.rowGroupsMeta.length === rowGroupCounts(i))
     }
+    if (previousRowGroupSize == null) conf.unset(OapFileFormat.ROW_GROUP_SIZE)
+    else conf.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
   }
 
   test("test oap row group configuration") {
