@@ -26,6 +26,7 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.trees.TreeNode
 import org.apache.spark.sql.execution.SQLExecution
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources._
@@ -46,7 +47,8 @@ case class CreateIndex(
     allowExists: Boolean,
     indexType: AnyIndexType,
     partitionSpec: Option[TablePartitionSpec]) extends RunnableCommand with Logging {
-  override def children: Seq[LogicalPlan] = Seq(relation)
+
+  override lazy val containsChild: Set[TreeNode[_]] = Seq(relation).toSet
 
   override val output: Seq[Attribute] = Seq.empty
 
@@ -196,7 +198,7 @@ case class DropIndex(
     allowNotExists: Boolean,
     partitionSpec: Option[TablePartitionSpec]) extends RunnableCommand {
 
-  override def children: Seq[LogicalPlan] = Seq(relation)
+  override lazy val containsChild: Set[TreeNode[_]] = Seq(relation).toSet
 
   override val output: Seq[Attribute] = Seq.empty
 
@@ -256,7 +258,7 @@ case class DropIndex(
  */
 case class RefreshIndex(
     relation: LogicalPlan) extends RunnableCommand with Logging {
-  override def children: Seq[LogicalPlan] = Seq(relation)
+  override lazy val containsChild: Set[TreeNode[_]] = Seq(relation).toSet
 
   override val output: Seq[Attribute] = Seq.empty
 
@@ -408,7 +410,8 @@ case class RefreshIndex(
  */
 case class OapShowIndex(relation: LogicalPlan, relationName: String)
     extends RunnableCommand with Logging {
-  override def children: Seq[LogicalPlan] = Seq(relation)
+
+  override lazy val containsChild: Set[TreeNode[_]] = Seq(relation).toSet
 
   override val output: Seq[Attribute] = {
     AttributeReference("table", StringType, nullable = true)() ::

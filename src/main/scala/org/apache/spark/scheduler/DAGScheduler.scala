@@ -233,8 +233,8 @@ class DAGScheduler(
   /**
    * Called by TaskScheduler implementation when an executor fails.
    */
-  def executorLost(execId: String): Unit = {
-    eventProcessLoop.post(ExecutorLost(execId))
+  def executorLost(execId: String, reason: ExecutorLossReason): Unit = {
+    eventProcessLoop.post(ExecutorLost(execId, reason))
   }
 
   /**
@@ -1301,18 +1301,20 @@ class DAGScheduler(
               s"has failed the maximum allowable number of " +
               s"times: ${Stage.MAX_CONSECUTIVE_FETCH_FAILURES}. " +
               s"Most recent failure reason: ${failureMessage}", None)
-          } else if (failedStages.isEmpty) {
-            // Don't schedule an event to resubmit failed stages if failed isn't empty, because
-            // in that case the event will already have been scheduled.
-            // TODO: Cancel running tasks in the stage
-            logInfo(s"Resubmitting $mapStage (${mapStage.name}) and " +
-              s"$failedStage (${failedStage.name}) due to fetch failure")
-            messageScheduler.schedule(new Runnable {
-              override def run(): Unit = eventProcessLoop.post(ResubmitFailedStages)
-            }, DAGScheduler.RESUBMIT_TIMEOUT, TimeUnit.MILLISECONDS)
+          } else {
+            if (failedStages.isEmpty) {
+              // Don't schedule an event to resubmit failed stages if failed isn't empty, because
+              // in that case the event will already have been scheduled.
+              // TODO: Cancel running tasks in the stage
+              logInfo(s"Resubmitting $mapStage (${mapStage.name}) and " +
+                s"$failedStage (${failedStage.name}) due to fetch failure")
+              messageScheduler.schedule(new Runnable {
+                override def run(): Unit = eventProcessLoop.post(ResubmitFailedStages)
+              }, DAGScheduler.RESUBMIT_TIMEOUT, TimeUnit.MILLISECONDS)
+            }
+            failedStages += failedStage
+            failedStages += mapStage
           }
-          failedStages += failedStage
-          failedStages += mapStage
           // Mark the map whose fetch failed as broken in the map stage
           if (mapId != -1) {
             mapStage.removeOutputLoc(mapId, bmAddress)
@@ -1364,6 +1366,7 @@ class DAGScheduler(
       blockManagerMaster.removeExecutor(execId)
 
       if (!env.blockManager.externalShuffleServiceEnabled || fetchFailed) {
+        logInfo("Shuffle files lost for executor: %s (epoch %d)".format(execId, currentEpoch))
         // TODO: This will be really slow if we keep accumulating shuffle map stages
         for ((shuffleId, stage) <- shuffleToMapStage) {
           stage.removeOutputsOnExecutor(execId)
@@ -1672,8 +1675,12 @@ private[scheduler] class DAGSchedulerEventProcessLoop(dagScheduler: DAGScheduler
     case ExecutorAdded(execId, host) =>
       dagScheduler.handleExecutorAdded(execId, host)
 
-    case ExecutorLost(execId) =>
-      dagScheduler.handleExecutorLost(execId, fetchFailed = false)
+    case ExecutorLost(execId, reason) =>
+      val filesLost = reason match {
+        case SlaveLost(_, true) => true
+        case _ => false
+      }
+      dagScheduler.handleExecutorLost(execId, filesLost)
 
     case BeginEvent(task, taskInfo) =>
       dagScheduler.handleBeginEvent(task, taskInfo)

@@ -33,7 +33,7 @@ class StatisticsManagerSuite extends QueryTest with SharedSQLContext with Before
   override def beforeEach(): Unit = {
     val path = Utils.createTempDir().getAbsolutePath
 
-    sql(s"""CREATE TEMPORARY TABLE oap_test
+    sql(s"""CREATE TEMPORARY VIEW oap_test
            | (attr_int INT, attr_str STRING, attr_double DOUBLE,
            |     attr_float FLOAT, attr_date DATE)
            | USING oap

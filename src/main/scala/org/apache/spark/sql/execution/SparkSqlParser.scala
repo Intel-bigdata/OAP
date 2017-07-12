@@ -280,13 +280,24 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
    * Create a [[DescribeTableCommand]] logical plan.
    */
   override def visitDescribeTable(ctx: DescribeTableContext): LogicalPlan = withOrigin(ctx) {
-    // Describe partition and column are not supported yet. Return null and let the parser decide
+    // Describe column are not supported yet. Return null and let the parser decide
     // what to do with this (create an exception or pass it on to a different system).
-    if (ctx.describeColName != null || ctx.partitionSpec != null) {
+    if (ctx.describeColName != null) {
       null
     } else {
+      val partitionSpec = if (ctx.partitionSpec != null) {
+        // According to the syntax, visitPartitionSpec returns `Map[String, Option[String]]`.
+          visitPartitionSpec(ctx.partitionSpec).map {
+            case (key, Some(value)) => key -> value
+            case (key, _) =>
+              throw new ParseException(s"PARTITION specification is incomplete: `$key`", ctx)
+          }
+      } else {
+        Map.empty[String, String]
+      }
       DescribeTableCommand(
         visitTableIdentifier(ctx.tableIdentifier),
+        partitionSpec,
         ctx.EXTENDED != null,
         ctx.FORMATTED != null)
     }
@@ -404,6 +415,20 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
     TruncateTableCommand(
       visitTableIdentifier(ctx.tableIdentifier),
       Option(ctx.partitionSpec).map(visitNonOptionalPartitionSpec))
+  }
+
+  /**
+   * Create a [[AlterTableRecoverPartitionsCommand]] command.
+   *
+   * For example:
+   * {{{
+   *   MSCK REPAIR TABLE tablename
+   * }}}
+   */
+  override def visitRepairTable(ctx: RepairTableContext): LogicalPlan = withOrigin(ctx) {
+    AlterTableRecoverPartitionsCommand(
+      visitTableIdentifier(ctx.tableIdentifier),
+      "MSCK REPAIR TABLE")
   }
 
   /**
@@ -765,6 +790,19 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
   }
 
   /**
+   * Create an [[AlterTableRecoverPartitionsCommand]] command
+   *
+   * For example:
+   * {{{
+   *   ALTER TABLE table RECOVER PARTITIONS;
+   * }}}
+   */
+  override def visitRecoverPartitions(
+      ctx: RecoverPartitionsContext): LogicalPlan = withOrigin(ctx) {
+    AlterTableRecoverPartitionsCommand(visitTableIdentifier(ctx.tableIdentifier))
+  }
+
+  /**
    * Create an [[AlterTableSetLocationCommand]] command
    *
    * For example:
@@ -993,12 +1031,6 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
 
     selectQuery match {
       case Some(q) =>
-        // Just use whatever is projected in the select statement as our schema
-        if (schema.nonEmpty) {
-          operationNotAllowed(
-            "Schema may not be specified in a Create Table As Select (CTAS) statement",
-            ctx)
-        }
         // Hive does not allow to use a CTAS statement to create a partitioned table.
         if (tableDesc.partitionColumnNames.nonEmpty) {
           val errorMessage = "A Create Table As Select (CTAS) statement is not allowed to " +
@@ -1007,6 +1039,12 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
             "OPTIONS (...) PARTITIONED BY ...\" to create a partitioned table through a " +
             "CTAS statement."
           operationNotAllowed(errorMessage, ctx)
+        }
+        // Just use whatever is projected in the select statement as our schema
+        if (schema.nonEmpty) {
+          operationNotAllowed(
+            "Schema may not be specified in a Create Table As Select (CTAS) statement",
+            ctx)
         }
 
         val hasStorageProperties = (ctx.createFileFormat != null) || (ctx.rowFormat != null)
@@ -1153,7 +1191,7 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
         entry("mapkey.delim", ctx.keysTerminatedBy) ++
         Option(ctx.linesSeparatedBy).toSeq.map { token =>
           val value = string(token)
-          assert(
+          validate(
             value == "\n",
             s"LINES TERMINATED BY only supports newline '\\n' right now: $value",
             ctx)
@@ -1210,7 +1248,7 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
    *
    * For example:
    * {{{
-   *   CREATE [TEMPORARY] VIEW [IF NOT EXISTS] [db_name.]view_name
+   *   CREATE [OR REPLACE] [TEMPORARY] VIEW [IF NOT EXISTS] [db_name.]view_name
    *   [(column_name [COMMENT column_comment], ...) ]
    *   [COMMENT view_comment]
    *   [TBLPROPERTIES (property_name = property_value, ...)]
@@ -1225,60 +1263,44 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
       val schema = identifiers.map { ic =>
         CatalogColumn(ic.identifier.getText, null, nullable = true, Option(ic.STRING).map(string))
       }
-      createView(
-        ctx,
-        ctx.tableIdentifier,
-        comment = Option(ctx.STRING).map(string),
-        schema,
-        ctx.query,
-        Option(ctx.tablePropertyList).map(visitPropertyKeyValues).getOrElse(Map.empty),
-        ctx.EXISTS != null,
-        ctx.REPLACE != null,
-        ctx.TEMPORARY != null
-      )
+
+      val sql = Option(source(ctx.query))
+      val tableDesc = CatalogTable(
+        identifier = visitTableIdentifier(ctx.tableIdentifier),
+        tableType = CatalogTableType.VIEW,
+        schema = schema,
+        storage = CatalogStorageFormat.empty,
+        properties = Option(ctx.tablePropertyList).map(visitPropertyKeyValues).getOrElse(Map.empty),
+        viewOriginalText = sql,
+        viewText = sql,
+        comment = Option(ctx.STRING).map(string))
+
+      CreateViewCommand(
+        tableDesc,
+        plan(ctx.query),
+        allowExisting = ctx.EXISTS != null,
+        replace = ctx.REPLACE != null,
+        isTemporary = ctx.TEMPORARY != null)
     }
   }
 
   /**
-   * Alter the query of a view. This creates a [[CreateViewCommand]] command.
+   * Alter the query of a view. This creates a [[AlterViewAsCommand]] command.
+   *
+   * For example:
+   * {{{
+   *   ALTER VIEW [db_name.]view_name AS SELECT ...;
+   * }}}
    */
   override def visitAlterViewQuery(ctx: AlterViewQueryContext): LogicalPlan = withOrigin(ctx) {
-    createView(
-      ctx,
-      ctx.tableIdentifier,
-      comment = None,
-      Seq.empty,
-      ctx.query,
-      Map.empty,
-      allowExist = false,
-      replace = true,
-      isTemporary = false)
-  }
-
-  /**
-   * Create a [[CreateViewCommand]] command.
-   */
-  private def createView(
-      ctx: ParserRuleContext,
-      name: TableIdentifierContext,
-      comment: Option[String],
-      schema: Seq[CatalogColumn],
-      query: QueryContext,
-      properties: Map[String, String],
-      allowExist: Boolean,
-      replace: Boolean,
-      isTemporary: Boolean): LogicalPlan = {
-    val sql = Option(source(query))
     val tableDesc = CatalogTable(
-      identifier = visitTableIdentifier(name),
+      identifier = visitTableIdentifier(ctx.tableIdentifier),
       tableType = CatalogTableType.VIEW,
-      schema = schema,
       storage = CatalogStorageFormat.empty,
-      properties = properties,
-      viewOriginalText = sql,
-      viewText = sql,
-      comment = comment)
-    CreateViewCommand(tableDesc, plan(query), allowExist, replace, isTemporary)
+      schema = Nil,
+      viewOriginalText = Option(source(ctx.query)))
+
+    AlterViewAsCommand(tableDesc, plan(ctx.query))
   }
 
   /**

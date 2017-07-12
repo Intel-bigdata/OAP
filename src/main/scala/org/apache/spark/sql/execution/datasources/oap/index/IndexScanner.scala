@@ -24,6 +24,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.sources._
@@ -31,10 +32,9 @@ import org.apache.spark.sql.types.StructType
 
 
 private[oap] object IndexScanner {
-  val DUMMY_KEY_START: Key = InternalRow(Array[Any](): _*) // we compare the ref not the value
-  val DUMMY_KEY_END: Key = InternalRow(Array[Any](): _*) // we compare the ref not the value
+  val DUMMY_KEY_START: Key = new UnsafeRow() // we compare the ref not the value
+  val DUMMY_KEY_END: Key = new UnsafeRow() // we compare the ref not the value
 }
-
 
 private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
   extends Iterator[Long] with Serializable with Logging{
