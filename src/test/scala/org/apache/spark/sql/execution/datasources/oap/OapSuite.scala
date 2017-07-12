@@ -36,6 +36,7 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
+    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     path = Utils.createTempDir()
     path.delete()
     parquetPath = Utils.createTempDir()

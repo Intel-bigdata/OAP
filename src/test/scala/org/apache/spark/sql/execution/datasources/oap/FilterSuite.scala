@@ -32,6 +32,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   import testImplicits._
 
   override def beforeEach(): Unit = {
+    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val path = Utils.createTempDir().getAbsolutePath
 
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b STRING)

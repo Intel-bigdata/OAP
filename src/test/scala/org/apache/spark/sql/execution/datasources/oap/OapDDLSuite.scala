@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 
@@ -30,6 +31,7 @@ class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   import testImplicits._
 
   override def beforeEach(): Unit = {
+    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val path1 = Utils.createTempDir().getAbsolutePath
     val path2 = Utils.createTempDir().getAbsolutePath
 

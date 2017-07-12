@@ -29,6 +29,7 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
   import testImplicits._
 
   override def beforeEach(): Unit = {
+    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val path1 = Utils.createTempDir().getAbsolutePath
 
     sql(s"""CREATE TEMPORARY VIEW oap_test_1 (a INT, b STRING)
@@ -41,8 +42,8 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
   }
 
   test("index integrity") {
-      val data: Seq[(Int, String)] = scala.util.Random.shuffle(1 to 300).map{
-                                      i => (i, s"this is test $i") }.toSeq
+      val data: Seq[(Int, String)] =
+        scala.util.Random.shuffle(1 to 300).map{ i => (i, s"this is test $i") }.toSeq
       data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table oap_test_1 select * from t")
       sql("create oindex index1 on oap_test_1 (a) using bitmap")

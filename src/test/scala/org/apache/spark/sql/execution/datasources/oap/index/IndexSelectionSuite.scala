@@ -23,8 +23,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
@@ -37,6 +38,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
   private var path: Path = null
 
   override def beforeEach(): Unit = {
+    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val data = (1 to 300).map(i => (i, i + 100, i + 200, i + 300, s"this is row $i"))
     val df = sparkContext.parallelize(data, 3).toDF("a", "b", "c", "d", "e")
     df.write.format("oap").mode(SaveMode.Overwrite).save(tempDir.getAbsolutePath)

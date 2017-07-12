@@ -37,6 +37,7 @@ class OapQuerySuite extends HiveComparisonTest with BeforeAndAfter  {
 
   override def beforeAll() {
     super.beforeAll()
+    sparkContext.conf.set(SQLConf.OAP_IS_TESTING.key, SQLConf.OAP_IS_TESTING.defaultValueString)
     TestHive.setCacheTables(true)
     // Timezone is fixed to America/Los_Angeles for those timezone sensitive tests (timestamp_*)
     TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"))

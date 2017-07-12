@@ -188,12 +188,14 @@ private[oap] class OapDataReader(
          */
         val indexFileSize = indexPath.getFileSystem(conf).getContentSummary(indexPath).getLength
         val dataFileSize = path.getFileSystem(conf).getContentSummary(path).getLength
+        val isTesting = conf.getBoolean(SQLConf.OAP_IS_TESTING.key,
+                              SQLConf.OAP_IS_TESTING.defaultValue.get)
         val iter =
           if (indexFileSize > FiberCacheManager.getMaximumFiberSizeInBytes(conf)) {
             logWarning(s"Index File size $indexFileSize B is too large and couldn't be cached." +
               s"Please increase ${SQLConf.OAP_FIBERCACHE_SIZE.key} for better performance")
             fileScanner.iterator(conf, requiredIds)
-          } else if (indexFileSize > dataFileSize * 0.7) {
+          } else if (indexFileSize > dataFileSize * 0.7 && !isTesting) {
             logWarning(s"Index File size $indexFileSize B is too large comparing " +
                         s"to Data File Size $dataFileSize. Using Data File Scan instead.")
             fileScanner.iterator(conf, requiredIds)

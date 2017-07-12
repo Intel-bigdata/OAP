@@ -641,6 +641,13 @@ object SQLConf {
       .intConf
       .createWithDefault(1024)
 
+  val OAP_IS_TESTING =
+    SQLConfigBuilder("spark.sql.oap.testing")
+      .internal()
+      .doc("To indicate if the test is ongoing")
+      .booleanConf
+      .createWithDefault(false)
+
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"

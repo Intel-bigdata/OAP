@@ -27,6 +27,7 @@ import org.scalatest.BeforeAndAfter
 
 import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
@@ -38,6 +39,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
+    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     tmpDir = Utils.createTempDir()
   }
 
