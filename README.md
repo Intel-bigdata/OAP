@@ -65,7 +65,7 @@ Parquet Support - Enable OAP support for parquet files
 * Usage: `sqlContext.conf.setConfString(SQLConf.OAP_PARQUET_ENABLED.key, "false")`
 
 Fiber Cache Size - Total Memory size to cache Fiber. Unit: KB
-* Default: 307200
+* Default: `spark.executor.memory * 0.3`
 * Usage: `sqlContext.conf.setConfString(SQLConf.OAP_FIBERCACHE_SIZE.key, s"{100 * 1024 * 1024}")`
 
 Full Scan Threshold - If the analysis result is above this threshold, it will go through the whole data file instead of read index data.
@@ -73,12 +73,12 @@ Full Scan Threshold - If the analysis result is above this threshold, it will go
 * Usage: `sqlContext.conf.setConfString(SQLConf.OAP_FULL_SCAN_THRESHOLD.key, "0.8")`
 
 Row Group Size - Row count for each row group
-* Default: 1024
+* Default: 1048576
 * Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key, "1025")`
 * Usage2: `CREATE TABLE t USING oap OPTIONS ('rowgroup' '1024')`
 
 Compression Codec - Choose compression type for OAP data files.
-* Default: UNCOMPRESSED
+* Default: GZIP
 * Values: UNCOMPRESSED, SNAPPY, GZIP, LZO
 * Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, "SNAPPY")`
 * Usage2: `CREATE TABLE t USING oap OPTIONS ('compression' 'SNAPPY')`
