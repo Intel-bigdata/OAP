@@ -57,7 +57,7 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
   }
 
   test("Large Bloom Bit Size Cause JVM crash. Issue #278") {
-    sqlContext.conf.setConfString(SQLConf.OAP_BLOOMFILTER_MAXBITS.key, s"${1 << 30}")
+    sqlContext.conf.setConf(SQLConf.OAP_BLOOMFILTER_MAXBITS, 1 << 30)
 
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
@@ -67,6 +67,8 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
     checkAnswer(sql("SELECT * FROM oap_test_1 WHERE a = 1"), Row(1, "this is test 1") :: Nil)
 
     sql("drop oindex index1 on oap_test_1")
+    sqlContext.conf.setConf(SQLConf.OAP_BLOOMFILTER_MAXBITS,
+      SQLConf.OAP_BLOOMFILTER_MAXBITS.defaultValue.get)
   }
 
   test("index row boundary") {
