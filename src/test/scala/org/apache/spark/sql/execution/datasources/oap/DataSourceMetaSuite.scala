@@ -375,11 +375,13 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     val isNotNull = Seq(IsNotNull(AttributeReference("b", IntegerType)()))
     val eq = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)))
     val eq2 = Seq(EqualTo(AttributeReference("b", IntegerType)(), Literal(1)))
+    val eq3 = Seq(EqualTo(Literal(1), AttributeReference("a", IntegerType)()))
     val lt = Seq(LessThan(AttributeReference("a", IntegerType)(), Literal(1)))
     val gt = Seq(GreaterThan(AttributeReference("a", IntegerType)(), Literal(1)))
     val gt2 = Seq(GreaterThan(AttributeReference("c", StringType)(), Literal("A Row")))
     val lte = Seq(LessThanOrEqual(AttributeReference("a", IntegerType)(), Literal(1)))
     val gte = Seq(GreaterThanOrEqual(AttributeReference("a", IntegerType)(), Literal(1)))
+    val gte1 = Seq(GreaterThanOrEqual(Literal(1), AttributeReference("a", IntegerType)()))
     val or1 = Seq(Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(15)),
       EqualTo(AttributeReference("a", IntegerType)(), Literal(1))) )
     val or2 = Seq(Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(15)),
@@ -458,11 +460,13 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
     assert(! isNotNull.exists(meta.isSupportedByIndex(_, hashSetList)))
     assert(eq.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(eq3.exists(meta.isSupportedByIndex(_, hashSetList)))
     assert(lt.exists(meta.isSupportedByIndex(_, hashSetList)))
     assert(gt.exists(meta.isSupportedByIndex(_, hashSetList)))
     assert(gt2.exists(meta.isSupportedByIndex(_, hashSetList)))
     assert(lte.exists(meta.isSupportedByIndex(_, hashSetList)))
     assert(gte.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(gte1.exists(meta.isSupportedByIndex(_, hashSetList)))
     assert(! eq2.exists(meta.isSupportedByIndex(_, hashSetList)))
     assert(or1.exists(meta.isSupportedByIndex(_, hashSetList)))
     assert(or2.exists(meta.isSupportedByIndex(_, hashSetList)))

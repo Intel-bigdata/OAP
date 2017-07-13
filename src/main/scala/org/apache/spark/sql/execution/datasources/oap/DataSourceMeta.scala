@@ -295,36 +295,39 @@ private[oap] case class DataSourceMeta(
      val bTreeSet: mutable.HashSet[String] = hashSetList(0)
      val bitmapSet: mutable.HashSet[String] = hashSetList(1)
      var attr: String = null
+
+     def checkInMetaSet(attrRef: AttributeReference): Boolean = {
+       if (attr ==  null || attr == attrRef.name) {
+         attr = attrRef.name
+         bTreeSet.contains(attr) || bitmapSet.contains(attr)
+       } else false
+     }
+
      def checkAttribute(filter: Expression): Boolean = filter match {
        case Or(left, right) =>
          checkAttribute(left) && checkAttribute(right)
        case And(left, right) =>
          checkAttribute(left) && checkAttribute(right)
        case EqualTo(attrRef: AttributeReference, _) =>
-         if (attr ==  null || attr == attrRef.name) {
-           attr = attrRef.name
-           bTreeSet.contains(attr) || bitmapSet.contains(attr)
-         } else false
+         checkInMetaSet(attrRef)
+       case EqualTo(_, attrRef: AttributeReference) =>
+         checkInMetaSet(attrRef)
        case LessThan(attrRef: AttributeReference, _) =>
-         if (attr ==  null || attr == attrRef.name) {
-           attr = attrRef.name
-           bTreeSet.contains(attr) || bitmapSet.contains(attr)
-         } else false
+         checkInMetaSet(attrRef)
+       case LessThan(_, attrRef: AttributeReference) =>
+         checkInMetaSet(attrRef)
        case LessThanOrEqual(attrRef: AttributeReference, _) =>
-         if (attr ==  null || attr == attrRef.name) {
-           attr = attrRef.name
-           bTreeSet.contains(attr) || bitmapSet.contains(attr)
-         } else false
+         checkInMetaSet(attrRef)
+       case LessThanOrEqual(_, attrRef: AttributeReference) =>
+         checkInMetaSet(attrRef)
        case GreaterThan(attrRef: AttributeReference, _) =>
-         if (attr ==  null || attr == attrRef.name) {
-           attr = attrRef.name
-           bTreeSet.contains(attr) || bitmapSet.contains(attr)
-         } else false
+         checkInMetaSet(attrRef)
+       case GreaterThan(_, attrRef: AttributeReference) =>
+         checkInMetaSet(attrRef)
        case GreaterThanOrEqual(attrRef: AttributeReference, _) =>
-         if (attr ==  null || attr == attrRef.name) {
-           attr = attrRef.name
-           bTreeSet.contains(attr) || bitmapSet.contains(attr)
-         } else false
+         checkInMetaSet(attrRef)
+       case GreaterThanOrEqual(_, attrRef: AttributeReference) =>
+         checkInMetaSet(attrRef)
        case _ => false
      }
 
