@@ -394,4 +394,83 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
     sql("drop oindex index1 on oap_test")
   }
+
+  test("testInCondtions") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create sindex index1 on parquet_test (b)")
+
+    // will use b in (....)
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
+      "b in('this is test 1','this is test 2','this is test 4')"),
+      Row(1, "this is test 1") :: Row(2, "this is test 2")
+        :: Row(4, "this is test 4") :: Nil)
+  }
+
+  test("testInCondtionsStringFieldNotCastDouble") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create sindex index1 on parquet_test (b)")
+
+    // will use b in(1,2,4), values cast to string
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
+      "b in(1,2,4)"),
+      Row(1, "1") :: Row(2, "2")
+        :: Row(4, "4") :: Nil)
+  }
+
+  test("testInCondtionsIntFieldNotCastDouble") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create sindex index1 on parquet_test (a)")
+
+    // will use a in (20,30,40), value cast to int
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
+      "a=10 AND a in (20,30,40)"), Nil)
+  }
+
+  test("testComplexQueryConditions") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create sindex index1 on parquet_test (a)")
+    sql("create sindex index2 on parquet_test (b)")
+
+    // ((cast(a#12 as double) = 10.0) || a#12 IN (20,30)),
+    // not support cast(a#12 as double) = 10.0
+    // can not use index
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
+      "a=10 or a in (20,30)"),
+      Row(10, "10") :: Row(20, "20")
+        :: Row(30, "30") :: Nil)
+
+    // not support by index
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
+      "b='10' or a in (20,30)"),
+      Row(10, "10") :: Row(20, "20")
+        :: Row(30, "30") :: Nil)
+
+    // not support by index
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
+      "b='10' or (b = '20' and a in (10,20,30))"),
+      Row(10, "10") :: Row(20, "20") :: Nil)
+  }
+
+
+  test("testBetweenConditions") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create sindex index1 on parquet_test (a)")
+
+    // (a#12 >= 10) && (a#12 <= 30)
+    // use index
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
+      "a BETWEEN 10 AND 12"),
+      Row(10, "10") :: Row(11, "11")
+        :: Row(12, "12") :: Nil)
+  }
 }

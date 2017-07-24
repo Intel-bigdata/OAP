@@ -327,6 +327,8 @@ private[oap] case class DataSourceMeta(
         checkInMetaSet(attrRef)
       case GreaterThanOrEqual(_, attrRef: AttributeReference) =>
         checkInMetaSet(attrRef)
+      case In(attrRef: AttributeReference, _) =>
+        checkInMetaSet(attrRef)
       case _ => false
     }
 

@@ -167,6 +167,8 @@ private[sql] class OapFileFormat extends FileFormat
                 if (attr ==  null || attr == attribute) {attr = attribute; true} else false
               case GreaterThanOrEqual(attribute, _) =>
                 if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+              case In(attribute, _) =>
+                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
               case _ => true
             }
 
