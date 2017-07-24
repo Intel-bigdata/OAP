@@ -145,7 +145,7 @@ private[oap] object ScannerBuilder extends Logging {
       case LessThanOrEqual(ic(indexer), _) => true
       case Or(ic(indexer), _) => true
       case And(ic(indexer), _) => true
-      case In(ic(indexer), _) => truef
+      case In(ic(indexer), _) => true
       case _ => false
     }
   }
