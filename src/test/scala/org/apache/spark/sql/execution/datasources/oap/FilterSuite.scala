@@ -395,11 +395,11 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sql("drop oindex index1 on oap_test")
   }
 
-  test("testInCondtions") {
+  test("test paruet use in") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
-    sql("create sindex index1 on parquet_test (b)")
+    sql("create oindex index1 on parquet_test (b)")
 
     // will use b in (....)
     checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
@@ -408,11 +408,11 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
         :: Row(4, "this is test 4") :: Nil)
   }
 
-  test("testInCondtionsStringFieldNotCastDouble") {
+  test("test parquet use in StringFieldNotCastDouble") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
-    sql("create sindex index1 on parquet_test (b)")
+    sql("create oindex index1 on parquet_test (b)")
 
     // will use b in(1,2,4), values cast to string
     checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
@@ -421,23 +421,23 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
         :: Row(4, "4") :: Nil)
   }
 
-  test("testInCondtionsIntFieldNotCastDouble") {
+  test("test parquet use in IntFieldNotCastDouble") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
-    sql("create sindex index1 on parquet_test (a)")
+    sql("create oindex index1 on parquet_test (a)")
 
     // will use a in (20,30,40), value cast to int
     checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
       "a=10 AND a in (20,30,40)"), Nil)
   }
 
-  test("testComplexQueryConditions") {
+  test("test parquet query include in") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
-    sql("create sindex index1 on parquet_test (a)")
-    sql("create sindex index2 on parquet_test (b)")
+    sql("create oindex index1 on parquet_test (a)")
+    sql("create oindex index2 on parquet_test (b)")
 
     // ((cast(a#12 as double) = 10.0) || a#12 IN (20,30)),
     // not support cast(a#12 as double) = 10.0
@@ -457,14 +457,25 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
       "b='10' or (b = '20' and a in (10,20,30))"),
       Row(10, "10") :: Row(20, "20") :: Nil)
+
+    // use index
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
+      "b='10' and b in (10,20,30)"),
+      Row(10, "10") :: Nil)
+
+    // use index
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
+      "b='10' or b in (10,20,30)"),
+      Row(10, "10") :: Row(20, "20")
+        :: Row(30, "30")  :: Nil)
   }
 
 
-  test("testBetweenConditions") {
+  test("test parquet use between") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
-    sql("create sindex index1 on parquet_test (a)")
+    sql("create oindex index1 on parquet_test (a)")
 
     // (a#12 >= 10) && (a#12 <= 30)
     // use index
@@ -472,5 +483,77 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       "a BETWEEN 10 AND 12"),
       Row(10, "10") :: Row(11, "11")
         :: Row(12, "12") :: Nil)
+  }
+
+  test("test oap use in") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index1 on oap_test (b)")
+
+    // will use b in (....)
+    checkAnswer(sql("SELECT * FROM oap_test WHERE " +
+      "b in('this is test 1','this is test 2','this is test 4')"),
+      Row(1, "this is test 1") :: Row(2, "this is test 2")
+        :: Row(4, "this is test 4") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE " +
+      "b in('this is test 2','this is test 1','this is test 2')"),
+      Row(1, "this is test 1") :: Row(2, "this is test 2") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE " +
+      "b in('this is test 1','this is test 2','this is test 1')"),
+      Row(1, "this is test 1") :: Row(2, "this is test 2") :: Nil)
+
+  }
+
+
+  test("test oap use in IntFieldNotCastDouble") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index1 on oap_test (a)")
+
+    // will use a in (20,30,40), value cast to int
+    checkAnswer(sql("SELECT * FROM oap_test WHERE " +
+      "a=10 AND a in (20,30,40)"), Nil)
+  }
+
+  test("test oap query include in") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index1 on oap_test (a)")
+    sql("create oindex index2 on oap_test (b)")
+
+    // ((cast(a#12 as double) = 10.0) || a#12 IN (20,30)),
+    // not support cast(a#12 as double) = 10.0
+    // can not use index
+    checkAnswer(sql("SELECT * FROM oap_test WHERE " +
+      "a=10 or a in (20,30)"),
+      Row(10, "10") :: Row(20, "20")
+        :: Row(30, "30") :: Nil)
+
+    // use index
+    checkAnswer(sql("SELECT * FROM oap_test WHERE " +
+      "b='10' and b in (10,20,30)"),
+      Row(10, "10") :: Nil)
+
+    // use index
+    checkAnswer(sql("SELECT * FROM oap_test WHERE " +
+      "b='10' or b in (10,20,30)"),
+      Row(10, "10") :: Row(20, "20")
+        :: Row(30, "30")  :: Nil)
+
+    // not support by index
+    checkAnswer(sql("SELECT * FROM oap_test WHERE " +
+      "b='10' or a in (20,30)"),
+      Row(10, "10") :: Row(20, "20")
+        :: Row(30, "30") :: Nil)
+
+    // not support by index
+    checkAnswer(sql("SELECT * FROM oap_test WHERE " +
+      "b='10' or (b = '20' and a in (10,20,30))"),
+      Row(10, "10") :: Row(20, "20") :: Nil)
   }
 }
