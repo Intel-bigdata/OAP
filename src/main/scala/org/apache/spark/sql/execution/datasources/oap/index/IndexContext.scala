@@ -207,6 +207,9 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
   def unapply(value: Any): Option[Key] =
     Some(InternalRow(CatalystTypeConverters.convertToCatalyst(value)))
 
+  def unapply(values: Array[Any]): Option[Array[Key]] =
+    Some(values.map(value => InternalRow(CatalystTypeConverters.convertToCatalyst(value))))
+
 }
 
 private[oap] object DummyIndexContext extends IndexContext(null) {
