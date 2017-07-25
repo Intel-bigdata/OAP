@@ -30,7 +30,7 @@ import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Expression, JoinedRow}
+import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
@@ -240,6 +240,32 @@ private[sql] class OapFileFormat extends FileFormat
         hashSetList.append(bTreeIndexAttrSet)
         hashSetList.append(bitmapIndexAttrSet)
         expressions.exists(m.isSupportedByIndex(_, hashSetList))
+      case None => false
+    }
+  }
+
+  def hasAvailableIndex(attributes: AttributeSet): Boolean = {
+    meta match {
+      case Some(m) =>
+        val bTreeIndexAttrSet = new mutable.HashSet[String]()
+        val bitmapIndexAttrSet = new mutable.HashSet[String]()
+        var idx = 0
+        while(idx < m.indexMetas.length) {
+          m.indexMetas(idx).indexType match {
+            case BTreeIndex(entries) =>
+              bTreeIndexAttrSet.add(m.schema(entries(0).ordinal).name)
+            case BitMapIndex(entries) =>
+              entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
+            case _ => // we don't support other types of index
+          }
+          idx = 1
+        }
+        val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
+        hashSetList.append(bTreeIndexAttrSet)
+        hashSetList.append(bitmapIndexAttrSet)
+        // hashSetList.contains(attributes)
+        attributes.exists(hashSetList.contains(_))
+        attributes.map{attr => hashSetList.map(_.contains(attr.name)).reduce(_ || _)}.reduce(_ && _)
       case None => false
     }
   }
