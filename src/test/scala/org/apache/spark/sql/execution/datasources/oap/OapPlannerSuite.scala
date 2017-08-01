@@ -48,28 +48,36 @@ class OapPlannerSuite
     spark.experimental.extraStrategies = SortPushDownStrategy :: Nil
 
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
-    val data = (1 to 300).map{ i => (i, s"this is test $i")}
-    val dataRDD = spark.sparkContext.parallelize(data, 3)
+    val data = (1 to 300).map{ i => (i%102, s"this is test $i")}
+    val dataRDD = spark.sparkContext.parallelize(data, 10)
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_sort_opt_table select * from t")
     sql("create oindex index1 on oap_sort_opt_table (a)")
+    sql("create oindex index2 on oap_sort_opt_table (b)")
 
+    // ASC
     checkAnswer(
-      sql("SELECT * FROM oap_sort_opt_table WHERE a >= 98 AND a <= 106 ORDER BY a LIMIT 4"),
-                Row(98, "this is test 98") ::
-                Row(99, "this is test 99") ::
-                Row(100, "this is test 100") ::
-                Row(101, "this is test 101") :: Nil)
+      sql("SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"),
+                Row(0) :: Row(0) :: Row(1) :: Row(1) :: Row(1) :: Row(2) :: Row(2) :: Nil)
 
+    // DESC
     checkAnswer(
-      sql("SELECT * FROM oap_sort_opt_table WHERE a >= 98 AND a <= 101 ORDER BY a DESC LIMIT 4"),
-          Row(101, "this is test 101") ::
-          Row(100, "this is test 100") ::
-          Row(99, "this is test 99") ::
-          Row(98, "this is test 98") :: Nil)
+      sql("SELECT a FROM oap_sort_opt_table WHERE a >= 90 AND a <= 101 ORDER BY a DESC LIMIT 14"),
+          Row(101) :: Row(101) :: Row(100) :: Row(100) :: Row(99) :: Row(99) :: Row(98) ::
+          Row( 98) :: Row( 97) :: Row( 97) :: Row( 96) :: Row(96) :: Row(96) :: Row(95) :: Nil)
+
+
+//    // TODO: Project != filter
+//    checkAnswer(
+//      sql("SELECT b FROM oap_sort_opt_table WHERE a >= 98 AND a <= 101 ORDER BY a DESC LIMIT 4"),
+//      Row("this is test 101") ::
+//        Row("this is test 100") ::
+//        Row("this is test 99") ::
+//        Row("this is test 98") :: Nil)
 
     sql("drop oindex index1 on oap_sort_opt_table")
+    sql("drop oindex index2 on oap_sort_opt_table")
   }
 
 }

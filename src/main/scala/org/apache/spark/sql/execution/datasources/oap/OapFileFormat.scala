@@ -20,17 +20,15 @@ package org.apache.spark.sql.execution.datasources.oap
 import java.net.URI
 
 import scala.collection.mutable
-
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileStatus, FileSystem, FSDataOutputStream, Path}
+import org.apache.hadoop.fs.{FSDataOutputStream, FileStatus, FileSystem, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow}
+import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
@@ -220,6 +218,92 @@ private[sql] class OapFileFormat extends FileFormat
     }
   }
 
+  private[sql] def buildReaderWithPartitionValues( sparkSession: SparkSession,
+                                                   dataSchema: StructType,
+                                                   partitionSchema: StructType,
+                                                   requiredSchema: StructType,
+                                                   filters: Seq[Filter],
+                                                   sortOrder: SortOrder,
+                                                   limit : Int,
+                                                   options: Map[String, String],
+                                                   hadoopConf: Configuration)
+                                                  : PartitionedFile => Iterator[InternalRow] = {
+    // TODO we need to pass the extra data source meta information via the func parameter
+    // OapFileFormat.deserializeDataSourceMeta(hadoopConf) match {
+    meta match {
+      case Some(m) =>
+        logDebug("Building OapDataReader with "
+          + m.dataReaderClassName.substring(m.dataReaderClassName.lastIndexOf(".") + 1)
+          + " ...")
+
+        def canTriggerIndex(filter: Filter): Boolean = {
+          var attr: String = null
+          def checkAttribute(filter: Filter): Boolean = filter match {
+            case Or(left, right) =>
+              checkAttribute(left) && checkAttribute(right)
+            case And(left, right) =>
+              checkAttribute(left) && checkAttribute(right)
+            case EqualTo(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case LessThan(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case LessThanOrEqual(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case GreaterThan(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case GreaterThanOrEqual(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case _ => true
+          }
+
+          checkAttribute(filter)
+        }
+
+        val ic = new IndexContext(m)
+
+        if (m.indexMetas.nonEmpty) { // check and use index
+          logDebug("Supported Filters by Oap:")
+          // filter out the "filters" on which we can use the B+ tree index
+          val supportFilters = filters.toArray.filter(canTriggerIndex)
+          // After filtered, supportFilter only contains:
+          // 1. Or predicate that contains only one attribute internally;
+          // 2. Some atomic predicates, such as LessThan, EqualTo, etc.
+          if (supportFilters.nonEmpty) {
+            // determine whether we can use B+ tree index
+            supportFilters.foreach(filter => logDebug("\t" + filter.toString))
+            ScannerBuilder.build(supportFilters, ic)
+          }
+        }
+        //        val filterScanner = ic.getScannerBuilder.map(_.build)
+        val filterScanner = ic.getScanner
+
+        val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
+
+        hadoopConf.setDouble(SQLConf.OAP_FULL_SCAN_THRESHOLD.key,
+          sparkSession.conf.get(SQLConf.OAP_FULL_SCAN_THRESHOLD))
+        val broadcastedHadoopConf =
+          sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
+
+        (file: PartitionedFile) => {
+          assert(file.partitionValues.numFields == partitionSchema.size)
+
+          val iter = new OapDataReader(
+            new Path(new URI(file.filePath)), m, filterScanner, requiredIds)
+            .initialize(broadcastedHadoopConf.value.value)
+
+          val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
+          val joinedRow = new JoinedRow()
+          val appendPartitionColumns = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
+
+          iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+        }
+      case None => (_: PartitionedFile) => {
+        // TODO need to think about when there is no oap.meta file at all
+        Iterator.empty
+      }
+    }
+  }
+
   def hasAvailableIndex(expressions: Seq[Expression]): Boolean = {
     meta match {
       case Some(m) =>
@@ -258,7 +342,7 @@ private[sql] class OapFileFormat extends FileFormat
               entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
             case _ => // we don't support other types of index
           }
-          idx = 1
+          idx += 1
         }
         val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
         hashSetList.append(bTreeIndexAttrSet)
