@@ -137,7 +137,9 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
       lastIdx = availableIndexes.head._1
       bestIndexer = availableIndexes.head._2
     }
-    logDebug("\t" + bestIndexer.toString + "; lastIdx: " + lastIdx)
+    if (bestIndexer != null) {
+      logInfo("\t" + bestIndexer.toString + "; lastIdx: " + lastIdx)
+    }
     (lastIdx, bestIndexer)
   }
 
