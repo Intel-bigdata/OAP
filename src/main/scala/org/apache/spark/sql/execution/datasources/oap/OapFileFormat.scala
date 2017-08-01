@@ -289,7 +289,7 @@ private[sql] class OapFileFormat extends FileFormat
 
           val iter = new OapDataReader(
             new Path(new URI(file.filePath)), m, filterScanner, requiredIds)
-            .initialize(broadcastedHadoopConf.value.value)
+            .initialize(broadcastedHadoopConf.value.value, sortOrder.isAscending, limit)
 
           val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
           val joinedRow = new JoinedRow()
