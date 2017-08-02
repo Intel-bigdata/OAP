@@ -44,6 +44,10 @@ class OapPlannerSuite
            | OPTIONS (path '$path1')""".stripMargin)
   }
 
+  override def afterEach(): Unit = {
+    sqlContext.dropTempTable("oap_sort_opt_table")
+  }
+
   test("SortPushDown Test") {
     spark.experimental.extraStrategies = SortPushDownStrategy :: Nil
 

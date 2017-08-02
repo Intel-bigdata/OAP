@@ -131,16 +131,15 @@ trait OAPStrategies {
         logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
 
         val readFile = files.fileFormat.asInstanceOf[OapFileFormat].buildReaderWithPartitionValues(
-                                sparkSession = files.sparkSession,
-                                dataSchema = files.dataSchema,
-                                partitionSchema = files.partitionSchema,
-                                requiredSchema = prunedDataSchema,
-                                filters = pushedDownFilters,
-                                order,
-                                limit,
-                                options = files.options,
-                                hadoopConf = files.sparkSession.sessionState
-                                              .newHadoopConfWithOptions(files.options))
+          sparkSession = files.sparkSession,
+          dataSchema = files.dataSchema,
+          partitionSchema = files.partitionSchema,
+          requiredSchema = prunedDataSchema,
+          filters = pushedDownFilters,
+          order.isAscending,
+          limit,
+          options = files.options,
+          hadoopConf = files.sparkSession.sessionState.newHadoopConfWithOptions(files.options))
 
         val plannedPartitions = {
             val defaultMaxSplitBytes = files.sparkSession.sessionState.conf.filesMaxPartitionBytes

@@ -158,7 +158,7 @@ private[oap] class OapDataReader(
 
   def initialize(conf: Configuration,
                  ascending: Boolean = true,
-                 limit: Int = -1): Iterator[InternalRow] = {
+                 limit: Int = 0): Iterator[InternalRow] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
@@ -212,7 +212,8 @@ private[oap] class OapDataReader(
                   if (limit > 0) {
                     if (ascending) fs.toArray.take(limit)
                     else fs.toArray.reverse.take(limit)
-                  } else fs.toArray
+                  }
+                  else fs.toArray
                 }
 
                 fileScanner.iterator(conf, requiredIds, rowIDs)
