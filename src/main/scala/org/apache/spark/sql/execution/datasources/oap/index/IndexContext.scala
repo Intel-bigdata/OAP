@@ -209,7 +209,6 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
 
   def unapply(values: Array[Any]): Option[Array[Key]] =
     Some(values.map(value => InternalRow(CatalystTypeConverters.convertToCatalyst(value))))
-
 }
 
 private[oap] object DummyIndexContext extends IndexContext(null) {
