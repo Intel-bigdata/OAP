@@ -39,29 +39,39 @@ trait OAPStrategies {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case logical.ReturnAnswer(rootPlan) => rootPlan match {
         case logical.Limit(IntegerLiteral(limit), logical.Sort(order, true, child)) =>
-          child match {
-            case PhysicalOperation(projectList, filters,
-            relation @ LogicalRelation(file: HadoopFsRelation, _, table)) =>
-              val filterAttributes = AttributeSet(ExpressionSet(filters))
-              val orderAttributes = AttributeSet(ExpressionSet(order.map{_.child}))
-              if ((file.fileFormat.isInstanceOf[OapFileFormat] &&
-                  file.fileFormat.initialize(file.sparkSession, file.options, file.location)
-                  .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes)) &&
-                  (orderAttributes.size == 1 &&
-                   (filterAttributes.isEmpty || filterAttributes == orderAttributes))) {
-                val childSortAndLimitPlan = pushDownSortToOAPFileScanExec(projectList, filters,
-                                                                          relation, file, table,
-                                                                          limit, order.head)
-                TakeOrderedAndProjectExec(limit, order, projectList,
-                                            childSortAndLimitPlan) :: Nil
-              } else Nil
-            case _ =>
-              Nil
-          }
+          val childPlan = calcChildPlan(child, limit, order)
+          TakeOrderedAndProjectExec(limit, order, child.output,
+                                    childPlan) :: Nil
+        case logical.Limit(
+            IntegerLiteral(limit),
+            logical.Project(projectList, logical.Sort(order, true, child))) =>
+          val childPlan = calcChildPlan(child, limit, order)
+          execution.TakeOrderedAndProjectExec(
+            limit, order, projectList, childPlan) :: Nil
         case _ =>
           Nil
       }
       case _ => Nil
+    }
+
+    def calcChildPlan(child : LogicalPlan, limit : Int, order : Seq[SortOrder]) : SparkPlan = {
+      child match {
+        case PhysicalOperation(projectList, filters,
+                                relation@LogicalRelation(file: HadoopFsRelation, _, table)) =>
+          val filterAttributes = AttributeSet(ExpressionSet(filters))
+          val orderAttributes = AttributeSet(ExpressionSet(order.map {_.child}))
+          if ((file.fileFormat.isInstanceOf[OapFileFormat] &&
+              file.fileFormat.initialize(file.sparkSession, file.options, file.location)
+                .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes)) &&
+              (orderAttributes.size == 1 &&
+              (filterAttributes.isEmpty || filterAttributes == orderAttributes))) {
+            pushDownSortToOAPFileScanExec(projectList, filters,
+                                          relation, file, table,
+                                          limit, order.head)
+          }
+          else PlanLater(child)
+        case _ => PlanLater(child)
+      }
     }
 
     def pushDownSortToOAPFileScanExec(projects: Seq[NamedExpression], filters: Seq[Expression],
