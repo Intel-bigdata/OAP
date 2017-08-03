@@ -23,29 +23,30 @@ import java.io.File
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapreduce.lib.input.FileSplit
-import org.scalatest.BeforeAndAfterAll
 
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.io._
+import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
 
 
-class FiberSuite extends SparkFunSuite with Logging with BeforeAndAfterAll {
+class FiberSuite extends SharedSQLContext with Logging {
   private var file: File = _
   val conf: Configuration = new Configuration()
 
   override def beforeAll(): Unit = {
+    super.beforeAll()
     file = Utils.createTempDir()
     file.delete()
   }
 
   override def afterAll(): Unit = {
     Utils.deleteRecursively(file)
+    super.afterAll()
   }
 
   test("test reading / writing oap file") {
