@@ -25,16 +25,19 @@ import scala.collection.mutable
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
 
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.config._
 import org.apache.spark.internal.Logging
-import org.apache.spark.SparkConf
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.storage.{BlockId, FiberBlockId, StorageLevel}
+import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
+import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
 
 
 // TODO need to register within the SparkContext
@@ -145,6 +148,10 @@ private[oap] trait AbstractFiberCacheManger extends Logging {
   }
 }
 
+private[oap] class CacheResult (
+  val cached: Boolean,
+  val buffer: ChunkedByteBuffer)
+
 /**
  * Fiber Cache Manager
  */
@@ -156,8 +163,58 @@ object FiberCacheManager extends AbstractFiberCacheManger {
   def evictFiberCacheData(fiber: Fiber): Unit = fiber match {
     case idxFiber: IndexFiber =>
       val entry = ConfigurationCache[Fiber](idxFiber, new Configuration())
-      if(cache != null && cache.asMap().asScala.contains(entry)) cache.invalidate(entry)
+      if (cache != null && cache.asMap().asScala.contains(entry)) cache.invalidate(entry)
     case _ => // todo: consider whether we indeed need to evict DataFiberCachedData manually
+  }
+
+  def fiber2Block(fiber: Fiber): BlockId = {
+    fiber match {
+      case DataFiber(file, columnIndex, rowGroupId) =>
+        FiberBlockId("data_" + file.path + "_" + columnIndex + "_" + rowGroupId)
+      case IndexFiber(file) =>
+        FiberBlockId("index_" + file.file)
+    }
+  }
+
+  def releaseLock(fiber: Fiber): Unit = {
+    val blockId = fiber2Block(fiber)
+    logDebug("Release lock for: " + blockId.name)
+    val blockManager = SparkEnv.get.blockManager
+    blockManager.releaseLock(blockId)
+  }
+
+  def getOrElseUpdate(fiber: Fiber, conf: Configuration): CacheResult = {
+    val blockManager = SparkEnv.get.blockManager
+    val blockId = fiber2Block(fiber)
+    logDebug("Fiber name: " + blockId.name)
+    val storageLevel = StorageLevel(useDisk = false, useMemory = true,
+      useOffHeap = true, deserialized = false, 1)
+
+    val allocator = Platform.allocateDirectBuffer _
+    blockManager.getLocalBytes(blockId) match {
+      case Some(buffer) =>
+        logDebug("Got fiber from cache.")
+        new CacheResult(true, buffer)
+      case None =>
+        logDebug("No fiber found. Build it")
+        // TODO: [linhong] fiber2Data returns a MemoryBlock, change to Array[Byte] will be better.
+        val fiberData = fiber2Data(fiber, conf).fiberData
+        val fiberByteArray = new Array[Byte](fiberData.size().toInt)
+        Platform.copyMemory(fiberData.getBaseObject, fiberData.getBaseOffset,
+          fiberByteArray, Platform.BYTE_ARRAY_OFFSET,
+          fiberData.size())
+        val cbbos = new ChunkedByteBufferOutputStream(fiberData.size().toInt, allocator)
+        cbbos.write(fiberByteArray)
+        cbbos.close()
+        val bytes = cbbos.toChunkedByteBuffer
+        if (blockManager.putBytes(blockId, bytes, storageLevel)) {
+          logDebug("Put fiber to cache success")
+          new CacheResult(true, blockManager.getLocalBytes(blockId).get)
+        } else {
+          logDebug("Put fiber to cache fail")
+          new CacheResult(false, bytes)
+        }
+    }
   }
 
   override def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = fiber match {
