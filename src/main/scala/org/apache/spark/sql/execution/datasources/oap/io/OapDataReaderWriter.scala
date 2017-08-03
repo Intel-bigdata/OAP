@@ -25,7 +25,7 @@ import org.apache.parquet.io.api.Binary
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
-import org.apache.spark.sql.execution.datasources.oap.filecache.{DataFiberBuilder, FiberCacheManager}
+import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.execution.datasources.oap.statistics._
 import org.apache.spark.sql.internal.SQLConf
@@ -170,32 +170,12 @@ private[oap] class OapDataReader(
         val statsAnalyseResult = tryToReadStatistics(indexPath, conf)
         val statsAnalyseFinished = System.currentTimeMillis()
 
-        /**
-         * [WORKAROUND] if index file is larger than cache.maximumWeight / cache.concurrencyLevel,
-         * it will be removed immediately after loading and MemoryBlock in FiberCache is freed.
-         * But the IndexFiberCache is still used by IndexScanner cause JVM crash. For now, we skip
-         * using index if index file is too large. Another case is index file size > data file
-         * size. There is no need to load index if so.
-         * To fix this, we need TODO:
-         * 1. A better way to config cache.maximumWeight to maximize the use of off heap memory
-         *    Currently, we let user to config this parameter and use a very small value in case
-         *    off heap memory overhead.
-         * 2. Split large fiber into small ones
-         *   Currently, index file is a very large fiber, and a column in row group is a fiber.
-         *   If row group is large, then fiber is large. We can expect a column in row group has
-         *   multiple fibers and index fiber can slit into several small parts.
-         * 3. Handle the exception if FiberCache is larger than maximumWeight / concurrencyLevel
-         */
         val indexFileSize = indexPath.getFileSystem(conf).getContentSummary(indexPath).getLength
         val dataFileSize = path.getFileSystem(conf).getContentSummary(path).getLength
         val isTesting = conf.getBoolean(SQLConf.OAP_IS_TESTING.key,
                               SQLConf.OAP_IS_TESTING.defaultValue.get)
         val iter =
-          if (indexFileSize > FiberCacheManager.getMaximumFiberSizeInBytes(conf)) {
-            logWarning(s"Index File size $indexFileSize B is too large and couldn't be cached." +
-              s"Please increase ${SQLConf.OAP_FIBERCACHE_SIZE.key} for better performance")
-            fileScanner.iterator(conf, requiredIds)
-          } else if (indexFileSize > dataFileSize * 0.7 && !isTesting) {
+          if (indexFileSize > dataFileSize * 0.7 && !isTesting) {
             logWarning(s"Index File size $indexFileSize B is too large comparing " +
                         s"to Data File Size $dataFileSize. Using Data File Scan instead.")
             fileScanner.iterator(conf, requiredIds)

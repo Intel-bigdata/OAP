@@ -19,7 +19,6 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.TimeUnit
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 import com.google.common.cache._
@@ -27,15 +26,12 @@ import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.executor.custom.CustomManager
-import org.apache.spark.internal.config._
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.storage.{BlockId, FiberBlockId, StorageLevel}
 import org.apache.spark.unsafe.Platform
-import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
 import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
 
@@ -55,99 +51,6 @@ private[oap] sealed case class ConfigurationCache[T](key: T, conf: Configuration
   }
 }
 
-/**
- * The abstract class is for unit testing purpose.
- */
-private[oap] trait AbstractFiberCacheManger extends Logging {
-  type ENTRY = ConfigurationCache[Fiber]
-
-  protected def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache
-  protected def freeFiberData(fiberCache: FiberCache): Unit
-
-  @transient protected var cache: LoadingCache[ENTRY, FiberCache] = _
-
-  protected var maximumFiberSizeInBytes: Long = _
-
-  def getMaximumFiberSizeInBytes(conf: Configuration): Long = {
-    if (cache == null) {
-      cache = buildCache(conf)
-      maximumFiberSizeInBytes
-    }
-    else maximumFiberSizeInBytes
-  }
-
-  private def buildCache(conf: Configuration): LoadingCache[ENTRY, FiberCache] = {
-
-    val KB = 1024L
-    val executorMemory = conf.get(EXECUTOR_MEMORY.key, EXECUTOR_MEMORY.defaultValueString)
-    val overhead = Utils.byteStringAsBytes(executorMemory) * 0.3 / KB
-
-    val weightConfig = conf.getLong(SQLConf.OAP_FIBERCACHE_SIZE.key, overhead.toLong)
-
-    val weight =
-      if (weightConfig > 4L * Int.MaxValue) {
-
-        // In Guava 15.0, totalWeight is Int, so maximumWeight / concurrencyLevel should be
-        // less than Int.MaxValue. What's more, if one fiber cache is very large, it may cause
-        // totalWeight < Int.MaxValue < totalWeight + fiberSize. So the maximumWeight should
-        // also be *FAR* less than Int.MaxValue. If totalWeight > Int.MaxValue, overflow, then
-        // totalWeight will treated as a very small value, and never greater than maximumWeight.
-        logWarning(s"${SQLConf.OAP_FIBERCACHE_SIZE.key}): $weightConfig is too large." +
-          s"Please reduce to 8TB or less")
-
-        4L * Int.MaxValue // The Unit here is KB. Int.MaxValue = 2G.
-
-      } else weightConfig
-    logDebug(s"${SQLConf.OAP_FIBERCACHE_SIZE.key} set to $weight KB")
-
-    maximumFiberSizeInBytes = weight * KB / 4
-
-    val builder = CacheBuilder.newBuilder()
-      .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
-      .weigher(new Weigher[ENTRY, FiberCache] {
-        override def weigh(key: ENTRY, value: FiberCache): Int = {
-          // Use KB as Unit due to large weight will cause Guava overflow
-          val weight = math.ceil(value.fiberData.size() / 1024.0)
-          if (weight > Int.MaxValue / 2) { // make sure totalWeight + fiberSize less than Int.Max
-            throw new OapException(s"Fiber with more than 1TB size is not allowed.")
-          }
-          weight.toInt
-        }
-      })
-      .maximumWeight(weight)
-      .removalListener(new RemovalListener[ENTRY, FiberCache] {
-        override def onRemoval(n: RemovalNotification[ENTRY, FiberCache]): Unit = {
-          logDebug("Removing Fiber Cache" + (n.getKey.key match {
-            case DataFiber(file, group, fiber) => s"(Data: ${file.path}, $group, $fiber)"
-            case IndexFiber(file) => s"(Index: ${file.file.toString})"
-            case _ => s"Unknown Fiber"
-          }))
-          // TODO cause exception while we removal the using data. we need an lock machanism
-          // to lock the allocate, using and the free
-          freeFiberData(n.getValue)
-        }
-      })
-
-    if (conf.getBoolean(SQLConf.OAP_FIBERCACHE_STATS.key, false)) builder.recordStats()
-
-    builder.build[ENTRY, FiberCache](new CacheLoader[ENTRY, FiberCache]() {
-      override def load(entry: ENTRY): FiberCache = {
-        logDebug("Loading Fiber Cache" + (entry.key match {
-          case DataFiber(file, group, fiber) => s"(Data: ${file.path}, $group, $fiber)"
-          case IndexFiber(file) => s"(Index: ${file.file.toString})"
-          case _ => s"Unknown Fiber"
-        }))
-        fiber2Data(entry.key, entry.conf)
-      }
-    })
-  }
-
-  def apply[T <: FiberCache](fiber: Fiber, conf: Configuration): T = {
-    if (cache == null) cache = buildCache(conf)
-    cache.get(ConfigurationCache(fiber, conf)).asInstanceOf[T]
-  }
-}
-
 private[oap] class CacheResult (
   val cached: Boolean,
   val buffer: ChunkedByteBuffer)
@@ -155,17 +58,7 @@ private[oap] class CacheResult (
 /**
  * Fiber Cache Manager
  */
-object FiberCacheManager extends AbstractFiberCacheManger {
-  /**
-   * evict Fiber -> FiberCache(MemoryBlock off-heap) data manually
-   * @param fiber:the fiber whose corresponding memory block(off -heap) that needs to be evicted
-   */
-  def evictFiberCacheData(fiber: Fiber): Unit = fiber match {
-    case idxFiber: IndexFiber =>
-      val entry = ConfigurationCache[Fiber](idxFiber, new Configuration())
-      if (cache != null && cache.asMap().asScala.contains(entry)) cache.invalidate(entry)
-    case _ => // todo: consider whether we indeed need to evict DataFiberCachedData manually
-  }
+object FiberCacheManager extends Logging {
 
   def fiber2Block(fiber: Fiber): BlockId = {
     fiber match {
@@ -217,23 +110,15 @@ object FiberCacheManager extends AbstractFiberCacheManger {
     }
   }
 
-  override def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = fiber match {
+  def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = fiber match {
     case DataFiber(file, columnIndex, rowGroupId) =>
       file.getFiberData(rowGroupId, columnIndex, conf)
     case IndexFiber(file) => file.getIndexFiberData(conf)
     case other => throw new OapException(s"Cannot identify what's $other")
   }
 
-  override def freeFiberData(fiberCache: FiberCache): Unit = MemoryManager.free(fiberCache)
-
   def status: String = {
-    val dataFiberConfPairs =
-      if (cache == null) Set.empty[(DataFiber, Configuration)]
-      else {
-        this.cache.asMap().keySet().asScala.collect {
-          case entry @ ConfigurationCache(key: DataFiber, conf) => (key, conf)
-        }
-      }
+    val dataFiberConfPairs = Set.empty[(DataFiber, Configuration)]
 
     val fiberFileToFiberMap = new mutable.HashMap[String, mutable.Buffer[DataFiber]]()
     dataFiberConfPairs.foreach { case (dataFiber, _) =>
@@ -243,7 +128,7 @@ object FiberCacheManager extends AbstractFiberCacheManger {
 
     val filePathSet = new mutable.HashSet[String]()
     val statusRawData = dataFiberConfPairs.collect {
-      case (dataFiber @ DataFiber(dataFile : OapDataFile, _, _), conf)
+      case (_ @ DataFiber(dataFile : OapDataFile, _, _), conf)
         if !filePathSet.contains(dataFile.path) =>
         val fileMeta =
           DataFileHandleCacheManager(dataFile, conf).asInstanceOf[OapDataFileHandle]
