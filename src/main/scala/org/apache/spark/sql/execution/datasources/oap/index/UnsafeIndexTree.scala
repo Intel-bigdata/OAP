@@ -19,9 +19,9 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap._
-import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberCache
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
+import org.apache.spark.util.io.ChunkedByteBuffer
 
 
 private[oap] object CurrentKey {
@@ -49,15 +49,15 @@ private[oap] trait IndexNode {
 }
 
 trait UnsafeIndexTree {
-  def buffer: DataFiberCache
+  def buffer: ChunkedByteBuffer
   def offset: Long
-  def baseObj: Object = buffer.fiberData.getBaseObject
-  def baseOffset: Long = buffer.fiberData.getBaseOffset
+  def baseObj: Object = buffer.toArray
+  def baseOffset: Long = Platform.BYTE_ARRAY_OFFSET
   def length: Int = Platform.getInt(baseObj, baseOffset + offset)
 }
 
 private[oap] case class UnsafeIndexNodeValue(
-    buffer: DataFiberCache,
+    buffer: ChunkedByteBuffer,
     offset: Long,
     dataEnd: Long) extends IndexNodeValue with UnsafeIndexTree {
   // 4 <- value1, 8 <- value2
@@ -69,7 +69,7 @@ private[oap] case class UnsafeIndexNodeValue(
 }
 
 private[oap] case class UnsafeIndexNode(
-    buffer: DataFiberCache,
+    buffer: ChunkedByteBuffer,
     offset: Long,
     dataEnd: Long,
     schema: StructType) extends IndexNode with UnsafeIndexTree {

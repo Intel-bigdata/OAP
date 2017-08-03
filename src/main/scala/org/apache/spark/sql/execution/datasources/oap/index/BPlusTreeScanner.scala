@@ -25,6 +25,8 @@ import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.unsafe.Platform
+import org.apache.spark.util.io.ChunkedByteBuffer
 
 // we scan the index from the smallest to the largest,
 // this will scan the B+ Tree (index) leaf node.
@@ -34,6 +36,8 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
   @transient protected var currentKeyArray: Array[CurrentKey] = _
 
   var currentKeyIdx = 0
+  var indexFiber: IndexFiber = _
+  var fiberCached: Boolean = false
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
@@ -42,19 +46,23 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     logDebug("Loading Index File: " + path)
     logDebug("\tFile Size: " + path.getFileSystem(conf).getFileStatus(path).getLen)
     val indexFile = IndexFile(path)
-    val indexFiber = IndexFiber(indexFile)
-    val indexData: IndexFiberCacheData = FiberCacheManager(indexFiber, conf)
-    val root = open(indexData, keySchema, indexFile.version(conf))
+    indexFiber = IndexFiber(indexFile)
+    val indexData = FiberCacheManager.getOrElseUpdate(indexFiber, conf)
+    fiberCached = indexData.cached
+    val root = open(indexData.buffer, keySchema, indexFile.version(conf))
 
     _init(root)
   }
 
   def open(
-      data: IndexFiberCacheData,
+      data: ChunkedByteBuffer,
       keySchema: StructType,
       version: Int = IndexFile.INDEX_VERSION): IndexNode = {
     assert(version == IndexFile.INDEX_VERSION, "Unsupported version of index data!")
-    UnsafeIndexNode(DataFiberCache(data.fiberData), data.rootOffset, data.dataEnd, keySchema)
+    val bytes = data.toArray
+    val dataEnd = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + bytes.length - 16)
+    val rootOffset = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + bytes.length - 8)
+    UnsafeIndexNode(data, rootOffset, dataEnd, keySchema)
   }
 
   def _init(root : IndexNode): IndexScanner = {
@@ -180,12 +188,12 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
 
 
   override def hasNext: Boolean = {
-    if (intervalArray.isEmpty) return false
-    for(i <- currentKeyIdx until currentKeyArray.length) {
+    for (i <- currentKeyIdx until currentKeyArray.length) {
       if (!currentKeyArray(i).isEnd && !intervalShouldStop(i)) {
         return true
       }
     }// end for
+    if (fiberCached) FiberCacheManager.releaseLock(indexFiber)
     false
   }
 

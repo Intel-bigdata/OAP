@@ -20,17 +20,17 @@ package org.apache.spark.sql.execution.datasources.oap
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
-import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberCache
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 import org.apache.spark.util.collection.BitSet
+import org.apache.spark.util.io.ChunkedByteBuffer
 
 
-class ColumnValues(defaultSize: Int, dataType: DataType, val raw: DataFiberCache) {
+class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByteBuffer) {
   require(dataType.isInstanceOf[AtomicType], "Only atomic type accepted for now.")
 
-  private val baseObject = raw.fiberData.getBaseObject
+  private val baseObject = buffer.toArray
   // for any FiberData, the first defaultSize / 8 will be the bitmask
   // TODO what if defaultSize / 8 is not an integer?
 
@@ -38,13 +38,14 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: DataFiberCache
   val bitset: BitSet = {
     val bs = new BitSet(defaultSize)
     val longs = bs.toLongArray()
-    Platform.copyMemory(baseObject, raw.fiberData.getBaseOffset,
+    Platform.copyMemory(baseObject, Platform.BYTE_ARRAY_OFFSET,
       longs, Platform.LONG_ARRAY_OFFSET, longs.length * 8)
+
     bs
   }
 
   // TODO should be in FiberByteData
-  private val baseOffset = raw.fiberData.getBaseOffset + bitset.toLongArray().length * 8
+  private val baseOffset = Platform.BYTE_ARRAY_OFFSET + bitset.toLongArray().length * 8
 
   def isNullAt(idx: Int): Boolean = !bitset.get(idx)
 
@@ -112,7 +113,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: DataFiberCache
     //    value #N
     val length = getIntValue(idx * 2)
     val offset = getIntValue(idx * 2 + 1)
-    UTF8String.fromAddress(baseObject, raw.fiberData.getBaseOffset + offset, length)
+    UTF8String.fromAddress(baseObject, Platform.BYTE_ARRAY_OFFSET + offset, length)
   }
 
   def getBinaryValue(idx: Int): Array[Byte] = {
@@ -132,7 +133,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val raw: DataFiberCache
     val length = getIntValue(idx * 2)
     val offset = getIntValue(idx * 2 + 1)
     val result = new Array[Byte](length)
-    Platform.copyMemory(baseObject, raw.fiberData.getBaseOffset + offset, result,
+    Platform.copyMemory(baseObject, Platform.BYTE_ARRAY_OFFSET + offset, result,
       Platform.BYTE_ARRAY_OFFSET, length)
 
     result
