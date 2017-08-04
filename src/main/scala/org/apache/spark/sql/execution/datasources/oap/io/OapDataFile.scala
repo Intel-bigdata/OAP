@@ -115,6 +115,11 @@ private[oap] case class OapDataFile(path: String, schema: StructType) extends Da
     cbbos.toChunkedByteBuffer
   }
 
+  def closeRowGroup(fiber: Fiber, cacheResult: CacheResult): Unit = {
+    if (cacheResult.cached) FiberCacheManager.releaseLock(fiber)
+    else cacheResult.buffer.dispose()
+  }
+
   // full file scan
   // TODO: [linhong] two iterator functions are similar. Can we merge them?
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
@@ -135,8 +140,8 @@ private[oap] case class OapDataFile(path: String, schema: StructType) extends Da
         row.reset(meta.rowCountInLastGroup, columns).toIterator
       }
       CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
-        cacheResults.zip(requiredIds).foreach { case (cacheResult, id) =>
-            if (cacheResult.cached) FiberCacheManager.releaseLock(DataFiber(this, id, groupId))
+        cacheResults.zip(requiredIds).foreach {
+          case (cacheResult, id) => closeRowGroup(DataFiber(this, id, groupId), cacheResult)
         }
       )
     }
@@ -168,8 +173,8 @@ private[oap] case class OapDataFile(path: String, schema: StructType) extends Da
           subRowIds.iterator.map(rowId => row.moveToRow((rowId % meta.rowCountInEachGroup).toInt))
 
         CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
-          cacheResults.zip(requiredIds).foreach { case (cacheResult, id) =>
-              if (cacheResult.cached) FiberCacheManager.releaseLock(DataFiber(this, id, groupId))
+          cacheResults.zip(requiredIds).foreach {
+            case (cacheResult, id) => closeRowGroup(DataFiber(this, id, groupId), cacheResult)
           }
         )
     }

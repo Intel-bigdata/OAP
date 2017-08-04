@@ -40,13 +40,14 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   var empty: Boolean = _
   var internalBitSet: BitSet = _
   var indexFiber: IndexFiber = _
-  var fiberCached: Boolean = false
+  var indexData: CacheResult = _
 
   override def hasNext: Boolean = {
     if (!empty && internalItr.hasNext) {
       true
     } else {
-      if (fiberCached) FiberCacheManager.releaseLock(indexFiber)
+      if (indexData.cached) FiberCacheManager.releaseLock(indexFiber)
+      else indexData.buffer.dispose()
       false
     }
   }
@@ -58,8 +59,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     val indexFile = IndexFile(path)
     indexFiber = IndexFiber(indexFile)
-    val indexData = FiberCacheManager.getOrElseUpdate(indexFiber, conf)
-    fiberCached = indexData.cached
+    indexData = FiberCacheManager.getOrElseUpdate(indexFiber, conf)
     open(indexData.buffer, indexFile.version(conf))
 
     this

@@ -37,7 +37,7 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
 
   var currentKeyIdx = 0
   var indexFiber: IndexFiber = _
-  var fiberCached: Boolean = false
+  var indexData: CacheResult = _
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
@@ -47,8 +47,7 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     logDebug("\tFile Size: " + path.getFileSystem(conf).getFileStatus(path).getLen)
     val indexFile = IndexFile(path)
     indexFiber = IndexFiber(indexFile)
-    val indexData = FiberCacheManager.getOrElseUpdate(indexFiber, conf)
-    fiberCached = indexData.cached
+    indexData = FiberCacheManager.getOrElseUpdate(indexFiber, conf)
     val root = open(indexData.buffer, keySchema, indexFile.version(conf))
 
     _init(root)
@@ -193,7 +192,8 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
         return true
       }
     }// end for
-    if (fiberCached) FiberCacheManager.releaseLock(indexFiber)
+    if (indexData.cached) FiberCacheManager.releaseLock(indexFiber)
+    else indexData.buffer.dispose()
     false
   }
 
