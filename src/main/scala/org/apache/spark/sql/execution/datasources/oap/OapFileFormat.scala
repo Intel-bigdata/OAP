@@ -372,11 +372,19 @@ private[oap] class OapOutputWriter(
   }
   private val writer: OapDataWriter = {
     val isCompressed: Boolean = FileOutputFormat.getCompressOutput(context)
-    val file: Path = new Path(path, getFileName(OapFileFormat.OAP_DATA_EXTENSION))
-    val fs: FileSystem = file.getFileSystem(context.getConfiguration)
+    val conf: Configuration = context.getConfiguration()
+    var compressionFormat: String = ""
+    compressionFormat =
+      conf.get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).toString()
+    if (!compressionFormat.isEmpty() && !compressionFormat.matches("UNCOMPRESSED")) {
+      compressionFormat = "." + compressionFormat.toLowerCase()
+    }
+    val file: Path = new Path(path, getFileName(compressionFormat +
+                                                OapFileFormat.OAP_DATA_EXTENSION))
+    val fs: FileSystem = file.getFileSystem(conf)
     val fileOut: FSDataOutputStream = fs.create(file, false)
 
-    new OapDataWriter(isCompressed, fileOut, dataSchema, context.getConfiguration)
+    new OapDataWriter(isCompressed, fileOut, dataSchema, conf)
   }
 
   override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
