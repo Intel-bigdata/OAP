@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import java.nio.ByteBuffer
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
@@ -29,8 +31,8 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.CompletionIterator
+import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
 
 
 private[oap] case class OapDataFile(path: String, schema: StructType) extends DataFile {
@@ -62,7 +64,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType) extends Da
     } else dictionaries(fiberId)
   }
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): ChunkedByteBuffer = {
     val meta: OapDataFileHandle = DataFileHandleCacheManager(this, conf)
     val groupMeta = meta.rowGroupsMeta(groupId)
 
@@ -105,12 +107,12 @@ private[oap] case class OapDataFile(path: String, schema: StructType) extends Da
     putToFiberCache(fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount))
   }
 
-  private def putToFiberCache(buf: Array[Byte]): DataFiberCache = {
+  private def putToFiberCache(buf: Array[Byte]): ChunkedByteBuffer = {
     // TODO: make it configurable
-    val fiberCacheData = MemoryManager.allocate(buf.length)
-    Platform.copyMemory(buf, Platform.BYTE_ARRAY_OFFSET, fiberCacheData.fiberData.getBaseObject,
-      fiberCacheData.fiberData.getBaseOffset, buf.length)
-    fiberCacheData
+    val cbbos = new ChunkedByteBufferOutputStream(buf.length, ByteBuffer.allocate)
+    cbbos.write(buf)
+    cbbos.close()
+    cbbos.toChunkedByteBuffer
   }
 
   // full file scan

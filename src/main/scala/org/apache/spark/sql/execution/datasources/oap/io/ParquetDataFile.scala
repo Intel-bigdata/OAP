@@ -25,14 +25,15 @@ import org.apache.parquet.hadoop.RecordReaderBuilder
 import org.apache.parquet.hadoop.api.RecordReader
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 import org.apache.spark.sql.execution.datasources.oap.filecache._
+import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.util.io.ChunkedByteBuffer
 
 
 private[oap] case class ParquetDataFile(path: String, schema: StructType) extends DataFile {
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache = {
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): ChunkedByteBuffer = {
     // TODO data cache
     throw new UnsupportedOperationException("Not support getFiberData Operation.")
   }

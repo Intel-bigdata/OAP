@@ -33,7 +33,7 @@ import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.storage.{BlockId, FiberBlockId, StorageLevel}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.collection.BitSet
-import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
+import org.apache.spark.util.io.ChunkedByteBuffer
 
 
 // TODO need to register within the SparkContext
@@ -91,15 +91,7 @@ object FiberCacheManager extends Logging {
       case None =>
         logDebug("No fiber found. Build it")
         // TODO: [linhong] fiber2Data returns a MemoryBlock, change to Array[Byte] will be better.
-        val fiberData = fiber2Data(fiber, conf).fiberData
-        val fiberByteArray = new Array[Byte](fiberData.size().toInt)
-        Platform.copyMemory(fiberData.getBaseObject, fiberData.getBaseOffset,
-          fiberByteArray, Platform.BYTE_ARRAY_OFFSET,
-          fiberData.size())
-        val cbbos = new ChunkedByteBufferOutputStream(fiberData.size().toInt, allocator)
-        cbbos.write(fiberByteArray)
-        cbbos.close()
-        val bytes = cbbos.toChunkedByteBuffer
+        val bytes = fiber2Data(fiber, conf).copy(allocator)
         if (blockManager.putBytes(blockId, bytes, storageLevel)) {
           logDebug("Put fiber to cache success")
           new CacheResult(true, blockManager.getLocalBytes(blockId).get)
@@ -110,7 +102,7 @@ object FiberCacheManager extends Logging {
     }
   }
 
-  def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = fiber match {
+  def fiber2Data(fiber: Fiber, conf: Configuration): ChunkedByteBuffer = fiber match {
     case DataFiber(file, columnIndex, rowGroupId) =>
       file.getFiberData(rowGroupId, columnIndex, conf)
     case IndexFiber(file) => file.getIndexFiberData(conf)

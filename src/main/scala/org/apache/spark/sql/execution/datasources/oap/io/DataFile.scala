@@ -25,9 +25,9 @@ import org.apache.parquet.column.Dictionary
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberCache
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
+import org.apache.spark.util.io.ChunkedByteBuffer
 
 
 abstract class DataFile {
@@ -35,7 +35,7 @@ abstract class DataFile {
   def schema: StructType
 
   def createDataFileHandle(conf: Configuration): DataFileHandle
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): ChunkedByteBuffer
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
   : Iterator[InternalRow]

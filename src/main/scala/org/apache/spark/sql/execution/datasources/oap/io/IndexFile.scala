@@ -17,46 +17,38 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import java.nio.ByteBuffer
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql.execution.datasources.oap.filecache.{DataFiberCache, IndexFiberCacheData, MemoryManager}
-import org.apache.spark.unsafe.Platform
+import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
 
 
 /**
- * Read the index file into memory(offheap), and can be accessed as [[IndexFiberCacheData]].
+ * Read the index file into memory, and can be accessed as [[ChunkedByteBuffer]].
  */
 private[oap] case class IndexFile(file: Path) {
-  private def putToFiberCache(buf: Array[Byte]): DataFiberCache = {
+  private def putToFiberCache(buf: Array[Byte]): ChunkedByteBuffer = {
     // TODO: make it configurable
-    val fiberCacheData = MemoryManager.allocate(buf.length)
-    Platform.copyMemory(
-      buf, Platform.BYTE_ARRAY_OFFSET, fiberCacheData.fiberData.getBaseObject,
-      fiberCacheData.fiberData.getBaseOffset, buf.length)
-    fiberCacheData
+    val cbbos = new ChunkedByteBufferOutputStream(buf.length, ByteBuffer.allocate)
+    cbbos.write(buf)
+    cbbos.close()
+    cbbos.toChunkedByteBuffer
   }
 
-  def getIndexFiberData(conf: Configuration): IndexFiberCacheData = {
+  def getIndexFiberData(conf: Configuration): ChunkedByteBuffer = {
     val fs = file.getFileSystem(conf)
     val fin = fs.open(file)
     // wind to end of file to get tree root
     // TODO check if enough to fit in Int
     val fileLength = fs.getContentSummary(file).getLength
-    var bytes = new Array[Byte](fileLength.toInt)
+    val bytes = new Array[Byte](fileLength.toInt)
 
     fin.readFully(0, bytes)
     fin.close()
-    val offHeapMem = putToFiberCache(bytes)
-    bytes = null
-
-    val baseObj = offHeapMem.fiberData.getBaseObject
-    val baseOff = offHeapMem.fiberData.getBaseOffset
-    val dataEnd = Platform.getLong(baseObj, baseOff + fileLength - 16)
-    val rootOffset = Platform.getLong(baseObj, baseOff + fileLength - 8)
-
     // TODO partial cached index fiber
-    IndexFiberCacheData(offHeapMem.fiberData, dataEnd, rootOffset)
+    putToFiberCache(bytes)
   }
 
   def version(conf: Configuration): Int = {
