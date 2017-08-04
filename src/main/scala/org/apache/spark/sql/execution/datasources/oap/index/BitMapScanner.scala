@@ -22,6 +22,7 @@ import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import sun.nio.ch.DirectBuffer
 
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.InternalRow
@@ -46,8 +47,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     if (!empty && internalItr.hasNext) {
       true
     } else {
-      if (indexData.cached) FiberCacheManager.releaseLock(indexFiber)
-      else indexData.buffer.dispose()
+      if (indexData != null) {
+        if (indexData.cached) FiberCacheManager.releaseLock(indexFiber)
+        else indexData.buffer.dispose()
+      }
       false
     }
   }
@@ -66,8 +69,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   def open(indexData: ChunkedByteBuffer, version: Int = IndexFile.INDEX_VERSION): Unit = {
-    val baseObj = indexData.toArray
-    val baseOffset = Platform.BYTE_ARRAY_OFFSET + IndexFile.indexFileHeaderLength
+    val (baseObj, baseOffset): (Object, Long) = indexData.chunks.head match {
+      case buf: DirectBuffer => (null, buf.address() + IndexFile.indexFileHeaderLength)
+      case _ => (indexData.toArray, Platform.BYTE_ARRAY_OFFSET + IndexFile.indexFileHeaderLength)
+    }
 
     // get the byte number first
     val objLength = Platform.getInt(baseObj, baseOffset)

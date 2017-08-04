@@ -109,6 +109,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType) extends Da
 
   private def putToFiberCache(buf: Array[Byte]): ChunkedByteBuffer = {
     // TODO: make it configurable
+    // TODO: [linhong] For now, ChunkedByteBuffer only contains one ByteBuffer
     val cbbos = new ChunkedByteBufferOutputStream(buf.length, ByteBuffer.allocate)
     cbbos.write(buf)
     cbbos.close()

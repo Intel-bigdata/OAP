@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import sun.nio.ch.DirectBuffer
 
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap._
@@ -58,9 +59,12 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
       keySchema: StructType,
       version: Int = IndexFile.INDEX_VERSION): IndexNode = {
     assert(version == IndexFile.INDEX_VERSION, "Unsupported version of index data!")
-    val bytes = data.toArray
-    val dataEnd = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + bytes.length - 16)
-    val rootOffset = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + bytes.length - 8)
+    val (baseObject, baseOffset): (Object, Long) = data.chunks.head match {
+      case buf: DirectBuffer => (null, buf.address())
+      case _ => (data.toArray, Platform.BYTE_ARRAY_OFFSET)
+    }
+    val dataEnd = Platform.getLong(baseObject, baseOffset + data.size - 16)
+    val rootOffset = Platform.getLong(baseObject, baseOffset + data.size - 8)
     UnsafeIndexNode(data, rootOffset, dataEnd, keySchema)
   }
 
@@ -192,8 +196,10 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
         return true
       }
     }// end for
-    if (indexData.cached) FiberCacheManager.releaseLock(indexFiber)
-    else indexData.buffer.dispose()
+    if (indexData != null) {
+      if (indexData.cached) FiberCacheManager.releaseLock(indexFiber)
+      else indexData.buffer.dispose()
+    }
     false
   }
 

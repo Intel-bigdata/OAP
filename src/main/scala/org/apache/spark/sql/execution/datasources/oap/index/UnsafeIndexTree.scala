@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
+import sun.nio.ch.DirectBuffer
+
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.types.StructType
@@ -51,8 +53,14 @@ private[oap] trait IndexNode {
 trait UnsafeIndexTree {
   def buffer: ChunkedByteBuffer
   def offset: Long
-  def baseObj: Object = buffer.toArray
-  def baseOffset: Long = Platform.BYTE_ARRAY_OFFSET
+  def baseObj: Object = buffer.chunks.head match {
+    case _: DirectBuffer => null
+    case _ => buffer.toArray
+  }
+  def baseOffset: Long = buffer.chunks.head match {
+    case buf: DirectBuffer => buf.address()
+    case _ => Platform.BYTE_ARRAY_OFFSET
+  }
   def length: Int = Platform.getInt(baseObj, baseOffset + offset)
 }
 

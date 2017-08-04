@@ -90,13 +90,18 @@ object FiberCacheManager extends Logging {
         new CacheResult(true, buffer)
       case None =>
         logDebug("No fiber found. Build it")
-        // TODO: [linhong] fiber2Data returns a MemoryBlock, change to Array[Byte] will be better.
-        val bytes = fiber2Data(fiber, conf).copy(allocator)
-        if (blockManager.putBytes(blockId, bytes, storageLevel)) {
+        val bytes = fiber2Data(fiber, conf)
+        // For the sake of simplicity, only support one ByteBuffer in ChunkedBytesBuffer currently.
+        assert(bytes.chunks.length == 1, "Fiber data can have only one ByteBuffer")
+        val offHeapBytes = bytes.copy(allocator)
+        // If put bytes into BlockManager failed, means there is no enough off-heap memory.
+        // So, use on-heap memory after failure.
+        if (blockManager.putBytes(blockId, offHeapBytes, storageLevel)) {
           logDebug("Put fiber to cache success")
           new CacheResult(true, blockManager.getLocalBytes(blockId).get)
         } else {
           logDebug("Put fiber to cache fail")
+          offHeapBytes.dispose()
           new CacheResult(false, bytes)
         }
     }
