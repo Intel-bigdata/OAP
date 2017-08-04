@@ -20,11 +20,13 @@ package org.apache.spark.sql.execution.datasources.oap
 import java.net.URI
 
 import scala.collection.mutable
+
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataOutputStream, FileStatus, FileSystem, Path}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, FSDataOutputStream, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
@@ -38,7 +40,6 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.SerializableConfiguration
-
 
 private[sql] class OapFileFormat extends FileFormat
   with DataSourceRegister
@@ -153,7 +154,7 @@ private[sql] class OapFileFormat extends FileFormat
                                                  isAscending: Boolean,
                                                  limit: Int,
                                                  options: Map[String, String],
-                                                 hadoopConf: Configuration) :
+                                                 hadoopConf: Configuration):
                                                  (PartitionedFile) => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
     // OapFileFormat.deserializeDataSourceMeta(hadoopConf) match {
@@ -231,26 +232,32 @@ private[sql] class OapFileFormat extends FileFormat
     }
   }
 
+  private def indexHashSetList = {
+    assert(meta.isDefined)
+    val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
+    val bTreeIndexAttrSet = new mutable.HashSet[String]()
+    val bitmapIndexAttrSet = new mutable.HashSet[String]()
+    var idx = 0
+    val m = meta.get
+    while(idx < m.indexMetas.length) {
+      m.indexMetas(idx).indexType match {
+        case BTreeIndex(entries) =>
+          bTreeIndexAttrSet.add(m.schema(entries(0).ordinal).name)
+        case BitMapIndex(entries) =>
+          entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
+        case _ => // we don't support other types of index
+      }
+      idx += 1
+    }
+    hashSetList.append(bTreeIndexAttrSet)
+    hashSetList.append(bitmapIndexAttrSet)
+    hashSetList
+  }
+
   def hasAvailableIndex(expressions: Seq[Expression]): Boolean = {
     meta match {
       case Some(m) =>
-        val bTreeIndexAttrSet = new mutable.HashSet[String]()
-        val bitmapIndexAttrSet = new mutable.HashSet[String]()
-        var idx = 0
-        while(idx < m.indexMetas.length) {
-          m.indexMetas(idx).indexType match {
-            case BTreeIndex(entries) =>
-              bTreeIndexAttrSet.add(m.schema(entries(0).ordinal).name)
-            case BitMapIndex(entries) =>
-              entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
-            case _ => // we don't support other types of index
-          }
-          idx += 1
-        }
-        val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
-        hashSetList.append(bTreeIndexAttrSet)
-        hashSetList.append(bitmapIndexAttrSet)
-        expressions.exists(m.isSupportedByIndex(_, hashSetList))
+        expressions.exists(m.isSupportedByIndex(_, indexHashSetList))
       case None => false
     }
   }
@@ -258,25 +265,8 @@ private[sql] class OapFileFormat extends FileFormat
   def hasAvailableIndex(attributes: AttributeSet): Boolean = {
     meta match {
       case Some(m) =>
-        val bTreeIndexAttrSet = new mutable.HashSet[String]()
-        val bitmapIndexAttrSet = new mutable.HashSet[String]()
-        var idx = 0
-        while(idx < m.indexMetas.length) {
-          m.indexMetas(idx).indexType match {
-            case BTreeIndex(entries) =>
-              bTreeIndexAttrSet.add(m.schema(entries(0).ordinal).name)
-            case BitMapIndex(entries) =>
-              entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
-            case _ => // we don't support other types of index
-          }
-          idx += 1
-        }
-        val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
-        hashSetList.append(bTreeIndexAttrSet)
-        hashSetList.append(bitmapIndexAttrSet)
-        // hashSetList.contains(attributes)
-        attributes.exists(hashSetList.contains(_))
-        attributes.map{attr => hashSetList.map(_.contains(attr.name)).reduce(_ || _)}.reduce(_ && _)
+        attributes.map{attr =>
+          indexHashSetList.map(_.contains(attr.name)).reduce(_ || _)}.reduce(_ && _)
       case None => false
     }
   }

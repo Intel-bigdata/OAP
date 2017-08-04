@@ -21,9 +21,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.io.api.Binary
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.SortOrder
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.filecache.{DataFiberBuilder, FiberCacheManager}
 import org.apache.spark.sql.execution.datasources.oap.index._

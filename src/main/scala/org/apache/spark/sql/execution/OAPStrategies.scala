@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.{BlockLocation, FileStatus, LocatedFileStatus, Path}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.{expressions, TableIdentifier}
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, AttributeSet, Expression, ExpressionSet, IntegerLiteral, NamedExpression, SortOrder}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
@@ -35,7 +35,26 @@ import org.apache.spark.sql.Strategy
 
 trait OAPStrategies {
 
-  object SortPushDownStrategy extends Strategy with Logging{
+  /**
+   * Plans special cases of orderby+limit operators.
+   * If OAP database already has index on a specific column, we
+   * can push this sort and limit condition down to file scan RDD,
+   * i.e. before this strategy applies, the child (could be a deep
+   * child) the FileScanRDD gives full ROW scan and do lots sort and
+   * limit in upper tree level. But after it applies, FileScanRDD
+   * gives sorted (because of OAP index) and limited ROWs to upper
+   * level, and then do only few sort and limit operation.
+   *
+   * Limitations:
+   * Only 2 use scenarios so far.
+   *   1.filter + order by with limit on same/single column
+   *     SELECT x FROM xx WHERE filter(A) ORDER BY Column-A LIMIT N
+   *   2. order by a single column with limit Only
+   *     SELECT x FROM xx ORDER BY Column-A LIMIT N
+   *
+   * TODO: add more use scenarios in future.
+   */
+  object SortPushDownStrategy extends Strategy with Logging {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case logical.ReturnAnswer(rootPlan) => rootPlan match {
         case logical.Limit(IntegerLiteral(limit), logical.Sort(order, true, child)) =>
@@ -54,30 +73,34 @@ trait OAPStrategies {
       case _ => Nil
     }
 
-    def calcChildPlan(child : LogicalPlan, limit : Int, order : Seq[SortOrder]) : SparkPlan = {
-      child match {
-        case PhysicalOperation(projectList, filters,
-                                relation@LogicalRelation(file: HadoopFsRelation, _, table)) =>
-          val filterAttributes = AttributeSet(ExpressionSet(filters))
-          val orderAttributes = AttributeSet(ExpressionSet(order.map {_.child}))
-          if ((file.fileFormat.isInstanceOf[OapFileFormat] &&
+    def calcChildPlan(child : LogicalPlan, limit : Int, order : Seq[SortOrder])
+                      : SparkPlan = child match {
+      case PhysicalOperation(
+            projectList, filters, relation@LogicalRelation(file: HadoopFsRelation, _, table)) =>
+        val filterAttributes = AttributeSet(ExpressionSet(filters))
+        val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
+        if ((orderAttributes.size == 1 &&
+            (filterAttributes.isEmpty || filterAttributes == orderAttributes)) &&
+            (file.fileFormat.isInstanceOf[OapFileFormat] &&
               file.fileFormat.initialize(file.sparkSession, file.options, file.location)
-                .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes)) &&
-              (orderAttributes.size == 1 &&
-              (filterAttributes.isEmpty || filterAttributes == orderAttributes))) {
-            pushDownSortToOAPFileScanExec(projectList, filters,
-                                          relation, file, table,
-                                          limit, order.head)
-          }
-          else PlanLater(child)
-        case _ => PlanLater(child)
-      }
+              .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes))) {
+          pushDownSortToOAPFileScan(projectList, filters,
+                                        relation, file, table,
+                                        limit, order.head)
+        }
+        else PlanLater(child)
+      case _ => PlanLater(child)
     }
 
-    def pushDownSortToOAPFileScanExec(projects: Seq[NamedExpression], filters: Seq[Expression],
+
+    /**
+     * Pretty much like FileSourceStrategy.apply() as the only difference is the sort
+     * and limit config were pushed down to FileScanRDD's reader function.
+     */
+    def pushDownSortToOAPFileScan(projects: Seq[NamedExpression], filters: Seq[Expression],
                                       l: LogicalPlan, files : HadoopFsRelation,
                                       table: Option[TableIdentifier],
-                                      limit : Int, order : SortOrder) : SparkPlan = {
+                                      limit : Int, order : SortOrder): SparkPlan = {
         // Filters on this relation fall into four categories based
         // on where we can use them to avoid
         // reading unneeded data:
@@ -140,70 +163,62 @@ trait OAPStrategies {
           limit,
           options = files.options,
           hadoopConf = files.sparkSession.sessionState.newHadoopConfWithOptions(files.options))
+        logInfo(s"Pushed Order By $order, Limit $limit.")
 
         val plannedPartitions = {
-            val defaultMaxSplitBytes = files.sparkSession.sessionState.conf.filesMaxPartitionBytes
-            val openCostInBytes = files.sparkSession.sessionState.conf.filesOpenCostInBytes
-            val defaultParallelism = files.sparkSession.sparkContext.defaultParallelism
-            val totalBytes = selectedPartitions.flatMap(_.files.map(_.getLen + openCostInBytes)).sum
-            val bytesPerCore = totalBytes / defaultParallelism
-            val maxSplitBytes = Math.min(defaultMaxSplitBytes,
-              Math.max(openCostInBytes, bytesPerCore))
-            logInfo(s"Planning scan with bin packing, max size: $maxSplitBytes bytes, " +
-              s"open cost is considered as scanning $openCostInBytes bytes.")
+          val defaultMaxSplitBytes = files.sparkSession.sessionState.conf.filesMaxPartitionBytes
+          val openCostInBytes = files.sparkSession.sessionState.conf.filesOpenCostInBytes
+          val defaultParallelism = files.sparkSession.sparkContext.defaultParallelism
+          val totalBytes = selectedPartitions.flatMap(_.files.map(_.getLen + openCostInBytes)).sum
+          val bytesPerCore = totalBytes / defaultParallelism
+          val maxSplitBytes = Math.min(defaultMaxSplitBytes,
+            Math.max(openCostInBytes, bytesPerCore))
+          logInfo(s"Planning scan with bin packing, max size: $maxSplitBytes bytes, " +
+            s"open cost is considered as scanning $openCostInBytes bytes.")
 
-            val splitFiles = selectedPartitions.flatMap { partition =>
-              partition.files.flatMap { file =>
-                val blockLocations = getBlockLocations(file)
-                if (files.fileFormat.isSplitable(files.sparkSession, files.options, file.getPath)) {
-                  (0L until file.getLen by maxSplitBytes).map { offset =>
-                    val remaining = file.getLen - offset
-                    val size = if (remaining > maxSplitBytes) maxSplitBytes else remaining
-                    val hosts = getBlockHosts(blockLocations, offset, size)
-                    PartitionedFile(
-                      partition.values, file.getPath.toUri.toString, offset, size, hosts)
-                  }
-                } else {
-                  val hosts = getBlockHosts(blockLocations, 0, file.getLen)
-                  Seq(PartitionedFile(
-                    partition.values, file.getPath.toUri.toString, 0, file.getLen, hosts))
-                }
-              }
-            }.toArray.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
-
-            val partitions = new ArrayBuffer[FilePartition]
-            val currentFiles = new ArrayBuffer[PartitionedFile]
-            var currentSize = 0L
-
-            /** Add the given file to the current partition. */
-            def addFile(file: PartitionedFile): Unit = {
-              currentSize += file.length + openCostInBytes
-              currentFiles.append(file)
+          val splitFiles = selectedPartitions.flatMap { partition =>
+            partition.files.flatMap { file =>
+              assert(!files.fileFormat.isSplitable(files.sparkSession, files.options, file.getPath))
+              val blockLocations = OAPFileUtils.getBlockLocations(file)
+              val hosts = OAPFileUtils.getBlockHosts(blockLocations, 0, file.getLen)
+              Seq(PartitionedFile(
+                partition.values, file.getPath.toUri.toString, 0, file.getLen, hosts))
             }
+          }.toArray.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
 
-            /** Close the current partition and move to the next. */
-            def closePartition(): Unit = {
-              if (currentFiles.nonEmpty) {
-                val newPartition =
-                  FilePartition(
-                    partitions.size,
-                    currentFiles.toArray.toSeq) // Copy to a new Array.
-                partitions.append(newPartition)
-              }
-              currentFiles.clear()
-              currentSize = 0
-            }
+          val partitions = new ArrayBuffer[FilePartition]
+          val currentFiles = new ArrayBuffer[PartitionedFile]
+          var currentSize = 0L
 
-            // Assign files to partitions using "First Fit Decreasing" (FFD)
-            // TODO: consider adding a slop factor here?
-            splitFiles.foreach { file =>
-              if (currentSize + file.length > maxSplitBytes) {
-                closePartition()
-              }
-              addFile(file)
+          /** Add the given file to the current partition. */
+          def addFile(file: PartitionedFile): Unit = {
+            currentSize += file.length + openCostInBytes
+            currentFiles.append(file)
+          }
+
+          /** Close the current partition and move to the next. */
+          def closePartition(): Unit = {
+            if (currentFiles.nonEmpty) {
+              val newPartition =
+                FilePartition(
+                  partitions.size,
+                  currentFiles.toArray.toSeq) // Copy to a new Array.
+              partitions.append(newPartition)
             }
-            closePartition()
-            partitions
+            currentFiles.clear()
+            currentSize = 0
+          }
+
+          // Assign files to partitions using "First Fit Decreasing" (FFD)
+          // TODO: consider adding a slop factor here?
+          splitFiles.foreach { file =>
+            if (currentSize + file.length > maxSplitBytes) {
+              closePartition()
+            }
+            addFile(file)
+          }
+          closePartition()
+          partitions
         }
 
         // These metadata values make scan plans uniquely identifiable for equality checking.
@@ -235,8 +250,16 @@ trait OAPStrategies {
 
         withProjections
     }
+    // TODO: Add more OAP specific strategies
+  }
 
-    private def getBlockLocations(file: FileStatus): Array[BlockLocation] = file match {
+  /**
+   * A Util class to handle file block (hadoop/hdfs file) related information.
+   */
+  object OAPFileUtils {
+
+    private[OAPStrategies] def getBlockLocations(file: FileStatus)
+                                : Array[BlockLocation] = file match {
       case f: LocatedFileStatus => f.getBlockLocations
       case f => Array.empty[BlockLocation]
     }
@@ -245,7 +268,7 @@ trait OAPStrategies {
     // pair that represents a segment of the same file, find out the block that contains the largest
     // fraction the segment, and returns location hosts of that block.
     // If no such block can be found, returns an empty array.
-    private def getBlockHosts(
+    private[OAPStrategies] def getBlockHosts(
                                blockLocations: Array[BlockLocation],
                                offset: Long, length: Long): Array[String] = {
       val candidates = blockLocations.map {
@@ -275,9 +298,5 @@ trait OAPStrategies {
         hosts
       }
     }
-
-
   }
-
-  // TODO: Add more OAP specific strategies
 }
