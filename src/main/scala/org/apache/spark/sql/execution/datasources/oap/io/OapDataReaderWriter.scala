@@ -80,8 +80,6 @@ private[oap] class OapDataWriter(
     codec = COMPRESSION_CODEC)
 
   private val codecFactory = new CodecFactory(conf)
-  private val compressor: BytesCompressor =
-    codecFactory.getCompressor(COMPRESSION_CODEC)
 
   def write(row: InternalRow) {
     var idx = 0
@@ -98,6 +96,7 @@ private[oap] class OapDataWriter(
 
   private def writeRowGroup(): Unit = {
     rowGroupCount += 1
+    val compressor: BytesCompressor = codecFactory.getCompressor(COMPRESSION_CODEC)
     val fiberLens = new Array[Int](rowGroup.length)
     val fiberUncompressedLens = new Array[Int](rowGroup.length)
     var idx: Int = 0
@@ -146,6 +145,7 @@ private[oap] class OapDataWriter(
         if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else ROW_GROUP_SIZE)
 
     fiberMeta.write(out)
+    codecFactory.release()
     out.close()
   }
 }
@@ -159,7 +159,7 @@ private[oap] class OapDataReader(
   def initialize(conf: Configuration): Iterator[InternalRow] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
-    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
+    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
 
     val start = System.currentTimeMillis()
     filterScanner match {

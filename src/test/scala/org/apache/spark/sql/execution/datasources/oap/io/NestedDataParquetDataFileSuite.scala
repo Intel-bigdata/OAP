@@ -138,7 +138,7 @@ class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
   test("skip read record 1") {
 
-    val reader = ParquetDataFile(fileName, requestStructType)
+    val reader = ParquetDataFile(fileName, requestStructType, new Configuration())
 
     val requiredIds = Array(0, 1, 2)
 
@@ -160,7 +160,7 @@ class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
   test("read all ") {
 
-    val reader = ParquetDataFile(fileName, requestStructType)
+    val reader = ParquetDataFile(fileName, requestStructType, new Configuration())
 
     val requiredIds = Array(0, 2)
 

@@ -33,6 +33,7 @@ import org.apache.spark.util.Utils
 abstract class DataFile {
   def path: String
   def schema: StructType
+  def configuration: Configuration
 
   def createDataFileHandle(conf: Configuration): DataFileHandle
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): DataFiberCache
@@ -43,11 +44,12 @@ abstract class DataFile {
 }
 
 private[oap] object DataFile {
-  def apply(path: String, schema: StructType, dataFileClassName: String): DataFile = {
+  def apply(path: String, schema: StructType, dataFileClassName: String,
+            configuration: Configuration): DataFile = {
     Try(Utils.classForName(dataFileClassName).getDeclaredConstructor(
-      classOf[String], classOf[StructType])).toOption match {
+      classOf[String], classOf[StructType], classOf[Configuration])).toOption match {
       case Some(ctor) =>
-        Try (ctor.newInstance(path, schema).asInstanceOf[DataFile]) match {
+        Try (ctor.newInstance(path, schema, configuration).asInstanceOf[DataFile]) match {
           case Success(e) => e
           case Failure(e) =>
             throw new OapException(s"Cannot instantiate class $dataFileClassName", e)
