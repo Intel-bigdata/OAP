@@ -96,6 +96,7 @@ trait OAPStrategies {
     /**
      * Pretty much like FileSourceStrategy.apply() as the only difference is the sort
      * and limit config were pushed down to FileScanRDD's reader function.
+     * TODO: remove OAP irrelevant code.
      */
     def pushDownSortToOAPFileScan(projects: Seq[NamedExpression], filters: Seq[Expression],
                                       l: LogicalPlan, files : HadoopFsRelation,

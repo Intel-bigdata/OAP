@@ -202,9 +202,8 @@ private[sql] class OapFileFormat extends FileFormat
             ScannerBuilder.build(supportFilters, ic)
           }
         }
-        //        val filterScanner = ic.getScannerBuilder.map(_.build)
-        val filterScanner = ic.getScanner
 
+        val filterScanner = ic.getScanner
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
         hadoopConf.setDouble(SQLConf.OAP_FULL_SCAN_THRESHOLD.key,

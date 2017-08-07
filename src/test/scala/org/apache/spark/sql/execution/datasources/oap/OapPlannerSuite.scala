@@ -89,7 +89,7 @@ class OapPlannerSuite
 
     checkAnswer(
       sql("SELECT b FROM oap_sort_opt_table WHERE a >= 1 AND a <= 10 ORDER BY a LIMIT 4"),
-      Row("this is test 1") ::
+        Row("this is test 1") ::
         Row("this is test 2") ::
         Row("this is test 3") ::
         Row("this is test 4") :: Nil)
@@ -97,5 +97,4 @@ class OapPlannerSuite
     sql("drop oindex index1 on oap_sort_opt_table")
     sql("drop oindex index2 on oap_sort_opt_table")
   }
-
 }
