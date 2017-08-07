@@ -56,6 +56,11 @@ trait OapSharedSQLContext extends SQLTestUtils {
     }
     // Ensure we have initialized the context before calling parent code
     super.beforeAll()
+    // A small TRICK here. Clear database before testing to avoid the "table already exists" problem
+    sql("DROP DATABASE IF EXISTS oap_test_database CASCADE")
+    sql("CREATE DATABASE oap_test_database")
+    sql("USE oap_test_database")
+
   }
 
   /**
