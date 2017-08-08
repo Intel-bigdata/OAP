@@ -20,19 +20,18 @@ package org.apache.spark.sql.execution.datasources.oap
 import java.sql.Date
 
 import org.scalatest.BeforeAndAfterEach
-
-import org.apache.spark.sql.{QueryTest, Row}
+import org.apache.spark.sql.{QueryTest, Row, SparkSession}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 
 
-class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
-  import testImplicits._
+class FilterSuite extends QueryTest with BeforeAndAfterEach {
+  import TestOap._
+  import TestOap.testImplicits._
 
   override def beforeEach(): Unit = {
-    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val path = Utils.createTempDir().getAbsolutePath
 
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b STRING)
@@ -556,4 +555,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       "b='10' or (b = '20' and a in (10,20,30))"),
       Row(10, "10") :: Row(20, "20") :: Nil)
   }
+
+  override protected def spark: SparkSession = sparkSession
 }
