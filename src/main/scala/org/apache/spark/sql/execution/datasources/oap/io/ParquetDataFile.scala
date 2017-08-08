@@ -105,8 +105,8 @@ private[oap] case class ParquetDataFile
     }
   }
 
-  override def createDataFileHandle(conf: Configuration): ParquetDataFileHandle = {
-    new ParquetDataFileHandle().read(conf, new Path(StringUtils.unEscapeString(path)))
+  override def createDataFileHandle(): ParquetDataFileHandle = {
+    new ParquetDataFileHandle().read(configuration, new Path(StringUtils.unEscapeString(path)))
   }
 
   override def getDictionary(fiberId: Int, conf: Configuration): Dictionary = null

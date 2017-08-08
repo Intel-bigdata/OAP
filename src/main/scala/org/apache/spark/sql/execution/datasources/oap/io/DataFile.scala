@@ -35,7 +35,7 @@ abstract class DataFile {
   def schema: StructType
   def configuration: Configuration
 
-  def createDataFileHandle(conf: Configuration): DataFileHandle
+  def createDataFileHandle(): DataFileHandle
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): ChunkedByteBuffer
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])

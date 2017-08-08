@@ -162,7 +162,7 @@ private[oap] object DataFileHandleCacheManager extends Logging {
         override def load(entry: ENTRY)
         : DataFileHandle = {
           logDebug(s"Loading Data File Handle ${entry.key.path}")
-          entry.key.createDataFileHandle(entry.conf)
+          entry.key.createDataFileHandle()
         }
       })
 

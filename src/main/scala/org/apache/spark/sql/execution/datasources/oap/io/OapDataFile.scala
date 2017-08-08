@@ -187,10 +187,10 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     codecFactory.release()
   }
 
-  override def createDataFileHandle(conf: Configuration): OapDataFileHandle = {
+  override def createDataFileHandle(): OapDataFileHandle = {
     val p = new Path(StringUtils.unEscapeString(path))
 
-    val fs = p.getFileSystem(conf)
+    val fs = p.getFileSystem(configuration)
 
     new OapDataFileHandle().read(fs.open(p), fs.getFileStatus(p).getLen)
   }
