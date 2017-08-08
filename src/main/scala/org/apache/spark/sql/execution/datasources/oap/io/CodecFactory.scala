@@ -24,16 +24,15 @@ import scala.collection.mutable
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.io.compress.{CodecPool, CompressionCodec}
 import org.apache.hadoop.util.ReflectionUtils
+import org.apache.parquet.format.{CompressionCodec => ParquetCodec}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
 // This is a simple version of parquet's CodeFactory.
 // TODO: [linhong] Need change this into Scala Code style
 private[oap] class CodecFactory(conf: Configuration) {
 
-  private val compressors =
-    new mutable.HashMap[org.apache.parquet.format.CompressionCodec, BytesCompressor]
-  private val decompressors =
-    new mutable.HashMap[org.apache.parquet.format.CompressionCodec, BytesDecompressor]
+  private val compressors = new mutable.HashMap[ParquetCodec, BytesCompressor]
+  private val decompressors = new mutable.HashMap[ParquetCodec, BytesDecompressor]
   private val codecByName = new mutable.HashMap[String, CompressionCodec]
 
   private def getCodec(codecString: String): Option[CompressionCodec] = {
@@ -51,11 +50,11 @@ private[oap] class CodecFactory(conf: Configuration) {
     }
   }
 
-  def getCompressor(codec: org.apache.parquet.format.CompressionCodec): BytesCompressor = {
+  def getCompressor(codec: ParquetCodec): BytesCompressor = {
     compressors.getOrElseUpdate(codec, new BytesCompressor(getCodec(codec.name)))
   }
 
-  def getDecompressor(codec: org.apache.parquet.format.CompressionCodec): BytesDecompressor = {
+  def getDecompressor(codec: ParquetCodec): BytesDecompressor = {
     decompressors.getOrElseUpdate(codec, new BytesDecompressor(getCodec(codec.name)))
   }
 
@@ -90,9 +89,7 @@ private[oap] class BytesCompressor(compressionCodec: Option[CompressionCodec]) {
     }
   }
 
-  def release(): Unit = {
-    if (compressor != null) CodecPool.returnCompressor(compressor)
-  }
+  def release(): Unit = CodecPool.returnCompressor(compressor)
 }
 
 private[oap] class BytesDecompressor(compressionCodec: Option[CompressionCodec]) {
@@ -114,7 +111,5 @@ private[oap] class BytesDecompressor(compressionCodec: Option[CompressionCodec])
     }
   }
 
-  def release(): Unit = {
-    if (decompressor != null) CodecPool.returnDecompressor(decompressor)
-  }
+  def release(): Unit = CodecPool.returnDecompressor(decompressor)
 }

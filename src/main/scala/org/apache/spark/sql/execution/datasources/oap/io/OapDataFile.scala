@@ -118,23 +118,23 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     val row = new BatchColumn()
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     val iterator =
-    (0 until meta.groupCount).iterator.flatMap { groupId =>
-      var i = 0
-      while (i < columns.length) {
-        columns(i) = new ColumnValues(
-          meta.rowCountInEachGroup,
-          schema(requiredIds(i)).dataType,
-          FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
-        i += 1
-      }
+      (0 until meta.groupCount).iterator.flatMap { groupId =>
+        var i = 0
+        while (i < columns.length) {
+          columns(i) = new ColumnValues(
+            meta.rowCountInEachGroup,
+            schema(requiredIds(i)).dataType,
+            FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
+          i += 1
+        }
 
-      if (groupId < meta.groupCount - 1) {
-        // not the last row group
-        row.reset(meta.rowCountInEachGroup, columns).toIterator
-      } else {
-        row.reset(meta.rowCountInLastGroup, columns).toIterator
+        if (groupId < meta.groupCount - 1) {
+          // not the last row group
+          row.reset(meta.rowCountInEachGroup, columns).toIterator
+        } else {
+          row.reset(meta.rowCountInLastGroup, columns).toIterator
+        }
       }
-    }
     CompletionIterator[InternalRow, Iterator[InternalRow]](iterator, close())
   }
 
@@ -145,33 +145,33 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     val columns: Array[ColumnValues] = new Array[ColumnValues](requiredIds.length)
     var lastGroupId = -1
     val iterator =
-    rowIds.indices.iterator.map { idx =>
-      val rowId = rowIds(idx)
-      val groupId = (rowId / meta.rowCountInEachGroup).toInt
-      val rowIdxInGroup = (rowId % meta.rowCountInEachGroup).toInt
+      rowIds.indices.iterator.map { idx =>
+        val rowId = rowIds(idx)
+        val groupId = (rowId / meta.rowCountInEachGroup).toInt
+        val rowIdxInGroup = (rowId % meta.rowCountInEachGroup).toInt
 
-      if (lastGroupId != groupId) {
-        // if we move to another row group, or the first row group
-        var i = 0
-        while (i < columns.length) {
-          columns(i) = new ColumnValues(
-            meta.rowCountInEachGroup,
-            schema(requiredIds(i)).dataType,
-            FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
-          i += 1
-        }
-        if (groupId < meta.groupCount - 1) {
-          // not the last row group
-          row.reset(meta.rowCountInEachGroup, columns)
-        } else {
-          row.reset(meta.rowCountInLastGroup, columns)
+        if (lastGroupId != groupId) {
+          // if we move to another row group, or the first row group
+          var i = 0
+          while (i < columns.length) {
+            columns(i) = new ColumnValues(
+              meta.rowCountInEachGroup,
+              schema(requiredIds(i)).dataType,
+              FiberCacheManager(DataFiber(this, requiredIds(i), groupId), conf))
+            i += 1
+          }
+          if (groupId < meta.groupCount - 1) {
+            // not the last row group
+            row.reset(meta.rowCountInEachGroup, columns)
+          } else {
+            row.reset(meta.rowCountInLastGroup, columns)
+          }
+
+          lastGroupId = groupId
         }
 
-        lastGroupId = groupId
+        row.moveToRow(rowIdxInGroup)
       }
-
-      row.moveToRow(rowIdxInGroup)
-    }
     CompletionIterator[InternalRow, Iterator[InternalRow]](iterator, close())
   }
 
