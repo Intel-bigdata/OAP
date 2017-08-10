@@ -31,7 +31,7 @@ import org.apache.parquet.hadoop.util.SerializationUtil
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow}
+import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateOrdering, GenerateUnsafeProjection}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
@@ -42,7 +42,6 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.util.SerializableConfiguration
-
 
 private[sql] class OapFileFormat extends FileFormat
   with DataSourceRegister
@@ -127,9 +126,9 @@ private[sql] class OapFileFormat extends FileFormat
       options: Map[String, String],
       hadoopConf: Configuration): (PartitionedFile) => Iterator[InternalRow] = {
     // For Parquet data source, `buildReader` already handles partition values appending. Here we
-    // simply delegate to `buildReader`.
-    buildReader(
-      sparkSession, dataSchema, partitionSchema, requiredSchema, filters, options, hadoopConf)
+    // simply delegate to another buildReaderWithPartitionValues which has sort & limit support.
+    buildReaderWithPartitionValues(sparkSession, dataSchema, partitionSchema, requiredSchema,
+      filters, false, 0, options, hadoopConf)
   }
 
   override def buildReader(
@@ -140,6 +139,21 @@ private[sql] class OapFileFormat extends FileFormat
       filters: Seq[Filter],
       options: Map[String, String],
       hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
+    buildReaderWithPartitionValues(sparkSession, dataSchema, partitionSchema, requiredSchema,
+                                    filters, false, 0, options, hadoopConf)
+  }
+
+  // Build reader with sort and limit operation
+  private[sql] def buildReaderWithPartitionValues(sparkSession: SparkSession,
+                                                 dataSchema: StructType,
+                                                 partitionSchema: StructType,
+                                                 requiredSchema: StructType,
+                                                 filters: Seq[Filter],
+                                                 isAscending: Boolean,
+                                                 limit: Int,
+                                                 options: Map[String, String],
+                                                 hadoopConf: Configuration):
+                                                 (PartitionedFile) => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
     // OapFileFormat.deserializeDataSourceMeta(hadoopConf) match {
     meta match {
@@ -151,24 +165,24 @@ private[sql] class OapFileFormat extends FileFormat
         def canTriggerIndex(filter: Filter): Boolean = {
           var attr: String = null
           def checkAttribute(filter: Filter): Boolean = filter match {
-              case Or(left, right) =>
-                checkAttribute(left) && checkAttribute(right)
-              case And(left, right) =>
-                checkAttribute(left) && checkAttribute(right)
-              case EqualTo(attribute, _) =>
-                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-              case LessThan(attribute, _) =>
-                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-              case LessThanOrEqual(attribute, _) =>
-                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-              case GreaterThan(attribute, _) =>
-                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-              case GreaterThanOrEqual(attribute, _) =>
-                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-              case In(attribute, _) =>
-                if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-              case _ => true
-            }
+            case Or(left, right) =>
+              checkAttribute(left) && checkAttribute(right)
+            case And(left, right) =>
+              checkAttribute(left) && checkAttribute(right)
+            case EqualTo(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case LessThan(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case LessThanOrEqual(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case GreaterThan(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case GreaterThanOrEqual(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case In(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case _ => true
+          }
 
           checkAttribute(filter)
         }
@@ -250,9 +264,8 @@ private[sql] class OapFileFormat extends FileFormat
             ScannerBuilder.build(supportFilters, ic)
           }
         }
-//        val filterScanner = ic.getScannerBuilder.map(_.build)
-        val filterScanner = ic.getScanner
 
+        val filterScanner = ic.getScanner
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
         hadoopConf.setDouble(SQLConf.OAP_FULL_SCAN_THRESHOLD.key,
@@ -291,26 +304,41 @@ private[sql] class OapFileFormat extends FileFormat
     }
   }
 
+  private def indexHashSetList = {
+    assert(meta.isDefined)
+    val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
+    val bTreeIndexAttrSet = new mutable.HashSet[String]()
+    val bitmapIndexAttrSet = new mutable.HashSet[String]()
+    var idx = 0
+    val m = meta.get
+    while(idx < m.indexMetas.length) {
+      m.indexMetas(idx).indexType match {
+        case BTreeIndex(entries) =>
+          bTreeIndexAttrSet.add(m.schema(entries(0).ordinal).name)
+        case BitMapIndex(entries) =>
+          entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
+        case _ => // we don't support other types of index
+      }
+      idx += 1
+    }
+    hashSetList.append(bTreeIndexAttrSet)
+    hashSetList.append(bitmapIndexAttrSet)
+    hashSetList
+  }
+
   def hasAvailableIndex(expressions: Seq[Expression]): Boolean = {
     meta match {
       case Some(m) if sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX) =>
-        val bTreeIndexAttrSet = new mutable.HashSet[String]()
-        val bitmapIndexAttrSet = new mutable.HashSet[String]()
-        var idx = 0
-        while(idx < m.indexMetas.length) {
-          m.indexMetas(idx).indexType match {
-            case BTreeIndex(entries) =>
-              bTreeIndexAttrSet.add(m.schema(entries(0).ordinal).name)
-            case BitMapIndex(entries) =>
-              entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
-            case _ => // we don't support other types of index
-          }
-          idx += 1
-        }
-        val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
-        hashSetList.append(bTreeIndexAttrSet)
-        hashSetList.append(bitmapIndexAttrSet)
-        expressions.exists(m.isSupportedByIndex(_, hashSetList))
+        expressions.exists(m.isSupportedByIndex(_, indexHashSetList))
+      case None => false
+    }
+  }
+
+  def hasAvailableIndex(attributes: AttributeSet): Boolean = {
+    meta match {
+      case Some(m) if sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX) =>
+        attributes.map{attr =>
+          indexHashSetList.map(_.contains(attr.name)).reduce(_ || _)}.reduce(_ && _)
       case None => false
     }
   }

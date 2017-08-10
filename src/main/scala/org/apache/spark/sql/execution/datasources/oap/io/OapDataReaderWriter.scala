@@ -156,7 +156,9 @@ private[oap] class OapDataReader(
   filterScanner: Option[IndexScanner],
   requiredIds: Array[Int]) extends Logging {
 
-  def initialize(conf: Configuration): Iterator[InternalRow] = {
+  def initialize(conf: Configuration,
+                 ascending: Boolean = true,
+                 limit: Int = 0): Iterator[InternalRow] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
@@ -195,7 +197,14 @@ private[oap] class OapDataReader(
               case StaticsAnalysisResult.USE_INDEX =>
                 fs.initialize(path, conf)
                 // total Row count can be get from the filter scanner
-                val rowIDs = fs.toArray.sorted
+                val rowIDs = {
+                  if (limit > 0) {
+                    if (ascending) fs.toArray.take(limit)
+                    else fs.toArray.reverse.take(limit)
+                  }
+                  else fs.toArray
+                }
+
                 fileScanner.iterator(conf, requiredIds, rowIDs)
               case StaticsAnalysisResult.SKIP_INDEX =>
                 Iterator.empty
