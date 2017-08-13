@@ -20,10 +20,8 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.util.concurrent.TimeUnit
 
 import scala.collection.mutable
-
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
@@ -32,6 +30,7 @@ import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.storage.{BlockId, FiberBlockId, StorageLevel}
 import org.apache.spark.unsafe.Platform
+import org.apache.spark.util.TimeStampedHashMap
 import org.apache.spark.util.collection.BitSet
 import org.apache.spark.util.io.ChunkedByteBuffer
 
@@ -60,12 +59,26 @@ private[oap] class CacheResult (
  */
 object FiberCacheManager extends Logging {
 
+  private val dataFileIdMap = new TimeStampedHashMap[String, DataFile](updateTimeStampOnGet = true)
+
   def fiber2Block(fiber: Fiber): BlockId = {
     fiber match {
       case DataFiber(file, columnIndex, rowGroupId) =>
+        dataFileIdMap.getOrElseUpdate(file.path, file)
         FiberBlockId("data_" + file.path + "_" + columnIndex + "_" + rowGroupId)
       case IndexFiber(file) =>
         FiberBlockId("index_" + file.file)
+    }
+  }
+
+  def block2Fiber(blockId: BlockId): Fiber = {
+
+    val FiberDataBlock = "fiber_data_(.*)_([0-9]+)_([0-9]+)".r
+    blockId.name match {
+      case FiberDataBlock(fileId, columnIndex, rowGroupId) =>
+        val dataFile = dataFileIdMap(fileId)
+        DataFiber(dataFile, columnIndex.toInt, rowGroupId.toInt)
+      case _ => throw new OapException("unknown blockId: " + blockId.name)
     }
   }
 
@@ -115,20 +128,31 @@ object FiberCacheManager extends Logging {
   }
 
   def status: String = {
-    val dataFiberConfPairs = Set.empty[(DataFiber, Configuration)]
+    val blockManager = SparkEnv.get.blockManager
+    val fiberBlockIds = blockManager.getMatchingBlockIds(blockId =>
+      blockId.name.startsWith("fiber_data_"))
+    val threshTime = System.currentTimeMillis()
+    val fibers = fiberBlockIds.map(blockId => block2Fiber(blockId))
+    logDebug("current cached blocks: \n" +
+      fibers.map{case dataFiber: DataFiber =>
+        dataFiber.file.path +
+          " column:" + dataFiber.columnIndex +
+          " groupId:" + dataFiber.rowGroupId}.mkString("\n"))
+
+    // We have went over all fiber blocks in BlockManager. Remove out-dated item in dataFileIdMap
+    dataFileIdMap.clearOldValues(threshTime)
 
     val fiberFileToFiberMap = new mutable.HashMap[String, mutable.Buffer[DataFiber]]()
-    dataFiberConfPairs.foreach { case (dataFiber, _) =>
+    fibers.foreach { case dataFiber: DataFiber =>
       fiberFileToFiberMap.getOrElseUpdate(
         dataFiber.file.path, new mutable.ArrayBuffer[DataFiber]) += dataFiber
     }
 
     val filePathSet = new mutable.HashSet[String]()
-    val statusRawData = dataFiberConfPairs.collect {
-      case (_ @ DataFiber(dataFile : OapDataFile, _, _), conf)
-        if !filePathSet.contains(dataFile.path) =>
+    val statusRawData = fibers.collect {
+      case _ @ DataFiber(dataFile : OapDataFile, _, _) if !filePathSet.contains(dataFile.path) =>
         val fileMeta =
-          DataFileHandleCacheManager(dataFile, conf).asInstanceOf[OapDataFileHandle]
+          DataFileHandleCacheManager(dataFile).asInstanceOf[OapDataFileHandle]
         val fiberBitSet = new BitSet(fileMeta.groupCount * fileMeta.fieldCount)
         val fiberCachedList: Seq[DataFiber] =
           fiberFileToFiberMap.getOrElse(dataFile.path, Seq.empty)
@@ -137,7 +161,7 @@ object FiberCacheManager extends Logging {
         }
         filePathSet.add(dataFile.path)
         FiberCacheStatus(dataFile.path, fiberBitSet, fileMeta)
-    }.toSeq
+    }
 
     val retStatus = CacheStatusSerDe.serialize(statusRawData)
     retStatus
@@ -145,7 +169,7 @@ object FiberCacheManager extends Logging {
 }
 
 private[oap] object DataFileHandleCacheManager extends Logging {
-  type ENTRY = ConfigurationCache[DataFile]
+  type ENTRY = DataFile
   private val cache =
     CacheBuilder
       .newBuilder()
@@ -154,20 +178,20 @@ private[oap] object DataFileHandleCacheManager extends Logging {
       .removalListener(new RemovalListener[ENTRY, DataFileHandle]() {
         override def onRemoval(n: RemovalNotification[ENTRY, DataFileHandle])
         : Unit = {
-          logDebug(s"Evicting Data File Handle ${n.getKey.key.path}")
+          logDebug(s"Evicting Data File Handle ${n.getKey.path}")
           n.getValue.fin.close()
         }
       })
       .build[ENTRY, DataFileHandle](new CacheLoader[ENTRY, DataFileHandle]() {
         override def load(entry: ENTRY)
         : DataFileHandle = {
-          logDebug(s"Loading Data File Handle ${entry.key.path}")
-          entry.key.createDataFileHandle()
+          logDebug(s"Loading Data File Handle ${entry.path}")
+          entry.createDataFileHandle()
         }
       })
 
-  def apply[T <: DataFileHandle](fiberCache: DataFile, conf: Configuration): T = {
-    cache.get(ConfigurationCache(fiberCache, conf)).asInstanceOf[T]
+  def apply[T <: DataFileHandle](fiberCache: DataFile): T = {
+    cache.get(fiberCache).asInstanceOf[T]
   }
 }
 

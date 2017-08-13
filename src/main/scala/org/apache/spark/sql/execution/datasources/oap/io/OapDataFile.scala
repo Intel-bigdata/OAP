@@ -40,7 +40,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
 
   private val dictionaries = new Array[Dictionary](schema.length)
   private val codecFactory = new CodecFactory(configuration)
-  private val meta: OapDataFileHandle = DataFileHandleCacheManager(this, configuration)
+  private val meta: OapDataFileHandle = DataFileHandleCacheManager(this)
 
   def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
     val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)

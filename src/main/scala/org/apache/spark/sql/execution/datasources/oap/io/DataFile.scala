@@ -17,12 +17,12 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import scala.util.{Failure, Success, Try}
+import java.util.concurrent.atomic.AtomicInteger
 
+import scala.util.{Failure, Success, Try}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FSDataInputStream
 import org.apache.parquet.column.Dictionary
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.types.StructType

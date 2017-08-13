@@ -74,7 +74,7 @@ private[oap] case class ParquetDataFile
 
     val readSupport = new OapReadSupportImpl
 
-    val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this, conf)
+    val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
     RecordReaderBuilder
       .builder(readSupport, new Path(StringUtils.unEscapeString(path)), conf)
       .withFooter(meta.footer)
