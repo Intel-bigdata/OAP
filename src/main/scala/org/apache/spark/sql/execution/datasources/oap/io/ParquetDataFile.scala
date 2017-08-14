@@ -31,7 +31,8 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.io.ChunkedByteBuffer
 
 
-private[oap] case class ParquetDataFile(path: String, schema: StructType) extends DataFile {
+private[oap] case class ParquetDataFile
+(path: String, schema: StructType, configuration: Configuration) extends DataFile {
 
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): ChunkedByteBuffer = {
     // TODO data cache

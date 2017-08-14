@@ -80,8 +80,6 @@ private[oap] class OapDataWriter(
     codec = COMPRESSION_CODEC)
 
   private val codecFactory = new CodecFactory(conf)
-  private val compressor: BytesCompressor =
-    codecFactory.getCompressor(COMPRESSION_CODEC)
 
   def write(row: InternalRow) {
     var idx = 0
@@ -98,6 +96,7 @@ private[oap] class OapDataWriter(
 
   private def writeRowGroup(): Unit = {
     rowGroupCount += 1
+    val compressor: BytesCompressor = codecFactory.getCompressor(COMPRESSION_CODEC)
     val fiberLens = new Array[Int](rowGroup.length)
     val fiberUncompressedLens = new Array[Int](rowGroup.length)
     var idx: Int = 0
@@ -146,6 +145,7 @@ private[oap] class OapDataWriter(
         if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else ROW_GROUP_SIZE)
 
     fiberMeta.write(out)
+    codecFactory.release()
     out.close()
   }
 }
@@ -156,10 +156,12 @@ private[oap] class OapDataReader(
   filterScanner: Option[IndexScanner],
   requiredIds: Array[Int]) extends Logging {
 
-  def initialize(conf: Configuration): Iterator[InternalRow] = {
+  def initialize(conf: Configuration,
+                 ascending: Boolean = true,
+                 limit: Int = 0): Iterator[InternalRow] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
-    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName)
+    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
 
     val start = System.currentTimeMillis()
     filterScanner match {
@@ -186,7 +188,14 @@ private[oap] class OapDataReader(
               case StaticsAnalysisResult.USE_INDEX =>
                 fs.initialize(path, conf)
                 // total Row count can be get from the filter scanner
-                val rowIDs = fs.toArray.sorted
+                val rowIDs = {
+                  if (limit > 0) {
+                    if (ascending) fs.toArray.take(limit)
+                    else fs.toArray.reverse.take(limit)
+                  }
+                  else fs.toArray
+                }
+
                 fileScanner.iterator(conf, requiredIds, rowIDs)
               case StaticsAnalysisResult.SKIP_INDEX =>
                 Iterator.empty

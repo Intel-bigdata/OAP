@@ -60,7 +60,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
   test("read by columnIds and rowIds") {
 
-    val reader = ParquetDataFile(fileName, requestStructType)
+    val reader = ParquetDataFile(fileName, requestStructType, new Configuration())
 
     val requiredIds = Array(0, 1)
 
@@ -84,7 +84,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
   test("read by columnIds and empty rowIds array") {
 
-    val reader = ParquetDataFile(fileName, requestStructType)
+    val reader = ParquetDataFile(fileName, requestStructType, new Configuration())
 
     val requiredIds = Array(0, 1)
 
@@ -103,7 +103,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
   test("read by columnIds ") {
 
-    val reader = ParquetDataFile(fileName, requestStructType)
+    val reader = ParquetDataFile(fileName, requestStructType, new Configuration())
 
     val requiredIds = Array(0)
 
@@ -124,7 +124,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
   }
 
   test("createDataFileHandle") {
-    val reader = ParquetDataFile(fileName, requestStructType)
+    val reader = ParquetDataFile(fileName, requestStructType, new Configuration())
     val meta = reader.createDataFileHandle(DataGenerator.configuration)
     val footer = meta.footer
 

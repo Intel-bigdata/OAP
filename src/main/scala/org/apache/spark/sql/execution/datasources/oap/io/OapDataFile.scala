@@ -31,16 +31,18 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.types._
-import org.apache.spark.util.CompletionIterator
 import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
+import org.apache.spark.util.CompletionIterator
 
 
-private[oap] case class OapDataFile(path: String, schema: StructType) extends DataFile {
+private[oap] case class OapDataFile(path: String, schema: StructType,
+                                    configuration: Configuration) extends DataFile {
 
   private val dictionaries = new Array[Dictionary](schema.length)
+  private val codecFactory = new CodecFactory(configuration)
+  private val meta: OapDataFileHandle = DataFileHandleCacheManager(this, configuration)
 
   def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
-    val meta: OapDataFileHandle = DataFileHandleCacheManager(this, conf)
     val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)
     val dictDataLens = meta.columnsMeta.map(_.dictionaryDataLength)
 
@@ -65,10 +67,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType) extends Da
   }
 
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): ChunkedByteBuffer = {
-    val meta: OapDataFileHandle = DataFileHandleCacheManager(this, conf)
     val groupMeta = meta.rowGroupsMeta(groupId)
-
-    val codecFactory = new CodecFactory(conf)
     val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
 
     // get the fiber data start position
@@ -124,61 +123,68 @@ private[oap] case class OapDataFile(path: String, schema: StructType) extends Da
   // full file scan
   // TODO: [linhong] two iterator functions are similar. Can we merge them?
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
-    val meta: OapDataFileHandle = DataFileHandleCacheManager(this, conf)
     val row = new BatchColumn()
-    (0 until meta.groupCount).iterator.flatMap { groupId =>
-      val cacheResults = requiredIds.map(id =>
-        FiberCacheManager.getOrElseUpdate(DataFiber(this, id, groupId), conf))
-
-      val columns = cacheResults.zip(requiredIds).map { case (cacheResult, id) =>
-          new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, cacheResult.buffer)
-      }
-
-      val iterator = if (groupId < meta.groupCount - 1) {
-        // not the last row group
-        row.reset(meta.rowCountInEachGroup, columns).toIterator
-      } else {
-        row.reset(meta.rowCountInLastGroup, columns).toIterator
-      }
-      CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
-        cacheResults.zip(requiredIds).foreach {
-          case (cacheResult, id) => closeRowGroup(DataFiber(this, id, groupId), cacheResult)
-        }
-      )
-    }
-  }
-
-  // scan by given row ids, and we assume the rowIds are sorted
-  def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
-  : Iterator[InternalRow] = {
-    val meta: OapDataFileHandle = DataFileHandleCacheManager(this, conf)
-    val row = new BatchColumn()
-    val groupIds = rowIds.groupBy(rowId => (rowId / meta.rowCountInEachGroup).toInt)
-    groupIds.iterator.flatMap {
-      case (groupId, subRowIds) =>
+    val iterator =
+      (0 until meta.groupCount).iterator.flatMap { groupId =>
         val cacheResults = requiredIds.map(id =>
           FiberCacheManager.getOrElseUpdate(DataFiber(this, id, groupId), conf))
 
         val columns = cacheResults.zip(requiredIds).map { case (cacheResult, id) =>
-            new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, cacheResult.buffer)
+          new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, cacheResult.buffer)
         }
 
-        if (groupId < meta.groupCount - 1) {
+        val iterator = if (groupId < meta.groupCount - 1) {
           // not the last row group
-          row.reset(meta.rowCountInEachGroup, columns)
+          row.reset(meta.rowCountInEachGroup, columns).toIterator
         } else {
-          row.reset(meta.rowCountInLastGroup, columns)
+          row.reset(meta.rowCountInLastGroup, columns).toIterator
         }
-
-        val iterator =
-          subRowIds.iterator.map(rowId => row.moveToRow((rowId % meta.rowCountInEachGroup).toInt))
-
         CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
           cacheResults.zip(requiredIds).foreach {
             case (cacheResult, id) => closeRowGroup(DataFiber(this, id, groupId), cacheResult)
           }
         )
-    }
+      }
+    CompletionIterator[InternalRow, Iterator[InternalRow]](iterator, close())
+  }
+
+  // scan by given row ids, and we assume the rowIds are sorted
+  def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
+  : Iterator[InternalRow] = {
+    val row = new BatchColumn()
+    val groupIds = rowIds.groupBy(rowId => (rowId / meta.rowCountInEachGroup).toInt)
+    val iterator =
+      groupIds.iterator.flatMap {
+        case (groupId, subRowIds) =>
+          val cacheResults = requiredIds.map(id =>
+            FiberCacheManager.getOrElseUpdate(DataFiber(this, id, groupId), conf))
+
+          val columns = cacheResults.zip(requiredIds).map { case (cacheResult, id) =>
+            new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, cacheResult.buffer)
+          }
+
+          if (groupId < meta.groupCount - 1) {
+            // not the last row group
+            row.reset(meta.rowCountInEachGroup, columns).toIterator
+          } else {
+            row.reset(meta.rowCountInLastGroup, columns).toIterator
+          }
+
+          val iterator =
+            subRowIds.iterator.map(rowId => row.moveToRow((rowId % meta.rowCountInEachGroup).toInt))
+
+          CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
+            cacheResults.zip(requiredIds).foreach {
+              case (cacheResult, id) => closeRowGroup(DataFiber(this, id, groupId), cacheResult)
+            }
+          )
+      }
+    CompletionIterator[InternalRow, Iterator[InternalRow]](iterator, close())
+  }
+
+  def close(): Unit = {
+    // We don't close DataFileHandle in order to re-use it from cache.
+    codecFactory.release()
   }
 
   override def createDataFileHandle(conf: Configuration): OapDataFileHandle = {
