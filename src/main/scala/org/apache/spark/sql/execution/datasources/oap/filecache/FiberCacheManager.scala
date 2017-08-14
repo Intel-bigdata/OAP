@@ -20,8 +20,10 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.util.concurrent.TimeUnit
 
 import scala.collection.mutable
+
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
