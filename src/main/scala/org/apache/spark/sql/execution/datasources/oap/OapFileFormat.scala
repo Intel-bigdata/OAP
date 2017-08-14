@@ -373,12 +373,12 @@ private[oap] class OapOutputWriter(
   private val writer: OapDataWriter = {
     val isCompressed: Boolean = FileOutputFormat.getCompressOutput(context)
     val conf: Configuration = context.getConfiguration()
-    val compressionFileFormat: String = ""
     val compressionType: String =
       conf.get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).toString()
-    if (!compressionType.isEmpty() && !compressionType.matches("UNCOMPRESSED")) {
-      compressionFileFormat.concat("." + compressionType.toLowerCase())
-    }
+    val compressionFileFormat: String =
+      if (!compressionType.isEmpty() && !compressionType.matches("UNCOMPRESSED")) {
+        "." + compressionType.toLowerCase()
+      } else ""
     val file: Path = new Path(path, getFileName(compressionFileFormat +
                                                 OapFileFormat.OAP_DATA_EXTENSION))
     val fs: FileSystem = file.getFileSystem(conf)
