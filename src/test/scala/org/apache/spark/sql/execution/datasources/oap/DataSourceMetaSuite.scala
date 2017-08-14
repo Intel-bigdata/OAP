@@ -25,6 +25,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfter
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.internal.SQLConf
@@ -36,6 +37,8 @@ import org.apache.spark.util.Utils
 class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
   import testImplicits._
   private var tmpDir: File = null
+
+  protected override val sparkConf = new SparkConf().set("spark.memory.offHeap.size", "100m")
 
   override def beforeAll(): Unit = {
     super.beforeAll()

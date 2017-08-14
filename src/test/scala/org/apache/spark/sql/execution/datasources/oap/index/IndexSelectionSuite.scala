@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.SaveMode
@@ -36,6 +37,8 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
   import testImplicits._
   private var tempDir: File = null
   private var path: Path = null
+
+  protected override val sparkConf = new SparkConf().set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)

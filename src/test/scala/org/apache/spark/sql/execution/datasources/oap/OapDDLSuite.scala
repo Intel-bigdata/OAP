@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
@@ -29,6 +30,8 @@ import org.apache.spark.util.Utils
 
 class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
   import testImplicits._
+
+  protected override val sparkConf = new SparkConf().set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)

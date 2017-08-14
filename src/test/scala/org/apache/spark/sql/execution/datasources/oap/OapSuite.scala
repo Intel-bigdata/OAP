@@ -21,6 +21,7 @@ import java.io.File
 
 import org.scalatest.BeforeAndAfter
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
@@ -32,7 +33,8 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
   import testImplicits._
   private var path: File = null
   private var parquetPath: File = null
-  private var df: DataFrame = null
+
+  protected override val sparkConf = new SparkConf().set("spark.memory.offHeap.size", "100m")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
