@@ -378,6 +378,8 @@ private[oap] class OapOutputWriter(
       conf.get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).toString()
     if (!compressionFormat.isEmpty() && !compressionFormat.matches("UNCOMPRESSED")) {
       compressionFormat = "." + compressionFormat.toLowerCase()
+    } else {
+      compressionFormat = ""
     }
     val file: Path = new Path(path, getFileName(compressionFormat +
                                                 OapFileFormat.OAP_DATA_EXTENSION))
