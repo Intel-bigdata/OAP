@@ -77,6 +77,54 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
     }
   }
 
+  test("Add the corresponding compression type for the OAP data file name if any") {
+    val defaultCompressionType =
+      sqlContext.conf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
+    val fileNameIterator = path.listFiles()
+    for (fileName <- fileNameIterator) {
+      if (fileName.toString().endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
+          assert(fileName.toString().contains(defaultCompressionType) == true)
+      }
+    }
+
+    sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, "SNAPPY")
+    val snappyDf = sqlContext.read.format("oap").load(path.getAbsolutePath)
+    snappyDf.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
+    val snappyCompressionType =
+      sqlContext.conf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
+    val snappyFileNameIterator = path.listFiles()
+    for (fileName <- snappyFileNameIterator) {
+      if (fileName.toString().endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
+          assert(fileName.toString().contains(snappyCompressionType) == true)
+      }
+    }
+
+    sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, "LZO")
+    val lzoDf = sqlContext.read.format("oap").load(path.getAbsolutePath)
+    lzoDf.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
+    val lzoCompressionType =
+      sqlContext.conf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
+    val lzoFileNameIterator = path.listFiles()
+    for (fileName <- lzoFileNameIterator) {
+      if (fileName.toString().endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
+          assert(fileName.toString().contains(lzoCompressionType) == true)
+      }
+    }
+
+    // If the OAP data file is uncompressed, keep the original file name.
+    sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, "UNCOMPRESSED")
+    val uncompressDf = sqlContext.read.format("oap").load(path.getAbsolutePath)
+    uncompressDf.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
+    val uncompressCompressionType =
+      sqlContext.conf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
+    val uncompressFileNameIterator = path.listFiles()
+    for (fileName <- uncompressFileNameIterator) {
+      if (fileName.toString().endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
+          assert(fileName.toString().contains(uncompressCompressionType) == false)
+      }
+    }
+  }
+
   /** Verifies data and schema. */
   private def verifyFrame(df: DataFrame): Unit = {
     // schema
