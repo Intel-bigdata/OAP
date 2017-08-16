@@ -371,18 +371,18 @@ private[oap] class OapOutputWriter(
     partitionString = ps
   }
   private val writer: OapDataWriter = {
-    val isCompressed: Boolean = FileOutputFormat.getCompressOutput(context)
-    val conf: Configuration = context.getConfiguration()
-    val compressionType: String =
+    val isCompressed = FileOutputFormat.getCompressOutput(context)
+    val conf = context.getConfiguration()
+    val compressionType =
       conf.get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).trim()
-    val compressionFileFormat: String =
+    val compressionFileFormat =
       if (!compressionType.isEmpty() && !compressionType.matches("UNCOMPRESSED")) {
         "." + compressionType.toLowerCase()
       } else ""
-    val file: Path = new Path(path, getFileName(compressionFileFormat +
-                                                OapFileFormat.OAP_DATA_EXTENSION))
-    val fs: FileSystem = file.getFileSystem(conf)
-    val fileOut: FSDataOutputStream = fs.create(file, false)
+    val file =
+      new Path(path, getFileName(compressionFileFormat + OapFileFormat.OAP_DATA_EXTENSION))
+    val fs = file.getFileSystem(conf)
+    val fileOut = fs.create(file, false)
 
     new OapDataWriter(isCompressed, fileOut, dataSchema, conf)
   }
