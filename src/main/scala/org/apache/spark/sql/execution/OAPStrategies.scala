@@ -22,7 +22,8 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.hadoop.fs.{BlockLocation, FileStatus, LocatedFileStatus, Path}
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.{expressions, TableIdentifier}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.{expressions, InternalRow, TableIdentifier}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical
@@ -32,6 +33,7 @@ import org.apache.spark.sql.execution.DataSourceScanExec.{INPUT_PATHS, PUSHED_FI
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.Strategy
+import org.apache.spark.util.Utils
 
 trait OAPStrategies {
 
@@ -65,8 +67,8 @@ trait OAPStrategies {
             IntegerLiteral(limit),
             logical.Project(projectList, logical.Sort(order, true, child))) =>
           val childPlan = calcChildPlan(child, limit, order)
-          execution.TakeOrderedAndProjectExec(
-            limit, order, projectList, childPlan) :: Nil
+          execution.TakeOrderedAndProjectExec(limit, order,
+                                              projectList, childPlan) :: Nil
         case _ =>
           Nil
       }
@@ -84,9 +86,10 @@ trait OAPStrategies {
             (file.fileFormat.isInstanceOf[OapFileFormat] &&
               file.fileFormat.initialize(file.sparkSession, file.options, file.location)
               .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes))) {
-          pushDownSortToOAPFileScan(projectList, filters,
-                                        relation, file, table,
-                                        limit, order.head)
+          PushDownSortToOAPFileScanExec(limit, order, projectList,
+                                        TakeOrderedOAPFileScan(projectList, filters,
+                                                                      relation, file, table,
+                                                                      limit, order.head))
         }
         else PlanLater(child)
       case _ => PlanLater(child)
@@ -98,10 +101,10 @@ trait OAPStrategies {
      * and limit config were pushed down to FileScanRDD's reader function.
      * TODO: remove OAP irrelevant code.
      */
-    def pushDownSortToOAPFileScan(projects: Seq[NamedExpression], filters: Seq[Expression],
-                                      l: LogicalPlan, files : HadoopFsRelation,
-                                      table: Option[TableIdentifier],
-                                      limit : Int, order : SortOrder): SparkPlan = {
+    def TakeOrderedOAPFileScan(projects: Seq[NamedExpression], filters: Seq[Expression],
+                               l: LogicalPlan, files : HadoopFsRelation,
+                               table: Option[TableIdentifier],
+                               limit : Int, order : SortOrder): SparkPlan = {
         // Filters on this relation fall into four categories based
         // on where we can use them to avoid
         // reading unneeded data:
@@ -300,4 +303,34 @@ trait OAPStrategies {
       }
     }
   }
+}
+
+/**
+ * A simple wrapper Exec to mark push down execution, which
+ * can be easily viewed by sql explain.
+ */
+case class PushDownSortToOAPFileScanExec(
+                                          limit: Int,
+                                          sortOrder: Seq[SortOrder],
+                                          projectList: Seq[NamedExpression],
+                                          child: SparkPlan) extends UnaryExecNode {
+
+  /**
+   * Here we can not tell its order because rows in each partition may not in order
+   * because they could come from different files, which is because spark combines
+   * files reading sometimes (depends on various conditions) for better performance.
+   * Refer to fileScanRDD for the file reading combination.
+   */
+  override def outputOrdering: Seq[SortOrder] = Nil
+
+  override def simpleString: String = {
+    val orderByString = Utils.truncatedString(sortOrder, "[", ",", "]")
+    val outputString = Utils.truncatedString(output, "[", ",", "]")
+
+    s"PushDownSortToOAPFileScanExec(limit=$limit, orderBy=$orderByString, output=$outputString)"
+  }
+
+  override protected def doExecute(): RDD[InternalRow] = child.execute()
+
+  override def output: Seq[Attribute] = child.output
 }
