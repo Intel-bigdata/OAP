@@ -69,6 +69,7 @@ object FiberCacheManager extends Logging {
         dataFileIdMap.getOrElseUpdate(file.path, file)
         FiberBlockId("data_" + file.path + "_" + columnIndex + "_" + rowGroupId)
       case IndexFiber(file) =>
+        // TODO: Need to improve this if we have multiple fibers in one index file
         FiberBlockId("index_" + file.file)
     }
   }
