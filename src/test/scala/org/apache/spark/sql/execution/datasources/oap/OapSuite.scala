@@ -79,6 +79,27 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
     }
   }
 
+  test("Add the corresponding compression type for the OAP data file name if any") {
+    Seq("GZIP", "SNAPPY", "LZO", "UNCOMPRESSED").foreach (codec => {
+      sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, codec)
+      val df = sqlContext.read.format("oap").load(path.getAbsolutePath)
+      df.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
+      val compressionType =
+        sqlContext.conf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
+      val fileNameIterator = path.listFiles()
+      for (fileName <- fileNameIterator) {
+        if (fileName.toString().endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
+          // If the OAP data file is uncompressed, keep the original file name.
+          if (!codec.matches("UNCOMPRESSED")) {
+            assert(fileName.toString().contains(compressionType) == true)
+          } else {
+            assert(fileName.toString().contains(compressionType) == false)
+          }
+        }
+      }
+    })
+  }
+
   /** Verifies data and schema. */
   private def verifyFrame(df: DataFrame): Unit = {
     // schema
