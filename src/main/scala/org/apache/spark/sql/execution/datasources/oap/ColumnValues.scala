@@ -32,8 +32,8 @@ import org.apache.spark.util.io.ChunkedByteBuffer
 class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByteBuffer) {
   require(dataType.isInstanceOf[AtomicType], "Only atomic type accepted for now.")
 
-  private val (baseObject, baseOffset): (Object, Long) = buffer.chunks.head match {
-    case buf: DirectBuffer => (null, buf.address())
+  private val (baseObject, baseOffset): (Object, Long) = buffer.chunks.headOption match {
+    case Some(buf: DirectBuffer) => (null, buf.address())
     case _ => (buffer.toArray, Platform.BYTE_ARRAY_OFFSET)
   }
   // for any FiberData, the first defaultSize / 8 will be the bitmask
