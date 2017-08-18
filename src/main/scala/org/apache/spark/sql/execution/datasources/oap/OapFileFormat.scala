@@ -283,7 +283,7 @@ private[sql] class OapFileFormat extends FileFormat
 
           val conf = broadcastedHadoopConf.value.value
           val dataFile = DataFile(file.filePath, m.schema, m.dataReaderClassName, conf)
-          val dataFileHandle: DataFileHandle = DataFileHandleCacheManager(dataFile, conf)
+          val dataFileHandle: DataFileHandle = DataFileHandleCacheManager(dataFile)
           if (dataFileHandle.isInstanceOf[OapDataFileHandle] && filters.exists(filter =>
             canSkipFile(dataFileHandle.asInstanceOf[OapDataFileHandle].columnsMeta.map(
               _.statistics), filter, m.schema))) {
