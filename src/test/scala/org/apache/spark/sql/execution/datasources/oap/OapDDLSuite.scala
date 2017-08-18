@@ -31,7 +31,7 @@ import org.apache.spark.util.Utils
 class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
   import testImplicits._
 
-  protected override val sparkConf = new SparkConf().set("spark.memory.offHeap.size", "100m")
+  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)

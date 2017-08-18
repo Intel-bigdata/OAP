@@ -38,7 +38,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
   import testImplicits._
   private var tmpDir: File = null
 
-  protected override val sparkConf = new SparkConf().set("spark.memory.offHeap.size", "100m")
+  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeAll(): Unit = {
     super.beforeAll()

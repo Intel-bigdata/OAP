@@ -38,7 +38,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
   private var tempDir: File = null
   private var path: Path = null
 
-  protected override val sparkConf = new SparkConf().set("spark.memory.offHeap.size", "100m")
+  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)

@@ -38,7 +38,7 @@ class FiberSuite extends SharedSQLContext with Logging {
   private var file: File = _
   val conf: Configuration = new Configuration()
 
-  protected override val sparkConf = new SparkConf().set("spark.memory.offHeap.size", "100m")
+  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeAll(): Unit = {
     super.beforeAll()

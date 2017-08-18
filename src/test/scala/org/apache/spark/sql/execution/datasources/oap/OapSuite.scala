@@ -34,7 +34,7 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
   private var path: File = null
   private var parquetPath: File = null
 
-  protected override val sparkConf = new SparkConf().set("spark.memory.offHeap.size", "100m")
+  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
