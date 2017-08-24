@@ -61,14 +61,12 @@ trait OAPStrategies {
       case logical.ReturnAnswer(rootPlan) => rootPlan match {
         case logical.Limit(IntegerLiteral(limit), logical.Sort(order, true, child)) =>
           val childPlan = calcChildPlan(child, limit, order)
-          TakeOrderedAndProjectExec(limit, order, child.output,
-                                    childPlan) :: Nil
+          execution.TakeOrderedAndProjectExec(limit, order, child.output, childPlan) :: Nil
         case logical.Limit(
             IntegerLiteral(limit),
             logical.Project(projectList, logical.Sort(order, true, child))) =>
           val childPlan = calcChildPlan(child, limit, order)
-          execution.TakeOrderedAndProjectExec(limit, order,
-                                              projectList, childPlan) :: Nil
+          execution.TakeOrderedAndProjectExec(limit, order, projectList, childPlan) :: Nil
         case _ =>
           Nil
       }
@@ -87,9 +85,7 @@ trait OAPStrategies {
               file.fileFormat.initialize(file.sparkSession, file.options, file.location)
               .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes))) {
           PushDownSortToOAPFileScanExec(limit, order, projectList,
-                                        TakeOrderedOAPFileScan(projectList, filters,
-                                                                      relation, file, table,
-                                                                      limit, order.head))
+            TakeOrderedOAPFileScan(projectList, filters, relation, file, table, limit, order.head))
         }
         else PlanLater(child)
       case _ => PlanLater(child)
@@ -101,10 +97,11 @@ trait OAPStrategies {
      * and limit config were pushed down to FileScanRDD's reader function.
      * TODO: remove OAP irrelevant code.
      */
-    def TakeOrderedOAPFileScan(projects: Seq[NamedExpression], filters: Seq[Expression],
-                               l: LogicalPlan, files : HadoopFsRelation,
-                               table: Option[TableIdentifier],
-                               limit : Int, order : SortOrder): SparkPlan = {
+    def TakeOrderedOAPFileScan(
+                                projects: Seq[NamedExpression], filters: Seq[Expression],
+                                l: LogicalPlan, files : HadoopFsRelation,
+                                table: Option[TableIdentifier],
+                                limit : Int, order : SortOrder): SparkPlan = {
         // Filters on this relation fall into four categories based
         // on where we can use them to avoid
         // reading unneeded data:
@@ -273,8 +270,8 @@ trait OAPStrategies {
     // fraction the segment, and returns location hosts of that block.
     // If no such block can be found, returns an empty array.
     private[OAPStrategies] def getBlockHosts(
-                               blockLocations: Array[BlockLocation],
-                               offset: Long, length: Long): Array[String] = {
+                                              blockLocations: Array[BlockLocation],
+                                              offset: Long, length: Long): Array[String] = {
       val candidates = blockLocations.map {
         // The fragment starts from a position within this block
         case b if b.getOffset <= offset && offset < b.getOffset + b.getLength =>

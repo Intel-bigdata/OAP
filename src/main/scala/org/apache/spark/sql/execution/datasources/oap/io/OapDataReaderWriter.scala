@@ -177,13 +177,13 @@ private[oap] class OapDataReader(
         val isTesting = conf.getBoolean(SQLConf.OAP_IS_TESTING.key,
                               SQLConf.OAP_IS_TESTING.defaultValue.get)
         val iter =
-          if (indexFileSize > dataFileSize * 0.7 && !isTesting) {
+          if (limit <= 0 && indexFileSize > dataFileSize * 0.7 && !isTesting) {
             logWarning(s"Index File size $indexFileSize B is too large comparing " +
                         s"to Data File Size $dataFileSize. Using Data File Scan instead.")
             fileScanner.iterator(conf, requiredIds)
           } else {
             statsAnalyseResult match {
-              case StaticsAnalysisResult.FULL_SCAN =>
+              case StaticsAnalysisResult.FULL_SCAN if (limit <= 0) =>
                 fileScanner.iterator(conf, requiredIds)
               case StaticsAnalysisResult.USE_INDEX =>
                 fs.initialize(path, conf)
