@@ -186,6 +186,7 @@ private[oap] class OapDataReader(
               case StaticsAnalysisResult.FULL_SCAN if (limit <= 0) =>
                 fileScanner.iterator(conf, requiredIds)
               case StaticsAnalysisResult.USE_INDEX =>
+                conf.setBoolean("oap.use_index", true)
                 fs.initialize(path, conf)
                 // total Row count can be get from the filter scanner
                 val rowIDs = {

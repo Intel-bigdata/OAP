@@ -144,6 +144,8 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
 
       // files.fileFormat.initialize(files.sparkSession, files.options, files.location)
 
+      val hadoopConf = files.sparkSession.sessionState.newHadoopConfWithOptions(files.options)
+      hadoopConf.setBoolean("oap.use_index", false)
       val readFile = files.fileFormat.buildReaderWithPartitionValues(
         sparkSession = files.sparkSession,
         dataSchema = files.dataSchema,
@@ -151,7 +153,7 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
         requiredSchema = prunedDataSchema,
         filters = pushedDownFilters,
         options = files.options,
-        hadoopConf = files.sparkSession.sessionState.newHadoopConfWithOptions(files.options))
+        hadoopConf)
 
       val plannedPartitions = files.bucketSpec match {
         case Some(bucketing) if files.sparkSession.sessionState.conf.bucketingEnabled =>
@@ -261,6 +263,12 @@ private[sql] object FileSourceStrategy extends Strategy with Logging {
         withFilter
       } else {
         execution.ProjectExec(projects, withFilter)
+      }
+      val use_index = hadoopConf.getBoolean("oap.use_index", false)
+      if (use_index) {
+        logInfo("Used index by OAP")
+      } else {
+        logInfo("Not used index by OAP")
       }
 
       withProjections :: Nil

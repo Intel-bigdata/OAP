@@ -45,7 +45,7 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     logDebug("Loading Index File: " + path)
-    logDebug("\tFile Size: " + path.getFileSystem(conf).getFileStatus(path).getLen)
+    logDebug("\t Index File Size: " + path.getFileSystem(conf).getFileStatus(path).getLen)
     val indexFile = IndexFile(path)
     indexFiber = IndexFiber(indexFile)
     indexData = FiberCacheManager.getOrElseUpdate(indexFiber, conf)
