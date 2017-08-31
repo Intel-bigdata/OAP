@@ -250,12 +250,6 @@ private[sql] class OapFileFormat extends FileFormat
             // determine whether we can use index
             supportFilters.foreach(filter => logDebug("\t" + filter.toString))
             ScannerBuilder.build(supportFilters, ic)
-            if (options.contains(
-              OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)) {
-              ic.getScanner.get.setScanNumLimit(
-                options.get(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY).get.toInt
-              )
-            }
           }
         }
 
@@ -266,10 +260,6 @@ private[sql] class OapFileFormat extends FileFormat
           sparkSession.conf.get(SQLConf.OAP_FULL_SCAN_THRESHOLD))
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
-
-        val isAscending = options.getOrElse(
-          OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY, "false").toBoolean
-        val limit = options.getOrElse(OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY, "0").toInt
 
         (file: PartitionedFile) => {
           assert(file.partitionValues.numFields == partitionSchema.size)
@@ -283,7 +273,7 @@ private[sql] class OapFileFormat extends FileFormat
           } else {
             val iter = new OapDataReader(
               new Path(new URI(file.filePath)), m, filterScanner, requiredIds)
-              .initialize(conf, isAscending, limit)
+              .initialize(conf, options)
 
             val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
             val joinedRow = new JoinedRow()
