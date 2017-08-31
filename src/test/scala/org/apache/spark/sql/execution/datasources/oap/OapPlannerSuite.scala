@@ -19,12 +19,12 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.SparkConf
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.execution.OAPStrategies
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
+import org.apache.spark.SparkConf
 
 case class Source(name: String, age: Int, addr: String, phone: String, height: Int)
 
@@ -35,20 +35,26 @@ class OapPlannerSuite
   with OAPStrategies
 {
   import testImplicits._
-
   sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val path1 = Utils.createTempDir().getAbsolutePath
+    val path2 = Utils.createTempDir().getAbsolutePath
 
     sql(s"""CREATE TEMPORARY VIEW oap_sort_opt_table (a INT, b STRING)
            | USING oap
            | OPTIONS (path '$path1')""".stripMargin)
+
+    sql(s"""CREATE TEMPORARY VIEW oap_distinct_opt_table (a INT, b STRING)
+           | USING oap
+           | OPTIONS (path '$path2')""".stripMargin)
+
   }
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("oap_sort_opt_table")
+    sqlContext.dropTempTable("oap_distinct_opt_table")
   }
 
   test("SortPushDown Test") {
@@ -62,6 +68,9 @@ class OapPlannerSuite
     sql("insert overwrite table oap_sort_opt_table select * from t")
     sql("create oindex index1 on oap_sort_opt_table (a)")
     sql("create oindex index2 on oap_sort_opt_table (b)")
+
+    sql("explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7")
+      .collect().map(println(_))
 
     // ASC
     checkAnswer(
@@ -99,5 +108,45 @@ class OapPlannerSuite
 
     sql("drop oindex index1 on oap_sort_opt_table")
     sql("drop oindex index2 on oap_sort_opt_table")
+  }
+
+  test("Distinct index scan if SemiJoin Test") {
+    spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
+    spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
+    val data = (1 to 300).map{ i => (i, s"this is test $i")}
+    val dataRDD = spark.sparkContext.parallelize(data, 10)
+
+    dataRDD.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_sort_opt_table select * from t")
+    sql("create oindex index1 on oap_sort_opt_table (a)")
+
+    val data1 = (1 to 300).map{ i => (i % 10, s"this is test $i")}
+    val dataRDD1 = spark.sparkContext.parallelize(data1, 5)
+
+    dataRDD1.toDF("key", "value").createOrReplaceTempView("t1")
+    sql("insert overwrite table oap_distinct_opt_table select * from t1")
+    sql("create oindex index1 on oap_distinct_opt_table (a)")
+
+    spark.experimental.extraStrategies = SortPushDownStrategy :: OAPSemiJoinStrategy :: Nil
+//    checkKeywordsExist(
+//      sql("explain SELECT * " +
+//      "FROM oap_sort_opt_table t1 " +
+//      "WHERE EXISTS " +
+//      "(SELECT 1 FROM oap_distinct_opt_table t2 " +
+//      "WHERE t1.a = t2.a AND t2.a >= 1 AND t1.a < 5) " +
+//      "ORDER BY a"), "DistinctOapFileScanExec")
+
+    checkAnswer(
+      sql("SELECT * " +
+      "FROM oap_sort_opt_table t1 " +
+      "WHERE EXISTS " +
+      "(SELECT 1 FROM oap_distinct_opt_table t2 " +
+      "WHERE t1.a = t2.a AND t2.a >= 1 AND t1.a < 5) " +
+      "ORDER BY a"),
+      Seq(
+        Row(1, "this is test 1"),
+        Row(2, "this is test 2"),
+        Row(3, "this is test 3"),
+        Row(4, "this is test 4")))
   }
 }

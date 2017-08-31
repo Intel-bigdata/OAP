@@ -26,7 +26,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, FSDataOutputStream, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-import org.apache.parquet.hadoop.util.SerializationUtil
+import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
@@ -34,15 +34,14 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateOrdering, GenerateUnsafeProjection}
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io._
-import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.util.SerializableConfiguration
-
 
 private[sql] class OapFileFormat extends FileFormat
   with DataSourceRegister
@@ -122,45 +121,29 @@ private[sql] class OapFileFormat extends FileFormat
                             options: Map[String, String],
                             path: Path): Boolean = false
 
-  override private[sql] def buildReaderWithPartitionValues(
-      sparkSession: SparkSession,
-      dataSchema: StructType,
-      partitionSchema: StructType,
-      requiredSchema: StructType,
-      filters: Seq[Filter],
-      options: Map[String, String],
-      hadoopConf: Configuration): (PartitionedFile) => Iterator[InternalRow] = {
-    // For Parquet data source, `buildReader` already handles partition values appending. Here we
-    // simply delegate to another buildReaderWithPartitionValues which has sort & limit support.
-    buildReaderWithPartitionValues(sparkSession, dataSchema, partitionSchema, requiredSchema,
-      filters, false, 0, options, hadoopConf)
-  }
-
   override def buildReader(
-      sparkSession: SparkSession,
-      dataSchema: StructType,
-      partitionSchema: StructType,
-      requiredSchema: StructType,
-      filters: Seq[Filter],
-      options: Map[String, String],
-      hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
-    buildReaderWithPartitionValues(sparkSession, dataSchema, partitionSchema, requiredSchema,
-                                    filters, false, 0, options, hadoopConf)
+                            sparkSession: SparkSession,
+                            dataSchema: StructType,
+                            partitionSchema: StructType,
+                            requiredSchema: StructType,
+                            filters: Seq[Filter],
+                            options: Map[String, String],
+                            hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
+    buildReaderWithPartitionValues(
+      sparkSession, dataSchema, partitionSchema, requiredSchema, filters, options, hadoopConf)
   }
 
-  // Build reader with sort and limit operation
-  private[sql] def buildReaderWithPartitionValues(sparkSession: SparkSession,
-                                                 dataSchema: StructType,
-                                                 partitionSchema: StructType,
-                                                 requiredSchema: StructType,
-                                                 filters: Seq[Filter],
-                                                 isAscending: Boolean,
-                                                 limit: Int,
-                                                 options: Map[String, String],
-                                                 hadoopConf: Configuration):
-                                                 (PartitionedFile) => Iterator[InternalRow] = {
+
+  override def buildReaderWithPartitionValues(
+                                               sparkSession: SparkSession,
+                                               dataSchema: StructType,
+                                               partitionSchema: StructType,
+                                               requiredSchema: StructType,
+                                               filters: Seq[Filter],
+                                               options: Map[String, String],
+                                               hadoopConf: Configuration
+                                             ): (PartitionedFile) => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
-    // OapFileFormat.deserializeDataSourceMeta(hadoopConf) match {
     meta match {
       case Some(m) =>
         logDebug("Building OapDataReader with "
@@ -267,6 +250,12 @@ private[sql] class OapFileFormat extends FileFormat
             // determine whether we can use index
             supportFilters.foreach(filter => logDebug("\t" + filter.toString))
             ScannerBuilder.build(supportFilters, ic)
+            if (options.contains(
+              OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)) {
+              ic.getScanner.get.setScanNumLimit(
+                options.get(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY).get.toInt
+              )
+            }
           }
         }
 
@@ -278,9 +267,12 @@ private[sql] class OapFileFormat extends FileFormat
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
+        val isAscending = options.getOrElse(
+          OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY, "false").toBoolean
+        val limit = options.getOrElse(OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY, "0").toInt
+
         (file: PartitionedFile) => {
           assert(file.partitionValues.numFields == partitionSchema.size)
-
           val conf = broadcastedHadoopConf.value.value
           val dataFile = DataFile(file.filePath, m.schema, m.dataReaderClassName, conf)
           val dataFileHandle: DataFileHandle = DataFileHandleCacheManager(dataFile)
@@ -506,4 +498,11 @@ private[sql] object OapFileFormat {
   def deserializeDataSourceMeta(conf: Configuration): Option[DataSourceMeta] = {
     SerializationUtil.readObjectFromConfAsBase64(OAP_DATA_SOURCE_META, conf)
   }
+
+  /**
+   * Oap Optimization Options.
+   */
+  val OAP_QUERY_ORDER_OPTION_KEY = "OapOrderQuery"
+  val OAP_QUERY_LIMIT_OPTION_KEY = "OapLimitQuery"
+  val OAP_INDEX_SCAN_NUM_OPTION_KEY = "OapLimitIndexScan"
 }

@@ -80,7 +80,7 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
           // find the first key in the left-most leaf node
           var tmpNode = root
           while (!tmpNode.isLeaf) tmpNode = tmpNode.childAt(0)
-          currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0)
+          currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0, getLimitScanNum())
         } else {
           // find the first identical key or the first key right greater than the specified one
           if (keySchema.size > interval.start.numFields) { // exists Dummy_Key
@@ -174,7 +174,7 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     if (node.isLeaf) {
       // here currentKey is equal to candidate or the last key on the left side
       // which is less than the candidate
-      val currentKey = new CurrentKey(node, m, 0)
+      val currentKey = new CurrentKey(node, m, 0, getLimitScanNum())
 
       if (notFind && findFirst) {
         // if not found and the goal is to find the start key, then let's move forward a key

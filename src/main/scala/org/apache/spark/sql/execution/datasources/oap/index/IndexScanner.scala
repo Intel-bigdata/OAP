@@ -46,6 +46,19 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
   var intervalArray: ArrayBuffer[RangeInterval] = _
   protected var keySchema: StructType = _
 
+  /**
+   * Scan N items from each index entry.
+   */
+  private var limitScan : Int = 0
+
+  def setScanNumLimit(scanNum : Int) : Unit = {
+    limitScan = scanNum
+  }
+
+  def getLimitScanNum() : Int = limitScan
+
+  def limitScanEnabled() : Boolean = limitScan > 0
+
   def meta: IndexMeta = idxMeta
   def getSchema: StructType = keySchema
 
