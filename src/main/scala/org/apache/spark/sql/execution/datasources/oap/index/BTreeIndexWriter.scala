@@ -59,15 +59,16 @@ private[oap] class BTreeIndexWriter(
     // configuration.set(DATASOURCE_OUTPUTPATH, outputPath)
     if (isAppend) {
       val fs = FileSystem.get(configuration)
-      var skip = true
       var nextFile = InputFileNameHolder.getInputFileName().toString
-      iterator.next()
+      var skip = fs.exists(IndexUtils.indexFileFromDataFile(new Path(nextFile), indexName, time))
+      // iterator.next()
       while(iterator.hasNext && skip) {
         val cacheFile = nextFile
         nextFile = InputFileNameHolder.getInputFileName().toString
         // avoid calling `fs.exists` for every row
-        skip = cacheFile == nextFile || fs.exists(new Path(nextFile))
-        iterator.next()
+        skip = cacheFile == nextFile ||
+          fs.exists(IndexUtils.indexFileFromDataFile(new Path(nextFile), indexName, time))
+        if(skip) iterator.next()
       }
       if (skip) return Nil
     }

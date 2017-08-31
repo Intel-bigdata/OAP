@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import java.sql.Date
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkConf
@@ -33,10 +35,12 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   import testImplicits._
 
   sparkConf.set("spark.memory.offHeap.size", "100m")
+  var currentPath: String = _
 
   override def beforeEach(): Unit = {
     sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val path = Utils.createTempDir().getAbsolutePath
+    currentPath = path
 
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b STRING)
            | USING oap
@@ -373,8 +377,14 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       Row(1, "this is test 1") :: Nil)
 
     sql("insert into table oap_test select * from t")
+    val check_path = new Path(currentPath)
+    assert(check_path.getFileSystem(
+      new Configuration()).globStatus(new Path(check_path, "*.index")).length == 2)
     sql("refresh oindex on oap_test")
+    assert(check_path.getFileSystem(
+      new Configuration()).globStatus(new Path(check_path, "*.index")).length == 4)
 
+    val a = sql("SELECT * FROM oap_test WHERE a = 1")
     checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
       Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
 
