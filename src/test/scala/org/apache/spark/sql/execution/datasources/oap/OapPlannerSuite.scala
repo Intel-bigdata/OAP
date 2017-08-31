@@ -69,8 +69,10 @@ class OapPlannerSuite
     sql("create oindex index1 on oap_sort_opt_table (a)")
     sql("create oindex index2 on oap_sort_opt_table (b)")
 
-    sql("explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7")
-      .collect().map(println(_))
+    // check strategy is applied.
+    checkKeywordsExist(
+      sql("explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"),
+      "PushDownSortToOAPFileScanExec")
 
     // ASC
     checkAnswer(
@@ -128,13 +130,13 @@ class OapPlannerSuite
     sql("create oindex index1 on oap_distinct_opt_table (a)")
 
     spark.experimental.extraStrategies = SortPushDownStrategy :: OAPSemiJoinStrategy :: Nil
-//    checkKeywordsExist(
-//      sql("explain SELECT * " +
-//      "FROM oap_sort_opt_table t1 " +
-//      "WHERE EXISTS " +
-//      "(SELECT 1 FROM oap_distinct_opt_table t2 " +
-//      "WHERE t1.a = t2.a AND t2.a >= 1 AND t1.a < 5) " +
-//      "ORDER BY a"), "DistinctOapFileScanExec")
+    checkKeywordsExist(
+      sql("explain SELECT * " +
+      "FROM oap_sort_opt_table t1 " +
+      "WHERE EXISTS " +
+      "(SELECT 1 FROM oap_distinct_opt_table t2 " +
+      "WHERE t1.a = t2.a AND t2.a >= 1 AND t1.a < 5) " +
+      "ORDER BY a"), "DistinctOapFileScanExec")
 
     checkAnswer(
       sql("SELECT * " +

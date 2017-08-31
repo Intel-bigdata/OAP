@@ -86,9 +86,9 @@ trait OAPStrategies extends Logging {
             (file.fileFormat.isInstanceOf[OapFileFormat] &&
               file.fileFormat.initialize(file.sparkSession, file.options, file.location)
               .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes))) {
-          val OapOption = file.options +
+          val OapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY -> limit.toString) +
-            (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString)
+            (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
           OrderLimitOapFileScanExec(
             limit, order, projectList,
             GenerateOapFileScanPlan(
