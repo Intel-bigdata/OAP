@@ -61,14 +61,12 @@ trait OAPStrategies extends Logging {
       case logical.ReturnAnswer(rootPlan) => rootPlan match {
         case logical.Limit(IntegerLiteral(limit), logical.Sort(order, true, child)) =>
           val childPlan = calcChildPlan(child, limit, order)
-          TakeOrderedAndProjectExec(limit, order, child.output,
-                                    childPlan) :: Nil
+          TakeOrderedAndProjectExec(limit, order, child.output, childPlan) :: Nil
         case logical.Limit(
             IntegerLiteral(limit),
             logical.Project(projectList, logical.Sort(order, true, child))) =>
           val childPlan = calcChildPlan(child, limit, order)
-          execution.TakeOrderedAndProjectExec(limit, order,
-                                              projectList, childPlan) :: Nil
+          TakeOrderedAndProjectExec(limit, order, projectList, childPlan) :: Nil
         case _ =>
           Nil
       }
@@ -385,7 +383,7 @@ case class OrderLimitOapFileScanExec(
     val orderByString = Utils.truncatedString(sortOrder, "[", ",", "]")
     val outputString = Utils.truncatedString(output, "[", ",", "]")
 
-    s"PushDownSortToOAPFileScanExec(limit=$limit, orderBy=$orderByString, output=$outputString)"
+    s"OrderLimitOapFileScanExec(limit=$limit, orderBy=$orderByString, output=$outputString)"
   }
 }
 
