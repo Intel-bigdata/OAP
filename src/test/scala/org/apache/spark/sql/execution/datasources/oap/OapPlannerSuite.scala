@@ -72,7 +72,7 @@ class OapPlannerSuite
     // check strategy is applied.
     checkKeywordsExist(
       sql("explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"),
-      "PushDownSortToOAPFileScanExec")
+      "OrderLimitOapFileScanExec")
 
     // ASC
     checkAnswer(
