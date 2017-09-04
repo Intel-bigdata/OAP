@@ -24,7 +24,6 @@ import org.apache.spark.sql.execution.OAPStrategies
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
-import org.apache.spark.SparkConf
 
 case class Source(name: String, age: Int, addr: String, phone: String, height: Int)
 

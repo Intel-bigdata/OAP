@@ -49,10 +49,10 @@ private[sql] class OapFileFormat extends FileFormat
   with Serializable {
 
   override def initialize(
-    sparkSession: SparkSession,
-    options: Map[String, String],
-    fileCatalog: FileCatalog,
-    readFiles: Option[Seq[FileStatus]] = None): FileFormat = {
+      sparkSession: SparkSession,
+      options: Map[String, String],
+      fileCatalog: FileCatalog,
+      readFiles: Option[Seq[FileStatus]] = None): FileFormat = {
     super.initialize(sparkSession, options, fileCatalog)
 
     val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
@@ -85,9 +85,9 @@ private[sql] class OapFileFormat extends FileFormat
   var meta: Option[DataSourceMeta] = _
 
   override def prepareWrite(
-    sparkSession: SparkSession,
-    job: Job, options: Map[String, String],
-    dataSchema: StructType): OutputWriterFactory = {
+      sparkSession: SparkSession,
+      job: Job, options: Map[String, String],
+      dataSchema: StructType): OutputWriterFactory = {
     val conf = job.getConfiguration
 
     // TODO: Should we have our own config util instead of SqlConf?
@@ -117,32 +117,32 @@ private[sql] class OapFileFormat extends FileFormat
   }
 
   override def isSplitable(
-                            sparkSession: SparkSession,
-                            options: Map[String, String],
-                            path: Path): Boolean = false
+      sparkSession: SparkSession,
+      options: Map[String, String],
+      path: Path): Boolean = false
 
   override def buildReader(
-                            sparkSession: SparkSession,
-                            dataSchema: StructType,
-                            partitionSchema: StructType,
-                            requiredSchema: StructType,
-                            filters: Seq[Filter],
-                            options: Map[String, String],
-                            hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
+      sparkSession: SparkSession,
+      dataSchema: StructType,
+      partitionSchema: StructType,
+      requiredSchema: StructType,
+      filters: Seq[Filter],
+      options: Map[String, String],
+      hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
     buildReaderWithPartitionValues(
       sparkSession, dataSchema, partitionSchema, requiredSchema, filters, options, hadoopConf)
   }
 
 
   override def buildReaderWithPartitionValues(
-                                               sparkSession: SparkSession,
-                                               dataSchema: StructType,
-                                               partitionSchema: StructType,
-                                               requiredSchema: StructType,
-                                               filters: Seq[Filter],
-                                               options: Map[String, String],
-                                               hadoopConf: Configuration
-                                             ): (PartitionedFile) => Iterator[InternalRow] = {
+      sparkSession: SparkSession,
+      dataSchema: StructType,
+      partitionSchema: StructType,
+      requiredSchema: StructType,
+      filters: Seq[Filter],
+      options: Map[String, String],
+      hadoopConf: Configuration
+  ): (PartitionedFile) => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
     meta match {
       case Some(m) =>
@@ -418,9 +418,9 @@ private[oap] case class OapWriteResult(
     fileName: String, rowsWritten: Int, partitionString: String)
 
 private[oap] class OapOutputWriter(
-                                            path: String,
-                                            dataSchema: StructType,
-                                            context: TaskAttemptContext) extends OutputWriter {
+    path: String,
+    dataSchema: StructType,
+    context: TaskAttemptContext) extends OutputWriter {
   private var rowCount = 0
   private var partitionString: String = ""
   override def setPartitionString(ps: String): Unit = {

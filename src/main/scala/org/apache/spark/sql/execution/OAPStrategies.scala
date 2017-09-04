@@ -18,19 +18,18 @@
 package org.apache.spark.sql.execution
 
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.fs.{BlockLocation, FileStatus, LocatedFileStatus, Path}
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{execution, SparkSession, Strategy}
-import org.apache.spark.sql.catalyst.{expressions, InternalRow, TableIdentifier}
+import org.apache.spark.sql.{SparkSession, Strategy, execution}
+import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier, expressions}
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalOperation}
-import org.apache.spark.sql.catalyst.plans.{logical, LeftSemi}
+import org.apache.spark.sql.catalyst.plans.{LeftSemi, logical}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.DataSourceScanExec.{INPUT_PATHS, PUSHED_FILTERS}
-import org.apache.spark.sql.execution.datasources.{CaseInsensitiveMap, _}
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.joins.BuildRight
 import org.apache.spark.util.Utils
@@ -73,8 +72,10 @@ trait OAPStrategies extends Logging {
       case _ => Nil
     }
 
-    def calcChildPlan(child : LogicalPlan, limit : Int, order : Seq[SortOrder])
-                      : SparkPlan = child match {
+    def calcChildPlan(
+        child : LogicalPlan,
+        limit : Int,
+        order : Seq[SortOrder]): SparkPlan = child match {
       case PhysicalOperation(
             projectList, filters, relation@LogicalRelation(file: HadoopFsRelation, _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
@@ -89,7 +90,7 @@ trait OAPStrategies extends Logging {
             (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
           OrderLimitOapFileScanExec(
             limit, order, projectList,
-            GenerateOapFileScanPlan(
+            createOapFileScanPlan(
               projectList, filters, relation, file, table, OapOption))
         }
         else PlanLater(child)
@@ -113,6 +114,11 @@ trait OAPStrategies extends Logging {
   object OAPSemiJoinStrategy extends Strategy with Logging {
     private def canBroadcast(plan: LogicalPlan): Boolean = {
       val conf = SparkSession.getActiveSession.get.sessionState.conf
+      /**
+       * We can take a much larger threshold here since if this optimization
+       * is applicable, only distinct item will be broadcasted, those data
+       * should much less than the origin table.
+       */
       plan.statistics.isBroadcastable ||
         plan.statistics.sizeInBytes <= conf.autoBroadcastJoinThreshold
     }
@@ -126,8 +132,9 @@ trait OAPStrategies extends Logging {
       case _ => Nil
     }
 
-    def calcChildPlan(child : LogicalPlan, order : Seq[SortOrder])
-    : SparkPlan = child match {
+    def calcChildPlan(
+        child : LogicalPlan,
+        order : Seq[SortOrder]): SparkPlan = child match {
       case PhysicalOperation(
       projectList, filters, relation@LogicalRelation(file: HadoopFsRelation, _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
@@ -142,7 +149,7 @@ trait OAPStrategies extends Logging {
           DistinctOapFileScanExec(
             scanNumber = 1,
             projectList,
-            GenerateOapFileScanPlan(projectList, filters, relation, file, table, OapOption))
+            createOapFileScanPlan(projectList, filters, relation, file, table, OapOption))
         }
         else PlanLater(child)
       case _ => PlanLater(child)
@@ -154,11 +161,11 @@ trait OAPStrategies extends Logging {
    * and limit config were pushed down to FileScanRDD's reader function.
    * TODO: remove OAP irrelevant code.
    */
-  def GenerateOapFileScanPlan(
-                               projects: Seq[NamedExpression], filters: Seq[Expression],
-                               l: LogicalPlan, files : HadoopFsRelation,
-                               table: Option[TableIdentifier],
-                               OapOption: Map[String, String]): SparkPlan = {
+  def createOapFileScanPlan(
+      projects: Seq[NamedExpression], filters: Seq[Expression],
+      l: LogicalPlan, files : HadoopFsRelation,
+      table: Option[TableIdentifier],
+      OapOption: Map[String, String]): SparkPlan = {
     // Filters on this relation fall into four categories based
     // on where we can use them to avoid
     // reading unneeded data:
@@ -312,8 +319,8 @@ trait OAPStrategies extends Logging {
    */
   object OAPFileUtils {
 
-    private[OAPStrategies] def getBlockLocations(file: FileStatus)
-    : Array[BlockLocation] = file match {
+    private[OAPStrategies] def getBlockLocations(
+        file: FileStatus): Array[BlockLocation] = file match {
       case f: LocatedFileStatus => f.getBlockLocations
       case f => Array.empty[BlockLocation]
     }
@@ -323,8 +330,8 @@ trait OAPStrategies extends Logging {
     // fraction the segment, and returns location hosts of that block.
     // If no such block can be found, returns an empty array.
     private[OAPStrategies] def getBlockHosts(
-                                              blockLocations: Array[BlockLocation],
-                                              offset: Long, length: Long): Array[String] = {
+        blockLocations: Array[BlockLocation],
+        offset: Long, length: Long): Array[String] = {
       val candidates = blockLocations.map {
         // The fragment starts from a position within this block
         case b if b.getOffset <= offset && offset < b.getOffset + b.getLength =>
@@ -374,10 +381,10 @@ abstract class OapFileScanExec extends UnaryExecNode {
 }
 
 case class OrderLimitOapFileScanExec(
-                                      limit: Int,
-                                      sortOrder: Seq[SortOrder],
-                                      projectList: Seq[NamedExpression],
-                                      child: SparkPlan) extends OapFileScanExec {
+    limit: Int,
+    sortOrder: Seq[SortOrder],
+    projectList: Seq[NamedExpression],
+    child: SparkPlan) extends OapFileScanExec {
 
   override def simpleString: String = {
     val orderByString = Utils.truncatedString(sortOrder, "[", ",", "]")
@@ -388,9 +395,9 @@ case class OrderLimitOapFileScanExec(
 }
 
 case class DistinctOapFileScanExec(
-                                    scanNumber: Int,
-                                    projectList: Seq[NamedExpression],
-                                    child: SparkPlan) extends OapFileScanExec {
+    scanNumber: Int,
+    projectList: Seq[NamedExpression],
+    child: SparkPlan) extends OapFileScanExec {
 
   override def simpleString: String = {
     val outputString = Utils.truncatedString(output, "[", ",", "]")
