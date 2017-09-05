@@ -366,7 +366,7 @@ trait OAPStrategies extends Logging {
  * A simple wrapper SparkPlan exec base class to mark OAP related execution,
  * which can be easily viewed by sql explain.
  */
-abstract class OapFileScanExec extends UnaryExecNode {
+abstract class OapFileScanExec extends UnaryExecNode with CodegenSupport {
   /**
    * Here we can not tell its order because rows in each partition may not in order
    * because they could come from different files, which is because spark combines
@@ -378,6 +378,21 @@ abstract class OapFileScanExec extends UnaryExecNode {
   override protected def doExecute(): RDD[InternalRow] = child.execute()
 
   override def output: Seq[Attribute] = child.output
+
+  def inputRDDs(): Seq[RDD[InternalRow]] = {
+    child.asInstanceOf[CodegenSupport].inputRDDs()
+  }
+
+  protected override def doProduce(ctx: CodegenContext): String = {
+    child.asInstanceOf[CodegenSupport].produce(ctx, this)
+  }
+
+  override def doConsume(
+      ctx: CodegenContext, input: Seq[ExprCode], row: ExprCode): String = {
+    s"""
+        ${consume(ctx, input)}
+     """.stripMargin
+  }
 }
 
 case class OrderLimitOapFileScanExec(
