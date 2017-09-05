@@ -73,9 +73,9 @@ trait OAPStrategies extends Logging {
     }
 
     def calcChildPlan(
-        child : LogicalPlan,
-        limit : Int,
-        order : Seq[SortOrder]): SparkPlan = child match {
+        child: LogicalPlan,
+        limit: Int,
+        order: Seq[SortOrder]): SparkPlan = child match {
       case PhysicalOperation(
             projectList, filters, relation@LogicalRelation(file: HadoopFsRelation, _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
@@ -85,13 +85,13 @@ trait OAPStrategies extends Logging {
             (file.fileFormat.isInstanceOf[OapFileFormat] &&
               file.fileFormat.initialize(file.sparkSession, file.options, file.location)
               .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes))) {
-          val OapOption = new CaseInsensitiveMap(file.options +
+          val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY -> limit.toString) +
             (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
-          OrderLimitOapFileScanExec(
+          OapOrderLimitFileScanExec(
             limit, order, projectList,
             createOapFileScanPlan(
-              projectList, filters, relation, file, table, OapOption))
+              projectList, filters, relation, file, table, oapOption))
         }
         else PlanLater(child)
       case _ => PlanLater(child)
@@ -133,8 +133,8 @@ trait OAPStrategies extends Logging {
     }
 
     def calcChildPlan(
-        child : LogicalPlan,
-        order : Seq[SortOrder]): SparkPlan = child match {
+        child: LogicalPlan,
+        order: Seq[SortOrder]): SparkPlan = child match {
       case PhysicalOperation(
       projectList, filters, relation@LogicalRelation(file: HadoopFsRelation, _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
@@ -144,12 +144,12 @@ trait OAPStrategies extends Logging {
           (file.fileFormat.isInstanceOf[OapFileFormat] &&
             file.fileFormat.initialize(file.sparkSession, file.options, file.location)
               .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes))) {
-          val OapOption = new CaseInsensitiveMap(file.options +
+          val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY -> "1"))
-          DistinctOapFileScanExec(
+          OapDistinctFileScanExec(
             scanNumber = 1,
             projectList,
-            createOapFileScanPlan(projectList, filters, relation, file, table, OapOption))
+            createOapFileScanPlan(projectList, filters, relation, file, table, oapOption))
         }
         else PlanLater(child)
       case _ => PlanLater(child)
@@ -389,13 +389,15 @@ abstract class OapFileScanExec extends UnaryExecNode with CodegenSupport {
 
   override def doConsume(
       ctx: CodegenContext, input: Seq[ExprCode], row: ExprCode): String = {
+    val count = 1
     s"""
-        ${consume(ctx, input)}
+       | if ($count == 0) continue;
+       | ${consume(ctx, input)}
      """.stripMargin
   }
 }
 
-case class OrderLimitOapFileScanExec(
+case class OapOrderLimitFileScanExec(
     limit: Int,
     sortOrder: Seq[SortOrder],
     projectList: Seq[NamedExpression],
@@ -405,11 +407,11 @@ case class OrderLimitOapFileScanExec(
     val orderByString = Utils.truncatedString(sortOrder, "[", ",", "]")
     val outputString = Utils.truncatedString(output, "[", ",", "]")
 
-    s"OrderLimitOapFileScanExec(limit=$limit, orderBy=$orderByString, output=$outputString)"
+    s"OapOrderLimitFileScanExec(limit=$limit, orderBy=$orderByString, output=$outputString)"
   }
 }
 
-case class DistinctOapFileScanExec(
+case class OapDistinctFileScanExec(
     scanNumber: Int,
     projectList: Seq[NamedExpression],
     child: SparkPlan) extends OapFileScanExec {
@@ -417,6 +419,6 @@ case class DistinctOapFileScanExec(
   override def simpleString: String = {
     val outputString = Utils.truncatedString(output, "[", ",", "]")
 
-    s"DistinctOapFileScanExec(output=$outputString, scan [$scanNumber] row of each index)"
+    s"OapDistinctFileScanExec(output=$outputString, scan [$scanNumber] row of each index)"
   }
 }

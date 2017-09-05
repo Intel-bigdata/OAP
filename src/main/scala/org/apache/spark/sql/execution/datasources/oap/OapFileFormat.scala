@@ -142,7 +142,7 @@ private[sql] class OapFileFormat extends FileFormat
       filters: Seq[Filter],
       options: Map[String, String],
       hadoopConf: Configuration
-  ): (PartitionedFile) => Iterator[InternalRow] = {
+  ): PartitionedFile => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
     meta match {
       case Some(m) =>
@@ -492,7 +492,7 @@ private[sql] object OapFileFormat {
   /**
    * Oap Optimization Options.
    */
-  val OAP_QUERY_ORDER_OPTION_KEY = "OapOrderQuery"
-  val OAP_QUERY_LIMIT_OPTION_KEY = "OapLimitQuery"
-  val OAP_INDEX_SCAN_NUM_OPTION_KEY = "OapLimitIndexScan"
+  val OAP_QUERY_ORDER_OPTION_KEY = "oap.scan.file.order"
+  val OAP_QUERY_LIMIT_OPTION_KEY = "oap.scan.file.limit"
+  val OAP_INDEX_SCAN_NUM_OPTION_KEY = "oap.scan.index.limit"
 }

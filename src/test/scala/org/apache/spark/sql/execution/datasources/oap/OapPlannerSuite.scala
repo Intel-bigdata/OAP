@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.execution.OAPStrategies
+import org.apache.spark.sql.execution._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
@@ -71,7 +71,7 @@ class OapPlannerSuite
     // check strategy is applied.
     checkKeywordsExist(
       sql("explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"),
-      "OrderLimitOapFileScanExec")
+      "OapOrderLimitFileScanExec")
 
     // ASC
     checkAnswer(
@@ -135,7 +135,7 @@ class OapPlannerSuite
       "WHERE EXISTS " +
       "(SELECT 1 FROM oap_distinct_opt_table t2 " +
       "WHERE t1.a = t2.a AND t2.a >= 1 AND t1.a < 5) " +
-      "ORDER BY a"), "DistinctOapFileScanExec")
+      "ORDER BY a"), "OapDistinctFileScanExec")
 
     checkAnswer(
       sql("SELECT * " +
@@ -149,5 +149,35 @@ class OapPlannerSuite
         Row(2, "this is test 2"),
         Row(3, "this is test 3"),
         Row(4, "this is test 4")))
+
+    sql("drop oindex index1 on oap_sort_opt_table")
+    sql("drop oindex index1 on oap_distinct_opt_table")
+  }
+
+  test("OapFileScan WholeStageCodeGen Check") {
+    spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
+    val data = (1 to 300).map{ i => (i, s"this is test $i")}
+    val dataRDD = spark.sparkContext.parallelize(data, 10)
+
+    dataRDD.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_sort_opt_table select * from t")
+    sql("create oindex index1 on oap_sort_opt_table (a)")
+
+    spark.experimental.extraStrategies = SortPushDownStrategy :: OAPSemiJoinStrategy :: Nil
+    spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
+    val sqlString =
+      "explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"
+
+    // OapOrderLimitFileScanExec is applied.
+    checkKeywordsExist(sql(sqlString), "OapOrderLimitFileScanExec")
+    // OapOrderLimitFileScanExec WholeStageCodeGen is disabled.
+    checkKeywordsNotExist(sql(sqlString), "*OapOrderLimitFileScanExec")
+
+    spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "true")
+
+    // OapOrderLimitFileScanExec WholeStageCodeGen is enabled.
+    checkKeywordsExist(sql(sqlString), "*OapOrderLimitFileScanExec")
+
+    sql("drop oindex index1 on oap_sort_opt_table")
   }
 }
