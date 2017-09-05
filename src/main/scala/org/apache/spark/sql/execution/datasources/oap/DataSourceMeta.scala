@@ -42,12 +42,10 @@ import org.apache.spark.sql.types._
  *    .
  *    .
  * FileMeta N
- * IndexMeta 1      -- 768 bytes
+ * IndexMeta 1      -- 512 bytes
  *     Name         -- 255 bytes -- The index name.
  *     indexType    --   1 bytes -- The index type. Sort(0)/ Bitmap Mask(1).
  *     keyOrdinal   -- 256 bytes -- The bit mask for the index key. Maximum support 256 fields
- *     keySortDir   -- 256 bytes -- The bit mask for the key's sort direction. This is only used by
- *                                  BTreeIndex. The bit is set if the sort direction is Descending.
  * IndexMeta 2
  *    .
  *    .
@@ -170,21 +168,18 @@ private[oap] class IndexMeta(
     writeString(name, INDEX_META_NAME_LENGTH, out)
     writeString(time, INDEX_META_TIME_LENGTH, out)
     val keyBits = BitSet.empty
-    val dirBits = BitSet.empty
     indexType match {
       case BTreeIndex(entries) =>
         out.writeByte(BTREE_INDEX_TYPE)
-        writeBTreeIndexEntries(entries, INDEX_META_KEY_LENGTH * 2, out)
+        writeBTreeIndexEntries(entries, INDEX_META_KEY_LENGTH, out)
       case BitMapIndex(entries) =>
         out.writeByte(BITMAP_INDEX_TYPE)
         entries.foreach(keyBits += _)
         writeBitSet(keyBits, INDEX_META_KEY_LENGTH, out)
-        writeBitSet(dirBits, INDEX_META_KEY_LENGTH, out)
       case HashIndex(entries) =>
         out.writeByte(HASH_INDEX_TYPE)
         entries.foreach(keyBits += _)
         writeBitSet(keyBits, INDEX_META_KEY_LENGTH, out)
-        writeBitSet(dirBits, INDEX_META_KEY_LENGTH, out)
     }
   }
 
@@ -390,7 +385,7 @@ private[oap] object DataSourceMeta {
   final val FILE_META_FINGERPRINT_LENGTH = 248
   final val FILE_META_DATA_FILE_NAME_LENGTH = 256
 
-  final val INDEX_META_LENGTH = 768
+  final val INDEX_META_LENGTH = 512
   final val INDEX_META_NAME_LENGTH = 240
   final val INDEX_META_TIME_LENGTH = 15
   final val INDEX_META_TYPE_LENGTH = 1
