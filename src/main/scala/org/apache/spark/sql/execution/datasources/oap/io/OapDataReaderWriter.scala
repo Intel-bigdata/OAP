@@ -157,8 +157,7 @@ private[oap] class OapDataReader(
   requiredIds: Array[Int]) extends Logging {
 
   def initialize(conf: Configuration,
-                 ascending: Boolean = true,
-                 limit: Int = 0): Iterator[InternalRow] = {
+                 options: Map[String, String] = Map.empty): Iterator[InternalRow] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
@@ -176,8 +175,28 @@ private[oap] class OapDataReader(
         val dataFileSize = path.getFileSystem(conf).getContentSummary(path).getLength
         val isTesting = conf.getBoolean(SQLConf.OAP_IS_TESTING.key,
                               SQLConf.OAP_IS_TESTING.defaultValue.get)
+
+        val isAscending = options.getOrElse(
+          OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY, "false").toBoolean
+        val limit = options.getOrElse(OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY, "0").toInt
+
+        if (options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)) {
+          fs.setScanNumLimit(
+            options.get(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY).get.toInt
+          )
+        }
+
+        val isFastIndexQuery : Boolean =
+          limit > 0 || options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)
+
         val enableOIndex = conf.getBoolean(SQLConf.OAP_ENABLE_OINDEX.key,
           SQLConf.OAP_ENABLE_OINDEX.defaultValue.get)
+
+        /**
+         * Once index is disabled, there is no way to do fast query.
+         * OapStrategy should aware of this and create a non-fast query plan.
+         */
+        assert((!enableOIndex && isFastIndexQuery) == false)
 
         val iter =
           // Below is for OAP developers to easily analyze and compare performance without removing
@@ -192,14 +211,14 @@ private[oap] class OapDataReader(
             fileScanner.iterator(conf, requiredIds)
           } else {
             statsAnalyseResult match {
-              case StaticsAnalysisResult.FULL_SCAN if (limit == 0) =>
+              case StaticsAnalysisResult.FULL_SCAN if !isFastIndexQuery =>
                 fileScanner.iterator(conf, requiredIds)
               case StaticsAnalysisResult.USE_INDEX =>
                 fs.initialize(path, conf)
                 // total Row count can be get from the filter scanner
                 val rowIDs = {
                   if (limit > 0) {
-                    if (ascending) fs.toArray.take(limit)
+                    if (isAscending) fs.toArray.take(limit)
                     else fs.toArray.reverse.take(limit)
                   }
                   else fs.toArray

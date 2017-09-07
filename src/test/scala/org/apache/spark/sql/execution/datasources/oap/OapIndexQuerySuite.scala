@@ -60,9 +60,7 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
   }
 
   test("index row boundary") {
-    val groupSize = spark.sparkContext.hadoopConfiguration
-      .get(OapFileFormat.ROW_GROUP_SIZE,
-        OapFileFormat.DEFAULT_ROW_GROUP_SIZE).toInt
+    val groupSize = 1024 // use a small row group to check boundary.
 
     val testRowId = groupSize - 1
     val data: Seq[(Int, String)] = (0 until groupSize * 3)

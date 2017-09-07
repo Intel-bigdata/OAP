@@ -26,7 +26,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, FSDataOutputStream, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-import org.apache.parquet.hadoop.util.SerializationUtil
+import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
@@ -34,9 +34,9 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateOrdering, GenerateUnsafeProjection}
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io._
-import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
@@ -81,9 +81,9 @@ private[sql] class OapFileFormat extends FileFormat
   var meta: Option[DataSourceMeta] = _
 
   override def prepareWrite(
-    sparkSession: SparkSession,
-    job: Job, options: Map[String, String],
-    dataSchema: StructType): OutputWriterFactory = {
+      sparkSession: SparkSession,
+      job: Job, options: Map[String, String],
+      dataSchema: StructType): OutputWriterFactory = {
     val conf = job.getConfiguration
 
     // TODO: Should we have our own config util instead of SqlConf?
@@ -113,9 +113,9 @@ private[sql] class OapFileFormat extends FileFormat
   }
 
   override def isSplitable(
-                            sparkSession: SparkSession,
-                            options: Map[String, String],
-                            path: Path): Boolean = false
+      sparkSession: SparkSession,
+      options: Map[String, String],
+      path: Path): Boolean = false
 
   override def buildReaderWithPartitionValues(
       sparkSession: SparkSession,
@@ -124,38 +124,22 @@ private[sql] class OapFileFormat extends FileFormat
       requiredSchema: StructType,
       filters: Seq[Filter],
       options: Map[String, String],
-      hadoopConf: Configuration): (PartitionedFile) => Iterator[InternalRow] = {
-    // For Parquet data source, `buildReader` already handles partition values appending. Here we
-    // simply delegate to another buildReaderWithPartitionValues which has sort & limit support.
-    buildReaderWithPartitionValues(sparkSession, dataSchema, partitionSchema, requiredSchema,
-      filters, false, 0, options, hadoopConf)
+      hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
+    buildReaderWithPartitionValues(
+      sparkSession, dataSchema, partitionSchema, requiredSchema, filters, options, hadoopConf)
   }
 
-  override def buildReader(
+
+  override def buildReaderWithPartitionValues(
       sparkSession: SparkSession,
       dataSchema: StructType,
       partitionSchema: StructType,
       requiredSchema: StructType,
       filters: Seq[Filter],
       options: Map[String, String],
-      hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
-    buildReaderWithPartitionValues(sparkSession, dataSchema, partitionSchema, requiredSchema,
-                                    filters, false, 0, options, hadoopConf)
-  }
-
-  // Build reader with sort and limit operation
-  private[sql] def buildReaderWithPartitionValues(sparkSession: SparkSession,
-                                                 dataSchema: StructType,
-                                                 partitionSchema: StructType,
-                                                 requiredSchema: StructType,
-                                                 filters: Seq[Filter],
-                                                 isAscending: Boolean,
-                                                 limit: Int,
-                                                 options: Map[String, String],
-                                                 hadoopConf: Configuration):
-                                                 (PartitionedFile) => Iterator[InternalRow] = {
+      hadoopConf: Configuration
+  ): PartitionedFile => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
-    // OapFileFormat.deserializeDataSourceMeta(hadoopConf) match {
     meta match {
       case Some(m) =>
         logDebug("Building OapDataReader with "
@@ -277,7 +261,6 @@ private[sql] class OapFileFormat extends FileFormat
 
         (file: PartitionedFile) => {
           assert(file.partitionValues.numFields == partitionSchema.size)
-
           val conf = broadcastedHadoopConf.value.value
           val dataFile = DataFile(file.filePath, m.schema, m.dataReaderClassName, conf)
           val dataFileHandle: DataFileHandle = DataFileHandleCacheManager(dataFile)
@@ -288,7 +271,7 @@ private[sql] class OapFileFormat extends FileFormat
           } else {
             val iter = new OapDataReader(
               new Path(new URI(file.filePath)), m, filterScanner, requiredIds)
-              .initialize(conf)
+              .initialize(conf, options)
 
             val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
             val joinedRow = new JoinedRow()
@@ -437,9 +420,9 @@ private[oap] case class OapWriteResult(
     fileName: String, rowsWritten: Int, partitionString: String)
 
 private[oap] class OapOutputWriter(
-       path: String,
-       dataSchema: StructType,
-       context: TaskAttemptContext) extends OutputWriter {
+    path: String,
+    dataSchema: StructType,
+    context: TaskAttemptContext) extends OutputWriter {
   private var rowCount = 0
   private var partitionString: String = ""
   override def setPartitionString(ps: String): Unit = {
@@ -511,4 +494,11 @@ private[sql] object OapFileFormat {
   def deserializeDataSourceMeta(conf: Configuration): Option[DataSourceMeta] = {
     SerializationUtil.readObjectFromConfAsBase64(OAP_DATA_SOURCE_META, conf)
   }
+
+  /**
+   * Oap Optimization Options.
+   */
+  val OAP_QUERY_ORDER_OPTION_KEY = "oap.scan.file.order"
+  val OAP_QUERY_LIMIT_OPTION_KEY = "oap.scan.file.limit"
+  val OAP_INDEX_SCAN_NUM_OPTION_KEY = "oap.scan.index.limit"
 }

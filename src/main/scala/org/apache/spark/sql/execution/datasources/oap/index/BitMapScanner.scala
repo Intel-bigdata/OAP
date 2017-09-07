@@ -122,8 +122,14 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     })
 
     if (bitMapArray.nonEmpty) {
-      internalBitSet = bitMapArray.reduceLeft(_ | _)
-      internalItr = internalBitSet.iterator
+      if (limitScanEnabled()) {
+        // Get N items from each index.
+        internalItr = bitMapArray.flatMap(bitSet =>
+          bitSet.iterator.take(getLimitScanNum())).iterator
+      } else {
+        internalBitSet = bitMapArray.reduceLeft(_ | _)
+        internalItr = internalBitSet.iterator
+      }
       empty = false
     } else {
       empty = true
