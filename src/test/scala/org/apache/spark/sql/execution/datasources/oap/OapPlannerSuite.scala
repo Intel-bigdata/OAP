@@ -31,7 +31,7 @@ class OapPlannerSuite
   extends QueryTest
   with SharedSQLContext
   with BeforeAndAfterEach
-  with OAPStrategies
+  with OapStrategies
 {
   import testImplicits._
   sparkConf.set("spark.memory.offHeap.size", "100m")
@@ -49,16 +49,16 @@ class OapPlannerSuite
            | USING oap
            | OPTIONS (path '$path2')""".stripMargin)
 
+    spark.experimental.extraStrategies = oapStrategies
   }
 
   override def afterEach(): Unit = {
+    spark.experimental.extraStrategies = Nil
     sqlContext.dropTempTable("oap_sort_opt_table")
     sqlContext.dropTempTable("oap_distinct_opt_table")
   }
 
   test("SortPushDown Test") {
-    spark.experimental.extraStrategies = SortPushDownStrategy :: Nil
-
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
     val data = (1 to 300).map{ i => (i%102, s"this is test $i")}
     val dataRDD = spark.sparkContext.parallelize(data, 10)
@@ -89,8 +89,6 @@ class OapPlannerSuite
   }
 
   test("SortPushDown Test with Different Project") {
-    spark.experimental.extraStrategies = SortPushDownStrategy :: Nil
-
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
     val data = (1 to 300).map{ i => (i, s"this is test $i")}
     val dataRDD = spark.sparkContext.parallelize(data, 10)
@@ -128,7 +126,6 @@ class OapPlannerSuite
     sql("insert overwrite table oap_distinct_opt_table select * from t1")
     sql("create oindex index1 on oap_distinct_opt_table (a)")
 
-    spark.experimental.extraStrategies = SortPushDownStrategy :: OAPSemiJoinStrategy :: Nil
     checkKeywordsExist(
       sql("explain SELECT * " +
       "FROM oap_sort_opt_table t1 " +
@@ -163,7 +160,6 @@ class OapPlannerSuite
     sql("insert overwrite table oap_sort_opt_table select * from t")
     sql("create oindex index1 on oap_sort_opt_table (a)")
 
-    spark.experimental.extraStrategies = SortPushDownStrategy :: OAPSemiJoinStrategy :: Nil
     spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
     val sqlString =
       "explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"
@@ -180,4 +176,26 @@ class OapPlannerSuite
 
     sql("drop oindex index1 on oap_sort_opt_table")
   }
+
+  test("minmax aggregation test") {
+    spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
+    val data = (1 to 300).map{ i =>
+      val ii = i % 10
+      (i, s"this is test $ii")
+    }
+    val dataRDD = spark.sparkContext.parallelize(data, 10)
+
+    dataRDD.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_sort_opt_table select * from t")
+    sql("create oindex index1 on oap_sort_opt_table (a)")
+
+    val sqlString =
+      "SELECT min(a), max(a) FROM oap_sort_opt_table"
+
+    checkKeywordsExist(sql("explain " ++: sqlString), "*OapAggregationFileScanExec")
+    checkAnswer(sql(sqlString), Seq(Row(1, 300)))
+
+    sql("drop oindex index1 on oap_sort_opt_table")
+  }
+
 }

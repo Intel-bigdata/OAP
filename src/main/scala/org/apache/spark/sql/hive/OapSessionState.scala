@@ -19,7 +19,7 @@ package org.apache.spark.sql.hive
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.parser.{ParserInterface, SqlBaseParser}
-import org.apache.spark.sql.execution.{OAPStrategies, SparkPlanner, SparkSqlParser}
+import org.apache.spark.sql.execution.{OapStrategies, SparkPlanner, SparkSqlParser}
 import org.apache.spark.sql.execution.datasources.{DataSourceStrategy, FileSourceStrategy}
 import org.apache.spark.sql.hive.client.HiveClient
 import org.apache.spark.sql.internal.{SQLConf, VariableSubstitution}
@@ -34,14 +34,14 @@ class OapSessionState(sparkSession: OapSession) extends HiveSessionState(sparkSe
 
   override def planner: SparkPlanner = {
     new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies)
-    with OAPStrategies
+    with OapStrategies
     {
       override def strategies: Seq[Strategy] = {
             experimentalMethods.extraStrategies ++ (
               FileSourceStrategy ::
               DataSourceStrategy ::
               DDLStrategy ::
-              SortPushDownStrategy ::
+              OapSortLimitStrategy ::
               SpecialLimits ::
               Aggregation ::
               JoinSelection ::

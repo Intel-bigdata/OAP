@@ -23,8 +23,9 @@ import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.{execution, SparkSession, Strategy}
 import org.apache.spark.sql.catalyst.{expressions, InternalRow}
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
-import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalOperation}
+import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalAggregation, PhysicalOperation}
 import org.apache.spark.sql.catalyst.plans.{logical, LeftSemi}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
@@ -33,7 +34,12 @@ import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.joins.BuildRight
 import org.apache.spark.util.Utils
 
-trait OAPStrategies extends Logging {
+trait OapStrategies extends Logging {
+
+  def oapStrategies: Seq[Strategy] =
+      OapSortLimitStrategy ::
+      OapSemiJoinStrategy ::
+      OapAggregation :: Nil
 
   /**
    * Plans special cases of orderby+limit operators.
@@ -54,7 +60,7 @@ trait OAPStrategies extends Logging {
    *
    * TODO: add more use scenarios in future.
    */
-  object SortPushDownStrategy extends Strategy with Logging {
+  object OapSortLimitStrategy extends Strategy with Logging {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case logical.ReturnAnswer(rootPlan) => rootPlan match {
         case logical.Limit(IntegerLiteral(limit), logical.Sort(order, true, child)) =>
@@ -112,7 +118,7 @@ trait OAPStrategies extends Logging {
    * TODO: choose any index if no filter.
    *
    */
-  object OAPSemiJoinStrategy extends Strategy with Logging {
+  object OapSemiJoinStrategy extends Strategy with Logging {
     private def canBroadcast(plan: LogicalPlan): Boolean = {
       val conf = SparkSession.getActiveSession.get.sessionState.conf
       /**
@@ -129,7 +135,9 @@ trait OAPStrategies extends Logging {
         if joinType == LeftSemi && canBroadcast(right) =>
         Seq(joins.BroadcastHashJoinExec(
           leftKeys, rightKeys, joinType, BuildRight, condition, planLater(left),
-          calcChildPlan(right, rightKeys.map{SortOrder(_, Ascending)})))
+          calcChildPlan(right, rightKeys.map {
+            SortOrder(_, Ascending)
+          })))
       case _ => Nil
     }
 
@@ -145,6 +153,12 @@ trait OAPStrategies extends Logging {
           (file.fileFormat.isInstanceOf[OapFileFormat])) {
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY -> "1"))
+
+          val indexHint = {
+            if (!filters.isEmpty) filters
+            else IsNotNull(orderAttributes.head) :: Nil
+          }
+
           createOapFileScanPlan(
             projectList, filters, relation, file, table, oapOption) match {
             case Some(fastScan) =>
@@ -153,6 +167,94 @@ trait OAPStrategies extends Logging {
                 projectList,
                 fastScan)
             case None => PlanLater(child)
+          }
+        } else PlanLater(child)
+    }
+  }
+
+  /**
+   * Work as Aggregation in SparkStrategies with OAP optimization.
+   * So far we support Min/Max only because we need extra UDF to do
+   * things like count which is a aggregation result instead of a row
+   * from data source.
+   * Now the only workable case is:
+   * SELECT [min/max](column name) FROM table.
+   */
+  object OapAggregation extends Strategy {
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case PhysicalAggregation(
+      groupingExpressions, aggregateExpressions, resultExpressions, child) =>
+
+        val (functionsWithDistinct, functionsWithoutDistinct) =
+          aggregateExpressions.partition(_.isDistinct)
+        if (functionsWithDistinct.map(_.aggregateFunction.children).distinct.length > 1) {
+          // This is a sanity check. We should not reach here when we have multiple distinct
+          // column sets. Our MultipleDistinctRewriter should take care this case.
+          sys.error("You hit a query analyzer bug. Please report your query to " +
+            "Spark user mailing list.")
+        }
+
+        val aggregateOperator =
+          if (aggregateExpressions.map(_.aggregateFunction).exists(!_.supportsPartial)) {
+            if (functionsWithDistinct.nonEmpty) {
+              sys.error("Distinct columns cannot exist in Aggregate operator containing " +
+                "aggregate functions which don't support partial aggregation.")
+            } else {
+              // So far do not support non-partial aggregations.
+              Nil
+            }
+          } else if (functionsWithDistinct.isEmpty) {
+            // So far we support only Min/Max with index.
+            if (aggregateExpressions.map {
+              case AggregateExpression(Min(_), _, _, _) => true
+              case AggregateExpression(Max(_), _, _, _) => true
+              case _ => false
+            }.reduce(_ && _)) {
+              aggregate.AggUtils.planAggregateWithoutDistinct(
+                groupingExpressions,
+                aggregateExpressions,
+                resultExpressions,
+                calcChildPlan(
+                  groupingExpressions, aggregateExpressions, resultExpressions, child))
+            } else Nil
+          } else {
+            // TODO: support distinct in future.
+            Nil
+          }
+
+        aggregateOperator
+
+      case _ => Nil
+    }
+
+    private def calcChildPlan(
+        grouping: Seq[NamedExpression],
+        aggExpressions: Seq[AggregateExpression],
+        resultExpressions: Seq[NamedExpression],
+        child : LogicalPlan
+    ) : SparkPlan = child match {
+      case PhysicalOperation(
+      projectList, filters, relation@LogicalRelation(file: HadoopFsRelation, _, table)) =>
+        val filterAttributes = AttributeSet(ExpressionSet(filters))
+        val aggregationAttributes = AttributeSet(ExpressionSet(aggExpressions.flatMap(_.children)))
+        if (grouping.isEmpty && (aggregationAttributes.size == 1 &&
+          (filterAttributes.isEmpty || filterAttributes == aggregationAttributes))) {
+          val oapOption = new CaseInsensitiveMap(file.options +
+            (OapFileFormat.OAP_INDEX_AGG_MINMAX_OPTION_KEY -> "true"))
+
+          val indexHint = {
+            if (!filters.isEmpty) filters
+            else IsNotNull(aggregationAttributes.head) :: Nil
+          }
+
+          createOapFileScanPlan(
+            projectList, indexHint, relation, file, table, oapOption) match {
+            case Some(fastScan) =>
+              OapAggregationFileScanExec(
+                aggExpressions,
+                projectList,
+                fastScan)
+            case _ => PlanLater(child)
           }
         }
         else PlanLater(child)
@@ -312,5 +414,18 @@ case class OapDistinctFileScanExec(
     val outputString = Utils.truncatedString(output, "[", ",", "]")
 
     s"OapDistinctFileScanExec(output=$outputString, scan [$scanNumber] row of each index)"
+  }
+}
+
+case class OapAggregationFileScanExec(
+    aggExpression: Seq[AggregateExpression],
+    projectList: Seq[NamedExpression],
+    child: SparkPlan) extends OapFileScanExec {
+
+  override def simpleString: String = {
+    val outputString = Utils.truncatedString(output, "[", ",", "]")
+    val aggString = Utils.truncatedString(aggExpression, "[", ",", "]")
+
+    s"OapAggregationFileScanExec(output=$outputString, Aggregation function=$aggString)"
   }
 }

@@ -157,7 +157,7 @@ private[oap] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int, index
     CurrentKey.INVALID_KEY_INDEX
   }
 
-  private var limitScanNum: Int = indexLimit
+  private val limitScanNum: Int = indexLimit
 
   private var currentScanNum: Int = 1
 

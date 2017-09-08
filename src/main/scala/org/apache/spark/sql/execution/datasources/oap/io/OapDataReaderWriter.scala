@@ -217,12 +217,15 @@ private[oap] class OapDataReader(
 
         if (options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)) {
           fs.setScanNumLimit(
-            options.get(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY).get.toInt
+            options(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY).toInt
           )
         }
 
+        val isMinMaxAgg = options.getOrElse(
+          OapFileFormat.OAP_INDEX_AGG_MINMAX_OPTION_KEY, "false").toBoolean
+
         val isFastIndexQuery : Boolean =
-          limit > 0 || options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)
+          limit > 0 || isMinMaxAgg || options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)
 
         /**
          * Once index is disabled, there is no way to do fast query.
@@ -249,11 +252,19 @@ private[oap] class OapDataReader(
                 fs.initialize(path, conf)
                 // total Row count can be get from the filter scanner
                 val rowIDs = {
-                  if (limit > 0) {
-                    if (isAscending) fs.toArray.take(limit)
-                    else fs.toArray.reverse.take(limit)
+                  if (isMinMaxAgg) {
+                    val fullRows = fs.toArray
+                    if (!fullRows.isEmpty) {
+                      Array(fullRows.head, fullRows.last)
+                    }
+                    else fullRows
+                  } else {
+                    if (limit > 0) {
+                      if (isAscending) fs.toArray.take(limit)
+                      else fs.toArray.reverse.take(limit)
+                    }
+                    else fs.toArray
                   }
-                  else fs.toArray
                 }
 
                 OapIndexInfo.partitionOapIndex.put(path.toString(), true)

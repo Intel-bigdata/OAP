@@ -144,6 +144,10 @@ private[oap] object ScannerBuilder extends Logging {
       case LessThan(attribute, ic(key)) =>
         val ranger = new RangeInterval(IndexScanner.DUMMY_KEY_START, key, true, false)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
+      case IsNotNull(attribute) =>
+        val ranger =
+          new RangeInterval(IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END, true, true)
+        mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case _ => mutable.HashMap.empty
     }
   }
@@ -175,7 +179,7 @@ private[oap] object ScannerBuilder extends Logging {
         else combineIntervalMaps(leftMap, rightMap, ic, needMerge = true)
     )
 
-    if (intervalMap != null) {
+    if (!intervalMap.isEmpty) {
       intervalMap.foreach(intervals =>
         logDebug("\t" + intervals._1 + ": " + intervals._2.mkString(" - ")))
 
