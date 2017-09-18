@@ -18,7 +18,7 @@
 package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.spark.sql.catalyst.expressions.SortDirection
-import org.apache.spark.sql.execution.datasources.oap.{IndexMeta, Key}
+import org.apache.spark.sql.execution.datasources.oap.{ColumnValues, IndexMeta, Key}
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructField
 
@@ -31,17 +31,37 @@ import org.apache.spark.sql.types.StructField
 // 5. Use DataRecordReader to do full scan if there is no optimization.
 class OapRecordReader(
   availableIndices: Seq[IndexMeta],
+  dataName: String,
   filters: Seq[Filter],
   direction: SortDirection,
   scanNum: Int,
   required: Seq[StructField]) {
 
-  private val indexRecordReader = new OapIndexRecordReader(filters, direction, scanNum)
-  private val dataRecordReader = new OapDataRecordReader()
+  private var indexRecordReader: OapIndexRecordReader = _
+  private val dataRecordReader: OapDataRecordReader = _
 
-  def nextKeyValue(): Boolean = true
-  def getCurrentValue: Key = null
+  def initialize(): Unit = {
+    indexRecordReader = getBestIndex
+  }
 
-  private def getBestIndex: OapIndexRecordReader = null
+  def nextKeyValue(): Boolean = {
+    if (indexRecordReader != null) {
+      indexRecordReader.nextRowId()
+      if (!isCoveredByIndex) {
+        dataRecordReader.nextKeyValue(indexRecordReader.getCurrentRowId._2)
+      }
+    }
+    else dataRecordReader.nextKeyValue()
+  }
 
+  def getCurrentValue: Key = dataRecordReader.getCurrentValue
+
+  def isCoveredByIndex: Boolean = false
+
+  private def getBestIndex: OapIndexRecordReader = {
+
+    availableIndices.map { meta =>
+      new OapIndexRecordReader(meta.name, filters, direction, scanNum)
+    }.sortBy(_.getCost).head
+  }
 }

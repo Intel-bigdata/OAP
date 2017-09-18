@@ -41,7 +41,7 @@ class OapIndexFileReader {
 
   // Get the index data fiber from Child Tree (One Fiber is One Node)
   // If the fiber hasn't be load to memory, readIndexTree will be called
-  def readIndexDataFiber(key: Key): IndexNode = null
+  def readIndexDataFiber(): IndexNode = null
 
   // Read the whole child tree from Disk
   private def readIndexTree(TreeId: Int): IndexTree = null

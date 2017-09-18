@@ -23,23 +23,43 @@ import org.apache.spark.sql.sources.Filter
 
 
 // OapIndexRecordReader is an iterator to get [Key, RowID] pair.
-class OapIndexRecordReader(filters: Seq[Filter], direction: SortDirection, scanNum: Int) {
+class OapIndexRecordReader(
+  name: String,
+  filters: Seq[Filter],
+  direction: SortDirection,
+  scanNum: Int) {
 
   // Get Disk Data through OapIndexFileReader
   private val indexFileReader = new OapIndexFileReader()
+  private var indexHeader: IndexHeader = _
+  private var indexNode: IndexNode = _
 
   // For example: Read Index Header
-  def initialize(): Unit = {}
+  def initialize(): Unit = {
+    indexHeader = indexFileReader.readIndexHeader()
+  }
 
   // Similar to hasNext()
-  def nextRowId(): Boolean = true
+  def nextRowId(): Boolean = {
+    checkEndOfFiber()
+    if (indexNode != null) {
+      // Some code to advance to next Row ID
+      true
+    } else {
+      false
+    }
+  }
 
   // Similar to next(). Read one [Key, RowId] pair from Index Data Fiber.
-  def getCurrentRowId: (Key, Long) = null
+  def getCurrentRowId: (Key, Long) = {
+    // Some Code to get current Row ID
+    null
+  }
 
   // Calculate current cast for this index. Used for index selection
   def getCost: Double = 0
 
-  // If Index Data Filber is used up. Get next one from IndexRecordReader
+  // If Index Data Fiber is used up. Get next one from IndexRecordReader
   def checkEndOfFiber(): Unit = {}
+
 }

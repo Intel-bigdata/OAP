@@ -22,7 +22,7 @@ import org.apache.spark.sql.execution.datasources.oap.Key
 // OapDataFile can be split to two classes:
 //    One is OapDataFileReader to read data from Disk
 //    Another is DataFileRecord to parse data and get the needed row
-class OapDataRecordReader {
+class OapDataRecordReader(name: String) {
 
   def nextKeyValue(): Boolean = false
   def nextKeyValue(rowId: Long): Boolean = false
