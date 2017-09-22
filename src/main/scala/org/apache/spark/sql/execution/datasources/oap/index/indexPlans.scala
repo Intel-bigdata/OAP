@@ -20,19 +20,21 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.Job
 
-import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
+import org.apache.spark.SparkException
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.analysis.EliminateSubqueryAliases
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes._
+import org.apache.spark.sql.catalyst.catalog.SimpleCatalogRelation
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
-import org.apache.spark.sql.catalyst.trees.TreeNode
+import org.apache.spark.sql.catalyst.plans.logical.Project
 import org.apache.spark.sql.execution.SQLExecution
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
@@ -42,17 +44,20 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
  */
 case class CreateIndex(
     indexName: String,
-    relation : LogicalPlan,
+    table: TableIdentifier,
     indexColumns: Array[IndexColumn],
     allowExists: Boolean,
     indexType: AnyIndexType,
     partitionSpec: Option[TablePartitionSpec]) extends RunnableCommand with Logging {
 
-  override lazy val containsChild: Set[TreeNode[_]] = Seq(relation).toSet
-
   override val output: Seq[Attribute] = Seq.empty
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
+    val relation =
+      EliminateSubqueryAliases(sparkSession.sessionState.catalog.lookupRelation(table)) match {
+        case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
+        case other => other
+      }
     val (fileCatalog, s, readerClassName, identifier) = relation match {
       case LogicalRelation(
       HadoopFsRelation(_, fileCatalog, _, s, _, _: OapFileFormat, _), _, id) =>
@@ -194,15 +199,18 @@ case class CreateIndex(
  */
 case class DropIndex(
     indexName: String,
-    relation: LogicalPlan,
+    table: TableIdentifier,
     allowNotExists: Boolean,
     partitionSpec: Option[TablePartitionSpec]) extends RunnableCommand {
-
-  override lazy val containsChild: Set[TreeNode[_]] = Seq(relation).toSet
 
   override val output: Seq[Attribute] = Seq.empty
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
+    val relation =
+      EliminateSubqueryAliases(sparkSession.sessionState.catalog.lookupRelation(table)) match {
+        case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
+        case other => other
+      }
     relation match {
       case LogicalRelation(HadoopFsRelation(_, fileCatalog, _, _, _, format, _), _, identifier)
           if format.isInstanceOf[OapFileFormat] || format.isInstanceOf[ParquetFileFormat] =>
@@ -257,12 +265,16 @@ case class DropIndex(
  * Refreshes an index for table
  */
 case class RefreshIndex(
-    relation: LogicalPlan) extends RunnableCommand with Logging {
-  override lazy val containsChild: Set[TreeNode[_]] = Seq(relation).toSet
+    table: TableIdentifier) extends RunnableCommand with Logging {
 
   override val output: Seq[Attribute] = Seq.empty
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
+    val relation =
+      EliminateSubqueryAliases(sparkSession.sessionState.catalog.lookupRelation(table)) match {
+        case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
+        case other => other
+      }
     val (fileCatalog, s, readerClassName) = relation match {
       case LogicalRelation(
           HadoopFsRelation(_, fileCatalog, _, s, _, _: OapFileFormat, _), _, _) =>
@@ -408,10 +420,8 @@ case class RefreshIndex(
 /**
  * List indices for table
  */
-case class OapShowIndex(relation: LogicalPlan, relationName: String)
+case class OapShowIndex(table: TableIdentifier, relationName: String)
     extends RunnableCommand with Logging {
-
-  override lazy val containsChild: Set[TreeNode[_]] = Seq(relation).toSet
 
   override val output: Seq[Attribute] = {
     AttributeReference("table", StringType, nullable = true)() ::
@@ -423,6 +433,11 @@ case class OapShowIndex(relation: LogicalPlan, relationName: String)
   }
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
+    val relation =
+      EliminateSubqueryAliases(sparkSession.sessionState.catalog.lookupRelation(table)) match {
+        case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
+        case other => other
+      }
     val (fileCatalog, schema) = relation match {
       case LogicalRelation(HadoopFsRelation(_, fileCatalog, _, s, _, _, _), _, id) =>
         (fileCatalog, s)
