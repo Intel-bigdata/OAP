@@ -39,7 +39,7 @@ trait OapStrategies extends Logging {
   def oapStrategies: Seq[Strategy] =
       OapSortLimitStrategy ::
       OapSemiJoinStrategy ::
-      OapAggregation :: Nil
+      OapAggregationStrategy :: Nil
 
   /**
    * Plans special cases of orderby+limit operators.
@@ -178,9 +178,9 @@ trait OapStrategies extends Logging {
    * things like count which is a aggregation result instead of a row
    * from data source.
    * Now the only workable case is:
-   * SELECT [min/max](column name) FROM table.
+   * SELECT [min/max](column name) FROM table WHERE filter on same column.
    */
-  object OapAggregation extends Strategy {
+  object OapAggregationStrategy extends Strategy {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case PhysicalAggregation(
       groupingExpressions, aggregateExpressions, resultExpressions, child) =>

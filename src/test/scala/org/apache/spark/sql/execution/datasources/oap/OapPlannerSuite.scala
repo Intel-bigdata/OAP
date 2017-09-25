@@ -192,10 +192,9 @@ class OapPlannerSuite
     val sqlString =
       "SELECT min(a), max(a) FROM oap_sort_opt_table"
 
-    checkKeywordsExist(sql("explain " ++: sqlString), "*OapAggregationFileScanExec")
+    checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
     checkAnswer(sql(sqlString), Seq(Row(1, 300)))
 
     sql("drop oindex index1 on oap_sort_opt_table")
   }
-
 }

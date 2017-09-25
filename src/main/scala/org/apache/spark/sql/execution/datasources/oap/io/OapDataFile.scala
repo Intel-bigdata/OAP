@@ -165,9 +165,9 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
 
           if (groupId < meta.groupCount - 1) {
             // not the last row group
-            row.reset(meta.rowCountInEachGroup, columns).toIterator
+            row.reset(meta.rowCountInEachGroup, columns)
           } else {
-            row.reset(meta.rowCountInLastGroup, columns).toIterator
+            row.reset(meta.rowCountInLastGroup, columns)
           }
 
           val iterator =
