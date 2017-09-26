@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.Job
-
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql._
@@ -34,7 +34,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
+import org.apache.spark.sql.types._
 
 
 /**
@@ -127,34 +127,51 @@ case class CreateIndex(
       // p.files.foreach(f => builder.addFileMeta(FileMeta("", 0, f.getPath.toString)))
       (metaBuilder, parent, existOld)
     })
+
+    // Sanity checks
+    if (fileCatalog.paths.size != 1) {
+      throw new AnalysisException(
+        "Can only write data to relations with a single path.")
+    }
+    val outputPath = fileCatalog.paths.head
+    val fs = outputPath.getFileSystem(configuration)
+    val qualifiedOutputPath = outputPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
+
     val job = Job.getInstance(configuration)
-    val indexFileFormat = new OapIndexFileFormat
+    FileOutputFormat.setOutputPath(job, qualifiedOutputPath)
+    val options = Map(
+      "indexName" -> indexName,
+      "indexTime" -> time)
+
+    val indexFileFormat = new OapIndexFileFormatNext
     val ids =
       indexColumns.map(c => s.map(_.name).toIndexedSeq.indexOf(c.columnName))
-    val keySchema = StructType(ids.map(s.toIndexedSeq(_)))
+    // val keySchema: StructType = StructType(ids.map(s.toIndexedSeq(_)))
+
+    val keySchema = StructType(indexColumns.map { indexColumn =>
+      val field = s(indexColumn.columnName)
+      StructField(
+        field.name,
+        field.dataType,
+        field.nullable,
+        new MetadataBuilder().putBoolean("isAscending", indexColumn.isAscending).build())
+    })
+
     var ds = Dataset.ofRows(sparkSession, Project(ids.map(relation.output), relation))
     partitionSpec.getOrElse(Map.empty).foreach { case (k, v) =>
       ds = ds.filter(s"$k='$v'")
     }
     val queryExecution = ds.queryExecution
     val retVal = SQLExecution.withNewExecutionId(sparkSession, queryExecution) {
-      val indexRelation =
-        WriteIndexRelation(
+      val relation =
+        WriteRelation(
           sparkSession,
           keySchema,
-          indexFileFormat.prepareWrite(sparkSession, _, null, keySchema))
+          qualifiedOutputPath.toString,
+          indexFileFormat.prepareWrite(sparkSession, _, options, keySchema),
+          None)
 
-      val writerContainer = {
-        // TODO Partition and bucket TBD
-        IndexWriterFactory.getIndexWriter(indexRelation,
-          job,
-          indexColumns,
-          keySchema,
-          indexName,
-          time,
-          indexType,
-          isAppend = false)
-      }
+      val writerContainer = new DefaultWriterContainer(relation, job, false)
 
       // This call shouldn't be put into the `try` block below because it only initializes and
       // prepares the job, any exception thrown from here shouldn't cause abortJob() to be called.
@@ -162,7 +179,7 @@ case class CreateIndex(
 
       try {
         val results = sparkSession.sparkContext.runJob(
-          queryExecution.toRdd, writerContainer.writeIndexFromRows _)
+          queryExecution.toRdd, writerContainer.writeRows _)
         writerContainer.commitJob(results.flatten)
         results.flatten
       } catch { case cause: Throwable =>
@@ -170,7 +187,7 @@ case class CreateIndex(
         writerContainer.abortJob()
         throw new SparkException("Job aborted.", cause)
       }
-    }.toSeq
+    }.toSeq.asInstanceOf[Seq[Seq[IndexBuildResult]]].flatten
 //    val ret = OapIndexBuild(sparkSession, indexName,
 //      indexColumns, s, bAndP.map(_._2), readerClassName, indexType).execute()
     val retMap = retVal.groupBy(_.parent)
