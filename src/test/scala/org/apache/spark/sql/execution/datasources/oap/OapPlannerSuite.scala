@@ -18,12 +18,12 @@
 package org.apache.spark.sql.execution.datasources.oap
 
 import org.scalatest.BeforeAndAfterEach
-
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
+import org.junit.Ignore
 
 case class Source(name: String, age: Int, addr: String, phone: String, height: Int)
 
@@ -40,6 +40,7 @@ class OapPlannerSuite
     sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val path1 = Utils.createTempDir().getAbsolutePath
     val path2 = Utils.createTempDir().getAbsolutePath
+    val path3 = Utils.createTempDir().getAbsolutePath
 
     sql(s"""CREATE TEMPORARY VIEW oap_sort_opt_table (a INT, b STRING)
            | USING oap
@@ -49,6 +50,11 @@ class OapPlannerSuite
            | USING oap
            | OPTIONS (path '$path2')""".stripMargin)
 
+    sql(s"""CREATE TEMPORARY VIEW oap_fix_length_schema_table (a INT, b INT)
+           | USING oap
+           | OPTIONS (path '$path3')""".stripMargin)
+
+
     spark.experimental.extraStrategies = oapStrategies
   }
 
@@ -56,6 +62,7 @@ class OapPlannerSuite
     spark.experimental.extraStrategies = Nil
     sqlContext.dropTempTable("oap_sort_opt_table")
     sqlContext.dropTempTable("oap_distinct_opt_table")
+    sqlContext.dropTempTable("oap_fix_length_schema_table")
   }
 
   test("SortPushDown Test") {
@@ -177,7 +184,7 @@ class OapPlannerSuite
     sql("drop oindex index1 on oap_sort_opt_table")
   }
 
-  test("minmax aggregation test") {
+  ignore("minmax aggregation test") {
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
     val data = (1 to 300).map{ i =>
       val ii = i % 10
@@ -197,4 +204,31 @@ class OapPlannerSuite
 
     sql("drop oindex index1 on oap_sort_opt_table")
   }
+
+  test("aggregation with group by test") {
+    spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
+    val data = (1 to 300).map{ i =>
+      (i % 101, i % 37)
+    }
+    val dataRDD = spark.sparkContext.parallelize(data, 10)
+
+    dataRDD.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_fix_length_schema_table select * from t")
+    sql("create oindex index1 on oap_fix_length_schema_table (a)")
+
+    val sqlString =
+      "SELECT a, min(b), max(b) FROM oap_fix_length_schema_table group by a order by a"
+
+//    checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
+
+    sql("explain " + sqlString).collect.map(println(_))
+    sql(sqlString).collect().map(println(_))
+
+    spark.experimental.extraStrategies = Nil
+    sql("explain " + sqlString).collect.map(println(_))
+    sql(sqlString).collect().map(println(_))
+
+    sql("drop oindex index1 on oap_fix_length_schema_table")
+  }
+
 }

@@ -17,18 +17,20 @@
 
 package org.apache.spark.sql.execution
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.catalyst.catalog.CatalogTable
-import org.apache.spark.sql.{execution, SparkSession, Strategy}
-import org.apache.spark.sql.catalyst.{expressions, InternalRow}
+import org.apache.spark.sql.{SparkSession, Strategy, execution}
+import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier, expressions}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalAggregation, PhysicalOperation}
-import org.apache.spark.sql.catalyst.plans.{logical, LeftSemi}
+import org.apache.spark.sql.catalyst.plans.{LeftSemi, logical}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
+import org.apache.spark.sql.execution.aggregate.OapAggUtils
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.joins.BuildRight
@@ -91,8 +93,13 @@ trait OapStrategies extends Logging {
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY -> limit.toString) +
             (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
+          val indexHint = {
+            if (!filters.isEmpty) filters
+            else IsNotNull(orderAttributes.head) :: Nil
+          }
+
           createOapFileScanPlan(
-            projectList, filters, relation, file, table, oapOption) match {
+            projectList, filters, relation, file, table, oapOption, indexHint) match {
             case Some(fastScan) =>
               OapOrderLimitFileScanExec(
                 limit, order, projectList,
@@ -160,7 +167,7 @@ trait OapStrategies extends Logging {
           }
 
           createOapFileScanPlan(
-            projectList, filters, relation, file, table, oapOption) match {
+            projectList, filters, relation, file, table, oapOption, indexHint) match {
             case Some(fastScan) =>
               OapDistinctFileScanExec(
                 scanNumber = 1,
@@ -204,13 +211,9 @@ trait OapStrategies extends Logging {
               Nil
             }
           } else if (functionsWithDistinct.isEmpty) {
-            // So far we support only Min/Max with index.
-            if (aggregateExpressions.map {
-              case AggregateExpression(Min(_), _, _, _) => true
-              case AggregateExpression(Max(_), _, _, _) => true
-              case _ => false
-            }.reduce(_ && _)) {
-              aggregate.AggUtils.planAggregateWithoutDistinct(
+            // Support single group by
+            if (groupingExpressions.size == 1) {
+              OapAggUtils.planAggregateWithoutDistinct(
                 groupingExpressions,
                 aggregateExpressions,
                 resultExpressions,
@@ -228,7 +231,7 @@ trait OapStrategies extends Logging {
     }
 
     private def calcChildPlan(
-        grouping: Seq[NamedExpression],
+        groupExpressions: Seq[NamedExpression],
         aggExpressions: Seq[AggregateExpression],
         resultExpressions: Seq[NamedExpression],
         child : LogicalPlan
@@ -236,19 +239,21 @@ trait OapStrategies extends Logging {
       case PhysicalOperation(
       projectList, filters, relation@LogicalRelation(file: HadoopFsRelation, _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
-        val aggregationAttributes = AttributeSet(ExpressionSet(aggExpressions.flatMap(_.children)))
-        if (grouping.isEmpty && (aggregationAttributes.size == 1 &&
-          (filterAttributes.isEmpty || filterAttributes == aggregationAttributes))) {
-          val oapOption = new CaseInsensitiveMap(file.options +
-            (OapFileFormat.OAP_INDEX_AGG_MINMAX_OPTION_KEY -> "true"))
+        val groupingAttributes = AttributeSet(groupExpressions.map(_.toAttribute))
 
-          val indexHint = {
-            if (!filters.isEmpty) filters
-            else IsNotNull(aggregationAttributes.head) :: Nil
-          }
+        val indexHint = {
+          /**
+           * TODO: IsNotNull filters out the NULL value, we need another
+           * Expression case class to do index full scan (include NULL).
+           * If none in Spark, we can create one for OAP.
+           */
+          if (filterAttributes == groupingAttributes) filters
+          else IsNotNull(groupingAttributes.head) :: Nil
+        }
 
+        if (file.fileFormat.isInstanceOf[OapFileFormat]) {
           createOapFileScanPlan(
-            projectList, indexHint, relation, file, table, oapOption) match {
+            projectList, indexHint, relation, file, table, file.options, indexHint) match {
             case Some(fastScan) =>
               OapAggregationFileScanExec(
                 aggExpressions,
@@ -268,11 +273,15 @@ trait OapStrategies extends Logging {
    * TODO: remove OAP irrelevant code.
    */
   def createOapFileScanPlan(
-      projects: Seq[NamedExpression], filters: Seq[Expression],
-      l: LogicalRelation, _fsRelation : HadoopFsRelation,
-      table: Option[CatalogTable],
-      OapOption: Map[String, String]): Option[SparkPlan] = {
-    // Filters on this relation fall into four categories based on where we can use them to avoid
+      projects: Seq[NamedExpression],
+      filters: Seq[Expression],
+      l: LogicalPlan,
+      _fsRelation: HadoopFsRelation,
+      table: Option[TableIdentifier],
+      OapOption: Map[String, String],
+      indexHint: Seq[Expression]): Option[SparkPlan] = {
+    // Filters on this relation fall into four categories based
+    // on where we can use them to avoid
     // reading unneeded data:
     //  - partition keys only - used to prune directories to read
     //  - bucket keys only - optionally used to prune files to read
@@ -284,6 +293,13 @@ trait OapStrategies extends Logging {
     // case insensitive, we should change them to match the one in schema, so we donot need to
     // worry about case sensitivity anymore.
     val normalizedFilters = filters.map { e =>
+      e transform {
+        case a: AttributeReference =>
+          a.withName(l.output.find(_.semanticEquals(a)).get.name)
+      }
+    }
+
+    val normalizedIndexHint = indexHint.map { e =>
       e transform {
         case a: AttributeReference =>
           a.withName(l.output.find(_.semanticEquals(a)).get.name)
@@ -307,12 +323,12 @@ trait OapStrategies extends Logging {
         _fsRelation
     }
 
-    if (fsRelation.fileFormat.asInstanceOf[OapFileFormat].hasAvailableIndex(normalizedFilters)) {
+    if (fsRelation.fileFormat.asInstanceOf[OapFileFormat].hasAvailableIndex(normalizedIndexHint)) {
       val dataColumns =
         l.resolve(fsRelation.dataSchema, fsRelation.sparkSession.sessionState.analyzer.resolver)
 
       // Partition keys are not available in the statistics of the files.
-      val dataFilters = normalizedFilters.filter(_.references.intersect(partitionSet).isEmpty)
+      val dataFilters = normalizedIndexHint.filter(_.references.intersect(partitionSet).isEmpty)
 
       // Predicates with both partition keys and attributes need to be evaluated after the scan.
       val afterScanFilters = filterSet -- partitionKeyFilters.filter(_.references.nonEmpty)
