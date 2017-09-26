@@ -17,10 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.BaseOrdering
@@ -55,6 +54,11 @@ abstract class Statistics{
    * @return number of bytes written in writer
    */
   def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
+    IndexUtils.writeInt(writer, id)
+    4L
+  }
+
+  def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
     IndexUtils.writeInt(writer, id)
     4L
   }

@@ -17,10 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
+import java.io.OutputStream
+
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.index._
@@ -123,6 +123,27 @@ class StatisticsManager {
     })
     offset
   }
+  def write(out: OutputStream): Long = {
+    var offset = 0L
+
+    IndexUtils.writeLong(out, StatisticsManager.STATISTICSMASK)
+    offset += 8
+
+    IndexUtils.writeInt(out, stats.length)
+    offset += 4
+    for (stat <- stats) {
+      IndexUtils.writeInt(out, stat.id)
+      offset += 4
+    }
+
+    val sortedKeys = sortKeys
+    stats.foreach(stat => {
+      val off = stat.write(out, sortedKeys)
+      assert(off >= 0)
+      offset += off
+    })
+    offset
+  }
 
   private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
 
@@ -191,10 +212,8 @@ object StatisticsManager {
 
   val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[StatisticsType]] =
     scala.collection.mutable.Map(
-      BTreeIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
-        BloomFilterStatisticsType, PartByValueStatisticsType),
-      BitMapIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
-        BloomFilterStatisticsType, PartByValueStatisticsType))
+      BTreeIndexType -> Array.empty,
+      BitMapIndexType -> Array.empty)
 
   /**
    * Using a static object to store parameter is not a good idea, some reasons:
