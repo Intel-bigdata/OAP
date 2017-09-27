@@ -124,19 +124,6 @@ private[sql] class OapFileFormat extends FileFormat
       requiredSchema: StructType,
       filters: Seq[Filter],
       options: Map[String, String],
-      hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
-    buildReaderWithPartitionValues(
-      sparkSession, dataSchema, partitionSchema, requiredSchema, filters, options, hadoopConf)
-  }
-
-
-  override def buildReaderWithPartitionValues(
-      sparkSession: SparkSession,
-      dataSchema: StructType,
-      partitionSchema: StructType,
-      requiredSchema: StructType,
-      filters: Seq[Filter],
-      options: Map[String, String],
       hadoopConf: Configuration
   ): PartitionedFile => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
