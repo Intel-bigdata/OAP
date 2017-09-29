@@ -24,12 +24,14 @@ import org.antlr.v4.runtime.tree.TerminalNode
 
 import org.apache.spark.sql.{AnalysisException, SaveMode}
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
+import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.parser._
 import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, OneRowRelation, ScriptInputOutputSchema}
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.{CreateTable, _}
+import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.internal.{HiveSerDe, SQLConf, VariableSubstitution}
 import org.apache.spark.sql.types.StructType
 
@@ -1397,5 +1399,65 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
       inSerdeProps, outSerdeProps,
       reader, writer,
       schemaLess)
+  }
+
+  /**
+   * Create an index. Create a [[CreateIndex]] command.
+   *
+   * {{{
+   *   CREATE OINDEX [IF NOT EXISTS] indexName ON tableName (col1 [ASC | DESC], col2, ...)
+   *   [USING (BTREE | BLOOM | BITMAP)] [PARTITION (partcol1=val1, partcol2=val2 ...)]
+   * }}}
+   */
+  override def visitOapCreateIndex(ctx: OapCreateIndexContext): LogicalPlan =
+    withOrigin(ctx) {
+      CreateIndex(
+        ctx.IDENTIFIER.getText, UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier())),
+        visitIndexCols(ctx.indexCols), ctx.EXISTS != null, visitIndexType(ctx.indexType),
+        Option(ctx.partitionSpec).map(visitNonOptionalPartitionSpec))
+    }
+
+  /**
+   * Drop an index. Create a [[DropIndex]] command.
+   *
+   * {{{
+   *   DROP OINDEX [IF EXISTS] indexName on tableName [PARTITION (partcol1=val1, partcol2=val2 ...)]
+   * }}}
+   */
+  override def visitOapDropIndex(ctx: OapDropIndexContext): LogicalPlan = withOrigin(ctx) {
+    DropIndex(
+      ctx.IDENTIFIER.getText,
+      UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier)), ctx.EXISTS != null,
+      Option(ctx.partitionSpec).map(visitNonOptionalPartitionSpec))
+  }
+
+  override def visitIndexCols(ctx: IndexColsContext): Array[IndexColumn] = withOrigin(ctx) {
+    ctx.indexCol.toArray(new Array[IndexColContext](ctx.indexCol.size)).map(visitIndexCol)
+  }
+
+  override def visitIndexCol(ctx: IndexColContext): IndexColumn = withOrigin(ctx) {
+    IndexColumn(ctx.identifier.getText, ctx.DESC == null)
+  }
+
+  override def visitIndexType(ctx: IndexTypeContext): AnyIndexType = if (ctx == null) {
+    BTreeIndexType
+  } else {
+    withOrigin(ctx) {
+      if (ctx.BTREE != null) {
+        BTreeIndexType
+      } else {
+        BitMapIndexType
+      }
+    }
+  }
+
+  override def visitOapRefreshIndices(ctx: OapRefreshIndicesContext): LogicalPlan =
+    withOrigin(ctx) {
+      RefreshIndex(UnresolvedRelation(visitTableIdentifier(ctx.tableIdentifier)))
+    }
+
+  override def visitOapShowIndex(ctx: OapShowIndexContext): LogicalPlan = withOrigin(ctx) {
+    val tableName = visitTableIdentifier(ctx.tableIdentifier)
+    OapShowIndex(UnresolvedRelation(tableName), tableName.identifier)
   }
 }

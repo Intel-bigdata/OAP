@@ -136,6 +136,7 @@ statement
     | (DESC | DESCRIBE) TABLE? option=(EXTENDED | FORMATTED)?
         tableIdentifier partitionSpec? describeColName?                #describeTable
     | REFRESH TABLE tableIdentifier                                    #refreshTable
+    | REFRESH SINDEX ON tableIdentifier                                #oapRefreshIndices
     | REFRESH .*?                                                      #refreshResource
     | CACHE LAZY? TABLE tableIdentifier (AS? query)?                   #cacheTable
     | UNCACHE TABLE (IF EXISTS)? tableIdentifier                       #uncacheTable
@@ -148,7 +149,26 @@ statement
     | SET ROLE .*?                                                     #failNativeCommand
     | SET .*?                                                          #setConfiguration
     | RESET                                                            #resetConfiguration
+    | CREATE SINDEX (IF NOT EXISTS)? IDENTIFIER ON
+        tableIdentifier indexCols (USING indexType)?
+        partitionSpec?                                                 #oapCreateIndex
+    | DROP SINDEX (IF EXISTS)? IDENTIFIER ON tableIdentifier
+        partitionSpec?                                                 #oapDropIndex
+    | SHOW SINDEX (FROM | IN) tableIdentifier                          #oapShowIndex
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
+    ;
+
+indexCols
+    : '(' indexCol (',' indexCol)* ')'
+    ;
+
+indexCol
+    : identifier (ASC | DESC)?
+    ;
+
+indexType
+    : BTREE
+    | BITMAP
     ;
 
 unsupportedHiveNativeCommands
@@ -922,6 +942,11 @@ LOCAL: 'LOCAL';
 INPATH: 'INPATH';
 CURRENT_DATE: 'CURRENT_DATE';
 CURRENT_TIMESTAMP: 'CURRENT_TIMESTAMP';
+
+SINDEX: 'SINDEX' | 'OINDEX';
+BTREE: 'BTREE';
+BLOOM: 'BLOOM';
+BITMAP: 'BITMAP';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''
