@@ -57,10 +57,7 @@ class TextFileFormat extends TextBasedFileFormat with DataSourceRegister {
     }
   }
 
-  override def inferSchema(
-      sparkSession: SparkSession,
-      options: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType] = Some(new StructType().add("value", StringType))
+  override def inferSchema: Option[StructType] = Some(new StructType().add("value", StringType))
 
   override def prepareWrite(
       sparkSession: SparkSession,

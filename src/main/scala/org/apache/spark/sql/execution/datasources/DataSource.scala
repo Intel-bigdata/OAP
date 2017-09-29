@@ -35,6 +35,7 @@ import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcRelationProvider
 import org.apache.spark.sql.execution.datasources.json.JsonFileFormat
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.sources._
@@ -181,10 +182,11 @@ case class DataSource(
       val equality = sparkSession.sessionState.conf.resolver
       StructType(schema.filterNot(f => partitionSchema.exists(p => equality(p.name, f.name))))
     }.orElse {
-      format.inferSchema(
+      format.initialize(
         sparkSession,
         caseInsensitiveOptions,
-        tempFileIndex.allFiles())
+        tempFileIndex.allFiles()
+        ).inferSchema
     }.getOrElse {
       throw new AnalysisException(
         s"Unable to infer schema for $format. It must be specified manually.")
@@ -344,11 +346,9 @@ case class DataSource(
           if hasMetadata(caseInsensitiveOptions.get("path").toSeq ++ paths) =>
         val basePath = new Path((caseInsensitiveOptions.get("path").toSeq ++ paths).head)
         val fileCatalog = new MetadataLogFileIndex(sparkSession, basePath)
+        format.initialize(sparkSession, caseInsensitiveOptions, fileCatalog.allFiles())
         val dataSchema = userSpecifiedSchema.orElse {
-          format.inferSchema(
-            sparkSession,
-            caseInsensitiveOptions,
-            fileCatalog.allFiles())
+          format.inferSchema
         }.getOrElse {
           throw new AnalysisException(
             s"Unable to infer schema for $format at ${fileCatalog.allFiles().mkString(",")}. " +
@@ -509,6 +509,7 @@ object DataSource {
     val csv = classOf[CSVFileFormat].getCanonicalName
     val libsvm = "org.apache.spark.ml.source.libsvm.LibSVMFileFormat"
     val orc = "org.apache.spark.sql.hive.orc.OrcFileFormat"
+    val oap = classOf[OapFileFormat].getCanonicalName
 
     Map(
       "org.apache.spark.sql.jdbc" -> jdbc,
@@ -527,7 +528,8 @@ object DataSource {
       "org.apache.spark.sql.hive.orc" -> orc,
       "org.apache.spark.ml.source.libsvm.DefaultSource" -> libsvm,
       "org.apache.spark.ml.source.libsvm" -> libsvm,
-      "com.databricks.spark.csv" -> csv
+      "com.databricks.spark.csv" -> csv,
+      "spn" -> oap
     )
   }
 

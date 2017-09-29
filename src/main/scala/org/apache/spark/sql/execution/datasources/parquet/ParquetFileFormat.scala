@@ -151,11 +151,8 @@ class ParquetFileFormat
     }
   }
 
-  def inferSchema(
-      sparkSession: SparkSession,
-      parameters: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType] = {
-    val parquetOptions = new ParquetOptions(parameters, sparkSession.sessionState.conf)
+  def inferSchema: Option[StructType] = {
+    val parquetOptions = new ParquetOptions(options, sparkSession.sessionState.conf)
 
     // Should we merge schemas from all Parquet part-files?
     val shouldMergeSchemas = parquetOptions.mergeSchema
@@ -275,7 +272,7 @@ class ParquetFileFormat
       sparkSession: SparkSession,
       options: Map[String, String],
       path: Path): Boolean = {
-    true
+      !sparkSession.conf.get(SQLConf.OAP_PARQUET_ENABLED)
   }
 
   override def buildReaderWithPartitionValues(

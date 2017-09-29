@@ -48,10 +48,7 @@ class CSVFileFormat extends TextBasedFileFormat with DataSourceRegister {
 
   override def equals(other: Any): Boolean = other.isInstanceOf[CSVFileFormat]
 
-  override def inferSchema(
-      sparkSession: SparkSession,
-      options: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType] = {
+  override def inferSchema: Option[StructType] = {
     val csvOptions = new CSVOptions(options)
 
     // TODO: Move filtering.

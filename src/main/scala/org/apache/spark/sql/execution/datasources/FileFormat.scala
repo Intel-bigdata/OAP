@@ -34,15 +34,28 @@ import org.apache.spark.sql.types.StructType
  * Used to read and write data stored in files to/from the [[InternalRow]] format.
  */
 trait FileFormat {
+  @transient protected var options: Map[String, String] = _
+  @transient protected var sparkSession: SparkSession = _
+  @transient protected var files: Seq[FileStatus] = _
+
+  // Instead of making the FileFormat as stateless, we give chance to initialize
+  // the FileFormat before reading or writing
+  def initialize(
+      sparkSession: SparkSession,
+      options: Map[String, String],
+      files: Seq[FileStatus]): FileFormat = {
+    this.sparkSession = sparkSession
+    this.options = options
+    this.files = files
+    this
+  }
+
   /**
    * When possible, this method should return the schema of the given `files`.  When the format
    * does not support inference, or no valid files are given should return None.  In these cases
    * Spark will require that user specify the schema manually.
    */
-  def inferSchema(
-      sparkSession: SparkSession,
-      options: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType]
+  def inferSchema: Option[StructType]
 
   /**
    * Prepares a write job and returns an [[OutputWriterFactory]].  Client side job preparation can

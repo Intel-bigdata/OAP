@@ -44,10 +44,7 @@ class JsonFileFormat extends TextBasedFileFormat with DataSourceRegister {
 
   override def shortName(): String = "json"
 
-  override def inferSchema(
-      sparkSession: SparkSession,
-      options: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType] = {
+  override def inferSchema: Option[StructType] = {
     if (files.isEmpty) {
       None
     } else {

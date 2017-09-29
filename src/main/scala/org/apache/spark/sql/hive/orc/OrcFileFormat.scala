@@ -51,10 +51,7 @@ class OrcFileFormat extends FileFormat with DataSourceRegister with Serializable
 
   override def toString: String = "ORC"
 
-  override def inferSchema(
-      sparkSession: SparkSession,
-      options: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType] = {
+  override def inferSchema: Option[StructType] = {
     OrcFileOperator.readSchema(
       files.map(_.getPath.toUri.toString),
       Some(sparkSession.sessionState.newHadoopConf())
