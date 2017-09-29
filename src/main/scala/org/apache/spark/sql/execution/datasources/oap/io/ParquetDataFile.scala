@@ -24,7 +24,7 @@ import org.apache.parquet.column.Dictionary
 import org.apache.parquet.hadoop.RecordReaderBuilder
 import org.apache.parquet.hadoop.api.RecordReader
 
-import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 import org.apache.spark.sql.types.StructType
@@ -39,30 +39,30 @@ private[oap] case class ParquetDataFile
     throw new UnsupportedOperationException("Not support getFiberData Operation.")
   }
 
-  def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
+  def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[UnsafeRow] = {
     val recordReader = recordReaderBuilder(conf, requiredIds)
       .buildDefault()
     recordReader.initialize()
-    new FileRecordReaderIterator[InternalRow](
-      recordReader.asInstanceOf[RecordReader[InternalRow]])
+    new FileRecordReaderIterator[UnsafeRow](
+      recordReader.asInstanceOf[RecordReader[UnsafeRow]])
   }
 
   def iterator(conf: Configuration,
                requiredIds: Array[Int],
-               rowIds: Array[Long]): Iterator[InternalRow] = {
+               rowIds: Array[Long]): Iterator[UnsafeRow] = {
     if (rowIds == null || rowIds.length == 0) {
       ParquetDataFile.emptyIterator
     } else {
       val recordReader = recordReaderBuilder(conf, requiredIds)
         .withGlobalRowIds(rowIds).buildIndexed()
       recordReader.initialize()
-      new FileRecordReaderIterator[InternalRow](
-        recordReader.asInstanceOf[RecordReader[InternalRow]])
+      new FileRecordReaderIterator[UnsafeRow](
+        recordReader.asInstanceOf[RecordReader[UnsafeRow]])
     }
   }
 
   private def recordReaderBuilder(conf: Configuration,
-                                  requiredIds: Array[Int]): RecordReaderBuilder[InternalRow] = {
+                                  requiredIds: Array[Int]): RecordReaderBuilder[UnsafeRow] = {
     val requestSchemaString = {
       var requestSchema = new StructType
       for (index <- requiredIds) {
@@ -114,10 +114,10 @@ private[oap] case class ParquetDataFile
 
 private[oap] object  ParquetDataFile {
 
-  val emptyIterator = new Iterator[InternalRow] {
+  val emptyIterator = new Iterator[UnsafeRow] {
     override def hasNext: Boolean = false
 
-    override def next(): InternalRow =
+    override def next(): UnsafeRow =
       throw new java.util.NoSuchElementException("Input is Empty RowIds Array")
   }
 }
