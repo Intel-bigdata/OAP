@@ -399,10 +399,8 @@ abstract class OapFileScanExec extends UnaryExecNode with CodegenSupport {
 
   override def doConsume(
       ctx: CodegenContext, input: Seq[ExprCode], row: ExprCode): String = {
-    val count = 1
     s"""
-       | if ($count == 0) continue;
-       | ${consume(ctx, input)}
+       ${consume(ctx, input)}
      """.stripMargin
   }
 }

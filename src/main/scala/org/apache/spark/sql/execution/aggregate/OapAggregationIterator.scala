@@ -159,7 +159,8 @@ class OapAggregationIterator(
   private[this] val hashMap = new UnsafeFixedWidthAggregationMap(
     initialAggregationBuffer,
     StructType.fromAttributes(aggregateFunctions.flatMap(_.aggBufferAttributes)),
-    StructType.fromAttributes(groupingExpressions.map(_.toAttribute)),
+//    StructType.fromAttributes(groupingExpressions.map(_.toAttribute)),
+    StructType.fromAttributes(Nil),
     TaskContext.get().taskMemoryManager(),
     16, // initial capacity
     TaskContext.get().taskMemoryManager().pageSizeBytes,
@@ -167,6 +168,9 @@ class OapAggregationIterator(
   )
 
   var currGroupHead : InternalRow = null
+
+  private val dummyGroupingProjection: UnsafeProjection =
+    UnsafeProjection.create(Nil, originalInputAttributes)
 
   /**
    * As rows are returned by index, so they are group-ed.
@@ -187,11 +191,12 @@ class OapAggregationIterator(
 
       (groupingKey, buffer)
     } else {
-      val groupingKey = groupingProjection.apply(null)
+      val groupingKey = dummyGroupingProjection.apply(null)
       val buffer: UnsafeRow = hashMap.getAggregationBufferFromUnsafeRow(groupingKey)
+      buffer.copyFrom(initialAggregationBuffer)
 
       processRow(buffer, currGroupHead)
-      val currGroupingKey = groupingProjection.apply(currGroupHead)
+      val currGroupingKey = groupingProjection.apply(currGroupHead).copy()
 
       val savedGroupKey = currGroupingKey
       if (inputIter.hasNext) {
@@ -395,7 +400,7 @@ class OapAggregationIterator(
   // Part 6: Loads input rows and setup aggregationBufferMapIterator if we
   //         have not switched to sort-based aggregation.
   ///////////////////////////////////////////////////////////////////////////
-  if (currGroupHead == null) {
+  if (currGroupHead == null && inputIter.hasNext) {
     currGroupHead = inputIter.next()
   }
 
@@ -411,10 +416,6 @@ class OapAggregationIterator(
     aggregationBufferMapIterator = hashMap.iterator()
     // Pre-load the first key-value pair from the aggregationBufferMapIterator.
     mapIteratorHasNext = aggregationBufferMapIterator.next()
-    // If the map is empty, we just free it.
-    if (!mapIteratorHasNext) {
-      hashMap.free()
-    }
   }
 
   ///////////////////////////////////////////////////////////////////////////
@@ -454,6 +455,7 @@ class OapAggregationIterator(
         peakMemory += maxMemory
         spillSize += metrics.memoryBytesSpilled - spillSizeBefore
         metrics.incPeakExecutionMemory(maxMemory)
+        hashMap.free() // free hashMap after process done.
       }
       numOutputRows += 1
       res

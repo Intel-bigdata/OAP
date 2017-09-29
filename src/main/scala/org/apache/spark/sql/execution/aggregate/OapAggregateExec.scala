@@ -776,12 +776,12 @@ case class OapAggregateExec(
         val functionString = Utils.truncatedString(allAggregateExpressions, "[", ", ", "]")
         val outputString = Utils.truncatedString(output, "[", ", ", "]")
         if (verbose) {
-          s"HashAggregate(keys=$keyString, functions=$functionString, output=$outputString)"
+          s"OapAggregate(keys=$keyString, functions=$functionString, output=$outputString)"
         } else {
-          s"HashAggregate(keys=$keyString, functions=$functionString)"
+          s"OapAggregate(keys=$keyString, functions=$functionString)"
         }
       case Some(fallbackStartsAt) =>
-        s"HashAggregateWithControlledFallback $groupingExpressions " +
+        s"OapAggregateWithControlledFallback $groupingExpressions " +
           s"$allAggregateExpressions $resultExpressions fallbackStartsAt=$fallbackStartsAt"
     }
   }
