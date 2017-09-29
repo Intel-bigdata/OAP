@@ -100,6 +100,10 @@ private[spark] case class TestBlockId(id: String) extends BlockId {
   override def name: String = "test_" + id
 }
 
+private[spark] case class FiberBlockId(id: String) extends BlockId {
+  override def name: String = "fiber_" + id
+}
+
 @DeveloperApi
 object BlockId {
   val RDD = "rdd_([0-9]+)_([0-9]+)".r
