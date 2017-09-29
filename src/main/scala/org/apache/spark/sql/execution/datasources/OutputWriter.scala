@@ -60,6 +60,13 @@ abstract class OutputWriterFactory extends Serializable {
   def newWriter(path: String): OutputWriter = {
     throw new UnsupportedOperationException("newInstance with just path not supported")
   }
+
+  /**
+   * This API called from the driver when all of the write task finished, and give the data
+   * source extensions to pass back the data writing task status, etc. writing the global
+   * meta information.
+   */
+  def commitJob(taskResults: Array[WriteResult]): Unit = { }
 }
 
 
@@ -80,7 +87,7 @@ abstract class OutputWriter {
    * Closes the [[OutputWriter]]. Invoked on the executor side after all rows are persisted, before
    * the task output is committed.
    */
-  def close(): Unit
+  def close(): WriteResult
 
   private var converter: InternalRow => Row = _
 
@@ -91,5 +98,9 @@ abstract class OutputWriter {
 
   protected[sql] def writeInternal(row: InternalRow): Unit = {
     write(converter(row))
+  }
+
+  protected[sql] def setPartitionString(ps: String): Unit = {
+    // do nothing
   }
 }
