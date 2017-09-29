@@ -31,7 +31,7 @@ import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow}
+import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateOrdering, GenerateUnsafeProjection}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
@@ -51,19 +51,15 @@ private[sql] class OapFileFormat extends FileFormat
   override def initialize(
       sparkSession: SparkSession,
       options: Map[String, String],
-      fileCatalog: FileCatalog,
-      readFiles: Option[Seq[FileStatus]] = None): FileFormat = {
-    super.initialize(sparkSession, options, fileCatalog)
+      files: Seq[FileStatus]): FileFormat = {
+    super.initialize(sparkSession, options, files)
 
     val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
     // TODO
     // 1. Make the scanning etc. as lazy loading, as inferSchema probably not be called
     // 2. We need to pass down the oap meta file and its associated partition path
 
-    val parents = readFiles match {
-      case Some(files) => files.map(file => file.getPath.getParent)
-      case _ => fileCatalog.allFiles().map(_.getPath.getParent)
-    }
+    val parents = files.map(file => file.getPath.getParent)
 
     // TODO we support partitions, but this only read meta from one of the partitions
     val partition2Meta = parents.distinct.reverse.map { parent =>
@@ -120,19 +116,6 @@ private[sql] class OapFileFormat extends FileFormat
       sparkSession: SparkSession,
       options: Map[String, String],
       path: Path): Boolean = false
-
-  override def buildReader(
-      sparkSession: SparkSession,
-      dataSchema: StructType,
-      partitionSchema: StructType,
-      requiredSchema: StructType,
-      filters: Seq[Filter],
-      options: Map[String, String],
-      hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
-    buildReaderWithPartitionValues(
-      sparkSession, dataSchema, partitionSchema, requiredSchema, filters, options, hadoopConf)
-  }
-
 
   override def buildReaderWithPartitionValues(
       sparkSession: SparkSession,
@@ -317,7 +300,7 @@ private[sql] class OapFileFormat extends FileFormat
     meta match {
       case Some(m) if sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX) =>
         expressions.exists(m.isSupportedByIndex(_, indexHashSetList))
-      case _ => false
+      case None => false
     }
   }
 
@@ -326,8 +309,8 @@ private[sql] class OapFileFormat extends FileFormat
       case Some(m) if sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX) =>
         attributes.map{attr =>
           indexHashSetList.map(_.contains(attr.name)).reduce(_ || _)}.reduce(_ && _)
-      case _ => false
-   }
+      case None => false
+    }
   }
 }
 
@@ -344,12 +327,24 @@ private[oap] class OapOutputWriterFactory(
     @transient protected val job: Job,
     options: Map[String, String]) extends OutputWriterFactory {
 
-  override def newInstance(
-                            path: String, bucketId: Option[Int],
+  override def newInstance(path: String,
                             dataSchema: StructType, context: TaskAttemptContext): OutputWriter = {
-    // TODO we don't support bucket yet
-    assert(bucketId.isDefined == false, "Oap doesn't support bucket yet.")
     new OapOutputWriter(path, dataSchema, context)
+  }
+
+  override def getFileExtension(context: TaskAttemptContext): String = {
+
+    val extensionMap = Map(
+      "UNCOMPRESSED" -> "",
+      "SNAPPY" -> ".snappy",
+      "GZIP" -> ".gzip",
+      "LZO" -> ".lzo")
+
+    val compressionType =
+      context.getConfiguration
+          .get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).trim
+
+    extensionMap(compressionType) + OapFileFormat.OAP_DATA_EXTENSION
   }
 
   private def oapMetaFileExists(path: Path): Boolean = {
@@ -430,15 +425,8 @@ private[oap] class OapOutputWriter(
   }
   private val writer: OapDataWriter = {
     val isCompressed = FileOutputFormat.getCompressOutput(context)
-    val conf = context.getConfiguration()
-    val compressionType =
-      conf.get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).trim()
-    val compressionFileFormat =
-      if (!compressionType.isEmpty() && !compressionType.matches("UNCOMPRESSED")) {
-        "." + compressionType.toLowerCase()
-      } else ""
-    val file =
-      new Path(path, getFileName(compressionFileFormat + OapFileFormat.OAP_DATA_EXTENSION))
+    val conf = context.getConfiguration
+    val file: Path = new Path(path)
     val fs = file.getFileSystem(conf)
     val fileOut = fs.create(file, false)
 
@@ -456,16 +444,7 @@ private[oap] class OapOutputWriter(
     OapWriteResult(dataFileName, rowCount, partitionString)
   }
 
-  private def getFileName(extension: String): String = {
-    val configuration = context.getConfiguration
-    // this is the way how we pass down the uuid
-    val uniqueWriteJobId = configuration.get("spark.sql.sources.writeJobUUID")
-    val taskAttemptId = context.getTaskAttemptID
-    val split = taskAttemptId.getTaskID.getId
-    f"part-r-$split%05d-${uniqueWriteJobId}$extension"
-  }
-
-  def dataFileName: String = getFileName(OapFileFormat.OAP_DATA_EXTENSION)
+  def dataFileName: String = path.split("/").last
 }
 
 private[sql] object OapFileFormat {
