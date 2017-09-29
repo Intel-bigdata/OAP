@@ -391,6 +391,14 @@ object SQLConf {
       .intConf
       .createWithDefault(32)
 
+  // Whether to perform eager analysis when constructing a dataframe.
+  // Set to false when debugging requires the ability to look at invalid query plans.
+  val DATAFRAME_EAGER_ANALYSIS = SQLConfigBuilder("spark.sql.eagerAnalysis")
+    .internal()
+    .doc("When true, eagerly applies query analysis on DataFrame operations.")
+    .booleanConf
+    .createWithDefault(true)
+
   // Whether to automatically resolve ambiguity in join conditions for self-joins.
   // See SPARK-6231.
   val DATAFRAME_SELF_JOIN_AUTO_RESOLVE_AMBIGUITY =
@@ -609,6 +617,109 @@ object SQLConf {
       "returned.")
     .booleanConf
     .createWithDefault(false)
+
+  val OAP_PARQUET_ENABLED =
+    SQLConfigBuilder("spark.sql.oap.parquet.enable")
+      .internal()
+      .doc("Whether enable oap file format when encounter parquet files")
+      .booleanConf
+      .createWithDefault(true)
+
+  val OAP_FULL_SCAN_THRESHOLD =
+    SQLConfigBuilder("spark.sql.oap.fsthreshold")
+      .internal()
+      .doc("Define the full scan threshold based on oap statistics in index file. " +
+        "If the analysis result is above this threshold, it will full scan data file, " +
+        "otherwise, follow index way.")
+      .doubleConf
+      .createWithDefault(0.8)
+
+  val OAP_STATISTICS_TYPES =
+    SQLConfigBuilder("spark.sql.oap.StatisticsType")
+      .internal()
+      .doc("Which types of pre-defined statistics are added in index file. " +
+        "And here you should just write the statistics name. " +
+        "Now, three types statistics are supported. " +
+        "\"MINMAX\" MinMaxStatistics, " +
+        "\"SAMPLE\" for SampleBasedStatistics, " +
+        "\"PARTBYVALUE\" for PartedByValueStatistics. " +
+        "If you want to add more than one type, just use comma " +
+        "to separate, eg. \"MINMAX, SAMPLE, PARTBYVALUE, BLOOM\"")
+      .stringConf
+      .createWithDefault("MINMAX, SAMPLE, PARTBYVALUE, BLOOM")
+
+  val OAP_STATISTICS_PART_NUM =
+    SQLConfigBuilder("spark.sql.oap.Statistics.partNum")
+      .internal()
+      .doc("PartedByValueStatistics gives statistics with the value interval, default 5")
+      .intConf
+      .createWithDefault(5)
+
+  val OAP_STATISTICS_SAMPLE_RATE =
+    SQLConfigBuilder("spark.sql.oap.Statistics.sampleRate")
+      .internal()
+      .doc("Sample rate for sample based statistics, default value 0.05")
+      .doubleConf
+      .createWithDefault(0.05)
+
+  val OAP_BLOOMFILTER_MAXBITS =
+    SQLConfigBuilder("spark.sql.oap.Bloomfilter.maxBits")
+      .internal()
+      .doc("Define the max bit count parameter used in bloom " +
+        "filter, default 33554432")
+      .intConf
+      .createWithDefault(1 << 20)
+
+  val OAP_BLOOMFILTER_NUMHASHFUNC =
+    SQLConfigBuilder("spark.sql.oap.Bloomfilter.numHashFunc")
+      .internal()
+      .doc("Define the number of hash functions used in bloom filter, default 3")
+      .intConf
+      .createWithDefault(3)
+
+  val OAP_FIBERCACHE_SIZE =
+    SQLConfigBuilder("spark.sql.oap.fiberCache.size")
+      .internal()
+      .doc("Define the size of fiber cache in KB, default 300 * 1024 KB")
+      .longConf
+      .createWithDefault(307200)
+
+  val OAP_FIBERCACHE_STATS =
+    SQLConfigBuilder("spark.sql.oap.fiberCache.stats")
+      .internal()
+      .doc("Whether enable cach stats record, default false")
+      .booleanConf
+      .createWithDefault(false)
+
+  val OAP_COMPRESSION = SQLConfigBuilder("spark.sql.oap.compression.codec")
+    .internal()
+    .doc("Sets the compression codec use when writing Parquet files. Acceptable values include: " +
+      "uncompressed, snappy, gzip, lzo.")
+    .stringConf
+    .transform(_.toUpperCase())
+    .checkValues(Set("UNCOMPRESSED", "SNAPPY", "GZIP", "LZO"))
+    .createWithDefault("GZIP")
+
+  val OAP_ROW_GROUP_SIZE =
+    SQLConfigBuilder("spark.sql.oap.rowgroup.size")
+      .internal()
+      .doc("Define the row number for each row group")
+      .intConf
+      .createWithDefault(1024 * 1024)
+
+  val OAP_IS_TESTING =
+    SQLConfigBuilder("spark.sql.oap.testing")
+      .internal()
+      .doc("To indicate if the test is ongoing")
+      .booleanConf
+      .createWithDefault(false)
+
+  val OAP_ENABLE_OINDEX =
+    SQLConfigBuilder("spark.sql.oap.oindex.enabled")
+      .internal()
+      .doc("To indicate to enable/disable oindex for developers even if the index file is there")
+      .booleanConf
+      .createWithDefault(true)
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
