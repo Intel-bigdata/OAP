@@ -32,12 +32,12 @@ import org.apache.spark.util._
  * A heartbeat from executors to the driver. This is a shared message used by several internal
  * components to convey liveness or execution information for in-progress tasks. It will also
  * expire the hosts that have not heartbeated for more than spark.network.timeout.
+ * spark.executor.heartbeatInterval should be significantly less than spark.network.timeout.
  */
 private[spark] case class Heartbeat(
     executorId: String,
     accumUpdates: Array[(Long, Seq[AccumulatorV2[_, _]])], // taskId -> accumulator updates
-    blockManagerId: BlockManagerId,
-    customizedInfo: Option[String] = None)
+    blockManagerId: BlockManagerId)
 
 /**
  * An event that SparkContext uses to notify HeartbeatReceiver that SparkContext.taskScheduler is
@@ -120,7 +120,7 @@ private[spark] class HeartbeatReceiver(sc: SparkContext, clock: Clock)
       context.reply(true)
 
     // Messages received from executors
-    case heartbeat @ Heartbeat(executorId, accumUpdates, blockManagerId, customizedInfo) =>
+    case heartbeat @ Heartbeat(executorId, accumUpdates, blockManagerId) =>
       if (scheduler != null) {
         if (executorLastSeen.contains(executorId)) {
           executorLastSeen(executorId) = clock.getTimeMillis()
@@ -147,9 +147,6 @@ private[spark] class HeartbeatReceiver(sc: SparkContext, clock: Clock)
         logWarning(s"Dropping $heartbeat because TaskScheduler is not ready yet")
         context.reply(HeartbeatResponse(reregisterBlockManager = true))
       }
-
-      customizedInfo.foreach { info =>
-        sc.listenerBus.post(SparkListenerCustomInfoUpdate(blockManagerId.host, executorId, info))}
   }
 
   /**

@@ -75,7 +75,6 @@ public final class VectorizedRleValuesReader extends ValuesReader
     fixedWidth = false;
   }
 
-
   public VectorizedRleValuesReader(int bitWidth) {
     fixedWidth = true;
     init(bitWidth);

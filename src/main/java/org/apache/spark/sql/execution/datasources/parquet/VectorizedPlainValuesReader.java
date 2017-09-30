@@ -31,7 +31,6 @@ import org.apache.parquet.io.api.Binary;
  */
 public class VectorizedPlainValuesReader extends ValuesReader implements VectorizedValuesReader {
   private byte[] buffer;
-
   private int offset;
   private int bitOffset; // Only used for booleans.
   private ByteBuffer byteBuffer; // used to wrap the byte array buffer
@@ -50,7 +49,6 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       byteBuffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
     }
   }
-
 
   @Override
   public void skip() {
@@ -172,7 +170,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public final Binary readBinary(int len) {
-    Binary result = Binary.fromReusedByteArray(buffer, offset - Platform.BYTE_ARRAY_OFFSET, len);
+    Binary result = Binary.fromConstantByteArray(buffer, offset - Platform.BYTE_ARRAY_OFFSET, len);
     offset += len;
     return result;
   }
