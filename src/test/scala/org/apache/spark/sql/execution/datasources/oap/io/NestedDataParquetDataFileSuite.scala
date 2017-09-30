@@ -282,5 +282,4 @@ class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
       writer.close()
     }
   }
-
 }

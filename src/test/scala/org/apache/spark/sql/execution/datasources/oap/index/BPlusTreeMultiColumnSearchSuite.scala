@@ -24,7 +24,6 @@ import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap._
-import org.apache.spark.sql.execution.datasources.oap.filecache.IndexFiberCacheData
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StringType, StructType}
 

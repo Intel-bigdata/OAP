@@ -209,6 +209,4 @@ object DataGenerator {
     }
     writer.close()
   }
-
 }
-
