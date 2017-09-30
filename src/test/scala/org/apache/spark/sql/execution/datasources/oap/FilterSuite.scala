@@ -30,18 +30,16 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 
-
 class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
   import testImplicits._
 
   sparkConf.set("spark.memory.offHeap.size", "100m")
-  var currentPath: String = _
+  private var currentPath: String = _
 
   override def beforeEach(): Unit = {
     sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val path = Utils.createTempDir().getAbsolutePath
     currentPath = path
-
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b STRING)
            | USING oap
            | OPTIONS (path '$path')""".stripMargin)
@@ -143,6 +141,31 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     sql("drop oindex index1 on oap_test")
   }
 
+
+  test("filtering2") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t where key = 1")
+    sql("insert into table oap_test select * from t where key = 2")
+    sql("insert into table oap_test select * from t where key = 3")
+    sql("insert into table oap_test select * from t where key = 4")
+
+    sql("create oindex index1 on oap_test (a)")
+
+    val checkPath = new Path(currentPath)
+    val fs = checkPath.getFileSystem(new Configuration())
+    val indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+    assert(indexFiles.length == 4)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
+      Row(1, "this is test 1") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 1 AND a <= 3"),
+      Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+
+    sql("drop oindex index1 on oap_test")
+  }
+
   test("filtering multi index") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
@@ -172,6 +195,30 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
       Row(1, "this is test 1") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
+      Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+  }
+
+  test("filtering parquet2") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t where key = 1")
+    sql("insert into table parquet_test select * from t where key = 2")
+    sql("insert into table parquet_test select * from t where key = 3")
+    sql("insert into table parquet_test select * from t where key = 4")
+
+    sql("create oindex index1 on parquet_test (a)")
+
+    val checkPath = new Path(currentPath)
+    val fs = checkPath.getFileSystem(new Configuration())
+    val indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+    assert(indexFiles.length == 4)
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
+      Row(1, "this is test 1") :: Nil)
+
+    val result = sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3").collect()
 
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
@@ -229,10 +276,17 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
         |SELECT key from t where value == 4
       """.stripMargin)
 
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh_parquet
+        |partition (b=1)
+        |SELECT key from t where value == 5
+      """.stripMargin)
+
     sql("refresh oindex on t_refresh_parquet")
 
     checkAnswer(sql("select * from t_refresh_parquet"),
-      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 2) :: Nil)
+      Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(5, 1) :: Row(4, 2) :: Nil)
   }
 
   test("test refresh in oap format on same partition") {
@@ -310,7 +364,12 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       Row(1, "this is test 1") :: Nil)
 
     sql("insert into table oap_test select * from t")
+    val checkPath = new Path(currentPath)
+    val fs = checkPath.getFileSystem(new Configuration())
+    assert(fs.globStatus(new Path(checkPath, "*.index")).length == 2)
+
     sql("refresh oindex on oap_test")
+    assert(fs.globStatus(new Path(checkPath, "*.index")).length == 4)
 
     checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
       Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)

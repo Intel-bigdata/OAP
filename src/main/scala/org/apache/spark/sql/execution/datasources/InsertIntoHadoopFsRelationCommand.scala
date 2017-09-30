@@ -98,12 +98,13 @@ case class InsertIntoHadoopFsRelationCommand(
         outputPath = outputPath.toString,
         isAppend = isAppend)
 
-      FileFormatWriter.write(
+      val writer = new FileFormatWriter
+      writer.write(
         sparkSession = sparkSession,
         queryExecution = Dataset.ofRows(sparkSession, query).queryExecution,
         fileFormat = fileFormat,
         committer = committer,
-        outputSpec = FileFormatWriter.OutputSpec(
+        outputSpec = writer.OutputSpec(
           qualifiedOutputPath.toString, customPartitionLocations),
         hadoopConf = hadoopConf,
         partitionColumns = partitionColumns,

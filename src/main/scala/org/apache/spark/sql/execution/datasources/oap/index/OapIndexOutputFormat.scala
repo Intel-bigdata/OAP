@@ -22,7 +22,7 @@ import java.io.{DataOutputStream, IOException, UnsupportedEncodingException}
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.Text
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
-import org.apache.hadoop.mapreduce.lib.output.{FileOutputCommitter, FileOutputFormat}
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.parquet.hadoop.util.ContextUtil
 
 private[index] class OapIndexOutputFormat[T] extends FileOutputFormat[Void, T] {
