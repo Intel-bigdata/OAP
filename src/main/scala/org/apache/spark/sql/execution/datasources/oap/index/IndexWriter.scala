@@ -63,13 +63,15 @@ private[index] abstract class IndexWriter extends FileFormatWriter {
     }
   }
 
-  override def getWriteTask(description: WriteJobDescription,
-                   taskAttemptContext: TaskAttemptContext,
-                   committer: FileCommitProtocol): Option[ExecuteWriteTask] = {
+  override def getWriteTask(
+      description: WriteJobDescription,
+      taskAttemptContext: TaskAttemptContext,
+      committer: FileCommitProtocol): Option[ExecuteWriteTask] = {
     Some(new IndexWriteTask(description, taskAttemptContext, committer))
   }
 
-  def writeIndexFromRows(description: WriteJobDescription,
+  def writeIndexFromRows(
+      description: WriteJobDescription,
       writer: IndexOutputWriter,
       iterator: Iterator[InternalRow]): Seq[IndexBuildResult]
 

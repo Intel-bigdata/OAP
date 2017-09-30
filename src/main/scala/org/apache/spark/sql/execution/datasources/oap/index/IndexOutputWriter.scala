@@ -23,8 +23,8 @@ import org.apache.spark.sql.Row
 import org.apache.spark.sql.execution.datasources._
 
 private[oap] class IndexOutputWriter(
-             bucketId: Option[Int],
-             context: TaskAttemptContext)
+    bucketId: Option[Int],
+    context: TaskAttemptContext)
   extends OutputWriter {
 
   protected var fileName: String = _
@@ -55,9 +55,10 @@ private[oap] class IndexOutputWriter(
 
   def copy(): IndexOutputWriter = new IndexOutputWriter(bucketId, context)
 
-  def initIndexInfo(fileName: String,
-                    indexName: String,
-                    time: String): Unit = {
+  def initIndexInfo(
+      fileName: String,
+      indexName: String,
+      time: String): Unit = {
     this.fileName = fileName
     this.indexName = indexName
     this.time = time

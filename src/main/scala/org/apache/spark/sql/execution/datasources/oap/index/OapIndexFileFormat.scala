@@ -39,23 +39,23 @@ private[index] class OapIndexFileFormat
    * by setting the output committer class in the conf of spark.sql.sources.outputCommitterClass.
    */
   override def prepareWrite(
-            sparkSession: SparkSession,
-            job: Job,
-            options: Map[String, String],
-            dataSchema: StructType): IndexOutputWriterFactory = {
+      sparkSession: SparkSession,
+      job: Job,
+      options: Map[String, String],
+      dataSchema: StructType): IndexOutputWriterFactory = {
     new IndexOutputWriterFactory {
       override def newInstance(
-               bucketId: Option[Int],
-               dataSchema: StructType,
-               context: TaskAttemptContext): IndexOutputWriter = {
+          bucketId: Option[Int],
+          dataSchema: StructType,
+          context: TaskAttemptContext): IndexOutputWriter = {
         taskAttemptContext = context
         new IndexOutputWriter(bucketId, context)
       }
 
       override def newInstance(
-               path: String,
-               dataSchema: StructType,
-               context: TaskAttemptContext): OutputWriter =
+          path: String,
+          dataSchema: StructType,
+          context: TaskAttemptContext): OutputWriter =
         newInstance(None, dataSchema, context)
 
       override def getFileExtension(context: TaskAttemptContext): String = {
