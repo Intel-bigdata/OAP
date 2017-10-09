@@ -134,15 +134,11 @@ private[spark] class Executor(
    */
   private var heartbeatFailures = 0
 
-  /**
-   * get the singleton instance that user configured
-   * private val customInfoClassName = conf.getOption("spark.executor.customInfoClass")
-   * TODO: make it configurable
-   */
-  private val customInfoClassName = Some(
-  "org.apache.spark.sql.execution.datasources.oap.filecache.OapHeartBeatMessager")
-  private val customManager: Option[CustomManager] = customInfoClassName
-    .map(cIC => Utils.classForName(cIC).newInstance().asInstanceOf[CustomManager])
+  private val customInfoClassNameSeq = Seq(
+    "org.apache.spark.sql.execution.datasources.oap.filecache.OapFiberCacheHeartBeatMessager",
+    "org.apache.spark.sql.execution.datasources.oap.io.OapIndexHeartBeatMessager")
+  private val customManagerSeq: Seq[CustomManager] = customInfoClassNameSeq.map(cIC =>
+    Utils.classForName(cIC).newInstance().asInstanceOf[CustomManager])
 
   startDriverHeartbeater()
 
@@ -548,7 +544,7 @@ private[spark] class Executor(
       executorId,
       accumUpdates.toArray,
       env.blockManager.blockManagerId,
-      customManager.map(_.status(conf)))
+      customManagerSeq.map(_.status(conf)))
 
     try {
       val response = heartbeatReceiverRef.askWithRetry[HeartbeatResponse](

@@ -24,11 +24,14 @@ import org.scalatest.BeforeAndAfter
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
+import org.apache.spark.scheduler.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.SparkConf
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
+import org.apache.spark.sql.execution.datasources.oap.io.{OapIndexInfo, OapIndexInfoStatus}
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataReader
+import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.test.SharedSQLContext
@@ -147,6 +150,28 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
     val itSetUseIndex = readerIndex.initialize(conf)
     assert(itSetUseIndex.size == 4)
     dir.delete()
+  }
+
+  test("OapIndexInfo status and update") {
+    val path1 = "partitionFile1"
+    val useIndex1 = true
+    val path2 = "partitionFile2"
+    val useIndex2 = false
+    val rawData1 = OapIndexInfoStatus(path1, useIndex1)
+    val rawData2 = OapIndexInfoStatus(path2, useIndex2)
+    val indexInfoStatusSeq = Seq(rawData1, rawData2)
+    OapIndexInfo.partitionOapIndex.clear
+    OapIndexInfo.partitionOapIndex.put(path1, useIndex1)
+    OapIndexInfo.partitionOapIndex.put(path2, useIndex2)
+    val indexInfoStatusSerializeStr = OapIndexInfo.status
+    assert(indexInfoStatusSerializeStr == OapIndexInfoStatusSerDe.serialize(indexInfoStatusSeq))
+    val host = "host1"
+    val executorId = "executorId1"
+    val oapIndexInfo = SparkListenerOapIndexInfoUpdate(host, executorId, indexInfoStatusSerializeStr)
+    OapIndexInfo.update(oapIndexInfo)
+    assert(oapIndexInfo.hostName == host)
+    assert(oapIndexInfo.executorId == executorId)
+    assert(oapIndexInfo.oapIndexInfo == indexInfoStatusSerializeStr)
   }
 
   /** Verifies data and schema. */
