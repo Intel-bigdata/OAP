@@ -300,7 +300,7 @@ private[sql] class OapFileFormat extends FileFormat
     meta match {
       case Some(m) if sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX) =>
         expressions.exists(m.isSupportedByIndex(_, indexHashSetList))
-      case None => false
+      case _ => false
     }
   }
 
@@ -309,7 +309,7 @@ private[sql] class OapFileFormat extends FileFormat
       case Some(m) if sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX) =>
         attributes.map{attr =>
           indexHashSetList.map(_.contains(attr.name)).reduce(_ || _)}.reduce(_ && _)
-      case None => false
+      case _ => false
     }
   }
 }
@@ -444,7 +444,7 @@ private[oap] class OapOutputWriter(
     OapWriteResult(dataFileName, rowCount, partitionString)
   }
 
-  def dataFileName: String = path.split("/").last
+  def dataFileName: String = new Path(path).getName
 }
 
 private[sql] object OapFileFormat {

@@ -29,7 +29,8 @@ private[index] abstract class IndexWriter extends FileFormatWriter {
 
   private var shouldCloseWriter: Boolean = false
 
-  class IndexWriteTask(description: WriteJobDescription,
+  class IndexWriteTask(
+      description: WriteJobDescription,
       taskAttemptContext: TaskAttemptContext,
       committer: FileCommitProtocol) extends ExecuteWriteTask {
 
