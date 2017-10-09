@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics._
@@ -102,26 +103,48 @@ private[oap] class BitMapIndexWriter(
           rowCnt += 1
         }
       }
-      // generate the bitset hashmap
-      val hashMap = new mutable.HashMap[InternalRow, BitSet]()
-      tmpMap.foreach(kv => {
-        val bs = new BitSet(rowCnt)
-        kv._2.foreach(bs.set)
-        hashMap.put(kv._1, bs)
-      })
+      val ordering = GenerateOrdering.create(keySchema)
+      val sortedKeyList = tmpMap.keySet.toList.sorted(ordering)
       val header = writeHead(writer, IndexFile.INDEX_VERSION)
-      // serialize hashMap and get length
-      val writeBuf = new ByteArrayOutputStream()
-      val out = new ObjectOutputStream(writeBuf)
-      out.writeObject(hashMap)
-      out.flush()
-      val objLen = writeBuf.size()
-      // write byteArray length and byteArray
-      IndexUtils.writeInt(writer, objLen)
-      writer.write(writeBuf.toByteArray)
-      out.close()
-      val indexEnd = 4 + objLen + header
-      val offset: Long = indexEnd
+      // Serialize sortedKeyList and get length
+      val writeSortedKeyListBuf = new ByteArrayOutputStream()
+      val sortedKeyListOut = new ObjectOutputStream(writeSortedKeyListBuf)
+      sortedKeyListOut.writeObject(sortedKeyList)
+      sortedKeyListOut.flush()
+      val sortedKeyListObjLen = writeSortedKeyListBuf.size()
+      // Write sortedKeyList byteArray length and byteArray
+      IndexUtils.writeInt(writer, sortedKeyListObjLen)
+      writer.write(writeSortedKeyListBuf.toByteArray)
+      sortedKeyListOut.close()
+
+      // Generate the fixed size bitset
+      val bs = new BitSet(rowCnt)
+      val firstKey = sortedKeyList.head
+      tmpMap.get(firstKey).get.foreach(bs.set)
+      val firstBitMapBuf = new ByteArrayOutputStream()
+      val firstBitMapOut = new ObjectOutputStream(firstBitMapBuf)
+      firstBitMapOut.writeObject(bs)
+      val elementBitMapSize = firstBitMapBuf.size
+      firstBitMapOut.close()
+      // Write the single bitmap size used by partial loading during index scanning.
+      IndexUtils.writeInt(writer, elementBitMapSize)
+
+      // Serialize and write each BitMap
+      sortedKeyList.foreach(sortedKey => {
+        tmpMap.get(sortedKey).get.foreach(bs.set)
+        val bsWriteBitMapBuf = new ByteArrayOutputStream()
+        val bsBitMapOut = new ObjectOutputStream(bsWriteBitMapBuf)
+        bsBitMapOut.writeObject(bs)
+        bsBitMapOut.flush()
+        writer.write(bsWriteBitMapBuf.toByteArray)
+        bsBitMapOut.close()
+      })
+      val bitmapCount = sortedKeyList.length
+      val totalBitMapLength = bitmapCount * elementBitMapSize
+      // The first 4 is for sortedKeyListObjLen value.
+      // The second 4 is for elementBitMapSize value.
+      val indexEnd = header + 4 + sortedKeyListObjLen + 4 + totalBitMapLength
+      var offset: Long = indexEnd
 
       statisticsManager.write(writer)
 

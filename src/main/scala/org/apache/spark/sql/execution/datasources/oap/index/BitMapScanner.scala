@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import java.io.{ByteArrayInputStream, ObjectInputStream}
 
 import scala.collection.mutable
+import scala.collection.immutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -69,26 +70,27 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   def open(indexData: ChunkedByteBuffer, version: Int = IndexFile.INDEX_VERSION): Unit = {
-    val (baseObj, baseOffset): (Object, Long) = indexData.chunks.head match {
+    this.ordering = GenerateOrdering.create(keySchema)
+    // Deserialize sortedKeyList[InternalRow] from index file
+    val (baseObj, sortedKeyListOffset): (Object, Long) = indexData.chunks.head match {
       case buf: DirectBuffer => (null, buf.address() + IndexFile.indexFileHeaderLength)
       case _ => (indexData.toArray, Platform.BYTE_ARRAY_OFFSET + IndexFile.indexFileHeaderLength)
     }
-
-    // get the byte number first
-    val objLength = Platform.getInt(baseObj, baseOffset)
-    val byteArrayStart = baseOffset + 4
-
-    // deserialize hashMap[Key: InternalRow, Value: BitSet] from index file
-    val byteArray = (0 until objLength).map(i => {
-      Platform.getByte(baseObj, byteArrayStart + i)
+    // Get the byte number first
+    val sortedKeyListObjLength = Platform.getInt(baseObj, sortedKeyListOffset)
+    val sortedKeyListByteArrayStart = sortedKeyListOffset + 4
+    val byteArray = (0 until sortedKeyListObjLength).map(i => {
+      Platform.getByte(baseObj, sortedKeyListByteArrayStart + i)
     }).toArray
     val inputStream = new ByteArrayInputStream(byteArray)
     val in = new ObjectInputStream(inputStream)
-    val hashMap = in.readObject().asInstanceOf[mutable.HashMap[InternalRow, BitSet]]
-    this.ordering = GenerateOrdering.create(keySchema)
+    val sortedKeyList = in.readObject().asInstanceOf[immutable.List[InternalRow]]
 
-    // get sorted key list and generate final bitset
-    val sortedKeyList = hashMap.keySet.toList.sorted(this.ordering)
+    // deserialize BitMap size from index file
+    val elementBitMapSize = Platform.getInt(baseObj, sortedKeyListByteArrayStart +
+      sortedKeyListObjLength)
+    var elementBitmapByteArrayStart = sortedKeyListByteArrayStart + sortedKeyListObjLength + 4
+
     val bitMapArray = intervalArray.flatMap(range => {
       val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
         // diff from which startIdx not found, so here startIdx = -2
@@ -116,8 +118,19 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
         // range not fond in cur bitmap, return empty for performance consideration
         Array.empty[BitSet]
       } else {
-        sortedKeyList.slice(startIdx, endIdx + 1).map(key =>
-          hashMap.get(key).get)
+        val partialBitMap = new mutable.ListBuffer[BitSet]()
+        elementBitmapByteArrayStart += startIdx * elementBitMapSize
+        (startIdx until endIdx + 1).map( element => {
+          val elementBitmapByteArray = (0 until elementBitMapSize).map(i => {
+            Platform.getByte(baseObj, elementBitmapByteArrayStart + i)
+          }).toArray
+          val bitmapInputStream = new ByteArrayInputStream(elementBitmapByteArray)
+          val bitmapIn = new ObjectInputStream(bitmapInputStream)
+          val elementBitMap = bitmapIn.readObject().asInstanceOf[BitSet]
+          partialBitMap.append(elementBitMap)
+          elementBitmapByteArrayStart += elementBitMapSize
+        })
+        partialBitMap
       }
     })
 
