@@ -26,13 +26,13 @@ import org.apache.parquet.io.api.RecordMaterializer
 import org.apache.parquet.schema._
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 
 
 /**
  * A Parquet [[ReadSupport]] implementation for reading Parquet records as Catalyst
- * [[InternalRow]]s.
+ * [[UnsafeRow]]s.
  *
  * The API interface of [[ReadSupport]] is a little bit over complicated because of
  * historical reasons.  In older versions of parquet-mr (say 1.6.0rc3 and prior),
@@ -50,7 +50,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelp
  * to pass requested schema from [[init()]]
  * to [[prepareForRead()]], but use a private `var` for simplicity.
  */
-class OapReadSupportImpl extends ReadSupport[InternalRow] with Logging {
+class OapReadSupportImpl extends ReadSupport[UnsafeRow] with Logging {
 
 
   /**
@@ -64,13 +64,13 @@ class OapReadSupportImpl extends ReadSupport[InternalRow] with Logging {
   /**
    * Called on executor side after [[init()]], before instantiating actual Parquet record readers.
    * Responsible for instantiating [[RecordMaterializer]], which is used for converting Parquet
-   * records to Catalyst [[InternalRow]]s.
+   * records to Catalyst [[UnsafeRow]]s.
    */
   override def prepareForRead(
                                conf: Configuration,
                                keyValueMetaData: JMap[String, String],
                                fileSchema: MessageType,
-                               readContext: ReadContext): RecordMaterializer[InternalRow] = {
+                               readContext: ReadContext): RecordMaterializer[UnsafeRow] = {
     ParquetReadSupportHelper.prepareForRead(conf, keyValueMetaData, fileSchema, readContext)
   }
 }

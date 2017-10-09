@@ -17,14 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import org.apache.hadoop.mapreduce.Job
-
 import org.apache.spark.sql.types.StructType
 
 private[index] object IndexWriterFactory {
   def getIndexWriter(
-      relation: WriteIndexRelation,
-      job: Job,
       indexColumns: Array[IndexColumn],
       keySchema: StructType,
       indexName: String,
@@ -33,9 +29,9 @@ private[index] object IndexWriterFactory {
       isAppend: Boolean): IndexWriter = {
     indexType match {
       case BTreeIndexType =>
-        new BTreeIndexWriter(relation, job, indexColumns, keySchema, indexName, time, isAppend)
+        new BTreeIndexWriter(indexColumns, keySchema, indexName, time, isAppend)
       case BitMapIndexType =>
-        new BitMapIndexWriter(relation, job, indexColumns, keySchema, indexName, time, isAppend)
+        new BitMapIndexWriter(indexColumns, keySchema, indexName, time, isAppend)
     }
   }
 }

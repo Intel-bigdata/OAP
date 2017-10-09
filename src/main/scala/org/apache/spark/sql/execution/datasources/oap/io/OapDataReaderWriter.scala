@@ -190,6 +190,12 @@ private[oap] class OapDataReader(
         val isFastIndexQuery : Boolean =
           limit > 0 || options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)
 
+        /**
+         * Once index is disabled, there is no way to do fast query.
+         * OapStrategy should aware of this and create a non-fast query plan.
+         */
+        assert((!enableOIndex && isFastIndexQuery) == false)
+
         val iter =
           // Below is for OAP developers to easily analyze and compare performance without removing
           // the index after it's created.

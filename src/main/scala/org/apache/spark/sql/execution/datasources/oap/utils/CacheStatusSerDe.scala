@@ -53,11 +53,11 @@ private[oap] object CacheStatusSerDe extends SerDe[String, Seq[FiberCacheStatus]
     compact(render("statusRawDataArray" -> statusJArray))
   }
 
+  private implicit val format = DefaultFormats
+
   override def deserialize(json: String): Seq[FiberCacheStatus] = {
     (parse(json) \ "statusRawDataArray").extract[List[JValue]].map(statusRawDataFromJson)
   }
-
-  private implicit val format = DefaultFormats
 
   private[oap] def bitSetToJson(bitSet: BitSet): JValue = {
     val words: Array[Long] = bitSet.toLongArray()

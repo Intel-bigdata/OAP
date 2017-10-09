@@ -17,25 +17,17 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
+import org.apache.hadoop.mapreduce.TaskAttemptContext
 
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.types.StructType
 
-/** A container for all the details required when writing an index. */
-case class WriteIndexRelation(
-    sparkSession: SparkSession,
-    keySchema: StructType,
-    prepareJobForWrite: Job => IndexOutputWriterFactory) {
-  def toWriteRelation: WriteRelation = WriteRelation(
-    sparkSession, keySchema, null, prepareJobForWrite, None)
-}
-
 abstract class IndexOutputWriterFactory extends OutputWriterFactory {
+
+  var taskAttemptContext: TaskAttemptContext = _
+
   override def newInstance(
       path: String,
-      bucketId: Option[Int], // TODO: This doesn't belong here...
       dataSchema: StructType,
       context: TaskAttemptContext): OutputWriter =
     throw new NotImplementedError("not support specifying path")

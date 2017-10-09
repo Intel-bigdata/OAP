@@ -25,7 +25,7 @@ import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
 import org.apache.parquet.io.api.RecordMaterializer
 import org.apache.parquet.schema.MessageType
 
-import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 
 object ParquetReadSupportHelper {
 
@@ -37,7 +37,7 @@ object ParquetReadSupportHelper {
                       conf: Configuration,
                       keyValueMetaData: JMap[String, String],
                       fileSchema: MessageType,
-                      readContext: ReadContext): RecordMaterializer[InternalRow]
+                      readContext: ReadContext): RecordMaterializer[UnsafeRow]
   = readSupport.prepareForRead(conf, keyValueMetaData, fileSchema, readContext)
 
   val SPARK_ROW_REQUESTED_SCHEMA = ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA
