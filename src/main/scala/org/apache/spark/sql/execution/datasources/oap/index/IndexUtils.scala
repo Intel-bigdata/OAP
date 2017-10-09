@@ -66,4 +66,14 @@ object IndexUtils {
     writer.write((v >>> 48).toInt & 0xFF)
     writer.write((v >>> 56).toInt & 0xFF)
   }
+  def writeLong(writer: OutputStream, v: Long): Unit = {
+    writer.write((v >>>  0).toInt & 0xFF)
+    writer.write((v >>>  8).toInt & 0xFF)
+    writer.write((v >>> 16).toInt & 0xFF)
+    writer.write((v >>> 24).toInt & 0xFF)
+    writer.write((v >>> 32).toInt & 0xFF)
+    writer.write((v >>> 40).toInt & 0xFF)
+    writer.write((v >>> 48).toInt & 0xFF)
+    writer.write((v >>> 56).toInt & 0xFF)
+  }
 }
