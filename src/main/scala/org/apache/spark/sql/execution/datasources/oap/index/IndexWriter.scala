@@ -17,42 +17,64 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import org.apache.hadoop.mapreduce.Job
+import org.apache.hadoop.mapreduce.TaskAttemptContext
 
-import org.apache.spark.{SparkException, TaskContext}
+import org.apache.spark.internal.io.FileCommitProtocol
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.{BaseWriterContainer, WriteResult}
+import org.apache.spark.sql.execution.datasources.{FileFormatWriter, WriteResult}
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 
-private[index] abstract class IndexWriter (
-    relation: WriteIndexRelation,
-    job: Job,
-    isAppend: Boolean) extends BaseWriterContainer(relation.toWriteRelation, job, isAppend) {
-  // TODO figure out right way to deal with bucket
-  protected def newIndexOutputWriter(bucketId: Option[Int] = None): IndexOutputWriter = {
-    try {
-      outputWriterFactory.asInstanceOf[IndexOutputWriterFactory].newInstance(
-        bucketId, dataSchema, taskAttemptContext)
-    } catch {
-      case e: org.apache.hadoop.fs.FileAlreadyExistsException =>
-        if (outputCommitter.getClass.getName.contains("Direct")) {
-          // SPARK-11382: DirectParquetOutputCommitter is not idempotent, meaning on retry
-          // attempts, the task will fail because the output file is created from a prior attempt.
-          // This often means the most visible error to the user is misleading. Augment the error
-          // to tell the user to look for the actual error.
-          throw new SparkException("The output file already exists but this could be due to a " +
-            "failure from an earlier attempt. Look through the earlier logs or stage page for " +
-            "the first error.\n  File exists error: " + e, e)
-        } else {
-          throw e
-        }
+
+private[index] abstract class IndexWriter extends FileFormatWriter {
+
+  private var shouldCloseWriter: Boolean = false
+
+  class IndexWriteTask(
+      description: WriteJobDescription,
+      taskAttemptContext: TaskAttemptContext,
+      committer: FileCommitProtocol) extends ExecuteWriteTask {
+
+    var outputWriter: IndexOutputWriter = {
+      val tmpFilePath = committer.newTaskTempFile(
+        taskAttemptContext,
+        None,
+        description.outputWriterFactory.getFileExtension(taskAttemptContext))
+
+      val outputWriter = description.outputWriterFactory.newInstance(
+        path = tmpFilePath,
+        dataSchema = description.nonPartitionColumns.toStructType,
+        context = taskAttemptContext)
+      outputWriter.initConverter(dataSchema = description.nonPartitionColumns.toStructType)
+      outputWriter.asInstanceOf[IndexOutputWriter]
+    }
+
+    override def execute(iter: Iterator[InternalRow]): (Set[String], Seq[WriteResult]) = {
+      var result = writeIndexFromRows(description, outputWriter, iter)
+      shouldCloseWriter = result != Nil
+      (Set.empty, result)
+    }
+
+    override def releaseResources(): WriteResult = {
+      var res: WriteResult = Nil
+      if (shouldCloseWriter && outputWriter != null) {
+        res = outputWriter.close()
+        outputWriter = null
+      }
+      res
     }
   }
 
+  override def getWriteTask(
+      description: WriteJobDescription,
+      taskAttemptContext: TaskAttemptContext,
+      committer: FileCommitProtocol): Option[ExecuteWriteTask] = {
+    Some(new IndexWriteTask(description, taskAttemptContext, committer))
+  }
+
   def writeIndexFromRows(
-      taskContext: TaskContext, iterator: Iterator[InternalRow]): Seq[IndexBuildResult]
-  def writeRows(taskContext: TaskContext, iterator: Iterator[InternalRow]): Seq[WriteResult] =
-    writeIndexFromRows(taskContext, iterator)
+      description: WriteJobDescription,
+      writer: IndexOutputWriter,
+      iterator: Iterator[InternalRow]): Seq[IndexBuildResult]
 
   protected def writeHead(writer: IndexOutputWriter, version: Int): Int = {
     writer.write("OAPIDX".getBytes("UTF-8"))

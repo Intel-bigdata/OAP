@@ -18,18 +18,18 @@
 package org.apache.spark.sql.sources
 
 import java.text.NumberFormat
+import java.util.Locale
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.io.{NullWritable, Text}
 import org.apache.hadoop.mapreduce.{Job, RecordWriter, TaskAttemptContext}
-import org.apache.hadoop.mapreduce.lib.output.{FileOutputFormat, TextOutputFormat}
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat
 
 import org.apache.spark.sql.{sources, Row, SparkSession}
 import org.apache.spark.sql.catalyst.{expressions, InternalRow}
 import org.apache.spark.sql.catalyst.expressions.{Cast, Expression, GenericInternalRow, InterpretedPredicate, InterpretedProjection, JoinedRow, Literal}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
-import org.apache.spark.sql.execution.command.CreateDataSourceTableUtils._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.util.SerializableConfiguration
@@ -38,7 +38,7 @@ class SimpleTextSource extends TextBasedFileFormat with DataSourceRegister {
   override def shortName(): String = "test"
 
   override def inferSchema: Option[StructType] = {
-    Some(DataType.fromJson(parameters("dataSchema")).asInstanceOf[StructType])
+    Some(DataType.fromJson(options("dataSchema")).asInstanceOf[StructType])
   }
 
   override def prepareWrite(
@@ -50,11 +50,12 @@ class SimpleTextSource extends TextBasedFileFormat with DataSourceRegister {
     new OutputWriterFactory {
       override def newInstance(
           path: String,
-          bucketId: Option[Int],
           dataSchema: StructType,
           context: TaskAttemptContext): OutputWriter = {
         new SimpleTextOutputWriter(path, context)
       }
+
+      override def getFileExtension(context: TaskAttemptContext): String = ""
     }
   }
 
@@ -118,9 +119,11 @@ class SimpleTextSource extends TextBasedFileFormat with DataSourceRegister {
   }
 }
 
-class SimpleTextOutputWriter(path: String, context: TaskAttemptContext) extends OutputWriter {
+class SimpleTextOutputWriter(path: String, context: TaskAttemptContext)
+  extends OutputWriter {
+
   private val recordWriter: RecordWriter[NullWritable, Text] =
-    new AppendingTextOutputFormat(new Path(path)).getRecordWriter(context)
+    new AppendingTextOutputFormat(path).getRecordWriter(context)
 
   override def write(row: Row): Unit = {
     val serialized = row.toSeq.map { v =>
@@ -134,19 +137,14 @@ class SimpleTextOutputWriter(path: String, context: TaskAttemptContext) extends 
   }
 }
 
-class AppendingTextOutputFormat(outputFile: Path) extends TextOutputFormat[NullWritable, Text] {
-  val numberFormat = NumberFormat.getInstance()
+class AppendingTextOutputFormat(path: String) extends TextOutputFormat[NullWritable, Text] {
 
+  val numberFormat = NumberFormat.getInstance(Locale.US)
   numberFormat.setMinimumIntegerDigits(5)
   numberFormat.setGroupingUsed(false)
 
   override def getDefaultWorkFile(context: TaskAttemptContext, extension: String): Path = {
-    val configuration = context.getConfiguration
-    val uniqueWriteJobId = configuration.get(DATASOURCE_WRITEJOBUUID)
-    val taskAttemptId = context.getTaskAttemptID
-    val split = taskAttemptId.getTaskID.getId
-    val name = FileOutputFormat.getOutputName(context)
-    new Path(outputFile, s"$name-${numberFormat.format(split)}-$uniqueWriteJobId")
+    new Path(path)
   }
 }
 

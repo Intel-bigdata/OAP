@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapreduce.lib.input.FileSplit
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.test.SharedSQLContext
@@ -147,7 +147,7 @@ class FiberSuite extends SharedSQLContext with Logging {
       schema: StructType, count: Int): Unit = {
     val out = FileSystem.get(conf).create(path, true)
     val writer = new OapDataWriter(false, out, schema, conf)
-    val row = new GenericMutableRow(schema.fields.length)
+    val row = new GenericInternalRow(schema.fields.length)
     for(i <- 0 until count) {
       schema.fields.zipWithIndex.foreach { entry =>
         if (shouldBeNull(i, entry._2)) {

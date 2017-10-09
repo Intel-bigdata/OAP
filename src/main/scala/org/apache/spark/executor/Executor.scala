@@ -134,13 +134,11 @@ private[spark] class Executor(
    */
   private var heartbeatFailures = 0
 
-  // get the singleton instance that user configured
-//  private val customInfoClassName = conf.getOption("spark.executor.customInfoClass")
-  // todo: make it configurable
-  private val customInfoClassName = Some(
-  "org.apache.spark.sql.execution.datasources.oap.filecache.OapHeartBeatMessager")
-  private val customManager: Option[CustomManager] = customInfoClassName
-    .map(cIC => Utils.classForName(cIC).newInstance().asInstanceOf[CustomManager])
+  private val customInfoClassNameSeq = Seq(
+    "org.apache.spark.sql.execution.datasources.oap.filecache.OapFiberCacheHeartBeatMessager",
+    "org.apache.spark.sql.execution.datasources.oap.io.OapIndexHeartBeatMessager")
+  private val customManagerSeq: Seq[CustomManager] = customInfoClassNameSeq.map(cIC =>
+    Utils.classForName(cIC).newInstance().asInstanceOf[CustomManager])
 
   startDriverHeartbeater()
 
@@ -241,13 +239,18 @@ private[spark] class Executor(
     }
 
     override def run(): Unit = {
+      val threadMXBean = ManagementFactory.getThreadMXBean
       val taskMemoryManager = new TaskMemoryManager(env.memoryManager, taskId)
       val deserializeStartTime = System.currentTimeMillis()
+      val deserializeStartCpuTime = if (threadMXBean.isCurrentThreadCpuTimeSupported) {
+        threadMXBean.getCurrentThreadCpuTime
+      } else 0L
       Thread.currentThread.setContextClassLoader(replClassLoader)
       val ser = env.closureSerializer.newInstance()
       logInfo(s"Running $taskName (TID $taskId)")
       execBackend.statusUpdate(taskId, TaskState.RUNNING, EMPTY_BYTE_BUFFER)
       var taskStart: Long = 0
+      var taskStartCpu: Long = 0
       startGCTime = computeTotalGcTime()
 
       try {
@@ -278,6 +281,9 @@ private[spark] class Executor(
 
         // Run the actual task and measure its runtime.
         taskStart = System.currentTimeMillis()
+        taskStartCpu = if (threadMXBean.isCurrentThreadCpuTimeSupported) {
+          threadMXBean.getCurrentThreadCpuTime
+        } else 0L
         var threwException = true
         val value = try {
           val res = task.run(
@@ -311,6 +317,9 @@ private[spark] class Executor(
           }
         }
         val taskFinish = System.currentTimeMillis()
+        val taskFinishCpu = if (threadMXBean.isCurrentThreadCpuTimeSupported) {
+          threadMXBean.getCurrentThreadCpuTime
+        } else 0L
 
         // If the task has been killed, let's fail it.
         if (task.killed) {
@@ -326,8 +335,12 @@ private[spark] class Executor(
         // includes the Partition. Second, Task.run() deserializes the RDD and function to be run.
         task.metrics.setExecutorDeserializeTime(
           (taskStart - deserializeStartTime) + task.executorDeserializeTime)
+        task.metrics.setExecutorDeserializeCpuTime(
+          (taskStartCpu - deserializeStartCpuTime) + task.executorDeserializeCpuTime)
         // We need to subtract Task.run()'s deserialization time to avoid double-counting
         task.metrics.setExecutorRunTime((taskFinish - taskStart) - task.executorDeserializeTime)
+        task.metrics.setExecutorCpuTime(
+          (taskFinishCpu - taskStartCpu) - task.executorDeserializeCpuTime)
         task.metrics.setJvmGCTime(computeTotalGcTime() - startGCTime)
         task.metrics.setResultSerializationTime(afterSerialization - beforeSerialization)
 
@@ -364,17 +377,22 @@ private[spark] class Executor(
 
       } catch {
         case ffe: FetchFailedException =>
-          val reason = ffe.toTaskEndReason
+          val reason = ffe.toTaskFailedReason
           setTaskFinishedAndClearInterruptStatus()
           execBackend.statusUpdate(taskId, TaskState.FAILED, ser.serialize(reason))
 
-        case _: TaskKilledException | _: InterruptedException if task.killed =>
+        case _: TaskKilledException =>
           logInfo(s"Executor killed $taskName (TID $taskId)")
           setTaskFinishedAndClearInterruptStatus()
           execBackend.statusUpdate(taskId, TaskState.KILLED, ser.serialize(TaskKilled))
 
+        case _: InterruptedException if task.killed =>
+          logInfo(s"Executor interrupted and killed $taskName (TID $taskId)")
+          setTaskFinishedAndClearInterruptStatus()
+          execBackend.statusUpdate(taskId, TaskState.KILLED, ser.serialize(TaskKilled))
+
         case CausedBy(cDE: CommitDeniedException) =>
-          val reason = cDE.toTaskEndReason
+          val reason = cDE.toTaskFailedReason
           setTaskFinishedAndClearInterruptStatus()
           execBackend.statusUpdate(taskId, TaskState.FAILED, ser.serialize(reason))
 
@@ -522,12 +540,11 @@ private[spark] class Executor(
       }
     }
 
-//    val message = Heartbeat(executorId, accumUpdates.toArray, env.blockManager.blockManagerId)
     val message = Heartbeat(
       executorId,
       accumUpdates.toArray,
       env.blockManager.blockManagerId,
-      customManager.map(_.status(conf)))
+      customManagerSeq.map(_.status(conf)))
 
     try {
       val response = heartbeatReceiverRef.askWithRetry[HeartbeatResponse](

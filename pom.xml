@@ -37,8 +37,8 @@
     <basedir>./</basedir>
     <scala.version>2.11.8</scala.version>
     <scala.binary.version>2.11</scala.binary.version>
-    <spark.version>2.0.2</spark.version>
-    <spark.internal.version>2.0.2</spark.internal.version>
+    <spark.version>2.1.0</spark.version>
+    <spark.internal.version>2.1.0</spark.internal.version>
     <jetty.version>9.2.16.v20160414</jetty.version>
   </properties>
 
@@ -178,7 +178,7 @@
     <dependency>
       <groupId>com.fasterxml.jackson.module</groupId>
       <artifactId>jackson-module-scala_${scala.binary.version}</artifactId>
-      <version>2.4.4</version>
+      <version>2.6.5</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -277,19 +277,13 @@
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.10</version>
+      <version>4.12</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.scalatest</groupId>
       <artifactId>scalatest_${scala.binary.version}</artifactId>
-      <version>2.2.1</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.scalacheck</groupId>
-      <artifactId>scalacheck_${scala.binary.version}</artifactId>
-      <version>1.11.3</version>
+      <version>2.2.6</version>
       <scope>test</scope>
     </dependency>
     <dependency>

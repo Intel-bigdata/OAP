@@ -21,8 +21,10 @@ import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.{FileFormat, OutputWriterFactory}
+import org.apache.spark.sql.execution.datasources.{FileFormat, OutputWriter, OutputWriterFactory}
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.types.StructType
+
 
 private[index] class OapIndexFileFormat
   extends FileFormat
@@ -37,16 +39,29 @@ private[index] class OapIndexFileFormat
    * by setting the output committer class in the conf of spark.sql.sources.outputCommitterClass.
    */
   override def prepareWrite(
-                             sparkSession: SparkSession,
-                             job: Job,
-                             options: Map[String, String],
-                             dataSchema: StructType): IndexOutputWriterFactory = {
+      sparkSession: SparkSession,
+      job: Job,
+      options: Map[String, String],
+      dataSchema: StructType): IndexOutputWriterFactory = {
     new IndexOutputWriterFactory {
       override def newInstance(
-                                bucketId: Option[Int],
-                                dataSchema: StructType,
-                                context: TaskAttemptContext): IndexOutputWriter = {
+          bucketId: Option[Int],
+          dataSchema: StructType,
+          context: TaskAttemptContext): IndexOutputWriter = {
+        taskAttemptContext = context
         new IndexOutputWriter(bucketId, context)
+      }
+
+      override def newInstance(
+          path: String,
+          dataSchema: StructType,
+          context: TaskAttemptContext): OutputWriter =
+        newInstance(None, dataSchema, context)
+
+      override def getFileExtension(context: TaskAttemptContext): String = {
+        OapFileFormat.OAP_INDEX_EXTENSION
+        // +context.getConfiguration
+        // .get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION)
       }
     }
   }

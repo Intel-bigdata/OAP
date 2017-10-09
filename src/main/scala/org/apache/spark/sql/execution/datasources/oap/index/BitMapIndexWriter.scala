@@ -22,85 +22,55 @@ import java.io.{ByteArrayOutputStream, ObjectOutputStream}
 import scala.collection.mutable
 
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.mapreduce.Job
 
-import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
-import org.apache.spark.sql.execution.datasources.WriteResult
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics._
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
 
 // TODO respect `sparkSession.conf.get(SQLConf.PARTITION_MAX_FILES)`
 private[oap] class BitMapIndexWriter(
-    relation: WriteIndexRelation,
-    job: Job,
     indexColumns: Array[IndexColumn],
     keySchema: StructType,
     indexName: String,
     time: String,
-    isAppend: Boolean) extends IndexWriter(relation, job, isAppend) {
+    isAppend: Boolean) extends IndexWriter {
 
-  override def writeIndexFromRows(
-      taskContext: TaskContext, iterator: Iterator[InternalRow]): Seq[IndexBuildResult] = {
+  override def writeIndexFromRows(description: WriteJobDescription,
+      writer: IndexOutputWriter, iterator: Iterator[InternalRow]): Seq[IndexBuildResult] = {
     var taskReturn: Seq[IndexBuildResult] = Nil
     var writeNewFile = false
-    executorSideSetup(taskContext)
-    val configuration = taskAttemptContext.getConfiguration
+    val configuration = description.serializableHadoopConf.value
     // to get input filename
     if (!iterator.hasNext) return Nil
+
     if (isAppend) {
-      val fs = FileSystem.get(configuration)
-      var skip = true
+      def isIndexExists(fileName: String): Boolean = {
+        val indexPath =
+          IndexUtils.indexFileFromDataFile(new Path(fileName), indexName, time)
+        val fs = FileSystem.get(configuration)
+        fs.exists(indexPath)
+      }
+
       var nextFile = InputFileNameHolder.getInputFileName().toString
-      iterator.next()
+      if(nextFile== null ||  nextFile.isEmpty) return Nil
+      var skip = isIndexExists(nextFile)
+
       while(iterator.hasNext && skip) {
         val cacheFile = nextFile
         nextFile = InputFileNameHolder.getInputFileName().toString
         // avoid calling `fs.exists` for every row
-        skip = cacheFile == nextFile || fs.exists(new Path(nextFile))
-        iterator.next()
+        skip = cacheFile == nextFile || isIndexExists(nextFile)
+        if(skip) iterator.next()
       }
       if (skip) return Nil
     }
+
     val filename = InputFileNameHolder.getInputFileName().toString
-    configuration.set(IndexWriter.INPUT_FILE_NAME, filename)
-    configuration.set(IndexWriter.INDEX_NAME, indexName)
-    configuration.set(IndexWriter.INDEX_TIME, time)
-    // TODO deal with partition
-    var writer = newIndexOutputWriter()
-    writer.initConverter(dataSchema)
-
-    def commitTask(): Seq[WriteResult] = {
-      try {
-        var writeResults: Seq[WriteResult] = Nil
-        if (writer != null) {
-          writeResults = writeResults :+ writer.close()
-          writer = null
-        }
-        super.commitTask()
-        writeResults
-      } catch {
-        case cause: Throwable =>
-          // This exception will be handled in `InsertIntoHadoopFsRelation.insert$writeRows`, and
-          // will cause `abortTask()` to be invoked.
-          throw new RuntimeException("Failed to commit task", cause)
-      }
-    }
-
-    def abortTask(): Unit = {
-      try {
-        if (writer != null) {
-          writer.close()
-        }
-      } finally {
-        super.abortTask()
-      }
-    }
+    writer.initIndexInfo(filename, indexName, time)
 
     def writeTask(): Seq[IndexBuildResult] = {
       val statisticsManager = new StatisticsManager
@@ -117,7 +87,7 @@ private[oap] class BitMapIndexWriter(
       while (iterator.hasNext && !writeNewFile) {
         val fname = InputFileNameHolder.getInputFileName().toString
         if (fname != filename) {
-          taskReturn = taskReturn ++: writeIndexFromRows(taskContext, iterator)
+          taskReturn = taskReturn ++: writeIndexFromRows(description, writer.copy(), iterator)
           writeNewFile = true
         } else {
           val v = genericProjector(iterator.next()).copy()
@@ -151,7 +121,7 @@ private[oap] class BitMapIndexWriter(
       writer.write(writeBuf.toByteArray)
       out.close()
       val indexEnd = 4 + objLen + header
-      var offset: Long = indexEnd
+      val offset: Long = indexEnd
 
       statisticsManager.write(writer)
 
@@ -160,22 +130,14 @@ private[oap] class BitMapIndexWriter(
       IndexUtils.writeLong(writer, offset) // index file end offset
       IndexUtils.writeLong(writer, indexEnd) // dataEnd
 
+      // avoid fd leak
+      writer.close()
 
-      // writer.close()
-      taskReturn :+ IndexBuildResult(filename, rowCnt, "", new Path(filename).getParent.toString)
+      taskReturn :+ IndexBuildResult(new Path(filename).getName, rowCnt, "",
+        new Path(filename).getParent.toString)
     }
 
-    // If anything below fails, we should abort the task.
-    try {
-      Utils.tryWithSafeFinallyAndFailureCallbacks {
-        val res = writeTask()
-        commitTask()
-        res
-      }(catchBlock = abortTask())
-    } catch {
-      case t: Throwable =>
-        throw new SparkException("Task failed while writing rows", t)
-    }
+    writeTask()
   }
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
 }

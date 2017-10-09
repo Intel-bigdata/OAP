@@ -173,6 +173,12 @@ class BatchColumn {
   object internalRow extends InternalRow {
     override def numFields: Int = values.length
 
+    override def setNullAt(i: Int): Unit =
+      throw new NotImplementedError("")
+
+    override def update(i: Int, value: Any): Unit =
+      throw new NotImplementedError("")
+
     override def copy(): InternalRow = {
       val row = new Array[Any](values.length)
       var i = 0

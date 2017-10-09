@@ -21,9 +21,19 @@ import java.io.File
 
 import org.scalatest.BeforeAndAfter
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
+
+import org.apache.spark.scheduler.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.SparkConf
 import org.apache.spark.sql._
+import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
+import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
+import org.apache.spark.sql.execution.datasources.oap.io.{OapIndexInfo, OapIndexInfoStatus}
+import org.apache.spark.sql.execution.datasources.oap.io.OapDataReader
+import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.sources._
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
@@ -98,6 +108,70 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
         }
       }
     })
+  }
+
+  test("Enable/disable using OAP index after the index is created already") {
+    val dir = Utils.createTempDir()
+    dir.delete()
+    val data = sparkContext.parallelize(1 to 100, 1)
+      .map(i => (i, s"this is row $i"))
+    data.toDF("a", "b").write.format("oap").mode(SaveMode.Overwrite).save(dir.getAbsolutePath)
+    val files = dir.listFiles
+    var oapDataFile: File = null
+    var oapMetaFile: File = null
+    files.foreach { fileName =>
+      if (fileName.toString().endsWith(OapFileFormat.OAP_DATA_EXTENSION)) oapDataFile = fileName
+      if (fileName.toString().endsWith(OapFileFormat.OAP_META_FILE)) oapMetaFile = fileName
+    }
+    val df = sqlContext.read.format("oap").load(dir.getAbsolutePath)
+    df.createOrReplaceTempView("oap_table")
+    sql("create oindex oap_idx on oap_table (a)")
+    val conf = spark.sparkContext.hadoopConfiguration
+    val filePath = new Path(oapDataFile.toString)
+    val metaPath = new Path(oapMetaFile.toString)
+    val dataSourceMeta = DataSourceMeta.initialize(metaPath, conf)
+    val requiredIds = Array(0, 1)
+    // No index scanner is used.
+    val readerNoIndex = new OapDataReader(filePath, dataSourceMeta, None, requiredIds)
+    val itNoIndex = readerNoIndex.initialize(conf)
+    assert(itNoIndex.size == 100)
+    val ic = new IndexContext(dataSourceMeta)
+    val filters: Array[Filter] = Array(
+      And(GreaterThan("a", 9), LessThan("a", 14)))
+    ScannerBuilder.build(filters, ic)
+    var filterScanner = ic.getScanner
+    val readerIndex = new OapDataReader(filePath, dataSourceMeta, filterScanner, requiredIds)
+    val itIndex = readerIndex.initialize(conf)
+    assert(itIndex.size == 4)
+    conf.setBoolean(SQLConf.OAP_ENABLE_OINDEX.key, false)
+    val itSetIgnoreIndex = readerIndex.initialize(conf)
+    assert(itSetIgnoreIndex.size == 100)
+    conf.setBoolean(SQLConf.OAP_ENABLE_OINDEX.key, true)
+    val itSetUseIndex = readerIndex.initialize(conf)
+    assert(itSetUseIndex.size == 4)
+    dir.delete()
+  }
+
+  test("OapIndexInfo status and update") {
+    val path1 = "partitionFile1"
+    val useIndex1 = true
+    val path2 = "partitionFile2"
+    val useIndex2 = false
+    val rawData1 = OapIndexInfoStatus(path1, useIndex1)
+    val rawData2 = OapIndexInfoStatus(path2, useIndex2)
+    val indexInfoStatusSeq = Seq(rawData1, rawData2)
+    OapIndexInfo.partitionOapIndex.clear
+    OapIndexInfo.partitionOapIndex.put(path1, useIndex1)
+    OapIndexInfo.partitionOapIndex.put(path2, useIndex2)
+    val indexInfoStatusSerializeStr = OapIndexInfo.status
+    assert(indexInfoStatusSerializeStr == OapIndexInfoStatusSerDe.serialize(indexInfoStatusSeq))
+    val host = "host1"
+    val executorId = "executorId1"
+    val oapIndexInfo = SparkListenerOapIndexInfoUpdate(host, executorId, indexInfoStatusSerializeStr)
+    OapIndexInfo.update(oapIndexInfo)
+    assert(oapIndexInfo.hostName == host)
+    assert(oapIndexInfo.executorId == executorId)
+    assert(oapIndexInfo.oapIndexInfo == indexInfoStatusSerializeStr)
   }
 
   /** Verifies data and schema. */

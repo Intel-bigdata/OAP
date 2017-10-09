@@ -38,7 +38,7 @@ import org.apache.spark.util.io.ChunkedByteBuffer
 
 
 // TODO need to register within the SparkContext
-class OapHeartBeatMessager extends CustomManager with Logging {
+class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
   override def status(conf: SparkConf): String = {
     FiberCacheManager.status
   }
@@ -131,16 +131,22 @@ object FiberCacheManager extends Logging {
   }
 
   def status: String = {
-    val blockManager = SparkEnv.get.blockManager
-    val fiberBlockIds = blockManager.getMatchingBlockIds(blockId =>
-      blockId.name.startsWith("fiber_data_"))
+    val sparkEnv = SparkEnv.get
     val threshTime = System.currentTimeMillis()
-    val fibers = fiberBlockIds.map(blockId => block2Fiber(blockId))
+
+    val fibers =
+      if (sparkEnv == null) Seq.empty
+      else {
+        val fiberBlockIds = sparkEnv.blockManager.getMatchingBlockIds(blockId =>
+          blockId.name.startsWith("fiber_data_"))
+        fiberBlockIds.map(blockId => block2Fiber(blockId))
+      }
+
     logDebug("current cached blocks: \n" +
-      fibers.map{case dataFiber: DataFiber =>
-        dataFiber.file.path +
+      fibers.map {
+        case dataFiber: DataFiber => dataFiber.file.path +
           " column:" + dataFiber.columnIndex +
-          " groupId:" + dataFiber.rowGroupId}.mkString("\n"))
+          " groupId:" + dataFiber.rowGroupId }.mkString("\n"))
 
     // We have went over all fiber blocks in BlockManager. Remove out-dated item in dataFileIdMap
     dataFileIdMap.clearOldValues(threshTime)

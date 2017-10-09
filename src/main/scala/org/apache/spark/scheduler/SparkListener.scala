@@ -144,6 +144,15 @@ case class SparkListenerCustomInfoUpdate(
     customizedInfo: String) extends SparkListenerEvent
 
 /**
+ * Interface for creating OAP index information listeners which are used to
+ * report to OAP users.
+ */
+@DeveloperApi
+case class SparkListenerOapIndexInfoUpdate(
+    hostName: String,
+    executorId: String,
+    oapIndexInfo: String) extends SparkListenerEvent
+/**
  * Interface for creating history listeners defined in other modules like SQL, which are used to
  * rebuild the history UI.
  */
@@ -258,6 +267,11 @@ private[spark] trait SparkListenerInterface {
    * Called when the driver receives some user customized info.
    */
   def onCustomInfoUpdate(customInfoUpdate: SparkListenerCustomInfoUpdate) { }
+
+  /**
+   * Called when the driver receives oap index info.
+   */
+  def onOapIndexInfoUpdate(oapIndexInfoUpdate: SparkListenerOapIndexInfoUpdate) { }
 }
 
 

@@ -17,20 +17,17 @@
 
 package org.apache.spark.sql.execution
 
-import scala.collection.mutable.ArrayBuffer
-
-import org.apache.hadoop.fs.{BlockLocation, FileStatus, LocatedFileStatus, Path}
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.{execution, SparkSession, Strategy}
-import org.apache.spark.sql.catalyst.{expressions, InternalRow, TableIdentifier}
+import org.apache.spark.sql.catalyst.{expressions, InternalRow}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalOperation}
 import org.apache.spark.sql.catalyst.plans.{logical, LeftSemi}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.DataSourceScanExec.{INPUT_PATHS, PUSHED_FILTERS}
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.joins.BuildRight
@@ -84,16 +81,18 @@ trait OAPStrategies extends Logging {
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
         if ((orderAttributes.size == 1 &&
             (filterAttributes.isEmpty || filterAttributes == orderAttributes)) &&
-            (file.fileFormat.isInstanceOf[OapFileFormat] &&
-              file.fileFormat.initialize(file.sparkSession, file.options, file.location)
-              .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes))) {
+            (file.fileFormat.isInstanceOf[OapFileFormat])) {
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY -> limit.toString) +
             (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
-          OapOrderLimitFileScanExec(
-            limit, order, projectList,
-            createOapFileScanPlan(
-              projectList, filters, relation, file, table, oapOption))
+          createOapFileScanPlan(
+            projectList, filters, relation, file, table, oapOption) match {
+            case Some(fastScan) =>
+              OapOrderLimitFileScanExec(
+                limit, order, projectList,
+                fastScan)
+            case None => PlanLater(child)
+          }
         }
         else PlanLater(child)
       case _ => PlanLater(child)
@@ -143,15 +142,18 @@ trait OAPStrategies extends Logging {
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
         if ((orderAttributes.size == 1 &&
           (filterAttributes.isEmpty || filterAttributes == orderAttributes)) &&
-          (file.fileFormat.isInstanceOf[OapFileFormat] &&
-            file.fileFormat.initialize(file.sparkSession, file.options, file.location)
-              .asInstanceOf[OapFileFormat].hasAvailableIndex(orderAttributes))) {
+          (file.fileFormat.isInstanceOf[OapFileFormat])) {
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY -> "1"))
-          OapDistinctFileScanExec(
-            scanNumber = 1,
-            projectList,
-            createOapFileScanPlan(projectList, filters, relation, file, table, oapOption))
+          createOapFileScanPlan(
+            projectList, filters, relation, file, table, oapOption) match {
+            case Some(fastScan) =>
+              OapDistinctFileScanExec(
+                scanNumber = 1,
+                projectList,
+                fastScan)
+            case None => PlanLater(child)
+          }
         }
         else PlanLater(child)
       case _ => PlanLater(child)
@@ -165,11 +167,10 @@ trait OAPStrategies extends Logging {
    */
   def createOapFileScanPlan(
       projects: Seq[NamedExpression], filters: Seq[Expression],
-      l: LogicalPlan, files : HadoopFsRelation,
-      table: Option[TableIdentifier],
-      OapOption: Map[String, String]): SparkPlan = {
-    // Filters on this relation fall into four categories based
-    // on where we can use them to avoid
+      l: LogicalRelation, _fsRelation : HadoopFsRelation,
+      table: Option[CatalogTable],
+      OapOption: Map[String, String]): Option[SparkPlan] = {
+    // Filters on this relation fall into four categories based on where we can use them to avoid
     // reading unneeded data:
     //  - partition keys only - used to prune directories to read
     //  - bucket keys only - optionally used to prune files to read
@@ -188,179 +189,68 @@ trait OAPStrategies extends Logging {
     }
 
     val partitionColumns =
-      l.resolve(files.partitionSchema, files.sparkSession.sessionState.analyzer.resolver)
+      l.resolve(
+        _fsRelation.partitionSchema, _fsRelation.sparkSession.sessionState.analyzer.resolver)
     val partitionSet = AttributeSet(partitionColumns)
     val partitionKeyFilters =
       ExpressionSet(normalizedFilters.filter(_.references.subsetOf(partitionSet)))
     logInfo(s"Pruning directories with: ${partitionKeyFilters.mkString(",")}")
 
-    val dataColumns =
-      l.resolve(files.dataSchema, files.sparkSession.sessionState.analyzer.resolver)
+    val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq)
 
-    // Partition keys are not available in the statistics of the files.
-    val dataFilters = normalizedFilters.filter(_.references.intersect(partitionSet).isEmpty)
-
-    // Predicates with both partition keys and attributes need to be evaluated after the scan.
-    val afterScanFilters = filterSet -- partitionKeyFilters
-    logInfo(s"Post-Scan Filters: ${afterScanFilters.mkString(",")}")
-
-    val selectedPartitions = files.location.listFiles(partitionKeyFilters.toSeq)
-
-    val filterAttributes = AttributeSet(afterScanFilters)
-    val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
-    val requiredAttributes = AttributeSet(requiredExpressions)
-
-    val readDataColumns =
-      dataColumns
-        .filter(requiredAttributes.contains)
-        .filterNot(partitionColumns.contains)
-    val prunedDataSchema = readDataColumns.toStructType
-    logInfo(s"Pruned Data Schema: ${prunedDataSchema.simpleString(5)}")
-
-    val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
-    logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
-
-    val readFile = files.fileFormat.asInstanceOf[OapFileFormat].buildReaderWithPartitionValues(
-      sparkSession = files.sparkSession,
-      dataSchema = files.dataSchema,
-      partitionSchema = files.partitionSchema,
-      requiredSchema = prunedDataSchema,
-      filters = pushedDownFilters,
-      options = OapOption,
-      hadoopConf = files.sparkSession.sessionState.newHadoopConfWithOptions(files.options))
-
-    val plannedPartitions = {
-      val defaultMaxSplitBytes = files.sparkSession.sessionState.conf.filesMaxPartitionBytes
-      val openCostInBytes = files.sparkSession.sessionState.conf.filesOpenCostInBytes
-      val defaultParallelism = files.sparkSession.sparkContext.defaultParallelism
-      val totalBytes = selectedPartitions.flatMap(_.files.map(_.getLen + openCostInBytes)).sum
-      val bytesPerCore = totalBytes / defaultParallelism
-      val maxSplitBytes = Math.min(defaultMaxSplitBytes,
-        Math.max(openCostInBytes, bytesPerCore))
-      logInfo(s"Planning scan with bin packing, max size: $maxSplitBytes bytes, " +
-        s"open cost is considered as scanning $openCostInBytes bytes.")
-
-      val splitFiles = selectedPartitions.flatMap { partition =>
-        partition.files.flatMap { file =>
-          assert(!files.fileFormat.isSplitable(files.sparkSession, files.options, file.getPath))
-          val blockLocations = OAPFileUtils.getBlockLocations(file)
-          val hosts = OAPFileUtils.getBlockHosts(blockLocations, 0, file.getLen)
-          Seq(PartitionedFile(
-            partition.values, file.getPath.toUri.toString, 0, file.getLen, hosts))
-        }
-      }.toArray.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
-
-      val partitions = new ArrayBuffer[FilePartition]
-      val currentFiles = new ArrayBuffer[PartitionedFile]
-      var currentSize = 0L
-
-      /** Add the given file to the current partition. */
-      def addFile(file: PartitionedFile): Unit = {
-        currentSize += file.length + openCostInBytes
-        currentFiles.append(file)
-      }
-
-      /** Close the current partition and move to the next. */
-      def closePartition(): Unit = {
-        if (currentFiles.nonEmpty) {
-          val newPartition =
-            FilePartition(
-              partitions.size,
-              currentFiles.toArray.toSeq) // Copy to a new Array.
-          partitions.append(newPartition)
-        }
-        currentFiles.clear()
-        currentSize = 0
-      }
-
-      // Assign files to partitions using "First Fit Decreasing" (FFD)
-      // TODO: consider adding a slop factor here?
-      splitFiles.foreach { file =>
-        if (currentSize + file.length > maxSplitBytes) {
-          closePartition()
-        }
-        addFile(file)
-      }
-      closePartition()
-      partitions
+    val fsRelation: HadoopFsRelation = _fsRelation.fileFormat match {
+      case fileFormat : OapFileFormat =>
+        fileFormat.initialize(_fsRelation.sparkSession, _fsRelation.options,
+          selectedPartitions.flatMap(p => p.files).toSeq)
+        _fsRelation
     }
 
-    // These metadata values make scan plans uniquely identifiable for equality checking.
-    val meta = Map(
-      "PartitionFilters" -> partitionKeyFilters.mkString("[", ", ", "]"),
-      "Format" -> files.fileFormat.toString,
-      "ReadSchema" -> prunedDataSchema.simpleString,
-      PUSHED_FILTERS -> pushedDownFilters.mkString("[", ", ", "]"),
-      INPUT_PATHS -> files.location.paths.mkString(", "))
+    if (fsRelation.fileFormat.asInstanceOf[OapFileFormat].hasAvailableIndex(normalizedFilters)) {
+      val dataColumns =
+        l.resolve(fsRelation.dataSchema, fsRelation.sparkSession.sessionState.analyzer.resolver)
 
-    val scan =
-      DataSourceScanExec.create(
-        readDataColumns ++ partitionColumns,
-        new FileScanRDD(
-          files.sparkSession,
-          readFile,
-          plannedPartitions),
-        files,
-        meta,
-        table)
+      // Partition keys are not available in the statistics of the files.
+      val dataFilters = normalizedFilters.filter(_.references.intersect(partitionSet).isEmpty)
 
-    val afterScanFilter = afterScanFilters.toSeq.reduceOption(expressions.And)
-    val withFilter = afterScanFilter.map(execution.FilterExec(_, scan)).getOrElse(scan)
-    val withProjections = if (projects == withFilter.output) {
-      withFilter
-    } else {
-      execution.ProjectExec(projects, withFilter)
-    }
+      // Predicates with both partition keys and attributes need to be evaluated after the scan.
+      val afterScanFilters = filterSet -- partitionKeyFilters.filter(_.references.nonEmpty)
+      logInfo(s"Post-Scan Filters: ${afterScanFilters.mkString(",")}")
 
-    withProjections
-  }
+      val filterAttributes = AttributeSet(afterScanFilters)
+      val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
+      val requiredAttributes = AttributeSet(requiredExpressions)
 
+      val readDataColumns =
+        dataColumns
+          .filter(requiredAttributes.contains)
+          .filterNot(partitionColumns.contains)
+      val outputSchema = readDataColumns.toStructType
+      logInfo(s"Output Data Schema: ${outputSchema.simpleString(5)}")
 
-  /**
-   * A Util class to handle file block (hadoop/hdfs file) related information.
-   */
-  object OAPFileUtils {
+      val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
+      logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
 
-    private[OAPStrategies] def getBlockLocations(
-        file: FileStatus): Array[BlockLocation] = file match {
-      case f: LocatedFileStatus => f.getBlockLocations
-      case f => Array.empty[BlockLocation]
-    }
+      val outputAttributes = readDataColumns ++ partitionColumns
 
-    // Given locations of all blocks of a single file, `blockLocations`, and an `(offset, length)`
-    // pair that represents a segment of the same file, find out the block that contains the largest
-    // fraction the segment, and returns location hosts of that block.
-    // If no such block can be found, returns an empty array.
-    private[OAPStrategies] def getBlockHosts(
-        blockLocations: Array[BlockLocation],
-        offset: Long, length: Long): Array[String] = {
-      val candidates = blockLocations.map {
-        // The fragment starts from a position within this block
-        case b if b.getOffset <= offset && offset < b.getOffset + b.getLength =>
-          b.getHosts -> (b.getOffset + b.getLength - offset).min(length)
+      val scan =
+        new FileSourceScanExec(
+          fsRelation,
+          outputAttributes,
+          outputSchema,
+          partitionKeyFilters.toSeq,
+          pushedDownFilters,
+          table.map(_.identifier))
 
-        // The fragment ends at a position within this block
-        case b if offset <= b.getOffset && offset + length < b.getLength =>
-          b.getHosts -> (offset + length - b.getOffset).min(length)
-
-        // The fragment fully contains this block
-        case b if offset <= b.getOffset && b.getOffset + b.getLength <= offset + length =>
-          b.getHosts -> b.getLength
-
-        // The fragment doesn't intersect with this block
-        case b =>
-          b.getHosts -> 0L
-      }.filter { case (hosts, size) =>
-        size > 0L
-      }
-
-      if (candidates.isEmpty) {
-        Array.empty[String]
+      val afterScanFilter = afterScanFilters.toSeq.reduceOption(expressions.And)
+      val withFilter = afterScanFilter.map(execution.FilterExec(_, scan)).getOrElse(scan)
+      val withProjections = if (projects == withFilter.output) {
+        withFilter
       } else {
-        val (hosts, _) = candidates.maxBy { case (_, size) => size }
-        hosts
+        execution.ProjectExec(projects, withFilter)
       }
-    }
+
+      Option(withProjections)
+    } else None
   }
 }
 

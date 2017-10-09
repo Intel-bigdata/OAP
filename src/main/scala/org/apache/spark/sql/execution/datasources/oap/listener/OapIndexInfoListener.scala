@@ -15,23 +15,13 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.oap.index
+package org.apache.spark.sql.execution.datasources.oap.listener
 
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.scheduler.{SparkListener, SparkListenerOapIndexInfoUpdate}
+import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
 
-private[index] object IndexWriterFactory {
-  def getIndexWriter(
-      indexColumns: Array[IndexColumn],
-      keySchema: StructType,
-      indexName: String,
-      time: String,
-      indexType: AnyIndexType,
-      isAppend: Boolean): IndexWriter = {
-    indexType match {
-      case BTreeIndexType =>
-        new BTreeIndexWriter(indexColumns, keySchema, indexName, time, isAppend)
-      case BitMapIndexType =>
-        new BitMapIndexWriter(indexColumns, keySchema, indexName, time, isAppend)
-    }
+class OapIndexInfoListener extends SparkListener {
+  override def onOapIndexInfoUpdate(indexInfo: SparkListenerOapIndexInfoUpdate): Unit = {
+    OapIndexInfo.update(indexInfo)
   }
 }

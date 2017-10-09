@@ -29,6 +29,7 @@ import org.apache.parquet.hadoop.example.GroupWriteSupport
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.hadoop.metadata.CompressionCodecName.UNCOMPRESSED
 
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 
 
@@ -198,7 +199,16 @@ class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     val FILE_TEST = new Path(TARGET_DIR + "/Paper.parquet")
 
-    val configuration = new Configuration()
+    val configuration = {
+      val conf = new Configuration()
+      conf.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING.key,
+        SQLConf.PARQUET_BINARY_AS_STRING.defaultValue.get)
+      conf.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key,
+        SQLConf.PARQUET_INT96_AS_TIMESTAMP.defaultValue.get)
+      conf.setBoolean(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key,
+        SQLConf.PARQUET_WRITE_LEGACY_FORMAT.defaultValue.get)
+      conf
+    }
 
     val BLOCK_SIZE_DEFAULT = ParquetWriter.DEFAULT_BLOCK_SIZE
 
@@ -272,5 +282,4 @@ class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
       writer.close()
     }
   }
-
 }
