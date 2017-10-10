@@ -21,13 +21,14 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{SparkSession, Strategy, execution}
-import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier, expressions}
+import org.apache.spark.sql.{execution, SparkSession, Strategy}
+import org.apache.spark.sql.catalyst.{expressions, InternalRow}
+import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalAggregation, PhysicalOperation}
-import org.apache.spark.sql.catalyst.plans.{LeftSemi, logical}
+import org.apache.spark.sql.catalyst.plans.{logical, LeftSemi}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.aggregate.OapAggUtils
@@ -277,7 +278,7 @@ trait OapStrategies extends Logging {
       filters: Seq[Expression],
       l: LogicalPlan,
       _fsRelation: HadoopFsRelation,
-      table: Option[TableIdentifier],
+      table: Option[CatalogTable],
       OapOption: Map[String, String],
       indexHint: Seq[Expression]): Option[SparkPlan] = {
     // Filters on this relation fall into four categories based
