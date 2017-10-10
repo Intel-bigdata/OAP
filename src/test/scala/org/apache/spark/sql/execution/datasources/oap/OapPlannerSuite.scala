@@ -215,7 +215,7 @@ class OapPlannerSuite
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_fix_length_schema_table select * from t")
     sql("create oindex index1 on oap_fix_length_schema_table (a)")
-    spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
+//    spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
 
     val sqlString =
       "SELECT a, min(b), max(b) FROM oap_fix_length_schema_table where a < 30 group by a order by a"

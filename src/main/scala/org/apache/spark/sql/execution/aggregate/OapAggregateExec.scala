@@ -135,10 +135,11 @@ case class OapAggregateExec(
 
   override def usedInputs: AttributeSet = inputSet
 
-  override def supportCodegen: Boolean = {
-    // ImperativeAggregate is not supported right now
-    !aggregateExpressions.exists(_.aggregateFunction.isInstanceOf[ImperativeAggregate])
-  }
+  override def supportCodegen: Boolean = false
+//  {
+//    // ImperativeAggregate is not supported right now
+//    !aggregateExpressions.exists(_.aggregateFunction.isInstanceOf[ImperativeAggregate])
+//  }
 
   override def inputRDDs(): Seq[RDD[InternalRow]] = {
     child.asInstanceOf[CodegenSupport].inputRDDs()
