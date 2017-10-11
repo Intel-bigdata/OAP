@@ -20,7 +20,6 @@ package org.apache.spark.sql.execution.datasources
 import java.util.{Date, UUID}
 
 import scala.collection.mutable
-import scala.runtime.BoxedUnit
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -32,12 +31,13 @@ import org.apache.spark._
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.io.FileCommitProtocol
 import org.apache.spark.internal.io.FileCommitProtocol.TaskCommitMessage
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.sql.catalyst.catalog.{BucketSpec, ExternalCatalogUtils}
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.HashPartitioning
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.{QueryExecution, SQLExecution, UnsafeKVExternalSorter}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.util.{SerializableConfiguration, Utils}
@@ -45,15 +45,14 @@ import org.apache.spark.util.collection.unsafe.sort.UnsafeExternalSorter
 
 
 /** A helper object for writing FileFormat data out to a location. */
-class FileFormatWriter extends Logging
-  with Serializable {
+object FileFormatWriter extends Logging {
 
   /** Describes how output files should be placed in the filesystem. */
   case class OutputSpec(
     outputPath: String, customPartitionLocations: Map[TablePartitionSpec, String])
 
   /** A shared job description for all the write tasks. */
-  class WriteJobDescription(
+  private class WriteJobDescription(
       val uuid: String,  // prevent collision between different (appending) write jobs
       val serializableHadoopConf: SerializableConfiguration,
       val outputWriterFactory: OutputWriterFactory,
@@ -153,13 +152,6 @@ class FileFormatWriter extends Logging
     }
   }
 
-  def getWriteTask(description: WriteJobDescription, taskAttemptContext: TaskAttemptContext,
-      committer: FileCommitProtocol): Option[ExecuteWriteTask] = {
-    return Option.empty
-  }
-
-  def setHadoopConf(hadoopConf: Configuration): Unit = {}
-
   /** Writes data out in a single Spark task. */
   private def executeTask(
       description: WriteJobDescription,
@@ -189,20 +181,17 @@ class FileFormatWriter extends Logging
     committer.setupTask(taskAttemptContext)
 
     val writeTask =
-      getWriteTask(description, taskAttemptContext, committer).getOrElse {
-        if (description.partitionColumns.isEmpty && description.bucketSpec.isEmpty) {
-          new SingleDirectoryWriteTask(description, taskAttemptContext, committer)
-        } else {
-          new DynamicPartitionWriteTask(description, taskAttemptContext, committer)
-        }
+      if (description.partitionColumns.isEmpty && description.bucketSpec.isEmpty) {
+        new SingleDirectoryWriteTask(description, taskAttemptContext, committer)
+      } else {
+        new DynamicPartitionWriteTask(description, taskAttemptContext, committer)
       }
 
     try {
       Utils.tryWithSafeFinallyAndFailureCallbacks(block = {
         // Execute the task to write rows out and commit the task.
         var (outputPartitions, writeResults) = writeTask.execute(iterator)
-        writeResults = (writeResults :+ writeTask.releaseResources())
-          .filterNot(r => r == Nil || r.isInstanceOf[BoxedUnit])
+        writeResults = writeResults ++ writeTask.releaseResources()
         (committer.commitTask(taskAttemptContext), outputPartitions, writeResults)
       })(catchBlock = {
         // If there is an error, release resource and then abort the task
@@ -224,13 +213,13 @@ class FileFormatWriter extends Logging
    * to commit or abort tasks. Exceptions thrown by the implementation of this trait will
    * automatically trigger task aborts.
    */
-  trait ExecuteWriteTask {
+  private trait ExecuteWriteTask {
     /**
      * Writes data out to files, and then returns the list of partition strings written out.
      * The list of partitions is sent back to the driver and used to update the catalog.
      */
     def execute(iterator: Iterator[InternalRow]): (Set[String], Seq[WriteResult])
-    def releaseResources(): WriteResult
+    def releaseResources(): Seq[WriteResult]
   }
 
   /** Writes data to a single directory (used for non-dynamic-partition writes). */
@@ -261,13 +250,13 @@ class FileFormatWriter extends Logging
       (Set.empty, Seq.empty)
     }
 
-    override def releaseResources(): WriteResult = {
-      var res: WriteResult = Nil
+    override def releaseResources(): Seq[WriteResult] = {
+      var writeResults: Seq[WriteResult] = Nil
       if (outputWriter != null) {
-        res = outputWriter.close()
+        writeResults = writeResults :+ outputWriter.close()
         outputWriter = null
       }
-      res
+      writeResults
     }
   }
 
@@ -328,14 +317,13 @@ class FileFormatWriter extends Logging
         ""
       }
       val ext = bucketId + description.outputWriterFactory.getFileExtension(taskAttemptContext)
-      var ps: String = ""
 
-      val customPath = partDir match {
+      val (customPath, partitionString) = partDir match {
         case Some(dir) =>
-          ps = dir
-          description.customPartitionLocations.get(PartitioningUtils.parsePathFragment(dir))
+          (description.customPartitionLocations.get(PartitioningUtils.parsePathFragment(dir)),
+              dir)
         case _ =>
-          None
+          (None, "")
       }
       val path = if (customPath.isDefined) {
         committer.newTaskTempFileAbsPath(taskAttemptContext, customPath.get, ext)
@@ -347,7 +335,7 @@ class FileFormatWriter extends Logging
         dataSchema = description.nonPartitionColumns.toStructType,
         context = taskAttemptContext)
       newWriter.initConverter(description.nonPartitionColumns.toStructType)
-      newWriter.setPartitionString(ps)
+      newWriter.setPartitionString(partitionString)
       newWriter
     }
 
@@ -426,13 +414,13 @@ class FileFormatWriter extends Logging
       (updatedPartitions.toSet, writeResults)
     }
 
-    override def releaseResources(): WriteResult = {
-      var res: WriteResult = Nil
+    override def releaseResources(): Seq[WriteResult] = {
+      var writeResults: Seq[WriteResult] = Nil
       if (currentWriter != null) {
-        res = currentWriter.close()
+        writeResults = writeResults :+ currentWriter.close()
         currentWriter = null
       }
-      res
+      writeResults
     }
   }
 }

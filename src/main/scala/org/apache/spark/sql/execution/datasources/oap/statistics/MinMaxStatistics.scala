@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
+import java.io.OutputStream
+
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
@@ -50,7 +52,7 @@ private[oap] class MinMaxStatistics extends Statistics {
     }
   }
 
-  override def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
     var offset = super.write(writer, sortedKeys)
     if (min != null) {
       offset += Statistics.writeInternalRow(converter, min, writer)

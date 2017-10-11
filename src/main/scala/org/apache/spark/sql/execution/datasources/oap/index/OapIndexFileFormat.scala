@@ -18,10 +18,11 @@
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
+import org.apache.parquet.hadoop.util.ContextUtil
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.{FileFormat, OutputWriter, OutputWriterFactory}
+import org.apache.spark.sql.execution.datasources.{FileFormat, OutputWriterFactory}
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.types.StructType
 
@@ -42,27 +43,33 @@ private[index] class OapIndexFileFormat
       sparkSession: SparkSession,
       job: Job,
       options: Map[String, String],
-      dataSchema: StructType): IndexOutputWriterFactory = {
-    new IndexOutputWriterFactory {
-      override def newInstance(
-          bucketId: Option[Int],
-          dataSchema: StructType,
-          context: TaskAttemptContext): IndexOutputWriter = {
-        taskAttemptContext = context
-        new IndexOutputWriter(bucketId, context)
-      }
+      dataSchema: StructType): OutputWriterFactory = {
 
-      override def newInstance(
-          path: String,
-          dataSchema: StructType,
-          context: TaskAttemptContext): OutputWriter =
-        newInstance(None, dataSchema, context)
 
-      override def getFileExtension(context: TaskAttemptContext): String = {
+    val configuration = ContextUtil.getConfiguration(job)
+
+    configuration.set(OapIndexFileFormat.ROW_SCHEMA, dataSchema.json)
+    configuration.set(OapIndexFileFormat.INDEX_TYPE, options("indexType"))
+    configuration.set(OapIndexFileFormat.INDEX_NAME, options("indexName"))
+    configuration.set(OapIndexFileFormat.INDEX_TIME, options("indexTime"))
+    configuration.set(OapIndexFileFormat.IS_APPEND, options("isAppend"))
+
+    new OutputWriterFactory {
+      override def getFileExtension(context: TaskAttemptContext): String =
         OapFileFormat.OAP_INDEX_EXTENSION
-        // +context.getConfiguration
-        // .get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION)
-      }
+
+      override def newInstance(path: String, dataSchema: StructType, context: TaskAttemptContext) =
+        new OapIndexOutputWriter(path, context)
     }
   }
 }
+
+private[index] object OapIndexFileFormat {
+  val ROW_SCHEMA: String = "org.apache.spark.sql.oap.row.attributes"
+  val INDEX_TYPE: String = "org.apache.spark.sql.oap.index.type"
+  val INDEX_NAME: String = "org.apache.spark.sql.oap.index.name"
+  val INDEX_TIME: String = "org.apache.spark.sql.oap.index.time"
+  val IS_APPEND: String = "org.apache.spark.sql.oap.index.append"
+}
+
+case class IndexBuildResult(dataFile: String, rowCount: Long, fingerprint: String, parent: String)

@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
+import java.io.OutputStream
+
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.catalyst.expressions._
@@ -55,7 +57,7 @@ private[oap] class BloomFilterStatistics extends Statistics {
     projectors.foreach(p => bfIndex.addValue(p(key).getBytes))
   }
 
-  override def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
     var offset = super.write(writer, sortedKeys)
 
     // Bloom filter index file format:

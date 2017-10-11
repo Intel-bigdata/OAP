@@ -28,7 +28,6 @@ import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.internal.SQLConf
 
-
 /**
  * A strategy for planning scans over collections of files that might be partitioned or bucketed
  * by user specified columns.

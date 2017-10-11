@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -54,7 +54,7 @@ abstract class Statistics{
    * @param sortedKeys sorted keys stored related to this statistics
    * @return number of bytes written in writer
    */
-  def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
+  def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
     IndexUtils.writeInt(writer, id)
     4L
   }
@@ -102,7 +102,7 @@ object Statistics {
 
   def writeInternalRow(converter: UnsafeProjection,
                        internalRow: InternalRow,
-                       writer: IndexOutputWriter): Int = {
+                       writer: OutputStream): Int = {
     val keyBuf = new ByteArrayOutputStream()
     val value = convertHelper(converter, internalRow, keyBuf)
 

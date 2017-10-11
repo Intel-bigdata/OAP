@@ -16,6 +16,8 @@
  */
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
+import java.io.OutputStream
+
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
@@ -47,7 +49,7 @@ private[oap] class SampleBasedStatistics extends Statistics {
   // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |   (4 + u3_sizeInBytes) Bytes, unsafeRow-3
   // ...
   // | unsafeRow-(sample_size) sizeInBytes | unsafeRow-(sample_size) content |
-  override def write(writer: IndexOutputWriter, sortedKeys: ArrayBuffer[Key]): Long = {
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
     var offset = super.write(writer, sortedKeys)
     val size = (sortedKeys.size * sampleRate).toInt
     sampleArray = takeSample(sortedKeys, size)

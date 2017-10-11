@@ -49,14 +49,7 @@ object IndexUtils {
       dataFile.getParent, "." + indexFileName + "." + time + "." +  name + OAP_INDEX_EXTENSION)
   }
 
-  def writeInt(writer: IndexOutputWriter, v: Int): Unit = {
-    writer.write((v >>>  0) & 0xFF)
-    writer.write((v >>>  8) & 0xFF)
-    writer.write((v >>> 16) & 0xFF)
-    writer.write((v >>> 24) & 0xFF)
-  }
-
-  def writeLong(writer: IndexOutputWriter, v: Long): Unit = {
+  def writeLong(writer: OutputStream, v: Long): Unit = {
     writer.write((v >>>  0).toInt & 0xFF)
     writer.write((v >>>  8).toInt & 0xFF)
     writer.write((v >>> 16).toInt & 0xFF)

@@ -23,15 +23,15 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileStatus, FileSystem, FSDataOutputStream, Path}
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-import org.apache.parquet.hadoop.util.{ContextUtil, SerializationUtil}
+import org.apache.parquet.hadoop.util.SerializationUtil
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateOrdering, GenerateUnsafeProjection}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
@@ -285,7 +285,7 @@ private[sql] class OapFileFormat extends FileFormat
     while(idx < m.indexMetas.length) {
       m.indexMetas(idx).indexType match {
         case BTreeIndex(entries) =>
-          bTreeIndexAttrSet.add(m.schema(entries(0).ordinal).name)
+          bTreeIndexAttrSet.add(m.schema(entries.head.ordinal).name)
         case BitMapIndex(entries) =>
           entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
         case _ => // we don't support other types of index
@@ -328,8 +328,10 @@ private[oap] class OapOutputWriterFactory(
     @transient protected val job: Job,
     options: Map[String, String]) extends OutputWriterFactory {
 
-  override def newInstance(path: String,
-                            dataSchema: StructType, context: TaskAttemptContext): OutputWriter = {
+  override def newInstance(
+      path: String,
+      dataSchema: StructType,
+      context: TaskAttemptContext): OutputWriter = {
     new OapOutputWriter(path, dataSchema, context)
   }
 

@@ -18,7 +18,6 @@
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.mapreduce.Job
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.io.FileCommitProtocol
@@ -35,7 +34,7 @@ import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
+import org.apache.spark.sql.types._
 
 
 /**
@@ -49,25 +48,23 @@ case class CreateIndex(
     indexType: AnyIndexType,
     partitionSpec: Option[TablePartitionSpec]) extends RunnableCommand with Logging {
 
-  override val output: Seq[Attribute] = Seq.empty
-
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val relation =
       EliminateSubqueryAliases(sparkSession.sessionState.catalog.lookupRelation(table)) match {
         case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
         case other => other
       }
-    val (fileCatalog, s, readerClassName, identifier) = relation match {
+    val (fileCatalog, schema, readerClassName, identifier, fsRelation) = relation match {
       case LogicalRelation(
-      HadoopFsRelation(fileCatalog, _, s, _, _: OapFileFormat, _), _, id) =>
-        (fileCatalog, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, id)
+      _fsRelation @ HadoopFsRelation(f, _, s, _, _: OapFileFormat, _), _, id) =>
+        (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, id, _fsRelation)
       case LogicalRelation(
-      HadoopFsRelation(fileCatalog, _, s, _, _: ParquetFileFormat, _), _, id) =>
+      _fsRelation @ HadoopFsRelation(f, _, s, _, _: ParquetFileFormat, _), _, id) =>
         if (!sparkSession.conf.get(SQLConf.OAP_PARQUET_ENABLED)) {
           throw new OapException(s"turn on ${
             SQLConf.OAP_PARQUET_ENABLED.key} to allow index building on parquet files")
         }
-        (fileCatalog, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, id)
+        (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, id, _fsRelation)
       case other =>
         throw new OapException(s"We don't support index building for ${other.simpleString}")
     }
@@ -105,18 +102,19 @@ case class CreateIndex(
         }
         metaBuilder.withNewSchema(oldMeta.schema)
       } else {
-        metaBuilder.withNewSchema(s)
+        metaBuilder.withNewSchema(schema)
       }
 
       indexType match {
         case BTreeIndexType =>
           val entries = indexColumns.map(c => {
             val dir = if (c.isAscending) Ascending else Descending
-            BTreeIndexEntry(s.map(_.name).toIndexedSeq.indexOf(c.columnName), dir)
+            BTreeIndexEntry(schema.map(_.name).toIndexedSeq.indexOf(c.columnName), dir)
           })
           metaBuilder.addIndexMeta(new IndexMeta(indexName, time, BTreeIndex(entries)))
         case BitMapIndexType =>
-          val entries = indexColumns.map(col => s.map(_.name).toIndexedSeq.indexOf(col.columnName))
+          val entries = indexColumns.map(col =>
+            schema.map(_.name).toIndexedSeq.indexOf(col.columnName))
           metaBuilder.addIndexMeta(new IndexMeta(indexName, time, BitMapIndex(entries)))
         case _ =>
           sys.error(s"Not supported index type $indexType")
@@ -132,11 +130,15 @@ case class CreateIndex(
       (metaBuilder, parent, existOld)
     })
 
-    val indexFileFormat = new OapIndexFileFormat
-    val ids =
-      indexColumns.map(c => s.map(_.name).toIndexedSeq.indexOf(c.columnName))
-    val keySchema = StructType(ids.map(s.toIndexedSeq(_)))
-    var ds = Dataset.ofRows(sparkSession, Project(ids.map(relation.output), relation))
+    val partitionColumns = relation.resolve(
+      fsRelation.partitionSchema, fsRelation.sparkSession.sessionState.analyzer.resolver)
+
+    val projectList = indexColumns.map { indexColumn =>
+      relation.output.find(p => p.name == indexColumn.columnName).get.withMetadata(
+        new MetadataBuilder().putBoolean("isAscending", indexColumn.isAscending).build())
+    }
+
+    var ds = Dataset.ofRows(sparkSession, Project(projectList, relation))
     partitionSpec.getOrElse(Map.empty).foreach { case (k, v) =>
       ds = ds.filter(s"$k='$v'")
     }
@@ -155,29 +157,27 @@ case class CreateIndex(
       outputPath = outPutPath.toUri.getPath,
       isAppend = false)
 
-    val indexWriter = IndexWriterFactory.getIndexWriter(indexColumns,
-        keySchema,
-        indexName,
-        time,
-        indexType,
-        isAppend = false)
+    val options = Map(
+      "indexName" -> indexName,
+      "indexTime" -> time,
+      "isAppend" -> "true",
+      "indexType" -> indexType.toString
+    )
 
-    val retVal = indexWriter.write(sparkSession = sparkSession,
+    val retVal = FileFormatWriter.write(
+      sparkSession = sparkSession,
       queryExecution = ds.queryExecution,
-      fileFormat = indexFileFormat,
+      fileFormat = new OapIndexFileFormat,
       committer = committer,
-      outputSpec = indexWriter.OutputSpec(
+      outputSpec = FileFormatWriter.OutputSpec(
         qualifiedOutputPath.toUri.getPath, Map.empty),
       hadoopConf = configuration,
       partitionColumns = Seq.empty,
       bucketSpec = Option.empty,
       refreshFunction = _ => Unit,
-      options = Map.empty)
+      options = options)
 
-    // val ret = OapIndexBuild(sparkSession, indexName,
-    // indexColumns, s, bAndP.map(_._2), readerClassName, indexType).execute()
-    val retMap = retVal
-      .map(_.asInstanceOf[IndexBuildResult]).groupBy(_.parent)
+    val retMap = retVal.asInstanceOf[Seq[Seq[IndexBuildResult]]].flatten.groupBy(_.parent)
     bAndP.foreach(bp =>
       retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
         if (!bp._3) bp._1.addFileMeta(
@@ -274,13 +274,13 @@ case class RefreshIndex(
         case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
         case other => other
       }
-    val (fileCatalog, s, readerClassName) = relation match {
+    val (fileCatalog, schema, readerClassName) = relation match {
       case LogicalRelation(
-          HadoopFsRelation(fileCatalog, _, s, _, _: OapFileFormat, _), _, _) =>
-        (fileCatalog, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME)
+          HadoopFsRelation(f, _, s, _, _: OapFileFormat, _), _, _) =>
+        (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME)
       case LogicalRelation(
-          HadoopFsRelation(fileCatalog, _, s, _, _: ParquetFileFormat, _), _, _) =>
-        (fileCatalog, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME)
+          HadoopFsRelation(f, _, s, _, _: ParquetFileFormat, _), _, _) =>
+        (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME)
       case other =>
         throw new OapException(s"We don't support index refreshing for ${other.simpleString}")
     }
@@ -321,7 +321,7 @@ case class RefreshIndex(
         // TODO for now we only support data file adding before updating index
         metaBuilder.withNewSchema(oldMeta.schema)
       } else {
-        metaBuilder.withNewSchema(s)
+        metaBuilder.withNewSchema(schema)
       }
       indices.foreach(metaBuilder.addIndexMeta)
       // we cannot build meta for those without oap meta data
@@ -339,18 +339,19 @@ case class RefreshIndex(
 
       val indexColumns = i.indexType match {
         case BTreeIndex(entries) =>
-          entries.map(e => IndexColumn(s(e.ordinal).name, e.dir == Ascending))
+          entries.map(e => IndexColumn(schema(e.ordinal).name, e.dir == Ascending))
         case BitMapIndex(entries) =>
           indexType = BitMapIndexType
-          entries.map(e => IndexColumn(s(e).name))
+          entries.map(e => IndexColumn(schema(e).name))
         case it => sys.error(s"Not implemented index type $it")
       }
-      val job = Job.getInstance(sparkSession.sparkContext.hadoopConfiguration)
-      val queryExecution = Dataset.ofRows(sparkSession, relation).queryExecution
-      val indexFileFormat = new OapIndexFileFormat
-      val ids =
-        indexColumns.map(c => s.map(_.name).toIndexedSeq.indexOf(c.columnName))
-      val keySchema = StructType(ids.map(s.toIndexedSeq(_)))
+
+      val projectList = indexColumns.map { indexColumn =>
+        relation.output.find(p => p.name == indexColumn.columnName).get.withMetadata(
+          new MetadataBuilder().putBoolean("isAscending", indexColumn.isAscending).build())
+      }
+
+      val ds = Dataset.ofRows(sparkSession, Project(projectList, relation))
 
       val outPutPath = fileCatalog.rootPaths.head
       assert(outPutPath != null, "Expected exactly one path to be specified, but no value")
@@ -366,32 +367,29 @@ case class RefreshIndex(
         outputPath = outPutPath.toUri.getPath,
         isAppend = false)
 
-      // Hack Alert: @liyuanjian when append=true, previous implement has bug,
-      // just simple skip it now for the refresh command before fixing the refresh logic.
-      val indexWriter = IndexWriterFactory.getIndexWriter(indexColumns.toArray,
-        keySchema,
-        i.name,
-        i.time,
-        indexType,
-        isAppend = true)
+      val options = Map(
+        "indexName" -> i.name,
+        "indexTime" -> i.time,
+        "isAppend" -> "true",
+        "indexType" -> indexType.toString
+      )
 
-      indexWriter.write(sparkSession = sparkSession,
-        queryExecution = queryExecution,
-        fileFormat = indexFileFormat,
+      FileFormatWriter.write(
+        sparkSession = sparkSession,
+        queryExecution = ds.queryExecution,
+        fileFormat = new OapIndexFileFormat,
         committer = committer,
-        outputSpec = indexWriter.OutputSpec(
+        outputSpec = FileFormatWriter.OutputSpec(
           qualifiedOutputPath.toUri.getPath, Map.empty),
         hadoopConf = configuration,
         partitionColumns = Seq.empty,
         bucketSpec = Option.empty,
         refreshFunction = _ => Unit,
-        options = Map.empty)
-
+        options = options)
     })
     if (buildrst.nonEmpty) {
       val ret = buildrst.head
-      val retMap = ret
-        .map(_.asInstanceOf[IndexBuildResult]).groupBy(_.parent)
+      val retMap = ret.asInstanceOf[Seq[Seq[IndexBuildResult]]].flatten.groupBy(_.parent)
 
       // there some cases oap meta files have already been updated
       // e.g. when inserting data in oap files the meta has already updated
@@ -442,8 +440,8 @@ case class OapShowIndex(table: TableIdentifier, relationName: String)
         case other => other
       }
     val (fileCatalog, schema) = relation match {
-      case LogicalRelation(HadoopFsRelation(fileCatalog, _, s, _, _, _), _, id) =>
-        (fileCatalog, s)
+      case LogicalRelation(HadoopFsRelation(f, _, s, _, _, _), _, id) =>
+        (f, s)
       case other =>
         throw new OapException(s"We don't support index listing for ${other.simpleString}")
     }

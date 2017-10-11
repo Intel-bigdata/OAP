@@ -23,7 +23,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.SparkConf
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.internal.SQLConf
@@ -140,7 +139,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
     sql("drop oindex index1 on oap_test")
   }
-
 
   test("filtering2") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }

@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
+import java.io.OutputStream
+
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
@@ -102,7 +104,7 @@ class StatisticsManager {
     stats.foreach(_.addOapKey(key))
   }
 
-  def write(out: IndexOutputWriter): Long = {
+  def write(out: OutputStream): Long = {
     var offset = 0L
 
     IndexUtils.writeLong(out, StatisticsManager.STATISTICSMASK)
@@ -191,10 +193,8 @@ object StatisticsManager {
 
   val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[StatisticsType]] =
     scala.collection.mutable.Map(
-      BTreeIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
-        BloomFilterStatisticsType, PartByValueStatisticsType),
-      BitMapIndexType -> Array(MinMaxStatisticsType, SampleBasedStatisticsType,
-        BloomFilterStatisticsType, PartByValueStatisticsType))
+      BTreeIndexType -> Array.empty,
+      BitMapIndexType -> Array.empty)
 
   /**
    * Using a static object to store parameter is not a good idea, some reasons:
