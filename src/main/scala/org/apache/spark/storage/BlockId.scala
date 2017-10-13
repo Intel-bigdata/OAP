@@ -114,6 +114,7 @@ object BlockId {
   val TASKRESULT = "taskresult_([0-9]+)".r
   val STREAM = "input-([0-9]+)-([0-9]+)".r
   val TEST = "test_(.*)".r
+  val FIBER = "fiber_(.*)".r
 
   /** Converts a BlockId "name" String back into a BlockId. */
   def apply(id: String): BlockId = id match {
@@ -133,6 +134,8 @@ object BlockId {
       StreamBlockId(streamId.toInt, uniqueId.toLong)
     case TEST(value) =>
       TestBlockId(value)
+    case FIBER(value) =>
+      FiberBlockId(value)
     case _ =>
       throw new IllegalStateException("Unrecognized BlockId: " + id)
   }
