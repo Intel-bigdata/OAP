@@ -27,7 +27,7 @@ import org.apache.spark.util.collection.BitSet
 
 
 /**
- * Microbenchmark for BitMap Index
+ * Microbenchmark for BitMap.
  */
 class BitMapMicroBenchmark extends QueryTest with SharedSQLContext {
   test("Microbenchmark for Bitmap index") {
@@ -62,4 +62,7 @@ class BitMapMicroBenchmark extends QueryTest with SharedSQLContext {
     println("RoaringBitmap writeExternal size(B) " + rbBuf2.size) // value is 42. 12656/42 = 301.
     // scalastyle:on println
   }
+
+  // TODO: To add the comparison result about bitmap index file to use BitSet and RoaringBitmap.
+
 }
