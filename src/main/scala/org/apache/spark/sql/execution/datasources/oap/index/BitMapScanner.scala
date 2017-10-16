@@ -79,7 +79,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       case buf: DirectBuffer => (null, buf.address() + IndexFile.indexFileHeaderLength)
       case _ => (indexData.toArray, Platform.BYTE_ARRAY_OFFSET + IndexFile.indexFileHeaderLength)
     }
-    // Get the byte number first
+    // Please refer to the general layout about roaring bitmap index file.
+    // Get the byte number first.
     val sortedKeyListObjLength = Platform.getInt(baseObj, sortedKeyListOffset)
     val sortedKeyListByteArrayStart = sortedKeyListOffset + 4
     val byteArray = (0 until sortedKeyListObjLength).map(i => {
@@ -89,18 +90,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     val in = new ObjectInputStream(inputStream)
     val sortedKeyList = in.readObject().asInstanceOf[immutable.List[InternalRow]]
 
+    val rbTotalSizeOffset = sortedKeyListByteArrayStart + sortedKeyListObjLength
+    val rbTotalSize = Platform.getInt(baseObj, rbTotalSizeOffset)
+    val rbOffsetOffset = rbTotalSizeOffset + 4 + rbTotalSize
     val indexBb = indexData.toByteBuffer
-    val rbPosition = IndexFile.indexFileHeaderLength + 4 + sortedKeyListObjLength
-    indexBb.position(rbPosition)
-    val rbCount = sortedKeyList.size
-    var curPosition = rbPosition
-    val rbList = new mutable.ListBuffer[ImmutableRoaringBitmap]()
-    (0 until rbCount).map(idx => {
-      val rb = new ImmutableRoaringBitmap(indexBb)
-      rbList.append(rb)
-      curPosition += rb.serializedSizeInBytes
-      indexBb.position(curPosition)
-    })
     val bitMapArray = intervalArray.flatMap(range => {
       val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
         // diff from which startIdx not found, so here startIdx = -2
@@ -128,9 +121,17 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
         // range not fond in cur bitmap, return empty for performance consideration
         Array.empty[ImmutableRoaringBitmap]
       } else {
+        val partialRbList = new mutable.ListBuffer[ImmutableRoaringBitmap]()
+        val rbStartIdxOffset = Platform.getLong(baseObj, rbOffsetOffset + startIdx * 8)
+        var curPosition = rbStartIdxOffset.toInt
+        indexBb.position(curPosition)
         (startIdx until endIdx + 1).map( idx => {
-          rbList.apply(idx)
+          val rb = new ImmutableRoaringBitmap(indexBb)
+          partialRbList.append(rb)
+          curPosition += rb.serializedSizeInBytes
+          indexBb.position(curPosition)
         })
+        partialRbList
       }
     })
 

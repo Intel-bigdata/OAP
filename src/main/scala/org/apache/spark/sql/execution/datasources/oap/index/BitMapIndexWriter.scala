@@ -104,6 +104,14 @@ private[oap] class BitMapIndexWriter(
           rowCnt += 1
         }
       }
+      /* The general layout for roaring bitmap index file is below:
+       * header (8 bytes)
+       * sorted key list size (4 bytes)
+       * sorted key list
+       * total roaring bitmap size (4 bytes)
+       * roaring bitmaps (each entry size is varied due to run length encoding and compression)
+       * offset list for the above each bitmap entry (each slot is fixed 8 bytes)
+       */
       val ordering = GenerateOrdering.create(keySchema)
       val sortedKeyList = tmpMap.keySet.toList.sorted(ordering)
       val header = writeHead(writer, IndexFile.INDEX_VERSION)
@@ -117,9 +125,13 @@ private[oap] class BitMapIndexWriter(
       IndexUtils.writeInt(writer, sortedKeyListObjLen)
       writer.write(writeSortedKeyListBuf.toByteArray)
       sortedKeyListOut.close()
+      // The second 4 is for the reserved four bytes for total rb size.
+      val rbOffset = header + 4 + sortedKeyListObjLen + 4
+      val rbOffsetListBuffer = new mutable.ListBuffer[Long]()
       // Get the total rb size.
-      var totalRbSize: Long = 0
+      var totalRbSize = 0
       sortedKeyList.foreach(sortedKey => {
+        rbOffsetListBuffer.append(rbOffset + totalRbSize)
         val rb = new MutableRoaringBitmap()
         tmpMap.get(sortedKey).get.foreach(rb.add)
         rb.runOptimize()
@@ -128,10 +140,26 @@ private[oap] class BitMapIndexWriter(
         rb.serialize(rbBitMapOut)
         rbBitMapOut.flush()
         totalRbSize += rbWriteBitMapBuf.size
+        rbBitMapOut.close()
+      })
+      rbOffsetListBuffer.append(rbOffset + totalRbSize)
+      IndexUtils.writeInt(writer, totalRbSize)
+      sortedKeyList.foreach(sortedKey => {
+        val rb = new MutableRoaringBitmap()
+        tmpMap.get(sortedKey).get.foreach(rb.add)
+        rb.runOptimize()
+        val rbWriteBitMapBuf = new ByteArrayOutputStream()
+        val rbBitMapOut = new DataOutputStream(rbWriteBitMapBuf)
+        rb.serialize(rbBitMapOut)
+        rbBitMapOut.flush()
         writer.write(rbWriteBitMapBuf.toByteArray)
         rbBitMapOut.close()
       })
-      val indexEnd = header + 4 + sortedKeyListObjLen + totalRbSize
+      // Save the offset for each rb entry.
+      rbOffsetListBuffer.foreach(offsetIdx =>
+        IndexUtils.writeLong(writer, offsetIdx))
+      val rbOffsetTotalSize = 8 * rbOffsetListBuffer.size
+      val indexEnd = rbOffset + totalRbSize + rbOffsetTotalSize
       var offset: Long = indexEnd
 
       statisticsManager.write(writer)
