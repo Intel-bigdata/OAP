@@ -69,7 +69,7 @@ class RoaringBitmapUsage extends QueryTest with SharedSQLContext {
     (700000 until 800000).map(rb3.add)
     val file = "roaringbitmaps.bin";
     val out = new DataOutputStream(new FileOutputStream(file));
-    val headerLength = 8
+    val headerLength = 4
     out.writeInt(headerLength)
     rb1.runOptimize();
     rb2.runOptimize();
@@ -82,9 +82,6 @@ class RoaringBitmapUsage extends QueryTest with SharedSQLContext {
     val int = new DataInputStream(new FileInputStream(file));
     // The 4 is the four bytes for header length.
     val headerLengthRead = int.readInt()
-    // scalastyle:off println
-    println("header length " + headerLengthRead)
-    // scalastyle:on println
     int.skip(rb1.serializedSizeInBytes + rb2.serializedSizeInBytes)
     val rbtest3 = new RoaringBitmap();
     rbtest3.deserialize(int);
@@ -97,7 +94,7 @@ class RoaringBitmapUsage extends QueryTest with SharedSQLContext {
     val rr2 = MutableRoaringBitmap.bitmapOf( 2, 3, 1010);
     val file = "mutableroaringbitmaps.bin";
     val dos = new DataOutputStream(new FileOutputStream(file));
-    val headerLength = 8
+    val headerLength = 4
     dos.writeInt(headerLength)
     rr1.runOptimize()
     rr2.runOptimize()
