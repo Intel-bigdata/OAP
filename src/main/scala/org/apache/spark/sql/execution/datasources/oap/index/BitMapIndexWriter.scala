@@ -17,11 +17,12 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import java.io.{ByteArrayOutputStream, ObjectOutputStream}
+import java.io.{ByteArrayOutputStream, DataOutputStream, ObjectOutputStream}
 
 import scala.collection.mutable
 
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.roaringbitmap.buffer.MutableRoaringBitmap
 
 import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.catalyst.InternalRow
@@ -116,34 +117,21 @@ private[oap] class BitMapIndexWriter(
       IndexUtils.writeInt(writer, sortedKeyListObjLen)
       writer.write(writeSortedKeyListBuf.toByteArray)
       sortedKeyListOut.close()
-
-      // Generate the fixed size bitset
-      val bs = new BitSet(rowCnt)
-      val firstKey = sortedKeyList.head
-      tmpMap.get(firstKey).get.foreach(bs.set)
-      val firstBitMapBuf = new ByteArrayOutputStream()
-      val firstBitMapOut = new ObjectOutputStream(firstBitMapBuf)
-      firstBitMapOut.writeObject(bs)
-      val elementBitMapSize = firstBitMapBuf.size
-      firstBitMapOut.close()
-      // Write the single bitmap size used by partial loading during index scanning.
-      IndexUtils.writeInt(writer, elementBitMapSize)
-
-      // Serialize and write each BitMap
+      // Get the total rb size.
+      var totalRbSize: Long = 0
       sortedKeyList.foreach(sortedKey => {
-        tmpMap.get(sortedKey).get.foreach(bs.set)
-        val bsWriteBitMapBuf = new ByteArrayOutputStream()
-        val bsBitMapOut = new ObjectOutputStream(bsWriteBitMapBuf)
-        bsBitMapOut.writeObject(bs)
-        bsBitMapOut.flush()
-        writer.write(bsWriteBitMapBuf.toByteArray)
-        bsBitMapOut.close()
+        val rb = new MutableRoaringBitmap()
+        tmpMap.get(sortedKey).get.foreach(rb.add)
+        rb.runOptimize()
+        val rbWriteBitMapBuf = new ByteArrayOutputStream()
+        val rbBitMapOut = new DataOutputStream(rbWriteBitMapBuf)
+        rb.serialize(rbBitMapOut)
+        rbBitMapOut.flush()
+        totalRbSize += rbWriteBitMapBuf.size
+        writer.write(rbWriteBitMapBuf.toByteArray)
+        rbBitMapOut.close()
       })
-      val bitmapCount = sortedKeyList.length
-      val totalBitMapLength = bitmapCount * elementBitMapSize
-      // The first 4 is for sortedKeyListObjLen value.
-      // The second 4 is for elementBitMapSize value.
-      val indexEnd = header + 4 + sortedKeyListObjLen + 4 + totalBitMapLength
+      val indexEnd = header + 4 + sortedKeyListObjLen + totalRbSize
       var offset: Long = indexEnd
 
       statisticsManager.write(writer)
