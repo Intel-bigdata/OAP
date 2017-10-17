@@ -192,29 +192,34 @@ class OapAggregationIterator(
 
       (groupingKey, buffer)
     } else {
+      // Init agg buffer for a new group.
       groupAggregationBuffer.copyFrom(initialAggregationBuffer)
-      val buffer = groupAggregationBuffer
 
-      processRow(buffer, currGroupHead)
+      // Set the group key and process the first row in current group.
       val currGroupingKey = groupingProjection.apply(currGroupHead).copy()
+      processRow(groupAggregationBuffer, currGroupHead)
 
-      val savedGroupKey = currGroupingKey
-      if (inputIter.hasNext) {
-        var newInput = inputIter.next()
-        var newGroupingKey = groupingProjection.apply(newInput)
-        while (newGroupingKey == currGroupingKey && inputIter.hasNext) {
-          processRow(buffer, newInput)
-          newInput = inputIter.next()
-          newGroupingKey = groupingProjection.apply(newInput)
+      var isSameGroup = true
+      while(isSameGroup && inputIter.hasNext) {
+        val nextInput = inputIter.next()
+        val nextGroupingKey = groupingProjection.apply(nextInput)
+        if (currGroupingKey.equals(nextGroupingKey)) {
+          // process next row which belongs to same group
+          processRow(groupAggregationBuffer, nextInput)
+        } else {
+          isSameGroup = false
+          currGroupHead = nextInput
         }
+      }
 
-        currGroupHead = {
-          if (newGroupingKey != currGroupingKey) newInput
-          else null // input process is completed.
-        }
-      } else currGroupHead = null
+      /**
+       * No more group, set currGroupHead to null to finish process
+       */
+      if (isSameGroup) {
+        currGroupHead = null
+      }
 
-      (savedGroupKey, buffer)
+      (currGroupingKey, groupAggregationBuffer)
     }
   }
 
