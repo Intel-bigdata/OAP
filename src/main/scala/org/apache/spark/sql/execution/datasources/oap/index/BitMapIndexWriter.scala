@@ -127,7 +127,7 @@ private[oap] class BitMapIndexWriter(
       sortedKeyListOut.close()
       // The second 4 is for the reserved four bytes for total rb size.
       val rbOffset = header + 4 + sortedKeyListObjLen + 4
-      val rbOffsetListBuffer = new mutable.ListBuffer[Long]()
+      val rbOffsetListBuffer = new mutable.ListBuffer[Integer]()
       // Get the total rb size.
       var totalRbSize = 0
       sortedKeyList.foreach(sortedKey => {
@@ -157,8 +157,8 @@ private[oap] class BitMapIndexWriter(
       })
       // Save the offset for each rb entry.
       rbOffsetListBuffer.foreach(offsetIdx =>
-        IndexUtils.writeLong(writer, offsetIdx))
-      val rbOffsetTotalSize = 8 * rbOffsetListBuffer.size
+        IndexUtils.writeInt(writer, offsetIdx))
+      val rbOffsetTotalSize = 4 * rbOffsetListBuffer.size
       val indexEnd = rbOffset + totalRbSize + rbOffsetTotalSize
       var offset: Long = indexEnd
 

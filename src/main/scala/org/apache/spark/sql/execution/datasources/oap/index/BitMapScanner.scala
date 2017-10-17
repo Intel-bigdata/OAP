@@ -122,8 +122,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
         Array.empty[ImmutableRoaringBitmap]
       } else {
         val partialRbList = new mutable.ListBuffer[ImmutableRoaringBitmap]()
-        val rbStartIdxOffset = Platform.getLong(baseObj, rbOffsetOffset + startIdx * 8)
-        var curPosition = rbStartIdxOffset.toInt
+        val rbStartIdxOffset = Platform.getInt(baseObj, rbOffsetOffset + startIdx * 4)
+        var curPosition = rbStartIdxOffset
         indexBb.position(curPosition)
         (startIdx until endIdx + 1).map( idx => {
           val rb = new ImmutableRoaringBitmap(indexBb)
