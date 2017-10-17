@@ -84,9 +84,14 @@ class BitMapMicroBenchmark extends QueryTest with SharedSQLContext with BeforeAn
     // scalastyle:on println
   }
 
-  // TODO: Tuning the roaring bitmap usage to get bitmap index file size further reduction.
+  /*                             record numbers    30000    300000              3000000
+   *         bitmap index file size with BitSet    866772   (2.84GB)2839781768  OOM
+   * bitmap index file size with roaring bitmap    162208   (7.48MB)7481772     73MB(73631772)
+   *                                      ratio    5.34     379.56              oo
+   */
+  // TODO: Tuning the roaring bitmap usage to further reduce bitmap index file size.
   test("test the bitmap index file size with BitSet and Roaring Bitmap") {
-    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    val data: Seq[(Int, String)] = (1 to 30000).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test select * from t")
     sql("create oindex index_bm on oap_test (a) USING BITMAP")
@@ -97,8 +102,6 @@ class BitMapMicroBenchmark extends QueryTest with SharedSQLContext with BeforeAn
       println("bitmap index file size " + fileName.length)
       // scalastyle:on println
       }
-      // bitmap index file size is ? for roaring bitmap.
-      // bitmap index file size is 162208B for BitSet.
     }
     sql("drop oindex index_bm on oap_test")
   }
