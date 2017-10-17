@@ -17,19 +17,40 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
+import java.io.File
 import java.io.{ByteArrayOutputStream, ObjectOutputStream}
 import org.roaringbitmap.RoaringBitmap
 import org.scalatest.BeforeAndAfterEach
 
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.collection.BitSet
+import org.apache.spark.util.Utils
 
 
 /**
  * Microbenchmark for BitMap.
  */
-class BitMapMicroBenchmark extends QueryTest with SharedSQLContext {
+class BitMapMicroBenchmark extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+  import testImplicits._
+  private var dir: File = null
+
+  override def beforeEach(): Unit = {
+    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
+    dir = Utils.createTempDir()
+    val path = dir.getAbsolutePath
+    sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b STRING)
+            | USING oap
+            | OPTIONS (path '$path')""".stripMargin)
+  }
+
+  override def afterEach(): Unit = {
+    sqlContext.dropTempTable("oap_test")
+    dir.delete()
+  }
+
   test("Microbenchmark for Bitmap index") {
     val intArray: Array[Int] = Array(100000, 10000, 1000, 100, 10, 1)
     val bs = new BitSet(100000)
@@ -63,6 +84,23 @@ class BitMapMicroBenchmark extends QueryTest with SharedSQLContext {
     // scalastyle:on println
   }
 
-  // TODO: To add the comparison result about bitmap index file to use BitSet and RoaringBitmap.
+  // TODO: Tuning the roaring bitmap usage to get bitmap index file size further reduction.
+  test("test the bitmap index file size with BitSet and Roaring Bitmap") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bm on oap_test (a) USING BITMAP")
+    val fileNameIterator = dir.listFiles()
+    for (fileName <- fileNameIterator) {
+      if (fileName.toString().endsWith(OapFileFormat.OAP_INDEX_EXTENSION)) {
+      // scalastyle:off println
+      println("bitmap index file size " + fileName.length)
+      // scalastyle:on println
+      }
+      // bitmap index file size is ? for roaring bitmap.
+      // bitmap index file size is 162208B for BitSet.
+    }
+    sql("drop oindex index_bm on oap_test")
+  }
 
 }
