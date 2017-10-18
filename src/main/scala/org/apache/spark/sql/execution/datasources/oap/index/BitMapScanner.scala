@@ -20,9 +20,12 @@ import java.io.{ByteArrayInputStream, ObjectInputStream}
 
 import scala.collection.mutable
 import scala.collection.immutable
+import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap
+import org.roaringbitmap.buffer.MutableRoaringBitmap
 import sun.nio.ch.DirectBuffer
 
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
@@ -38,9 +41,9 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   override def canBeOptimizedByStatistics: Boolean = true
 
-  @transient var internalItr: Iterator[Int] = Iterator[Int]()
+  @transient var internalItr: Iterator[Integer] = Iterator[Integer]()
   var empty: Boolean = _
-  var internalBitSet: BitSet = _
+  var internalBitSet: MutableRoaringBitmap = _
   var indexFiber: IndexFiber = _
   var indexData: CacheResult = _
 
@@ -76,7 +79,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       case buf: DirectBuffer => (null, buf.address() + IndexFile.indexFileHeaderLength)
       case _ => (indexData.toArray, Platform.BYTE_ARRAY_OFFSET + IndexFile.indexFileHeaderLength)
     }
-    // Get the byte number first
+    // Please refer to the general layout about roaring bitmap index file.
+    // Get the byte number first.
     val sortedKeyListObjLength = Platform.getInt(baseObj, sortedKeyListOffset)
     val sortedKeyListByteArrayStart = sortedKeyListOffset + 4
     val byteArray = (0 until sortedKeyListObjLength).map(i => {
@@ -86,11 +90,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     val in = new ObjectInputStream(inputStream)
     val sortedKeyList = in.readObject().asInstanceOf[immutable.List[InternalRow]]
 
-    // deserialize BitMap size from index file
-    val elementBitMapSize = Platform.getInt(baseObj, sortedKeyListByteArrayStart +
-      sortedKeyListObjLength)
-    var elementBitmapByteArrayStart = sortedKeyListByteArrayStart + sortedKeyListObjLength + 4
-
+    val rbTotalSizeOffset = sortedKeyListByteArrayStart + sortedKeyListObjLength
+    val rbTotalSize = Platform.getInt(baseObj, rbTotalSizeOffset)
+    val rbOffsetOffset = rbTotalSizeOffset + 4 + rbTotalSize
+    val indexBb = indexData.toByteBuffer
     val bitMapArray = intervalArray.flatMap(range => {
       val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
         // diff from which startIdx not found, so here startIdx = -2
@@ -116,32 +119,31 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
       if (startIdx == -1 || endIdx == -1) {
         // range not fond in cur bitmap, return empty for performance consideration
-        Array.empty[BitSet]
+        Array.empty[ImmutableRoaringBitmap]
       } else {
-        val partialBitMap = new mutable.ListBuffer[BitSet]()
-        elementBitmapByteArrayStart += startIdx * elementBitMapSize
-        (startIdx until endIdx + 1).map( element => {
-          val elementBitmapByteArray = (0 until elementBitMapSize).map(i => {
-            Platform.getByte(baseObj, elementBitmapByteArrayStart + i)
-          }).toArray
-          val bitmapInputStream = new ByteArrayInputStream(elementBitmapByteArray)
-          val bitmapIn = new ObjectInputStream(bitmapInputStream)
-          val elementBitMap = bitmapIn.readObject().asInstanceOf[BitSet]
-          partialBitMap.append(elementBitMap)
-          elementBitmapByteArrayStart += elementBitMapSize
+        val partialRbList = new mutable.ListBuffer[ImmutableRoaringBitmap]()
+        val rbStartIdxOffset = Platform.getInt(baseObj, rbOffsetOffset + startIdx * 4)
+        var curPosition = rbStartIdxOffset
+        indexBb.position(curPosition)
+        (startIdx until endIdx + 1).map( idx => {
+          val rb = new ImmutableRoaringBitmap(indexBb)
+          partialRbList.append(rb)
+          curPosition += rb.serializedSizeInBytes
+          indexBb.position(curPosition)
         })
-        partialBitMap
+        partialRbList
       }
     })
 
     if (bitMapArray.nonEmpty) {
       if (limitScanEnabled()) {
         // Get N items from each index.
-        internalItr = bitMapArray.flatMap(bitSet =>
-          bitSet.iterator.take(getLimitScanNum())).iterator
+        internalItr = bitMapArray.flatMap(rb =>
+          rb.iterator.asScala.take(getLimitScanNum())).iterator
       } else {
-        internalBitSet = bitMapArray.reduceLeft(_ | _)
-        internalItr = internalBitSet.iterator
+        internalBitSet = new MutableRoaringBitmap()
+        bitMapArray.foreach(rb => internalBitSet.or(rb))
+        internalItr = internalBitSet.iterator.asScala.toIterator
       }
       empty = false
     } else {
