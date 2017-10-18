@@ -24,7 +24,7 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.QueryTest
+import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.collection.BitSet
 import org.apache.spark.util.Utils
@@ -84,12 +84,17 @@ class BitMapMicroBenchmark extends QueryTest with SharedSQLContext with BeforeAn
     // scalastyle:on println
   }
 
-  /*                             record numbers    30000    300000              3000000
-   *         bitmap index file size with BitSet    866772   (2.84GB)2839781768  OOM
-   * bitmap index file size with roaring bitmap    162208   (7.48MB)7481772     73MB(73631772)
-   *                                      ratio    5.34     379.56              oo
+  /*                                  record numbers   30000    300000              3000000
+   *              bitmap index file size with BitSet   866772   (2.84GB)2839781768  OOM
+   *      bitmap index file size with roaring bitmap   162208   (7.48MB)7481772     73MB(73631772)
+   *                                      size ratio   5.34     379.56              +oo
+   *         single query execution time with BitSet   655ms    OOM                 +oo
+   * single query execution time with roaring bitmap   492ms    1183ms              13660ms
+   *                                      time ratio   1.33     +oo                 +oo
    */
-  // TODO: Tuning the roaring bitmap usage to further reduce bitmap index file size.
+  // TODO: Tuning the roaring bitmap usage to further reduce bitmap index file size, but need to
+  // consisder the trade-off between file size and query execution time, considering the bitmap
+  // decoding and decompression.
   test("test the bitmap index file size with BitSet and Roaring Bitmap") {
     val data: Seq[(Int, String)] = (1 to 30000).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
@@ -103,6 +108,14 @@ class BitMapMicroBenchmark extends QueryTest with SharedSQLContext with BeforeAn
       // scalastyle:on println
       }
     }
+    val startTime = System.nanoTime
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a = 15000"),
+      Row(15000, "this is test 15000") :: Nil)
+    val endTime = System.nanoTime
+    val elapsedTime = (endTime - startTime) / 1000000
+    // scalastyle:off println
+    println("execution time for single query " + elapsedTime + "ms")
+    // scalastyle:on println
     sql("drop oindex index_bm on oap_test")
   }
 
