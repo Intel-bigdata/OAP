@@ -32,12 +32,25 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.collection.BitSet
+import org.apache.spark.util.Utils
 
 
 /**
  * The usage for RoaringBitmap.
  */
-class RoaringBitmapUsage extends QueryTest with SharedSQLContext {
+class RoaringBitmapUsage extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+  private var dir: File = null
+  private var path: String = null
+
+  override def beforeEach(): Unit = {
+    dir = Utils.createTempDir()
+    path = dir.getAbsolutePath
+  }
+
+  override def afterEach(): Unit = {
+    dir.delete()
+  }
+
   test("how to write and read Roaring Bitmap") {
     val intArray1: Array[Int] = Array(100000, 10000, 1000, 100, 10, 1)
     val rb1 = new MutableRoaringBitmap()
@@ -67,7 +80,7 @@ class RoaringBitmapUsage extends QueryTest with SharedSQLContext {
     (0 until 100000).map(rb1.add)
     (100000 until 200000).map(element => rb2.add(3 * element))
     (700000 until 800000).map(rb3.add)
-    val file = "roaringbitmaps.bin";
+    val file = path + "roaringbitmaps.bin";
     val out = new DataOutputStream(new FileOutputStream(file));
     val headerLength = 4
     out.writeInt(headerLength)
@@ -92,7 +105,7 @@ class RoaringBitmapUsage extends QueryTest with SharedSQLContext {
     "to serialize to file and deserialize back") {
     val rr1 = MutableRoaringBitmap.bitmapOf(1, 2, 3, 1000);
     val rr2 = MutableRoaringBitmap.bitmapOf( 2, 3, 1010);
-    val file = "mutableroaringbitmaps.bin";
+    val file = path + "mutableroaringbitmaps.bin";
     val dos = new DataOutputStream(new FileOutputStream(file));
     val headerLength = 4
     dos.writeInt(headerLength)
