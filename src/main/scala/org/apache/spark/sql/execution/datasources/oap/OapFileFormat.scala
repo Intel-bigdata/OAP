@@ -477,5 +477,4 @@ private[sql] object OapFileFormat {
   val OAP_QUERY_ORDER_OPTION_KEY = "oap.scan.file.order"
   val OAP_QUERY_LIMIT_OPTION_KEY = "oap.scan.file.limit"
   val OAP_INDEX_SCAN_NUM_OPTION_KEY = "oap.scan.index.limit"
-  val OAP_INDEX_AGG_MINMAX_OPTION_KEY = "oap.scan.agg.minmax"
 }
