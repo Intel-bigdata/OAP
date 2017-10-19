@@ -186,7 +186,10 @@ trait OapStrategies extends Logging {
    * things like count which is a aggregation result instead of a row
    * from data source.
    * Now the only workable case is:
-   * SELECT [min/max](column name) FROM table WHERE filter on same column.
+   * SELECT [agg](column name)
+   * FROM table
+   * [WHERE filter on same column]
+   * GROUP BY same column
    */
   object OapAggregationStrategy extends Strategy {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
@@ -212,7 +215,7 @@ trait OapStrategies extends Logging {
               Nil
             }
           } else if (functionsWithDistinct.isEmpty) {
-            // Support single group by
+            // Support single group by only so far
             if (groupingExpressions.size == 1) {
               OapAggUtils.planAggregateWithoutDistinct(
                 groupingExpressions,
@@ -244,7 +247,8 @@ trait OapStrategies extends Logging {
 
         val indexHint = {
           /**
-           * TODO: IsNotNull filters out the NULL value, we need another
+           * TODO:
+           * IsNotNull filters out the NULL value, we need another
            * Expression case class to do index full scan (include NULL).
            * If none in Spark, we can create one for OAP.
            */

@@ -37,11 +37,10 @@ class OapSessionState(sparkSession: OapSession) extends HiveSessionState(sparkSe
     with OapStrategies
     {
       override def strategies: Seq[Strategy] = {
-            experimentalMethods.extraStrategies ++ (
+            experimentalMethods.extraStrategies ++ oapStrategies ++ (
               FileSourceStrategy ::
               DataSourceStrategy ::
               DDLStrategy ::
-              OapSortLimitStrategy ::
               SpecialLimits ::
               Aggregation ::
               JoinSelection ::

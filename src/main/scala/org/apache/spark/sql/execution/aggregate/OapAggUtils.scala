@@ -30,33 +30,20 @@ object OapAggUtils {
       initialInputBufferOffset: Int = 0,
       resultExpressions: Seq[NamedExpression] = Nil,
       child: SparkPlan): SparkPlan = {
-    val useHash = HashAggregateExec.supportsAggregate(
-      aggregateExpressions.flatMap(_.aggregateFunction.aggBufferAttributes))
-    if (useHash) {
-      if (requiredChildDistributionExpressions.isDefined) {
-        // final aggregate, fall back to Spark HashAggregateExec.
-        HashAggregateExec(
-          requiredChildDistributionExpressions = requiredChildDistributionExpressions,
-          groupingExpressions = groupingExpressions,
-          aggregateExpressions = aggregateExpressions,
-          aggregateAttributes = aggregateAttributes,
-          initialInputBufferOffset = initialInputBufferOffset,
-          resultExpressions = resultExpressions,
-          child = child)
-      } else {
-        // Apply partial aggregate optimizations.
-        OapAggregateExec(
-          requiredChildDistributionExpressions = requiredChildDistributionExpressions,
-          groupingExpressions = groupingExpressions,
-          aggregateExpressions = aggregateExpressions,
-          aggregateAttributes = aggregateAttributes,
-          initialInputBufferOffset = initialInputBufferOffset,
-          resultExpressions = resultExpressions,
-          child = child)
-      }
-    } else {
-      SortAggregateExec(
+    if (requiredChildDistributionExpressions.isDefined) {
+      // final aggregate, fall back to Spark HashAggregateExec.
+      HashAggregateExec(
         requiredChildDistributionExpressions = requiredChildDistributionExpressions,
+        groupingExpressions = groupingExpressions,
+        aggregateExpressions = aggregateExpressions,
+        aggregateAttributes = aggregateAttributes,
+        initialInputBufferOffset = initialInputBufferOffset,
+        resultExpressions = resultExpressions,
+        child = child)
+    } else {
+      // Apply partial aggregate optimizations.
+      OapAggregateExec(
+        requiredChildDistributionExpressions = None,
         groupingExpressions = groupingExpressions,
         aggregateExpressions = aggregateExpressions,
         aggregateAttributes = aggregateAttributes,
@@ -71,15 +58,14 @@ object OapAggUtils {
       aggregateExpressions: Seq[AggregateExpression],
       resultExpressions: Seq[NamedExpression],
       child: SparkPlan): Seq[SparkPlan] = {
+    val useHash = HashAggregateExec.supportsAggregate(
+      aggregateExpressions.flatMap(_.aggregateFunction.aggBufferAttributes))
 
-    if (!child.isInstanceOf[OapAggregationFileScanExec]) {
-      // Child is not oap optimization reading.
+    if (!child.isInstanceOf[OapAggregationFileScanExec] || !useHash) {
+      // Child can not leverage oap optimization reading.
       Nil
     } else {
-      // Check if we can use HashAggregate.
-
       // 1. Create an Aggregate Operator for partial aggregations.
-
       val groupingAttributes = groupingExpressions.map(_.toAttribute)
       val partialAggregateExpressions = aggregateExpressions.map(_.copy(mode = Partial))
       val partialAggregateAttributes =

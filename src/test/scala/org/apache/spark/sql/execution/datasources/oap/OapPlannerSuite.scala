@@ -184,28 +184,7 @@ class OapPlannerSuite
     sql("drop oindex index1 on oap_sort_opt_table")
   }
 
-  ignore("minmax aggregation test") {
-    spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
-    val data = (1 to 300).map{ i =>
-      val ii = i % 10
-      (i, s"this is test $ii")
-    }
-    val dataRDD = spark.sparkContext.parallelize(data, 10)
-
-    dataRDD.toDF("key", "value").createOrReplaceTempView("t")
-    sql("insert overwrite table oap_sort_opt_table select * from t")
-    sql("create oindex index1 on oap_sort_opt_table (a)")
-
-    val sqlString =
-      "SELECT min(a), max(a) FROM oap_sort_opt_table"
-
-    checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
-    checkAnswer(sql(sqlString), Seq(Row(1, 300)))
-
-    sql("drop oindex index1 on oap_sort_opt_table")
-  }
-
-  test("aggregation with group by test") {
+  test("aggregations with group by test") {
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
     val data = (1 to 300).map{ i =>
       (i % 101, i % 37)
@@ -215,20 +194,21 @@ class OapPlannerSuite
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_fix_length_schema_table select * from t")
     sql("create oindex index1 on oap_fix_length_schema_table (a)")
-//    spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
 
     val sqlString =
-      "SELECT a, min(b), max(b) FROM oap_fix_length_schema_table where a < 30 group by a order by a"
-//      "SELECT min(b), max(b) FROM oap_fix_length_schema_table"
+      "SELECT a, min(b), max(b), std(b), avg(b), first(b), last(b) " +
+        "FROM oap_fix_length_schema_table " +
+        "where a < 30 " +
+        "group by a"
 
-//    checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
-
-    sql("explain " + sqlString).collect.map(println(_))
-    sql(sqlString).collect().map(println(_))
+    checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
+    val oapDF = sql(sqlString)
 
     spark.experimental.extraStrategies = Nil
-    sql("explain " + sqlString).collect.map(println(_))
-    sql(sqlString).collect().map(println(_))
+    checkKeywordsNotExist(sql("explain " + sqlString), "OapAggregationFileScanExec")
+    val baseDF = sql(sqlString)
+
+    checkAnswer(oapDF, baseDF)
 
     sql("drop oindex index1 on oap_fix_length_schema_table")
   }
