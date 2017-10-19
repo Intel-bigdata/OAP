@@ -77,14 +77,12 @@ private[oap] class BitMapIndexWriter(
     def writeTask(): Seq[IndexBuildResult] = {
       val statisticsManager = new StatisticsManager
       statisticsManager.initialize(BitMapIndexType, keySchema, configuration)
-      // Current impl just for fast proving the effect of BitMap Index,
-      // we can do the optimize below:
-      // 1. each bitset in hashmap value has same length, we can save the
-      //    hash map in raw bits in file, like B+ Index above
-      // 2. use the BitMap with bit compress like javaewah
-      // TODO: BitMap Index storage format optimize
-      // get the tmpMap and total rowCnt in first travers
-      val tmpMap = new mutable.HashMap[InternalRow, mutable.ListBuffer[Int]]()
+      /* TODO: 1. Save the total bitmap size into somewhere (e.g. StatisticsManager) to avoid
+       *          go through roaring bitmaps twice to improve bitmap index writing efficiency.
+       *       2. Optimize roaring bitmap usage to reduce furhter index file size.
+       *       3. Explore an approach to partial load key set during bitmap scanning.
+       */
+      val tmpMap = new mutable.HashMap[InternalRow, MutableRoaringBitmap]()
       var rowCnt = 0
       while (iterator.hasNext && !writeNewFile) {
         val fname = InputFileNameHolder.getInputFileName().toString
@@ -95,11 +93,11 @@ private[oap] class BitMapIndexWriter(
           val v = genericProjector(iterator.next()).copy()
           statisticsManager.addOapKey(v)
           if (!tmpMap.contains(v)) {
-            val list = new mutable.ListBuffer[Int]()
-            list += rowCnt
-            tmpMap.put(v, list)
+            val rb = new MutableRoaringBitmap()
+            rb.add(rowCnt)
+            tmpMap.put(v, rb)
           } else {
-            tmpMap.get(v).get += rowCnt
+            tmpMap.get(v).get.add(rowCnt)
           }
           rowCnt += 1
         }
@@ -132,8 +130,7 @@ private[oap] class BitMapIndexWriter(
       var totalRbSize = 0
       sortedKeyList.foreach(sortedKey => {
         rbOffsetListBuffer.append(rbOffset + totalRbSize)
-        val rb = new MutableRoaringBitmap()
-        tmpMap.get(sortedKey).get.foreach(rb.add)
+        val rb = tmpMap.get(sortedKey).get
         rb.runOptimize()
         val rbWriteBitMapBuf = new ByteArrayOutputStream()
         val rbBitMapOut = new DataOutputStream(rbWriteBitMapBuf)
@@ -145,8 +142,7 @@ private[oap] class BitMapIndexWriter(
       rbOffsetListBuffer.append(rbOffset + totalRbSize)
       IndexUtils.writeInt(writer, totalRbSize)
       sortedKeyList.foreach(sortedKey => {
-        val rb = new MutableRoaringBitmap()
-        tmpMap.get(sortedKey).get.foreach(rb.add)
+        val rb = tmpMap.get(sortedKey).get
         rb.runOptimize()
         val rbWriteBitMapBuf = new ByteArrayOutputStream()
         val rbBitMapOut = new DataOutputStream(rbWriteBitMapBuf)
