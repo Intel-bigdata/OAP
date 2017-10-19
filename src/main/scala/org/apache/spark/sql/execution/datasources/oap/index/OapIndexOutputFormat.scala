@@ -58,17 +58,12 @@ private[index] class OapIndexOutputFormat[T] extends FileOutputFormat[Void, T] {
      * @throws IOException if the write throws, we pass it on
      */
     @throws(classOf[IOException])
-    private def writeObject(o: Any): Unit = {
-      if (o.isInstanceOf[Text]) {
-        val to: Text = o.asInstanceOf[Text]
-        out.write(to.getBytes, 0, to.getLength)
-      } else if (o.isInstanceOf[Array[Byte]]) {
-        out.write(o.asInstanceOf[Array[Byte]])
-      } else if (o.isInstanceOf[Int]) {
-        out.write(o.asInstanceOf[Int])
-      } else {
-        out.write(o.toString.getBytes(NoBoundaryRecordWriter.utf8))
-      }
+    private def writeObject(o: Any): Unit = o match {
+      case t: Text => out.write(t.getBytes, 0, t.getLength)
+      case byteArray: Array[Byte] => out.write(byteArray)
+      case b: Byte => out.write(Array(b))
+      case i: Int => out.write(i)
+      case _ => out.write(o.toString.getBytes(NoBoundaryRecordWriter.utf8))
     }
 
     @throws(classOf[IOException])
