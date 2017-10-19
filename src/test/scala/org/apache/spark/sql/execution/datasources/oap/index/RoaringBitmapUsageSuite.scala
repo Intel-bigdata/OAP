@@ -38,7 +38,7 @@ import org.apache.spark.util.Utils
 /**
  * The usage for RoaringBitmap.
  */
-class RoaringBitmapUsage extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class RoaringBitmapUsageSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
   private var dir: File = null
   private var path: String = null
 

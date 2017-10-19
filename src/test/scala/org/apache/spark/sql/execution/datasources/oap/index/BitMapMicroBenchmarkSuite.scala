@@ -33,7 +33,7 @@ import org.apache.spark.util.Utils
 /**
  * Microbenchmark for BitMap.
  */
-class BitMapMicroBenchmark extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class BitMapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
   import testImplicits._
   private var dir: File = null
 
