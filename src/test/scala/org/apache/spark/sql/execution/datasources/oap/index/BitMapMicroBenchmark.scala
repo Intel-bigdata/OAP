@@ -84,9 +84,10 @@ class BitMapMicroBenchmark extends QueryTest with SharedSQLContext with BeforeAn
     // scalastyle:on println
   }
 
-  /*                                  record numbers   30000    300000              3000000
-   *              bitmap index file size with BitSet   866772   (2.84GB)2839781768  OOM
-   *      bitmap index file size with roaring bitmap   162208   (7.48MB)7481772     73MB(73631772)
+  /* Below result is tested on my local dev machine(Core i7 3.47GHZ with 12 cores, 12GB memory).
+   *                                  record numbers   30000    300000              3000000
+   *           bitmap index file size with BitSet(B)   866772   (2.84GB)2839781768  OOM
+   *   bitmap index file size with roaring bitmap(B)   162208   (7.48MB)7481772     73MB(73631772)
    *                                      size ratio   5.34     379.56              +oo
    *         single query execution time with BitSet   655ms    OOM                 +oo
    * single query execution time with roaring bitmap   492ms    1183ms              13660ms
