@@ -221,14 +221,15 @@ private[oap] class OapDataReader(
           )
         }
 
-        val isFastIndexQuery : Boolean =
-          limit > 0 || options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)
+        val forceIndexScan : Boolean = limit > 0 ||
+          options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY) ||
+          options.contains(OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY)
 
         /**
-         * Once index is disabled, there is no way to do fast query.
+         * Once index is disabled, there is no way to do index optimized query.
          * OapStrategy should aware of this and create a non-fast query plan.
          */
-        assert((!enableOIndex && isFastIndexQuery) == false)
+        assert((!enableOIndex && forceIndexScan) == false)
 
         val iter =
           // Below is for OAP developers to easily analyze and compare performance without removing
@@ -237,13 +238,13 @@ private[oap] class OapDataReader(
             logWarning("OAP index is disabled. Using below approach to enable index,\n" +
               "sqlContext.conf.setConfString(SQLConf.OAP_USE_INDEX_FOR_DEVELOPERS.key, true)")
             fileScanner.iterator(conf, requiredIds)
-          } else if (!isFastIndexQuery && indexFileSize > dataFileSize * 0.7 && !isTesting) {
+          } else if (!forceIndexScan && indexFileSize > dataFileSize * 0.7 && !isTesting) {
             logWarning(s"Index File size $indexFileSize B is too large comparing " +
                         s"to Data File Size $dataFileSize. Using Data File Scan instead.")
             fileScanner.iterator(conf, requiredIds)
           } else {
             statsAnalyseResult match {
-              case StaticsAnalysisResult.FULL_SCAN if !isFastIndexQuery =>
+              case StaticsAnalysisResult.FULL_SCAN if !forceIndexScan =>
                 fileScanner.iterator(conf, requiredIds)
               case StaticsAnalysisResult.USE_INDEX =>
                 fs.initialize(path, conf)

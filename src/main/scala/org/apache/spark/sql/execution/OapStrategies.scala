@@ -42,7 +42,7 @@ trait OapStrategies extends Logging {
   def oapStrategies: Seq[Strategy] =
       OapSortLimitStrategy ::
       OapSemiJoinStrategy ::
-      OapAggregationStrategy :: Nil
+      OapGroupAggregateStrategy :: Nil
 
   /**
    * Plans special cases of orderby+limit operators.
@@ -181,17 +181,14 @@ trait OapStrategies extends Logging {
   }
 
   /**
-   * Work as Aggregation in SparkStrategies with OAP optimization.
-   * So far we support Min/Max only because we need extra UDF to do
-   * things like count which is a aggregation result instead of a row
-   * from data source.
-   * Now the only workable case is:
-   * SELECT [agg](column name)
-   * FROM table
-   * [WHERE filter on same column]
-   * GROUP BY same column
+   * Optimized Aggregations w/ GROUP BY as a OAP Strategies.
+   * Now the workable case is:
+   *   SELECT [agg](columns)
+   *   FROM table
+   *   [WHERE filter on columns]
+   *   GROUP BY one specific column
    */
-  object OapAggregationStrategy extends Strategy {
+  object OapGroupAggregateStrategy extends Strategy {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case PhysicalAggregation(
       groupingExpressions, aggregateExpressions, resultExpressions, child) =>
@@ -244,6 +241,8 @@ trait OapStrategies extends Logging {
       projectList, filters, relation@LogicalRelation(file: HadoopFsRelation, _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val groupingAttributes = AttributeSet(groupExpressions.map(_.toAttribute))
+        val oapOption = new CaseInsensitiveMap(file.options +
+          (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
 
         val indexHint = {
           /**
@@ -258,7 +257,7 @@ trait OapStrategies extends Logging {
 
         if (file.fileFormat.isInstanceOf[OapFileFormat]) {
           createOapFileScanPlan(
-            projectList, indexHint, relation, file, table, file.options, indexHint) match {
+            projectList, indexHint, relation, file, table, oapOption, indexHint) match {
             case Some(fastScan) =>
               OapAggregationFileScanExec(
                 aggExpressions,
