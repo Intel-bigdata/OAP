@@ -225,25 +225,48 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with Bef
      */
   }
 
-  test("test the bitmap index file size with BitSet and Roaring Bitmap") {
+  /* TODO:
+   *      1. Tuning the bitmap index to further reduce bitmap index file size, but need to
+   *        consisder the trade-off between file size and query execution time, considering bitmap
+   *        decoding and decompression.
+   *      2. Tuning the bitmap index to further improve index writing and scanning efficiency
+   *        for millions+ records.
+   */
+  test("test bitmap index performance with BitSet and RoaringBitmap") {
     val data: Seq[(Int, String)] = (1 to 30000).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test select * from t")
+    val createIdxStartTime = System.nanoTime
     sql("create oindex index_bm on oap_test (a) USING BITMAP")
+    val createIdxEndTime = System.nanoTime
+    // The unit is ms.
+    val createIdxElapsedTime = (createIdxEndTime - createIdxStartTime) / 1000000
     val fileNameIterator = dir.listFiles()
+    var fileSize = 0
     for (fileName <- fileNameIterator) {
       if (fileName.toString().endsWith(OapFileFormat.OAP_INDEX_EXTENSION)) {
-        val fileSize = fileName.length
+        fileSize = fileName.length.toInt
       }
     }
-    val startTime = System.nanoTime
+    val queryStartTime = System.nanoTime
     checkAnswer(sql("SELECT * FROM oap_test WHERE a = 15000"),
       Row(15000, "this is test 15000") :: Nil)
-    val endTime = System.nanoTime
+    val queryEndTime = System.nanoTime
     // The unit is ms.
-    val elapsedTime = (endTime - startTime) / 1000000
+    val queryElapsedTime = (queryEndTime - queryStartTime) / 1000000
     sql("drop oindex index_bm on oap_test")
-    // The microbenchmark result will be added after the bitmap partial loading patch is merged.
+    /* Below result is tested on my local dev machine(Core i7 3.47GHZ with 12 cores, 12GB memory).
+     *                                  record numbers   30000    300000              3000000
+     *               bitmap index file size before(MB)   0.87     2.84GB              OOM
+     *                bitmap index file size after(MB)   0.39     3.90                39
+     *                                      size ratio   2.23     728.21              +oo
+     *                 query execution time before(ms)   655      OOM                 +oo
+     *                  query execution time after(ms)   309      517                 2089
+     *                                      time ratio   2.12     +oo                 +oo
+     *                  index creation time before(ms)   759      OOM                 +oo
+     *                   index creation time after(ms)   430      994                 8124
+     *                                      time ratio   1.77     +oo                 +oo
+     */
   }
 
 }
