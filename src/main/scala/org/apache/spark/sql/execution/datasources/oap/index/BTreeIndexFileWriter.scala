@@ -21,7 +21,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
-import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 
 private case class BTreeIndexFileWriter(
@@ -59,8 +58,8 @@ private case class BTreeIndexFileWriter(
 
   def end(): Unit = {
     val littleEndianWriter = new LittleEndianDataOutputStream(writer)
-    littleEndianWriter.write(rowIdListSize)
-    littleEndianWriter.write(footerSize)
+    littleEndianWriter.writeInt(rowIdListSize)
+    littleEndianWriter.writeInt(footerSize)
   }
 
   def close(): Unit = writer.close()
