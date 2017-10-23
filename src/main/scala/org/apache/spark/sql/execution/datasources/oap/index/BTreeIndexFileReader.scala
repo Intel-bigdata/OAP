@@ -39,8 +39,8 @@ private case class BTreeIndexFileReader(
     val sectionLengthIndex = fileLength - FOOTER_LENGTH_SIZE - ROW_ID_LIST_LENGTH_SIZE
     val sectionLengthBuffer = new Array[Byte](FOOTER_LENGTH_SIZE + ROW_ID_LIST_LENGTH_SIZE)
     reader.readFully(sectionLengthIndex, sectionLengthBuffer)
-    val footerSize = getIntFromBuffer(sectionLengthBuffer, 0)
-    val rowIdListSize = getIntFromBuffer(sectionLengthBuffer, FOOTER_LENGTH_SIZE)
+    val rowIdListSize = getIntFromBuffer(sectionLengthBuffer, 0)
+    val footerSize = getIntFromBuffer(sectionLengthBuffer, ROW_ID_LIST_LENGTH_SIZE)
     (footerSize, rowIdListSize)
   }
 
