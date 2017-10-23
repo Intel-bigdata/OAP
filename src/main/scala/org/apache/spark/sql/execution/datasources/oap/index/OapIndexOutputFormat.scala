@@ -54,14 +54,14 @@ private[index] class OapIndexOutputFormat extends FileOutputFormat[Void, Interna
     if (canBeSkipped(file)) {
       new DummyIndexRecordWriter()
     } else if (indexType == "BTREE") {
-      val writer = file.getFileSystem(configuration).create(file, true)
+      val writer = BTreeIndexFileWriter(configuration, file)
       new BTreeIndexRecordWriter(configuration, writer, schema)
     } else if (indexType == "BITMAP") {
       val writer = file.getFileSystem(configuration).create(file, true)
       new BitmapIndexRecordWriter(configuration, writer, schema)
     } else if (indexType == "PERMUTERM") {
-      val writer = file.getFileSystem(configuration).create(file, true)
       // use BTree temporary
+      val writer = BTreeIndexFileWriter(configuration, file)
       new BTreeIndexRecordWriter(configuration, writer, schema)
     } else {
       throw new OapException("Unknown Index Type: " + indexType)

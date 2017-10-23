@@ -124,11 +124,9 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
   private val fileWriter = {
     val configuration = new Configuration()
     val fileWriter = new TestBTreeIndexFileWriter(configuration)
-    val writer = BTreeIndexRecordWriter(configuration, new ByteBufferOutputStream(), schema)
-    writer.setFileWriter(fileWriter)
+    val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
     records.map(InternalRow(_)).foreach(writer.write(null, _))
-    writer.flush()
-    fileWriter.close()
+    writer.close(null)
     fileWriter
   }
 

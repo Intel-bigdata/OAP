@@ -290,24 +290,8 @@ private[oap] class OapDataReader(
     } else if (filterScanner.get.intervalArray.isEmpty) {
       StaticsAnalysisResult.SKIP_INDEX
     } else {
-      val fs = indexPath.getFileSystem(conf)
-      val fin = fs.open(indexPath)
-
-      // read stats size
-      val fileLength = fs.getContentSummary(indexPath).getLength.toInt
-      val startPosArray = new Array[Byte](8)
-
-      fin.readFully(fileLength - 24, startPosArray)
-
-      val stBase = Platform.getLong(startPosArray, Platform.BYTE_ARRAY_OFFSET).toInt
-
-      val stsArray = new Array[Byte](fileLength - stBase)
-      fin.readFully(stBase, stsArray)
-      fin.close()
-
-      val statisticsManager = new StatisticsManager
-      statisticsManager.read(stsArray, filterScanner.get.getSchema)
-      statisticsManager.analyse(filterScanner.get.intervalArray, conf)
+      // TODO: Remove StatisticsManager
+      StaticsAnalysisResult.USE_INDEX
     }
   }
 }

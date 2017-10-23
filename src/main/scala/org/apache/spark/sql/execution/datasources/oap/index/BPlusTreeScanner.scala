@@ -19,15 +19,9 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import sun.nio.ch.DirectBuffer
 
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
-import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.unsafe.Platform
-import org.apache.spark.util.io.ChunkedByteBuffer
 
 // we scan the index from the smallest to the largest,
 // this will scan the B+ Tree (index) leaf node.
@@ -39,6 +33,7 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
   var currentKeyIdx = 0
   var indexFiber: IndexFiber = _
   var indexData: CacheResult = _
+  var recordReader: BTreeIndexRecordReader = _
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
@@ -46,170 +41,13 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     logDebug("Loading Index File: " + path)
     logDebug("\tFile Size: " + path.getFileSystem(conf).getFileStatus(path).getLen)
-    val indexFile = IndexFile(path)
-    indexFiber = IndexFiber(indexFile)
-    indexData = FiberCacheManager.getOrElseUpdate(indexFiber, conf)
-    val root = open(indexData.buffer, keySchema, indexFile.version(conf))
 
-    _init(root)
-  }
-
-  def open(
-      data: ChunkedByteBuffer,
-      keySchema: StructType,
-      version: Int = IndexFile.INDEX_VERSION): IndexNode = {
-    assert(version == IndexFile.INDEX_VERSION, "Unsupported version of index data!")
-    val (baseObject, baseOffset): (Object, Long) = data.chunks.head match {
-      case buf: DirectBuffer => (null, buf.address())
-      case _ => (data.toArray, Platform.BYTE_ARRAY_OFFSET)
-    }
-    val dataEnd = Platform.getLong(baseObject, baseOffset + data.size - 16)
-    val rootOffset = Platform.getLong(baseObject, baseOffset + data.size - 8)
-    UnsafeIndexNode(data, rootOffset, dataEnd, keySchema)
-  }
-
-  def _init(root : IndexNode): IndexScanner = {
-    assert(intervalArray ne null, "intervalArray is null!")
-    this.ordering = GenerateOrdering.create(keySchema)
-    currentKeyArray = new Array[CurrentKey](intervalArray.length)
-    currentKeyIdx = 0 // reset to initialized value for this thread
-    intervalArray.zipWithIndex.foreach {
-      case(interval: RangeInterval, i: Int) =>
-        var order: Ordering[Key] = null
-        if (interval.start == IndexScanner.DUMMY_KEY_START) {
-          // find the first key in the left-most leaf node
-          var tmpNode = root
-          while (!tmpNode.isLeaf) tmpNode = tmpNode.childAt(0)
-          currentKeyArray(i) = new CurrentKey(tmpNode, 0, 0, getLimitScanNum())
-        } else {
-          // find the first identical key or the first key right greater than the specified one
-          if (keySchema.size > interval.start.numFields) { // exists Dummy_Key
-            order = GenerateOrdering.create(StructType(keySchema.dropRight(1)))
-          } else order = this.ordering
-          currentKeyArray(i) = moveTo(root, interval.start, true, order)
-          if (keySchema.size > interval.end.numFields) { // exists Dummy_Key
-            order = GenerateOrdering.create(StructType(keySchema.dropRight(1)))
-            // find the last identical key or the last key less than the specified one on the left
-            this.intervalArray(i).end = moveTo(root, interval.end, false, order).currentKey
-          }
-        }
-        // to deal with the LeftOpen condition
-        while (!interval.startInclude &&
-          !currentKeyArray(i).isEnd &&
-          ordering.compare(interval.start, currentKeyArray(i).currentKey) == 0) {
-          // find exactly the key, since it's LeftOpen, skip the equivalent key(s)
-          currentKeyArray(i).moveNextKey
-        }
-    }
+    recordReader = BTreeIndexRecordReader(conf, keySchema)
+    recordReader.initialize(path, intervalArray)
     this
   }
 
-  // i: the interval index
-  def intervalShouldStop(i: Int): Boolean = { // detect if we need to stop scanning
-    if (intervalArray(i).end == IndexScanner.DUMMY_KEY_END) { // Left-Only search
-      return false
-    }
-    if (intervalArray(i).endInclude) { // RightClose
-      ordering.compare(
-        currentKeyArray(i).currentKey, intervalArray(i).end) > 0
-    }
-    else { // RightOpen
-      ordering.compare(
-        currentKeyArray(i).currentKey, intervalArray(i).end) >= 0
-    }
-  }
+  override def hasNext: Boolean = recordReader.hasNext
 
-  /**
-   * search the key that equals to candidate in the IndexNode of B+ tree
-   * @param node: the node where binary search is executed
-   * @param candidate: the candidate key
-   * @param findFirst: indicates whether the goal is to find the
-   *                  first appeared key that equals to candidate
-   * @param order: the ordering that used to compare two keys
-   * @return the CurrentKey object that points to the target key
-   * findFirst == true -> find the first appeared key that equals to candidate, this is used
-   * to determine the start key that begins the scan.
-   * In this case, the first identical key(if found) or
-   * the first key greater than the specified one on the right(if not found) is returned;
-   * findFirst == false -> find the last appeared key that equals to candidate, this is used
-   * to determine the end key that terminates the scan.
-   * In this case, the last identical key(if found) or
-   * the last key less than the specified one on the left(if not found) is returned.
-   */
-  protected def moveTo(node: IndexNode, candidate: Key, findFirst: Boolean, order: Ordering[Key])
-  : CurrentKey = {
-    var s = 0
-    var e = node.length - 1
-    var notFind = true
-
-    var m = s
-    while (s <= e & notFind) {
-      m = (s + e) / 2
-      val cmp = order.compare(node.keyAt(m), candidate)
-      if (cmp == 0) {
-        notFind = false
-      } else if (cmp < 0) {
-        s = m + 1
-      } else {
-        e = m - 1
-      }
-    }
-
-    if (notFind) {
-      m = if (e < 0) 0 else e
-    }
-    else { // the candidate key is found in the B+ tree
-      if (findFirst) {// if the goal is to find the first appeared key that equals to candidate
-        // if the goal is to find the start key,
-        // then find the last key that is less than the specified one on the left
-        // is always necessary in all Non-Leaf layers(considering the multi-column search)
-        while (m>0 && order.compare(node.keyAt(m), candidate) == 0) {m -= 1}
-        if (order.compare(node.keyAt(m), candidate) < 0) notFind = true
-      } else {
-        while (m<node.length-1 && order.compare(node.keyAt(m + 1), candidate) == 0)
-          m += 1
-      }
-    }
-
-    if (node.isLeaf) {
-      // here currentKey is equal to candidate or the last key on the left side
-      // which is less than the candidate
-      val currentKey = new CurrentKey(node, m, 0, getLimitScanNum())
-
-      if (notFind && findFirst) {
-        // if not found and the goal is to find the start key, then let's move forward a key
-        // if the goal is to find the end key, no need to move next
-        if (order.compare(node.keyAt(m), candidate) < 0) {// if current key < candidate
-          currentKey.moveNextKey
-        }
-      }
-      currentKey
-    } else {
-      moveTo(node.childAt(m), candidate, findFirst, order)
-    }
-  }
-
-
-  override def hasNext: Boolean = {
-    for (i <- currentKeyIdx until currentKeyArray.length) {
-      if (!currentKeyArray(i).isEnd && !intervalShouldStop(i)) {
-        return true
-      }
-    }// end for
-    if (indexData != null) {
-      if (indexData.cached) FiberCacheManager.releaseLock(indexFiber)
-      else indexData.buffer.dispose()
-    }
-    false
-  }
-
-  override def next(): Long = {
-    while (currentKeyArray(currentKeyIdx).isEnd || intervalShouldStop(currentKeyIdx)) {
-      currentKeyIdx += 1
-    }
-    val rowId = currentKeyArray(currentKeyIdx).currentRowId
-    currentKeyArray(currentKeyIdx).moveNextValue
-    rowId
-  }
-
+  override def next(): Long = recordReader.next()
 }
