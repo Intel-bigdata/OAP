@@ -23,10 +23,8 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
-import org.apache.spark.sql.execution.{UnsafeFixedWidthAggregationMap, UnsafeKVExternalSorter}
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.unsafe.KVIterator
 
 /**
  * An iterator used to evaluate aggregate functions for OAP index Data to
@@ -68,10 +66,6 @@ class OapAggregationIterator(
   ///////////////////////////////////////////////////////////////////////////
   // Part 1: Initializing aggregate functions.
   ///////////////////////////////////////////////////////////////////////////
-
-  // Remember spill data size of this task before execute this operator so that we can
-  // figure out how many bytes we spilled for this operator.
-  private val spillSizeBefore = TaskContext.get().taskMetrics().memoryBytesSpilled
 
   ///////////////////////////////////////////////////////////////////////////
   // Part 2: Methods and fields used by setting aggregation buffer values,
@@ -117,7 +111,7 @@ class OapAggregationIterator(
   private[this] val initialAggregationBuffer: UnsafeRow = createNewAggregationBuffer()
   private[this] val groupAggregationBuffer: UnsafeRow = initialAggregationBuffer.copy()
 
-  var currGroupHead : InternalRow = null
+  var currGroupHead : InternalRow = _
 
   /**
    * As rows are returned by index, so they are group-ed.
