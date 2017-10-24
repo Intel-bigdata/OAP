@@ -124,17 +124,4 @@ object OapAggregateExec {
     val aggregationBufferSchema = StructType.fromAttributes(aggregateBufferAttributes)
     UnsafeFixedWidthAggregationMap.supportsAggregationBufferSchema(aggregationBufferSchema)
   }
-
-  /**
-   * Determines whether records must be defensively copied before being sent to the shuffle.
-   * It is a opposite logic to ShuffleExchange.needToCopyObjectsBeforeShuffle. If shuffle does
-   * copy(), we don't need to copy. Also, the function is customized because those params in
-   * ShuffleExchange are not presented here.
-   * @return true if rows should be copied before being shuffled, false otherwise
-   */
-  def needToCopyObjects(): Boolean = {
-    val shuffleManager = SparkEnv.get.shuffleManager
-    val sortBasedShuffleOn = shuffleManager.isInstanceOf[SortShuffleManager]
-    !sortBasedShuffleOn
-  }
 }
