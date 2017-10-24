@@ -172,7 +172,8 @@ class OapAggregationIterator(
         val aggBuffer : (UnsafeRow, UnsafeRow) = processOneGroupInputs()
         // We did not fall back to sort-based aggregation.
         val result = generateOutput(aggBuffer._1, aggBuffer._2)
-        result.copy()
+        if(OapAggregateExec.needToCopyObjects()) result.copy()
+        else result
       }
 
       // If this is the last record, update the task's peak memory usage.

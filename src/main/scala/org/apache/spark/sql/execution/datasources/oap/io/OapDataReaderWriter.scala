@@ -221,7 +221,7 @@ private[oap] class OapDataReader(
           )
         }
 
-        val forceIndexScan : Boolean = limit > 0 ||
+        val forceIndexScan: Boolean = limit > 0 ||
           options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY) ||
           options.contains(OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY)
 

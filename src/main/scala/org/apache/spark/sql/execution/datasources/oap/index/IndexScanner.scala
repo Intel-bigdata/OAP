@@ -179,7 +179,7 @@ private[oap] object ScannerBuilder extends Logging {
         else combineIntervalMaps(leftMap, rightMap, ic, needMerge = true)
     )
 
-    if (!intervalMap.isEmpty) {
+    if (intervalMap.nonEmpty) {
       intervalMap.foreach(intervals =>
         logDebug("\t" + intervals._1 + ": " + intervals._2.mkString(" - ")))
 

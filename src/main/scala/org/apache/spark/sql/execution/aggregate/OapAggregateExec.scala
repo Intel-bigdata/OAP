@@ -17,7 +17,10 @@
 
 package org.apache.spark.sql.execution.aggregate
 
+import org.apache.spark.{Partitioner, SparkEnv}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.serializer.Serializer
+import org.apache.spark.shuffle.sort.SortShuffleManager
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.errors._
 import org.apache.spark.sql.catalyst.expressions._
@@ -61,10 +64,6 @@ case class OapAggregateExec(
 
   override def outputPartitioning: Partitioning = child.outputPartitioning
 
-  // This is for testing. We force TungstenAggregationIterator to fall back to the unsafe row hash
-  // map and/or the sort-based aggregation once it has processed a given number of input rows.
-  private val testFallbackStartsAt: Option[(Int, Int)] = None
-
   protected override def doExecute(): RDD[InternalRow] = attachTree(this, "execute") {
     val numOutputRows = longMetric("numOutputRows")
     val peakMemory = longMetric("peakMemory")
@@ -89,7 +88,7 @@ case class OapAggregateExec(
               newMutableProjection(expressions, inputSchema, subexpressionEliminationEnabled),
             child.output,
             iter,
-            testFallbackStartsAt,
+            testFallbackStartsAt = None, // No need to fallback
             numOutputRows,
             peakMemory,
             spillSize)
@@ -109,20 +108,13 @@ case class OapAggregateExec(
 
   private def toString(verbose: Boolean): String = {
     val allAggregateExpressions = aggregateExpressions
-
-    testFallbackStartsAt match {
-      case None =>
-        val keyString = Utils.truncatedString(groupingExpressions, "[", ", ", "]")
-        val functionString = Utils.truncatedString(allAggregateExpressions, "[", ", ", "]")
-        val outputString = Utils.truncatedString(output, "[", ", ", "]")
-        if (verbose) {
-          s"OapAggregate(keys=$keyString, functions=$functionString, output=$outputString)"
-        } else {
-          s"OapAggregate(keys=$keyString, functions=$functionString)"
-        }
-      case Some(fallbackStartsAt) =>
-        s"OapAggregateWithControlledFallback $groupingExpressions " +
-          s"$allAggregateExpressions $resultExpressions fallbackStartsAt=$fallbackStartsAt"
+    val keyString = Utils.truncatedString(groupingExpressions, "[", ", ", "]")
+    val functionString = Utils.truncatedString(allAggregateExpressions, "[", ", ", "]")
+    val outputString = Utils.truncatedString(output, "[", ", ", "]")
+    if (verbose) {
+      s"OapAggregate(keys=$keyString, functions=$functionString, output=$outputString)"
+    } else {
+      s"OapAggregate(keys=$keyString, functions=$functionString)"
     }
   }
 }
@@ -131,5 +123,18 @@ object OapAggregateExec {
   def supportsAggregate(aggregateBufferAttributes: Seq[Attribute]): Boolean = {
     val aggregationBufferSchema = StructType.fromAttributes(aggregateBufferAttributes)
     UnsafeFixedWidthAggregationMap.supportsAggregationBufferSchema(aggregationBufferSchema)
+  }
+
+  /**
+   * Determines whether records must be defensively copied before being sent to the shuffle.
+   * It is a opposite logic to ShuffleExchange.needToCopyObjectsBeforeShuffle. If shuffle does
+   * copy(), we don't need to copy. Also, the function is customized because those params in
+   * ShuffleExchange are not presented here.
+   * @return true if rows should be copied before being shuffled, false otherwise
+   */
+  def needToCopyObjects(): Boolean = {
+    val shuffleManager = SparkEnv.get.shuffleManager
+    val sortBasedShuffleOn = shuffleManager.isInstanceOf[SortShuffleManager]
+    !sortBasedShuffleOn
   }
 }

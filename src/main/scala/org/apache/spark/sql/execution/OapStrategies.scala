@@ -82,9 +82,9 @@ trait OapStrategies extends Logging {
         child: LogicalPlan,
         limit: Int,
         order: Seq[SortOrder]): SparkPlan = child match {
-      case PhysicalOperation(
-      projectList, filters, relation@LogicalRelation(
-      file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
+      case PhysicalOperation(projectList, filters,
+        relation @ LogicalRelation(
+          file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
         if ((orderAttributes.size == 1 &&
@@ -127,11 +127,9 @@ trait OapStrategies extends Logging {
   object OapSemiJoinStrategy extends Strategy with Logging {
     private def canBroadcast(plan: LogicalPlan): Boolean = {
       val conf = SparkSession.getActiveSession.get.sessionState.conf
-      /**
-       * We can take a much larger threshold here since if this optimization
-       * is applicable, only distinct item will be broadcasted, those data
-       * should much less than the origin table.
-       */
+      // We can take a much larger threshold here since if this optimization
+      // is applicable, only distinct item will be broadcasted, those data
+      // should much less than the origin table.
       plan.statistics.isBroadcastable ||
         plan.statistics.sizeInBytes <= conf.autoBroadcastJoinThreshold
     }
@@ -141,18 +139,16 @@ trait OapStrategies extends Logging {
         if joinType == LeftSemi && canBroadcast(right) =>
         Seq(joins.BroadcastHashJoinExec(
           leftKeys, rightKeys, joinType, BuildRight, condition, planLater(left),
-          calcChildPlan(right, rightKeys.map {
-            SortOrder(_, Ascending)
-          })))
+          calcChildPlan(right, rightKeys.map(SortOrder(_, Ascending)))))
       case _ => Nil
     }
 
     def calcChildPlan(
         child: LogicalPlan,
         order: Seq[SortOrder]): SparkPlan = child match {
-      case PhysicalOperation(
-      projectList, filters, relation@LogicalRelation(
-      file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
+      case PhysicalOperation(projectList, filters,
+        relation@LogicalRelation(
+          file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
         if ((orderAttributes.size == 1 &&
@@ -235,21 +231,19 @@ trait OapStrategies extends Logging {
         resultExpressions: Seq[NamedExpression],
         child : LogicalPlan
     ) : SparkPlan = child match {
-      case PhysicalOperation(
-      projectList, filters, relation@LogicalRelation(
-      file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
+      case PhysicalOperation(projectList, filters,
+        relation@LogicalRelation(
+          file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val groupingAttributes = AttributeSet(groupExpressions.map(_.toAttribute))
         val oapOption = new CaseInsensitiveMap(file.options +
           (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
 
         val indexHint = {
-          /**
-           * TODO:
-           * IsNotNull filters out the NULL value, we need another
-           * Expression case class to do index full scan (include NULL).
-           * If none in Spark, we can create one for OAP.
-           */
+          // TODO:
+          // IsNotNull filters out the NULL value, we need another
+          // Expression case class to do index full scan (include NULL).
+          // If none in Spark, we can create one for OAP.
           if (filterAttributes == groupingAttributes) filters
           else IsNotNull(groupingAttributes.head) :: Nil
         }
@@ -279,7 +273,7 @@ trait OapStrategies extends Logging {
       l: LogicalPlan,
       _fsRelation: HadoopFsRelation,
       table: Option[CatalogTable],
-      OapOption: Map[String, String],
+      oapOption: Map[String, String],
       indexHint: Seq[Expression]): Option[SparkPlan] = {
     // Filters on this relation fall into four categories based
     // on where we can use them to avoid
@@ -319,7 +313,7 @@ trait OapStrategies extends Logging {
 
     val fsRelation: HadoopFsRelation = _fsRelation.fileFormat match {
       case fileFormat : OapFileFormat =>
-        fileFormat.initialize(_fsRelation.sparkSession, _fsRelation.options,
+        fileFormat.initialize(_fsRelation.sparkSession, oapOption,
           selectedPartitions.flatMap(p => p.files))
         _fsRelation
     }
