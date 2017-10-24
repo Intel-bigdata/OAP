@@ -56,7 +56,7 @@ private[index] case class BTreeIndexRecordWriter(
     fileWriter.close()
   }
 
-  private def sortUniqueKeys(): Array[InternalRow] = {
+  private[index] def sortUniqueKeys(): Array[InternalRow] = {
     def buildOrdering(keySchema: StructType): Ordering[InternalRow] = {
       // here i change to use param id to index_id to get data type in keySchema
       val order = keySchema.zipWithIndex.map {
@@ -66,7 +66,8 @@ private[index] case class BTreeIndexRecordWriter(
             Ascending
           } else {
             Descending
-          })
+          }
+        )
       }
       GenerateOrdering.generate(order, keySchema.toAttributes)
     }
@@ -148,7 +149,8 @@ private[index] case class BTreeIndexRecordWriter(
    * ...
    * Key Data For Key #N
    */
-  private def serializeNode(uniqueKeys: Array[InternalRow], startPosInRowList: Int): Array[Byte] = {
+  private[index] def serializeNode(
+      uniqueKeys: Array[InternalRow], startPosInRowList: Int): Array[Byte] = {
     val buffer = new ByteArrayOutputStream()
     val output = new LittleEndianDataOutputStream(buffer)
     val keyBuffer = new ByteArrayOutputStream()
@@ -267,5 +269,5 @@ private[index] object BTreeIndexRecordWriter {
   }
 }
 
-private case class BTreeNodeMetaData(
-    rowCount: Int, byteSize: Int, min: InternalRow, max: InternalRow)
+private case class
+BTreeNodeMetaData(rowCount: Int, byteSize: Int, min: InternalRow, max: InternalRow)

@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 
 import scala.collection.mutable
@@ -34,7 +35,7 @@ import org.apache.spark.storage.{BlockId, FiberBlockId, StorageLevel}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.TimeStampedHashMap
 import org.apache.spark.util.collection.BitSet
-import org.apache.spark.util.io.ChunkedByteBuffer
+import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
 
 
 // TODO need to register within the SparkContext
@@ -63,6 +64,14 @@ object FiberCacheManager extends Logging {
 
   private val dataFileIdMap = new TimeStampedHashMap[String, DataFile](updateTimeStampOnGet = true)
 
+  private def toByteBuffer(buf: Array[Byte]): ChunkedByteBuffer = {
+    // TODO: make it configurable
+    val cbbos = new ChunkedByteBufferOutputStream(buf.length, ByteBuffer.allocate)
+    cbbos.write(buf)
+    cbbos.close()
+    cbbos.toChunkedByteBuffer
+  }
+
   def fiber2Block(fiber: Fiber): BlockId = {
     fiber match {
       case DataFiber(file, columnIndex, rowGroupId) =>
@@ -71,6 +80,8 @@ object FiberCacheManager extends Logging {
       case IndexFiber(file) =>
         // TODO: Need to improve this if we have multiple fibers in one index file
         FiberBlockId("index_" + file.file)
+      case BTreeFiber(_, file, section, idx) =>
+        FiberBlockId("btree_" + file + "_" + section + "_" + idx)
     }
   }
 
@@ -129,6 +140,7 @@ object FiberCacheManager extends Logging {
     case DataFiber(file, columnIndex, rowGroupId) =>
       file.getFiberData(rowGroupId, columnIndex, conf)
     case IndexFiber(file) => file.getIndexFiberData(conf)
+    case BTreeFiber(getFiberData, _, _, _) => toByteBuffer(getFiberData())
     case other => throw new OapException(s"Cannot identify what's $other")
   }
 
@@ -213,3 +225,10 @@ case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends 
 
 private[oap]
 case class IndexFiber(file: IndexFile) extends Fiber
+
+private[oap]
+case class BTreeFiber(
+    getFiberData: () => Array[Byte],
+    file: String,
+    section: Int,
+    idx: Int) extends Fiber

@@ -22,7 +22,7 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.unsafe.Platform
 
-private case class BTreeIndexFileReader(
+private[oap] case class BTreeIndexFileReader(
     configuration: Configuration,
     file: Path) {
 
