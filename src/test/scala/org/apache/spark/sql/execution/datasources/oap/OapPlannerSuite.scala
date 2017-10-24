@@ -202,13 +202,13 @@ class OapPlannerSuite
         "group by a"
 
     checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
-    val oapDF = sql(sqlString)
+    val oapDF = sql(sqlString).collect
 
     spark.experimental.extraStrategies = Nil
     checkKeywordsNotExist(sql("explain " + sqlString), "OapAggregationFileScanExec")
     val baseDF = sql(sqlString)
 
-    checkAnswer(oapDF, baseDF)
+    checkAnswer(baseDF, oapDF)
 
     sql("drop oindex index1 on oap_fix_length_schema_table")
   }

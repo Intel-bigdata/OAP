@@ -225,10 +225,8 @@ private[oap] class OapDataReader(
           options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY) ||
           options.contains(OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY)
 
-        /**
-         * Once index is disabled, there is no way to do index optimized query.
-         * OapStrategy should aware of this and create a non-fast query plan.
-         */
+        // Once index is disabled, there is no way to do index optimized query.
+        // OapStrategy should aware of this and create a non-fast query plan.
         assert((!enableOIndex && forceIndexScan) == false)
 
         val iter =

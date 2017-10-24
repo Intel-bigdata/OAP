@@ -113,12 +113,10 @@ class OapAggregationIterator(
 
   var currGroupHead : InternalRow = _
 
-  /**
-   * As rows are returned by index, so they are group-ed.
-   * We call this for one group. Processing stops after one
-   * group scan is done, and next group process starts when
-   * iterator next get called.
-   */
+  // As rows are returned by index, so they are group-ed.
+  // We call this for one group. Processing stops after one
+  // group scan is done, and next group process starts when
+  // iterator next get called.
   private def processOneGroupInputs(): (UnsafeRow, UnsafeRow) = {
     // Init agg buffer for a new group.
     groupAggregationBuffer.copyFrom(initialAggregationBuffer)
@@ -140,9 +138,7 @@ class OapAggregationIterator(
       }
     }
 
-    /**
-     * No more group, set currGroupHead to null to finish process
-     */
+    // No more group, set currGroupHead to null to finish process
     if (isSameGroup) {
       currGroupHead = null
     }
@@ -172,8 +168,7 @@ class OapAggregationIterator(
         val aggBuffer : (UnsafeRow, UnsafeRow) = processOneGroupInputs()
         // We did not fall back to sort-based aggregation.
         val result = generateOutput(aggBuffer._1, aggBuffer._2)
-        if(OapAggregateExec.needToCopyObjects()) result.copy()
-        else result
+        result.copy() //TODO: reconsider if we can save this copy.
       }
 
       // If this is the last record, update the task's peak memory usage.
