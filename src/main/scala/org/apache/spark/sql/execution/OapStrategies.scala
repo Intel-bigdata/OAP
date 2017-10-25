@@ -59,7 +59,9 @@ trait OapStrategies extends Logging {
    *   2. order by a single column with limit Only
    *     SELECT x FROM xx ORDER BY Column-A LIMIT N
    *
-   * TODO: add more use scenarios in future.
+   * TODO:
+   *   1. add more use scenarios in future.
+   *   2. abstract common implementation between oap strategies.
    */
   object OapSortLimitStrategy extends Strategy with Logging {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
@@ -87,15 +89,13 @@ trait OapStrategies extends Logging {
           file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
-        if ((orderAttributes.size == 1 &&
-            (filterAttributes.isEmpty || filterAttributes == orderAttributes))) {
+        if (orderAttributes.size == 1 &&
+            (filterAttributes.isEmpty || filterAttributes == orderAttributes)) {
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY -> limit.toString) +
             (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
-          val indexHint = {
-            if (filters.nonEmpty) filters
+          val indexHint = if (filters.nonEmpty) filters
             else IsNotNull(orderAttributes.head) :: Nil
-          }
 
           createOapFileScanPlan(
             projectList, filters, relation, file, table, oapOption, indexHint) match {
@@ -147,19 +147,17 @@ trait OapStrategies extends Logging {
         child: LogicalPlan,
         order: Seq[SortOrder]): SparkPlan = child match {
       case PhysicalOperation(projectList, filters,
-        relation@LogicalRelation(
+        relation @ LogicalRelation(
           file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
-        if ((orderAttributes.size == 1 &&
-          (filterAttributes.isEmpty || filterAttributes == orderAttributes))) {
+        if (orderAttributes.size == 1 &&
+          (filterAttributes.isEmpty || filterAttributes == orderAttributes)) {
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY -> "1"))
 
-          val indexHint = {
-            if (filters.nonEmpty) filters
+          val indexHint = if (filters.nonEmpty) filters
             else IsNotNull(orderAttributes.head) :: Nil
-          }
 
           createOapFileScanPlan(
             projectList, filters, relation, file, table, oapOption, indexHint) match {
@@ -232,21 +230,19 @@ trait OapStrategies extends Logging {
         child : LogicalPlan
     ) : SparkPlan = child match {
       case PhysicalOperation(projectList, filters,
-        relation@LogicalRelation(
+        relation @ LogicalRelation(
           file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val groupingAttributes = AttributeSet(groupExpressions.map(_.toAttribute))
         val oapOption = new CaseInsensitiveMap(file.options +
           (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
 
-        val indexHint = {
-          // TODO:
-          // IsNotNull filters out the NULL value, we need another
-          // Expression case class to do index full scan (include NULL).
-          // If none in Spark, we can create one for OAP.
-          if (filterAttributes == groupingAttributes) filters
+        // TODO:
+        // IsNotNull filters out the NULL value, we need another
+        // Expression case class to do index full scan (include NULL).
+        // If none in Spark, we can create one for OAP.
+        val indexHint = if (filterAttributes == groupingAttributes) filters
           else IsNotNull(groupingAttributes.head) :: Nil
-        }
 
         createOapFileScanPlan(
           projectList, indexHint, relation, file, table, oapOption, indexHint) match {
