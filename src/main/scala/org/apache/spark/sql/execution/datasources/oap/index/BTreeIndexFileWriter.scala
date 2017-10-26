@@ -23,6 +23,19 @@ import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 
+/**
+ * BTreeIndexFile Structure
+ * Field                          Description
+ * Version                        OAPIDX02
+ * Node #1                        Part #1 of all sorted key list
+ * Node #2
+ * ...
+ * Node #N
+ * Row ID List                    Row ID List sorted by corresponding key
+ * Footer                         Meta data for this index file
+ * Row Id List Section Size       4 bytes
+ * Footer Section Size            4 bytes
+ */
 private case class BTreeIndexFileWriter(
     configuration: Configuration,
     file: Path) {

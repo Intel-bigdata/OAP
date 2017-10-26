@@ -316,6 +316,7 @@ private[index] class BTreeIndexRecordWriter(
     buffer.toByteArray ++ keyBuffer.toByteArray
   }
 
+  // TODO: BTreeNode can be re-write. It doesn't carry any values.
   private def sumKeyCount(node: BTreeNode): Int = {
     if (node.children.nonEmpty) node.children.map(sumKeyCount).sum
     else node.root
@@ -351,6 +352,7 @@ private[index] class BTreeIndexRecordWriter(
    * ...
    * Min Key For Child #N
    * Max Key For Child #N - Max
+   * TODO: Make serialize and deserialize(in reader) in same style.
    */
   private def serializeFooter(nodes: Seq[BTreeNodeMetaData]): Array[Byte] = {
     val buffer = new ByteArrayOutputStream()
@@ -381,7 +383,6 @@ private[index] class BTreeIndexRecordWriter(
       offset += node.byteSize
     }
     buffer.toByteArray ++ keyBuffer.toByteArray
-
   }
 
   private def writeBasedOnSchema(
@@ -417,5 +418,5 @@ private[index] class BTreeIndexRecordWriter(
     }
   }
 }
-private case class
-BTreeNodeMetaData(rowCount: Int, byteSize: Int, min: InternalRow, max: InternalRow)
+private case class BTreeNodeMetaData(
+    rowCount: Int, byteSize: Int, min: InternalRow, max: InternalRow)
