@@ -40,7 +40,7 @@ private case class BTreeIndexFileWriter(
     configuration: Configuration,
     file: Path) {
 
-  private val writer = file.getFileSystem(configuration).create(file, true)
+  private lazy val writer = file.getFileSystem(configuration).create(file, true)
 
   private var rowIdListSize = 0
   private var footerSize = 0

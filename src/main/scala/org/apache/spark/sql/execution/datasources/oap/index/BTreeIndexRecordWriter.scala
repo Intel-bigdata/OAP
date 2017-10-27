@@ -65,9 +65,12 @@ private[index] class BTreeIndexRecordWriter(
       val order = keySchema.zipWithIndex.map {
         case (field, index) => SortOrder(
           BoundReference(index, field.dataType, nullable = true),
-          if (field.metadata.getBoolean("isAscending")) Ascending else Descending)
+          if (!field.metadata.contains("isAscending") || field.metadata.getBoolean("isAscending")) {
+            Ascending
+          } else {
+            Descending
+          })
       }
-
       GenerateOrdering.generate(order, keySchema.toAttributes)
     }
 
@@ -270,7 +273,7 @@ private[index] class BTreeIndexRecordWriter(
         val nodeUniqueKeys = uniqueKeys.slice(startPosInKeyList, startPosInKeyList + keyCount)
         val rowCount = nodeUniqueKeys.map(multiHashMap.get(_).size()).sum
 
-        val nodeBuf = serializeNode(nodeUniqueKeys, startPosInKeyList)
+        val nodeBuf = serializeNode(nodeUniqueKeys, startPosInRowList)
         fileWriter.writeNode(nodeBuf)
         startPosInKeyList += keyCount
         startPosInRowList += rowCount
