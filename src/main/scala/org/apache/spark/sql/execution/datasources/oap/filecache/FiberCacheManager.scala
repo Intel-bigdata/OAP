@@ -93,6 +93,8 @@ object FiberCacheManager extends Logging {
   }
 
   def getOrElseUpdate(fiber: Fiber, conf: Configuration): CacheResult = {
+    // Make sure no exception if no SparkContext is created.
+    if (SparkEnv.get == null) return new CacheResult(false, fiber2Data(fiber, conf))
     val blockManager = SparkEnv.get.blockManager
     val blockId = fiber2Block(fiber)
     logDebug("Fiber name: " + blockId.name)
