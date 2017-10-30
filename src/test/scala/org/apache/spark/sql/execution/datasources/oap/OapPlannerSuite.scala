@@ -116,7 +116,7 @@ class OapPlannerSuite
     sql("drop oindex index2 on oap_sort_opt_table")
   }
 
-  test("Distinct index scan if SemiJoin Test") {
+  ignore("Distinct index scan if SemiJoin Test") {
     spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
     val data = (1 to 300).map{ i => (i, s"this is test $i")}

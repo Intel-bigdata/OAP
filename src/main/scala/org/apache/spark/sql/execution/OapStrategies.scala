@@ -39,7 +39,8 @@ trait OapStrategies extends Logging {
 
   def oapStrategies: Seq[Strategy] =
       OapSortLimitStrategy ::
-      OapSemiJoinStrategy ::
+      // Disable semi join temporarily. TODO: Move scan number logic into IndexScanner
+      // OapSemiJoinStrategy ::
       OapGroupAggregateStrategy :: Nil
 
   /**
