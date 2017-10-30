@@ -129,6 +129,7 @@ private[index] case class BTreeIndexRecordReader(
     var found = false
     var m = s
     while (s <= e & !found) {
+      assert(s + e >= 0, "too large array size caused overflow")
       m = (s + e) / 2
       val cmp = compare(keys(m), candidate)
       if (cmp == 0) found = true
