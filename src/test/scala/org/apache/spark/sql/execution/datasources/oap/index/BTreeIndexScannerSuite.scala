@@ -17,12 +17,17 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
+
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
+import org.apache.spark.util.{ByteBufferOutputStream, Utils}
 
 class BTreeIndexScannerSuite extends SparkFunSuite {
 
@@ -72,7 +77,79 @@ class BTreeIndexScannerSuite extends SparkFunSuite {
     def keyAt(idx: Int): InternalRow = InternalRow(values(idx))
     val ordering = GenerateOrdering.create(schema)
 
-    assert(
-      reader.binarySearch(0, values.size, keyAt, InternalRow(10), ordering.compare) === (1, false))
+    def assertPosition(candidate: Int, position: Int, exists: Boolean): Unit = {
+      assert(
+        reader.binarySearch(
+          0, values.size, keyAt, InternalRow(candidate), ordering.compare) === (position, exists))
+    }
+    assertPosition(1, 0, exists = true)
+    assertPosition(10, 1, exists = false)
+    assertPosition(11, 1, exists = true)
+    assertPosition(20, 2, exists = false)
+    assertPosition(21, 2, exists = true)
+    assertPosition(30, 3, exists = false)
+    assertPosition(31, 3, exists = true)
+    assertPosition(40, 4, exists = false)
+    assertPosition(41, 4, exists = true)
+    assertPosition(50, 5, exists = false)
+    assertPosition(51, 5, exists = true)
+    assertPosition(60, 6, exists = false)
+    assertPosition(61, 6, exists = true)
+    assertPosition(70, 7, exists = false)
+    assertPosition(71, 7, exists = true)
+    assertPosition(80, 8, exists = false)
+    assertPosition(81, 8, exists = true)
+    assertPosition(90, 9, exists = false)
+    assertPosition(91, 9, exists = true)
+  }
+
+  test("test findRowIdRange") {
+    val configuration = new Configuration()
+    val schema = StructType(StructField("col", IntegerType) :: Nil)
+    val path = new Path(Utils.createTempDir().getAbsolutePath, "temp")
+    val writer = BTreeIndexRecordWriter(configuration, new ByteBufferOutputStream(), schema)
+    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    writer.setFileWriter(fileWriter)
+    // Values structure depends on BTreeUtils.generate2()
+    // Count = 150, node = 5, (1 - 59), (61 - 119), (121 - 179), (181 - 239) (241 - 299)
+    (1 to 300 by 2).map(InternalRow(_)).foreach(writer.write(null, _))
+    writer.flush()
+    fileWriter.close()
+
+    val reader = BTreeIndexRecordReader(configuration, schema)
+    reader.initialize(path, new ArrayBuffer[RangeInterval]())
+
+    // DUMMY_START <= x <= DUMMY_END
+    assert(reader.findRowIdRange(RangeInterval(
+      IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END,
+      includeStart = true, includeEnd = true)) === (0, 150))
+    // DUMMY_START < x <= Max
+    assert(reader.findRowIdRange(RangeInterval(
+      IndexScanner.DUMMY_KEY_START, InternalRow(299),
+      includeStart = true, includeEnd = true)) === (0, 150))
+    // DUMMY_START < x < Max
+    assert(reader.findRowIdRange(RangeInterval(
+      IndexScanner.DUMMY_KEY_START, InternalRow(299),
+      includeStart = true, includeEnd = false)) === (0, 149))
+    // Min <= x < DUMMY_END
+    assert(reader.findRowIdRange(RangeInterval(
+      InternalRow(1), IndexScanner.DUMMY_KEY_END,
+      includeStart = true, includeEnd = false)) === (0, 150))
+    // Min < x < DUMMY_END
+    assert(reader.findRowIdRange(RangeInterval(
+      InternalRow(1), IndexScanner.DUMMY_KEY_END,
+      includeStart = false, includeEnd = false)) === (1, 150))
+    // 2 < x <= 4 (Target not exist in values)
+    assert(reader.findRowIdRange(RangeInterval(
+      InternalRow(2), InternalRow(4), includeStart = false, includeEnd = true)) === (1, 2))
+    // 59 < x <= 119 (get the next position of target value)
+    assert(reader.findRowIdRange(RangeInterval(
+      InternalRow(59), InternalRow(119), includeStart = false, includeEnd = true)) === (30, 60))
+    // 1 < x < 1
+    assert(reader.findRowIdRange(RangeInterval(
+      InternalRow(1), InternalRow(1), includeStart = false, includeEnd = false)) === (1, 0))
+    // 1 <= x <= 1
+    assert(reader.findRowIdRange(RangeInterval(
+      InternalRow(1), InternalRow(1), includeStart = true, includeEnd = true)) === (0, 1))
   }
 }

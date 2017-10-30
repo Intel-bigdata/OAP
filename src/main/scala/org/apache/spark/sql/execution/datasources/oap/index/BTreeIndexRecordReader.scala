@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
@@ -41,21 +40,20 @@ private[index] case class BTreeIndexRecordReader(
   private var rowIdList: BTreeRowIdList = _
   private var reader: BTreeIndexFileReader = _
 
-  @transient private lazy val ordering = GenerateOrdering.create(schema)
+  private lazy val ordering = GenerateOrdering.create(schema)
+  private lazy val partialOrdering = GenerateOrdering.create(StructType(schema.dropRight(1)))
 
   def initialize(path: Path, intervalArray: ArrayBuffer[RangeInterval]): Unit = {
-
     reader = BTreeIndexFileReader(configuration, path)
     footer = BTreeFooter(reader.readFooter())
     rowIdList = BTreeRowIdList(reader.readRowIdList())
-
     internalIterator = intervalArray.toIterator.flatMap { interval =>
       val (start, end) = findRowIdRange(interval)
       (start until end).toIterator.map(rowIdList.getRowId)
     }
   }
 
-  private def findRowIdRange(interval: RangeInterval): (Int, Int) = {
+  private[index] def findRowIdRange(interval: RangeInterval): (Int, Int) = {
     val (nodeIdxForStart, isStartFound) = findNodeIdx(interval.start, isStart = true)
     val (nodeIdxForEnd, isEndFound) = findNodeIdx(interval.end, isStart = false)
 
@@ -84,17 +82,12 @@ private[index] case class BTreeIndexRecordReader(
       candidate: InternalRow,
       isStart: Boolean,
       findNext: Boolean): Int = {
-
     val node =
       BTreeNodeData(reader.readNode(footer.getNodeOffset(nodeIdx), footer.getNodeSize(nodeIdx)))
-
     val keyCount = node.getKeyCount
-
     val (pos, found) =
       binarySearch(0, keyCount, node.getKey(_, schema), candidate, rowOrdering(_, _, isStart))
-
     val keyPos = if (found && findNext) pos + 1 else pos
-
     if (keyPos == keyCount) {
       if (nodeIdx + 1 == footer.getNodesCount) footer.getRecordCount
       else {
@@ -142,10 +135,9 @@ private[index] case class BTreeIndexRecordReader(
       else if (cmp < 0) s = m + 1
       else e = m - 1
     }
+    if (!found) m = s
     (m, found)
   }
-
-  private lazy val partialOrdering = GenerateOrdering.create(StructType(schema.dropRight(1)))
 
   /**
    * Compare auxiliary function.
