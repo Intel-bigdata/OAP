@@ -24,7 +24,6 @@ import scala.collection.JavaConverters._
 
 import com.google.common.collect.ArrayListMultimap
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
@@ -36,11 +35,18 @@ import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
 import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils}
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.UTF8String
 
-private[index] class BTreeIndexRecordWriter(
+private[index] case class BTreeIndexRecordWriter(
     configuration: Configuration,
-    writer: FSDataOutputStream,
+    writer: OutputStream,
     keySchema: StructType) extends RecordWriter[Void, InternalRow] {
+
+  // TODO: Pass index file Path
+  private var fileWriter: BTreeIndexFileWriter = _
+  // Just a temp function to inject fileWriter. Since I can't change class parameter list before
+  // Code integration.
+  def setFileWriter(writer: BTreeIndexFileWriter): Unit = fileWriter = writer
 
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
 
@@ -244,9 +250,6 @@ private[index] class BTreeIndexRecordWriter(
     IndexFile.indexFileHeaderLength
   }
 
-  // TODO: Pass index file Path
-  private val fileWriter = BTreeIndexFileWriter(configuration, new Path("./temp"))
-
   /**
    * Working Flow:
    *  1. Call fileWriter.start() to write some Index Info
@@ -256,7 +259,7 @@ private[index] class BTreeIndexRecordWriter(
    *  5. Serialize footer and call fileWriter.writeFooter()
    *  5. Call fileWriter.end() to write some meta data (e.g. file offset for each section)
    */
-  private def flush(): Unit = {
+  private[index] def flush(): Unit = {
     val uniqueKeys = sortUniqueKeys()
     val treeShape = BTreeUtils.generate2(uniqueKeys.length)
     // Trick here. If root node has no child, then write root node as a child.
@@ -313,7 +316,7 @@ private[index] class BTreeIndexRecordWriter(
     uniqueKeys.foreach { key =>
       output.writeInt(keyBuffer.size())
       output.writeInt(rowPos)
-      writeBasedOnSchema(keyOutput, key, keySchema)
+      BTreeIndexRecordWriter.writeBasedOnSchema(keyOutput, key, keySchema)
       rowPos += multiHashMap.get(key).size()
     }
     buffer.toByteArray ++ keyBuffer.toByteArray
@@ -379,47 +382,47 @@ private[index] class BTreeIndexRecordWriter(
       output.writeInt(node.byteSize)
       // Min Key Pos for each Child
       output.writeInt(keyBuffer.size())
-      writeBasedOnSchema(keyOutput, node.min, keySchema)
+      BTreeIndexRecordWriter.writeBasedOnSchema(keyOutput, node.min, keySchema)
       // Max Key Pos for each Child
       output.writeInt(keyBuffer.size())
-      writeBasedOnSchema(keyOutput, node.max, keySchema)
+      BTreeIndexRecordWriter.writeBasedOnSchema(keyOutput, node.max, keySchema)
       offset += node.byteSize
     }
     buffer.toByteArray ++ keyBuffer.toByteArray
   }
+}
 
-  private def writeBasedOnSchema(
+private[index] object BTreeIndexRecordWriter {
+
+  private[index] def writeBasedOnSchema(
       writer: LittleEndianDataOutputStream, row: InternalRow, schema: StructType): Unit = {
     schema.zipWithIndex.foreach {
-      case (field, index) => writeBasedOnDataType(writer, row, field.dataType, index)
+      case (field, index) => writeBasedOnDataType(writer, row.get(index, field.dataType))
     }
   }
 
-  private def writeBasedOnDataType(
+  private[index] def writeBasedOnDataType(
       writer: LittleEndianDataOutputStream,
-      row: InternalRow,
-      dataType: DataType,
-      ordinal: Int): Unit = {
-    dataType match {
-      case BooleanType => writer.writeBoolean(row.getBoolean(ordinal))
-      case ByteType => writer.writeByte(row.getByte(ordinal))
-      case ShortType => writer.writeShort(row.getShort(ordinal))
-      case IntegerType => writer.writeInt(row.getInt(ordinal))
-      case LongType => writer.writeLong(row.getLong(ordinal))
-      case FloatType => writer.writeFloat(row.getFloat(ordinal))
-      case DoubleType => writer.writeDouble(row.getDouble(ordinal))
-      case DateType => writer.writeInt(row.getInt(ordinal))
-      case StringType =>
-        val bytes = row.getUTF8String(ordinal).getBytes
+      value: Any): Unit = {
+    value match {
+      case int: Boolean => writer.writeBoolean(int)
+      case short: Short => writer.writeShort(short)
+      case byte: Byte => writer.writeByte(byte)
+      case int: Int => writer.writeInt(int)
+      case long: Long => writer.writeLong(long)
+      case float: Float => writer.writeFloat(float)
+      case double: Double => writer.writeDouble(double)
+      case string: UTF8String =>
+        val bytes = string.getBytes
         writer.writeInt(bytes.length)
         writer.write(bytes)
-      case BinaryType =>
-        val bytes = row.getBinary(ordinal)
-        writer.writeInt(bytes.length)
-        writer.write(bytes)
-      case _ => throw new OapException("not support data type")
+      case binary: Array[Byte] =>
+        writer.writeInt(binary.length)
+        writer.write(binary)
+      case other => throw new OapException(s"not support data type $other")
     }
   }
 }
+
 private case class BTreeNodeMetaData(
     rowCount: Int, byteSize: Int, min: InternalRow, max: InternalRow)

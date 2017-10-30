@@ -23,7 +23,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
@@ -35,9 +34,9 @@ private case class BTreeIndexRecordReader(
 
   private var internalIterator: Iterator[Int] = _
 
+  import BTreeIndexRecordReader._
   private var footer: BTreeFooter = _
   private var rowIdList: BTreeRowIdList = _
-
   private var reader: BTreeIndexFileReader = _
 
   def initialize(path: Path, intervalArray: ArrayBuffer[RangeInterval]): Unit = {
@@ -70,8 +69,11 @@ private case class BTreeIndexRecordReader(
   }
 
   override def next(): Int = internalIterator.next()
+}
 
-  def readBasedOnSchema(buffer: Array[Byte], offset: Int, schema: StructType): InternalRow = {
+private[index] object BTreeIndexRecordReader {
+  private[index] def readBasedOnSchema(
+      buffer: Array[Byte], offset: Int, schema: StructType): InternalRow = {
     var pos = offset
     val values = schema.map(_.dataType).map { dataType =>
       val (value, length) = readBasedOnDataType(buffer, pos, dataType)
@@ -81,8 +83,7 @@ private case class BTreeIndexRecordReader(
     InternalRow.fromSeq(values)
   }
 
-  private def readBasedOnDataType(buffer: Array[Byte], offset: Int, dataType: DataType) = {
-
+  private[index] def readBasedOnDataType(buffer: Array[Byte], offset: Int, dataType: DataType) = {
     dataType match {
       case BooleanType =>
         (Platform.getBoolean(buffer, Platform.BYTE_ARRAY_OFFSET + offset), BooleanType.defaultSize)
@@ -118,8 +119,7 @@ private case class BTreeIndexRecordReader(
     }
   }
 
-  private case class BTreeFooter(buf: Array[Byte]) {
-
+  private[index] case class BTreeFooter(buf: Array[Byte]) {
     private val nodePosOffset = Integer.BYTES
     private val nodeSizeOffset = Integer.BYTES * 2
     private val minPosOffset = Integer.BYTES * 3
@@ -129,6 +129,12 @@ private case class BTreeIndexRecordReader(
 
     def getRecordCount: Int = Platform.getInt(buf, Platform.BYTE_ARRAY_OFFSET)
     def getNodesCount: Int = Platform.getInt(buf, Platform.BYTE_ARRAY_OFFSET + Integer.BYTES)
+    def getMaxValue(idx: Int, schema: StructType): InternalRow =
+      BTreeIndexRecordReader.readBasedOnSchema(
+        buf, getMaxValueOffset(idx), schema)
+    def getMinValue(idx: Int, schema: StructType): InternalRow =
+      BTreeIndexRecordReader.readBasedOnSchema(
+        buf, getMinValueOffset(idx), schema)
     def getMinValueOffset(idx: Int): Int =
       nodeMetaStart + nodeMetaByteSize * getNodesCount + Platform.getInt(
         buf,
@@ -147,22 +153,21 @@ private case class BTreeIndexRecordReader(
         Platform.BYTE_ARRAY_OFFSET + nodeMetaStart + idx * nodeMetaByteSize + nodeSizeOffset)
   }
 
-  private case class BTreeRowIdList(buf: Array[Byte]) {
+  private[index] case class BTreeRowIdList(buf: Array[Byte]) {
     def getRowId(idx: Int): Int =
       Platform.getInt(buf, Platform.BYTE_ARRAY_OFFSET + idx * Integer.BYTES)
   }
 
-  private case class BTreeNodeData(buf: Array[Byte]) {
+  private[index] case class BTreeNodeData(buf: Array[Byte]) {
     private val posSectionStart = Integer.BYTES
     private val posEntrySize = Integer.BYTES * 2
     private def valueSectionStart = posSectionStart + getKeyCount * posEntrySize
 
     def getKeyCount: Int = Platform.getInt(buf, Platform.BYTE_ARRAY_OFFSET)
-    def getKey(idx: Int): InternalRow = {
-      val offset =
-        valueSectionStart +
-        Platform.getInt(buf, Platform.BYTE_ARRAY_OFFSET + posSectionStart + idx * posEntrySize)
-      readBasedOnSchema(buf, offset, keySchema)
+    def getKey(idx: Int, schema: StructType): InternalRow = {
+      val offset = valueSectionStart +
+          Platform.getInt(buf, Platform.BYTE_ARRAY_OFFSET + posSectionStart + idx * posEntrySize)
+      readBasedOnSchema(buf, offset, schema)
     }
     def getRowIdPos(idx: Int): Int = Platform.getInt(
       buf, Platform.BYTE_ARRAY_OFFSET + posSectionStart + idx * posEntrySize + Integer.BYTES)
