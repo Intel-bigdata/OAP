@@ -56,8 +56,8 @@ private[index] case class BTreeIndexRecordReader(
   }
 
   private def findRowIdRange(interval: RangeInterval): (Int, Int) = {
-    val (nodeIdxForStart, isStartFound) = findChildIdx(interval.start, isStart = true)
-    val (nodeIdxForEnd, isEndFound) = findChildIdx(interval.end, isStart = false)
+    val (nodeIdxForStart, isStartFound) = findNodeIdx(interval.start, isStart = true)
+    val (nodeIdxForEnd, isEndFound) = findNodeIdx(interval.end, isStart = false)
 
     val recordCount = footer.getRecordCount
     if (nodeIdxForStart == nodeIdxForEnd && !isStartFound && !isEndFound) {
@@ -107,7 +107,13 @@ private[index] case class BTreeIndexRecordReader(
     } else node.getRowIdPos(keyPos)
   }
 
-  private def findChildIdx(candidate: InternalRow, isStart: Boolean): (Option[Int], Boolean) = {
+  /**
+   * Find the Node index contains the candidate. If no, return the first which node.max >= candidate
+   * If candidate > all node.max, return None
+   * @param isStart to indicate if the candidate is interval.start or interval.end
+   * @return Option of Node index and if candidate falls in node (means min <= candidate < max)
+   */
+  private def findNodeIdx(candidate: InternalRow, isStart: Boolean): (Option[Int], Boolean) = {
     val idxOption = (0 until footer.getNodesCount).find { idx =>
       rowOrdering(candidate, footer.getMaxValue(idx, schema), isStart) <= 0
     }
@@ -117,11 +123,14 @@ private[index] case class BTreeIndexRecordReader(
     })
   }
 
-  private def binarySearch(
+  /**
+   * Constrain: keys.last >= candidate must be true. This is guaranteed by [[findNodeIdx]]
+   * @return the first key >= candidate. (keys.last >= candidate makes this always possible)
+   */
+  private[index] def binarySearch(
       start: Int, length: Int,
-      keys: Int => Key, candidate: Key,
-      compare: (Key, Key) => Int): (Int, Boolean) = {
-
+      keys: Int => InternalRow, candidate: InternalRow,
+      compare: (InternalRow, InternalRow) => Int): (Int, Boolean) = {
     var s = 0
     var e = length - 1
     var found = false
@@ -137,7 +146,14 @@ private[index] case class BTreeIndexRecordReader(
   }
 
   private lazy val partialOrdering = GenerateOrdering.create(StructType(schema.dropRight(1)))
-  private def rowOrdering(x: InternalRow, y: InternalRow, isStart: Boolean): Int = {
+
+  /**
+   * Compare auxiliary function.
+   * @param x, y are the key to be compared.
+   *         One comes from interval.start/end. One comes from index records
+   * @param isStart indicates to compare interval.start or interval end
+   */
+  private[index] def rowOrdering(x: InternalRow, y: InternalRow, isStart: Boolean): Int = {
     if (x.numFields == y.numFields) {
       ordering.compare(x, y)
     } else if (x.numFields < y.numFields) {
