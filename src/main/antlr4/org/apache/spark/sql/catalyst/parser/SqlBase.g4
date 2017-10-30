@@ -155,6 +155,7 @@ statement
     | DROP SINDEX (IF EXISTS)? IDENTIFIER ON tableIdentifier
         partitionSpec?                                                 #oapDropIndex
     | SHOW SINDEX (FROM | IN) tableIdentifier                          #oapShowIndex
+    | CHECK SINDEX ON tableIdentifier                                  #oapCheckIndex
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
     ;
 
@@ -714,7 +715,7 @@ nonReserved
     | DESCRIBE | DROP | EXISTS | FALSE | FOR | GROUP | IN | INSERT | INTO | IS |LIKE
     | NULL | ORDER | OUTER | TABLE | TRUE | WITH | RLIKE
     | AND | CASE | CAST | DISTINCT | DIV | ELSE | END | FUNCTION | INTERVAL | MACRO | OR | STRATIFY | THEN
-    | UNBOUNDED | WHEN
+    | UNBOUNDED | WHEN | CHECK
     | DATABASE | SELECT | FROM | WHERE | HAVING | TO | TABLE | WITH | NOT | CURRENT_DATE | CURRENT_TIMESTAMP
     ;
 
@@ -804,6 +805,7 @@ USE: 'USE';
 PARTITIONS: 'PARTITIONS';
 FUNCTIONS: 'FUNCTIONS';
 DROP: 'DROP';
+CHECK: 'CHECK';
 UNION: 'UNION';
 EXCEPT: 'EXCEPT';
 SETMINUS: 'MINUS';

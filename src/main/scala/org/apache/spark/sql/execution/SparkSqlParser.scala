@@ -1459,4 +1459,10 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
     val tableName = visitTableIdentifier(ctx.tableIdentifier)
     OapShowIndex(tableName, tableName.identifier)
   }
+
+  override def visitOapCheckIndex(ctx: OapCheckIndexContext): LogicalPlan =
+    withOrigin(ctx) {
+      val tableIdentifier = visitTableIdentifier(ctx.tableIdentifier)
+      OapCheckIndex(tableIdentifier, tableIdentifier.identifier)
+    }
 }

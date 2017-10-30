@@ -71,12 +71,32 @@ private[oap] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends 
   def appendEntry(entry: BTreeIndexEntry): BTreeIndex = BTreeIndex(entries :+ entry)
 
   override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BTREE"
+
+  override def equals(other: Any): Boolean =
+    other match {
+      case that: BTreeIndex =>
+        that.entries.length == entries.length &&
+          that.entries.indices.forall(i => that.entries(i).ordinal == entries(i).ordinal)
+      case _ => false
+    }
+
+  override def hashCode(): Int = super.hashCode()
 }
 
 private[oap] case class BitMapIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): BitMapIndex = BitMapIndex(entries :+ entry)
 
   override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BITMAP"
+
+  override def equals(other: Any): Boolean =
+    other match {
+      case that: BitMapIndex =>
+        that.entries.length == entries.length &&
+          that.entries.indices.forall(i => that.entries(i) == entries(i))
+      case _ => false
+    }
+
+  override def hashCode(): Int = super.hashCode()
 }
 
 private[oap] case class TrieIndex(entry: Int) extends IndexType {
@@ -87,6 +107,16 @@ private[oap] case class HashIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): HashIndex = HashIndex(entries :+ entry)
 
   override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BITMAP"
+
+  override def equals(other: Any): Boolean =
+    other match {
+      case that: HashIndex =>
+        that.entries.length == entries.length &&
+          that.entries.indices.forall(i => that.entries(i) == entries(i))
+      case _ => false
+    }
+
+  override def hashCode(): Int = super.hashCode()
 }
 
 private[oap] class FileMeta {
