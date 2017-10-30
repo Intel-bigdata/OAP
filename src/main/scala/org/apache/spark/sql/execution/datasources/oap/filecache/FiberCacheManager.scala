@@ -65,11 +65,7 @@ object FiberCacheManager extends Logging {
   private val dataFileIdMap = new TimeStampedHashMap[String, DataFile](updateTimeStampOnGet = true)
 
   private def toByteBuffer(buf: Array[Byte]): ChunkedByteBuffer = {
-    // TODO: make it configurable
-    val cbbos = new ChunkedByteBufferOutputStream(buf.length, ByteBuffer.allocate)
-    cbbos.write(buf)
-    cbbos.close()
-    cbbos.toChunkedByteBuffer
+    new ChunkedByteBuffer(ByteBuffer.wrap(buf))
   }
 
   def fiber2Block(fiber: Fiber): BlockId = {
