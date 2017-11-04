@@ -41,7 +41,6 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     tmpDir = Utils.createTempDir()
   }
 
@@ -378,7 +377,7 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     oapDf.createOrReplaceTempView("oapt1")
 
     sql("create oindex indexA on oapt1 (a)")
-    sql("create oindex indexC on oapt1 (c)")
+    sql("create oindex indexC on oapt1 (c) using bitmap")
     sql("create oindex indexABC on oapt1 (a,b,c)")
 
     val path = new Path(
@@ -412,25 +411,25 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
     val gte = Seq(GreaterThanOrEqual(AttributeReference("a", IntegerType)(), Literal(1)))
     val gte1 = Seq(GreaterThanOrEqual(Literal(1), AttributeReference("a", IntegerType)()))
     val or1 = Seq(Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(15)),
-      EqualTo(AttributeReference("a", IntegerType)(), Literal(1))) )
+      EqualTo(AttributeReference("a", IntegerType)(), Literal(1))))
     val or2 = Seq(Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(15)),
-      LessThan(AttributeReference("a", IntegerType)(), Literal(3))) )
+      LessThan(AttributeReference("a", IntegerType)(), Literal(3))))
 
     val or3 = Seq(Or(GreaterThan(AttributeReference("c", StringType)(), Literal("A row")),
-      LessThan(AttributeReference("c", StringType)(), Literal("A row"))) )
+      LessThan(AttributeReference("c", StringType)(), Literal("A row"))))
 
     val or4 = Seq(Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(3)),
-      LessThan(AttributeReference("c", StringType)(), Literal("A row"))) )
+      LessThan(AttributeReference("c", StringType)(), Literal("A row"))))
 
     val complicated_Or = Seq(Or(GreaterThan(AttributeReference("a", IntegerType)(), Literal(50)),
       And(GreaterThan(AttributeReference("a", IntegerType)(), Literal(3)),
-        LessThan(AttributeReference("a", IntegerType)(), Literal(24)))) )
+        LessThan(AttributeReference("a", IntegerType)(), Literal(24)))))
 
     val moreComplicated_Or =
       Seq(Or(And(GreaterThan(AttributeReference("a", IntegerType)(), Literal(56)),
         LessThan(AttributeReference("a", IntegerType)(), Literal(97))),
-      And(GreaterThan(AttributeReference("a", IntegerType)(), Literal(3)),
-        LessThan(AttributeReference("a", IntegerType)(), Literal(24)))) )
+        And(GreaterThan(AttributeReference("a", IntegerType)(), Literal(3)),
+          LessThan(AttributeReference("a", IntegerType)(), Literal(24)))))
 
     // ************** Muliti-Column Search Queries**********
     val multi_column1 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
@@ -456,16 +455,16 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       LessThan(AttributeReference("c", StringType)(), Literal("A row")))
 
     val multi_column7 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
-      GreaterThan(AttributeReference("b", IntegerType)(), Literal(56)) )
+      GreaterThan(AttributeReference("b", IntegerType)(), Literal(56)))
 
     val multi_column8 = Seq(LessThan(AttributeReference("a", IntegerType)(), Literal(1)),
-      GreaterThan(AttributeReference("b", IntegerType)(), Literal(56)) )
+      GreaterThan(AttributeReference("b", IntegerType)(), Literal(56)))
 
     val multi_column9 = Seq(EqualTo(AttributeReference("b", IntegerType)(), Literal(1)),
-      GreaterThan(AttributeReference("c", StringType)(), Literal("a Row")) )
+      GreaterThan(AttributeReference("c", StringType)(), Literal("a Row")))
 
     val multi_column10 = Seq(LessThan(AttributeReference("b", IntegerType)(), Literal(1)),
-      GreaterThan(AttributeReference("c", StringType)(), Literal("a Row")) )
+      GreaterThan(AttributeReference("c", StringType)(), Literal("a Row")))
 
     val multi_column11 = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)),
       EqualTo(AttributeReference("b", IntegerType)(), Literal(56)),
@@ -487,37 +486,50 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       EqualTo(AttributeReference("c", StringType)(), Literal("A row")),
       GreaterThan(AttributeReference("a", IntegerType)(), Literal(10)))
 
-    assert(! isNotNull.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(eq.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(eq3.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(lt.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(gt.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(gt2.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(lte.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(gte.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(gte1.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(! eq2.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(or1.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(or2.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(or3.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(! or4.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(complicated_Or.exists(meta.isSupportedByIndex(_, hashSetList)))
+    // No requirement
+    assert(!isNotNull.exists(meta.isSupportedByIndex(_, None)))
+    assert(eq.exists(meta.isSupportedByIndex(_, None)))
+    assert(eq3.exists(meta.isSupportedByIndex(_, None)))
+    assert(lt.exists(meta.isSupportedByIndex(_, None)))
+    assert(gt.exists(meta.isSupportedByIndex(_, None)))
+    assert(gt2.exists(meta.isSupportedByIndex(_, None)))
+    assert(lte.exists(meta.isSupportedByIndex(_, None)))
+    assert(gte.exists(meta.isSupportedByIndex(_, None)))
+    assert(gte1.exists(meta.isSupportedByIndex(_, None)))
+    assert(!eq2.exists(meta.isSupportedByIndex(_, None)))
+    assert(or1.exists(meta.isSupportedByIndex(_, None)))
+    assert(or2.exists(meta.isSupportedByIndex(_, None)))
+    assert(or3.exists(meta.isSupportedByIndex(_, None)))
+    assert(!or4.exists(meta.isSupportedByIndex(_, None)))
+    assert(complicated_Or.exists(meta.isSupportedByIndex(_, None)))
     assert(
-      moreComplicated_Or.exists(meta.isSupportedByIndex(_, hashSetList))
+      moreComplicated_Or.exists(meta.isSupportedByIndex(_, None))
     )
-    assert(multi_column1.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column2.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column3.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column4.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column5.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column6.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column7.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column8.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column9.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column10.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column11.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column12.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column13.exists(meta.isSupportedByIndex(_, hashSetList)))
-    assert(multi_column14.exists(meta.isSupportedByIndex(_, hashSetList)))
+    assert(multi_column1.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column2.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column3.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column4.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column5.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column6.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column7.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column8.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column9.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column10.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column11.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column12.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column13.exists(meta.isSupportedByIndex(_, None)))
+    assert(multi_column14.exists(meta.isSupportedByIndex(_, None)))
+
+    // check requirements.
+    val indexRequirement: IndexType = BTreeIndex()
+    // btree metrics, bitmap index should fail
+    assert(eq.exists(meta.isSupportedByIndex(_, Some(indexRequirement))))
+    assert(!gt2.exists(meta.isSupportedByIndex(_, Some(indexRequirement))))
+
+    val multiRequirements: Seq[IndexType] = Seq(BTreeIndex(), BitMapIndex())
+    assert(
+      multi_column6.zip(multiRequirements)
+        .map(x => meta.isSupportedByIndex(x._1, Some(x._2))).reduce(_ && _))
+
   }
 }

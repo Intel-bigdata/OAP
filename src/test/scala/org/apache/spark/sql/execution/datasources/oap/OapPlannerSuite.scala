@@ -37,7 +37,6 @@ class OapPlannerSuite
   sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
-    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val path1 = Utils.createTempDir().getAbsolutePath
     val path2 = Utils.createTempDir().getAbsolutePath
     val path3 = Utils.createTempDir().getAbsolutePath
@@ -209,6 +208,30 @@ class OapPlannerSuite
     val baseDF = sql(sqlString)
 
     checkAnswer(baseDF, oapDF)
+
+    sql("drop oindex index1 on oap_fix_length_schema_table")
+  }
+
+  test("index selection") {
+    spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
+    val data = (1 to 300).map{ i =>
+      (i % 101, i % 37)
+    }
+    val dataRDD = spark.sparkContext.parallelize(data, 10)
+
+    dataRDD.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_fix_length_schema_table select * from t")
+    sql("create oindex index1 on oap_fix_length_schema_table (a)")
+    sql("create oindex index2 on oap_fix_length_schema_table (b)")
+    sql("create oindex index3 on oap_fix_length_schema_table (a, b)")
+
+    val sqlString =
+      "SELECT * " +
+        "FROM oap_fix_length_schema_table " +
+        "where a = 5 and b > 20 "
+
+    sql(sqlString).collect.map(println(_))
+
 
     sql("drop oindex index1 on oap_fix_length_schema_table")
   }

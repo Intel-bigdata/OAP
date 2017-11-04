@@ -36,7 +36,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   private var currentPath: String = _
 
   override def beforeEach(): Unit = {
-    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     sqlContext.conf.setConf(SQLConf.OAP_ENABLE_TRIE_OVER_BTREE, false)
     val path = Utils.createTempDir().getAbsolutePath
     currentPath = path

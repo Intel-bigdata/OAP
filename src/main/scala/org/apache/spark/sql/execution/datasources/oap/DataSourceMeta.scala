@@ -21,7 +21,6 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.{ArrayBuffer, BitSet}
-import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
@@ -29,7 +28,6 @@ import org.apache.hadoop.fs._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFile
 import org.apache.spark.sql.types._
-
 
 /**
  * The Oap meta file is organized in the following format.
@@ -61,16 +59,71 @@ import org.apache.spark.sql.types._
  *
  */
 
-private[oap] trait IndexType
+private[oap] trait IndexType {
+  final val INDEX_METRICS_KEY_ORDER = 0
+  final val INDEX_METRICS_KEY_GROUP = 1
+  final val INDEX_METRICS_KEY_ITERABLE = 2
+  final val INDEX_METRICS_KEY_EXISTENCE = 4
+  final val INDEX_METRICS_TOTAL_NUMBER = 8
+
+  // A metrics BitSet
+  //    0 1 2 3 4 5 6 7
+  //    X X X X X X X X
+  //    | | | | Reserved
+  //    | | | |
+  //    | | | |
+  //    | | | |
+  //    | | | +> Quick check key's existence.
+  //    | | +> Key value is iterable in index.
+  //    | +> Key is organized in group.
+  //    +> Key is stored in order.
+  def metrics: BitSet = BitSet.fromBitMask(Array(0))
+
+  // if index is sorted index. hash-based index unset this.
+  // metrics.set(INDEX_METRICS_KEY_ORDER)
+
+  // if index is scanned in group.
+  // a special case is index is built in group, but scan is not.
+  // metrics.set(INDEX_METRICS_KEY_GROUP)
+
+  // if key value is needed.
+  // sometimes a range based index may not store all keys in index.
+  // TODO: index scan does not return key, enable in future.
+  // metrics.set(INDEX_METRICS_KEY_ITERABLE)
+
+  // if support fast existence check.
+  // metrics.set(INDEX_METRICS_KEY_EXISTENCE)
+
+  // Get index sort direction if INDEX_METRICS_KEY_ORDER is true.
+  def indexOrder: Seq[SortDirection] = Seq.empty
+
+  def satisfy(requirements: Option[IndexType]): Boolean = requirements match {
+    case Some(r) => metrics.equals(r.metrics)
+    case _ => true // No requirements.
+  }
+}
 
 private[oap] case class BTreeIndexEntry(ordinal: Int, dir: SortDirection = Ascending) {
   override def toString: String = ordinal + " " + (if (dir == Ascending) "ASC" else "DESC")
 }
 
 private[oap] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends IndexType {
-  def appendEntry(entry: BTreeIndexEntry): BTreeIndex = BTreeIndex(entries :+ entry)
+  def appendEntry(entry: BTreeIndexEntry): BTreeIndex = {
+    BTreeIndex(entries :+ entry)
+  }
 
   override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BTREE"
+
+  override def indexOrder : Seq[SortDirection] = {
+    if (entries.nonEmpty) {
+      entries.map(_.dir)
+    } else {
+      Nil
+    }
+  }
+
+  override def metrics: BitSet =
+    BitSet.fromBitMask(Array(INDEX_METRICS_KEY_ORDER | INDEX_METRICS_KEY_GROUP))
 }
 
 private[oap] case class BitMapIndex(entries: Seq[Int] = Nil) extends IndexType {
@@ -134,7 +187,8 @@ private[oap] class IndexMeta(
 
   override def toString: String = name + ": " + indexType
 
-  private def writeBitSet(value: BitSet, totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {
+  private def writeBitSet(
+      value: BitSet, totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {
     val sizeBefore = out.size
     value.toBitMask.foreach(out.writeLong)
     val sizeWritten = out.size - sizeBefore
@@ -295,15 +349,29 @@ private[oap] case class DataSourceMeta(
     dataReaderClassName: String,
     @transient fileHeader: FileHeader) extends Serializable {
 
-  def isSupportedByIndex(exp: Expression,
-      hashSetList: mutable.ListBuffer[mutable.HashSet[String]]): Boolean = {
-    val bTreeSet: mutable.HashSet[String] = hashSetList(0)
-    val bitmapSet: mutable.HashSet[String] = hashSetList(1)
+    def isSupportedByIndex(
+      exp: Expression,
+      requirements: Option[IndexType] = None): Boolean = {
     var attr: String = null
     def checkInMetaSet(attrRef: AttributeReference): Boolean = {
       if (attr ==  null || attr == attrRef.name) {
+        var idx = 0
         attr = attrRef.name
-        bTreeSet.contains(attr) || bitmapSet.contains(attr)
+        var isSupported = false
+        while(idx < indexMetas.length && !isSupported) {
+          isSupported = indexMetas(idx).indexType match {
+            case index @ BTreeIndex(entries) =>
+              schema(entries.head.ordinal).name == attr && index.satisfy(requirements)
+            case index @ BitMapIndex(entries) =>
+              entries.map(ordinal =>
+                  schema(ordinal).name).contains(attr) && index.satisfy(requirements)
+            case index @ TrieIndex(entry) =>
+              schema(entry).name.contains(attr) && index.satisfy(requirements)
+            case _ => false// we don't support other types of index
+          }
+          idx += 1
+        }
+        isSupported
       } else false
     }
 

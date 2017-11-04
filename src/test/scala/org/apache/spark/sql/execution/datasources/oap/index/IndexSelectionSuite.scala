@@ -41,7 +41,6 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
   sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
-    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     sqlContext.conf.setConf(SQLConf.OAP_ENABLE_TRIE_OVER_BTREE, false)
     val data = (1 to 300).map(i => (i, i + 100, i + 200, i + 300, s"this is row $i"))
     val df = sparkContext.parallelize(data, 3).toDF("a", "b", "c", "d", "e")

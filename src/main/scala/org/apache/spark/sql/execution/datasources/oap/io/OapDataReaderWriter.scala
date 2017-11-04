@@ -195,78 +195,55 @@ private[oap] class OapDataReader(
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
-
     val start = System.currentTimeMillis()
+
     filterScanner match {
       case Some(fs) if fs.existRelatedIndexFile(path, conf) =>
         val indexPath = IndexUtils.indexFileFromDataFile(path, fs.meta.name, fs.meta.time)
-
         val initFinished = System.currentTimeMillis()
-        val statsAnalyseResult = tryToReadStatistics(indexPath, conf)
-        val statsAnalyseFinished = System.currentTimeMillis()
 
-        val indexFileSize = indexPath.getFileSystem(conf).getContentSummary(indexPath).getLength
-        val dataFileSize = path.getFileSystem(conf).getContentSummary(path).getLength
-        val isTesting = conf.getBoolean(SQLConf.OAP_IS_TESTING.key,
-                              SQLConf.OAP_IS_TESTING.defaultValue.get)
         val enableOIndex = conf.getBoolean(SQLConf.OAP_ENABLE_OINDEX.key,
           SQLConf.OAP_ENABLE_OINDEX.defaultValue.get)
-        val isAscending = options.getOrElse(
-          OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY, "false").toBoolean
-        val limit = options.getOrElse(OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY, "0").toInt
 
-        if (options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)) {
-          fs.setScanNumLimit(
-            options(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY).toInt
-          )
-        }
+        val useIndex = enableOIndex && canUseIndex(indexPath, conf)
+        val indexPolicyCheckFinished = System.currentTimeMillis()
 
-        val forceIndexScan: Boolean = limit > 0 ||
-          options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY) ||
-          options.contains(OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY)
+        // Below is for OAP developers to easily analyze and compare performance without removing
+        // the index after it's created.
+        val iter = if (!useIndex) {
+          logWarning("OAP index is skipped. Set below flags to force enable index,\n" +
+            "sqlContext.conf.setConfString(SQLConf.OAP_USE_INDEX_FOR_DEVELOPERS.key, true) or \n" +
+            "sqlContext.conf.setConfString(SQLConf.OAP_EXECUTOR_INDEX_SELECTION.key, false)")
+          fileScanner.iterator(conf, requiredIds)
+        } else {
+          val isAscending = options.getOrElse(
+            OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY, "false").toBoolean
+          val limit = options.getOrElse(OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY, "0").toInt
 
-        // Once index is disabled, there is no way to do index optimized query.
-        // OapStrategy should aware of this and create a non-fast query plan.
-        assert((!enableOIndex && forceIndexScan) == false)
-
-        val iter =
-          // Below is for OAP developers to easily analyze and compare performance without removing
-          // the index after it's created.
-          if (!enableOIndex) {
-            logWarning("OAP index is disabled. Using below approach to enable index,\n" +
-              "sqlContext.conf.setConfString(SQLConf.OAP_USE_INDEX_FOR_DEVELOPERS.key, true)")
-            fileScanner.iterator(conf, requiredIds)
-          } else if (!forceIndexScan && indexFileSize > dataFileSize * 0.7 && !isTesting) {
-            logWarning(s"Index File size $indexFileSize B is too large comparing " +
-                        s"to Data File Size $dataFileSize. Using Data File Scan instead.")
-            fileScanner.iterator(conf, requiredIds)
-          } else {
-            statsAnalyseResult match {
-              case StaticsAnalysisResult.FULL_SCAN if !forceIndexScan =>
-                fileScanner.iterator(conf, requiredIds)
-              case StaticsAnalysisResult.USE_INDEX =>
-                fs.initialize(path, conf)
-                // total Row count can be get from the filter scanner
-                val rowIDs = {
-                  if (limit > 0) {
-                    if (isAscending) fs.toArray.take(limit)
-                    else fs.toArray.reverse.take(limit)
-                  }
-                  else fs.toArray
-                }
-
-                OapIndexInfo.partitionOapIndex.put(path.toString(), true)
-                logInfo("Partition File " + path.toString() + " will use OAP index.\n")
-                fileScanner.iterator(conf, requiredIds, rowIDs)
-              case StaticsAnalysisResult.SKIP_INDEX =>
-                Iterator.empty
-            }
+          if (options.contains(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY)) {
+            fs.setScanNumLimit(
+              options(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY).toInt
+            )
           }
+
+          fs.initialize(path, conf)
+          // total Row count can be get from the filter scanner
+          val rowIDs = {
+            if (limit > 0) {
+              if (isAscending) fs.toArray.take(limit)
+              else fs.toArray.reverse.take(limit)
+            }
+            else fs.toArray
+          }
+          OapIndexInfo.partitionOapIndex.put(path.toString(), true)
+          logInfo("Partition File " + path.toString() + " will use OAP index.\n")
+          fileScanner.iterator(conf, requiredIds, rowIDs)
+        }
 
         val iteratorFinished = System.currentTimeMillis()
         logDebug("Load Index: " + (initFinished - start) + "ms")
-        logDebug("Load Stats: " + (statsAnalyseFinished - initFinished) + "ms")
-        logDebug("Construct Iterator: " + (iteratorFinished - statsAnalyseFinished) + "ms")
+        logDebug("Load Stats: " + (indexPolicyCheckFinished - initFinished) + "ms")
+        logDebug("Construct Iterator: " + (iteratorFinished - indexPolicyCheckFinished) + "ms")
         iter
       case _ =>
         logDebug("No index file exist for data file: " + path)
@@ -276,6 +253,37 @@ private[oap] class OapDataReader(
         logDebug("Construct Iterator: " + (iteratorFinished - start) + "ms")
 
         iter
+    }
+  }
+
+  /**
+   * Executor chooses to use index or not according to policies.
+   *  1. OAP_EXECUTOR_INDEX_SELECTION is enabled.
+   *  2. Statistics info recommends index scan.
+   *  3. Considering about file I/O, index file size should be less
+   *     than data file.
+   *  4. TODO: add more.
+   *
+   * @param indexPath: index file path.
+   * @param conf: configurations
+   * @return Boolean to indicate if executor chooses to use index.
+   */
+  private def canUseIndex(indexPath: Path, conf: Configuration): Boolean = {
+    if (conf.getBoolean(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key,
+        SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.defaultValue.get)) {
+      // Index selection is enabled, executor chooses index according to policy.
+      // Get statistics info.
+      val statsAnalyseResult = tryToReadStatistics(indexPath, conf)
+
+      // Get file size info
+      val indexFileSize = indexPath.getFileSystem(conf).getContentSummary(indexPath).getLength
+      val dataFileSize = path.getFileSystem(conf).getContentSummary(path).getLength
+
+      statsAnalyseResult == StaticsAnalysisResult.USE_INDEX &&
+        indexFileSize <= dataFileSize * 0.7
+    } else {
+      // Index selection is disabled, executor always uses index.
+      true
     }
   }
 

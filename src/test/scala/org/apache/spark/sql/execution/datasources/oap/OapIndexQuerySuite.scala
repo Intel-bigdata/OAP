@@ -32,7 +32,6 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
   sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
-    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     val path1 = Utils.createTempDir().getAbsolutePath
 
     sql(s"""CREATE TEMPORARY VIEW oap_test_1 (a INT, b STRING)

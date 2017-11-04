@@ -33,15 +33,24 @@ import org.apache.spark.sql.execution.aggregate.OapAggUtils
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.joins.BuildRight
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.Utils
 
 trait OapStrategies extends Logging {
 
-  def oapStrategies: Seq[Strategy] =
+  def oapStrategies: Seq[Strategy] = {
+    // If executor index selection (EIS) is enabled, oapStrategies are disabled.
+    // TODO: a profile to control those which can be applied even if EIS is enabled.
+    val conf = SparkSession.getActiveSession.get.sessionState.conf
+    if (conf.getConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION)) {
+      Nil
+    } else {
       OapSortLimitStrategy ::
       // Disable semi join temporarily. TODO: Move scan number logic into IndexScanner
       // OapSemiJoinStrategy ::
       OapGroupAggregateStrategy :: Nil
+    }
+  }
 
   /**
    * Plans special cases of orderby+limit operators.

@@ -715,19 +715,19 @@ object SQLConf {
       .booleanConf
       .createWithDefault(true)
 
-  val OAP_IS_TESTING =
-    SQLConfigBuilder("spark.sql.oap.testing")
-      .internal()
-      .doc("To indicate if the test is ongoing")
-      .booleanConf
-      .createWithDefault(false)
-
   val OAP_ENABLE_OINDEX =
     SQLConfigBuilder("spark.sql.oap.oindex.enabled")
       .internal()
       .doc("To indicate to enable/disable oindex for developers even if the index file is there")
       .booleanConf
       .createWithDefault(true)
+
+  val OAP_ENABLE_EXECUTOR_INDEX_SELECTION =
+    SQLConfigBuilder("spark.sql.oap.oindex.cbo.enabled")
+      .internal()
+      .doc("To indicate if enable/disable index cbo which helps to choose a fast query path")
+      .booleanConf
+      .createWithDefault(false)
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"

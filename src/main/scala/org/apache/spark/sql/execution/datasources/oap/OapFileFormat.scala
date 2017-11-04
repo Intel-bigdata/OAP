@@ -19,7 +19,6 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import java.net.URI
 
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
@@ -31,7 +30,7 @@ import org.apache.parquet.hadoop.util.SerializationUtil
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, JoinedRow}
+import org.apache.spark.sql.catalyst.expressions.{Expression, JoinedRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateOrdering, GenerateUnsafeProjection}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
@@ -275,43 +274,30 @@ private[sql] class OapFileFormat extends FileFormat
     }
   }
 
-  private def indexHashSetList = {
-    assert(meta.isDefined)
-    val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
-    val bTreeIndexAttrSet = new mutable.HashSet[String]()
-    val bitmapIndexAttrSet = new mutable.HashSet[String]()
-    var idx = 0
-    val m = meta.get
-    while(idx < m.indexMetas.length) {
-      m.indexMetas(idx).indexType match {
-        case BTreeIndex(entries) =>
-          bTreeIndexAttrSet.add(m.schema(entries.head.ordinal).name)
-        case BitMapIndex(entries) =>
-          entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
-        case _ => // we don't support other types of index
+  /**
+   * Check if index satisfies strategies' requirements.
+   *
+   * @param expressions: Index expressions.
+   * @param requiredTypes: Required index metrics by optimization strategies.
+   * @return
+   */
+  def hasAvailableIndex(
+      expressions: Seq[Expression],
+      requiredTypes: Seq[IndexType] = Nil
+  ): Boolean = {
+    if (expressions.nonEmpty && sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX)) {
+      meta match {
+        case Some(m) if requiredTypes.isEmpty =>
+          expressions.map(m.isSupportedByIndex(_, None)).reduce(_ && _)
+        case Some(m) if requiredTypes.length == expressions.length =>
+          expressions.zip(requiredTypes).map{ x =>
+            val expression = x._1
+            val requirement = Some(x._2)
+            m.isSupportedByIndex(expression, requirement)
+          }.reduce(_ && _)
+        case _ => false
       }
-      idx += 1
-    }
-    hashSetList.append(bTreeIndexAttrSet)
-    hashSetList.append(bitmapIndexAttrSet)
-    hashSetList
-  }
-
-  def hasAvailableIndex(expressions: Seq[Expression]): Boolean = {
-    meta match {
-      case Some(m) if sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX) =>
-        expressions.exists(m.isSupportedByIndex(_, indexHashSetList))
-      case _ => false
-    }
-  }
-
-  def hasAvailableIndex(attributes: AttributeSet): Boolean = {
-    meta match {
-      case Some(m) if sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX) =>
-        attributes.map{attr =>
-          indexHashSetList.map(_.contains(attr.name)).reduce(_ || _)}.reduce(_ && _)
-      case _ => false
-    }
+    } else false
   }
 }
 

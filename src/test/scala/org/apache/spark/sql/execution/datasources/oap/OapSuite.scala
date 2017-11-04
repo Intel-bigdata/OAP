@@ -19,15 +19,11 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import java.io.File
 
+import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfter
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
-
 import org.apache.spark.scheduler.SparkListenerOapIndexInfoUpdate
-import org.apache.spark.SparkConf
 import org.apache.spark.sql._
-import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io.{OapIndexInfo, OapIndexInfoStatus}
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataReader
@@ -48,7 +44,6 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    sqlContext.conf.setConf(SQLConf.OAP_IS_TESTING, true)
     path = Utils.createTempDir()
     path.delete()
     parquetPath = Utils.createTempDir()
