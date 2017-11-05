@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
+import org.apache.spark.unsafe.types.UTF8String
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -91,7 +93,28 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
               availableIndexes.append((entries.indexOf(entry), meta.indexMetas(idx)) )
             }
           }
+        case TrieIndex(entry) =>
+          if (intervalMap.contains(meta.schema(entry).name)) {
+            availableIndexes.append((0, meta.indexMetas(idx)) )
+          }
         case other => // TODO support other types of index
+      }
+      idx += 1
+    } // end while
+    availableIndexes.foreach(indices =>
+      logDebug("\t" + indices._2.toString + "; lastIdx: " + indices._1))
+  }
+
+  def selectAvailableIndex2(attr: String): Unit = {
+    logDebug("Selecting Available Index for string ops:")
+    var idx = 0
+    while (idx < meta.indexMetas.length) {
+      meta.indexMetas(idx).indexType match {
+        case TrieIndex(entry) =>
+          if (meta.schema(entry).name.equals(attr)) {
+            availableIndexes.append((0, meta.indexMetas(idx)) )
+          }
+        case other =>
       }
       idx += 1
     } // end while
@@ -145,9 +168,20 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
     (lastIdx, bestIndexer)
   }
 
-  def buildScanner(lastIdx: Int, bestIndexer: IndexMeta, intervalMap:
-  mutable.HashMap[String, ArrayBuffer[RangeInterval]]): Unit = {
-    //    intervalArray.sortWith(compare)
+  def buildScanner2(pattern: Array[Byte]): Unit = {
+    // TODO make sure available
+    scanner = new TrieScanner(availableIndexes.head._2)
+    scanner.pattern = pattern
+    logDebug("Index Scanner Intervals: " + scanner.intervalArray.mkString(", "))
+    getBestIndexer(0)
+    val keySchema = new StructType().add(meta.schema(1))
+    scanner.withKeySchema(keySchema)
+  }
+
+  def buildScanner(
+    lastIdx: Int, bestIndexer: IndexMeta,
+    intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]]): Unit = {
+    // intervalArray.sortWith(compare)
     logDebug("Building Index Scanner with IndexMeta and IntervalMap ...")
 
     if (lastIdx == -1 && bestIndexer == null) return

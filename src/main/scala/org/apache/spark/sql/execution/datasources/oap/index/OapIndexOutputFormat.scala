@@ -60,9 +60,8 @@ private[index] class OapIndexOutputFormat extends FileOutputFormat[Void, Interna
       val writer = file.getFileSystem(configuration).create(file, true)
       new BitmapIndexRecordWriter(configuration, writer, schema)
     } else if (indexType == "PERMUTERM") {
-      // use BTree temporary
-      val writer = BTreeIndexFileWriter(configuration, file)
-      new BTreeIndexRecordWriter(configuration, writer, schema)
+      val writer = file.getFileSystem(configuration).create(file, true)
+      new PermutermIndexRecordWriter(configuration, writer, schema)
     } else {
       throw new OapException("Unknown Index Type: " + indexType)
     }

@@ -152,6 +152,14 @@ private[sql] class OapFileFormat extends FileFormat
               if (attr ==  null || attr == attribute) {attr = attribute; true} else false
             case In(attribute, _) =>
               if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case StringLike(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case StringStartsWith(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case StringEndsWith(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case StringContains(attribute, _) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
             case _ => true
           }
 
@@ -232,6 +240,7 @@ private[sql] class OapFileFormat extends FileFormat
           if (supportFilters.nonEmpty) {
             // determine whether we can use index
             supportFilters.foreach(filter => logDebug("\t" + filter.toString))
+            // TODO implement decoration chain here
             ScannerBuilder.build(supportFilters, ic)
           }
         }
@@ -280,6 +289,7 @@ private[sql] class OapFileFormat extends FileFormat
     val hashSetList = new mutable.ListBuffer[mutable.HashSet[String]]()
     val bTreeIndexAttrSet = new mutable.HashSet[String]()
     val bitmapIndexAttrSet = new mutable.HashSet[String]()
+    val trieIndexAttrSet = new mutable.HashSet[String]()
     var idx = 0
     val m = meta.get
     while(idx < m.indexMetas.length) {
@@ -288,10 +298,14 @@ private[sql] class OapFileFormat extends FileFormat
           bTreeIndexAttrSet.add(m.schema(entries.head.ordinal).name)
         case BitMapIndex(entries) =>
           entries.map(ordinal => m.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
+        case TrieIndex(entry) =>
+          trieIndexAttrSet.add(m.schema(entry).name)
         case _ => // we don't support other types of index
       }
       idx += 1
     }
+    // TODO take priority elsewhere to use trie for string search
+    hashSetList.append(trieIndexAttrSet)
     hashSetList.append(bTreeIndexAttrSet)
     hashSetList.append(bitmapIndexAttrSet)
     hashSetList

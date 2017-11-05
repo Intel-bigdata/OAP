@@ -211,7 +211,7 @@ private[oap] class CurrentKey(node: IndexNode, keyIdx: Int, valueIdx: Int, index
 }
 
 private [oap] class RangeInterval(s: Key, e: Key, includeStart: Boolean, includeEnd: Boolean)
-  extends Serializable{
+  extends Serializable {
   var start = s
   var end = e
   var startInclude = includeStart

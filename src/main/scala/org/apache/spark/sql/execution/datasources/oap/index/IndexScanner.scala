@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
+import org.apache.spark.unsafe.types.UTF8String
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -45,6 +47,7 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
   @transient protected var ordering: Ordering[Key] = _
   var intervalArray: ArrayBuffer[RangeInterval] = _
   protected var keySchema: StructType = _
+  var pattern: Array[Byte] = _
 
   /**
    * Scan N items from each index entry.
@@ -113,8 +116,9 @@ private[oap] object ScannerBuilder extends Logging {
     leftMap
   }
 
-  def optimizeFilterBound(filter: Filter, ic: IndexContext)
-  : mutable.HashMap[String, ArrayBuffer[RangeInterval]] = {
+  def optimizeFilterBound(
+    filter: Filter,
+    ic: IndexContext): mutable.HashMap[String, ArrayBuffer[RangeInterval]] = {
     filter match {
       case And(leftFilter, rightFilter) =>
         val leftMap = optimizeFilterBound(leftFilter, ic)
@@ -152,6 +156,25 @@ private[oap] object ScannerBuilder extends Logging {
     }
   }
 
+  def optimizeStringConditions(filter: Filter, ic: IndexContext): (String, Array[Byte]) = {
+    // TODO support multiple string conditions AND/OR
+    // TODO put "\u0003" in val, including in PermutermUtil
+    // TODO string equals
+    filter match {
+      case StringLike(attribute, pattern) =>
+        // TODO support "%a%b%" by find the longest match
+        // TODO support "?"
+        (attribute, null)
+      case StringStartsWith(attribute, begin) =>
+        (attribute, UTF8String.fromString("\u0003" + begin).getBytes)
+      case StringEndsWith(attribute, end) =>
+        (attribute, UTF8String.fromString(end + "\u0003").getBytes)
+      case StringEndsWith(attribute, str) =>
+        (attribute, UTF8String.fromString(str).getBytes)
+      case _ => ("", null)
+    }
+  }
+
   // return whether a Filter predicate can be supported by our current work
   def canSupport(filter: Filter, ic: IndexContext): Boolean = {
     filter match {
@@ -163,6 +186,10 @@ private[oap] object ScannerBuilder extends Logging {
       case Or(ic(indexer), _) => true
       case And(ic(indexer), _) => true
       case In(ic(indexer), _) => true
+      case StringContains(ic(indexer), _) => true
+      case StringStartsWith(ic(indexer), _) => true
+      case StringEndsWith(ic(indexer), _) => true
+      case StringLike(ic(indexer), _) => true
       case _ => false
     }
   }
@@ -178,6 +205,7 @@ private[oap] object ScannerBuilder extends Logging {
         else if (rightMap == null || rightMap.isEmpty) leftMap
         else combineIntervalMaps(leftMap, rightMap, ic, needMerge = true)
     )
+    val filtersForString = filters.map(optimizeStringConditions(_, ic)).filter(_._2 != null)
 
     if (intervalMap.nonEmpty) {
       intervalMap.foreach(intervals =>
@@ -186,8 +214,13 @@ private[oap] object ScannerBuilder extends Logging {
       ic.selectAvailableIndex(intervalMap)
       val (num, idxMeta) = ic.getBestIndexer(intervalMap.size)
       ic.buildScanner(num, idxMeta, intervalMap)
+    } else if (filtersForString.length == 1) {
+      val (attr, pattern) = filtersForString.head
+      ic.selectAvailableIndex2(attr)
+      ic.buildScanner2(pattern)
     }
 
+    // TODO seems useless?
     filters.filterNot(canSupport(_, ic))
   }
 

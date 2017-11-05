@@ -19,7 +19,6 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.SparkConf
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
@@ -59,7 +58,7 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
       assert(dfWithoutIdx.count == dfOriginal.count)
   }
 
-  test("index row boundary") {
+  test("btree index row boundary") {
     val groupSize = 1024 // use a small row group to check boundary.
 
     val testRowId = groupSize - 1
@@ -73,5 +72,18 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
       Row(testRowId, s"this is test $testRowId") :: Nil)
 
     sql("drop oindex index1 on oap_test_1")
+  }
+
+  test("permuterm index") {
+    val data: Seq[(Int, String)] =
+      scala.util.Random.shuffle(1 to 20).map(i => (i, s"test$i")).seq.toSeq
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test_1 select * from t")
+    sql("create oindex index2 on oap_test_1 (b)")
+
+    checkAnswer(sql(s"SELECT * FROM oap_test_1 WHERE b like 'test2%'"),
+      Row(2, s"test2") :: Row(20, s"test20") :: Nil)
+
+    sql("drop oindex index2 on oap_test_1")
   }
 }

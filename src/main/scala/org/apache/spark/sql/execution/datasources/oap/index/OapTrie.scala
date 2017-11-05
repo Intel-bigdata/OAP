@@ -43,6 +43,50 @@ private[oap] trait TrieNode {
   }
 }
 
+/**
+ * A File-based Trie node. The first int is combined of node Key (1-byte, this is because we
+ * are using UTF-8 encoding in spark) and child count (2-byte, a total of 4-byte since it's up
+ * to 256 and align to 4) of the trie node, then an int indicating rowIdsPointer of this node,
+ * -1 if there's no options. Then [child count] * [child offset of file(int, 4 bytes)] is written.
+ * Note those children should be ordered in ascii ascending order to enable bisection method.
+ * @param buffer the total area of data
+ * @param intOffset offset of this node in the file stored
+ */
+private[oap] case class UnsafeTrie(
+    buffer: ChunkedByteBuffer,
+    page: Int,
+    intOffset: Int,
+    dataEnd: Long) extends TrieNode with UnsafeIndexTree {
+  def offset: Long = intOffset.toLong
+  private lazy val firstInt: Int = Platform.getInt(baseObj, baseOffset + offset)
+  // def nodeKey: Byte = Platform.getShort(baseObj, baseOffset + offset).toByte
+  def nodeKey: Byte = (firstInt >> 16).toByte
+  // def childCount: Int = Platform.getShort(baseObj, baseOffset + offset + 2)
+  def childCount: Int = firstInt & 0xFFFF
+  def canTerminate: Boolean = rowIdsPointer >= 0
+  def rowIdsPointer: Int = Platform.getInt(baseObj, baseOffset + offset + 4)
+  def children: Seq[TrieNode] = (0 until childCount).map(childAt)
+  def childAt(idx: Int): TrieNode =
+    UnsafeTrie(buffer,
+      Platform.getInt(baseObj, baseOffset + offset + 8 + idx * 8 + 4),
+      Platform.getInt(baseObj, baseOffset + offset + 8 + idx * 8), dataEnd)
+  def allPointers: Seq[Int] = if (canTerminate) {
+    rowIdsPointer +: children.flatMap(_.allPointers)
+  } else {
+    children.flatMap(_.allPointers)
+  }
+  override def length: Int = 8 + 8 * childCount
+  override val baseOffset = super.baseOffset + dataEnd
+}
+
+private[oap] case class UnsafeIds(buffer: ChunkedByteBuffer, offset: Long) extends UnsafeIndexTree {
+  def count: Int = Platform.getInt(baseObj, baseOffset + offset)
+  def apply(id: Int): Int = {
+    assert(id < count && id >= 0, id)
+    Platform.getInt(baseObj, baseOffset + offset + 4 * id + 4)
+  }
+}
+
 case class TriePointer(page: Int, offset: Int)
 
 private[oap] case class InMemoryTrie(
