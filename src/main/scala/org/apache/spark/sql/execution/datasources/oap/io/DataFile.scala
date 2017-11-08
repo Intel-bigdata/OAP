@@ -69,4 +69,10 @@ private[oap] object DataFile {
 abstract class DataFileHandle {
   def fin: FSDataInputStream
   def len: Long
+
+  def close: Unit = {
+    if (fin != null) {
+      fin.close
+    }
+  }
 }

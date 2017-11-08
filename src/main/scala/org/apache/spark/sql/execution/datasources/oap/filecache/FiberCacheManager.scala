@@ -24,8 +24,8 @@ import scala.collection.mutable
 
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.{SparkConf, SparkEnv}
+
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
@@ -35,7 +35,7 @@ import org.apache.spark.storage.{BlockId, FiberBlockId, StorageLevel}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.TimeStampedHashMap
 import org.apache.spark.util.collection.BitSet
-import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
+import org.apache.spark.util.io.ChunkedByteBuffer
 
 
 // TODO need to register within the SparkContext
@@ -198,7 +198,7 @@ private[oap] object DataFileHandleCacheManager extends Logging {
         override def onRemoval(n: RemovalNotification[ENTRY, DataFileHandle])
         : Unit = {
           logDebug(s"Evicting Data File Handle ${n.getKey.path}")
-          n.getValue.fin.close()
+          n.getValue.close
         }
       })
       .build[ENTRY, DataFileHandle](new CacheLoader[ENTRY, DataFileHandle]() {
