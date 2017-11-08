@@ -52,13 +52,14 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelp
  */
 class OapReadSupportImpl extends ReadSupport[UnsafeRow] with Logging {
 
+  private val readSupportHelper = new ParquetReadSupportHelper
 
   /**
    * Called on executor side before [[prepareForRead()]] and instantiating actual Parquet record
    * readers.  Responsible for figuring out Parquet requested schema used for column pruning.
    */
   override def init(context: InitContext): ReadContext = {
-    ParquetReadSupportHelper.init(context)
+    readSupportHelper.init(context)
   }
 
   /**
@@ -71,7 +72,7 @@ class OapReadSupportImpl extends ReadSupport[UnsafeRow] with Logging {
                                keyValueMetaData: JMap[String, String],
                                fileSchema: MessageType,
                                readContext: ReadContext): RecordMaterializer[UnsafeRow] = {
-    ParquetReadSupportHelper.prepareForRead(conf, keyValueMetaData, fileSchema, readContext)
+    readSupportHelper.prepareForRead(conf, keyValueMetaData, fileSchema, readContext)
   }
 }
 
