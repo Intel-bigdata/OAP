@@ -276,7 +276,9 @@ private[oap] class OapDataReader(
       // Policy 1: index file size < data file size.
       val indexFileSize = indexPath.getFileSystem(conf).getContentSummary(indexPath).getLength
       val dataFileSize = path.getFileSystem(conf).getContentSummary(path).getLength
-      indexFileSize <= dataFileSize * 0.7
+      val ratio = conf.getDouble(SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
+        SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
+      indexFileSize <= dataFileSize * ratio
 
       // Policy 2: statistics tells the scan cost
       // TODO: Get statistics info after statistics is enabled.

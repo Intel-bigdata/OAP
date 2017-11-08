@@ -723,11 +723,18 @@ object SQLConf {
       .createWithDefault(true)
 
   val OAP_ENABLE_EXECUTOR_INDEX_SELECTION =
-    SQLConfigBuilder("spark.sql.oap.oindex.cbo.enabled")
+    SQLConfigBuilder("spark.sql.oap.oindex.eis.enabled")
       .internal()
       .doc("To indicate if enable/disable index cbo which helps to choose a fast query path")
       .booleanConf
       .createWithDefault(false)
+
+  val OAP_INDEX_FILE_SIZE_MAX_RATIO =
+    SQLConfigBuilder("spark.sql.oap.oindex.size.ratio")
+      .internal()
+      .doc("To indicate if enable/disable index cbo which helps to choose a fast query path")
+      .doubleConf
+      .createWithDefault(0.7)
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
