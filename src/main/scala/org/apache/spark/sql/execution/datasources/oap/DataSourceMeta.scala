@@ -21,10 +21,8 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.{ArrayBuffer, BitSet}
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
-
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFile
 import org.apache.spark.sql.types._
@@ -115,7 +113,7 @@ private[oap] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends 
 
   override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BTREE"
 
-  override def indexOrder : Seq[SortDirection] = {
+  override def indexOrder: Seq[SortDirection] = {
     if (entries.nonEmpty) {
       entries.map(_.dir)
     } else {
@@ -285,7 +283,7 @@ private[oap] object IndexMeta {
   final val HASH_INDEX_TYPE = 2
   final val TRIE_INDEX_TYPE = 3
 
-  def apply() : IndexMeta = new IndexMeta()
+  def apply(): IndexMeta = new IndexMeta()
   def apply(name: String, time: String, indexType: IndexType): IndexMeta = {
     val indexMeta = new IndexMeta()
     indexMeta.name = name
@@ -349,29 +347,23 @@ private[oap] case class DataSourceMeta(
     dataReaderClassName: String,
     @transient fileHeader: FileHeader) extends Serializable {
 
-    def isSupportedByIndex(
-      exp: Expression,
-      requirements: Option[IndexType] = None): Boolean = {
+    def isSupportedByIndex(exp: Expression, requirements: Option[IndexType] = None): Boolean = {
     var attr: String = null
     def checkInMetaSet(attrRef: AttributeReference): Boolean = {
       if (attr ==  null || attr == attrRef.name) {
-        var idx = 0
         attr = attrRef.name
-        var isSupported = false
-        while(idx < indexMetas.length && !isSupported) {
-          isSupported = indexMetas(idx).indexType match {
+        indexMetas.exists{
+          _.indexType match {
             case index @ BTreeIndex(entries) =>
               schema(entries.head.ordinal).name == attr && index.satisfy(requirements)
             case index @ BitMapIndex(entries) =>
               entries.map(ordinal =>
-                  schema(ordinal).name).contains(attr) && index.satisfy(requirements)
+                schema(ordinal).name).contains(attr) && index.satisfy(requirements)
             case index @ TrieIndex(entry) =>
               schema(entry).name.contains(attr) && index.satisfy(requirements)
-            case _ => false// we don't support other types of index
+            case _ => false
           }
-          idx += 1
         }
-        isSupported
       } else false
     }
 
@@ -508,7 +500,7 @@ private[oap] object DataSourceMeta {
     indexMetas
   }
 
-  private def readSchema(fileHeader: FileHeader, in: FSDataInputStream) : StructType = {
+  private def readSchema(fileHeader: FileHeader, in: FSDataInputStream): StructType = {
     in.seek(FILE_META_START_OFFSET + FILE_META_LENGTH * fileHeader.dataFileCount +
       INDEX_META_LENGTH * fileHeader.indexCount)
     StructType.fromString(in.readUTF())
@@ -577,7 +569,7 @@ private[oap] object DataSourceMeta {
     }
   }
 
-  def newBuilder() : DataSourceMetaBuilder = {
+  def newBuilder(): DataSourceMetaBuilder = {
     new DataSourceMetaBuilder
   }
 }

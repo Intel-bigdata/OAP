@@ -272,15 +272,18 @@ private[oap] class OapDataReader(
     if (conf.getBoolean(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key,
         SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.defaultValue.get)) {
       // Index selection is enabled, executor chooses index according to policy.
-      // Get statistics info.
-      val statsAnalyseResult = tryToReadStatistics(indexPath, conf)
 
-      // Get file size info
+      // Policy 1: index file size < data file size.
       val indexFileSize = indexPath.getFileSystem(conf).getContentSummary(indexPath).getLength
       val dataFileSize = path.getFileSystem(conf).getContentSummary(path).getLength
+      indexFileSize <= dataFileSize * 0.7
 
-      statsAnalyseResult == StaticsAnalysisResult.USE_INDEX &&
-        indexFileSize <= dataFileSize * 0.7
+      // Policy 2: statistics tells the scan cost
+      // TODO: Get statistics info after statistics is enabled.
+      // val statsAnalyseResult = tryToReadStatistics(indexPath, conf)
+      // statsAnalyseResult == StaticsAnalysisResult.USE_INDEX
+
+      // More Policies
     } else {
       // Index selection is disabled, executor always uses index.
       true
