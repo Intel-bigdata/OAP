@@ -93,7 +93,7 @@ private[oap] trait IndexType {
   def metrics: BitSet = BitSet.fromBitMask(Array(0))
 
   // Get index sort direction if INDEX_METRICS_KEY_ORDER is true.
-  def indexOrder: Seq[SortDirection] = Seq.empty
+  def indexOrder: Seq[SortDirection] = Nil
 
   // Check if this index matches the required index metrics.
   def satisfy(requirements: Option[IndexType]): Boolean = requirements match {
