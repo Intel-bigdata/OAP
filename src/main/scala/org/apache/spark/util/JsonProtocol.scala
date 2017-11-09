@@ -102,6 +102,8 @@ private[spark] object JsonProtocol {
         throw new MatchError(blockUpdated)  // TODO(ekl) implement this
       case customInfoUpdate: SparkListenerCustomInfoUpdate =>
         throw new MatchError(customInfoUpdate)  // TODO to implement this
+      case customInfoUpdate: SparkListenerOapIndexInfoUpdate =>
+        throw new MatchError(customInfoUpdate)  // TODO to implement this
       case _ => parse(mapper.writeValueAsString(event))
     }
   }
