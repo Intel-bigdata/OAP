@@ -627,4 +627,17 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       "b='10' or (b = '20' and a in (10,20,30))"),
       Row(10, "10") :: Row(20, "20") :: Nil)
   }
+
+  test("test parquet inner join") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i / 10, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create oindex index1 on parquet_test (a)")
+
+    checkAnswer(sql("select t2.a, sum(t2.b) " +
+      "from (select a from parquet_test where a = 3 ) t1 " +
+      "inner join parquet_test t2 on t1.a = t2.a " +
+      "group by t2.a"),
+      Row(3, 3450.0) :: Nil)
+  }
 }

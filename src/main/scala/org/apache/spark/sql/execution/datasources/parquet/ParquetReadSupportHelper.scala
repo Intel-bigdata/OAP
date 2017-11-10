@@ -27,7 +27,7 @@ import org.apache.parquet.schema.MessageType
 
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 
-object ParquetReadSupportHelper {
+class ParquetReadSupportHelper {
 
   val readSupport = new ParquetReadSupport
 
@@ -39,6 +39,10 @@ object ParquetReadSupportHelper {
                       fileSchema: MessageType,
                       readContext: ReadContext): RecordMaterializer[UnsafeRow]
   = readSupport.prepareForRead(conf, keyValueMetaData, fileSchema, readContext)
+
+}
+
+object ParquetReadSupportHelper {
 
   val SPARK_ROW_REQUESTED_SCHEMA = ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA
 
