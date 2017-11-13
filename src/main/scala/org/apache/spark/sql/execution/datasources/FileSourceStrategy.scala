@@ -114,13 +114,13 @@ object FileSourceStrategy extends Strategy with Logging {
           } else {
             logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
             _fsRelation.fileFormat.initialize(_fsRelation.sparkSession, _fsRelation.options,
-              selectedPartitions.flatMap(p => p.files).toSeq)
+              selectedPartitions.flatMap(p => p.files))
             _fsRelation
           }
 
         case _: FileFormat =>
           _fsRelation.fileFormat.initialize(_fsRelation.sparkSession, _fsRelation.options,
-            selectedPartitions.flatMap(p => p.files).toSeq)
+            selectedPartitions.flatMap(p => p.files))
           _fsRelation
       }
 
