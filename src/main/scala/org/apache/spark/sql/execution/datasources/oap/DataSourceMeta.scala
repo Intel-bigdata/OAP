@@ -394,8 +394,6 @@ private[oap] case class DataSourceMeta(
         checkInMetaSet(attrRef)
       case In(attrRef: AttributeReference, _) =>
         checkInMetaSet(attrRef)
-      case IsNotNull(attrRef: AttributeReference) =>
-        checkInMetaSet(attrRef)
       case _ => false
     }
 

@@ -288,9 +288,9 @@ private[sql] class OapFileFormat extends FileFormat
     if (expressions.nonEmpty && sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX)) {
       meta match {
         case Some(m) if requiredTypes.isEmpty =>
-          expressions.forall(m.isSupportedByIndex(_, None))
+          expressions.exists(m.isSupportedByIndex(_, None))
         case Some(m) if requiredTypes.length == expressions.length =>
-          expressions.zip(requiredTypes).forall{ x =>
+          expressions.zip(requiredTypes).exists{ x =>
             val expression = x._1
             val requirement = Some(x._2)
             m.isSupportedByIndex(expression, requirement)
