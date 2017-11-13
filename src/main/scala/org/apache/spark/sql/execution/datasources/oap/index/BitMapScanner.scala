@@ -16,7 +16,6 @@
  */
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import java.io.{ByteArrayInputStream, ObjectInputStream}
 import java.nio.ByteBuffer
 
 import scala.collection.mutable
@@ -27,7 +26,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap
 import org.roaringbitmap.buffer.MutableRoaringBitmap
-import sun.nio.ch.DirectBuffer
 
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.InternalRow
@@ -70,7 +68,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   private var bmEntryListCache: CacheResult = _
   private var bmEntryListBuffer: Array[Byte] = _
 
-  @transient private var bmRowIdIterator: Iterator[Integer] = Iterator[Integer]()
+  @transient private var bmRowIdIterator: Iterator[Integer] = _
   private var empty: Boolean = _
 
   override def hasNext: Boolean = {

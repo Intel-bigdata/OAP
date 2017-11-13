@@ -67,7 +67,7 @@ private[index] class PermutermIndexRecordWriter(
     var i = 0
     var fileOffset = 0
     val offsetMap = new java.util.HashMap[UTF8String, Int]()
-    fileOffset += writeHead(writer, IndexFile.INDEX_VERSION)
+    fileOffset += IndexUtils.writeHead(writer, IndexFile.INDEX_VERSION)
     // write data segment.
     while (i < partitionUniqueSize) {
       offsetMap.put(uniqueKeys(i), fileOffset)
@@ -116,14 +116,6 @@ private[index] class PermutermIndexRecordWriter(
     var length = 0
     trieNode.children.foreach(length += writeTrie(writer, _, treeMap))
     length + writer.writeNode(trieNode, treeMap)
-  }
-
-  private def writeHead(writer: OutputStream, version: Int): Int = {
-    writer.write("OAPIDX".getBytes("UTF-8"))
-    assert(version <= 65535)
-    val data = Array((version >> 8).toByte, (version & 0xFF).toByte)
-    writer.write(data)
-    IndexFile.indexFileHeaderLength
   }
 }
 

@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
@@ -33,7 +34,17 @@ import org.apache.spark.unsafe.types.UTF8String
  * Utils for Index read/write
  */
 private[oap] object IndexUtils {
-  // TODO remove this and corresponding test
+
+  def writeHead(writer: OutputStream, version: Int): Int = {
+    val headerContent = "OAPIDX"
+    writer.write(headerContent.getBytes("UTF-8"))
+    assert(version <= 65535)
+    val versionData = Array((version >> 8).toByte, (version & 0xFF).toByte)
+    writer.write(versionData)
+    assert((headerContent.length + versionData.size) == IndexFile.indexFileHeaderLength)
+    IndexFile.indexFileHeaderLength
+  }
+
   def writeInt(out: OutputStream, v: Int): Unit = {
     out.write((v >>>  0) & 0xFF)
     out.write((v >>>  8) & 0xFF)

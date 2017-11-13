@@ -44,15 +44,9 @@ private case class BTreeIndexFileWriter(
 
   private var rowIdListSize = 0
   private var footerSize = 0
-  private def writeVersion(version: Int): Unit = {
-    writer.write("OAPIDX".getBytes("UTF-8"))
-    assert(version <= 65535)
-    val data = Array((version >> 8).toByte, (version & 0xFF).toByte)
-    writer.write(data)
-  }
 
   def start(): Unit = {
-    writeVersion(IndexFile.INDEX_VERSION)
+    IndexUtils.writeHead(writer, IndexFile.INDEX_VERSION)
   }
 
   def writeNode(buf: Array[Byte]): Unit = {

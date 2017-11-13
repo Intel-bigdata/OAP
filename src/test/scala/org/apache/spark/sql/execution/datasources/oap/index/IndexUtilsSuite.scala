@@ -22,8 +22,9 @@ import java.io.{ByteArrayOutputStream, DataOutputStream}
 import org.apache.hadoop.fs.Path
 import org.junit.Assert._
 
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
+import org.apache.spark.SparkFunSuite
+import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.unsafe.Platform
 
 class IndexUtilsSuite extends SparkFunSuite with Logging {
@@ -82,5 +83,16 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
         new Path("/path/to/"),
         new Path("/path/to/_temp/2/"),
         ".t1.ABC.index1.index").toString)
+  }
+
+  test("writeHead to write common and consistent index version to all the index file headers") {
+    val buf = new ByteArrayOutputStream(8)
+    val out = new DataOutputStream(buf)
+    IndexUtils.writeHead(out, IndexFile.INDEX_VERSION)
+    val bytes = buf.toByteArray
+    assert(Platform.getByte(bytes, Platform.BYTE_ARRAY_OFFSET + 6) ==
+      (IndexFile.INDEX_VERSION >> 8).toByte)
+    assert(Platform.getByte(bytes, Platform.BYTE_ARRAY_OFFSET + 7) ==
+      (IndexFile.INDEX_VERSION & 0xFF).toByte)
   }
 }

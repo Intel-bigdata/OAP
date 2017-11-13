@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import java.io.{ByteArrayOutputStream, DataOutputStream, ObjectOutputStream, OutputStream}
+import java.io.{ByteArrayOutputStream, DataOutputStream, OutputStream}
 
 import scala.collection.mutable
 import scala.collection.immutable
@@ -158,22 +158,12 @@ private[oap] class BitmapIndexRecordWriter(
   private def flushToFile(): Unit = {
     val statisticsManager = new StatisticsManager
     statisticsManager.initialize(BitMapIndexType, keySchema, configuration)
-    writeHead(writer, IndexFile.INDEX_VERSION)
+    IndexUtils.writeHead(writer, IndexFile.INDEX_VERSION)
     writeUniqueKeyList()
     writeBmEntryList()
     writeBmOffsetList()
     // The index end is also the starting position of stats file.
     statisticsManager.write(writer)
     writeBmFooter()
-  }
-
- // TODO: below are common for both BTree and Bitmap indexes. It can be abstracted into IndexWriter.
-  private def writeHead(writer: OutputStream, version: Int): Unit = {
-    val headerContent = "OAPIDX"
-    writer.write(headerContent.getBytes("UTF-8"))
-    assert(version <= 65535)
-    val versionData = Array((version >> 8).toByte, (version & 0xFF).toByte)
-    writer.write(versionData)
-    assert((headerContent.length + versionData.size) == IndexFile.indexFileHeaderLength)
   }
 }
