@@ -212,11 +212,15 @@ private[oap] class OapDataReader(
           }
           fs.initialize(path, conf)
           // total Row count can be get from the filter scanner
-          if (limit > 0) {
+          val rowIds = if (limit > 0) {
             if (isAscending) fs.toArray.take(limit)
             else fs.toArray.reverse.take(limit)
           }
           else fs.toArray
+
+          // Parquet reader does not support backward scan, so rowIds must be sorted.
+          if (meta.dataReaderClassName contains("ParquetDataFile")) rowIds.sorted
+          else rowIds
         }
         val start = System.currentTimeMillis()
         val iter = fileScanner.iterator(conf, requiredIds, getRowIds(options))
