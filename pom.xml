@@ -40,6 +40,7 @@
     <spark.version>2.1.0</spark.version>
     <spark.internal.version>2.1.0</spark.internal.version>
     <jetty.version>9.2.16.v20160414</jetty.version>
+    <hadoop-common.version>2.7.3</hadoop-common.version>
   </properties>
 
   <repositories>
@@ -303,6 +304,12 @@
       <artifactId>RoaringBitmap</artifactId>
       <version>0.6.51</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <version>${hadoop-common.version}</version>
+      <scope>compile</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -514,8 +521,49 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.8</version>
+        <executions>
+          <execution>
+            <id>build-native</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <tasks>
+                <property name="native.src.dir" value="${basedir}/src/main/native"/>
+                <property name="build.native.target" value="${project.build.outputDirectory}/com/intel/compression/native/lib/${os.name}/${os.arch}"/>
+                <mkdir dir="${build.native.target}"/>
+                <exec dir="${native.src.dir}" executable="make" failonerror="true">
+                <env key="JAVA_HOME" value="${java.home}/.." />
+                </exec>
+                <copy todir="${build.native.target}" file="${native.src.dir}/libIntelCompressionCodec.so"/>
+              </tasks>
+            </configuration>
+          </execution>
+          <execution>
+            <id>clean-native</id>
+            <phase>clean</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <tasks>
+                <property name="native.src.dir" value="${basedir}/src/main/native"/>
+                <exec dir="${native.src.dir}" executable="make" failonerror="true">
+                  <arg value="clean" />
+                </exec>
+              </tasks>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
     </plugins>
-    
+
   </build>
 
 </project>

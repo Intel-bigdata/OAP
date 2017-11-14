@@ -85,6 +85,26 @@ Compression Codec - Choose compression type for OAP data files.
 
 Refer to [OAP User guide](https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide) for more details.
 
+## How to enable Zstd codec
+1. Download the latest Zstandard source code from https://github.com/facebook/zstd
+2. Build the Zstandard library by `make` in the root directory, it will generate `libzstd.so` in the `lib` sub directory
+3. To enable Spark shuffle compression using zstd codec, put below configurations to _$SPARK_HOME/conf/spark-defaults.conf_
+```
+spark.io.compression.codec          com.intel.compression.spark.ZstdCompressionCodec
+spark.executor.extraClassPath       ./oap-<version>.jar
+spark.driver.extraClassPath         /path/to/oap-dir/oap-0.2.0.jar
+spark.executor.extraLibraryPath     /path/to/libzstd.so
+spark.driver.extraLibraryPath       /path/to/libzstd.so
+```
+### How to enable Zstd AVX-512 support
+If you want to use the feature of the AVX-512 to accelerate the zstd codec, please update your gcc to version 7.1 and build the zstd with `CFLAGS="-O3 -march=skylake-avx512" make`, the following is a simply benchmark report run on `Xeon(R) Platinum 8170 CPU @ 2.10GHz`  
+```
+./zstd-avx512 -b1 COPYING 
+1#COPYING           :     18091 ->      7419 (2.438), 196.6 MB/s , 723.6 MB/s 
+./zstd-gcc-7.1 -b1 COPYING 
+1#COPYING           :     18091 ->      7419 (2.438), 190.9 MB/s , 695.8 MB/s
+```
+
 ## How to Contribute
 If you are looking for some ideas on what to contribute, check out GitHub issues for this project labeled ["Pick me up!"](https://github.com/Intel-bigdata/OAP/issues?labels=pick+me+up%21&state=open).
 Comment on the issue with your questions and ideas.
