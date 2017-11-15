@@ -208,4 +208,20 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
     ScannerBuilder.build(filters, ic)
     assertIndexer(ic, 3, "idxACD", 2)
   }
+
+  test("Bitmap Scanner only supports equal query.") {
+    sql("create oindex idxa on oap_test(a) USING BITMAP")
+    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val ic = new IndexContext(oapMeta)
+    val nonEqualFilters: Array[Filter] = Array(
+      Or(And(GreaterThan("a", 9), LessThan("a", 14)),
+        And(GreaterThan("a", 23), LessThan("a", 166)))
+    )
+    ScannerBuilder.build(nonEqualFilters, ic)
+    // Non equal filters won't build BitmapScanner.
+    assert(ic.getScanner == None)
+    val equalFilters: Array[Filter] = Array(Or(EqualTo("a", 14), EqualTo("b", 166)))
+    ScannerBuilder.build(equalFilters, ic)
+    assert(ic.getScanner.get.isInstanceOf[BitMapScanner])
+  }
 }

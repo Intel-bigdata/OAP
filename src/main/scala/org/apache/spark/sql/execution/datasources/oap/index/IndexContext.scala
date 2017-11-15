@@ -187,17 +187,29 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
 
         } // end for
       case BitMapIndex(entries) =>
-        keySchema = new StructType().add(meta.schema(entries(lastIdx)))
-        scanner = BitMapScanner(bestIndexer)
         val attribute = meta.schema(entries(lastIdx)).name
         val filterOptimizer = unapply(attribute).get
-        scanner.intervalArray =
+        val sortedIntervalArray =
           intervalMap(attribute).sortWith(filterOptimizer.compareRangeInterval)
+        val singleValueIntervalArray =
+          sortedIntervalArray.filter(filterOptimizer.isSingleValueInterval)
+        // Make sure that each interval is really equal query.
+        singleValueIntervalArray.foreach(interval => {
+          assert(interval.start == interval.end)
+        })
+        if (singleValueIntervalArray.nonEmpty) {
+          keySchema = new StructType().add(meta.schema(entries(lastIdx)))
+          scanner = BitMapScanner(bestIndexer)
+          logDebug("Bitmap index only supports equal query.")
+          scanner.intervalArray = singleValueIntervalArray
+        }
       case _ =>
     }
 
-    logDebug("Index Scanner Intervals: " + scanner.intervalArray.mkString(", "))
-    scanner.withKeySchema(keySchema)
+    if (scanner != null && keySchema != null) {
+      logDebug("Index Scanner Intervals: " + scanner.intervalArray.mkString(", "))
+      scanner.withKeySchema(keySchema)
+    }
   }
 
   def unapply(attribute: String): Option[FilterOptimizer] = {
@@ -223,6 +235,9 @@ private[oap] object DummyIndexContext extends IndexContext(null) {
 
 private[oap] class FilterOptimizer(keySchema: StructType) {
   val order = GenerateOrdering.create(keySchema)
+
+  def isSingleValueInterval(interval: RangeInterval): Boolean =
+    interval.start == interval.end && interval.startInclude && interval.endInclude
 
   // compare two intervals
   def compareRangeInterval(interval1: RangeInterval, interval2: RangeInterval): Boolean = {
