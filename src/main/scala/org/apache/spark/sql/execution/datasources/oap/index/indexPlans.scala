@@ -107,6 +107,7 @@ case class CreateIndex(
               s"""Index $indexName exists on ${identifier.getOrElse(parent)}""")
           } else {
             logWarning(s"Dup index name $indexName")
+            return Nil
           }
         }
         if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)

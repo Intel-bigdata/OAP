@@ -165,5 +165,28 @@ class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       new Configuration()).globStatus(new Path(path,
       "oap_partition_table/b=2/c=c2/*.index")).length != 0)
   }
+
+  test("create duplicated name index") {
+    val data: Seq[(Int, String)] = (1 to 100).map { i => (i, s"this is test $i") }
+    val df = data.toDF("a", "b")
+    val pathDir = Utils.createTempDir().getAbsolutePath
+    df.write.format("oap").mode(SaveMode.Overwrite).save(pathDir)
+    val oapDf = spark.read.format("oap").load(pathDir)
+    oapDf.createOrReplaceTempView("t")
+    sql("create oindex idxa on t (a)")
+    val path = new Path(pathDir)
+    val fs = path.getFileSystem(sparkContext.hadoopConfiguration)
+    val indexFiles1 = fs.listStatus(path).collect { case fileStatus if fileStatus.isFile &&
+      fileStatus.getPath.getName.endsWith(OapFileFormat.OAP_INDEX_EXTENSION) =>
+        fileStatus.getPath.getName
+    }
+
+    sql("create oindex if not exists idxa on t (a)")
+    val indexFiles2 = fs.listStatus(path).collect { case fileStatus if fileStatus.isFile &&
+      fileStatus.getPath.getName.endsWith(OapFileFormat.OAP_INDEX_EXTENSION) =>
+      fileStatus.getPath.getName
+    }
+    assert(indexFiles1 === indexFiles2)
+  }
 }
 
