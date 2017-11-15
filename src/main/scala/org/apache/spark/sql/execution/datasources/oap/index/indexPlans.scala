@@ -242,12 +242,13 @@ case class DropIndex(
             val oldMeta = m.get
             val existsIndexes = oldMeta.indexMetas
             val existsData = oldMeta.fileMetas
-            if (!existsIndexes.exists(_.name == indexName)) {
+            if (existsIndexes.forall(_.name != indexName)) {
               if (!allowNotExists) {
                 throw new AnalysisException(
                   s"""Index $indexName does not exist on ${identifier.getOrElse(parent)}""")
               } else {
                 logWarning(s"drop non-exists index $indexName")
+                return Nil
               }
             }
             if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)
