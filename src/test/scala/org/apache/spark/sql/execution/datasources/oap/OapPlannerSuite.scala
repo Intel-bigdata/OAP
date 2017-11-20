@@ -130,7 +130,7 @@ class OapPlannerSuite
 
     dataRDD1.toDF("key", "value").createOrReplaceTempView("t1")
     sql("insert overwrite table oap_distinct_opt_table select * from t1")
-    sql("create oindex index1 on oap_distinct_opt_table (a)")
+    sql("create oindex index1 on oap_distinct_opt_table (a) using bitmap")
 
     checkKeywordsExist(
       sql("explain SELECT * " +

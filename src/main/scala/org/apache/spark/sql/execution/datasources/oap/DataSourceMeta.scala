@@ -21,6 +21,7 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.{ArrayBuffer, BitSet}
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 import org.apache.spark.sql.catalyst.expressions._
@@ -57,7 +58,7 @@ import org.apache.spark.sql.types._
  *
  */
 
-private[oap] trait IndexType {
+trait IndexType {
 
   // Bit is set if index is sorted index. hash-based index unset this.
   // Once this bit is on, indexOrder should be called to check direction.
@@ -106,7 +107,7 @@ private[oap] case class BTreeIndexEntry(ordinal: Int, dir: SortDirection = Ascen
   override def toString: String = ordinal + " " + (if (dir == Ascending) "ASC" else "DESC")
 }
 
-private[oap] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends IndexType {
+case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends IndexType {
   def appendEntry(entry: BTreeIndexEntry): BTreeIndex = {
     BTreeIndex(entries :+ entry)
   }
@@ -125,13 +126,13 @@ private[oap] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends 
     BitSet.fromBitMask(Array(INDEX_METRICS_KEY_ORDER_BIT_MASK | INDEX_METRICS_KEY_GROUP_BIT_MASK))
 }
 
-private[oap] case class BitMapIndex(entries: Seq[Int] = Nil) extends IndexType {
+case class BitMapIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): BitMapIndex = BitMapIndex(entries :+ entry)
 
   override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BITMAP"
 }
 
-private[oap] case class HashIndex(entries: Seq[Int] = Nil) extends IndexType {
+case class HashIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): HashIndex = HashIndex(entries :+ entry)
 
   override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BITMAP"
@@ -337,7 +338,7 @@ private[oap] case class DataSourceMeta(
     dataReaderClassName: String,
     @transient fileHeader: FileHeader) extends Serializable {
 
-    def isSupportedByIndex(exp: Expression, requirements: Option[IndexType] = None): Boolean = {
+    def isSupportedByIndex(exp: Expression, requirement: Option[IndexType] = None): Boolean = {
     var attr: String = null
     def checkInMetaSet(attrRef: AttributeReference): Boolean = {
       if (attr ==  null || attr == attrRef.name) {
@@ -345,10 +346,16 @@ private[oap] case class DataSourceMeta(
         indexMetas.exists{
           _.indexType match {
             case index @ BTreeIndex(entries) =>
-              schema(entries.head.ordinal).name == attr && index.satisfy(requirements)
+              schema(entries.head.ordinal).name == attr && index.satisfy(requirement)
             case index @ BitMapIndex(entries) =>
               entries.map(ordinal =>
+<<<<<<< 3f8c00e23ed5a56ceda076d05f87369583c9dc5a
                 schema(ordinal).name).contains(attr) && index.satisfy(requirements)
+=======
+                schema(ordinal).name).contains(attr) && index.satisfy(requirement)
+            case index @ TrieIndex(entry) =>
+              schema(entry).name.contains(attr) && index.satisfy(requirement)
+>>>>>>> Add index requirement check on oapStrategies.
             case _ => false
           }
         }

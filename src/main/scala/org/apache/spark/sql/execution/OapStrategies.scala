@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.aggregate.OapAggUtils
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
+import org.apache.spark.sql.execution.datasources.oap.{BitMapIndex, BTreeIndex, IndexType, OapFileFormat}
 import org.apache.spark.sql.execution.joins.BuildRight
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.Utils
@@ -45,9 +45,11 @@ trait OapStrategies extends Logging {
     if (conf.getConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION)) {
       Nil
     } else {
+      // BtreeIndex applicable strategies.
       OapSortLimitStrategy ::
-      // Disable semi join temporarily. TODO: Move scan number logic into IndexScanner
-      // OapSemiJoinStrategy ::
+      // BitMapIndex applicable strategies.
+      OapSemiJoinStrategy ::
+      // No requirement.
       OapGroupAggregateStrategy :: Nil
     }
   }
@@ -106,9 +108,10 @@ trait OapStrategies extends Logging {
             (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
           val indexHint = if (filters.nonEmpty) filters
             else IsNotNull(orderAttributes.head) :: Nil
+          val indexRequirement = indexHint.map(_ => BTreeIndex())
 
-          createOapFileScanPlan(
-            projectList, filters, relation, file, table, oapOption, indexHint) match {
+          createOapFileScanPlan(projectList, filters,
+            relation, file, table, oapOption, indexHint, indexRequirement) match {
             case Some(fastScan) =>
               OapOrderLimitFileScanExec(
                 limit, order, projectList,
@@ -165,17 +168,14 @@ trait OapStrategies extends Logging {
           (filterAttributes.isEmpty || filterAttributes == orderAttributes)) {
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY -> "1"))
-
           val indexHint = if (filters.nonEmpty) filters
             else IsNotNull(orderAttributes.head) :: Nil
+          val indexRequirement = indexHint.map(_ => BitMapIndex())
 
-          createOapFileScanPlan(
-            projectList, filters, relation, file, table, oapOption, indexHint) match {
+          createOapFileScanPlan(projectList, filters, relation, file,
+            table, oapOption, indexHint, indexRequirement) match {
             case Some(fastScan) =>
-              OapDistinctFileScanExec(
-                scanNumber = 1,
-                projectList,
-                fastScan)
+              OapDistinctFileScanExec(scanNumber = 1, projectList, fastScan)
             case None => PlanLater(child)
           }
         } else PlanLater(child)
@@ -255,7 +255,7 @@ trait OapStrategies extends Logging {
           else IsNotNull(groupingAttributes.head) :: Nil
 
         createOapFileScanPlan(
-          projectList, indexHint, relation, file, table, oapOption, indexHint) match {
+          projectList, indexHint, relation, file, table, oapOption, indexHint, Nil) match {
           case Some(fastScan) =>
             OapAggregationFileScanExec(
               aggExpressions,
@@ -280,7 +280,8 @@ trait OapStrategies extends Logging {
       _fsRelation: HadoopFsRelation,
       table: Option[CatalogTable],
       oapOption: Map[String, String],
-      indexHint: Seq[Expression]): Option[SparkPlan] = {
+      indexHint: Seq[Expression],
+      indexRequirements: Seq[IndexType]): Option[SparkPlan] = {
     // Filters on this relation fall into four categories based
     // on where we can use them to avoid
     // reading unneeded data:
@@ -324,7 +325,8 @@ trait OapStrategies extends Logging {
         _fsRelation
     }
 
-    if (fsRelation.fileFormat.asInstanceOf[OapFileFormat].hasAvailableIndex(normalizedIndexHint)) {
+    if (fsRelation.fileFormat.asInstanceOf[OapFileFormat]
+      .hasAvailableIndex(normalizedIndexHint, indexRequirements)) {
       val dataColumns =
         l.resolve(fsRelation.dataSchema, fsRelation.sparkSession.sessionState.analyzer.resolver)
 

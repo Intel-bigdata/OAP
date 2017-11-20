@@ -18,8 +18,8 @@
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.scalatest.BeforeAndAfterEach
-
 import org.apache.spark.SparkConf
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
@@ -39,7 +39,7 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b STRING)
             | USING oap
             | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY VIEW oap_test_date (a INT, b DATE)
+    sql(s"""CREATE TEMPORARY VIEW oap_test_date (a INT, b STRING)
             | USING oap
             | OPTIONS (path '$path')""".stripMargin)
     sql(s"""CREATE TEMPORARY VIEW parquet_test (a INT, b STRING)

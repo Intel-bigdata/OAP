@@ -208,7 +208,7 @@ private[oap] class OapDataReader(
           val sameOrder =
             !((indexScanner.meta.indexType.indexOrder.head == Ascending) ^ isAscending)
 
-          // total Row count can be get from the filter scanner
+          // total Row count can be get from the index scanner
           val limit = options.getOrElse(OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY, "0").toInt
           val rowIds = if (limit > 0) {
             if (sameOrder) indexScanner.take(limit).toArray
