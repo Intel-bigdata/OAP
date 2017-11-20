@@ -19,10 +19,9 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
-import org.apache.spark.sql.catalyst.expressions.JoinedRow
+import org.apache.spark.sql.catalyst.expressions.{Ascending, JoinedRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.types.StructType
@@ -51,7 +50,7 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
     scanner = null
   }
 
-  def selectAvailableIndex(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]])
+  private def selectAvailableIndex(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]])
   : Unit = {
     logDebug("Selecting Available Index:")
     var idx = 0
@@ -145,8 +144,11 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
     (lastIdx, bestIndexer)
   }
 
-  def buildScanner(lastIdx: Int, bestIndexer: IndexMeta, intervalMap:
-  mutable.HashMap[String, ArrayBuffer[RangeInterval]]): Unit = {
+  def buildScanner(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]],
+      options: Map[String, String] = Map.empty): Unit = {
+    selectAvailableIndex(intervalMap)
+    val (lastIdx, bestIndexer) = getBestIndexer(intervalMap.size)
+
     //    intervalArray.sortWith(compare)
     logDebug("Building Index Scanner with IndexMeta and IntervalMap ...")
 
@@ -209,6 +211,9 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
     if (scanner != null && keySchema != null) {
       logDebug("Index Scanner Intervals: " + scanner.intervalArray.mkString(", "))
       scanner.withKeySchema(keySchema)
+
+      scanner.setInternalLimit(
+        options.getOrElse(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY, "0").toInt)
     }
   }
 

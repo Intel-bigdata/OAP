@@ -39,6 +39,9 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   override def canBeOptimizedByStatistics: Boolean = true
 
+  // TODO: use hash instead of order compare.
+  @transient protected var ordering: Ordering[Key] = _
+
   private val BITMAP_FOOTER_SIZE = 5 * 8
 
   private var bmUniqueKeyListTotalSize: Int = _
@@ -250,10 +253,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   private def initDesiredRowIdIterator(): Unit = {
     val bitmapArray = getDesiredBitmapArray
     if (bitmapArray.nonEmpty) {
-      if (limitScanEnabled()) {
+      if (indexEntryScanIsLimited()) {
         // Get N items from each index.
         bmRowIdIterator = bitmapArray.flatMap(bm =>
-          bm.iterator.asScala.take(getLimitScanNum)).iterator
+          bm.iterator.asScala.take(internalLimit)).iterator
       } else {
         bmRowIdIterator =
           bitmapArray.reduceLeft(BufferFastAggregation.or(_, _)).iterator.asScala

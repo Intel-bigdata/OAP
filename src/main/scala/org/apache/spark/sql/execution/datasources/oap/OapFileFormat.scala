@@ -231,7 +231,9 @@ private[sql] class OapFileFormat extends FileFormat
           if (supportFilters.nonEmpty) {
             // determine whether we can use index
             supportFilters.foreach(filter => logDebug("\t" + filter.toString))
-            ScannerBuilder.build(supportFilters, ic)
+            // get index options such as limit, order, etc.
+            val indexOptions = options.filterKeys(_.contains("oap.scan"))
+            ScannerBuilder.build(supportFilters, ic, indexOptions)
           }
         }
 
