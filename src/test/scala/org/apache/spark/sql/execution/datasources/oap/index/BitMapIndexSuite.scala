@@ -39,9 +39,6 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b STRING)
             | USING oap
             | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY VIEW oap_test_date (a INT, b DATE)
-            | USING oap
-            | OPTIONS (path '$path')""".stripMargin)
     sql(s"""CREATE TEMPORARY VIEW parquet_test (a INT, b STRING)
             | USING parquet
             | OPTIONS (path '$path')""".stripMargin)
@@ -58,7 +55,6 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("oap_test")
-    sqlContext.dropTempTable("oap_test_date")
     sqlContext.dropTempTable("parquet_test")
     sqlContext.dropTempTable("parquet_test_date")
     sql("DROP TABLE IF EXISTS t_refresh")
@@ -136,5 +132,56 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
       "AND (b like '%18%' or b like '%19%')"),
       result.toDF("key", "value"))
     sql("drop oindex index_bf on oap_test")
+  }
+
+  test("out-of-bound bitmap index") {
+    val joinTablePath = Utils.createTempDir().getAbsolutePath
+    sql(s"""CREATE TEMPORARY VIEW oap_test_join (a INT, b STRING)
+           | USING oap
+           | OPTIONS (path '$joinTablePath')""".stripMargin)
+
+    val data = (1 to 300).map{ i => (i, s"this is test $i")}
+    val dataRDD = spark.sparkContext.parallelize(data, 10)
+    dataRDD.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index1 on oap_test (a) using bitmap")
+
+    val data1 = (1 to 300).map{ i => (i % 10, s"this is test $i")}
+    val dataRDD1 = spark.sparkContext.parallelize(data1, 5)
+    dataRDD1.toDF("key", "value").createOrReplaceTempView("t1")
+    sql("insert overwrite table oap_test_join select * from t1")
+    sql("create oindex index1 on oap_test_join (a) using bitmap")
+
+    // range query, should not access bitmap index.
+    checkAnswer(
+      sql("SELECT * " +
+        "FROM oap_test t1 " +
+        "WHERE EXISTS " +
+        "(SELECT 1 FROM oap_test_join t2 " +
+        "WHERE t1.a = t2.a AND t2.a >= 1 AND t1.a < 5) " +
+        "ORDER BY a"),
+      Seq(
+        Row(1, "this is test 1"),
+        Row(2, "this is test 2"),
+        Row(3, "this is test 3"),
+        Row(4, "this is test 4")))
+
+    // equal query, should access bitmap index.
+    checkAnswer(
+      sql("SELECT * " +
+        "FROM oap_test t1 " +
+        "WHERE EXISTS " +
+        "(SELECT 1 FROM oap_test_join t2 " +
+        "WHERE t1.a = t2.a AND t2.a IN (1, 2, 3, 4, 5, 6, 7) AND t1.a IN (1, 2, 3, 4)) " +
+        "ORDER BY a"),
+      Seq(
+        Row(1, "this is test 1"),
+        Row(2, "this is test 2"),
+        Row(3, "this is test 3"),
+        Row(4, "this is test 4")))
+
+    sql("drop oindex index1 on oap_test")
+    sql("drop oindex index1 on oap_test_join")
+    sqlContext.dropTempTable("oap_test_join")
   }
 }
