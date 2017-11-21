@@ -102,7 +102,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   private def readBmFooterFromCache(cr: CacheResult): Unit = {
-    val (baseObj, baseOffset): (Object, Long) = cr.buffer.chunks.head match {
+    val (baseObj, baseOffset): (AnyRef, Long) = cr.buffer.chunks.head match {
       case db: DirectBuffer => (null, db.address())
       case _ => (cr.buffer.toArray, Platform.BYTE_ARRAY_OFFSET)
     }
@@ -121,19 +121,19 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   private def readBmUniqueKeyListFromCache(cr: CacheResult): mutable.ListBuffer[InternalRow] = {
-    val (baseObj, baseOffset): (Object, Long) = cr.buffer.chunks.head match {
+    val (baseObj, baseOffset): (AnyRef, Long) = cr.buffer.chunks.head match {
       case db: DirectBuffer => (null, db.address())
       case _ => (cr.buffer.toArray, Platform.BYTE_ARRAY_OFFSET)
     }
     val uniqueKeyList = new mutable.ListBuffer[InternalRow]()
     var curOffset = baseOffset
-    (0 until bmUniqueKeyListCount).foreach(_ => {
+    for(idx <- 0 until bmUniqueKeyListCount) {
       val (value, length) =
         IndexUtils.readBasedOnDataType(baseObj, curOffset, keySchema.fields(0).dataType)
       curOffset += length.toInt
       val row = InternalRow.apply(value)
       uniqueKeyList.append(row)
-    })
+    }
     assert(uniqueKeyList.size == bmUniqueKeyListCount)
     uniqueKeyList
   }
@@ -176,13 +176,13 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     fin.close()
   }
 
-  private def getStartIdxOffset(baseObj: Object, baseOffset: Long, startIdx: Int): Int = {
+  private def getStartIdxOffset(baseObj: AnyRef, baseOffset: Long, startIdx: Int): Int = {
     val idxOffset = baseOffset + startIdx * 4
     val startIdxOffset = Platform.getInt(baseObj, idxOffset)
     startIdxOffset
   }
 
-  private def getEndIdxOffset(baseObj: Object, baseOffset: Long, endIdx: Int): Int = {
+  private def getEndIdxOffset(baseObj: AnyRef, baseOffset: Long, endIdx: Int): Int = {
     val idxOffset = baseOffset + endIdx * 4
     val endIdxOffset = Platform.getInt(baseObj, idxOffset)
     endIdxOffset
@@ -224,19 +224,19 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     val rawBb = ByteBuffer.wrap(byteArray)
     var curPosition = position
     rawBb.position(curPosition)
-    (startIdx until endIdx).map(_ => {
+    for(idx <- startIdx until endIdx) {
       // Below is directly constructed from byte buffer rather than deserializing into java object.
       val bmEntry = new ImmutableRoaringBitmap(rawBb)
       partialBitmapList.append(bmEntry)
       curPosition += bmEntry.serializedSizeInBytes
       rawBb.position(curPosition)
-    })
+    }
     partialBitmapList
   }
 
-  private def getDesiredBitmapList: immutable.List[ImmutableRoaringBitmap] = {
+  private def getDesiredBitmapList: List[ImmutableRoaringBitmap] = {
     val keyList = readBmUniqueKeyListFromCache(bmUniqueKeyListCache)
-    val (baseObj, baseOffset): (Object, Long) = bmOffsetListCache.buffer.chunks.head match {
+    val (baseObj, baseOffset): (AnyRef, Long) = bmOffsetListCache.buffer.chunks.head match {
       case db: DirectBuffer => (null, db.address())
       case _ => (bmOffsetListCache.buffer.toArray, Platform.BYTE_ARRAY_OFFSET)
     }
