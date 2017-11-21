@@ -112,10 +112,7 @@ trait OapStrategies extends Logging {
 
           createOapFileScanPlan(projectList, filters,
             relation, file, table, oapOption, indexHint, indexRequirement) match {
-            case Some(fastScan) =>
-              OapOrderLimitFileScanExec(
-                limit, order, projectList,
-                fastScan)
+            case Some(fastScan) => OapOrderLimitFileScanExec(limit, order, projectList, fastScan)
             case None => PlanLater(child)
           }
         }
@@ -174,11 +171,11 @@ trait OapStrategies extends Logging {
 
           createOapFileScanPlan(projectList, filters, relation, file,
             table, oapOption, indexHint, indexRequirement) match {
-            case Some(fastScan) =>
-              OapDistinctFileScanExec(scanNumber = 1, projectList, fastScan)
+            case Some(fastScan) => OapDistinctFileScanExec(scanNumber = 1, projectList, fastScan)
             case None => PlanLater(child)
           }
         } else PlanLater(child)
+      case _ => PlanLater(child)
     }
   }
 
@@ -194,7 +191,6 @@ trait OapStrategies extends Logging {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case PhysicalAggregation(
       groupingExpressions, aggregateExpressions, resultExpressions, child) =>
-
         val (functionsWithDistinct, _) =
           aggregateExpressions.partition(_.isDistinct)
         if (functionsWithDistinct.map(_.aggregateFunction.children).distinct.length > 1) {
@@ -227,9 +223,7 @@ trait OapStrategies extends Logging {
             // TODO: support distinct in future.
             Nil
           }
-
         aggregateOperator
-
       case _ => Nil
     }
 
@@ -256,14 +250,9 @@ trait OapStrategies extends Logging {
 
         createOapFileScanPlan(
           projectList, indexHint, relation, file, table, oapOption, indexHint, Nil) match {
-          case Some(fastScan) =>
-            OapAggregationFileScanExec(
-              aggExpressions,
-              projectList,
-              fastScan)
+          case Some(fastScan) => OapAggregationFileScanExec(aggExpressions, projectList, fastScan)
           case _ => PlanLater(child)
         }
-
       case _ => PlanLater(child)
     }
   }
