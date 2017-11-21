@@ -53,7 +53,7 @@ case class CreateIndex(
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val relation =
       EliminateSubqueryAliases(sparkSession.sessionState.catalog.lookupRelation(table)) match {
-        case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
+        case r: SimpleCatalogRelation => (new FindDataSourceTable(sparkSession))(r)
         case other => other
       }
     val (fileCatalog, schema, readerClassName, identifier, fsRelation) = relation match {
@@ -178,9 +178,9 @@ case class CreateIndex(
       partitionColumns = Seq.empty,
       bucketSpec = Option.empty,
       refreshFunction = _ => Unit,
-      options = options)
+      options = options).asInstanceOf[Seq[Seq[IndexBuildResult]]]
 
-    val retMap = retVal.asInstanceOf[Seq[Seq[IndexBuildResult]]].flatten.groupBy(_.parent)
+    val retMap = retVal.flatten.groupBy(_.parent)
     bAndP.foreach(bp =>
       retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
         if (!bp._3) bp._1.addFileMeta(
@@ -210,7 +210,7 @@ case class DropIndex(
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val relation =
       EliminateSubqueryAliases(sparkSession.sessionState.catalog.lookupRelation(table)) match {
-        case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
+        case r: SimpleCatalogRelation => (new FindDataSourceTable(sparkSession))(r)
         case other => other
       }
     relation match {
@@ -275,7 +275,7 @@ case class RefreshIndex(
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val relation =
       EliminateSubqueryAliases(sparkSession.sessionState.catalog.lookupRelation(table)) match {
-        case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
+        case r: SimpleCatalogRelation => (new FindDataSourceTable(sparkSession))(r)
         case other => other
       }
     val (fileCatalog, schema, readerClassName) = relation match {
@@ -389,11 +389,10 @@ case class RefreshIndex(
         partitionColumns = Seq.empty,
         bucketSpec = Option.empty,
         refreshFunction = _ => Unit,
-        options = options)
+        options = options).asInstanceOf[Seq[Seq[IndexBuildResult]]]
     })
     if (buildrst.nonEmpty) {
-      val ret = buildrst.head
-      val retMap = ret.asInstanceOf[Seq[Seq[IndexBuildResult]]].flatten.groupBy(_.parent)
+      val retMap = buildrst.head.flatten.groupBy(_.parent)
 
       // there some cases oap meta files have already been updated
       // e.g. when inserting data in oap files the meta has already updated
@@ -440,7 +439,7 @@ case class OapShowIndex(table: TableIdentifier, relationName: String)
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val relation =
       EliminateSubqueryAliases(sparkSession.sessionState.catalog.lookupRelation(table)) match {
-        case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
+        case r: SimpleCatalogRelation => (new FindDataSourceTable(sparkSession))(r)
         case other => other
       }
     val (fileCatalog, schema) = relation match {
@@ -610,7 +609,7 @@ case class OapCheckIndex(
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val relation =
       EliminateSubqueryAliases(sparkSession.sessionState.catalog.lookupRelation(table)) match {
-        case r: SimpleCatalogRelation => new FindDataSourceTable(sparkSession)(r)
+        case r: SimpleCatalogRelation => (new FindDataSourceTable(sparkSession))(r)
         case other => other
       }
 
