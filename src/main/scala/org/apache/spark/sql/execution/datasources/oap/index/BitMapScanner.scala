@@ -25,7 +25,8 @@ import scala.collection.JavaConverters._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap
-import org.roaringbitmap.buffer.MutableRoaringBitmap
+import org.roaringbitmap.buffer.BufferFastAggregation
+import sun.nio.ch.DirectBuffer
 
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.InternalRow
@@ -68,6 +69,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   private var bmEntryListCache: CacheResult = _
   private var bmEntryListBuffer: Array[Byte] = _
 
+  // If using BitSet, just use below structure.
+  // @transient private var bmRowIdIterator: Iterator[Int] = _
   @transient private var bmRowIdIterator: Iterator[Integer] = _
   private var empty: Boolean = _
 
@@ -108,11 +111,14 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private def readBmFooterFromCache(cr: CacheResult): Unit = {
     // In most cases, below cached is true.
-    val baseBuffer = if (cr.cached) cr.buffer.toArray else bmFooterBuffer
-    bmUniqueKeyListTotalSize = Platform.getInt(baseBuffer, Platform.BYTE_ARRAY_OFFSET)
-    bmUniqueKeyListCount = Platform.getInt(baseBuffer, Platform.BYTE_ARRAY_OFFSET + 4)
-    bmEntryListTotalSize = Platform.getInt(baseBuffer, Platform.BYTE_ARRAY_OFFSET + 8)
-    bmOffsetListTotalSize = Platform.getInt(baseBuffer, Platform.BYTE_ARRAY_OFFSET + 12)
+    val (baseBuffer, baseOffset): (Object, Long) = if (cr.cached) cr.buffer.chunks.head match {
+      case db: DirectBuffer => (null, db.address())
+      case _ => (cr.buffer.toArray, Platform.BYTE_ARRAY_OFFSET) }
+      else (bmFooterBuffer, Platform.BYTE_ARRAY_OFFSET)
+    bmUniqueKeyListTotalSize = Platform.getInt(baseBuffer, baseOffset)
+    bmUniqueKeyListCount = Platform.getInt(baseBuffer, baseOffset + 4)
+    bmEntryListTotalSize = Platform.getInt(baseBuffer, baseOffset + 8)
+    bmOffsetListTotalSize = Platform.getInt(baseBuffer, baseOffset + 12)
     // bmFooterBuffer is not used any more.
     bmFooterBuffer = null
   }
@@ -127,14 +133,16 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private def readBmUniqueKeyListFromCache(cr: CacheResult): mutable.ListBuffer[InternalRow] = {
     // In most cases, below cached is true.
-    val baseBuffer = if (cr.cached) cr.buffer.toArray else bmUniqueKeyListBuffer
+    val (baseBuffer, baseOffset): (Object, Long) = if (cr.cached) cr.buffer.chunks.head match {
+      case db: DirectBuffer => (null, db.address())
+      case _ => (cr.buffer.toArray, Platform.BYTE_ARRAY_OFFSET) }
+      else (bmUniqueKeyListBuffer, Platform.BYTE_ARRAY_OFFSET)
     val uniqueKeyList = new mutable.ListBuffer[InternalRow]()
-    val (baseObj, baseOffset) = (baseBuffer, Platform.BYTE_ARRAY_OFFSET)
     var curOffset = baseOffset
     (0 until bmUniqueKeyListCount).map(idx => {
       val (value, length) =
-        IndexUtils.readBasedOnDataType(baseObj, curOffset, keySchema.fields(0).dataType)
-      curOffset += length.toInt
+        IndexUtils.readBasedOnDataType(baseBuffer, curOffset, keySchema.fields(0).dataType)
+      curOffset += length
       val row = InternalRow.apply(value)
       uniqueKeyList.append(row)
     })
@@ -182,19 +190,19 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     fin.close()
   }
 
-  private def getStartIdxOffset(offsetListBuffer: Array[Byte], startIdx: Int): Int = {
-    val idxOffset = Platform.BYTE_ARRAY_OFFSET + startIdx * 4
-    val startIdxOffset = Platform.getInt(offsetListBuffer, idxOffset)
+  private def getStartIdxOffset(baseBuffer: Object, baseOffset: Long, startIdx: Int): Int = {
+    val idxOffset = baseOffset + startIdx * 4
+    val startIdxOffset = Platform.getInt(baseBuffer, idxOffset)
     startIdxOffset
   }
 
-  private def getEndIdxOffset(offsetListBuffer: Array[Byte], endIdx: Int): Int = {
-    val idxOffset = Platform.BYTE_ARRAY_OFFSET + endIdx * 4
-    val endIdxOffset = Platform.getInt(offsetListBuffer, idxOffset)
+  private def getEndIdxOffset(baseBuffer: Object, baseOffset: Long, endIdx: Int): Int = {
+    val idxOffset = baseOffset + endIdx * 4
+    val endIdxOffset = Platform.getInt(baseBuffer, idxOffset)
     endIdxOffset
   }
 
-  private def getBitmapIdx(keySeq: immutable.IndexedSeq[InternalRow],
+  private def getBitmapIdx(keyList: mutable.ListBuffer[InternalRow],
       range: RangeInterval): (Int, Int) = {
     val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
       // diff from which startIdx not found, so here startIdx = -2
@@ -202,79 +210,149 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     } else {
       // find first key which >= start key, can't find return -1
       if (range.startInclude) {
-        keySeq.indexWhere(ordering.compare(range.start, _) <= 0)
+        keyList.indexWhere(ordering.compare(range.start, _) <= 0)
       } else {
-        keySeq.indexWhere(ordering.compare(range.start, _) < 0)
+        keyList.indexWhere(ordering.compare(range.start, _) < 0)
       }
     }
     val endIdx = if (range.end == IndexScanner.DUMMY_KEY_END) {
-      keySeq.size
+      keyList.size
     } else {
       // find last key which <= end key, can't find return -1
       if (range.endInclude) {
-        keySeq.lastIndexWhere(ordering.compare(_, range.end) <= 0)
+        keyList.lastIndexWhere(ordering.compare(_, range.end) <= 0)
       } else {
-        keySeq.lastIndexWhere(ordering.compare(_, range.end) < 0)
+        keyList.lastIndexWhere(ordering.compare(_, range.end) < 0)
       }
     }
     (startIdx, endIdx)
   }
 
-  private def getDesiredBitmaps(byteArray: Array[Byte], position: Int,
-      startIdx: Int, endIdx: Int): mutable.ListBuffer[ImmutableRoaringBitmap] = {
-    val partialBitmapList = new mutable.ListBuffer[ImmutableRoaringBitmap]()
-    val rawBb = ByteBuffer.wrap(byteArray)
+  private def getDesiredBitmapsUsingBitSet(byteArray: Object, baseOffset: Long, position: Int,
+      startIdx: Int, endIdx: Int): immutable.IndexedSeq[immutable.BitSet] = {
+    var curPosition = baseOffset + position
+    (startIdx until endIdx).map( idx => {
+      val bmLongArraySize = Platform.getInt(byteArray, curPosition)
+      val rawLongArray = new Array[Long](bmLongArraySize)
+      curPosition += 4
+      (0 until bmLongArraySize).map(idx => {
+        rawLongArray(idx) = Platform.getLong(byteArray, curPosition)
+        curPosition += 8
+      })
+      immutable.BitSet.fromBitMask(rawLongArray)
+    })
+  }
+
+  private def getDesiredBitmaps(byteArray: Object, baseOffset: Long, position: Int,
+      startIdx: Int, endIdx: Int): immutable.IndexedSeq[ImmutableRoaringBitmap] = {
+    val rawByteArray = (0 until bmEntryListTotalSize).map( idx => {
+      Platform.getByte(byteArray, baseOffset + idx)
+    }).toArray
+    val rawBb = ByteBuffer.wrap(rawByteArray)
     var curPosition = position
     rawBb.position(curPosition)
     (startIdx until endIdx).map( idx => {
       // Below is directly constructed from byte buffer rather than deserializing into java object.
       val bmEntry = new ImmutableRoaringBitmap(rawBb)
-      partialBitmapList.append(bmEntry)
       curPosition += bmEntry.serializedSizeInBytes
       rawBb.position(curPosition)
+      bmEntry
     })
-    partialBitmapList
   }
 
-  private def getDesiredBitmapList(): immutable.List[ImmutableRoaringBitmap] = {
+  private def getDesiredBitmapArrayUsingBitSet(): mutable.ArrayBuffer[immutable.BitSet] = {
     val keyList = readBmUniqueKeyListFromCache(bmUniqueKeyListCache)
-    val entryListBuffer =
+    val (entryListBuffer, entryListBaseOffset): (Object, Long) =
       // In most cases, below cached is true.
-      if (bmEntryListCache.cached) bmEntryListCache.buffer.toArray
-      else bmEntryListBuffer
-    val offsetListBuffer =
+      if (bmEntryListCache.cached) bmEntryListCache.buffer.chunks.head match {
+        case db: DirectBuffer => (null, db.address())
+        case _ => (bmEntryListCache.buffer.toArray, Platform.BYTE_ARRAY_OFFSET) }
+      else (bmEntryListBuffer, Platform.BYTE_ARRAY_OFFSET)
+    val (offsetListBuffer, offsetListBaseOffset): (Object, Long) =
       // In most cases, below cached is true.
-      if (bmOffsetListCache.cached) bmOffsetListCache.buffer.toArray
-      else bmOffsetListBuffer
-    val bitmapList = intervalArray.toList.flatMap(range => {
-      val (startIdx, endIdx) = getBitmapIdx(keyList.toIndexedSeq, range)
+      if (bmOffsetListCache.cached) bmOffsetListCache.buffer.chunks.head match {
+        case db: DirectBuffer => (null, db.address())
+        case _ => (bmOffsetListCache.buffer.toArray, Platform.BYTE_ARRAY_OFFSET) }
+      else (bmOffsetListBuffer, Platform.BYTE_ARRAY_OFFSET)
+    val bitmapArray = intervalArray.flatMap(range => {
+      val (startIdx, endIdx) = getBitmapIdx(keyList, range)
       if (startIdx == -1 || endIdx == -1) {
         // range not fond in cur bitmap, return empty for performance consideration
-        Array.empty[ImmutableRoaringBitmap]
+        Seq.empty[immutable.BitSet]
       } else {
-        val startIdxOffset = getStartIdxOffset(offsetListBuffer, startIdx)
-        val endIdxOffset = getEndIdxOffset(offsetListBuffer, endIdx + 1)
+        val startIdxOffset = getStartIdxOffset(offsetListBuffer, offsetListBaseOffset, startIdx)
+        val endIdxOffset = getEndIdxOffset(offsetListBuffer, offsetListBaseOffset, endIdx + 1)
         val curPostion = startIdxOffset - bmEntryListOffset
-        getDesiredBitmaps(entryListBuffer, curPostion, startIdx, (endIdx + 1))
+        getDesiredBitmapsUsingBitSet(entryListBuffer, entryListBaseOffset, curPostion,
+          startIdx, (endIdx + 1))
       }
     })
     // They are not used any more.
     bmEntryListBuffer = null
     bmOffsetListBuffer = null
-    bitmapList
+    bitmapArray
   }
 
-  private def getDesiredRowIdIterator(): Unit = {
-    val bitmapList = getDesiredBitmapList()
-    if (bitmapList.nonEmpty) {
+  private def getDesiredBitmapArray(): mutable.ArrayBuffer[ImmutableRoaringBitmap] = {
+    val keyList = readBmUniqueKeyListFromCache(bmUniqueKeyListCache)
+    val (entryListBuffer, entryListBaseOffset): (Object, Long) =
+      // In most cases, below cached is true.
+      if (bmEntryListCache.cached) bmEntryListCache.buffer.chunks.head match {
+        case db: DirectBuffer => (null, db.address())
+        case _ => (bmEntryListCache.buffer.toArray, Platform.BYTE_ARRAY_OFFSET) }
+      else (bmEntryListBuffer, Platform.BYTE_ARRAY_OFFSET)
+    val (offsetListBuffer, offsetListBaseOffset): (Object, Long) =
+      // In most cases, below cached is true.
+      if (bmOffsetListCache.cached) bmOffsetListCache.buffer.chunks.head match {
+        case db: DirectBuffer => (null, db.address())
+        case _ => (bmOffsetListCache.buffer.toArray, Platform.BYTE_ARRAY_OFFSET) }
+      else (bmOffsetListBuffer, Platform.BYTE_ARRAY_OFFSET)
+    val bitmapArray = intervalArray.flatMap(range => {
+      val (startIdx, endIdx) = getBitmapIdx(keyList, range)
+      if (startIdx == -1 || endIdx == -1) {
+        // range not fond in cur bitmap, return empty for performance consideration
+        Seq.empty[ImmutableRoaringBitmap]
+      } else {
+        val startIdxOffset = getStartIdxOffset(offsetListBuffer, offsetListBaseOffset, startIdx)
+        val endIdxOffset = getEndIdxOffset(offsetListBuffer, offsetListBaseOffset, endIdx + 1)
+        val curPostion = startIdxOffset - bmEntryListOffset
+        getDesiredBitmaps(entryListBuffer, entryListBaseOffset, curPostion, startIdx, (endIdx + 1))
+      }
+    })
+    // They are not used any more.
+    bmEntryListBuffer = null
+    bmOffsetListBuffer = null
+    bitmapArray
+  }
+
+/*
+  private def getDesiredRowIdIteratorUsingBitSet(): Unit = {
+    val bitmapArray = getDesiredBitmapArrayUsingBitSet()
+    if (bitmapArray.nonEmpty) {
       if (limitScanEnabled()) {
         // Get N items from each index.
-        bmRowIdIterator = bitmapList.flatMap(bm =>
+        bmRowIdIterator = bitmapArray.flatMap(bm =>
+          bm.iterator.take(getLimitScanNum)).iterator
+      } else {
+        bmRowIdIterator = bitmapArray.reduceLeft(_ | _).iterator
+      }
+      empty = false
+    } else {
+      empty = true
+    }
+  }
+*/
+
+  private def getDesiredRowIdIterator(): Unit = {
+    val bitmapArray = getDesiredBitmapArray()
+    if (bitmapArray.nonEmpty) {
+      if (limitScanEnabled()) {
+        // Get N items from each index.
+        bmRowIdIterator = bitmapArray.flatMap(bm =>
           bm.iterator.asScala.take(getLimitScanNum)).iterator
       } else {
-        var totalBm = new MutableRoaringBitmap()
-        bitmapList.foreach(bm => totalBm.or(bm))
-        bmRowIdIterator = totalBm.iterator.asScala.toIterator
+        bmRowIdIterator =
+          bitmapArray.reduceLeft(BufferFastAggregation.or(_, _)).iterator.asScala.toIterator
       }
       empty = false
     } else {
@@ -291,6 +369,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     val idxPath = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
 
     cacheBitmapAllSegments(idxPath, conf)
+    // If using BitSet, just replace with getDesiredRowIdIteratorUsingBitSet.
     getDesiredRowIdIterator()
 
     this

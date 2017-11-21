@@ -37,7 +37,7 @@ import org.apache.spark.sql.types._
 
 /* Below is the bitmap index general layout and sections.
  * #section id     section size(B) section description
- *    1              4               header
+ *    1              8               header
  *    2              varied          sorted unique key list (index column unique values)
  *    3              varied          bitmap entry list
  *    4              varied          bitmap entry offset list
@@ -61,6 +61,8 @@ private[oap] class BitmapIndexRecordWriter(
 
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
 
+  // If using BitSet, just use below structure.
+  // private val rowMapBitmap = new mutable.HashMap[InternalRow, mutable.BitSet]()
   private val rowMapBitmap = new mutable.HashMap[InternalRow, MutableRoaringBitmap]()
   private var recordCount: Int = 0
 
@@ -80,6 +82,8 @@ private[oap] class BitmapIndexRecordWriter(
   override def write(key: Void, value: InternalRow): Unit = {
     val v = genericProjector(value).copy()
     if (!rowMapBitmap.contains(v)) {
+      // If using BitSet, just use below structure.
+      // val bm = new mutable.BitSet()
       val bm = new MutableRoaringBitmap()
       bm.add(recordCount)
       rowMapBitmap.put(v, bm)
@@ -109,10 +113,28 @@ private[oap] class BitmapIndexRecordWriter(
     writer.write(bos.toByteArray)
   }
 
+/*
+  // Below is the BitSet version to write bitmap entry list.
+  private def writeBmEntryListUsingBitSet(): Unit = {
+    bmEntryListOffset = IndexFile.indexFileHeaderLength + bmUniqueKeyListTotalSize
+    bmOffsetListBuffer = new mutable.ListBuffer[Int]()
+    // Get the bitmap total size, and write each bitmap entrys one by one.
+    var totalBitmapSize = 0
+    bmUniqueKeyList.foreach(uniqueKey => {
+      bmOffsetListBuffer.append(bmEntryListOffset + totalBitmapSize)
+      val bm = rowMapBitmap.get(uniqueKey).get
+      val bmLongArray = bm.toBitMask
+      val bmLongArraySize = bmLongArray.size
+      IndexUtils.writeInt(writer, bmLongArraySize)
+      bmLongArray.foreach(element => IndexUtils.writeLong(writer, element))
+      totalBitmapSize += 4 + bmLongArraySize * 8
+    })
+    bmOffsetListBuffer.append(bmEntryListOffset + totalBitmapSize)
+    bmEntryListTotalSize = totalBitmapSize
+  }
+*/
+
   private def writeBmEntryList(): Unit = {
-    /* TODO: 1. Use BitSet of Spark or Scala or Java to replace roaring bitmap.
-     *       2. Optimize roaring bitmap usage to further reduce index file size.
-     */
     bmEntryListOffset = IndexFile.indexFileHeaderLength + bmUniqueKeyListTotalSize
     bmOffsetListBuffer = new mutable.ListBuffer[Int]()
     // Get the bitmap total size, and write each bitmap entrys one by one.
@@ -160,6 +182,7 @@ private[oap] class BitmapIndexRecordWriter(
     statisticsManager.initialize(BitMapIndexType, keySchema, configuration)
     IndexUtils.writeHead(writer, IndexFile.INDEX_VERSION)
     writeUniqueKeyList()
+    // If using BitSet, just replace with writeBmEntryListUsingBitSet.
     writeBmEntryList()
     writeBmOffsetList()
     // The index end is also the starting position of stats file.
