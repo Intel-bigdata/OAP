@@ -17,12 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import java.nio.ByteBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
-import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
 
 private[oap] trait CommonIndexFile {
   def file: Path
@@ -34,19 +30,12 @@ private[oap] trait CommonIndexFile {
     fin.close()
     (bytes(6) << 8) + bytes(7)
   }
-  protected def putToFiberCache(buf: Array[Byte]): ChunkedByteBuffer = {
-    // TODO: make it configurable
-    val cbbos = new ChunkedByteBufferOutputStream(buf.length, ByteBuffer.allocate)
-    cbbos.write(buf)
-    cbbos.close()
-    cbbos.toChunkedByteBuffer
-  }
 }
 /**
- * Read the index file into memory, and can be accessed as [[ChunkedByteBuffer]].
+ * Read the index file into memory, and can be accessed as Byte Array.
  */
 private[oap] case class IndexFile(file: Path) extends CommonIndexFile {
-  def getIndexFiberData(conf: Configuration): ChunkedByteBuffer = {
+  def getIndexFiberData(conf: Configuration): Array[Byte] = {
     val fs = file.getFileSystem(conf)
     val fin = fs.open(file)
     // wind to end of file to get tree root
@@ -56,8 +45,7 @@ private[oap] case class IndexFile(file: Path) extends CommonIndexFile {
 
     fin.readFully(0, bytes)
     fin.close()
-    // TODO partial cached index fiber
-    putToFiberCache(bytes)
+    bytes
   }
 }
 

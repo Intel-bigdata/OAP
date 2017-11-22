@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import java.nio.ByteBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
@@ -31,7 +29,6 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.types._
-import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
 import org.apache.spark.util.CompletionIterator
 
 
@@ -66,7 +63,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     } else dictionaries(fiberId)
   }
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): ChunkedByteBuffer = {
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): Array[Byte] = {
     val groupMeta = meta.rowGroupsMeta(groupId)
     val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
 
@@ -103,21 +100,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
       if (groupId == meta.groupCount - 1) meta.rowCountInLastGroup
       else meta.rowCountInEachGroup
 
-    putToFiberCache(fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount))
-  }
-
-  private def putToFiberCache(buf: Array[Byte]): ChunkedByteBuffer = {
-    // TODO: make it configurable
-    // TODO: [linhong] For now, ChunkedByteBuffer only contains one ByteBuffer
-    val cbbos = new ChunkedByteBufferOutputStream(buf.length, ByteBuffer.allocate)
-    cbbos.write(buf)
-    cbbos.close()
-    cbbos.toChunkedByteBuffer
-  }
-
-  def closeRowGroup(fiber: Fiber, cacheResult: CacheResult): Unit = {
-    if (cacheResult.cached) FiberCacheManager.releaseLock(fiber)
-    else cacheResult.buffer.dispose()
+    fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
   }
 
   // full file scan
@@ -126,11 +109,11 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     val row = new BatchColumn()
     val iterator =
       (0 until meta.groupCount).iterator.flatMap { groupId =>
-        val cacheResults = requiredIds.map(id =>
+        val fiberDataGroup = requiredIds.map(id =>
           FiberCacheManager.getOrElseUpdate(DataFiber(this, id, groupId), conf))
 
-        val columns = cacheResults.zip(requiredIds).map { case (cacheResult, id) =>
-          new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, cacheResult.buffer)
+        val columns = fiberDataGroup.zip(requiredIds).map { case (fiberData, id) =>
+          new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberData)
         }
 
         val iterator = if (groupId < meta.groupCount - 1) {
@@ -140,9 +123,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
           row.reset(meta.rowCountInLastGroup, columns).toIterator
         }
         CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
-          cacheResults.zip(requiredIds).foreach {
-            case (cacheResult, id) => closeRowGroup(DataFiber(this, id, groupId), cacheResult)
-          }
+          fiberDataGroup.foreach(_.release())
         )
       }
     CompletionIterator[InternalRow, Iterator[InternalRow]](iterator, close())
@@ -156,11 +137,11 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     val iterator =
       groupIds.iterator.flatMap {
         case (groupId, subRowIds) =>
-          val cacheResults = requiredIds.map(id =>
+          val fiberDataGroup = requiredIds.map(id =>
             FiberCacheManager.getOrElseUpdate(DataFiber(this, id, groupId), conf))
 
-          val columns = cacheResults.zip(requiredIds).map { case (cacheResult, id) =>
-            new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, cacheResult.buffer)
+          val columns = fiberDataGroup.zip(requiredIds).map { case (fiberData, id) =>
+            new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberData)
           }
 
           if (groupId < meta.groupCount - 1) {
@@ -174,9 +155,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
             subRowIds.iterator.map(rowId => row.moveToRow((rowId % meta.rowCountInEachGroup).toInt))
 
           CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
-            cacheResults.zip(requiredIds).foreach {
-              case (cacheResult, id) => closeRowGroup(DataFiber(this, id, groupId), cacheResult)
-            }
+            fiberDataGroup.foreach(_.release())
           )
       }
     CompletionIterator[InternalRow, Iterator[InternalRow]](iterator, close())

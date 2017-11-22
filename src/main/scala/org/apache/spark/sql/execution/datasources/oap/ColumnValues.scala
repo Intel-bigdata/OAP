@@ -17,25 +17,20 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
-import sun.nio.ch.DirectBuffer
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberData
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 import org.apache.spark.util.collection.BitSet
-import org.apache.spark.util.io.ChunkedByteBuffer
 
 
-class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByteBuffer) {
+class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberData) {
   require(dataType.isInstanceOf[AtomicType], "Only atomic type accepted for now.")
 
-  private val (baseObject, baseOffset): (Object, Long) = buffer.chunks.headOption match {
-    case Some(buf: DirectBuffer) => (null, buf.address())
-    case _ => (buffer.toArray, Platform.BYTE_ARRAY_OFFSET)
-  }
+  private val (baseObject, baseOffset): (AnyRef, Long) = (buffer.baseObj, buffer.baseOffset)
   // for any FiberData, the first defaultSize / 8 will be the bitmask
   // TODO what if defaultSize / 8 is not an integer?
 
@@ -70,7 +65,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByte
     case _: MapType => throw new NotImplementedError(s"Map")
     case _: StructType => throw new NotImplementedError(s"Struct")
     case TimestampType => throw new NotImplementedError(s"Timestamp")
-    case other => throw new NotImplementedError(s"other")
+    case other => throw new NotImplementedError(s"$other")
   }
 
   private def getAs[T](idx: Int): T = genericGet(idx).asInstanceOf[T]

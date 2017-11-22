@@ -21,14 +21,12 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import sun.nio.ch.DirectBuffer
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.oap.filecache.{BTreeFiber, CacheResult, FiberCacheManager}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{BTreeFiber, FiberCacheManager, FiberData}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
-import org.apache.spark.util.io.ChunkedByteBuffer
 
 private[index] case class BTreeIndexRecordReader(
     configuration: Configuration,
@@ -39,10 +37,10 @@ private[index] case class BTreeIndexRecordReader(
   import BTreeIndexRecordReader.{BTreeFooter, BTreeRowIdList, BTreeNodeData}
   private var footer: BTreeFooter = _
   private var footerFiber: BTreeFiber = _
-  private var footerCache: CacheResult = _
+  private var footerCache: FiberData = _
   private var rowIdList: BTreeRowIdList = _
   private var rowIdListFiber: BTreeFiber = _
-  private var rowIdListCache: CacheResult = _
+  private var rowIdListCache: FiberData = _
 
   private var reader: BTreeIndexFileReader = _
 
@@ -54,11 +52,11 @@ private[index] case class BTreeIndexRecordReader(
 
     footerFiber = BTreeFiber(() => reader.readFooter(), reader.file.toString, 0, 0)
     footerCache = FiberCacheManager.getOrElseUpdate(footerFiber, configuration)
-    footer = BTreeFooter(footerCache.buffer)
+    footer = BTreeFooter(footerCache)
 
     rowIdListFiber = BTreeFiber(() => reader.readRowIdList(), reader.file.toString, 1, 0)
     rowIdListCache = FiberCacheManager.getOrElseUpdate(rowIdListFiber, configuration)
-    rowIdList = BTreeRowIdList(rowIdListCache.buffer)
+    rowIdList = BTreeRowIdList(rowIdListCache)
 
     internalIterator = intervalArray.toIterator.flatMap { interval =>
       val (start, end) = findRowIdRange(interval)
@@ -103,7 +101,7 @@ private[index] case class BTreeIndexRecordReader(
       nodeIdx
     )
     val nodeCache = FiberCacheManager.getOrElseUpdate(nodeFiber, configuration)
-    val node = BTreeNodeData(nodeCache.buffer)
+    val node = BTreeNodeData(nodeCache)
 
     val keyCount = node.getKeyCount
 
@@ -124,13 +122,13 @@ private[index] case class BTreeIndexRecordReader(
             2,
             nodeIdx + 1)
           val nextNodeCache = FiberCacheManager.getOrElseUpdate(nextNodeFiber, configuration)
-          val nextNode = BTreeNodeData(nextNodeCache.buffer)
+          val nextNode = BTreeNodeData(nextNodeCache)
           val rowPos = nextNode.getRowIdPos(0)
-          releaseCache(nextNodeCache, nextNodeFiber)
+          nextNodeCache.release()
           rowPos
         }
       } else node.getRowIdPos(keyPos)
-    releaseCache(nodeCache, nodeFiber)
+    nodeCache.release()
     rowPos
   }
 
@@ -193,16 +191,9 @@ private[index] case class BTreeIndexRecordReader(
     }
   }
 
-  private def releaseCache(cache: CacheResult, fiber: BTreeFiber): Unit = {
-    if (cache != null) {
-      if (cache.cached) FiberCacheManager.releaseLock(fiber)
-      else cache.buffer.dispose()
-    }
-  }
-
   def close(): Unit = {
-    releaseCache(footerCache, footerFiber)
-    releaseCache(rowIdListCache, rowIdListFiber)
+    footerCache.release()
+    rowIdListCache.release()
     reader.close()
   }
 
@@ -224,7 +215,7 @@ private[index] case class BTreeIndexRecordReader(
 
 private[index] object BTreeIndexRecordReader {
   private[index] def readBasedOnSchema(
-      baseObj: Object, offset: Long, schema: StructType): InternalRow = {
+      baseObj: AnyRef, offset: Long, schema: StructType): InternalRow = {
     var pos = offset
     val values = schema.map(_.dataType).map { dataType =>
       val (value, length) = IndexUtils.readBasedOnDataType(baseObj, pos, dataType)
@@ -234,7 +225,7 @@ private[index] object BTreeIndexRecordReader {
     InternalRow.fromSeq(values)
   }
 
-  private[index] case class BTreeFooter(buf: ChunkedByteBuffer) {
+  private[index] case class BTreeFooter(buf: FiberData) {
     private val nodePosOffset = Integer.SIZE / 8
     private val nodeSizeOffset = Integer.SIZE / 8 * 2
     private val minPosOffset = Integer.SIZE / 8 * 3
@@ -242,10 +233,8 @@ private[index] object BTreeIndexRecordReader {
     private val nodeMetaStart = Integer.SIZE / 8 * 2
     private val nodeMetaByteSize = Integer.SIZE / 8 * 5
 
-    private val (baseObj, baseOffset): (Object, Long) = buf.chunks.head match {
-      case db: DirectBuffer => (null, db.address())
-      case _ => (buf.toArray, Platform.BYTE_ARRAY_OFFSET)
-    }
+    private val (baseObj, baseOffset): (AnyRef, Long) = (buf.baseObj, buf.baseOffset)
+
     def getRecordCount: Int = Platform.getInt(baseObj, baseOffset)
     def getNodesCount: Int = Platform.getInt(baseObj, baseOffset + Integer.SIZE / 8)
     def getMaxValue(idx: Int, schema: StructType): InternalRow =
@@ -264,21 +253,18 @@ private[index] object BTreeIndexRecordReader {
       Platform.getInt(baseObj, baseOffset + nodeMetaStart + idx * nodeMetaByteSize + nodeSizeOffset)
   }
 
-  private[index] case class BTreeRowIdList(buf: ChunkedByteBuffer) {
-    private val (baseObj, baseOffset): (Object, Long) = buf.chunks.head match {
-      case db: DirectBuffer => (null, db.address())
-      case _ => (buf.toArray, Platform.BYTE_ARRAY_OFFSET)
-    }
+  private[index] case class BTreeRowIdList(buf: FiberData) {
+    private val (baseObj, baseOffset): (AnyRef, Long) = (buf.baseObj, buf.baseOffset)
+
     def getRowId(idx: Int): Int = Platform.getInt(baseObj, baseOffset + idx * Integer.SIZE / 8)
   }
 
-  private[index] case class BTreeNodeData(buf: ChunkedByteBuffer) {
+  private[index] case class BTreeNodeData(buf: FiberData) {
     private val posSectionStart = Integer.SIZE / 8
     private val posEntrySize = Integer.SIZE / 8 * 2
-    private val (baseObj, baseOffset): (Object, Long) = buf.chunks.head match {
-      case db: DirectBuffer => (null, db.address())
-      case _ => (buf.toArray, Platform.BYTE_ARRAY_OFFSET)
-    }
+
+    private val (baseObj, baseOffset): (AnyRef, Long) = (buf.baseObj, buf.baseOffset)
+
     private def valueSectionStart = posSectionStart + getKeyCount * posEntrySize
 
     def getKeyCount: Int = Platform.getInt(baseObj, baseOffset)

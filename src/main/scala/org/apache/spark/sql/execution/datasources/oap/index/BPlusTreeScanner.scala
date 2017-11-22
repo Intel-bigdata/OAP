@@ -21,7 +21,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.execution.datasources.oap._
-import org.apache.spark.sql.execution.datasources.oap.filecache._
 
 // we scan the index from the smallest to the largest,
 // this will scan the B+ Tree (index) leaf node.
@@ -31,13 +30,10 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
   @transient protected var currentKeyArray: Array[CurrentKey] = _
 
   var currentKeyIdx = 0
-  var indexFiber: IndexFiber = _
-  var indexData: CacheResult = _
   var recordReader: BTreeIndexRecordReader = _
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
-    // val root = BTreeIndexCacheManager(dataPath, context, keySchema, meta)
     val path = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     logDebug("Loading Index File: " + path)
     logDebug("\tFile Size: " + path.getFileSystem(conf).getFileStatus(path).getLen)
