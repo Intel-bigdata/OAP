@@ -349,13 +349,7 @@ private[oap] case class DataSourceMeta(
               schema(entries.head.ordinal).name == attr && index.satisfy(requirement)
             case index @ BitMapIndex(entries) =>
               entries.map(ordinal =>
-<<<<<<< 3f8c00e23ed5a56ceda076d05f87369583c9dc5a
-                schema(ordinal).name).contains(attr) && index.satisfy(requirements)
-=======
                 schema(ordinal).name).contains(attr) && index.satisfy(requirement)
-            case index @ TrieIndex(entry) =>
-              schema(entry).name.contains(attr) && index.satisfy(requirement)
->>>>>>> Add index requirement check on oapStrategies.
             case _ => false
           }
         }
