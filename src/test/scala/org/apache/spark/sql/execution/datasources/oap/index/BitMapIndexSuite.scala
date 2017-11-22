@@ -37,9 +37,6 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b STRING)
             | USING oap
             | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY VIEW oap_test_date (a INT, b STRING)
-            | USING oap
-            | OPTIONS (path '$path')""".stripMargin)
     sql(s"""CREATE TEMPORARY VIEW parquet_test (a INT, b STRING)
             | USING parquet
             | OPTIONS (path '$path')""".stripMargin)
@@ -56,7 +53,6 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("oap_test")
-    sqlContext.dropTempTable("oap_test_date")
     sqlContext.dropTempTable("parquet_test")
     sqlContext.dropTempTable("parquet_test_date")
     sql("DROP TABLE IF EXISTS t_refresh")
