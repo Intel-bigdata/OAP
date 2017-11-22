@@ -137,4 +137,60 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
       result.toDF("key", "value"))
     sql("drop oindex index_bf on oap_test")
   }
+
+  test("BitMap index for range predicate involving boundaries") {
+    val data: Seq[(Int, String)] = (1 to 200).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bf on oap_test (a) USING BITMAP")
+    val greatThanResult: Seq[(Int, String)] = (45 to 200).map { i => (i, s"this is test $i") }
+    val littleThanResult: Seq[(Int, String)] = (1 to 44).map { i => (i, s"this is test $i") }
+    val emptyResult : Seq[(Int, String)] = Seq.empty
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 45"),
+      greatThanResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a < 45"),
+      littleThanResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a < 1"),
+      emptyResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 200"),
+      emptyResult.toDF("key", "value"))
+
+    sql("drop oindex index_bf on oap_test")
+  }
+
+  test("BitMap index for range predicate involving boundaries") {
+    val data: Seq[(Int, String)] = (1 to 200).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bf on oap_test (a) USING BITMAP")
+    val greatThanResult: Seq[(Int, String)] = (45 to 200).map { i => (i, s"this is test $i") }
+    val littleThanResult: Seq[(Int, String)] = (1 to 44).map { i => (i, s"this is test $i") }
+    val firstResult: Seq[(Int, String)] = (1).map { i => (i, s"this is test $i") }
+    val lastResult: Seq[(Int, String)] = (200).map { i => (i, s"this is test $i") }
+    val emptyResult : Seq[(Int, String)] = Seq.empty
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 45"),
+      greatThanResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a < 45"),
+      littleThanResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a <= 1"),
+      firstResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 200"),
+      lastResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a < 1"),
+      emptyResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 200"),
+      emptyResult.toDF("key", "value"))
+
+    sql("drop oindex index_bf on oap_test")
+  }
 }
