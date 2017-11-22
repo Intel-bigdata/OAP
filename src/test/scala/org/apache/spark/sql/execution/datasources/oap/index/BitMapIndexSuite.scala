@@ -18,10 +18,8 @@
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.scalatest.BeforeAndAfterEach
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
+
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 

@@ -202,15 +202,15 @@ private[oap] class OapDataReader(
         def getRowIds(options: Map[String, String]): Array[Long] = {
           indexScanner.initialize(path, conf)
 
-          // File level scan options
-          val isAscending = options.getOrElse(
-            OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY, "true").toBoolean
-          val sameOrder =
-            !((indexScanner.meta.indexType.indexOrder.head == Ascending) ^ isAscending)
-
           // total Row count can be get from the index scanner
           val limit = options.getOrElse(OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY, "0").toInt
           val rowIds = if (limit > 0) {
+            // Order limit scan options
+            val isAscending = options.getOrElse(
+              OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY, "true").toBoolean
+            val sameOrder =
+              !((indexScanner.meta.indexType.indexOrder.head == Ascending) ^ isAscending)
+
             if (sameOrder) indexScanner.take(limit).toArray
             else indexScanner.toArray.reverse.take(limit)
           } else indexScanner.toArray
