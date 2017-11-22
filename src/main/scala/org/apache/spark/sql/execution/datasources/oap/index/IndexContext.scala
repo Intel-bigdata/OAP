@@ -144,7 +144,8 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
     (lastIdx, bestIndexer)
   }
 
-  def buildScanner(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]],
+  def buildScanner(
+      intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]],
       options: Map[String, String] = Map.empty): Unit = {
     selectAvailableIndex(intervalMap)
     val (lastIdx, bestIndexer) = getBestIndexer(intervalMap.size)

@@ -110,8 +110,15 @@ trait OapStrategies extends Logging {
             else IsNotNull(orderAttributes.head) :: Nil
           val indexRequirement = indexHint.map(_ => BTreeIndex())
 
-          createOapFileScanPlan(projectList, filters,
-            relation, file, table, oapOption, indexHint, indexRequirement) match {
+          createOapFileScanPlan(
+            projectList,
+            filters,
+            relation,
+            file,
+            table,
+            oapOption,
+            indexHint,
+            indexRequirement) match {
             case Some(fastScan) => OapOrderLimitFileScanExec(limit, order, projectList, fastScan)
             case None => PlanLater(child)
           }
@@ -169,8 +176,15 @@ trait OapStrategies extends Logging {
             else IsNotNull(orderAttributes.head) :: Nil
           val indexRequirement = indexHint.map(_ => BitMapIndex())
 
-          createOapFileScanPlan(projectList, filters, relation, file,
-            table, oapOption, indexHint, indexRequirement) match {
+          createOapFileScanPlan(
+            projectList,
+            filters,
+            relation,
+            file,
+            table,
+            oapOption,
+            indexHint,
+            indexRequirement) match {
             case Some(fastScan) => OapDistinctFileScanExec(scanNumber = 1, projectList, fastScan)
             case None => PlanLater(child)
           }
@@ -307,60 +321,61 @@ trait OapStrategies extends Logging {
 
     val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq)
 
-    val fsRelation: HadoopFsRelation = _fsRelation.fileFormat match {
-      case fileFormat : OapFileFormat =>
+    _fsRelation.fileFormat match {
+      case fileFormat: OapFileFormat =>
         fileFormat.initialize(_fsRelation.sparkSession, oapOption,
           selectedPartitions.flatMap(p => p.files))
-        _fsRelation
+
+        if (fileFormat.hasAvailableIndex(normalizedIndexHint, indexRequirements)) {
+          val dataColumns = l.resolve(
+              _fsRelation.dataSchema, _fsRelation.sparkSession.sessionState.analyzer.resolver)
+
+          // Partition keys are not available in the statistics of the files.
+          val dataFilters = normalizedIndexHint.filter(_.references.intersect(partitionSet).isEmpty)
+
+          // Predicates with both partition keys and attributes need to be evaluated after the scan.
+          val afterScanFilters = filterSet -- partitionKeyFilters.filter(_.references.nonEmpty)
+          logInfo(s"Post-Scan Filters: ${afterScanFilters.mkString(",")}")
+
+          val filterAttributes = AttributeSet(afterScanFilters)
+          val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
+          val requiredAttributes = AttributeSet(requiredExpressions)
+
+          val readDataColumns =
+            dataColumns
+              .filter(requiredAttributes.contains)
+              .filterNot(partitionColumns.contains)
+          val outputSchema = readDataColumns.toStructType
+          logInfo(s"Output Data Schema: ${outputSchema.simpleString(5)}")
+
+          val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
+          logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
+
+          val outputAttributes = readDataColumns ++ partitionColumns
+
+          val scan =
+            new FileSourceScanExec(
+              _fsRelation,
+              outputAttributes,
+              outputSchema,
+              partitionKeyFilters.toSeq,
+              pushedDownFilters,
+              table.map(_.identifier))
+
+          val afterScanFilter = afterScanFilters.toSeq.reduceOption(expressions.And)
+          val withFilter = afterScanFilter.map(execution.FilterExec(_, scan)).getOrElse(scan)
+          val withProjections = if (projects == withFilter.output) {
+            withFilter
+          } else {
+            execution.ProjectExec(projects, withFilter)
+          }
+
+          Option(withProjections)
+        } else {
+          None
+        }
+      case _ => None
     }
-
-    if (fsRelation.fileFormat.asInstanceOf[OapFileFormat]
-      .hasAvailableIndex(normalizedIndexHint, indexRequirements)) {
-      val dataColumns =
-        l.resolve(fsRelation.dataSchema, fsRelation.sparkSession.sessionState.analyzer.resolver)
-
-      // Partition keys are not available in the statistics of the files.
-      val dataFilters = normalizedIndexHint.filter(_.references.intersect(partitionSet).isEmpty)
-
-      // Predicates with both partition keys and attributes need to be evaluated after the scan.
-      val afterScanFilters = filterSet -- partitionKeyFilters.filter(_.references.nonEmpty)
-      logInfo(s"Post-Scan Filters: ${afterScanFilters.mkString(",")}")
-
-      val filterAttributes = AttributeSet(afterScanFilters)
-      val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
-      val requiredAttributes = AttributeSet(requiredExpressions)
-
-      val readDataColumns =
-        dataColumns
-          .filter(requiredAttributes.contains)
-          .filterNot(partitionColumns.contains)
-      val outputSchema = readDataColumns.toStructType
-      logInfo(s"Output Data Schema: ${outputSchema.simpleString(5)}")
-
-      val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
-      logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
-
-      val outputAttributes = readDataColumns ++ partitionColumns
-
-      val scan =
-        new FileSourceScanExec(
-          fsRelation,
-          outputAttributes,
-          outputSchema,
-          partitionKeyFilters.toSeq,
-          pushedDownFilters,
-          table.map(_.identifier))
-
-      val afterScanFilter = afterScanFilters.toSeq.reduceOption(expressions.And)
-      val withFilter = afterScanFilter.map(execution.FilterExec(_, scan)).getOrElse(scan)
-      val withProjections = if (projects == withFilter.output) {
-        withFilter
-      } else {
-        execution.ProjectExec(projects, withFilter)
-      }
-
-      Option(withProjections)
-    } else None
   }
 }
 

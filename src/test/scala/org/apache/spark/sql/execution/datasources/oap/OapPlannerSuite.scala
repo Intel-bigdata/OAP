@@ -53,7 +53,6 @@ class OapPlannerSuite
            | USING oap
            | OPTIONS (path '$path3')""".stripMargin)
 
-
     spark.experimental.extraStrategies = oapStrategies
   }
 
