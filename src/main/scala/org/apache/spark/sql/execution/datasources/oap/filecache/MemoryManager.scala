@@ -49,6 +49,8 @@ trait FiberCache {
       bytes.length)
     bytes
   }
+
+  def size(): Long = fiberData.size()
 }
 
 // Data fiber caching, the in-memory representation can be found at [[DataFiberBuilder]]
@@ -107,7 +109,7 @@ private[oap] object MemoryManager extends Logging {
    *  Leave it empty for now
    *  TODO: finish this after Cache Manager is ready.
    */
-  private def freeSpace(space: Long): Long = 0L
+  private def freeSpace(space: Long): Long = CacheManager.evictToFreeSpace(space)
 
   /** Set to private, since putToFiberCache is enough for Cache Manager to request memory */
   private[filecache] def allocate(numOfBytes: Int): Option[MemoryBlock] = {
