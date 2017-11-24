@@ -260,7 +260,7 @@ trait OapStrategies extends Logging {
         // Expression case class to do index full scan (include NULL).
         // If none in Spark, we can create one for OAP.
         val indexHint = if (filterAttributes == groupingAttributes) filters
-          else IsNotNull(groupingAttributes.head) :: Nil
+                        else IsNotNull(groupingAttributes.head) :: Nil
 
         createOapFileScanPlan(
           projectList, indexHint, relation, file, table, oapOption, indexHint, Nil) match {

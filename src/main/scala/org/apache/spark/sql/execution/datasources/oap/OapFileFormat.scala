@@ -232,7 +232,7 @@ private[sql] class OapFileFormat extends FileFormat
             // determine whether we can use index
             supportFilters.foreach(filter => logDebug("\t" + filter.toString))
             // get index options such as limit, order, etc.
-            val indexOptions = options.filterKeys(_.contains("oap.scan"))
+            val indexOptions = options.filterKeys(OapFileFormat.oapOptimizationKeySeq.contains(_))
             ScannerBuilder.build(supportFilters, ic, indexOptions)
           }
         }
@@ -459,6 +459,13 @@ private[sql] object OapFileFormat {
 
   def deserializeDataSourceMeta(conf: Configuration): Option[DataSourceMeta] = {
     SerializationUtil.readObjectFromConfAsBase64(OAP_DATA_SOURCE_META, conf)
+  }
+
+  val oapOptimizationKeySeq : Seq[String] = {
+    OAP_QUERY_ORDER_OPTION_KEY ::
+    OAP_QUERY_LIMIT_OPTION_KEY ::
+    OAP_INDEX_SCAN_NUM_OPTION_KEY ::
+    OAP_INDEX_GROUP_BY_OPTION_KEY :: Nil
   }
 
   /**

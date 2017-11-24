@@ -213,7 +213,7 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
       logDebug("Index Scanner Intervals: " + scanner.intervalArray.mkString(", "))
       scanner.withKeySchema(keySchema)
 
-      scanner.setInternalLimit(
+      scanner.internalLimit_=(
         options.getOrElse(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY, "0").toInt)
     }
   }

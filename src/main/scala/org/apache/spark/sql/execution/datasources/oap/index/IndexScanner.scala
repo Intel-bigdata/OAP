@@ -51,17 +51,18 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
   /**
    * Scan N items from each index entry.
    */
-  private var limitScan : Int = 0
+  private var _internalLimit : Int = 0
 
-  def setInternalLimit(scanNum : Int) : Unit = {
-    limitScan = scanNum
-  }
+  // _internalLimit setter
+  def internalLimit_= (scanNum : Int) : Unit = _internalLimit = scanNum
 
-  def internalLimit : Int = limitScan
+  // _internalLimit getter
+  def internalLimit : Int = _internalLimit
 
-  def indexEntryScanIsLimited() : Boolean = limitScan > 0
+  def indexEntryScanIsLimited() : Boolean = _internalLimit > 0
 
   def meta: IndexMeta = idxMeta
+
   def getSchema: StructType = keySchema
 
   def indexIsAvailable(dataPath: Path, conf: Configuration): Boolean = {
