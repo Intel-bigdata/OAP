@@ -98,11 +98,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   private def readBmFooterFromCache(data: FiberCache): Unit = {
-    val (baseObj, baseOffset) = (data.getBaseObj, data.getBaseOffset)
-    bmUniqueKeyListTotalSize = Platform.getInt(baseObj, baseOffset)
-    bmUniqueKeyListCount = Platform.getInt(baseObj, baseOffset + 4)
-    bmEntryListTotalSize = Platform.getInt(baseObj, baseOffset + 8)
-    bmOffsetListTotalSize = Platform.getInt(baseObj, baseOffset + 12)
+    bmUniqueKeyListTotalSize = data.getInt(0)
+    bmUniqueKeyListCount = data.getInt(4)
+    bmEntryListTotalSize = data.getInt(8)
+    bmOffsetListTotalSize = data.getInt(12)
   }
 
   private def loadBmKeyList(fin: FSDataInputStream): Array[Byte] = {
@@ -114,11 +113,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   private def readBmUniqueKeyListFromCache(data: FiberCache): IndexedSeq[InternalRow] = {
-    val (baseObj, baseOffset) = (data.getBaseObj, data.getBaseOffset)
-    var curOffset = baseOffset
+    var curOffset = 0L
     (0 until bmUniqueKeyListCount).map( idx => {
       val (value, length) =
-        IndexUtils.readBasedOnDataType(baseObj, curOffset, keySchema.fields(0).dataType)
+        IndexUtils.readBasedOnDataType(data, curOffset, keySchema.fields(0).dataType)
       curOffset += length
       InternalRow.apply(value)
     })
@@ -162,15 +160,15 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     fin.close()
   }
 
-  private def getStartIdxOffset(baseObj: AnyRef, baseOffset: Long, startIdx: Int): Int = {
+  private def getStartIdxOffset(fiberCache: FiberCache, baseOffset: Long, startIdx: Int): Int = {
     val idxOffset = baseOffset + startIdx * 4
-    val startIdxOffset = Platform.getInt(baseObj, idxOffset)
+    val startIdxOffset = fiberCache.getInt(idxOffset)
     startIdxOffset
   }
 
-  private def getEndIdxOffset(baseObj: AnyRef, baseOffset: Long, endIdx: Int): Int = {
+  private def getEndIdxOffset(fiberCache: FiberCache, baseOffset: Long, endIdx: Int): Int = {
     val idxOffset = baseOffset + endIdx * 4
-    val endIdxOffset = Platform.getInt(baseObj, idxOffset)
+    val endIdxOffset = Platform.getInt(FiberCache, idxOffset)
     endIdxOffset
   }
 
@@ -220,14 +218,13 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private def getDesiredBitmapArray: mutable.ArrayBuffer[ImmutableRoaringBitmap] = {
     val keySeq = readBmUniqueKeyListFromCache(bmUniqueKeyListCache)
-    val (baseObj, baseOffset) = (bmOffsetListCache.getBaseObj, bmOffsetListCache.getBaseOffset)
     intervalArray.flatMap(range => {
       val (startIdx, endIdx) = getBitmapIdx(keySeq, range)
       if (startIdx == -1 || endIdx == -1) {
         // range not fond in cur bitmap, return empty for performance consideration
         Seq.empty[ImmutableRoaringBitmap]
       } else {
-        val startIdxOffset = getStartIdxOffset(baseObj, baseOffset, startIdx)
+        val startIdxOffset = getStartIdxOffset(bmOffsetListCache, 0L, startIdx)
         val curPosition = startIdxOffset - bmEntryListOffset
         getDesiredBitmaps(bmEntryListCache.toArray, curPosition, startIdx, endIdx + 1)
       }

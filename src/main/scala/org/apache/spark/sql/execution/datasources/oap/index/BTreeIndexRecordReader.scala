@@ -219,10 +219,10 @@ private[index] case class BTreeIndexRecordReader(
 
 private[index] object BTreeIndexRecordReader {
   private[index] def readBasedOnSchema(
-      baseObj: Object, offset: Long, schema: StructType): InternalRow = {
+      fiberCache: FiberCache, offset: Long, schema: StructType): InternalRow = {
     var pos = offset
     val values = schema.map(_.dataType).map { dataType =>
-      val (value, length) = IndexUtils.readBasedOnDataType(baseObj, pos, dataType)
+      val (value, length) = IndexUtils.readBasedOnDataType(fiberCache, pos, dataType)
       pos += length
       value
     }
@@ -237,43 +237,40 @@ private[index] object BTreeIndexRecordReader {
     private val nodeMetaStart = Integer.SIZE / 8 * 2
     private val nodeMetaByteSize = Integer.SIZE / 8 * 5
 
-    private val (baseObj, baseOffset) = (fiberCache.getBaseObj, fiberCache.getBaseOffset)
-    def getRecordCount: Int = Platform.getInt(baseObj, baseOffset)
-    def getNodesCount: Int = Platform.getInt(baseObj, baseOffset + Integer.SIZE / 8)
+    def getRecordCount: Int = fiberCache.getInt(0)
+    def getNodesCount: Int = fiberCache.getInt(Integer.SIZE / 8)
     def getMaxValue(idx: Int, schema: StructType): InternalRow =
-      BTreeIndexRecordReader.readBasedOnSchema(baseObj, baseOffset + getMaxValueOffset(idx), schema)
+      BTreeIndexRecordReader.readBasedOnSchema(fiberCache, getMaxValueOffset(idx), schema)
     def getMinValue(idx: Int, schema: StructType): InternalRow =
-      BTreeIndexRecordReader.readBasedOnSchema(baseObj, baseOffset + getMinValueOffset(idx), schema)
+      BTreeIndexRecordReader.readBasedOnSchema(fiberCache, getMinValueOffset(idx), schema)
     def getMinValueOffset(idx: Int): Int =
-      Platform.getInt(baseObj, baseOffset + nodeMetaStart + nodeMetaByteSize * idx + minPosOffset) +
+      fiberCache.getInt(nodeMetaStart + nodeMetaByteSize * idx + minPosOffset) +
           nodeMetaStart + nodeMetaByteSize * getNodesCount
     def getMaxValueOffset(idx: Int): Int =
-      Platform.getInt(baseObj, baseOffset + nodeMetaStart + nodeMetaByteSize * idx + maxPosOffset) +
+      fiberCache.getInt(nodeMetaStart + nodeMetaByteSize * idx + maxPosOffset) +
           nodeMetaStart + nodeMetaByteSize * getNodesCount
     def getNodeOffset(idx: Int): Int =
-      Platform.getInt(baseObj, baseOffset + nodeMetaStart + idx * nodeMetaByteSize + nodePosOffset)
+      fiberCache.getInt(nodeMetaStart + idx * nodeMetaByteSize + nodePosOffset)
     def getNodeSize(idx: Int): Int =
-      Platform.getInt(baseObj, baseOffset + nodeMetaStart + idx * nodeMetaByteSize + nodeSizeOffset)
+      fiberCache.getInt(nodeMetaStart + idx * nodeMetaByteSize + nodeSizeOffset)
   }
 
   private[index] case class BTreeRowIdList(fiberCache: FiberCache) {
-    private val (baseObj, baseOffset) = (fiberCache.getBaseObj, fiberCache.getBaseOffset)
-    def getRowId(idx: Int): Int = Platform.getInt(baseObj, baseOffset + idx * Integer.SIZE / 8)
+    def getRowId(idx: Int): Int = fiberCache.getInt(idx * Integer.SIZE / 8)
   }
 
   private[index] case class BTreeNodeData(fiberCache: FiberCache) {
     private val posSectionStart = Integer.SIZE / 8
     private val posEntrySize = Integer.SIZE / 8 * 2
-    private val (baseObj, baseOffset) = (fiberCache.getBaseObj, fiberCache.getBaseOffset)
     private def valueSectionStart = posSectionStart + getKeyCount * posEntrySize
 
-    def getKeyCount: Int = Platform.getInt(baseObj, baseOffset)
+    def getKeyCount: Int = fiberCache.getInt(0)
     def getKey(idx: Int, schema: StructType): InternalRow = {
       val offset = valueSectionStart +
-          Platform.getInt(baseObj, baseOffset + posSectionStart + idx * posEntrySize)
-      BTreeIndexRecordReader.readBasedOnSchema(baseObj, baseOffset + offset, schema)
+          fiberCache.getInt(posSectionStart + idx * posEntrySize)
+      BTreeIndexRecordReader.readBasedOnSchema(fiberCache, offset, schema)
     }
     def getRowIdPos(idx: Int): Int =
-      Platform.getInt(baseObj, baseOffset + posSectionStart + idx * posEntrySize + Integer.SIZE / 8)
+      fiberCache.getInt(posSectionStart + idx * posEntrySize + Integer.SIZE / 8)
   }
 }

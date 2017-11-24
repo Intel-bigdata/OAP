@@ -20,11 +20,13 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.util.concurrent.atomic.AtomicLong
 
 import org.apache.spark.SparkEnv
+import org.apache.spark.sql.execution.datasources.oap.ColumnValues
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.storage.{BlockManager, TestBlockId}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
+import org.apache.spark.unsafe.types.UTF8String
 
 // TODO: make it an alias of MemoryBlock
 trait FiberCache {
@@ -51,8 +53,21 @@ trait FiberCache {
   }
 
   // TODO: Hide this, change to generic getXXX function instead.
-  def getBaseObj: AnyRef = fiberData.getBaseObject
-  def getBaseOffset: Long = fiberData.getBaseOffset
+  private def getBaseObj: AnyRef = fiberData.getBaseObject
+  private def getBaseOffset: Long = fiberData.getBaseOffset
+
+  def getBoolean(offset: Long): Boolean = Platform.getBoolean(getBaseObj, getBaseOffset + offset)
+  def getByte(offset: Long): Byte = Platform.getByte(getBaseObj, getBaseOffset + offset)
+  def getInt(offset: Long): Int = Platform.getInt(getBaseObj, getBaseOffset + offset)
+  def getDouble(offset: Long): Double = Platform.getDouble(getBaseObj, getBaseOffset + offset)
+  def getLong(offset: Long): Long = Platform.getLong(getBaseObj, getBaseOffset + offset)
+  def getShort(offset: Long): Short = Platform.getShort(getBaseObj, getBaseOffset + offset)
+  def getFloat(offset: Long): Float = Platform.getFloat(getBaseObj, getBaseOffset + offset)
+  def getUTF8String(offset: Long, length: Int): UTF8String =
+    UTF8String.fromAddress(getBaseObj, getBaseOffset + offset, length)
+  /** TODO: may cause copy memory from off-heap to on-heap, used by [[ColumnValues]] */
+  def copyMemory(offset: Long, dst: AnyRef, dstOffset: Long, length: Long): Unit =
+    Platform.copyMemory(getBaseObj, getBaseOffset + offset, dst, dstOffset, length)
 
   def size(): Long = fiberData.size()
 }

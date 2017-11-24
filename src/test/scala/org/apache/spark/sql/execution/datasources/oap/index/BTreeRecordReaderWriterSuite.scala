@@ -77,7 +77,7 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
       IndexUtils.writeBasedOnDataType(writer, value)
 
       val (answerValue, offset) = IndexUtils.readBasedOnDataType(
-        buf.toByteArray, Platform.BYTE_ARRAY_OFFSET, toSparkDataType(value))
+        FiberCache(buf.toByteArray), 0L, toSparkDataType(value))
 
       assert(value === answerValue, s"value: $value")
       value match {
@@ -101,7 +101,7 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
       val writer = new LittleEndianDataOutputStream(buf)
       BTreeIndexRecordWriter.writeBasedOnSchema(writer, row, schema)
       val answerRow = BTreeIndexRecordReader.readBasedOnSchema(
-        buf.toByteArray, Platform.BYTE_ARRAY_OFFSET, schema)
+        FiberCache(buf.toByteArray), 0L, schema)
       assert(row.equals(answerRow))
     }
   }
