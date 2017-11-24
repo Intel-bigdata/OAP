@@ -66,7 +66,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     } else dictionaries(fiberId)
   }
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): ChunkedByteBuffer = {
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): Array[Byte] = {
     val groupMeta = meta.rowGroupsMeta(groupId)
     val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
 
@@ -103,7 +103,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
       if (groupId == meta.groupCount - 1) meta.rowCountInLastGroup
       else meta.rowCountInEachGroup
 
-    putToFiberCache(fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount))
+    fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
   }
 
   private def putToFiberCache(buf: Array[Byte]): ChunkedByteBuffer = {
@@ -126,7 +126,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     val iterator =
       (0 until meta.groupCount).iterator.flatMap { groupId =>
         val fiberCacheGroup = requiredIds.map(id =>
-          FiberCacheManager.getOrElseUpdate(DataFiber(this, id, groupId), conf))
+          FiberCacheManager.get(DataFiber(this, id, groupId), conf))
 
         val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
           new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache)
@@ -156,7 +156,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
       groupIds.iterator.flatMap {
         case (groupId, subRowIds) =>
           val fiberCacheGroup = requiredIds.map(id =>
-            FiberCacheManager.getOrElseUpdate(DataFiber(this, id, groupId), conf))
+            FiberCacheManager.get(DataFiber(this, id, groupId), conf))
 
           val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
             new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache)

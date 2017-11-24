@@ -50,11 +50,11 @@ private[index] case class BTreeIndexRecordReader(
     reader = BTreeIndexFileReader(configuration, path)
 
     footerFiber = BTreeFiber(() => reader.readFooter(), reader.file.toString, 0, 0)
-    footerCache = FiberCacheManager.getOrElseUpdate(footerFiber, configuration)
+    footerCache = FiberCacheManager.get(footerFiber, configuration)
     footer = BTreeFooter(footerCache)
 
     rowIdListFiber = BTreeFiber(() => reader.readRowIdList(), reader.file.toString, 1, 0)
-    rowIdListCache = FiberCacheManager.getOrElseUpdate(rowIdListFiber, configuration)
+    rowIdListCache = FiberCacheManager.get(rowIdListFiber, configuration)
     rowIdList = BTreeRowIdList(rowIdListCache)
 
     internalIterator = intervalArray.toIterator.flatMap { interval =>
@@ -99,7 +99,7 @@ private[index] case class BTreeIndexRecordReader(
       2,
       nodeIdx
     )
-    val nodeCache = FiberCacheManager.getOrElseUpdate(nodeFiber, configuration)
+    val nodeCache = FiberCacheManager.get(nodeFiber, configuration)
     val node = BTreeNodeData(nodeCache)
 
     val keyCount = node.getKeyCount
@@ -120,7 +120,7 @@ private[index] case class BTreeIndexRecordReader(
             reader.file.toString,
             2,
             nodeIdx + 1)
-          val nextNodeCache = FiberCacheManager.getOrElseUpdate(nextNodeFiber, configuration)
+          val nextNodeCache = FiberCacheManager.get(nextNodeFiber, configuration)
           val nextNode = BTreeNodeData(nextNodeCache)
           val rowPos = nextNode.getRowIdPos(0)
           releaseCache(nextNodeCache, nextNodeFiber)

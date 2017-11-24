@@ -46,7 +46,7 @@ private[oap] trait CommonIndexFile {
  * Read the index file into memory, and can be accessed as [[ChunkedByteBuffer]].
  */
 private[oap] case class IndexFile(file: Path) extends CommonIndexFile {
-  def getIndexFiberData(conf: Configuration): ChunkedByteBuffer = {
+  def getIndexFiberData(conf: Configuration): Array[Byte] = {
     val fs = file.getFileSystem(conf)
     val fin = fs.open(file)
     // wind to end of file to get tree root
@@ -56,8 +56,7 @@ private[oap] case class IndexFile(file: Path) extends CommonIndexFile {
 
     fin.readFully(0, bytes)
     fin.close()
-    // TODO partial cached index fiber
-    putToFiberCache(bytes)
+    bytes
   }
 }
 

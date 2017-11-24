@@ -32,7 +32,6 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
 
   var currentKeyIdx = 0
   var indexFiber: IndexFiber = _
-  var indexData: CacheResult = _
   var recordReader: BTreeIndexRecordReader = _
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner = {

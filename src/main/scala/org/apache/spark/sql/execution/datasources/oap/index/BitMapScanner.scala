@@ -139,7 +139,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     bmFooterOffset = idxFileSize - BITMAP_FOOTER_SIZE
     // Cache the segments after first loading from file.
     bmFooterFiber = BitmapFiber(() => loadBmFooter(fin), idxPath.toString, 6, 0)
-    bmFooterCache = FiberCacheManager.getOrElseUpdate(bmFooterFiber, conf)
+    bmFooterCache = FiberCacheManager.get(bmFooterFiber, conf)
     readBmFooterFromCache(bmFooterCache)
 
     // Get the offset for the different segments in bitmap index file.
@@ -148,13 +148,13 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     bmOffsetListOffset = bmEntryListOffset + bmEntryListTotalSize
 
     bmUniqueKeyListFiber = BitmapFiber(() => loadBmKeyList(fin), idxPath.toString, 2, 0)
-    bmUniqueKeyListCache = FiberCacheManager.getOrElseUpdate(bmUniqueKeyListFiber, conf)
+    bmUniqueKeyListCache = FiberCacheManager.get(bmUniqueKeyListFiber, conf)
 
     bmEntryListFiber = BitmapFiber(() => loadBmEntryList(fin), idxPath.toString, 3, 0)
-    bmEntryListCache = FiberCacheManager.getOrElseUpdate(bmEntryListFiber, conf)
+    bmEntryListCache = FiberCacheManager.get(bmEntryListFiber, conf)
 
     bmOffsetListFiber = BitmapFiber(() => loadBmOffsetList(fin), idxPath.toString, 4, 0)
-    bmOffsetListCache = FiberCacheManager.getOrElseUpdate(bmOffsetListFiber, conf)
+    bmOffsetListCache = FiberCacheManager.get(bmOffsetListFiber, conf)
     fin.close()
   }
 
