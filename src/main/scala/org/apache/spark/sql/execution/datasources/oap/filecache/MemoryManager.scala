@@ -19,10 +19,10 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.atomic.AtomicLong
 
-import org.apache.spark.SparkEnv
-import org.apache.spark.sql.execution.datasources.oap.ColumnValues
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
+import org.apache.spark.SparkEnv
+import org.apache.spark.sql.execution.datasources.oap.ColumnValues
 import org.apache.spark.storage.{BlockManager, TestBlockId}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}

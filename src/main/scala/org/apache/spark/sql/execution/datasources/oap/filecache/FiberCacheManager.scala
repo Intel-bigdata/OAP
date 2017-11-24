@@ -20,15 +20,17 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.nio.ByteBuffer
 import java.util.concurrent.{Callable, TimeUnit}
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.oldFiberCacheManager.{block2Fiber, dataFileIdMap, logDebug}
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.storage.{BlockId, FiberBlockId, StorageLevel}
@@ -36,8 +38,6 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.TimeStampedHashMap
 import org.apache.spark.util.collection.BitSet
 import org.apache.spark.util.io.ChunkedByteBuffer
-
-import scala.collection.JavaConverters._
 
 // TODO need to register within the SparkContext
 class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {

@@ -17,21 +17,19 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import java.nio.ByteBuffer
-
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
+
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.{ByteBufferOutputStream, Utils}
-import org.apache.spark.util.io.ChunkedByteBuffer
 
 class BTreeRecordReaderWriterSuite extends SparkFunSuite {
 

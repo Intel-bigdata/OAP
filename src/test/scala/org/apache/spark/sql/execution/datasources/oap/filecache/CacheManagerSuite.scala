@@ -18,7 +18,9 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import scala.util.Random
+
 import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.{SparkConf, SparkContext, SparkFunSuite}
 
 class CacheManagerSuite extends SparkFunSuite {

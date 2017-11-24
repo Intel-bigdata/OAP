@@ -21,6 +21,7 @@ import java.io.OutputStream
 
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
+
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat

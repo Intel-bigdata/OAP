@@ -18,15 +18,14 @@
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import sun.nio.ch.DirectBuffer
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.oap.filecache.{BTreeFiber, CacheResult, FiberCache, FiberCacheManager}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{BTreeFiber, FiberCache, FiberCacheManager}
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.Platform
-import org.apache.spark.util.io.ChunkedByteBuffer
 
 private[index] case class BTreeIndexRecordReader(
     configuration: Configuration,
