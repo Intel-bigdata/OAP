@@ -17,25 +17,19 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
-import sun.nio.ch.DirectBuffer
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 import org.apache.spark.util.collection.BitSet
-import org.apache.spark.util.io.ChunkedByteBuffer
 
 
-class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByteBuffer) {
+class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache) {
   require(dataType.isInstanceOf[AtomicType], "Only atomic type accepted for now.")
 
-  private val (baseObject, baseOffset): (Object, Long) = buffer.chunks.headOption match {
-    case Some(buf: DirectBuffer) => (null, buf.address())
-    case _ => (buffer.toArray, Platform.BYTE_ARRAY_OFFSET)
-  }
   // for any FiberData, the first defaultSize / 8 will be the bitmask
   // TODO what if defaultSize / 8 is not an integer?
 
@@ -43,13 +37,12 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByte
   val bitset: BitSet = {
     val bs = new BitSet(defaultSize)
     val longs = bs.toLongArray()
-    Platform.copyMemory(baseObject, baseOffset,
-      longs, Platform.LONG_ARRAY_OFFSET, longs.length * 8)
+    buffer.copyMemory(0, longs, Platform.LONG_ARRAY_OFFSET, longs.length * 8)
 
     bs
   }
 
-  private val dataOffset = baseOffset + bitset.toLongArray().length * 8
+  private val dataOffset = bitset.toLongArray().length * 8
 
   def isNullAt(idx: Int): Boolean = !bitset.get(idx)
 
@@ -77,28 +70,28 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByte
   def get(idx: Int): AnyRef = getAs(idx)
 
   def getBooleanValue(idx: Int): Boolean = {
-    Platform.getBoolean(baseObject, dataOffset + idx * BooleanType.defaultSize)
+    buffer.getBoolean(dataOffset + idx * BooleanType.defaultSize)
   }
   def getByteValue(idx: Int): Byte = {
-    Platform.getByte(baseObject, dataOffset + idx * ByteType.defaultSize)
+    buffer.getByte(dataOffset + idx * ByteType.defaultSize)
   }
   def getDateValue(idx: Int): Int = {
-    Platform.getInt(baseObject, dataOffset + idx * IntegerType.defaultSize)
+    buffer.getInt(dataOffset + idx * IntegerType.defaultSize)
   }
   def getDoubleValue(idx: Int): Double = {
-    Platform.getDouble(baseObject, dataOffset + idx * DoubleType.defaultSize)
+    buffer.getDouble(dataOffset + idx * DoubleType.defaultSize)
   }
   def getIntValue(idx: Int): Int = {
-    Platform.getInt(baseObject, dataOffset + idx * IntegerType.defaultSize)
+    buffer.getInt(dataOffset + idx * IntegerType.defaultSize)
   }
   def getLongValue(idx: Int): Long = {
-    Platform.getLong(baseObject, dataOffset + idx * LongType.defaultSize)
+    buffer.getLong(dataOffset + idx * LongType.defaultSize)
   }
   def getShortValue(idx: Int): Short = {
-    Platform.getShort(baseObject, dataOffset + idx * ShortType.defaultSize)
+    buffer.getShort(dataOffset + idx * ShortType.defaultSize)
   }
   def getFloatValue(idx: Int): Float = {
-    Platform.getFloat(baseObject, dataOffset + idx * FloatType.defaultSize)
+    buffer.getFloat(dataOffset + idx * FloatType.defaultSize)
   }
 
   def getStringValue(idx: Int): UTF8String = {
@@ -117,7 +110,8 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByte
     //    value #N
     val length = getIntValue(idx * 2)
     val offset = getIntValue(idx * 2 + 1)
-    UTF8String.fromAddress(baseObject, baseOffset + offset, length)
+
+    buffer.getUTF8String(offset, length)
   }
 
   def getBinaryValue(idx: Int): Array[Byte] = {
@@ -137,8 +131,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByte
     val length = getIntValue(idx * 2)
     val offset = getIntValue(idx * 2 + 1)
     val result = new Array[Byte](length)
-    Platform.copyMemory(baseObject, baseOffset + offset, result,
-      Platform.BYTE_ARRAY_OFFSET, length)
+    buffer.copyMemory(offset, result, Platform.BYTE_ARRAY_OFFSET, length)
 
     result
   }

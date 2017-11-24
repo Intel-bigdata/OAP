@@ -18,9 +18,11 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.nio.ByteBuffer
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{Callable, TimeUnit}
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
@@ -36,7 +38,6 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.TimeStampedHashMap
 import org.apache.spark.util.collection.BitSet
 import org.apache.spark.util.io.ChunkedByteBuffer
-
 
 // TODO need to register within the SparkContext
 class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
@@ -57,10 +58,110 @@ private[oap] class CacheResult (
   val cached: Boolean,
   val buffer: ChunkedByteBuffer)
 
+/** CacheManager
+ *
+ *  TODO: Do we need change object to class for better initialization
+ *  TODO: Change to FiberCacheManger after code is reviewed.
+ */
+object FiberCacheManager extends Logging {
+
+  private val removalListener = new RemovalListener[Fiber, FiberCache] {
+    override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
+      logDebug(s"Removing Cache ${notification.getKey}")
+      notification.getValue.dispose()
+    }
+  }
+
+  /** To avoid storing configuration in each Cache, use a loader. After all, configuration is
+   *  not a part of Fiber.
+   */
+  private def cacheLoader(fiber: Fiber, configuration: Configuration) =
+    new Callable[FiberCache] {
+      override def call(): FiberCache = {
+        logDebug(s"Loading Cache $fiber")
+        MemoryManager.putToFiberCache(fiber.loadData(configuration))
+      }
+    }
+
+  // TODO: add a weigher to help evict cache when memory is used up. Not sure if it's needed.
+  private val cache = CacheBuilder.newBuilder()
+      .recordStats()
+      .concurrencyLevel(4)
+      .removalListener(removalListener)
+      .build[Fiber, FiberCache]()
+
+  // TODO: Will change to get(), keep it for compatible for now
+  def getOrElseUpdate(fiber: Fiber, conf: Configuration): FiberCache = {
+    val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
+    // TODO: How to deal with fiber without enough memory. Put into cache or not?
+    if (!fiberCache.isOffHeap) remove(fiber)
+    fiberCache
+  }
+
+  def remove(fiber: Fiber): Unit = {
+    cache.invalidate(fiber)
+  }
+
+  /** Evict some caches if MemoryManager has no enough memory.
+   *
+   *  Evict FiberCache -> removeListener.onRemoval -> FiberCache.dispose -> MemoryManager.free
+   *  After this, memory is freed.
+   *
+   *  @param space the amount of memory need to be freed.
+   *  @return 0 if can't free the targeted amount.
+   */
+  def evictToFreeSpace(space: Long): Long = {
+    // TODO: For example: Can't evict fiber in reading state or a FiberCache used on-heap memory
+    def isEvictable(fiber: Fiber, data: FiberCache): Boolean = true
+
+    var freedMemory = 0L
+    val selectedFibers = new ArrayBuffer[Fiber]
+    val iterator = cache.asMap().entrySet().iterator()
+    // TODO: Do we need to make sure the cache map is not changed during this eviction?
+    while (freedMemory < space && iterator.hasNext) {
+      val pair = iterator.next()
+      val (key, value) = (pair.getKey, pair.getValue)
+      if (isEvictable(key, value)) {
+        selectedFibers += key
+        freedMemory += value.size()
+      }
+    }
+    if (freedMemory >= space) {
+      selectedFibers.foreach(remove)
+      freedMemory
+    } else {
+      0L
+    }
+  }
+
+  // TODO: test case
+  private[filecache] def status: String = {
+    val dataFibers = this.cache.asMap().keySet().asScala.collect {
+      case fiber: DataFiber => fiber
+    }
+
+    val statusRawData = dataFibers.groupBy(_.file).map {
+      case (dataFile, fiberSet) =>
+        val fileMeta = DataFileHandleCacheManager(dataFile).asInstanceOf[OapDataFileHandle]
+        val fiberBitSet = new BitSet(fileMeta.groupCount * fileMeta.fieldCount)
+        fiberSet.foreach(fiber =>
+          fiberBitSet.set(fiber.columnIndex + fileMeta.fieldCount * fiber.rowGroupId))
+        FiberCacheStatus(dataFile.path, fiberBitSet, fileMeta)
+    }.toSeq
+
+    val retStatus = CacheStatusSerDe.serialize(statusRawData)
+    retStatus
+  }
+
+  // TODO: getStats maybe more flexible
+  def getHitCount: Long = cache.stats().hitCount()
+  def getMissCount: Long = cache.stats().missCount()
+}
+
 /**
  * Fiber Cache Manager
  */
-object FiberCacheManager extends Logging {
+object oldFiberCacheManager extends Logging {
 
   private val dataFileIdMap = new TimeStampedHashMap[String, DataFile](updateTimeStampOnGet = true)
 
@@ -217,20 +318,30 @@ private[oap] object DataFileHandleCacheManager extends Logging {
   }
 }
 
-private[oap] trait Fiber
+private[oap] trait Fiber {
+  def loadData(configuration: Configuration): Array[Byte]
+}
 
 private[oap]
-case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber
+case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
+  override def loadData(configuration: Configuration): Array[Byte] =
+    file.getFiberData(rowGroupId, columnIndex, configuration).toArray
+}
 
 private[oap]
-case class IndexFiber(file: IndexFile) extends Fiber
+case class IndexFiber(file: IndexFile) extends Fiber {
+  override def loadData(configuration: Configuration): Array[Byte] =
+    file.getIndexFiberData(configuration).toArray
+}
 
 private[oap]
 case class BTreeFiber(
     getFiberData: () => Array[Byte],
     file: String,
     section: Int,
-    idx: Int) extends Fiber
+    idx: Int) extends Fiber {
+  override def loadData(configuration: Configuration): Array[Byte] = getFiberData()
+}
 
 private[oap]
 case class BitmapFiber(
@@ -239,4 +350,10 @@ case class BitmapFiber(
     // "0" means no split sections within file.
     sectionIdxOfFile: Int,
     // "0" means no smaller loading units.
-    loadUnitIdxOfSection: Int) extends Fiber
+    loadUnitIdxOfSection: Int) extends Fiber {
+  override def loadData(configuration: Configuration): Array[Byte] = getFiberData()
+}
+
+private[oap] case class TestFiber(getData: () => Array[Byte], name: String) extends Fiber {
+  override def loadData(configuration: Configuration): Array[Byte] = getData()
+}
