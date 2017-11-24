@@ -18,10 +18,10 @@
 package org.apache.spark.sql.execution.datasources.oap
 
 import sun.nio.ch.DirectBuffer
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{Fiber, FiberCache}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
@@ -29,13 +29,10 @@ import org.apache.spark.util.collection.BitSet
 import org.apache.spark.util.io.ChunkedByteBuffer
 
 
-class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByteBuffer) {
+class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache) {
   require(dataType.isInstanceOf[AtomicType], "Only atomic type accepted for now.")
 
-  private val (baseObject, baseOffset): (Object, Long) = buffer.chunks.headOption match {
-    case Some(buf: DirectBuffer) => (null, buf.address())
-    case _ => (buffer.toArray, Platform.BYTE_ARRAY_OFFSET)
-  }
+  private val (baseObject, baseOffset) = (buffer.getBaseObj, buffer.getBaseOffset)
   // for any FiberData, the first defaultSize / 8 will be the bitmask
   // TODO what if defaultSize / 8 is not an integer?
 

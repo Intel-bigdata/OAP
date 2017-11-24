@@ -22,14 +22,13 @@ import java.util.concurrent.{Callable, TimeUnit}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.filecache.oldFiberCacheManager.{block2Fiber, dataFileIdMap, logDebug}
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.storage.{BlockId, FiberBlockId, StorageLevel}
@@ -37,6 +36,8 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.TimeStampedHashMap
 import org.apache.spark.util.collection.BitSet
 import org.apache.spark.util.io.ChunkedByteBuffer
+
+import scala.collection.JavaConverters._
 
 // TODO need to register within the SparkContext
 class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
@@ -62,7 +63,7 @@ private[oap] class CacheResult (
  *  TODO: Do we need change object to class for better initialization
  *  TODO: Change to FiberCacheManger after code is reviewed.
  */
-object CacheManager extends Logging {
+object FiberCacheManager extends Logging {
 
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
@@ -133,6 +134,25 @@ object CacheManager extends Logging {
     }
   }
 
+  // TODO: test case
+  private[filecache] def status: String = {
+    val dataFibers = this.cache.asMap().keySet().asScala.collect {
+      case fiber: DataFiber => fiber
+    }
+
+    val statusRawData = dataFibers.groupBy(_.file).map {
+      case (dataFile, fiberSet) =>
+        val fileMeta = DataFileHandleCacheManager(dataFile).asInstanceOf[OapDataFileHandle]
+        val fiberBitSet = new BitSet(fileMeta.groupCount * fileMeta.fieldCount)
+        fiberSet.foreach(fiber =>
+          fiberBitSet.set(fiber.columnIndex + fileMeta.fieldCount * fiber.rowGroupId))
+        FiberCacheStatus(dataFile.path, fiberBitSet, fileMeta)
+    }.toSeq
+
+    val retStatus = CacheStatusSerDe.serialize(statusRawData)
+    retStatus
+  }
+
   // TODO: getStats maybe more flexible
   def getHitCount: Long = cache.stats().hitCount()
   def getMissCount: Long = cache.stats().missCount()
@@ -141,7 +161,7 @@ object CacheManager extends Logging {
 /**
  * Fiber Cache Manager
  */
-object FiberCacheManager extends Logging {
+object oldFiberCacheManager extends Logging {
 
   private val dataFileIdMap = new TimeStampedHashMap[String, DataFile](updateTimeStampOnGet = true)
 

@@ -50,7 +50,19 @@ trait FiberCache {
     bytes
   }
 
+  // TODO: Hide this, change to generic getXXX function instead.
+  def getBaseObj: AnyRef = fiberData.getBaseObject
+  def getBaseOffset: Long = fiberData.getBaseOffset
+
   def size(): Long = fiberData.size()
+}
+
+object FiberCache {
+  // Give test suite a way to convert Array[Byte] to FiberCache. For test purpose.
+  private[oap] def apply(data: Array[Byte]): FiberCache = {
+    val memoryBlock = new MemoryBlock(data, Platform.BYTE_ARRAY_OFFSET, data.length)
+    DataFiberCache(memoryBlock)
+  }
 }
 
 // Data fiber caching, the in-memory representation can be found at [[DataFiberBuilder]]
@@ -109,7 +121,7 @@ private[oap] object MemoryManager extends Logging {
    *  Leave it empty for now
    *  TODO: finish this after Cache Manager is ready.
    */
-  private def freeSpace(space: Long): Long = CacheManager.evictToFreeSpace(space)
+  private def freeSpace(space: Long): Long = FiberCacheManager.evictToFreeSpace(space)
 
   /** Set to private, since putToFiberCache is enough for Cache Manager to request memory */
   private[filecache] def allocate(numOfBytes: Int): Option[MemoryBlock] = {

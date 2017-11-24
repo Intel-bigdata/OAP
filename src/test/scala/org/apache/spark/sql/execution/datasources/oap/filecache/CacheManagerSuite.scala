@@ -30,7 +30,8 @@ class CacheManagerSuite extends SparkFunSuite {
     bytes
   }
 
-  test("test CacheManager") {
+  // TODO: can only run alone since CacheManager is an object.
+  ignore("test FiberCacheManager") {
 
     new SparkContext(
       "local[2]",
@@ -48,38 +49,38 @@ class CacheManagerSuite extends SparkFunSuite {
     val fiber1 = TestFiber(() => data1, s"test fiber #1, size 256")
     val fiber2 = TestFiber(() => data2, s"test fiber #2, size 512")
     val fiber3 = TestFiber(() => data3, s"test fiber #3, size 665")
-    val fiber4 = TestFiber(() => data4, s"test fiber #4, size 1433")
+    val fiber4 = TestFiber(() => data4, s"test fiber #4, size 7168")
     val fiber5 = TestFiber(() => data5, s"test fiber #5, size 10240")
 
     // Put 3 fibers into empty cache
-    CacheManager.getOrElseUpdate(fiber1, configuration)
-    CacheManager.getOrElseUpdate(fiber2, configuration)
-    CacheManager.getOrElseUpdate(fiber3, configuration)
-    assert(CacheManager.getMissCount == 3)
+    FiberCacheManager.getOrElseUpdate(fiber1, configuration)
+    FiberCacheManager.getOrElseUpdate(fiber2, configuration)
+    FiberCacheManager.getOrElseUpdate(fiber3, configuration)
+    assert(FiberCacheManager.getMissCount == 3)
 
     // Get 3 fibers from cache
-    CacheManager.getOrElseUpdate(fiber1, configuration)
-    CacheManager.getOrElseUpdate(fiber2, configuration)
-    CacheManager.getOrElseUpdate(fiber3, configuration)
-    assert(CacheManager.getHitCount == 3)
+    FiberCacheManager.getOrElseUpdate(fiber1, configuration)
+    FiberCacheManager.getOrElseUpdate(fiber2, configuration)
+    FiberCacheManager.getOrElseUpdate(fiber3, configuration)
+    assert(FiberCacheManager.getHitCount == 3)
 
     // Put 1 large fiber into cache will cause eviction
-    CacheManager.getOrElseUpdate(fiber4, configuration)
-    assert(CacheManager.getMissCount == 4)
+    FiberCacheManager.getOrElseUpdate(fiber4, configuration)
+    assert(FiberCacheManager.getMissCount == 4)
     // Get large fiber from cache
-    CacheManager.getOrElseUpdate(fiber4, configuration)
-    assert(CacheManager.getHitCount == 4)
+    FiberCacheManager.getOrElseUpdate(fiber4, configuration)
+    assert(FiberCacheManager.getHitCount == 4)
 
     // Get 3 removed fibers from cache
-    CacheManager.getOrElseUpdate(fiber1, configuration)
-    CacheManager.getOrElseUpdate(fiber2, configuration)
-    CacheManager.getOrElseUpdate(fiber3, configuration)
-    assert(CacheManager.getMissCount == 7)
+    FiberCacheManager.getOrElseUpdate(fiber1, configuration)
+    FiberCacheManager.getOrElseUpdate(fiber2, configuration)
+    FiberCacheManager.getOrElseUpdate(fiber3, configuration)
+    assert(FiberCacheManager.getMissCount == 7)
 
     // Put too large fiber into cache, will not remove other fibers
-    CacheManager.getOrElseUpdate(fiber5, configuration)
-    assert(CacheManager.getMissCount == 8)
-    CacheManager.getOrElseUpdate(fiber2, configuration)
-    assert(CacheManager.getMissCount == 8)
+    FiberCacheManager.getOrElseUpdate(fiber5, configuration)
+    assert(FiberCacheManager.getMissCount == 8)
+    FiberCacheManager.getOrElseUpdate(fiber2, configuration)
+    assert(FiberCacheManager.getMissCount == 8)
   }
 }
