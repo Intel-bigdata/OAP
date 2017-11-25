@@ -123,16 +123,16 @@ private[oap] object MemoryManager extends Logging {
 
   // TODO: a config to control max memory size
   private val _maxMemory = {
-    val sparkMemoryManager = if (SparkEnv.get == null) None else Some(SparkEnv.get.memoryManager)
-    sparkMemoryManager.flatMap { memoryManager =>
+    if (SparkEnv.get == null) {
+      throw new OapException("No SparkContext is found")
+    } else {
+      val memoryManager = SparkEnv.get.memoryManager
       val oapMaxMemory = (memoryManager.maxOffHeapStorageMemory * 0.7).toLong
       if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
-        Some(oapMaxMemory)
+        oapMaxMemory
       } else {
-        None
+        throw new OapException("Can't acquire memory from spark Memory Manager")
       }
-    }.getOrElse {
-      throw new OapException("Can't acquire memory from spark Memory Manager")
     }
   }
 

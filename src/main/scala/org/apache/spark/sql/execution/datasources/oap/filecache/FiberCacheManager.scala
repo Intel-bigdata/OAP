@@ -20,8 +20,10 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.util.concurrent.{Callable, TimeUnit}
 
 import scala.collection.JavaConverters._
+
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
@@ -30,7 +32,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.MemoryManager.al
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.unsafe.Platform
-import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.util.collection.BitSet
 
 // TODO need to register within the SparkContext
@@ -54,11 +55,12 @@ object FiberCacheManager extends Logging {
     }
   }
   private val weigher = new Weigher[Fiber, FiberCache] {
-    override def weigh(key: Fiber, value: FiberCache): Int = (value.size() / MB).toInt
+    override def weigh(key: Fiber, value: FiberCache): Int =
+      math.ceil(value.size() / MB).toInt
   }
 
-  private val MB = 1024 * 1024
-  private val maxWeight = MemoryManager.maxMemory / MB
+  private val MB: Double = 1024 * 1024
+  private val maxWeight = (MemoryManager.maxMemory / MB).toInt
 
   /**
    * To avoid storing configuration in each Cache, use a loader.
@@ -148,6 +150,7 @@ object FiberCacheManager extends Logging {
       case IndexFiber(file) => file.getIndexFiberData(conf)
       case BTreeFiber(getFiberData, _, _, _) => getFiberData()
       case BitmapFiber(getFiberData, _, _, _) => getFiberData()
+      case TestFiber(getFiberData, _) => getFiberData()
       case other => throw new OapException(s"Cannot identify what's $other")
     }
     putToFiberCache(data)
