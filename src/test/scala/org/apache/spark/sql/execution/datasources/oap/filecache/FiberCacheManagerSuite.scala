@@ -78,4 +78,24 @@ class FiberCacheManagerSuite extends SparkFunSuite {
     println(stats.evictionCount())
     assert(fiberCacheInUse.isDisposed)
   }
+  test("add a very large fbier") {
+    new SparkContext(
+      "local[2]",
+      "FiberCacheManagerSuite",
+      new SparkConf().set("spark.memory.offHeap.size", "100m")
+    )
+    val configuration = new Configuration()
+    val MB: Double = 1024 * 1024
+    val memorySizeInMB = (MemoryManager.maxMemory / MB).toInt
+    // Cache concurrency is 4, means maximum ENTRY size is memory size / 4
+    val data = generateData(memorySizeInMB * 1024 * 1024 / 8)
+    val fiber = TestFiber(() => data, s"test fiber #0")
+    val fiberCache = FiberCacheManager.get(fiber, configuration)
+    assert(!fiberCache.isDisposed)
+
+    val data1 = generateData(memorySizeInMB * 1024 * 1024 / 2)
+    val fiber1 = TestFiber(() => data1, s"test fiber #1")
+    val fiberCache1 = FiberCacheManager.get(fiber1, configuration)
+    assert(fiberCache1.isDisposed)
+  }
 }
