@@ -31,6 +31,12 @@ import org.apache.spark.unsafe.types.UTF8String
 
 // TODO: make it an alias of MemoryBlock
 trait FiberCache {
+  /*
+  def updateFiberData(fiberData: MemoryBlock): Unit = {
+    this.fiberData.setObjAndOffset(fiberData.getBaseObject, fiberData.getBaseOffset)
+  }
+  */
+
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
 
@@ -41,6 +47,7 @@ trait FiberCache {
     disposed = true
   }
 
+  def isDisposed: Boolean = disposed
   /** For debug purpose */
   def toArray: Array[Byte] = {
     // TODO: Handle overflow

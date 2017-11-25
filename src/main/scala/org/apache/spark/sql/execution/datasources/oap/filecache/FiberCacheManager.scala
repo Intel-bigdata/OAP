@@ -20,10 +20,8 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.util.concurrent.{Callable, TimeUnit}
 
 import scala.collection.JavaConverters._
-
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
@@ -32,6 +30,7 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.MemoryManager.al
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.unsafe.Platform
+import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.util.collection.BitSet
 
 // TODO need to register within the SparkContext
@@ -72,6 +71,20 @@ object FiberCacheManager extends Logging {
         fiber2Data(fiber, configuration)
       }
     }
+  /*
+  private def anotherCacheLoader(fiber: Fiber, configuration: Configuration) = {
+    new Callable[FiberCache] {
+      override def call(): FiberCache = {
+        def calculateFiberSize(fiber: Fiber): Int = {
+          // Some code to get the size of fiber, to request an ENTRY in cache.
+          throw new NotImplementedError()
+        }
+        val memoryBlock = new MemoryBlock(null, -1, calculateFiberSize(fiber))
+        DataFiberCache(memoryBlock)
+      }
+    }
+  }
+  */
 
   private val cache = CacheBuilder.newBuilder()
       .recordStats()
@@ -91,6 +104,21 @@ object FiberCacheManager extends Logging {
     // a FiberCache, it's always possible to access a freed memory.
     // So, a flag in FiberCache is needed.
     cache.get(fiber, cacheLoader(fiber, conf))
+    /*
+    // Draft code to handle no enough memory problem
+    val v = cache.get(fiber, anotherCacheLoader(fiber, conf))
+    if (!v.isDisposed) {
+      val fiberData = MemoryManager.allocate(v.size().toInt)
+      val data = fiber2Data(fiber, conf)
+      Platform.copyMemory(
+        data,
+        Platform.BYTE_ARRAY_OFFSET,
+        fiberData.getBaseObject,
+        fiberData.getBaseOffset,
+        fiberData.size())
+      v.updateFiberData(fiberData)
+    }
+    */
   }
 
   // TODO: test case
