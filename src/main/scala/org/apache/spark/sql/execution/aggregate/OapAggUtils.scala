@@ -19,7 +19,8 @@ package org.apache.spark.sql.execution.aggregate
 
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Final, Partial}
-import org.apache.spark.sql.execution.{OapAggregationFileScanExec, SparkPlan}
+import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.datasources.oap.OapAggregationFileScanExec
 
 object OapAggUtils {
   private def createAggregate(

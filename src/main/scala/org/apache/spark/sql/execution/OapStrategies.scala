@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution
+package org.apache.spark.sql.execution.datasources.oap
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -29,9 +29,9 @@ import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalAggr
 import org.apache.spark.sql.catalyst.plans.{logical, LeftSemi}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
+import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.aggregate.OapAggUtils
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.oap.{BitMapIndex, BTreeIndex, IndexType, OapFileFormat}
 import org.apache.spark.sql.execution.joins.BuildRight
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.Utils

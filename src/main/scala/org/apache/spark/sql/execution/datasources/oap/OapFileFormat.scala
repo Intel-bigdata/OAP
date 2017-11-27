@@ -461,13 +461,6 @@ private[sql] object OapFileFormat {
     SerializationUtil.readObjectFromConfAsBase64(OAP_DATA_SOURCE_META, conf)
   }
 
-  val oapOptimizationKeySeq : Seq[String] = {
-    OAP_QUERY_ORDER_OPTION_KEY ::
-    OAP_QUERY_LIMIT_OPTION_KEY ::
-    OAP_INDEX_SCAN_NUM_OPTION_KEY ::
-    OAP_INDEX_GROUP_BY_OPTION_KEY :: Nil
-  }
-
   /**
    * Oap Optimization Options.
    */
@@ -475,4 +468,11 @@ private[sql] object OapFileFormat {
   val OAP_QUERY_LIMIT_OPTION_KEY = "oap.scan.file.limit"
   val OAP_INDEX_SCAN_NUM_OPTION_KEY = "oap.scan.index.limit"
   val OAP_INDEX_GROUP_BY_OPTION_KEY = "oap.scan.index.group"
+
+  val oapOptimizationKeySeq : Seq[String] = {
+      OAP_QUERY_ORDER_OPTION_KEY ::
+      OAP_QUERY_LIMIT_OPTION_KEY ::
+      OAP_INDEX_SCAN_NUM_OPTION_KEY ::
+      OAP_INDEX_GROUP_BY_OPTION_KEY :: Nil
+  }
 }

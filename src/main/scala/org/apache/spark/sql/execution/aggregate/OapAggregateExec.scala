@@ -17,10 +17,7 @@
 
 package org.apache.spark.sql.execution.aggregate
 
-import org.apache.spark.{Partitioner, SparkEnv}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.serializer.Serializer
-import org.apache.spark.shuffle.sort.SortShuffleManager
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.errors._
 import org.apache.spark.sql.catalyst.expressions._

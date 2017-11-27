@@ -107,7 +107,7 @@ private[oap] case class BTreeIndexEntry(ordinal: Int, dir: SortDirection = Ascen
   override def toString: String = ordinal + " " + (if (dir == Ascending) "ASC" else "DESC")
 }
 
-case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends IndexType {
+private[oap] case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends IndexType {
   def appendEntry(entry: BTreeIndexEntry): BTreeIndex = {
     BTreeIndex(entries :+ entry)
   }
@@ -126,13 +126,13 @@ case class BTreeIndex(entries: Seq[BTreeIndexEntry] = Nil) extends IndexType {
     BitSet.fromBitMask(Array(INDEX_METRICS_KEY_ORDER_BIT_MASK | INDEX_METRICS_KEY_GROUP_BIT_MASK))
 }
 
-case class BitMapIndex(entries: Seq[Int] = Nil) extends IndexType {
+private[oap] case class BitMapIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): BitMapIndex = BitMapIndex(entries :+ entry)
 
   override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BITMAP"
 }
 
-case class HashIndex(entries: Seq[Int] = Nil) extends IndexType {
+private[oap] case class HashIndex(entries: Seq[Int] = Nil) extends IndexType {
   def appendEntry(entry: Int): HashIndex = HashIndex(entries :+ entry)
 
   override def toString: String = "COLUMN(" + entries.mkString(", ") + ") BITMAP"
