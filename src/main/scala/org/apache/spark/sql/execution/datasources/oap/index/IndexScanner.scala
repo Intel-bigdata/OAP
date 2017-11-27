@@ -24,12 +24,14 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.unsafe.types.UTF8String
 
 
 private[oap] object IndexScanner {
@@ -206,6 +208,15 @@ private[oap] object ScannerBuilder extends Logging {
         val ranger =
           new RangeInterval(IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END, true, true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
+      case StringStartsWith(attribute, startStr) =>
+        val startUtf8 = UTF8String.fromString(startStr)
+        val endBuffer = new ArrayBuffer[Byte]
+        endBuffer.appendAll(startUtf8.getBytes.slice(0, startUtf8.numBytes() - 1))
+        endBuffer.append((startUtf8.getBytes.apply(startUtf8.numBytes - 1) + 1).toByte)
+        val endUtf8 = UTF8String.fromBytes(endBuffer.toArray)
+        val ranger =
+          new RangeInterval(InternalRow(startUtf8), InternalRow(endUtf8), true, false)
+        mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case _ => mutable.HashMap.empty
     }
   }
@@ -221,6 +232,7 @@ private[oap] object ScannerBuilder extends Logging {
       case Or(ic(indexer), _) => true
       case And(ic(indexer), _) => true
       case In(ic(indexer), _) => true
+      case StringStartsWith(ic(indexer), _) => true
       case _ => false
     }
   }
