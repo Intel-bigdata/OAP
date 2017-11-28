@@ -27,7 +27,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
@@ -70,7 +69,7 @@ object FiberCacheManager extends Logging {
     new Callable[FiberCache] {
       override def call(): FiberCache = {
         logDebug(s"Loading Cache $fiber")
-        fiber2Data(fiber, configuration)
+        fiber.fiber2Data(configuration)
       }
     }
 
@@ -87,7 +86,7 @@ object FiberCacheManager extends Logging {
     cache.get(fiber, cacheLoader(fiber, conf))
   }
 
-  // TODO: test case
+  // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly
   private[filecache] def status: String = {
     val dataFibers = cache.asMap().keySet().asScala.collect {
       case fiber: DataFiber => fiber
@@ -103,18 +102,6 @@ object FiberCacheManager extends Logging {
     }.toSeq
 
     CacheStatusSerDe.serialize(statusRawData)
-  }
-
-  private def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = {
-    fiber match {
-      case DataFiber(file, columnIndex, rowGroupId) =>
-        file.getFiberData(rowGroupId, columnIndex, conf)
-      case IndexFiber(file) => file.getIndexFiberData(conf)
-      case BTreeFiber(getFiberData, _, _, _) => getFiberData()
-      case BitmapFiber(getFiberData, _, _, _) => getFiberData()
-      case TestFiber(getFiberData, _) => getFiberData()
-      case other => throw new OapException(s"Cannot identify what's $other")
-    }
   }
 
   def getStats: CacheStats = cache.stats()
@@ -147,20 +134,29 @@ private[oap] object DataFileHandleCacheManager extends Logging {
   }
 }
 
-private[oap] trait Fiber
+private[oap] trait Fiber {
+  def fiber2Data(conf: Configuration): FiberCache
+}
 
 private[oap]
-case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber
+case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
+  override def fiber2Data(conf: Configuration): FiberCache =
+    file.getFiberData(rowGroupId, columnIndex, conf)
+}
 
 private[oap]
-case class IndexFiber(file: IndexFile) extends Fiber
+case class IndexFiber(file: IndexFile) extends Fiber {
+  override def fiber2Data(conf: Configuration): FiberCache = file.getIndexFiberData(conf)
+}
 
 private[oap]
 case class BTreeFiber(
     getFiberData: () => FiberCache,
     file: String,
     section: Int,
-    idx: Int) extends Fiber
+    idx: Int) extends Fiber {
+  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+}
 
 private[oap]
 case class BitmapFiber(
@@ -169,6 +165,10 @@ case class BitmapFiber(
     // "0" means no split sections within file.
     sectionIdxOfFile: Int,
     // "0" means no smaller loading units.
-    loadUnitIdxOfSection: Int) extends Fiber
+    loadUnitIdxOfSection: Int) extends Fiber {
+  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+}
 
-private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber
+private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
+  override def fiber2Data(conf: Configuration): FiberCache = getData()
+}
