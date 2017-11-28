@@ -70,7 +70,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: ChunkedByte
     case _: MapType => throw new NotImplementedError(s"Map")
     case _: StructType => throw new NotImplementedError(s"Struct")
     case TimestampType => throw new NotImplementedError(s"Timestamp")
-    case other => throw new NotImplementedError(s"other")
+    case other => throw new NotImplementedError(s"$other")
   }
 
   private def getAs[T](idx: Int): T = genericGet(idx).asInstanceOf[T]
@@ -189,14 +189,7 @@ class BatchColumn {
       new GenericInternalRow(row)
     }
 
-    override def anyNull: Boolean = {
-      var i = 0
-      while (i < values.length) {
-        if (values(i).isNullAt(currentIndex)) return true
-        i += 1
-      }
-      return false
-    }
+    override def anyNull: Boolean = values.exists(_.isNullAt(currentIndex))
 
     override def getUTF8String(ordinal: Int): UTF8String =
       values(ordinal).getStringValue(currentIndex)
