@@ -42,7 +42,7 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
 }
 
 /**
- * CacheManager
+ * FiberCacheManager
  *
  * TODO: change object to class for better initialization
  */
@@ -60,7 +60,7 @@ object FiberCacheManager extends Logging {
   }
 
   private val MB: Double = 1024 * 1024
-  private val maxWeight = (MemoryManager.maxMemory / MB).toInt
+  private val MAX_WEIGHT = (MemoryManager.maxMemory / MB).toInt
 
   /**
    * To avoid storing configuration in each Cache, use a loader.
@@ -92,7 +92,7 @@ object FiberCacheManager extends Logging {
       .recordStats()
       .concurrencyLevel(4)
       .removalListener(removalListener)
-      .maximumWeight(maxWeight)
+      .maximumWeight(MAX_WEIGHT)
       .weigher(weigher)
       .build[Fiber, FiberCache]()
 

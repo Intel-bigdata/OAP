@@ -30,7 +30,6 @@ class FiberCacheManagerSuite extends SparkFunSuite {
     bytes
   }
 
-  // scalastyle:off println
   test("unit test") {
     new SparkContext(
       "local[2]",
@@ -54,6 +53,7 @@ class FiberCacheManagerSuite extends SparkFunSuite {
     assert(stats.hitCount() == memorySizeInMB * 2)
     assert(stats.evictionCount() >= memorySizeInMB)
   }
+
   test("remove a fiber is in use") {
     new SparkContext(
       "local[2]",
@@ -75,10 +75,10 @@ class FiberCacheManagerSuite extends SparkFunSuite {
       assert(fiberCache.toArray sameElements data)
     }
     val stats = FiberCacheManager.getStats.minus(origStats)
-    println(stats.evictionCount())
     assert(fiberCacheInUse.isDisposed)
   }
-  test("add a very large fbier") {
+
+  test("add a very large fiber") {
     new SparkContext(
       "local[2]",
       "FiberCacheManagerSuite",
