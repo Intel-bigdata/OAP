@@ -22,7 +22,6 @@ import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 import org.apache.spark.util.collection.BitSet
 
@@ -37,7 +36,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache)
   val bitset: BitSet = {
     val bs = new BitSet(defaultSize)
     val longs = bs.toLongArray()
-    buffer.copyMemory(0, longs, Platform.LONG_ARRAY_OFFSET, longs.length * 8)
+    buffer.getLongs(0, longs)
 
     bs
   }
@@ -131,7 +130,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache)
     val length = getIntValue(idx * 2)
     val offset = getIntValue(idx * 2 + 1)
     val result = new Array[Byte](length)
-    buffer.copyMemory(offset, result, Platform.BYTE_ARRAY_OFFSET, length)
+    buffer.getBytes(offset, result)
 
     result
   }

@@ -82,6 +82,19 @@ trait FiberCache {
   def copyMemory(offset: Long, dst: AnyRef, dstOffset: Long, length: Long): Unit =
     Platform.copyMemory(getBaseObj, getBaseOffset + offset, dst, dstOffset, length)
 
+  def getLongs(offset: Long, dst: Array[Long]): Array[Long] = {
+    copyMemory(offset, dst, Platform.LONG_ARRAY_OFFSET, dst.length * 8)
+    dst
+  }
+  def getInts(offset: Long, dst: Array[Int]): Array[Int] = {
+    copyMemory(offset, dst, Platform.INT_ARRAY_OFFSET, dst.length * 4)
+    dst
+  }
+  def getBytes(offset: Long, dst: Array[Byte]): Array[Byte] = {
+    copyMemory(offset, dst, Platform.BYTE_ARRAY_OFFSET, dst.length)
+    dst
+  }
+
   def size(): Long = fiberData.size()
 }
 
