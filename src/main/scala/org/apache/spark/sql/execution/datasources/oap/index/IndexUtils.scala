@@ -27,7 +27,6 @@ import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
 
 
@@ -121,18 +120,12 @@ private[oap] object IndexUtils {
       case DoubleType => (fiberCache.getDouble(offset), DoubleType.defaultSize)
       case DateType => (fiberCache.getInt(offset), DateType.defaultSize)
       case StringType =>
-        val bytes = new Array[Byte](fiberCache.getInt(offset))
-        fiberCache.copyMemory(
-          offset + Integer.SIZE / 8,
-          bytes, Platform.BYTE_ARRAY_OFFSET,
-          bytes.length)
-        (UTF8String.fromBytes(bytes), Integer.SIZE / 8 + bytes.length)
+        val length = fiberCache.getInt(offset)
+        val string = fiberCache.getUTF8String(offset + Integer.SIZE / 8, length)
+        (string, Integer.SIZE / 8 + length)
       case BinaryType =>
-        val bytes = new Array[Byte](fiberCache.getInt(offset))
-        fiberCache.copyMemory(
-          offset + Integer.SIZE / 8,
-          bytes, Platform.BYTE_ARRAY_OFFSET,
-          bytes.length)
+        val length = fiberCache.getInt(offset)
+        val bytes = fiberCache.getBytes(offset + Integer.SIZE / 8, length)
         (bytes, Integer.SIZE / 8 + bytes.length)
       case other => throw new OapException(s"OAP index currently doesn't support data type $other")
     }

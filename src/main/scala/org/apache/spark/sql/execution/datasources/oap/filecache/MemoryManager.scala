@@ -77,8 +77,14 @@ trait FiberCache {
   def getUTF8String(offset: Long, length: Int): UTF8String =
     UTF8String.fromAddress(getBaseObj, getBaseOffset + offset, length)
 
+  def getBytes(offset: Long, length: Int): Array[Byte] = {
+    val bytes = new Array[Byte](length)
+    copyMemoryToBytes(offset, bytes)
+    bytes
+  }
+
   /** TODO: may cause copy memory from off-heap to on-heap, used by [[ColumnValues]] */
-  def copyMemory(offset: Long, dst: AnyRef, dstOffset: Long, length: Long): Unit =
+  private def copyMemory(offset: Long, dst: AnyRef, dstOffset: Long, length: Long): Unit =
     Platform.copyMemory(getBaseObj, getBaseOffset + offset, dst, dstOffset, length)
 
   def copyMemoryToLongs(offset: Long, dst: Array[Long]): Unit =

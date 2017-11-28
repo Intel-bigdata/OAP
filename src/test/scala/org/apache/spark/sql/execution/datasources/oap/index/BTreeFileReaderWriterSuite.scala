@@ -30,7 +30,7 @@ class BTreeFileReaderWriterSuite extends SparkFunSuite {
       "local[2]",
       "BTreeFileReaderWriterSuite",
       new SparkConf().set("spark.memory.offHeap.size", "100m"))
-    
+
     val path = new Path(Utils.createTempDir().getAbsolutePath, "index")
     val configuration = new Configuration()
     val footer = "footer".getBytes("UTF-8")
