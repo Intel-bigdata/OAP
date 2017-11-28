@@ -20,12 +20,17 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.SparkFunSuite
+import org.apache.spark.{SparkConf, SparkContext, SparkFunSuite}
 import org.apache.spark.util.Utils
 
 class BTreeFileReaderWriterSuite extends SparkFunSuite {
 
   test("BTree File Read/Write") {
+    new SparkContext(
+      "local[2]",
+      "BTreeFileReaderWriterSuite",
+      new SparkConf().set("spark.memory.offHeap.size", "100m"))
+    
     val path = new Path(Utils.createTempDir().getAbsolutePath, "index")
     val configuration = new Configuration()
     val footer = "footer".getBytes("UTF-8")
@@ -41,10 +46,10 @@ class BTreeFileReaderWriterSuite extends SparkFunSuite {
     writer.close()
     // Read content from File
     val reader = BTreeIndexFileReader(configuration, path)
-    val footerRead = reader.readFooter()
-    val rowIdListRead = reader.readRowIdList()
+    val footerRead = reader.readFooter().toArray
+    val rowIdListRead = reader.readRowIdList().toArray
     val nodesRead = (0 until 5).map(i =>
-      reader.readNode(nodes.slice(0, i).map(_.length).sum, nodes(i).length))
+      reader.readNode(nodes.slice(0, i).map(_.length).sum, nodes(i).length).toArray)
     // Check result
     assert(footer === footerRead)
     assert(rowIdList === rowIdListRead)
