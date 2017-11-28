@@ -17,10 +17,11 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.spark.{SparkConf, SparkContext, SparkFunSuite}
-
 import scala.util.Random
+
+import org.apache.hadoop.conf.Configuration
+
+import org.apache.spark.{SparkConf, SparkContext, SparkFunSuite}
 
 class FiberCacheManagerSuite extends SparkFunSuite {
   private val random = new Random(0)
@@ -42,7 +43,7 @@ class FiberCacheManagerSuite extends SparkFunSuite {
     val origStats = FiberCacheManager.getStats
     (1 to memorySizeInMB * 2).foreach { i =>
       val data = generateData(1024)
-      val fiber = TestFiber(() => MemoryManager.putToFiberCache(data), s"test fiber #$i")
+      val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #$i")
       val fiberCache = FiberCacheManager.get(fiber, configuration)
       val fiberCache2 = FiberCacheManager.get(fiber, configuration)
       assert(fiberCache.toArray sameElements data)
@@ -65,11 +66,11 @@ class FiberCacheManagerSuite extends SparkFunSuite {
     val memorySizeInMB = (MemoryManager.maxMemory / MB).toInt
 
     val dataInUse = generateData(1024)
-    val fiberInUse = TestFiber(() => MemoryManager.putToFiberCache(dataInUse), s"test fiber #0")
+    val fiberInUse = TestFiber(() => MemoryManager.putToDataFiberCache(dataInUse), s"test fiber #0")
     val fiberCacheInUse = FiberCacheManager.get(fiberInUse, configuration)
     (1 to memorySizeInMB * 2).foreach { i =>
       val data = generateData(1024)
-      val fiber = TestFiber(() => MemoryManager.putToFiberCache(data), s"test fiber #$i")
+      val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #$i")
       val fiberCache = FiberCacheManager.get(fiber, configuration)
       assert(fiberCache.toArray sameElements data)
     }
@@ -87,12 +88,12 @@ class FiberCacheManagerSuite extends SparkFunSuite {
     val memorySizeInMB = (MemoryManager.maxMemory / MB).toInt
     // Cache concurrency is 4, means maximum ENTRY size is memory size / 4
     val data = generateData(memorySizeInMB * 1024 * 1024 / 8)
-    val fiber = TestFiber(() => MemoryManager.putToFiberCache(data), s"test fiber #0")
+    val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #0")
     val fiberCache = FiberCacheManager.get(fiber, configuration)
     assert(!fiberCache.isDisposed)
 
     val data1 = generateData(memorySizeInMB * 1024 * 1024 / 2)
-    val fiber1 = TestFiber(() => MemoryManager.putToFiberCache(data1), s"test fiber #1")
+    val fiber1 = TestFiber(() => MemoryManager.putToDataFiberCache(data1), s"test fiber #1")
     val fiberCache1 = FiberCacheManager.get(fiber1, configuration)
     assert(fiberCache1.isDisposed)
   }

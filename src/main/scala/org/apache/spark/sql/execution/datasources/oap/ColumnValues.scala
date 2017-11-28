@@ -36,7 +36,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache)
   val bitset: BitSet = {
     val bs = new BitSet(defaultSize)
     val longs = bs.toLongArray()
-    buffer.getLongs(0, longs)
+    buffer.copyMemoryToLongs(0, longs)
 
     bs
   }
@@ -130,7 +130,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache)
     val length = getIntValue(idx * 2)
     val offset = getIntValue(idx * 2 + 1)
     val result = new Array[Byte](length)
-    buffer.getBytes(offset, result)
+    buffer.copyMemoryToBytes(offset, result)
 
     result
   }

@@ -28,10 +28,8 @@ import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.MemoryManager.allocate
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
-import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.collection.BitSet
 
 // TODO need to register within the SparkContext
@@ -42,7 +40,7 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
 }
 
 /**
- * FiberCacheManager
+ * Fiber Cache Manager
  *
  * TODO: change object to class for better initialization
  */

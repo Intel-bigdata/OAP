@@ -70,9 +70,9 @@ abstract class DataFileHandle {
   def fin: FSDataInputStream
   def len: Long
 
-  def close: Unit = {
+  def close(): Unit = {
     if (fin != null) {
-      fin.close
+      fin.close()
     }
   }
 }

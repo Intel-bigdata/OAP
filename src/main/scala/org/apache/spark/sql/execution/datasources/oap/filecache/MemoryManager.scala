@@ -17,10 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.io.DataInputStream
 import java.util.concurrent.atomic.AtomicLong
 
 import org.apache.hadoop.fs.FSDataInputStream
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.SparkEnv
@@ -31,37 +31,24 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
 import org.apache.spark.unsafe.types.UTF8String
 
-import scala.tools.nsc.interpreter.InputStream
-
 // TODO: make it an alias of MemoryBlock
 trait FiberCache {
-  /*
-  def updateFiberData(fiberData: MemoryBlock): Unit = {
-    this.fiberData.setObjAndOffset(fiberData.getBaseObject, fiberData.getBaseOffset)
-  }
-  */
-
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
 
   // TODO: need a flag to avoid accessing disposed FiberCache
   private var disposed = false
+  def isDisposed: Boolean = disposed
   def dispose(): Unit = {
     if (!disposed) MemoryManager.free(fiberData)
     disposed = true
   }
 
-  def isDisposed: Boolean = disposed
   /** For debug purpose */
   def toArray: Array[Byte] = {
     // TODO: Handle overflow
     val bytes = new Array[Byte](fiberData.size().toInt)
-    Platform.copyMemory(
-      fiberData.getBaseObject,
-      fiberData.getBaseOffset,
-      bytes,
-      Platform.BYTE_ARRAY_OFFSET,
-      bytes.length)
+    copyMemoryToBytes(0, bytes)
     bytes
   }
 
@@ -74,30 +61,34 @@ trait FiberCache {
   private def getBaseOffset: Long = fiberData.getBaseOffset
 
   def getBoolean(offset: Long): Boolean = Platform.getBoolean(getBaseObj, getBaseOffset + offset)
+
   def getByte(offset: Long): Byte = Platform.getByte(getBaseObj, getBaseOffset + offset)
+
   def getInt(offset: Long): Int = Platform.getInt(getBaseObj, getBaseOffset + offset)
+
   def getDouble(offset: Long): Double = Platform.getDouble(getBaseObj, getBaseOffset + offset)
+
   def getLong(offset: Long): Long = Platform.getLong(getBaseObj, getBaseOffset + offset)
+
   def getShort(offset: Long): Short = Platform.getShort(getBaseObj, getBaseOffset + offset)
+
   def getFloat(offset: Long): Float = Platform.getFloat(getBaseObj, getBaseOffset + offset)
+
   def getUTF8String(offset: Long, length: Int): UTF8String =
     UTF8String.fromAddress(getBaseObj, getBaseOffset + offset, length)
+
   /** TODO: may cause copy memory from off-heap to on-heap, used by [[ColumnValues]] */
   def copyMemory(offset: Long, dst: AnyRef, dstOffset: Long, length: Long): Unit =
     Platform.copyMemory(getBaseObj, getBaseOffset + offset, dst, dstOffset, length)
 
-  def getLongs(offset: Long, dst: Array[Long]): Array[Long] = {
+  def copyMemoryToLongs(offset: Long, dst: Array[Long]): Unit =
     copyMemory(offset, dst, Platform.LONG_ARRAY_OFFSET, dst.length * 8)
-    dst
-  }
-  def getInts(offset: Long, dst: Array[Int]): Array[Int] = {
+
+  def copyMemoryToInts(offset: Long, dst: Array[Int]): Unit =
     copyMemory(offset, dst, Platform.INT_ARRAY_OFFSET, dst.length * 4)
-    dst
-  }
-  def getBytes(offset: Long, dst: Array[Byte]): Array[Byte] = {
+
+  def copyMemoryToBytes(offset: Long, dst: Array[Byte]): Unit =
     copyMemory(offset, dst, Platform.BYTE_ARRAY_OFFSET, dst.length)
-    dst
-  }
 
   def size(): Long = fiberData.size()
 }
@@ -113,16 +104,13 @@ object FiberCache {
 // Data fiber caching, the in-memory representation can be found at [[DataFiberBuilder]]
 case class DataFiberCache(fiberData: MemoryBlock) extends FiberCache
 
-// TODO: This class seems not needed.
-// Because After index partial loading enabled, each MemoryBlock is only for its specific part.
 // Index fiber caching, only used internally by Oap
-private[oap] case class IndexFiberCacheData(
-    fiberData: MemoryBlock, dataEnd: Long, rootOffset: Long) extends FiberCache
+private[oap] case class IndexFiberCache(fiberData: MemoryBlock) extends FiberCache
 
 /**
  * Memory Manager
  *
- * Acquire fixed amount memory from spark during initialization.
+ * Acquire fixed amount of memory from spark during initialization.
  *
  * TODO: Should change object to class for better initialization.
  * For example, we can't test two MemoryManger in one test suite.
@@ -171,7 +159,9 @@ private[oap] object MemoryManager extends Logging {
     logDebug(s"freed ${memoryBlock.size()} memory, used: $memoryUsed")
   }
 
-  def putToFiberCache(in: FSDataInputStream, position: Long, length: Int): FiberCache = {
+  // Used by IndexFile
+  // TODO: putToFiberCache(in: Stream, position: Long, length: Int, type: FiberType)
+  def putToIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): IndexFiberCache = {
     val bytes = new Array[Byte](length)
     in.readFully(position, bytes)
 
@@ -182,12 +172,12 @@ private[oap] object MemoryManager extends Logging {
       memoryBlock.getBaseObject,
       memoryBlock.getBaseOffset,
       bytes.length)
-    DataFiberCache(memoryBlock)
+    IndexFiberCache(memoryBlock)
   }
 
   // Used by OapDataFile since we need to parse the raw data in on-heap memory before put it into
   // off-heap memory
-  def putToFiberCache(bytes: Array[Byte]): FiberCache = {
+  def putToDataFiberCache(bytes: Array[Byte]): DataFiberCache = {
     val memoryBlock = allocate(bytes.length)
     Platform.copyMemory(
       bytes,

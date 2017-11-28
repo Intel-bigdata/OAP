@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+
 import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
 import org.apache.spark.unsafe.Platform
 
@@ -52,13 +53,13 @@ private[oap] case class BTreeIndexFileReader(
     Platform.getInt(buffer, Platform.BYTE_ARRAY_OFFSET + offset)
 
   def readFooter(): FiberCache =
-    MemoryManager.putToFiberCache(reader, footerIndex, footerLength)
+    MemoryManager.putToIndexFiberCache(reader, footerIndex, footerLength)
 
   def readRowIdList(): FiberCache =
-    MemoryManager.putToFiberCache(reader, rowIdListIndex, rowIdListLength)
+    MemoryManager.putToIndexFiberCache(reader, rowIdListIndex, rowIdListLength)
 
   def readNode(offset: Int, size: Int): FiberCache =
-    MemoryManager.putToFiberCache(reader, nodesIndex + offset, size)
+    MemoryManager.putToIndexFiberCache(reader, nodesIndex + offset, size)
 
   def close(): Unit = reader.close()
 }

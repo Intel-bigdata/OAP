@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import java.nio.ByteBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
@@ -31,7 +29,6 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.types._
-import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
 import org.apache.spark.util.CompletionIterator
 
 
@@ -107,7 +104,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     // We have to read Array[Byte] from file and decode/decompress it before putToFiberCache
     // TODO: Try to finish this in off-heap memory
     val data = fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
-    MemoryManager.putToFiberCache(data)
+    MemoryManager.putToDataFiberCache(data)
   }
 
   def closeRowGroup(fiber: Fiber, fiberCache: FiberCache): Unit = {

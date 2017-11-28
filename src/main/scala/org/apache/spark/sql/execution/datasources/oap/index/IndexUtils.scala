@@ -42,7 +42,7 @@ private[oap] object IndexUtils {
     assert(version <= 65535)
     val versionData = Array((version >> 8).toByte, (version & 0xFF).toByte)
     writer.write(versionData)
-    assert((headerContent.length + versionData.size) == IndexFile.indexFileHeaderLength)
+    assert((headerContent.length + versionData.length) == IndexFile.indexFileHeaderLength)
     IndexFile.indexFileHeaderLength
   }
 

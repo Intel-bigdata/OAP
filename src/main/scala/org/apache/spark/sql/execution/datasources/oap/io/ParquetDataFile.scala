@@ -28,7 +28,6 @@ import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.util.io.ChunkedByteBuffer
 
 
 private[oap] case class ParquetDataFile
