@@ -17,12 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import java.nio.ByteBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
 
 private[oap] trait CommonIndexFile {
   def file: Path
@@ -34,29 +32,21 @@ private[oap] trait CommonIndexFile {
     fin.close()
     (bytes(6) << 8) + bytes(7)
   }
-  protected def putToFiberCache(buf: Array[Byte]): ChunkedByteBuffer = {
-    // TODO: make it configurable
-    val cbbos = new ChunkedByteBufferOutputStream(buf.length, ByteBuffer.allocate)
-    cbbos.write(buf)
-    cbbos.close()
-    cbbos.toChunkedByteBuffer
-  }
 }
 /**
- * Read the index file into memory, and can be accessed as [[ChunkedByteBuffer]].
+ * Read the index file into memory, and can be accessed as [[FiberCache]].
  */
 private[oap] case class IndexFile(file: Path) extends CommonIndexFile {
-  def getIndexFiberData(conf: Configuration): Array[Byte] = {
+  def getIndexFiberData(conf: Configuration): FiberCache = {
     val fs = file.getFileSystem(conf)
     val fin = fs.open(file)
     // wind to end of file to get tree root
     // TODO check if enough to fit in Int
     val fileLength = fs.getContentSummary(file).getLength
-    val bytes = new Array[Byte](fileLength.toInt)
 
-    fin.readFully(0, bytes)
+    val fiberCache = MemoryManager.putToFiberCache(fin, 0, fileLength.toInt)
     fin.close()
-    bytes
+    fiberCache
   }
 }
 

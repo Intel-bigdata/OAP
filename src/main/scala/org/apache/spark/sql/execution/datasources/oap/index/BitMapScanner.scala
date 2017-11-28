@@ -89,10 +89,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   override def next(): Long = bmRowIdIterator.next().toLong
 
-  private def loadBmFooter(fin: FSDataInputStream): Array[Byte] = {
-    val bmFooterBuffer = new Array[Byte](BITMAP_FOOTER_SIZE)
-    fin.readFully(bmFooterOffset, bmFooterBuffer, 0, BITMAP_FOOTER_SIZE)
-    bmFooterBuffer
+  private def loadBmFooter(fin: FSDataInputStream): FiberCache = {
+    MemoryManager.putToFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE)
   }
 
   private def readBmFooterFromCache(data: FiberCache): Unit = {
@@ -102,12 +100,11 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     bmOffsetListTotalSize = data.getInt(12)
   }
 
-  private def loadBmKeyList(fin: FSDataInputStream): Array[Byte] = {
+  private def loadBmKeyList(fin: FSDataInputStream): FiberCache = {
     val bmUniqueKeyListBuffer = new Array[Byte](bmUniqueKeyListTotalSize)
     // TODO: seems not supported yet on my local dev machine(hadoop is 2.7.3).
     // fin.setReadahead(bmUniqueKeyListTotalSize)
-    fin.readFully(bmUniqueKeyListOffset, bmUniqueKeyListBuffer, 0, bmUniqueKeyListTotalSize)
-    bmUniqueKeyListBuffer
+    MemoryManager.putToFiberCache(fin, bmUniqueKeyListOffset, bmUniqueKeyListTotalSize)
   }
 
   private def readBmUniqueKeyListFromCache(data: FiberCache): IndexedSeq[InternalRow] = {
@@ -120,16 +117,12 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     })
   }
 
-  private def loadBmEntryList(fin: FSDataInputStream): Array[Byte] = {
-    val bmEntryListBuffer = new Array[Byte](bmEntryListTotalSize)
-    fin.readFully(bmEntryListOffset, bmEntryListBuffer, 0, bmEntryListTotalSize)
-    bmEntryListBuffer
+  private def loadBmEntryList(fin: FSDataInputStream): FiberCache = {
+    MemoryManager.putToFiberCache(fin, bmEntryListOffset, bmEntryListTotalSize)
   }
 
-  private def loadBmOffsetList(fin: FSDataInputStream): Array[Byte] = {
-    val bmOffsetListBuffer = new Array[Byte](bmOffsetListTotalSize)
-    fin.readFully(bmOffsetListOffset, bmOffsetListBuffer, 0, bmOffsetListTotalSize)
-    bmOffsetListBuffer
+  private def loadBmOffsetList(fin: FSDataInputStream): FiberCache = {
+    MemoryManager.putToFiberCache(fin, bmOffsetListOffset, bmOffsetListTotalSize)
   }
 
   private def cacheBitmapAllSegments(idxPath: Path, conf: Configuration): Unit = {

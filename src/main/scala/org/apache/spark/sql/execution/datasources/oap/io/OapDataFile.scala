@@ -66,7 +66,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     } else dictionaries(fiberId)
   }
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): Array[Byte] = {
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache = {
     val groupMeta = meta.rowGroupsMeta(groupId)
     val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
 
@@ -85,6 +85,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     val bytes = new Array[Byte](len)
 
     val is = meta.fin
+    // TODO: replace by FSDataInputStream.readFully(position, buffer) which is thread safe
     is.synchronized {
       is.seek(fiberStart)
       is.readFully(bytes)
@@ -103,7 +104,10 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
       if (groupId == meta.groupCount - 1) meta.rowCountInLastGroup
       else meta.rowCountInEachGroup
 
-    fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
+    // We have to read Array[Byte] from file and decode/decompress it before putToFiberCache
+    // TODO: Try to finish this in off-heap memory
+    val data = fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
+    MemoryManager.putToFiberCache(data)
   }
 
   def closeRowGroup(fiber: Fiber, fiberCache: FiberCache): Unit = {

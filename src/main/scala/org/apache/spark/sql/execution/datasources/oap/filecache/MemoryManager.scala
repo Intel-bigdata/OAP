@@ -17,8 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.io.DataInputStream
 import java.util.concurrent.atomic.AtomicLong
 
+import org.apache.hadoop.fs.FSDataInputStream
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.SparkEnv
@@ -28,6 +30,8 @@ import org.apache.spark.storage.{BlockManager, TestBlockId}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
 import org.apache.spark.unsafe.types.UTF8String
+
+import scala.tools.nsc.interpreter.InputStream
 
 // TODO: make it an alias of MemoryBlock
 trait FiberCache {
@@ -140,6 +144,7 @@ private[oap] object MemoryManager extends Logging {
       throw new OapException("No SparkContext is found")
     } else {
       val memoryManager = SparkEnv.get.memoryManager
+      // TODO: make 0.7 configurable
       val oapMaxMemory = (memoryManager.maxOffHeapStorageMemory * 0.7).toLong
       if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
         oapMaxMemory
@@ -164,5 +169,32 @@ private[oap] object MemoryManager extends Logging {
     MemoryAllocator.UNSAFE.free(memoryBlock)
     _memoryUsed.getAndAdd(-memoryBlock.size())
     logDebug(s"freed ${memoryBlock.size()} memory, used: $memoryUsed")
+  }
+
+  def putToFiberCache(in: FSDataInputStream, position: Long, length: Int): FiberCache = {
+    val bytes = new Array[Byte](length)
+    in.readFully(position, bytes)
+
+    val memoryBlock = allocate(bytes.length)
+    Platform.copyMemory(
+      bytes,
+      Platform.BYTE_ARRAY_OFFSET,
+      memoryBlock.getBaseObject,
+      memoryBlock.getBaseOffset,
+      bytes.length)
+    DataFiberCache(memoryBlock)
+  }
+
+  // Used by OapDataFile since we need to parse the raw data in on-heap memory before put it into
+  // off-heap memory
+  def putToFiberCache(bytes: Array[Byte]): FiberCache = {
+    val memoryBlock = allocate(bytes.length)
+    Platform.copyMemory(
+      bytes,
+      Platform.BYTE_ARRAY_OFFSET,
+      memoryBlock.getBaseObject,
+      memoryBlock.getBaseOffset,
+      bytes.length)
+    DataFiberCache(memoryBlock)
   }
 }

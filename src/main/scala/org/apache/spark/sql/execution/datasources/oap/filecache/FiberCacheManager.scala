@@ -50,7 +50,9 @@ object FiberCacheManager extends Logging {
 
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
+      // TODO: Change the log more readable
       logDebug(s"Removing Cache ${notification.getKey}")
+      // TODO: Investigate lock mechanism to secure in-used FiberCache
       notification.getValue.dispose()
     }
   }
@@ -73,20 +75,6 @@ object FiberCacheManager extends Logging {
         fiber2Data(fiber, configuration)
       }
     }
-  /*
-  private def anotherCacheLoader(fiber: Fiber, configuration: Configuration) = {
-    new Callable[FiberCache] {
-      override def call(): FiberCache = {
-        def calculateFiberSize(fiber: Fiber): Int = {
-          // Some code to get the size of fiber, to request an ENTRY in cache.
-          throw new NotImplementedError()
-        }
-        val memoryBlock = new MemoryBlock(null, -1, calculateFiberSize(fiber))
-        DataFiberCache(memoryBlock)
-      }
-    }
-  }
-  */
 
   private val cache = CacheBuilder.newBuilder()
       .recordStats()
@@ -97,30 +85,8 @@ object FiberCacheManager extends Logging {
       .build[Fiber, FiberCache]()
 
   def get(fiber: Fiber, conf: Configuration): FiberCache = {
-    // Doesn't handle no enough memory problem here. A flag in FiberCache seem a better solution
-    //
-    // The problem in no enough memory is: The ENTRY.value (FiberCache) will still be returned.
-    // but ENTRY will be removed from the cache at the same time (i.e. FiberCache's memory is freed)
-    //
-    // But, with eviction is enabled, ENTRY can be removed at anytime. Every time we want to access
-    // a FiberCache, it's always possible to access a freed memory.
-    // So, a flag in FiberCache is needed.
+    // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
     cache.get(fiber, cacheLoader(fiber, conf))
-    /*
-    // Draft code to handle no enough memory problem
-    val v = cache.get(fiber, anotherCacheLoader(fiber, conf))
-    if (!v.isDisposed) {
-      val fiberData = MemoryManager.allocate(v.size().toInt)
-      val data = fiber2Data(fiber, conf)
-      Platform.copyMemory(
-        data,
-        Platform.BYTE_ARRAY_OFFSET,
-        fiberData.getBaseObject,
-        fiberData.getBaseOffset,
-        fiberData.size())
-      v.updateFiberData(fiberData)
-    }
-    */
   }
 
   // TODO: test case
@@ -141,10 +107,8 @@ object FiberCacheManager extends Logging {
     CacheStatusSerDe.serialize(statusRawData)
   }
 
-  // TODO: need more discuss about how to put data from file to cache.
-  // Restore back the original implementation first.
   private def fiber2Data(fiber: Fiber, conf: Configuration): FiberCache = {
-    val data = fiber match {
+    fiber match {
       case DataFiber(file, columnIndex, rowGroupId) =>
         file.getFiberData(rowGroupId, columnIndex, conf)
       case IndexFiber(file) => file.getIndexFiberData(conf)
@@ -153,18 +117,6 @@ object FiberCacheManager extends Logging {
       case TestFiber(getFiberData, _) => getFiberData()
       case other => throw new OapException(s"Cannot identify what's $other")
     }
-    putToFiberCache(data)
-  }
-
-  def putToFiberCache(data: Array[Byte]): FiberCache = {
-    val memoryBlock = allocate(data.length)
-    Platform.copyMemory(
-      data,
-      Platform.BYTE_ARRAY_OFFSET,
-      memoryBlock.getBaseObject,
-      memoryBlock.getBaseOffset,
-      data.length)
-    DataFiberCache(memoryBlock)
   }
 
   def getStats: CacheStats = cache.stats()
@@ -207,18 +159,18 @@ case class IndexFiber(file: IndexFile) extends Fiber
 
 private[oap]
 case class BTreeFiber(
-    getFiberData: () => Array[Byte],
+    getFiberData: () => FiberCache,
     file: String,
     section: Int,
     idx: Int) extends Fiber
 
 private[oap]
 case class BitmapFiber(
-    getFiberData: () => Array[Byte],
+    getFiberData: () => FiberCache,
     file: String,
     // "0" means no split sections within file.
     sectionIdxOfFile: Int,
     // "0" means no smaller loading units.
     loadUnitIdxOfSection: Int) extends Fiber
 
-private[oap] case class TestFiber(getData: () => Array[Byte], name: String) extends Fiber
+private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber

@@ -34,7 +34,7 @@ import org.apache.spark.util.io.ChunkedByteBuffer
 private[oap] case class ParquetDataFile
 (path: String, schema: StructType, configuration: Configuration) extends DataFile {
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): Array[Byte] = {
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache = {
     // TODO data cache
     throw new UnsupportedOperationException("Not support getFiberData Operation.")
   }
