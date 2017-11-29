@@ -132,10 +132,21 @@ private[oap] object IndexUtils {
     }
   }
 
+  def readBasedOnSchema(
+      fiberCache: FiberCache, offset: Long, schema: StructType): InternalRow = {
+    var pos = offset
+    val values = schema.map(_.dataType).map { dataType =>
+      val (value, length) = readBasedOnDataType(fiberCache, pos, dataType)
+      pos += length
+      value
+    }
+    InternalRow.fromSeq(values)
+  }
+
   def writeBasedOnSchema(
       writer: LittleEndianDataOutputStream, row: InternalRow, schema: StructType): Unit = {
     schema.zipWithIndex.foreach {
-      case (field, index) => IndexUtils.writeBasedOnDataType(writer, row.get(index, field.dataType))
+      case (field, index) => writeBasedOnDataType(writer, row.get(index, field.dataType))
     }
   }
 }

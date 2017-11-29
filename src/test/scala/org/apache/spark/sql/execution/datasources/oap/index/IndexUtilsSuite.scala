@@ -148,7 +148,7 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
       val buf = new ByteBufferOutputStream()
       val writer = new LittleEndianDataOutputStream(buf)
       IndexUtils.writeBasedOnSchema(writer, row, schema)
-      val answerRow = BTreeIndexRecordReader.readBasedOnSchema(
+      val answerRow = IndexUtils.readBasedOnSchema(
         FiberCache(buf.toByteArray), 0L, schema)
       assert(row.equals(answerRow))
     }
