@@ -22,6 +22,8 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
+import org.apache.spark.sql.execution.datasources.oap.index.BTreeIndexRecordReader.BTreeFooter
+import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
 
 // we scan the index from the smallest to the largest,
 // this will scan the B+ Tree (index) leaf node.
@@ -44,6 +46,20 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     recordReader = BTreeIndexRecordReader(conf, keySchema)
     recordReader.initialize(path, intervalArray)
     this
+  }
+
+  override protected def readStatistics(indexPath: Path, conf: Configuration): Double = {
+    // TODO decouple with btreeindexrecordreader
+    // This is called before the scanner call `initialize`
+    val reader = BTreeIndexFileReader(conf, indexPath)
+    val footerFiber = BTreeFiber(() => reader.readFooter(), reader.file.toString, 0, 0)
+    val footerCache = FiberCacheManager.get(footerFiber, conf)
+    val footer = BTreeFooter(footerCache)
+    val offset = footer.getStatsOffset
+
+    val statisticsManager = new StatisticsManager
+    statisticsManager.read(footerCache, offset, keySchema)
+    statisticsManager.analyse(intervalArray, conf)
   }
 
   override def hasNext: Boolean = recordReader.hasNext

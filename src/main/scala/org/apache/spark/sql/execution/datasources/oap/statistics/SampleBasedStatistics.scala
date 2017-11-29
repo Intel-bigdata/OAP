@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
@@ -49,7 +50,7 @@ private[oap] class SampleBasedStatistics extends Statistics {
   // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |   (4 + u3_sizeInBytes) Bytes, unsafeRow-3
   // ...
   // | unsafeRow-(sample_size) sizeInBytes | unsafeRow-(sample_size) content |
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
     var offset = super.write(writer, sortedKeys)
     val size = (sortedKeys.size * sampleRate).toInt
     sampleArray = takeSample(sortedKeys, size)
@@ -77,6 +78,24 @@ private[oap] class SampleBasedStatistics extends Statistics {
       offset += (4 + rowSize)
     }
     offset - baseOffset
+  }
+
+  override def read(fiberCache: FiberCache, offset: Int): Int = {
+    var readOffset = super.read(fiberCache, offset) + offset
+
+    val size = fiberCache.getInt(readOffset)
+    readOffset += 4
+
+    // TODO use unsafe way to interact with sample array
+    sampleArray = new Array[Key](size)
+
+    for (i <- 0 until size) {
+      val rowSize = fiberCache.getInt(readOffset)
+      sampleArray(i) = Statistics.getUnsafeRow(
+        schema.length, fiberCache, readOffset, rowSize).copy()
+      readOffset += (4 + rowSize)
+    }
+    readOffset - offset
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {

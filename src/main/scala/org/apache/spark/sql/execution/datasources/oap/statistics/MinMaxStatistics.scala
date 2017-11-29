@@ -24,6 +24,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
@@ -52,7 +53,7 @@ private[oap] class MinMaxStatistics extends Statistics {
     }
   }
 
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
     var offset = super.write(writer, sortedKeys)
     if (min != null) {
       offset += Statistics.writeInternalRow(converter, min, writer)
@@ -73,6 +74,20 @@ private[oap] class MinMaxStatistics extends Statistics {
     offset += (4 + maxSize)
 
     offset - baseOffset
+  }
+
+  override def read(fiberCache: FiberCache, offset: Int): Int = {
+    var readOffset = super.read(fiberCache, offset) + offset // offset after super.read
+
+    val minSize = fiberCache.getInt(readOffset)
+    min = Statistics.getUnsafeRow(schema.length, fiberCache, readOffset, minSize).copy()
+    readOffset += (4 + minSize)
+
+    val maxSize = fiberCache.getInt(readOffset)
+    max = Statistics.getUnsafeRow(schema.length, fiberCache, readOffset, maxSize).copy()
+    readOffset += (4 + maxSize)
+
+    readOffset - offset
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {

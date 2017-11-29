@@ -31,6 +31,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
+import org.apache.spark.sql.execution.datasources.oap.statistics.StaticsAnalysisResult
 import org.apache.spark.unsafe.Platform
 
 private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
@@ -94,6 +95,11 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private def loadBmFooter(fin: FSDataInputStream): FiberCache = {
     MemoryManager.putToIndexFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE)
+  }
+
+  override protected def readStatistics(indexPath: Path, conf: Configuration): Double = {
+    // TODO implement
+    StaticsAnalysisResult.USE_INDEX
   }
 
   private def readBmFooterFromCache(data: FiberCache): Unit = {

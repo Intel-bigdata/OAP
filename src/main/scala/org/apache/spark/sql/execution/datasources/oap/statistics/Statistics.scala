@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.BaseOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
@@ -54,9 +55,9 @@ abstract class Statistics {
    * @param sortedKeys sorted keys stored related to this statistics
    * @return number of bytes written in writer
    */
-  def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
+  def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
     IndexUtils.writeInt(writer, id)
-    4L
+    4
   }
 
   /**
@@ -73,6 +74,19 @@ abstract class Statistics {
   }
 
   /**
+   * Statistics read function, by default, statistics id should be same with
+   * current statistics
+   * @param fiberCache fiber read from file
+   * @param offset start offset to read the statistics
+   * @return number of bytes read from `bytes` array
+   */
+  def read(fiberCache: FiberCache, offset: Int): Int = {
+    val idFromFile = fiberCache.getInt(offset)
+    assert(idFromFile == id)
+    4
+  }
+
+  /**
    * Analyse the query `intervalArray` with `Statistics`, by default, if no content
    * is in this Statistics, then we should use index for the correctness of this array.
    * @param intervalArray query intervals from `IndexContext`
@@ -86,6 +100,10 @@ abstract class Statistics {
 object Statistics {
   def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
     UnsafeIndexNode.getUnsafeRow(schemaLen, array, Platform.BYTE_ARRAY_OFFSET + offset + 4, size)
+  }
+
+  def getUnsafeRow(schemaLen: Int, fiberCache: FiberCache, offset: Long, size: Int): UnsafeRow = {
+    UnsafeIndexNode.getUnsafeRow(schemaLen, fiberCache, offset + 4, size)
   }
 
   /**

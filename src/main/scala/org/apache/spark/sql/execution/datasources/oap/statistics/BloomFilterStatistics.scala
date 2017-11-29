@@ -24,6 +24,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
@@ -57,7 +58,7 @@ private[oap] class BloomFilterStatistics extends Statistics {
     projectors.foreach(p => bfIndex.addValue(p(key).getBytes))
   }
 
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
     var offset = super.write(writer, sortedKeys)
 
     // Bloom filter index file format:
@@ -87,6 +88,12 @@ private[oap] class BloomFilterStatistics extends Statistics {
     offset - baseOffset
   }
 
+  override def read(fiberCache: FiberCache, offset: Int): Int = {
+    var readOffset = super.read(fiberCache, offset) + offset
+    readOffset += readBloomFilter(fiberCache, readOffset)
+    readOffset - offset
+  }
+
   private def readBloomFilter(bytes: Array[Byte], baseOffset: Long): Long = {
     var offset = baseOffset
     val bitLength = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
@@ -102,6 +109,24 @@ private[oap] class BloomFilterStatistics extends Statistics {
 
     bfIndex = BloomFilter(bitSet, numHashFunc)
     offset - baseOffset
+  }
+
+  private def readBloomFilter(fiberCache: FiberCache, offset: Int): Int = {
+    var readOffset = offset
+
+    val bitLength = fiberCache.getInt(readOffset)
+    val numHashFunc = fiberCache.getInt(readOffset + 4)
+    readOffset += 8
+
+    val bitSet = new Array[Long](bitLength)
+
+    for (i <- 0 until bitLength) {
+      bitSet(i) = fiberCache.getLong(readOffset)
+      readOffset += 8
+    }
+
+    bfIndex = BloomFilter(bitSet, numHashFunc)
+    readOffset - offset
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {

@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.Platform
@@ -54,7 +55,7 @@ private[oap] class PartByValueStatistics extends Statistics {
                                          curMaxId: Int, accumulatorCnt: Int)
   protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
 
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
     var offset = super.write(writer, sortedKeys)
     val hashMap = new java.util.HashMap[Key, Int]()
     val uniqueKeys: ArrayBuffer[Key] = new ArrayBuffer[Key]()
@@ -110,6 +111,24 @@ private[oap] class PartByValueStatistics extends Statistics {
       metas.append(PartedByValueMeta(i, row, index, count))
     }
     offset - baseOffset
+  }
+
+  override def read(fiberCache: FiberCache, offset: Int): Int = {
+    var readOffset = super.read(fiberCache, offset) + offset
+
+    val size = fiberCache.getInt(readOffset)
+    readOffset += 4
+
+    for (i <- 0 until size) {
+      val rowSize = fiberCache.getInt(readOffset)
+      val row = Statistics.getUnsafeRow(schema.length, fiberCache, readOffset, rowSize).copy()
+      readOffset += rowSize + 4
+      val index = fiberCache.getInt(readOffset)
+      val count = fiberCache.getInt(readOffset + 4)
+      readOffset += 8
+      metas.append(PartedByValueMeta(i, row, index, count))
+    }
+    readOffset - offset
   }
 
   //  meta id:             0       1       2       3       4       5
