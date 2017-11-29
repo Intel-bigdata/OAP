@@ -23,18 +23,31 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
-import org.apache.spark.{SparkConf, SparkContext, SparkFunSuite}
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.OapEnv
 import org.apache.spark.sql.execution.datasources.oap.index.IndexUtils
+import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.{ByteBufferOutputStream, Utils}
 
-class MemoryManagerSuite extends SparkFunSuite {
-  new SparkContext(
-    "local[2]",
-    "MemoryManagerSuite",
-    new SparkConf().set("spark.memory.offHeap.size", "100m"))
+class MemoryManagerSuite extends SharedSQLContext {
+  sparkConf
+      .set("spark.memory.offHeap.size", "100m")
+      .set("spark.oap.memory.offHeap.fraction", "0.7")
+
+  private var fiberCache: FiberCache = _
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    fiberCache = {
+      val buf = new ByteBufferOutputStream()
+      val writer = new LittleEndianDataOutputStream(buf)
+      values.foreach(value => IndexUtils.writeBasedOnDataType(writer, value))
+      memoryManager.putToDataFiberCache(buf.toByteArray)
+    }
+  }
+
+  private def memoryManager = OapEnv.get.memoryManager
 
   private val random = new Random(0)
   private val values = {
@@ -56,11 +69,21 @@ class MemoryManagerSuite extends SparkFunSuite {
         floats ++ doubles ++ strings ++ binaries ++ Nil
     random.shuffle(values)
   }
-  private val fiberCache = {
-    val buf = new ByteBufferOutputStream()
-    val writer = new LittleEndianDataOutputStream(buf)
-    values.foreach(value => IndexUtils.writeBasedOnDataType(writer, value))
-    MemoryManager.putToDataFiberCache(buf.toByteArray)
+
+  // TODO: This will throw NPE with mvn test
+  test("test MemoryManager config") {
+    // default fraction is 0.7
+    assert(100 * 0.7 * 1024 * 1024 === memoryManager.maxMemory)
+    // change to 0.9
+    sparkContext.conf.set(MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION, "0.9")
+    OapEnv.update()
+    assert(100 * 0.9 * 1024 * 1024 === memoryManager.maxMemory)
+    // restore back
+    sparkContext.conf.set(
+      MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION,
+      MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION_DEFAULT.toString)
+    OapEnv.update()
+    assert(100 * 0.7 * 1024 * 1024 === memoryManager.maxMemory)
   }
 
   test("test data in IndexFiberCache") {
@@ -77,14 +100,14 @@ class MemoryManagerSuite extends SparkFunSuite {
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
     val is = createInputStreamFromBytes(bytes)
-    val indexFiberCache = MemoryManager.putToIndexFiberCache(is, 0, 10240)
+    val indexFiberCache = memoryManager.putToIndexFiberCache(is, 0, 10240)
     assert(bytes === indexFiberCache.toArray)
   }
 
   test("test data in DataFiberCache") {
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
-    val dataFiberCache = MemoryManager.putToDataFiberCache(bytes)
+    val dataFiberCache = memoryManager.putToDataFiberCache(bytes)
     assert(bytes === dataFiberCache.toArray)
   }
 
@@ -130,7 +153,7 @@ class MemoryManagerSuite extends SparkFunSuite {
   test("check invalidate FiberCache") {
     // 1. disposed FiberCache
     val bytes = new Array[Byte](1024)
-    val fiberCache = MemoryManager.putToDataFiberCache(bytes)
+    val fiberCache = memoryManager.putToDataFiberCache(bytes)
     fiberCache.dispose()
     val exception = intercept[OapException]{
       fiberCache.getByte(0)

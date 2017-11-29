@@ -20,13 +20,12 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.util.concurrent.{Callable, TimeUnit}
 
 import scala.collection.JavaConverters._
-
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.oap.OapEnv
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
@@ -34,7 +33,7 @@ import org.apache.spark.util.collection.BitSet
 // TODO need to register within the SparkContext
 class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
   override def status(conf: SparkConf): String = {
-    FiberCacheManager.status
+    OapEnv.get.fiberCacheManager.status
   }
 }
 
@@ -43,7 +42,7 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
  *
  * TODO: change object to class for better initialization
  */
-object FiberCacheManager extends Logging {
+class FiberCacheManager(memorySize: Long) extends Logging {
 
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
@@ -59,7 +58,7 @@ object FiberCacheManager extends Logging {
   }
 
   private val MB: Double = 1024 * 1024
-  private val MAX_WEIGHT = (MemoryManager.maxMemory / MB).toInt
+  private val MAX_WEIGHT = (memorySize / MB).toInt
 
   /**
    * To avoid storing configuration in each Cache, use a loader.
@@ -102,6 +101,10 @@ object FiberCacheManager extends Logging {
     }.toSeq
 
     CacheStatusSerDe.serialize(statusRawData)
+  }
+
+  def stop(): Unit = {
+    cache.cleanUp()
   }
 
   def getStats: CacheStats = cache.stats()

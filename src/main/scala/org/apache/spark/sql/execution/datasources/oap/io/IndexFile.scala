@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
+import org.apache.spark.sql.execution.datasources.oap.OapEnv
 import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
 
 private[oap] trait CommonIndexFile {
@@ -44,7 +44,7 @@ private[oap] case class IndexFile(file: Path) extends CommonIndexFile {
     // TODO check if enough to fit in Int
     val fileLength = fs.getContentSummary(file).getLength
 
-    val fiberCache = MemoryManager.putToIndexFiberCache(fin, 0, fileLength.toInt)
+    val fiberCache = OapEnv.get.memoryManager.putToIndexFiberCache(fin, 0, fileLength.toInt)
     fin.close()
     fiberCache
   }

@@ -20,17 +20,12 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.{SparkConf, SparkContext, SparkFunSuite}
+import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 
-class BTreeFileReaderWriterSuite extends SparkFunSuite {
+class BTreeFileReaderWriterSuite extends SharedSQLContext {
 
   test("BTree File Read/Write") {
-    new SparkContext(
-      "local[2]",
-      "BTreeFileReaderWriterSuite",
-      new SparkConf().set("spark.memory.offHeap.size", "100m"))
-
     val path = new Path(Utils.createTempDir().getAbsolutePath, "index")
     val configuration = new Configuration()
     val footer = "footer".getBytes("UTF-8")

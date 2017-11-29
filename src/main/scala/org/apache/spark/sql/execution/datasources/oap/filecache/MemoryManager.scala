@@ -20,12 +20,12 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.util.concurrent.atomic.AtomicLong
 
 import org.apache.hadoop.fs.FSDataInputStream
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
-import org.apache.spark.SparkEnv
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.ColumnValues
+import org.apache.spark.sql.execution.datasources.oap.OapEnv
 import org.apache.spark.storage.{BlockManager, TestBlockId}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
@@ -40,7 +40,7 @@ trait FiberCache {
   private var disposed = false
   def isDisposed: Boolean = disposed
   def dispose(): Unit = {
-    if (!disposed) MemoryManager.free(fiberData)
+    if (!disposed) OapEnv.get.memoryManager.free(fiberData)
     disposed = true
   }
 
@@ -121,8 +121,11 @@ private[oap] case class IndexFiberCache(fiberData: MemoryBlock) extends FiberCac
  * TODO: Should change object to class for better initialization.
  * For example, we can't test two MemoryManger in one test suite.
  */
-private[oap] object MemoryManager extends Logging {
+private[oap] class MemoryManager(
+    memoryManager: org.apache.spark.memory.MemoryManager,
+    conf: SparkConf) extends Logging {
 
+  require(memoryManager.maxOffHeapStorageMemory > 0)
   /**
    * Dummy block id to acquire memory from [[org.apache.spark.memory.MemoryManager]]
    *
@@ -132,19 +135,16 @@ private[oap] object MemoryManager extends Logging {
    */
   private val DUMMY_BLOCK_ID = TestBlockId("oap_memory_request_block")
 
-  // TODO: a config to control max memory size
   private val _maxMemory = {
-    if (SparkEnv.get == null) {
-      throw new OapException("No SparkContext is found")
+    val oapFraction = conf.getDouble(
+      MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION,
+      MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION_DEFAULT)
+
+    val oapMaxMemory = (memoryManager.maxOffHeapStorageMemory * oapFraction).toLong
+    if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
+      oapMaxMemory
     } else {
-      val memoryManager = SparkEnv.get.memoryManager
-      // TODO: make 0.7 configurable
-      val oapMaxMemory = (memoryManager.maxOffHeapStorageMemory * 0.7).toLong
-      if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
-        oapMaxMemory
-      } else {
-        throw new OapException("Can't acquire memory from spark Memory Manager")
-      }
+      throw new OapException("Can't acquire memory from spark Memory Manager")
     }
   }
 
@@ -152,6 +152,10 @@ private[oap] object MemoryManager extends Logging {
   private val _memoryUsed = new AtomicLong(0)
   def memoryUsed: Long = _memoryUsed.get()
   def maxMemory: Long = _maxMemory
+
+  def stop(): Unit = {
+    memoryManager.releaseStorageMemory(maxMemory, MemoryMode.OFF_HEAP)
+  }
 
   private[filecache] def allocate(numOfBytes: Int): MemoryBlock = {
     _memoryUsed.getAndAdd(numOfBytes)
@@ -193,4 +197,10 @@ private[oap] object MemoryManager extends Logging {
       bytes.length)
     DataFiberCache(memoryBlock)
   }
+}
+
+object MemoryManager {
+  // TODO: all configure parameters should be put in one place
+  val OAP_OFF_HEAP_MEMORY_FRACTION = "spark.oap.memory.offHeap.fraction"
+  val OAP_OFF_HEAP_MEMORY_FRACTION_DEFAULT = 0.7
 }
