@@ -29,7 +29,7 @@ import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
-abstract class Statistics{
+abstract class Statistics {
   val id: Int
   protected var schema: StructType = _
 

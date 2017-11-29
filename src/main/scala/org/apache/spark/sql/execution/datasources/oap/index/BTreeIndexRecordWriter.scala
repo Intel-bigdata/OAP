@@ -159,7 +159,7 @@ private[index] case class BTreeIndexRecordWriter(
     uniqueKeys.foreach { key =>
       output.writeInt(keyBuffer.size())
       output.writeInt(rowPos)
-      BTreeIndexRecordWriter.writeBasedOnSchema(keyOutput, key, keySchema)
+      IndexUtils.writeBasedOnSchema(keyOutput, key, keySchema)
       rowPos += multiHashMap.get(key).size()
     }
     buffer.toByteArray ++ keyBuffer.toByteArray
@@ -225,23 +225,13 @@ private[index] case class BTreeIndexRecordWriter(
       output.writeInt(node.byteSize)
       // Min Key Pos for each Child
       output.writeInt(keyBuffer.size())
-      BTreeIndexRecordWriter.writeBasedOnSchema(keyOutput, node.min, keySchema)
+      IndexUtils.writeBasedOnSchema(keyOutput, node.min, keySchema)
       // Max Key Pos for each Child
       output.writeInt(keyBuffer.size())
-      BTreeIndexRecordWriter.writeBasedOnSchema(keyOutput, node.max, keySchema)
+      IndexUtils.writeBasedOnSchema(keyOutput, node.max, keySchema)
       offset += node.byteSize
     }
     buffer.toByteArray ++ keyBuffer.toByteArray
-  }
-}
-
-private[index] object BTreeIndexRecordWriter {
-
-  private[index] def writeBasedOnSchema(
-      writer: LittleEndianDataOutputStream, row: InternalRow, schema: StructType): Unit = {
-    schema.zipWithIndex.foreach {
-      case (field, index) => IndexUtils.writeBasedOnDataType(writer, row.get(index, field.dataType))
-    }
   }
 }
 

@@ -33,77 +33,7 @@ import org.apache.spark.util.{ByteBufferOutputStream, Utils}
 
 class BTreeRecordReaderWriterSuite extends SparkFunSuite {
 
-  private val random = new Random(0)
-  private val values = {
-    val booleans: Seq[Boolean] = Seq(true, false)
-    val bytes: Seq[Byte] = Seq(Byte.MinValue, 0, 10, 30, Byte.MaxValue)
-    val shorts: Seq[Short] = Seq(Short.MinValue, -100, 0, 10, 200, Short.MaxValue)
-    val ints: Seq[Int] = Seq(Int.MinValue, -100, 0, 100, 12346, Int.MaxValue)
-    val longs: Seq[Long] = Seq(Long.MinValue, -10000, 0, 20, Long.MaxValue)
-    val floats: Seq[Float] = Seq(Float.MinValue, Float.MinPositiveValue, Float.MaxValue)
-    val doubles: Seq[Double] = Seq(Double.MinValue, Double.MinPositiveValue, Double.MaxValue)
-    val strings: Seq[UTF8String] =
-      Seq("", "test", "b plus tree", "BTreeRecordReaderWriter").map(UTF8String.fromString)
-    val binaries: Seq[Array[Byte]] = (0 until 20 by 5).map{ size =>
-      val buf = new Array[Byte](size)
-      random.nextBytes(buf)
-      buf
-    }
-    val values = booleans ++ bytes ++ shorts ++ ints ++ longs ++
-        floats ++ doubles ++ strings ++ binaries ++ Nil
-    random.shuffle(values)
-  }
-
-  private def toSparkDataType(any: Any): DataType = {
-    any match {
-      case _: Boolean => BooleanType
-      case _: Short => ShortType
-      case _: Byte => ByteType
-      case _: Int => IntegerType
-      case _: Long => LongType
-      case _: Float => FloatType
-      case _: Double => DoubleType
-      case _: UTF8String => StringType
-      case _: Array[Byte] => BinaryType
-    }
-  }
-
-  test("Read/Write Based On Data Type") {
-    values.foreach { value =>
-      val buf = new ByteBufferOutputStream()
-      val writer = new LittleEndianDataOutputStream(buf)
-      IndexUtils.writeBasedOnDataType(writer, value)
-
-      val (answerValue, offset) = IndexUtils.readBasedOnDataType(
-        FiberCache(buf.toByteArray), 0L, toSparkDataType(value))
-
-      assert(value === answerValue, s"value: $value")
-      value match {
-        case x: UTF8String =>
-          assert(offset === x.getBytes.length + Integer.SIZE / 8, s"string: $x")
-        case y: Array[Byte] =>
-          assert(offset === y.length + Integer.SIZE / 8, s"binary: ${y.mkString(",")}")
-        case other =>
-          assert(offset === toSparkDataType(other).defaultSize, s"value $other")
-      }
-    }
-  }
-
-  test("Read/Write Based On Schema") {
-    values.grouped(10).foreach { valueSeq =>
-      val schema = StructType(valueSeq.zipWithIndex.map {
-        case (v, i) => StructField(s"col$i", toSparkDataType(v))
-      })
-      val row = InternalRow.fromSeq(valueSeq)
-      val buf = new ByteBufferOutputStream()
-      val writer = new LittleEndianDataOutputStream(buf)
-      BTreeIndexRecordWriter.writeBasedOnSchema(writer, row, schema)
-      val answerRow = BTreeIndexRecordReader.readBasedOnSchema(
-        FiberCache(buf.toByteArray), 0L, schema)
-      assert(row.equals(answerRow))
-    }
-  }
-
+  private lazy val random = new Random(0)
   /**
    * This class is used to inject into BTreeRecordWriter and get the data it write.
    */

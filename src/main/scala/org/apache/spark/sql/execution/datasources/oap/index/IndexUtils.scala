@@ -22,6 +22,7 @@ import java.io.OutputStream
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
@@ -128,6 +129,13 @@ private[oap] object IndexUtils {
         val bytes = fiberCache.getBytes(offset + Integer.SIZE / 8, length)
         (bytes, Integer.SIZE / 8 + bytes.length)
       case other => throw new OapException(s"OAP index currently doesn't support data type $other")
+    }
+  }
+
+  def writeBasedOnSchema(
+      writer: LittleEndianDataOutputStream, row: InternalRow, schema: StructType): Unit = {
+    schema.zipWithIndex.foreach {
+      case (field, index) => IndexUtils.writeBasedOnDataType(writer, row.get(index, field.dataType))
     }
   }
 }
