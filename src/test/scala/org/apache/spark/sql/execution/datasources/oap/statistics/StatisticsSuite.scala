@@ -26,7 +26,6 @@ import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils, RangeInterval}
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
-import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.ByteBufferOutputStream
 
 class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
@@ -52,8 +51,8 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
     val writtenBytes = test.write(out, null)
     assert(writtenBytes == 4)
 
-    val bytes = out.toByteArray
-    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET) == test.id)
+    val fiber = wrapToFiberCache(out)
+    assert(fiber.getInt(0) == test.id)
     out.close()
   }
 
@@ -61,23 +60,23 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
     val test = new TestStatistics
     IndexUtils.writeInt(out, test.id)
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
-    val readBytes = test.read(bytes, 0)
-    assert(readBytes == 4L)
+    val readBytes = test.read(fiber, 0)
+    assert(readBytes == 4)
   }
 
   test("Statistics default analyzer test") {
     val test = new TestStatistics
     IndexUtils.writeInt(out, test.id)
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
-    val readBytes = test.read(bytes, 0)
-    assert(readBytes == 4L)
+    val readBytes = test.read(fiber, 0)
+    assert(readBytes == 4)
 
-    val analyResult = test.analyse(new ArrayBuffer[RangeInterval]())
-    assert(analyResult == StaticsAnalysisResult.USE_INDEX)
+    val analyzeResult = test.analyse(new ArrayBuffer[RangeInterval]())
+    assert(analyzeResult == StaticsAnalysisResult.USE_INDEX)
   }
 
 
@@ -192,14 +191,14 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
       IndexUtils.writeInt(byte_array_stream, row.getSizeInBytes)
       byte_array_stream.write(row.getBytes)
     })
-    val byte_array = byte_array_stream.toByteArray
+    val byte_array_fiber = wrapToFiberCache(byte_array_stream)
     byte_array_stream.close()
 
     var offset = 0L
     for (i <- unsafeRows.indices) {
-      val size = Platform.getInt(byte_array, Platform.BYTE_ARRAY_OFFSET + offset)
+      val size = byte_array_fiber.getInt(offset)
       val unsafeRowFromFile = Statistics.getUnsafeRow(schema.length,
-        byte_array, offset, size)
+        byte_array_fiber, offset, size)
       offset += 4 + size
       assert(ordering.equiv(unsafeRows(i), unsafeRowFromFile))
       assert(checkByteArray(unsafeRows(i).getBytes, unsafeRowFromFile.getBytes))

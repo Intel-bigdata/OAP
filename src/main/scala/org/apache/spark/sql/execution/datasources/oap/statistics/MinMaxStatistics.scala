@@ -27,7 +27,7 @@ import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.unsafe.Platform
+
 
 private[oap] class MinMaxStatistics extends Statistics {
   override val id: Int = MinMaxStatisticsType.id
@@ -60,20 +60,6 @@ private[oap] class MinMaxStatistics extends Statistics {
       offset += Statistics.writeInternalRow(converter, max, writer)
     }
     offset
-  }
-
-  override def read(bytes: Array[Byte], baseOffset: Long): Long = {
-    var offset = super.read(bytes, baseOffset) + baseOffset // offset after super.read
-
-    val minSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    min = Statistics.getUnsafeRow(schema.length, bytes, offset, minSize).copy()
-    offset += (4 + minSize)
-
-    val maxSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    max = Statistics.getUnsafeRow(schema.length, bytes, offset, maxSize).copy()
-    offset += (4 + maxSize)
-
-    offset - baseOffset
   }
 
   override def read(fiberCache: FiberCache, offset: Int): Int = {

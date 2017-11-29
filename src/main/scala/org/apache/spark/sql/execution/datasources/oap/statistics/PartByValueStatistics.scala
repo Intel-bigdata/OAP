@@ -28,7 +28,6 @@ import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.unsafe.Platform
 
 // PartedByValueStatistics gives statistics with the value interval.
 // for example, in an array where all internal rows appear only once
@@ -93,24 +92,6 @@ private[oap] class PartByValueStatistics extends Statistics {
       offset += 8
     })
     offset
-  }
-
-  override def read(bytes: Array[Byte], baseOffset: Long): Long = {
-    var offset = super.read(bytes, baseOffset) + baseOffset
-
-    val size = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    offset += 4
-
-    for (i <- 0 until size) {
-      val rowSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-      val row = Statistics.getUnsafeRow(schema.length, bytes, offset, rowSize).copy()
-      offset += rowSize + 4
-      val index = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-      val count = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset + 4)
-      offset += 8
-      metas.append(PartedByValueMeta(i, row, index, count))
-    }
-    offset - baseOffset
   }
 
   override def read(fiberCache: FiberCache, offset: Int): Int = {

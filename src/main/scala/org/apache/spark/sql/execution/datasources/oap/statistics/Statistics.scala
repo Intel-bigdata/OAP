@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.Platform
+
 
 abstract class Statistics {
   val id: Int
@@ -63,19 +63,6 @@ abstract class Statistics {
   /**
    * Statistics read function, by default, statistics id should be same with
    * current statistics
-   * @param bytes bytes read from file
-   * @param baseOffset start offset to read the statistics
-   * @return number of bytes read from `bytes` array
-   */
-  def read(bytes: Array[Byte], baseOffset: Long): Long = {
-    val idFromFile = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + baseOffset)
-    assert(idFromFile == id)
-    4L
-  }
-
-  /**
-   * Statistics read function, by default, statistics id should be same with
-   * current statistics
    * @param fiberCache fiber read from file
    * @param offset start offset to read the statistics
    * @return number of bytes read from `bytes` array
@@ -98,10 +85,6 @@ abstract class Statistics {
 
 // tool function for Statistics class
 object Statistics {
-  def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
-    UnsafeIndexNode.getUnsafeRow(schemaLen, array, Platform.BYTE_ARRAY_OFFSET + offset + 4, size)
-  }
-
   def getUnsafeRow(schemaLen: Int, fiberCache: FiberCache, offset: Long, size: Int): UnsafeRow = {
     UnsafeIndexNode.getUnsafeRow(schemaLen, fiberCache, offset + 4, size)
   }

@@ -27,8 +27,11 @@ import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.{BaseOrdering, GenerateOrdering}
-import org.apache.spark.sql.execution.datasources.oap.index.{BloomFilter, RangeInterval}
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
+import org.apache.spark.sql.execution.datasources.oap.index.RangeInterval
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.unsafe.Platform
+import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.unsafe.types.UTF8String
 
 abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
@@ -55,27 +58,22 @@ abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
     intervalArray.clear()
   }
 
-  protected def generateInterval(start: InternalRow, end: InternalRow,
-                                 startInclude: Boolean, endInclude: Boolean) = {
+  protected def generateInterval(
+      start: InternalRow, end: InternalRow,
+      startInclude: Boolean, endInclude: Boolean): Unit = {
     intervalArray.clear()
     intervalArray.append(new RangeInterval(start, end, startInclude, endInclude))
   }
 
-  protected def checkInternalRow(row1: InternalRow, row2: InternalRow) = {
+  protected def checkInternalRow(row1: InternalRow, row2: InternalRow): Unit = {
     val res = row1 == row2 // it works..
     assert(res, s"row1: $row1 does not match $row2")
   }
 
-  protected def checkBloomFilter(bf1: BloomFilter, bf2: BloomFilter) = {
-    val res =
-      if (bf1.getNumOfHashFunc != bf2.getNumOfHashFunc) false
-      else {
-        val bitLongArray1 = bf1.getBitMapLongArray
-        val bitLongArray2 = bf2.getBitMapLongArray
-
-        bitLongArray1.length == bitLongArray2.length && bitLongArray1.zip(bitLongArray2)
-          .map(t => t._1 == t._2).reduceOption(_ && _).getOrElse(true)
-      }
-    assert(res, "bloom filter does not match")
-  }
+  protected def wrapToFiberCache(out: ByteArrayOutputStream): FiberCache =
+    new FiberCache {
+      val bytes = out.toByteArray
+      override protected def fiberData: MemoryBlock =
+        new MemoryBlock(bytes, Platform.BYTE_ARRAY_OFFSET, bytes.length)
+    }
 }

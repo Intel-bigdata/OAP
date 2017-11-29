@@ -28,7 +28,6 @@ import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.unsafe.Platform
 
 
 private[oap] class SampleBasedStatistics extends Statistics {
@@ -61,23 +60,6 @@ private[oap] class SampleBasedStatistics extends Statistics {
       offset += Statistics.writeInternalRow(converter, key, writer)
     })
     offset
-  }
-
-  override def read(bytes: Array[Byte], baseOffset: Long): Long = {
-    var offset = super.read(bytes, baseOffset) + baseOffset
-
-    val size = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    offset += 4
-
-    // TODO is it ok to store all sample array in memory?
-    sampleArray = new Array[Key](size)
-
-    for (i <- 0 until size) {
-      val rowSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-      sampleArray(i) = Statistics.getUnsafeRow(schema.length, bytes, offset, rowSize).copy()
-      offset += (4 + rowSize)
-    }
-    offset - baseOffset
   }
 
   override def read(fiberCache: FiberCache, offset: Int): Int = {

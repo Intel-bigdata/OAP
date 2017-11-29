@@ -21,12 +21,25 @@ import scala.util.Random
 
 import org.apache.spark.sql.catalyst.expressions.{BoundReference, UnsafeProjection}
 import org.apache.spark.sql.execution.datasources.oap.index.{BloomFilter, IndexUtils}
-import org.apache.spark.unsafe.Platform
+
 
 class BloomFilterStatisticsSuite extends StatisticsTest {
 
   class TestBloomFilter extends BloomFilterStatistics {
     def getBloomFilter: BloomFilter = bfIndex
+  }
+
+  private def checkBloomFilter(bf1: BloomFilter, bf2: BloomFilter) = {
+    val res =
+      if (bf1.getNumOfHashFunc != bf2.getNumOfHashFunc) false
+      else {
+        val bitLongArray1 = bf1.getBitMapLongArray
+        val bitLongArray2 = bf2.getBitMapLongArray
+
+        bitLongArray1.length == bitLongArray2.length && bitLongArray1.zip(bitLongArray2)
+          .map(t => t._1 == t._2).reduceOption(_ && _).getOrElse(true)
+      }
+    assert(res, "bloom filter does not match")
   }
 
   test("write function test") {
@@ -48,22 +61,22 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
     }
     testBloomFilter.write(out, null)
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
     var offset = 0L
 
-    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
+    assert(fiber.getInt(offset)
       == BloomFilterStatisticsType.id)
     offset += 4
 
-    val bitArrayLength = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    val numOfHashFuncFromFile = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset + 4)
+    val bitArrayLength = fiber.getInt(offset)
+    val numOfHashFuncFromFile = fiber.getInt(offset + 4)
     offset += 8
     assert(bitArrayLength == bfIndex.getBitMapLongArray.length)
     assert(numOfHashFuncFromFile== numOfHashFunc)
 
     val bfArray = new Array[Long](bitArrayLength)
     for (i <- 0 until bitArrayLength) {
-      bfArray(i) = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
+      bfArray(i) = fiber.getLong(offset)
       offset += 8
     }
     val bfFromFile = BloomFilter(bfArray, numOfHashFunc)
@@ -91,11 +104,11 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
 
     for (l <- bfIndex.getBitMapLongArray) IndexUtils.writeLong(out, l)
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
     val testBloomFilter = new TestBloomFilter
     testBloomFilter.initialize(schema)
-    testBloomFilter.read(bytes, 0)
+    testBloomFilter.read(fiber, 0)
 
     checkBloomFilter(testBloomFilter.getBloomFilter, bfIndex)
   }
@@ -122,11 +135,11 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
     }
     bloomFilterWrite.write(out, null)
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
     val bloomFilterRead = new TestBloomFilter
     bloomFilterRead.initialize(schema)
-    bloomFilterRead.read(bytes, 0)
+    bloomFilterRead.read(fiber, 0)
 
     val bfIndexFromFile = bloomFilterRead.getBloomFilter
     assert(bfIndex.getBitMapLongArray.length == bfIndexFromFile.getBitMapLongArray.length)
@@ -157,11 +170,11 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
     }
     bloomFilterWrite.write(out, null)
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
     val bloomFilterRead = new TestBloomFilter
     bloomFilterRead.initialize(schema)
-    bloomFilterRead.read(bytes, 0)
+    bloomFilterRead.read(fiber, 0)
 
     for (i <- 1 until 300) {
       generateInterval(rowGen(i), rowGen(i), true, true)

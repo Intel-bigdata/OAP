@@ -20,7 +20,7 @@ import scala.util.Random
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
-import org.apache.spark.unsafe.Platform
+
 
 class MinMaxStatisticsSuite extends StatisticsTest {
 
@@ -44,18 +44,18 @@ class MinMaxStatisticsSuite extends StatisticsTest {
       assert(ordering.compare(key, max) <= 0)
     }
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
     var offset = 0L
 
-    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET) == MinMaxStatisticsType.id)
+    assert(fiber.getInt(0) == MinMaxStatisticsType.id)
     offset += 4
-    val minSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    val minFromFile = Statistics.getUnsafeRow(schema.length, bytes, offset, minSize)
+    val minSize = fiber.getInt(offset)
+    val minFromFile = Statistics.getUnsafeRow(schema.length, fiber, offset, minSize)
     checkInternalRow(minFromFile, converter(rowGen(1)))
     offset += (4 + minSize)
 
-    val maxSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    val maxFromFile = Statistics.getUnsafeRow(schema.length, bytes, offset, maxSize)
+    val maxSize = fiber.getInt(offset)
+    val maxFromFile = Statistics.getUnsafeRow(schema.length, fiber, offset, maxSize)
     checkInternalRow(maxFromFile, converter(rowGen(300)))
     offset += (4 + minSize)
   }
@@ -67,11 +67,11 @@ class MinMaxStatisticsSuite extends StatisticsTest {
     Statistics.writeInternalRow(converter, rowGen(1), out)
     Statistics.writeInternalRow(converter, rowGen(300), out)
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
     val testMinMax = new TestMinMax
     testMinMax.initialize(schema)
-    testMinMax.read(bytes, 0)
+    testMinMax.read(fiber, 0)
 
     val min = testMinMax.getMin
     val max = testMinMax.getMax
@@ -93,11 +93,11 @@ class MinMaxStatisticsSuite extends StatisticsTest {
     for (key <- keys) minmaxWrite.addOapKey(key)
     minmaxWrite.write(out, null) // MinMax does not need sortKeys parameter
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
     val minmaxRead = new TestMinMax
     minmaxRead.initialize(schema)
-    minmaxRead.read(bytes, 0)
+    minmaxRead.read(fiber, 0)
     val min = minmaxRead.getMin
     val max = minmaxRead.getMax
 
@@ -118,11 +118,11 @@ class MinMaxStatisticsSuite extends StatisticsTest {
     for (key <- keys) minmaxWrite.addOapKey(key)
     minmaxWrite.write(out, null) // MinMax does not need sortKeys parameter
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
     val minmaxRead = new TestMinMax
     minmaxRead.initialize(schema)
-    minmaxRead.read(bytes, 0)
+    minmaxRead.read(fiber, 0)
 
     generateInterval(rowGen(-10), rowGen(-1), startInclude = true, endInclude = true)
     assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)

@@ -129,35 +129,6 @@ class StatisticsManager {
 
   private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
 
-  // TODO remove this
-  def read(bytes: Array[Byte], s: StructType): Unit = {
-    var offset = 0L
-    val mask = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    offset += 8
-    if (mask != StatisticsManager.STATISTICSMASK) {
-      invalidStatistics = true
-    } else {
-      val numOfStats = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-      offset += 4
-      stats = new Array[Statistics](numOfStats)
-
-      for (i <- 0 until numOfStats) {
-        Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset) match {
-          case MinMaxStatisticsType.id => stats(i) = new MinMaxStatistics
-          case SampleBasedStatisticsType.id => stats(i) = new SampleBasedStatistics
-          case PartByValueStatisticsType.id => stats(i) = new PartByValueStatistics
-          case BloomFilterStatisticsType.id => stats(i) = new BloomFilterStatistics
-          case _ => throw new UnsupportedOperationException("unsupport statistics id")
-        }
-        offset += 4
-      }
-      for (stat <- stats) {
-        stat.initialize(s)
-        offset += stat.read(bytes, offset)
-      }
-    }
-  }
-
   def read(fiberCache: FiberCache, offset: Int, s: StructType): Unit = {
     var readOffset = 0
     val mask = fiberCache.getLong(offset + readOffset)

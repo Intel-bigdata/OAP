@@ -27,7 +27,6 @@ import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.Platform
 
 private[oap] class BloomFilterStatistics extends Statistics {
   override val id: Int = BloomFilterStatisticsType.id
@@ -82,33 +81,10 @@ private[oap] class BloomFilterStatistics extends Statistics {
     offset
   }
 
-  override def read(bytes: Array[Byte], baseOffset: Long): Long = {
-    var offset = super.read(bytes, baseOffset) + baseOffset
-    offset += readBloomFilter(bytes, offset)
-    offset - baseOffset
-  }
-
   override def read(fiberCache: FiberCache, offset: Int): Int = {
     var readOffset = super.read(fiberCache, offset) + offset
     readOffset += readBloomFilter(fiberCache, readOffset)
     readOffset - offset
-  }
-
-  private def readBloomFilter(bytes: Array[Byte], baseOffset: Long): Long = {
-    var offset = baseOffset
-    val bitLength = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    val numHashFunc = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset + 4)
-    offset += 8
-
-    val bitSet = new Array[Long](bitLength)
-
-    for (i <- 0 until bitLength) {
-      bitSet(i) = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-      offset += 8
-    }
-
-    bfIndex = BloomFilter(bitSet, numHashFunc)
-    offset - baseOffset
   }
 
   private def readBloomFilter(fiberCache: FiberCache, offset: Int): Int = {

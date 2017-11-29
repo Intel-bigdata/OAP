@@ -24,7 +24,6 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
-import org.apache.spark.unsafe.Platform
 
 
 class SampleBasedStatisticsSuite extends StatisticsTest{
@@ -42,16 +41,15 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     testSample.write(out, keys.to[ArrayBuffer])
 
     var offset = 0L
-    val bytes = out.toByteArray
-    assert(Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-      == SampleBasedStatisticsType.id)
+    val fiber = wrapToFiberCache(out)
+    assert(fiber.getInt(offset) == SampleBasedStatisticsType.id)
     offset += 4
-    val size = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
+    val size = fiber.getInt(offset)
     offset += 4
 
     for (i <- 0 until size) {
-      val rowSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-      val row = Statistics.getUnsafeRow(schema.length, bytes, offset, rowSize).copy()
+      val rowSize = fiber.getInt(offset)
+      val row = Statistics.getUnsafeRow(schema.length, fiber, offset, rowSize).copy()
       assert(ordering.compare(row, keys(i)) == 0)
       offset += 4 + rowSize
     }
@@ -69,11 +67,11 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
       Statistics.writeInternalRow(converter, keys(idx), out)
     }
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
     val testSample = new TestSample
     testSample.initialize(schema)
-    testSample.read(bytes, 0)
+    testSample.read(fiber, 0)
 
     val array = testSample.getSampleArray
 
@@ -89,11 +87,11 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     sampleWrite.initialize(schema)
     sampleWrite.write(out, keys.to[ArrayBuffer])
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
     val sampleRead = new TestSample
     sampleRead.initialize(schema)
-    sampleRead.read(bytes, 0)
+    sampleRead.read(fiber, 0)
 
     val array = sampleRead.getSampleArray
 
@@ -112,11 +110,11 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     sampleWrite.initialize(schema)
     sampleWrite.write(out, keys.to[ArrayBuffer])
 
-    val bytes = out.toByteArray
+    val fiber = wrapToFiberCache(out)
 
     val sampleRead = new TestSample
     sampleRead.initialize(schema)
-    sampleRead.read(bytes, 0)
+    sampleRead.read(fiber, 0)
 
     generateInterval(rowGen(-10), rowGen(-1), startInclude = true, endInclude = true)
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
