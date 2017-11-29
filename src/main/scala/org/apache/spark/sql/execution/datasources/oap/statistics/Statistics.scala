@@ -106,23 +106,11 @@ object Statistics {
     UnsafeIndexNode.getUnsafeRow(schemaLen, fiberCache, offset + 4, size)
   }
 
-  /**
-   * This method help oap convert InternalRow type to UnsafeRow type
-   * @param internalRow
-   * @param keyBuf
-   * @return unsafeRow
-   */
-  def convertHelper(converter: UnsafeProjection,
-                    internalRow: InternalRow,
-                    keyBuf: ByteArrayOutputStream): UnsafeRow = {
-    converter.apply(internalRow)
-  }
-
   def writeInternalRow(converter: UnsafeProjection,
                        internalRow: InternalRow,
                        writer: OutputStream): Int = {
     val keyBuf = new ByteArrayOutputStream()
-    val value = convertHelper(converter, internalRow, keyBuf)
+    val value = converter(internalRow)
 
     IndexUtils.writeInt(keyBuf, value.getSizeInBytes)
     value.writeToStream(keyBuf, null)
@@ -131,9 +119,10 @@ object Statistics {
     4 + value.getSizeInBytes
   }
 
-  // logic is complex, needs to be refactored :(
-  def rowInSingleInterval(row: InternalRow, interval: RangeInterval,
-                          startOrder: BaseOrdering, endOrder: BaseOrdering): Boolean = {
+  // TODO logic is complex, needs to be refactored :(
+  def rowInSingleInterval(
+      row: InternalRow, interval: RangeInterval,
+      startOrder: BaseOrdering, endOrder: BaseOrdering): Boolean = {
     // Only two cases are accepted, or something is wrong.
     // 1. row = [1, "aaa"], start = [1, "bbb"] => row.numFields == start.numFields
     // 2. row = [1, "aaa"], start = [1, DUMMY_KEY_START] => row.numFields -1 = start.numFields
@@ -160,8 +149,9 @@ object Statistics {
     withinStart && withinEnd
   }
 
-  def rowInIntervalArray(row: InternalRow, intervalArray: ArrayBuffer[RangeInterval],
-                         fullOrder: BaseOrdering, partialOrder: BaseOrdering): Boolean = {
+  def rowInIntervalArray(
+      row: InternalRow, intervalArray: ArrayBuffer[RangeInterval],
+      fullOrder: BaseOrdering, partialOrder: BaseOrdering): Boolean = {
     if (intervalArray == null || intervalArray.isEmpty) false
     else intervalArray.exists{interval =>
       val startOrder =
