@@ -17,8 +17,12 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
+import java.io.ByteArrayOutputStream
+
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
+
+import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
@@ -47,11 +51,11 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     val size = fiber.getInt(offset)
     offset += 4
 
+    var rowOffset = 0
     for (i <- 0 until size) {
-      val rowSize = fiber.getInt(offset)
-      val row = Statistics.getUnsafeRow(schema.length, fiber, offset, rowSize).copy()
+      val row = IndexUtils.readBasedOnSchema(fiber, offset + size * 4 + rowOffset, schema)
+      rowOffset = fiber.getInt(offset + i * 4)
       assert(ordering.compare(row, keys(i)) == 0)
-      offset += 4 + rowSize
     }
   }
 
@@ -63,9 +67,13 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     IndexUtils.writeInt(out, SampleBasedStatisticsType.id)
     IndexUtils.writeInt(out, size)
 
+    val tempWriter = new ByteArrayOutputStream()
+    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
     for (idx <- 0 until size) {
-      Statistics.writeInternalRow(converter, keys(idx), out)
+      IndexUtils.writeBasedOnSchema(littleEndianWriter, keys(idx), schema)
+      IndexUtils.writeInt(out, tempWriter.size)
     }
+    out.write(tempWriter.toByteArray)
 
     val fiber = wrapToFiberCache(out)
 

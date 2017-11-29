@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.FSDataInputStream
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.SparkEnv
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.ColumnValues
 import org.apache.spark.storage.{BlockManager, TestBlockId}
@@ -83,10 +82,6 @@ trait FiberCache {
     copyMemoryToBytes(offset, bytes)
     bytes
   }
-
-  @Deprecated
-  def pointUnsafeRow(unsafeRow: UnsafeRow, offset: Long, sizeInBytes: Int): Unit =
-    unsafeRow.pointTo(getBaseObj, getBaseOffset + offset, sizeInBytes)
 
   /** TODO: may cause copy memory from off-heap to on-heap, used by [[ColumnValues]] */
   private def copyMemory(offset: Long, dst: AnyRef, dstOffset: Long, length: Long): Unit =

@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import sun.nio.ch.DirectBuffer
 
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
@@ -143,13 +142,6 @@ private[oap] object UnsafeIndexNode {
     : UnsafeRow = {
     val curRow = getCorrectUnsafeRow(schemaLen)
     curRow.pointTo(baseObj, baseOffset, sizeInBytes)
-    curRow
-  }
-
-  def getUnsafeRow(schemaLen: Int, fiberCache: FiberCache, offset: Long, sizeInBytes : Int)
-  : UnsafeRow = {
-    val curRow = getCorrectUnsafeRow(schemaLen)
-    fiberCache.pointUnsafeRow(curRow, offset, sizeInBytes)
     curRow
   }
 }

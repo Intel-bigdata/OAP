@@ -16,13 +16,14 @@
  */
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
-import java.io.OutputStream
+import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
+import org.apache.parquet.bytes.LittleEndianDataOutputStream
+
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
@@ -34,7 +35,6 @@ private[oap] class SampleBasedStatistics extends Statistics {
   override val id: Int = SampleBasedStatisticsType.id
 
   lazy val sampleRate: Double = StatisticsManager.sampleRate
-  @transient private lazy val converter = UnsafeProjection.create(schema)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
 
@@ -56,9 +56,15 @@ private[oap] class SampleBasedStatistics extends Statistics {
 
     IndexUtils.writeInt(writer, size)
     offset += 4
+    val tempWriter = new ByteArrayOutputStream()
+    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
     sampleArray.foreach(key => {
-      offset += Statistics.writeInternalRow(converter, key, writer)
+      IndexUtils.writeBasedOnSchema(littleEndianWriter, key, schema)
+      IndexUtils.writeInt(writer, tempWriter.size())
+      offset += 4
     })
+    offset += tempWriter.size()
+    writer.write(tempWriter.toByteArray)
     offset
   }
 
@@ -71,17 +77,18 @@ private[oap] class SampleBasedStatistics extends Statistics {
     // TODO use unsafe way to interact with sample array
     sampleArray = new Array[Key](size)
 
+    var rowOffset = 0
     for (i <- 0 until size) {
-      val rowSize = fiberCache.getInt(readOffset)
-      sampleArray(i) = Statistics.getUnsafeRow(
-        schema.length, fiberCache, readOffset, rowSize).copy()
-      readOffset += (4 + rowSize)
+      sampleArray(i) = IndexUtils.readBasedOnSchema(
+        fiberCache, readOffset + size * 4 + rowOffset, schema)
+      rowOffset = fiberCache.getInt(readOffset + i * 4)
     }
+    readOffset += (rowOffset + size * 4)
     readOffset - offset
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
-    if (sampleArray == null || sampleArray.length <= 0) {
+    if (sampleArray == null || sampleArray.isEmpty) {
       StaticsAnalysisResult.USE_INDEX
     } else {
       var hitCnt = 0

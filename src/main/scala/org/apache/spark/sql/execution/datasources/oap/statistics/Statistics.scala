@@ -17,12 +17,11 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
-import java.io.{ByteArrayOutputStream, OutputStream}
+import java.io.OutputStream
 
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.BaseOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
@@ -85,23 +84,6 @@ abstract class Statistics {
 
 // tool function for Statistics class
 object Statistics {
-  def getUnsafeRow(schemaLen: Int, fiberCache: FiberCache, offset: Long, size: Int): UnsafeRow = {
-    UnsafeIndexNode.getUnsafeRow(schemaLen, fiberCache, offset + 4, size)
-  }
-
-  def writeInternalRow(converter: UnsafeProjection,
-                       internalRow: InternalRow,
-                       writer: OutputStream): Int = {
-    val keyBuf = new ByteArrayOutputStream()
-    val value = converter(internalRow)
-
-    IndexUtils.writeInt(keyBuf, value.getSizeInBytes)
-    value.writeToStream(keyBuf, null)
-    writer.write(keyBuf.toByteArray)
-    keyBuf.close()
-    4 + value.getSizeInBytes
-  }
-
   // TODO logic is complex, needs to be refactored :(
   def rowInSingleInterval(
       row: InternalRow, interval: RangeInterval,

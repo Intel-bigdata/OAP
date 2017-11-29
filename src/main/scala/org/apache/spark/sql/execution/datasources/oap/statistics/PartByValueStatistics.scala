@@ -17,12 +17,13 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
-import java.io.OutputStream
+import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.parquet.bytes.LittleEndianDataOutputStream
+
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
@@ -43,15 +44,14 @@ import org.apache.spark.sql.types.StructType
 
 private[oap] class PartByValueStatistics extends Statistics {
   override val id: Int = PartByValueStatisticsType.id
-  @transient private lazy val converter = UnsafeProjection.create(schema)
 
   private lazy val maxPartNum: Int = StatisticsManager.partNumber
   @transient private lazy val ordering = GenerateOrdering.create(schema)
   @transient private lazy val partialOrdering =
     GenerateOrdering.create(StructType(schema.dropRight(1)))
 
-  protected case class PartedByValueMeta(idx: Int, row: InternalRow,
-                                         curMaxId: Int, accumulatorCnt: Int)
+  protected case class PartedByValueMeta(
+      idx: Int, row: InternalRow, curMaxId: Int, accumulatorCnt: Int)
   protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
 
   override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
@@ -85,12 +85,17 @@ private[oap] class PartByValueStatistics extends Statistics {
 
     // start writing
     IndexUtils.writeInt(writer, metas.length)
+    val tempWriter = new ByteArrayOutputStream()
+    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
     metas.foreach(meta => {
-      offset += Statistics.writeInternalRow(converter, meta.row, writer)
+      IndexUtils.writeBasedOnSchema(littleEndianWriter, meta.row, schema)
       IndexUtils.writeInt(writer, meta.curMaxId)
       IndexUtils.writeInt(writer, meta.accumulatorCnt)
-      offset += 8
+      IndexUtils.writeInt(writer, tempWriter.size())
+      offset += 12
     })
+    offset += tempWriter.size
+    writer.write(tempWriter.toByteArray)
     offset
   }
 
@@ -100,15 +105,16 @@ private[oap] class PartByValueStatistics extends Statistics {
     val size = fiberCache.getInt(readOffset)
     readOffset += 4
 
+    var rowOffset = 0
     for (i <- 0 until size) {
-      val rowSize = fiberCache.getInt(readOffset)
-      val row = Statistics.getUnsafeRow(schema.length, fiberCache, readOffset, rowSize).copy()
-      readOffset += rowSize + 4
-      val index = fiberCache.getInt(readOffset)
-      val count = fiberCache.getInt(readOffset + 4)
-      readOffset += 8
+      val row = IndexUtils.readBasedOnSchema(
+        fiberCache, readOffset + size * 12 + rowOffset, schema)
+      val index = fiberCache.getInt(readOffset + i * 12)
+      val count = fiberCache.getInt(readOffset + i * 12 + 4)
+      rowOffset = fiberCache.getInt(readOffset + i * 12 + 8)
       metas.append(PartedByValueMeta(i, row, index, count))
     }
+    readOffset += (size * 12 + rowOffset)
     readOffset - offset
   }
 

@@ -16,7 +16,11 @@
  */
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
+import java.io.ByteArrayOutputStream
+
 import scala.util.Random
+
+import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
@@ -50,22 +54,28 @@ class MinMaxStatisticsSuite extends StatisticsTest {
     assert(fiber.getInt(0) == MinMaxStatisticsType.id)
     offset += 4
     val minSize = fiber.getInt(offset)
-    val minFromFile = Statistics.getUnsafeRow(schema.length, fiber, offset, minSize)
-    checkInternalRow(minFromFile, converter(rowGen(1)))
-    offset += (4 + minSize)
+    offset += 4
+    val totalSize = fiber.getInt(offset + 4)
+    offset += 4
+    val minFromFile = IndexUtils.readBasedOnSchema(fiber, offset, schema)
+    checkInternalRow(minFromFile, rowGen(1))
 
-    val maxSize = fiber.getInt(offset)
-    val maxFromFile = Statistics.getUnsafeRow(schema.length, fiber, offset, maxSize)
-    checkInternalRow(maxFromFile, converter(rowGen(300)))
-    offset += (4 + minSize)
+    val maxFromFile = IndexUtils.readBasedOnSchema(fiber, offset + minSize, schema)
+    checkInternalRow(maxFromFile, rowGen(300))
+    offset += (4 + totalSize)
   }
 
   test("read function test") {
     val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
     IndexUtils.writeInt(out, MinMaxStatisticsType.id)
-    Statistics.writeInternalRow(converter, rowGen(1), out)
-    Statistics.writeInternalRow(converter, rowGen(300), out)
+    val tempWriter = new ByteArrayOutputStream()
+    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
+    IndexUtils.writeBasedOnSchema(littleEndianWriter, rowGen(1), schema)
+    IndexUtils.writeInt(out, tempWriter.size)
+    IndexUtils.writeBasedOnSchema(littleEndianWriter, rowGen(300), schema)
+    IndexUtils.writeInt(out, tempWriter.size)
+    out.write(tempWriter.toByteArray)
 
     val fiber = wrapToFiberCache(out)
 

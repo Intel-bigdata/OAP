@@ -25,7 +25,6 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.{BaseOrdering, GenerateOrdering}
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index.RangeInterval
@@ -41,7 +40,6 @@ abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
   protected var schema: StructType = StructType(StructField("a", IntegerType)
     :: StructField("b", StringType) :: Nil)
 
-  @transient lazy protected val converter: UnsafeProjection = UnsafeProjection.create(schema)
   @transient lazy protected val ordering: BaseOrdering = GenerateOrdering.create(schema)
   @transient lazy protected val partialOrdering: BaseOrdering =
     GenerateOrdering.create(StructType(schema.dropRight(1)))

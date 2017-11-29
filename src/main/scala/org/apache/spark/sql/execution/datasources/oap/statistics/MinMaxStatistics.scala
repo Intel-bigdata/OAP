@@ -17,9 +17,11 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
-import java.io.OutputStream
+import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
+
+import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
@@ -56,8 +58,15 @@ private[oap] class MinMaxStatistics extends Statistics {
   override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
     var offset = super.write(writer, sortedKeys)
     if (min != null) {
-      offset += Statistics.writeInternalRow(converter, min, writer)
-      offset += Statistics.writeInternalRow(converter, max, writer)
+      val tempWriter = new ByteArrayOutputStream()
+      val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
+      IndexUtils.writeBasedOnSchema(littleEndianWriter, min, schema)
+      IndexUtils.writeInt(writer, tempWriter.size)
+      IndexUtils.writeBasedOnSchema(littleEndianWriter, max, schema)
+      IndexUtils.writeInt(writer, tempWriter.size)
+      offset += Integer.SIZE / 8 * 2
+      writer.write(tempWriter.toByteArray)
+      offset += tempWriter.size
     }
     offset
   }
@@ -66,12 +75,12 @@ private[oap] class MinMaxStatistics extends Statistics {
     var readOffset = super.read(fiberCache, offset) + offset // offset after super.read
 
     val minSize = fiberCache.getInt(readOffset)
-    min = Statistics.getUnsafeRow(schema.length, fiberCache, readOffset, minSize).copy()
-    readOffset += (4 + minSize)
-
-    val maxSize = fiberCache.getInt(readOffset)
-    max = Statistics.getUnsafeRow(schema.length, fiberCache, readOffset, maxSize).copy()
-    readOffset += (4 + maxSize)
+    readOffset += 4
+    val totalSize = fiberCache.getInt(readOffset)
+    readOffset += 4
+    min = IndexUtils.readBasedOnSchema(fiberCache, readOffset, schema)
+    max = IndexUtils.readBasedOnSchema(fiberCache, readOffset + minSize, schema)
+    readOffset += totalSize
 
     readOffset - offset
   }
