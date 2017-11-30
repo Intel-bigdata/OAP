@@ -19,14 +19,14 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import java.io.File
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
@@ -68,8 +68,17 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
   }
 
   private def assertIndexer(ic: IndexContext, attrNum: Int,
-                            targetIdxName: String, targetLastIdx: Int): Unit = {
-    val (lastIdx, idxMeta) = ic.getBestIndexer(attrNum)
+                            targetIdxName: String, targetLastIdx: Int,
+                            maxChooseSize: Int = 1): Unit = {
+    val availableIndexers = ic.getAvailableIndexers(attrNum, maxChooseSize)
+    val lastIdx = availableIndexers.headOption match {
+      case Some(v) => v._1
+      case _ => -1
+    }
+    val idxMeta = availableIndexers.headOption match {
+      case Some(v) => v._2
+      case _ => null
+    }
     assert(lastIdx == targetLastIdx)
     if (idxMeta != null) assert(idxMeta.name equals targetIdxName)
   }
@@ -217,9 +226,30 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
     )
     ScannerBuilder.build(nonEqualFilters, ic)
     // Non equal filters won't build BitmapScanner.
-    assert(ic.getScanner == None)
+    assert(ic.getScanners == None)
     val equalFilters: Array[Filter] = Array(Or(EqualTo("a", 14), EqualTo("b", 166)))
     ScannerBuilder.build(equalFilters, ic)
-    assert(ic.getScanner.get.isInstanceOf[BitMapScanner])
+    assert(ic.getScanners.get.scanners.head.isInstanceOf[BitMapScanner])
+  }
+
+  test("Multiple Indexes Test7") {
+    sql("create oindex idxa on oap_test(a)")
+    sql("create oindex idxb on oap_test(b)")
+    sql("create oindex idxe on oap_test(e)")
+    sql("create oindex idxABC on oap_test(a, b, c)")
+    sql("create oindex idxACD on oap_test(a, c, d)")
+    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val ic = new IndexContext(oapMeta)
+    val filters: Array[Filter] = Array(
+      EqualTo("a", 8), GreaterThanOrEqual("d", 10), EqualTo("e", 3))
+    ScannerBuilder.build(filters, ic)
+    val expectIdxs: ArrayBuffer[(Int, String)] = ArrayBuffer()
+    expectIdxs += ((0, "idxa"), (0, "idxe"))
+    val availableIndexers = ic.getAvailableIndexers(3, 2)
+    val availIdxs = new ArrayBuffer[(Int, String)]()
+    for (indexer <- availableIndexers) {
+      availIdxs.append((indexer._1, indexer._2.name))
+    }
+    assert(availIdxs sameElements expectIdxs)
   }
 }

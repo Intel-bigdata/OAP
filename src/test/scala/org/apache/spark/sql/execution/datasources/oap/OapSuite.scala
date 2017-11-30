@@ -134,7 +134,7 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
     val filters: Array[Filter] = Array(
       And(GreaterThan("a", 9), LessThan("a", 14)))
     ScannerBuilder.build(filters, ic)
-    var filterScanner = ic.getScanner
+    val filterScanner = ic.getScanners
     val readerIndex = new OapDataReader(filePath, dataSourceMeta, filterScanner, requiredIds)
     val itIndex = readerIndex.initialize(conf)
     assert(itIndex.size == 4)
@@ -162,7 +162,8 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
     assert(indexInfoStatusSerializeStr == OapIndexInfoStatusSerDe.serialize(indexInfoStatusSeq))
     val host = "host1"
     val executorId = "executorId1"
-    val oapIndexInfo = SparkListenerOapIndexInfoUpdate(host, executorId, indexInfoStatusSerializeStr)
+    val oapIndexInfo =
+      SparkListenerOapIndexInfoUpdate(host, executorId, indexInfoStatusSerializeStr)
     OapIndexInfo.update(oapIndexInfo)
     assert(oapIndexInfo.hostName == host)
     assert(oapIndexInfo.executorId == executorId)

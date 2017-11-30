@@ -471,7 +471,7 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
-    sql("create oindex index1 on parquet_test (b)")
+    sql("create oindex index1 on parquet_test (b) USING BITMAP")
 
     // will use b in (....)
     checkAnswer(sql("SELECT * FROM parquet_test WHERE " +

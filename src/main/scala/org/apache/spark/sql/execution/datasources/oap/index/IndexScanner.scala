@@ -24,7 +24,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
+import org.apache.spark.sql.catalyst.expressions.{SortDirection, UnsafeRow}
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
 import org.apache.spark.sql.internal.SQLConf
@@ -227,7 +227,8 @@ private[oap] object ScannerBuilder extends Logging {
   }
 
   def build(filters: Array[Filter], ic: IndexContext,
-      scannerOptions: Map[String, String] = Map.empty): Array[Filter] = {
+            maxChooseSize: Int = 2,
+            scannerOptions: Map[String, String] = Map.empty): Array[Filter] = {
     if (filters == null || filters.isEmpty) return filters
     logDebug("Transform filters into Intervals:")
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
@@ -243,10 +244,44 @@ private[oap] object ScannerBuilder extends Logging {
       intervalMap.foreach(intervals =>
         logDebug("\t" + intervals._1 + ": " + intervals._2.mkString(" - ")))
 
-      ic.buildScanner(intervalMap, scannerOptions)
+      ic.buildScanners(intervalMap, scannerOptions)
     }
 
     filters.filterNot(canSupport(_, ic))
   }
 
 }
+
+private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
+  extends Iterator[Long] with Serializable with Logging{
+
+  private var actualUsedScanners: Seq[IndexScanner] = _
+
+  private var backend: Iterator[Long] = _
+
+  def indexIsAvailable(dataPath: Path, conf: Configuration): Boolean = {
+    actualUsedScanners = scanners.filter(_.indexIsAvailable(dataPath, conf))
+    actualUsedScanners.nonEmpty
+  }
+
+  def order: SortDirection = actualUsedScanners.head.meta.indexType.indexOrder.head
+
+  def initialize(dataPath: Path, conf: Configuration): IndexScanners = {
+    actualUsedScanners.map(_.initialize(dataPath, conf))
+    backend = actualUsedScanners.map(_.toArray)
+      .sortBy(_.length)
+      .reduce((left, right) => {
+        if (left.isEmpty) left
+        else left.intersect(right)
+      }).toIterator
+    this
+  }
+
+  override def hasNext: Boolean = backend.hasNext
+
+  override def next(): Long = backend.next
+
+  override def toString(): String = scanners.map(_.toString()).mkString("|")
+
+}
+
