@@ -33,9 +33,11 @@ import org.apache.spark.sql.types.StructType
 private[oap] case class ParquetDataFile
 (path: String, schema: StructType, configuration: Configuration) extends DataFile {
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache = {
-    // TODO data cache
-    throw new UnsupportedOperationException("Not support getFiberData Operation.")
+  def getDataInputStream(
+      rowGroupId: Int,
+      columnIndex: Int,
+      conf: Configuration): FiberInputStream = {
+    throw new UnsupportedOperationException("Not support getFiberSize Operation.")
   }
 
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[UnsafeRow] = {

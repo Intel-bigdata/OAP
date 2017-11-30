@@ -17,7 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.io.ByteArrayInputStream
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import org.apache.hadoop.fs.FSDataInputStream
 import org.apache.spark.internal.Logging
@@ -33,6 +35,24 @@ import org.apache.spark.unsafe.types.UTF8String
 
 // TODO: make it an alias of MemoryBlock
 trait FiberCache {
+  def loadData(is: FiberInputStream): Unit = {
+    val bytes = new Array[Byte](is.length)
+    is.is match {
+      case fsInputStream: FSDataInputStream => fsInputStream.readFully(is.offset, bytes)
+      case bytesInputStream: ByteArrayInputStream =>
+        bytesInputStream.skip(is.offset)
+        bytesInputStream.read(bytes)
+    }
+    val memoryBlock = OapEnv.get.memoryManager.allocate(bytes.length)
+    Platform.copyMemory(
+      bytes,
+      Platform.BYTE_ARRAY_OFFSET,
+      memoryBlock.getBaseObject,
+      memoryBlock.getBaseOffset,
+      bytes.length)
+    fiberData.setObjAndOffset(memoryBlock.getBaseObject, memoryBlock.getBaseOffset)
+  }
+
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
 
@@ -40,9 +60,10 @@ trait FiberCache {
   private var disposed = false
   def isDisposed: Boolean = disposed
   def dispose(): Unit = {
-    if (!disposed) OapEnv.get.memoryManager.free(fiberData)
+    if (!disposed && fiberData.getBaseOffset != -1) OapEnv.get.memoryManager.free(fiberData)
     disposed = true
   }
+  val lock = new ReentrantReadWriteLock()
 
   /** For debug purpose */
   def toArray: Array[Byte] = {
@@ -97,6 +118,10 @@ trait FiberCache {
     copyMemory(offset, dst, Platform.BYTE_ARRAY_OFFSET, dst.length)
 
   def size(): Long = fiberData.size()
+
+  def release(): Unit = {
+    lock.readLock().unlock()
+  }
 }
 
 object FiberCache {

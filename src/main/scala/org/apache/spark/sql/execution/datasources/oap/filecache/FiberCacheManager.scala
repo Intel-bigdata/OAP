@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.io.InputStream
 import java.util.concurrent.{Callable, TimeUnit}
 
 import scala.collection.JavaConverters._
@@ -28,6 +29,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.oap.OapEnv
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
+import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.util.collection.BitSet
 
 // TODO need to register within the SparkContext
@@ -36,6 +38,8 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
     OapEnv.get.fiberCacheManager.status
   }
 }
+
+case class FiberInputStream(is: InputStream, offset: Long, length: Int)
 
 /**
  * Fiber Cache Manager
@@ -49,7 +53,13 @@ class FiberCacheManager(memorySize: Long) extends Logging {
       // TODO: Change the log more readable
       logDebug(s"Removing Cache ${notification.getKey}")
       // TODO: Investigate lock mechanism to secure in-used FiberCache
-      notification.getValue.dispose()
+      val fiberCache = notification.getValue
+      if (fiberCache.lock.writeLock().tryLock()) {
+        notification.getValue.dispose()
+        fiberCache.lock.writeLock().unlock()
+      } else {
+        cache.put(notification.getKey, notification.getValue)
+      }
     }
   }
   private val weigher = new Weigher[Fiber, FiberCache] {
@@ -64,15 +74,17 @@ class FiberCacheManager(memorySize: Long) extends Logging {
    * To avoid storing configuration in each Cache, use a loader.
    * After all, configuration is not a part of Fiber.
    */
-  private def cacheLoader(fiber: Fiber, configuration: Configuration) =
+  private def cacheLoader(fiber: Fiber, length: Int) =
     new Callable[FiberCache] {
       override def call(): FiberCache = {
         logDebug(s"Loading Cache $fiber")
-        fiber.fiber2Data(configuration)
+        // Create a fiberCache with dummy MemoryBlock. This is used to acquire memory
+        // If there is no enough memory, this fiberCache will be removed right after loading.
+        fiber.createFiberCache(length)
       }
     }
 
-  private val cache = CacheBuilder.newBuilder()
+  private val cache: Cache[Fiber, FiberCache] = CacheBuilder.newBuilder()
       .recordStats()
       .concurrencyLevel(4)
       .removalListener(removalListener)
@@ -80,9 +92,17 @@ class FiberCacheManager(memorySize: Long) extends Logging {
       .weigher(weigher)
       .build[Fiber, FiberCache]()
 
-  def get(fiber: Fiber, conf: Configuration): FiberCache = {
-    // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
-    cache.get(fiber, cacheLoader(fiber, conf))
+  def get(fiber: Fiber, is: => FiberInputStream): FiberCache = {
+    val fiberCache = cache.get(fiber, cacheLoader(fiber, is.length))
+    fiberCache.lock.readLock().lock()
+    if (fiberCache.isDisposed) {
+      fiberCache.lock.readLock().unlock()
+      null
+    } else {
+      // we have inserted FiberCache into Cache Manager, so we've acquire memory. load data
+      fiberCache.loadData(is)
+      fiberCache
+    }
   }
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly
@@ -138,40 +158,43 @@ private[oap] object DataFileHandleCacheManager extends Logging {
 }
 
 private[oap] trait Fiber {
-  def fiber2Data(conf: Configuration): FiberCache
+  def createFiberCache(length: Int): FiberCache
 }
 
 private[oap]
 case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache =
-    file.getFiberData(rowGroupId, columnIndex, conf)
+  override def createFiberCache(length: Int): FiberCache =
+    DataFiberCache(new MemoryBlock(null, -1, length))
 }
 
 private[oap]
 case class IndexFiber(file: IndexFile) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = file.getIndexFiberData(conf)
+  override def createFiberCache(length: Int): FiberCache =
+    IndexFiberCache(new MemoryBlock(null, -1, length))
 }
 
 private[oap]
 case class BTreeFiber(
-    getFiberData: () => FiberCache,
     file: String,
     section: Int,
     idx: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+  override def createFiberCache(length: Int): FiberCache =
+    IndexFiberCache(new MemoryBlock(null, -1, length))
 }
 
 private[oap]
 case class BitmapFiber(
-    getFiberData: () => FiberCache,
     file: String,
     // "0" means no split sections within file.
     sectionIdxOfFile: Int,
     // "0" means no smaller loading units.
     loadUnitIdxOfSection: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+  override def createFiberCache(length: Int): FiberCache =
+    IndexFiberCache(new MemoryBlock(null, -1, length))
 }
 
-private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getData()
+private[oap] case class TestFiber(
+    name: String) extends Fiber {
+  override def createFiberCache(length: Int): FiberCache =
+    DataFiberCache(new MemoryBlock(null, -1, length))
 }

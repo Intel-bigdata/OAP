@@ -17,10 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
-import org.apache.spark.{SparkConf, SparkEnv}
+import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, FiberCacheManager, MemoryManager}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCacheManager, MemoryManager}
 
 class OapEnv(
     val memoryManager: MemoryManager,

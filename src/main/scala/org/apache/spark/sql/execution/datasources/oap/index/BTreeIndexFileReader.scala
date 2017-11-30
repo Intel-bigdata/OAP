@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.execution.datasources.oap.OapEnv
-import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, FiberInputStream}
 import org.apache.spark.unsafe.Platform
 
 private[oap] case class BTreeIndexFileReader(
@@ -53,6 +53,18 @@ private[oap] case class BTreeIndexFileReader(
 
   private def getIntFromBuffer(buffer: Array[Byte], offset: Int) =
     Platform.getInt(buffer, Platform.BYTE_ARRAY_OFFSET + offset)
+
+  def getFooterInputStream: FiberInputStream = {
+    FiberInputStream(reader, footerIndex, footerLength)
+  }
+
+  def getRowIdListInputStream: FiberInputStream = {
+    FiberInputStream(reader, rowIdListIndex, rowIdListLength)
+  }
+
+  def getNodeInputStream(offset: Int, size: Int): FiberInputStream = {
+    FiberInputStream(reader, nodesIndex + offset, size)
+  }
 
   def readFooter(): FiberCache =
     memoryManager.putToIndexFiberCache(reader, footerIndex, footerLength)

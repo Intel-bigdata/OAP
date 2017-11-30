@@ -17,10 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.io.ByteArrayInputStream
+
 import scala.util.Random
-
-import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.sql.execution.datasources.oap.OapEnv
 import org.apache.spark.sql.test.SharedSQLContext
 
@@ -31,22 +30,28 @@ class FiberCacheManagerSuite extends SharedSQLContext {
     random.nextBytes(bytes)
     bytes
   }
+  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   private def memoryManager = OapEnv.get.memoryManager
   private def fiberCacheManager = OapEnv.get.fiberCacheManager
+  private def toInputStream(data: Array[Byte]): FiberInputStream = {
+    FiberInputStream(new ByteArrayInputStream(data), 0, data.length)
+  }
 
   test("unit test") {
-    val configuration = new Configuration()
     val MB: Double = 1024 * 1024
     val memorySizeInMB = (memoryManager.maxMemory / MB).toInt
     val origStats = fiberCacheManager.getStats
     (1 to memorySizeInMB * 2).foreach { i =>
       val data = generateData(1024)
-      val fiber = TestFiber(() => memoryManager.putToDataFiberCache(data), s"test fiber #$i")
-      val fiberCache = fiberCacheManager.get(fiber, configuration)
-      val fiberCache2 = fiberCacheManager.get(fiber, configuration)
+      val fiber =
+        TestFiber(s"test fiber #$i")
+      val fiberCache = fiberCacheManager.get(fiber, toInputStream(data))
+      val fiberCache2 = fiberCacheManager.get(fiber, toInputStream(data))
       assert(fiberCache.toArray sameElements data)
       assert(fiberCache2.toArray sameElements data)
+      fiberCache.release()
+      fiberCache2.release()
     }
     val stats = fiberCacheManager.getStats.minus(origStats)
     assert(stats.missCount() == memorySizeInMB * 2)
@@ -55,35 +60,39 @@ class FiberCacheManagerSuite extends SharedSQLContext {
   }
 
   test("remove a fiber is in use") {
-    val configuration = new Configuration()
     val MB: Double = 1024 * 1024
     val memorySizeInMB = (memoryManager.maxMemory / MB).toInt
 
     val dataInUse = generateData(1024)
-    val fiberInUse = TestFiber(() => memoryManager.putToDataFiberCache(dataInUse), s"test fiber #0")
-    val fiberCacheInUse = fiberCacheManager.get(fiberInUse, configuration)
+    val fiberInUse =
+      TestFiber(s"test fiber #0")
+    val fiberCacheInUse = fiberCacheManager.get(fiberInUse, toInputStream(dataInUse))
     (1 to memorySizeInMB * 2).foreach { i =>
       val data = generateData(1024)
-      val fiber = TestFiber(() => memoryManager.putToDataFiberCache(data), s"test fiber #$i")
-      val fiberCache = fiberCacheManager.get(fiber, configuration)
+      val fiber = TestFiber(s"test fiber #$i")
+      val fiberCache = fiberCacheManager.get(fiber, toInputStream(data))
       assert(fiberCache.toArray sameElements data)
+      fiberCache.release()
     }
-    assert(fiberCacheInUse.isDisposed)
+    assert(!fiberCacheInUse.isDisposed)
+    fiberCacheInUse.release()
   }
 
   test("add a very large fiber") {
-    val configuration = new Configuration()
     val MB: Double = 1024 * 1024
     val memorySizeInMB = (memoryManager.maxMemory / MB).toInt
     // Cache concurrency is 4, means maximum ENTRY size is memory size / 4
     val data = generateData(memorySizeInMB * 1024 * 1024 / 8)
-    val fiber = TestFiber(() => memoryManager.putToDataFiberCache(data), s"test fiber #0")
-    val fiberCache = fiberCacheManager.get(fiber, configuration)
+    val fiber =
+      TestFiber(s"test fiber #0")
+    val fiberCache = fiberCacheManager.get(fiber, toInputStream(data))
+    fiberCache.release()
     assert(!fiberCache.isDisposed)
 
     val data1 = generateData(memorySizeInMB * 1024 * 1024 / 2)
-    val fiber1 = TestFiber(() => memoryManager.putToDataFiberCache(data1), s"test fiber #1")
-    val fiberCache1 = fiberCacheManager.get(fiber1, configuration)
-    assert(fiberCache1.isDisposed)
+    val fiber1 =
+      TestFiber(s"test fiber #1")
+    val fiberCache1 = fiberCacheManager.get(fiber1, toInputStream(data1))
+    assert(fiberCache1 == null)
   }
 }

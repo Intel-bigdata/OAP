@@ -19,8 +19,9 @@ package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.OapEnv
-import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 
 private[oap] trait CommonIndexFile {
   def file: Path
@@ -37,6 +38,8 @@ private[oap] trait CommonIndexFile {
  * Read the index file into memory, and can be accessed as [[FiberCache]].
  */
 private[oap] case class IndexFile(file: Path) extends CommonIndexFile {
+  def getIndexFiberSize: Int = throw new OapException("IndexFile is not used")
+
   def getIndexFiberData(conf: Configuration): FiberCache = {
     val fs = file.getFileSystem(conf)
     val fin = fs.open(file)
