@@ -46,7 +46,7 @@ case class FiberInputStream(is: InputStream, offset: Long, length: Int)
  *
  * TODO: change object to class for better initialization
  */
-class FiberCacheManager(memorySize: Long) extends Logging {
+class FiberCacheManager(memorySize: Long, concurrency: Int) extends Logging {
 
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
@@ -86,7 +86,7 @@ class FiberCacheManager(memorySize: Long) extends Logging {
 
   private val cache: Cache[Fiber, FiberCache] = CacheBuilder.newBuilder()
       .recordStats()
-      .concurrencyLevel(4)
+      .concurrencyLevel(concurrency)
       .removalListener(removalListener)
       .maximumWeight(MAX_WEIGHT)
       .weigher(weigher)
@@ -128,6 +128,11 @@ class FiberCacheManager(memorySize: Long) extends Logging {
   }
 
   def getStats: CacheStats = cache.stats()
+}
+
+object FiberCacheManager {
+  val OAP_FIBER_CACHE_CONCURRENCY = "spark.oap.fiberCache.concurrency"
+  val OAP_FIBER_CACHE_CONCURRENCY_DEFAULT = 4
 }
 
 private[oap] object DataFileHandleCacheManager extends Logging {

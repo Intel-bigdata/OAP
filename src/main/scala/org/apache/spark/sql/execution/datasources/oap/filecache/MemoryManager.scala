@@ -148,7 +148,7 @@ private[oap] case class IndexFiberCache(fiberData: MemoryBlock) extends FiberCac
  */
 private[oap] class MemoryManager(
     memoryManager: org.apache.spark.memory.MemoryManager,
-    conf: SparkConf) extends Logging {
+    fraction: Double) extends Logging {
 
   require(memoryManager.maxOffHeapStorageMemory > 0)
   /**
@@ -161,11 +161,8 @@ private[oap] class MemoryManager(
   private val DUMMY_BLOCK_ID = TestBlockId("oap_memory_request_block")
 
   private val _maxMemory = {
-    val oapFraction = conf.getDouble(
-      MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION,
-      MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION_DEFAULT)
 
-    val oapMaxMemory = (memoryManager.maxOffHeapStorageMemory * oapFraction).toLong
+    val oapMaxMemory = (memoryManager.maxOffHeapStorageMemory * fraction).toLong
     if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
       oapMaxMemory
     } else {

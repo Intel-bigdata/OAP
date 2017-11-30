@@ -76,13 +76,13 @@ class MemoryManagerSuite extends SharedSQLContext {
     assert(100 * 0.7 * 1024 * 1024 === memoryManager.maxMemory)
     // change to 0.9
     sparkContext.conf.set(MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION, "0.9")
-    OapEnv.update()
+    OapEnv.restart()
     assert(100 * 0.9 * 1024 * 1024 === memoryManager.maxMemory)
     // restore back
     sparkContext.conf.set(
       MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION,
       MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION_DEFAULT.toString)
-    OapEnv.update()
+    OapEnv.restart()
     assert(100 * 0.7 * 1024 * 1024 === memoryManager.maxMemory)
   }
 

@@ -44,15 +44,24 @@ object OapEnv {
     val sparkEnv = SparkEnv.get
     if (sparkEnv == null) throw new OapException("Can't run OAP without SparkContext")
 
-    val memoryManager = new MemoryManager(sparkEnv.memoryManager, sparkEnv.conf)
-    val fiberCacheManager = new FiberCacheManager(memoryManager.maxMemory)
+    val oapFraction = sparkEnv.conf.getDouble(
+      MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION,
+      MemoryManager.OAP_OFF_HEAP_MEMORY_FRACTION_DEFAULT)
+
+    val concurrency = sparkEnv.conf.getInt(
+      FiberCacheManager.OAP_FIBER_CACHE_CONCURRENCY,
+      FiberCacheManager.OAP_FIBER_CACHE_CONCURRENCY_DEFAULT
+    )
+
+    val memoryManager = new MemoryManager(sparkEnv.memoryManager, oapFraction)
+    val fiberCacheManager = new FiberCacheManager(memoryManager.maxMemory, concurrency)
     new OapEnv(memoryManager, fiberCacheManager)
   }
 
   /**
    * Create a new OapEnv with latest SparkConf. For test purpose
    */
-  def update(): Unit = {
+  def restart(): Unit = {
     // TODO: clean previous OapEnv
     if (env != null) {
       env.stop()
