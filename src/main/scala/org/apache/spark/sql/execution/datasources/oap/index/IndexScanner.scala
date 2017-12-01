@@ -268,12 +268,16 @@ private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanners = {
     actualUsedScanners.map(_.initialize(dataPath, conf))
-    backend = actualUsedScanners.map(_.toArray)
-      .sortBy(_.length)
-      .reduce((left, right) => {
-        if (left.isEmpty) left
-        else left.intersect(right)
-      }).toIterator
+    backend = actualUsedScanners.length match {
+      case 0 => Iterator.empty
+      case 1 => actualUsedScanners.head.toArray.toIterator
+      case _ => actualUsedScanners.par.map(_.toArray).seq
+        .sortBy(_.length)
+        .reduce((left, right) => {
+          if (left.isEmpty) left
+          else left.intersect(right)
+        }).toIterator
+    }
     this
   }
 
