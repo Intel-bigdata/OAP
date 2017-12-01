@@ -199,7 +199,7 @@ private[oap] class OapDataReader(
 
     filterScanner match {
       case Some(indexScanner) if indexScanner.indexIsAvailable(path, conf) =>
-        def getRowIds(options: Map[String, String]): Array[Long] = {
+        def getRowIds(options: Map[String, String]): Array[Int] = {
           indexScanner.initialize(path, conf)
 
           // total Row count can be get from the index scanner

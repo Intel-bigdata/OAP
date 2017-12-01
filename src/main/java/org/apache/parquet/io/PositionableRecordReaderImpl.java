@@ -20,17 +20,15 @@ import org.apache.parquet.Preconditions;
 import org.apache.parquet.column.ColumnReader;
 import org.apache.parquet.column.impl.ColumnReadStoreImpl;
 import org.apache.parquet.io.api.RecordMaterializer;
-import org.apache.parquet.it.unimi.dsi.fastutil.longs.LongList;
+import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<T> {
 
     private final long recordMaxCount;
 
-    private long recordsRead = 0;
+    private int recordsRead = 0;
 
-    private Long currentRowId = -1L;
-
-    private LongList rowIdList = null;
+    private IntList rowIdList = null;
 
     private int currentIndex = 0;
 
@@ -38,7 +36,7 @@ public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<
                                         RecordMaterializer<T> recordMaterializer,
                                         ColumnReadStoreImpl columnStore,
                                         long recordCount,
-                                        LongList rowIdList) {
+                                        IntList rowIdList) {
         super(root, recordMaterializer, false, columnStore);
         Preconditions.checkNotNull(rowIdList,"rowIdList can not be null.");
         Preconditions.checkArgument(!rowIdList.isEmpty(), "rowIdList must has item.");
@@ -47,7 +45,7 @@ public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<
     }
 
     public T read() {
-        currentRowId = rowIdList.getLong(currentIndex);
+        int currentRowId = rowIdList.getInt(currentIndex);
         seek(currentRowId);
 
         if (recordsRead == recordMaxCount) {
@@ -59,7 +57,7 @@ public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<
         return super.read();
     }
 
-    private void seek(long position) {
+    private void seek(int position) {
 
         Preconditions.checkArgument(position >= recordsRead,
                 "Not support seek to backward position, recordsRead: %s want to read: %s", recordsRead, position);

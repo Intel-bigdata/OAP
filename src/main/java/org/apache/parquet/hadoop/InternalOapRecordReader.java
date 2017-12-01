@@ -31,7 +31,7 @@ import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.io.*;
 import org.apache.parquet.io.api.RecordMaterializer;
-import org.apache.parquet.it.unimi.dsi.fastutil.longs.LongList;
+import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.parquet.schema.MessageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +62,7 @@ public class InternalOapRecordReader<T> {
 
     private RecordReader<T> recordReader;
 
-    private Iterator<LongList> rowIdsIter;
+    private Iterator<IntList> rowIdsIter;
 
     private String createdBy;
 
@@ -91,7 +91,7 @@ public class InternalOapRecordReader<T> {
             }
             MessageColumnIO columnIO =
                     columnIOFactory.getColumnIO(requestedSchema, fileSchema, strictTypeChecking);
-            LongList rowIdList = rowIdsIter.next();
+            IntList rowIdList = rowIdsIter.next();
             this.recordReader = getRecordReader(columnIO,pages,rowIdList);
             metrics.startRecordAssemblyTime();
             totalCountLoadedSoFar += rowIdList.size();
@@ -99,7 +99,7 @@ public class InternalOapRecordReader<T> {
         }
     }
 
-    private RecordReader<T> getRecordReader(MessageColumnIO columnIO, PageReadStore pages, LongList rowIdList) {
+    private RecordReader<T> getRecordReader(MessageColumnIO columnIO, PageReadStore pages, IntList rowIdList) {
         return RecordReaderFactory.getRecordReader(columnIO, pages, recordConverter, createdBy, rowIdList);
     }
 
@@ -124,9 +124,9 @@ public class InternalOapRecordReader<T> {
         this.recordConverter = readSupport.prepareForRead(
                 configuration, fileMetadata, fileSchema, readContext);
         this.strictTypeChecking = configuration.getBoolean(STRICT_TYPE_CHECKING, true);
-        List<LongList> rowIdsList = ((IndexedParquetMetadata)parquetFileReader.getFooter()).getRowIdsList();
+        List<IntList> rowIdsList = ((IndexedParquetMetadata)parquetFileReader.getFooter()).getRowIdsList();
         this.rowIdsIter = rowIdsList.iterator();
-        for (LongList rowIdList : rowIdsList) {
+        for (IntList rowIdList : rowIdsList) {
             total += rowIdList.size();
         }
         this.reader.setRequestedSchema(requestedSchema);

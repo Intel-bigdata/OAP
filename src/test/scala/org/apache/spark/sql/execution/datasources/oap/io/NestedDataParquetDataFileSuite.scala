@@ -143,7 +143,7 @@ class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     val requiredIds = Array(0, 1, 2)
 
-    val rowIds = Array(1L)
+    val rowIds = Array(1)
 
     val iterator = reader.iterator(DataGenerator.configuration, requiredIds, rowIds)
 

@@ -65,7 +65,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     val requiredIds = Array(0, 1)
 
-    val rowIds = Array(0L, 1L, 7L, 8L, 120L, 121L, 381L, 382L)
+    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
 
     val iterator = reader.iterator(DataGenerator.configuration, requiredIds, rowIds)
 
@@ -89,7 +89,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     val requiredIds = Array(0, 1)
 
-    val rowIds = new Array[Long](0)
+    val rowIds = Array.emptyIntArray
 
     val iterator = reader.iterator(DataGenerator.configuration, requiredIds, rowIds)
 
@@ -99,7 +99,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
       iterator.next()
     }.getMessage
 
-    assert(e.contains("Input is Empty RowIds Array"))
+    assert(e.contains("next on empty iterator"))
   }
 
   test("read by columnIds ") {

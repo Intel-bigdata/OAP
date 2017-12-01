@@ -140,10 +140,10 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
   }
 
   // scan by given row ids, and we assume the rowIds are sorted
-  def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
+  def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int])
   : Iterator[InternalRow] = {
     val row = new BatchColumn()
-    val groupIds = rowIds.groupBy(rowId => (rowId / meta.rowCountInEachGroup).toInt)
+    val groupIds = rowIds.groupBy(rowId => rowId / meta.rowCountInEachGroup)
     val iterator =
       groupIds.iterator.flatMap {
         case (groupId, subRowIds) =>
@@ -162,7 +162,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
           }
 
           val iterator =
-            subRowIds.iterator.map(rowId => row.moveToRow((rowId % meta.rowCountInEachGroup).toInt))
+            subRowIds.iterator.map(rowId => row.moveToRow(rowId % meta.rowCountInEachGroup))
 
           CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
             fiberCacheGroup.zip(requiredIds).foreach {

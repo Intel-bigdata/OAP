@@ -48,9 +48,9 @@ private[oap] case class ParquetDataFile
 
   def iterator(conf: Configuration,
                requiredIds: Array[Int],
-               rowIds: Array[Long]): Iterator[UnsafeRow] = {
+               rowIds: Array[Int]): Iterator[UnsafeRow] = {
     if (rowIds == null || rowIds.length == 0) {
-      ParquetDataFile.emptyIterator
+      Iterator.empty
     } else {
       val recordReader = recordReaderBuilder(conf, requiredIds)
         .withGlobalRowIds(rowIds).buildIndexed()
@@ -109,14 +109,4 @@ private[oap] case class ParquetDataFile
   }
 
   override def getDictionary(fiberId: Int, conf: Configuration): Dictionary = null
-}
-
-private[oap] object  ParquetDataFile {
-
-  val emptyIterator = new Iterator[UnsafeRow] {
-    override def hasNext: Boolean = false
-
-    override def next(): UnsafeRow =
-      throw new java.util.NoSuchElementException("Input is Empty RowIds Array")
-  }
 }

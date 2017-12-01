@@ -90,7 +90,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     }
   }
 
-  override def next(): Long = bmRowIdIterator.next().toLong
+  override def next(): Int = bmRowIdIterator.next()
 
   private def loadBmFooter(fin: FSDataInputStream): FiberCache = {
     MemoryManager.putToIndexFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE)
