@@ -23,18 +23,15 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
-import org.apache.spark.{SparkConf, SparkContext, SparkFunSuite}
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.index.IndexUtils
+import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.{ByteBufferOutputStream, Utils}
 
-class MemoryManagerSuite extends SparkFunSuite {
-  new SparkContext(
-    "local[2]",
-    "MemoryManagerSuite",
-    new SparkConf().set("spark.memory.offHeap.size", "100m"))
+class MemoryManagerSuite extends SharedSQLContext {
+  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   private val random = new Random(0)
   private val values = {

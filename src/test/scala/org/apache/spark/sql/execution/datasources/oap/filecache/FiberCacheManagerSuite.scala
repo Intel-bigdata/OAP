@@ -21,9 +21,10 @@ import scala.util.Random
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.{SparkConf, SparkContext, SparkFunSuite}
+import org.apache.spark.sql.test.SharedSQLContext
 
-class FiberCacheManagerSuite extends SparkFunSuite {
+class FiberCacheManagerSuite extends SharedSQLContext {
+  sparkConf.set("spark.memory.offHeap.size", "100m")
   private val random = new Random(0)
   private def generateData(size: Int): Array[Byte] = {
     val bytes = new Array[Byte](size)
@@ -32,11 +33,6 @@ class FiberCacheManagerSuite extends SparkFunSuite {
   }
 
   test("unit test") {
-    new SparkContext(
-      "local[2]",
-      "FiberCacheManagerSuite",
-      new SparkConf().set("spark.memory.offHeap.size", "100m")
-    )
     val configuration = new Configuration()
     val MB: Double = 1024 * 1024
     val memorySizeInMB = (MemoryManager.maxMemory / MB).toInt
@@ -56,11 +52,6 @@ class FiberCacheManagerSuite extends SparkFunSuite {
   }
 
   test("remove a fiber is in use") {
-    new SparkContext(
-      "local[2]",
-      "FiberCacheManagerSuite",
-      new SparkConf().set("spark.memory.offHeap.size", "100m")
-    )
     val configuration = new Configuration()
     val MB: Double = 1024 * 1024
     val memorySizeInMB = (MemoryManager.maxMemory / MB).toInt
@@ -78,11 +69,6 @@ class FiberCacheManagerSuite extends SparkFunSuite {
   }
 
   test("add a very large fiber") {
-    new SparkContext(
-      "local[2]",
-      "FiberCacheManagerSuite",
-      new SparkConf().set("spark.memory.offHeap.size", "100m")
-    )
     val configuration = new Configuration()
     val MB: Double = 1024 * 1024
     val memorySizeInMB = (MemoryManager.maxMemory / MB).toInt
