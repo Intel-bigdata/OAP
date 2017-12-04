@@ -27,7 +27,6 @@ import org.scalatest.BeforeAndAfter
 
 import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
@@ -51,6 +50,10 @@ class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
       super.afterAll()
     }
   }
+
+  // Override afterEach because we don't want to check open streams
+  override def beforeEach(): Unit = {}
+  override def afterEach(): Unit = {}
 
   private def writeMetaFile(path: Path): Unit = {
     val oapMeta = DataSourceMeta.newBuilder()

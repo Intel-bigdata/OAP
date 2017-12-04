@@ -29,11 +29,13 @@ import org.apache.spark.sql.internal.SQLConf
 // Ignore because in separate package will encounter problem with shaded spark source.
 @Ignore
 class OapQuerySuite extends HiveComparisonTest with BeforeAndAfter  {
-  private val originalTimeZone = TimeZone.getDefault
-  private val originalLocale = Locale.getDefault
+  private lazy val originalTimeZone = TimeZone.getDefault
+  private lazy val originalLocale = Locale.getDefault
   import org.apache.spark.sql.hive.test.TestHive._
 
-  private val originalCrossJoinEnabled = TestHive.conf.crossJoinEnabled
+  // Note: invoke TestHive will create a SparkContext which can't be configured by us.
+  // So be careful this may affect current using SparkContext and cause strange problem.
+  private lazy val originalCrossJoinEnabled = TestHive.conf.crossJoinEnabled
 
   override def beforeAll() {
     super.beforeAll()
