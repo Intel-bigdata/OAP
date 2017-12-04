@@ -246,7 +246,7 @@ private[index] object BTreeIndexRecordReader {
       fiberCache.getInt(nodeMetaStart + idx * nodeMetaByteSize + nodePosOffset)
     def getNodeSize(idx: Int): Int =
       fiberCache.getInt(nodeMetaStart + idx * nodeMetaByteSize + nodeSizeOffset)
-    def getStatsOffset: Int = Integer.SIZE * 3 / 8 + nodeMetaByteSize * getNodesCount
+    def getStatsOffset: Int = Integer.SIZE / 8 * 3 + nodeMetaByteSize * getNodesCount
     private def getStatsLength: Int = fiberCache.getInt(
       nodeMetaStart + nodeMetaByteSize * getNodesCount)
   }

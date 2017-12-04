@@ -23,7 +23,6 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
-import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
@@ -33,7 +32,6 @@ import org.apache.spark.sql.types.StructType
 
 private[oap] class MinMaxStatistics extends Statistics {
   override val id: Int = MinMaxStatisticsType.id
-  @transient private lazy val converter = UnsafeProjection.create(schema)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
   protected var min: Key = _

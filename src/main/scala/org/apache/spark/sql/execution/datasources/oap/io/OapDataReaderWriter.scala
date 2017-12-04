@@ -30,7 +30,6 @@ import org.apache.spark.sql.catalyst.expressions.Ascending
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.execution.datasources.oap.statistics._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.types._
 import org.apache.spark.util.TimeStampedHashMap

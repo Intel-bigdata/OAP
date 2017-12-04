@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import org.apache.spark.sql.execution.datasources.oap.index.BTreeIndexRecordReader.BTreeFooter
-
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -28,9 +26,8 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap._
-import org.apache.spark.sql.execution.datasources.oap.filecache.{BTreeFiber, FiberCacheManager}
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
-import org.apache.spark.sql.execution.datasources.oap.statistics.{StaticsAnalysisResult, StatisticsManager}
+import org.apache.spark.sql.execution.datasources.oap.statistics.StaticsAnalysisResult
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
