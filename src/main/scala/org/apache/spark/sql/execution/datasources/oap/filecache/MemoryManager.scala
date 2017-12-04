@@ -17,15 +17,17 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.io.ByteArrayInputStream
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import org.apache.hadoop.fs.FSDataInputStream
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
-import org.apache.spark.SparkEnv
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.ColumnValues
+import org.apache.spark.sql.execution.datasources.oap.OapEnv
 import org.apache.spark.storage.{BlockManager, TestBlockId}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
@@ -33,6 +35,24 @@ import org.apache.spark.unsafe.types.UTF8String
 
 // TODO: make it an alias of MemoryBlock
 trait FiberCache {
+  def loadData(is: FiberInputStream): Unit = {
+    val bytes = new Array[Byte](is.length)
+    is.is match {
+      case fsInputStream: FSDataInputStream => fsInputStream.readFully(is.offset, bytes)
+      case bytesInputStream: ByteArrayInputStream =>
+        bytesInputStream.skip(is.offset)
+        bytesInputStream.read(bytes)
+    }
+    val memoryBlock = OapEnv.get.memoryManager.allocate(bytes.length)
+    Platform.copyMemory(
+      bytes,
+      Platform.BYTE_ARRAY_OFFSET,
+      memoryBlock.getBaseObject,
+      memoryBlock.getBaseOffset,
+      bytes.length)
+    fiberData.setObjAndOffset(memoryBlock.getBaseObject, memoryBlock.getBaseOffset)
+  }
+
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
 
@@ -40,9 +60,10 @@ trait FiberCache {
   private var disposed = false
   def isDisposed: Boolean = disposed
   def dispose(): Unit = {
-    if (!disposed) MemoryManager.free(fiberData)
+    if (!disposed && fiberData.getBaseOffset != -1) OapEnv.get.memoryManager.free(fiberData)
     disposed = true
   }
+  val lock = new ReentrantReadWriteLock()
 
   /** For debug purpose */
   def toArray: Array[Byte] = {
@@ -97,6 +118,10 @@ trait FiberCache {
     copyMemory(offset, dst, Platform.BYTE_ARRAY_OFFSET, dst.length)
 
   def size(): Long = fiberData.size()
+
+  def release(): Unit = {
+    lock.readLock().unlock()
+  }
 }
 
 object FiberCache {
@@ -121,8 +146,11 @@ private[oap] case class IndexFiberCache(fiberData: MemoryBlock) extends FiberCac
  * TODO: Should change object to class for better initialization.
  * For example, we can't test two MemoryManger in one test suite.
  */
-private[oap] object MemoryManager extends Logging {
+private[oap] class MemoryManager(
+    memoryManager: org.apache.spark.memory.MemoryManager,
+    fraction: Double) extends Logging {
 
+  require(memoryManager.maxOffHeapStorageMemory > 0)
   /**
    * Dummy block id to acquire memory from [[org.apache.spark.memory.MemoryManager]]
    *
@@ -132,19 +160,13 @@ private[oap] object MemoryManager extends Logging {
    */
   private val DUMMY_BLOCK_ID = TestBlockId("oap_memory_request_block")
 
-  // TODO: a config to control max memory size
   private val _maxMemory = {
-    if (SparkEnv.get == null) {
-      throw new OapException("No SparkContext is found")
+
+    val oapMaxMemory = (memoryManager.maxOffHeapStorageMemory * fraction).toLong
+    if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
+      oapMaxMemory
     } else {
-      val memoryManager = SparkEnv.get.memoryManager
-      // TODO: make 0.7 configurable
-      val oapMaxMemory = (memoryManager.maxOffHeapStorageMemory * 0.7).toLong
-      if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
-        oapMaxMemory
-      } else {
-        throw new OapException("Can't acquire memory from spark Memory Manager")
-      }
+      throw new OapException("Can't acquire memory from spark Memory Manager")
     }
   }
 
@@ -152,6 +174,10 @@ private[oap] object MemoryManager extends Logging {
   private val _memoryUsed = new AtomicLong(0)
   def memoryUsed: Long = _memoryUsed.get()
   def maxMemory: Long = _maxMemory
+
+  def stop(): Unit = {
+    memoryManager.releaseStorageMemory(maxMemory, MemoryMode.OFF_HEAP)
+  }
 
   private[filecache] def allocate(numOfBytes: Int): MemoryBlock = {
     _memoryUsed.getAndAdd(numOfBytes)
@@ -193,4 +219,10 @@ private[oap] object MemoryManager extends Logging {
       bytes.length)
     DataFiberCache(memoryBlock)
   }
+}
+
+object MemoryManager {
+  // TODO: all configure parameters should be put in one place
+  val OAP_OFF_HEAP_MEMORY_FRACTION = "spark.oap.memory.offHeap.fraction"
+  val OAP_OFF_HEAP_MEMORY_FRACTION_DEFAULT = 0.7
 }

@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import java.io.ByteArrayInputStream
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
@@ -24,20 +26,24 @@ import org.apache.parquet.bytes.BytesInput
 import org.apache.parquet.column.Dictionary
 import org.apache.parquet.column.page.DictionaryPage
 import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.{PlainBinaryDictionary, PlainIntegerDictionary}
-
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
+import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues, OapEnv}
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.CompletionIterator
 
 
-private[oap] case class OapDataFile(path: String, schema: StructType,
-                                    configuration: Configuration) extends DataFile {
+private[oap] case class OapDataFile(
+    path: String, schema: StructType,
+    configuration: Configuration) extends DataFile {
 
   private val dictionaries = new Array[Dictionary](schema.length)
   private val codecFactory = new CodecFactory(configuration)
   private val meta: OapDataFileHandle = DataFileHandleCacheManager(this)
+
+  // TODO: make this in class constructor parameter list
+  private def memoryManager = OapEnv.get.memoryManager
+  private def fiberCacheManager = OapEnv.get.fiberCacheManager
 
   def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
     val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)
@@ -63,7 +69,10 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     } else dictionaries(fiberId)
   }
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache = {
+  def getDataInputStream(
+      groupId: Int,
+      fiberId: Int,
+      conf: Configuration): FiberInputStream = {
     val groupMeta = meta.rowGroupsMeta(groupId)
     val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
 
@@ -104,11 +113,12 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     // We have to read Array[Byte] from file and decode/decompress it before putToFiberCache
     // TODO: Try to finish this in off-heap memory
     val data = fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
-    MemoryManager.putToDataFiberCache(data)
+    FiberInputStream(new ByteArrayInputStream(data), 0, data.length)
   }
 
   def closeRowGroup(fiber: Fiber, fiberCache: FiberCache): Unit = {
     // TODO: Release fiberCache's usage number
+    fiberCache.release()
   }
 
   // full file scan
@@ -118,7 +128,8 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     val iterator =
       (0 until meta.groupCount).iterator.flatMap { groupId =>
         val fiberCacheGroup = requiredIds.map(id =>
-          FiberCacheManager.get(DataFiber(this, id, groupId), conf))
+          fiberCacheManager
+              .get(DataFiber(this, id, groupId), getDataInputStream(groupId, id, conf)))
 
         val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
           new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache)
@@ -148,7 +159,8 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
       groupIds.iterator.flatMap {
         case (groupId, subRowIds) =>
           val fiberCacheGroup = requiredIds.map(id =>
-            FiberCacheManager.get(DataFiber(this, id, groupId), conf))
+            fiberCacheManager
+                .get(DataFiber(this, id, groupId), getDataInputStream(groupId, id, conf)))
 
           val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
             new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache)

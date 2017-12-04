@@ -18,14 +18,12 @@
 package org.apache.spark.sql.execution.datasources.oap.io
 
 import scala.util.{Failure, Success, Try}
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FSDataInputStream
 import org.apache.parquet.column.Dictionary
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
+import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, FiberInputStream}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
 
@@ -36,7 +34,7 @@ abstract class DataFile {
   def configuration: Configuration
 
   def createDataFileHandle(): DataFileHandle
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache
+  def getDataInputStream(rowGroupId: Int, columnIndex: Int, conf: Configuration): FiberInputStream
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int])
   : Iterator[InternalRow]

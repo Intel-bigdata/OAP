@@ -19,14 +19,16 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
-import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
+import org.apache.spark.sql.execution.datasources.oap.OapEnv
+import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, FiberInputStream}
 import org.apache.spark.unsafe.Platform
 
 private[oap] case class BTreeIndexFileReader(
     configuration: Configuration,
     file: Path) {
 
+  // TODO: make this in class constructor parameter list
+  private def memoryManager = OapEnv.get.memoryManager
   private val VERSION_SIZE = 8
   private val FOOTER_LENGTH_SIZE = Integer.SIZE / 8
   private val ROW_ID_LIST_LENGTH_SIZE = Integer.SIZE / 8
@@ -52,14 +54,26 @@ private[oap] case class BTreeIndexFileReader(
   private def getIntFromBuffer(buffer: Array[Byte], offset: Int) =
     Platform.getInt(buffer, Platform.BYTE_ARRAY_OFFSET + offset)
 
+  def getFooterInputStream: FiberInputStream = {
+    FiberInputStream(reader, footerIndex, footerLength)
+  }
+
+  def getRowIdListInputStream: FiberInputStream = {
+    FiberInputStream(reader, rowIdListIndex, rowIdListLength)
+  }
+
+  def getNodeInputStream(offset: Int, size: Int): FiberInputStream = {
+    FiberInputStream(reader, nodesIndex + offset, size)
+  }
+
   def readFooter(): FiberCache =
-    MemoryManager.putToIndexFiberCache(reader, footerIndex, footerLength)
+    memoryManager.putToIndexFiberCache(reader, footerIndex, footerLength)
 
   def readRowIdList(): FiberCache =
-    MemoryManager.putToIndexFiberCache(reader, rowIdListIndex, rowIdListLength)
+    memoryManager.putToIndexFiberCache(reader, rowIdListIndex, rowIdListLength)
 
   def readNode(offset: Int, size: Int): FiberCache =
-    MemoryManager.putToIndexFiberCache(reader, nodesIndex + offset, size)
+    memoryManager.putToIndexFiberCache(reader, nodesIndex + offset, size)
 
   def close(): Unit = reader.close()
 }
