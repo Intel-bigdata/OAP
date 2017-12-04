@@ -114,7 +114,8 @@ private[index] case class BTreeIndexRecordReader(
     val keyCount = node.getKeyCount
 
     val (pos, found) =
-      binarySearch(0, keyCount, node.getKey(_, schema), candidate, rowOrdering(_, _, isStart))
+      IndexUtils.binarySearch(0, keyCount, node.getKey(_, schema), candidate,
+        rowOrdering(_, _, isStart))
 
     val keyPos = if (found && findNext) pos + 1 else pos
 
@@ -156,30 +157,6 @@ private[index] case class BTreeIndexRecordReader(
       footer.getRowCountOfNode(idx) > 0 && // ensure this node is not an empty node
         rowOrdering(candidate, footer.getMinValue(idx, schema), isStart) >= 0
     })
-  }
-
-  /**
-   * Constrain: keys.last >= candidate must be true. This is guaranteed by [[findNodeIdx]]
-   * @return the first key >= candidate. (keys.last >= candidate makes this always possible)
-   */
-  private[index] def binarySearch(
-      start: Int, length: Int,
-      keys: Int => InternalRow, candidate: InternalRow,
-      compare: (InternalRow, InternalRow) => Int): (Int, Boolean) = {
-    var s = 0
-    var e = length - 1
-    var found = false
-    var m = s
-    while (s <= e & !found) {
-      assert(s + e >= 0, "too large array size caused overflow")
-      m = (s + e) / 2
-      val cmp = compare(keys(m), candidate)
-      if (cmp == 0) found = true
-      else if (cmp < 0) s = m + 1
-      else e = m - 1
-    }
-    if (!found) m = s
-    (m, found)
   }
 
   /**

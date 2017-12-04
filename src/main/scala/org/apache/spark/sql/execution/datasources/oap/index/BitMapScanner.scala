@@ -172,34 +172,35 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     startIdxOffset
   }
 
-  private def getEndIdxOffset(fiberCache: FiberCache, baseOffset: Long, endIdx: Int): Int = {
-    val idxOffset = baseOffset + endIdx * 4
-    val endIdxOffset = Platform.getInt(FiberCache, idxOffset)
-    endIdxOffset
-  }
-
   private def getBitmapIdx(keySeq: IndexedSeq[InternalRow],
       range: RangeInterval): (Int, Int) = {
+    val keyLength = keySeq.length
     val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
-      // diff from which startIdx not found, so here startIdx = -2
-      -2
+      // If no starting key, assume to start from the first key.
+      0
     } else {
-      // find first key which >= start key, can't find return -1
-      if (range.startInclude) {
-        keySeq.indexWhere(ordering.compare(range.start, _) <= 0)
-      } else {
-        keySeq.indexWhere(ordering.compare(range.start, _) < 0)
-      }
+      // If no found, return -1.
+      val (idx, found) =
+         IndexUtils.binarySearch(0, keyLength, keySeq(_), range.start, ordering.compare(_, _))
+      if (found) {
+        if (range.startInclude) idx else idx + 1
+      } else -1
     }
+    // If invalid starting index, just return.
+    if (startIdx == -1 || startIdx == keyLength) return (-1, -1)
+    // If equal query, no need to find endIdx.
+    if (range.start == range.end) return (startIdx, startIdx)
     val endIdx = if (range.end == IndexScanner.DUMMY_KEY_END) {
-      keySeq.size
+      // If no ending key, assume to end with the last key.
+      keyLength - 1
     } else {
-      // find last key which <= end key, can't find return -1
-      if (range.endInclude) {
-        keySeq.lastIndexWhere(ordering.compare(_, range.end) <= 0)
-      } else {
-        keySeq.lastIndexWhere(ordering.compare(_, range.end) < 0)
-      }
+      // The range may be invalid. I.e. endIdx may be little than startIdx.
+      // So find endIdx from the beginning.
+      val (idx, found) =
+         IndexUtils.binarySearch(0, keyLength, keySeq(_), range.end, ordering.compare(_, _))
+      if (found) {
+        if (range.endInclude) idx else idx - 1
+      } else -1
     }
     (startIdx, endIdx)
   }

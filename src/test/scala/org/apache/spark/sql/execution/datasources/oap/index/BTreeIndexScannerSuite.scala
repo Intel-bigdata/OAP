@@ -83,7 +83,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
 
     def assertPosition(candidate: Int, position: Int, exists: Boolean): Unit = {
       assert(
-        reader.binarySearch(
+        IndexUtils.binarySearch(
           0, values.size, keyAt, InternalRow(candidate), ordering.compare) === (position, exists))
     }
     assertPosition(1, 0, exists = true)

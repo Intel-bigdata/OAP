@@ -21,6 +21,7 @@ import java.io.OutputStream
 
 import org.apache.hadoop.fs.Path
 
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 
@@ -98,4 +99,28 @@ private[oap] object IndexUtils {
 
   val INT_SIZE = 4
   val LONG_SIZE = 8
+
+  /**
+   * Constrain: keys.last >= candidate must be true. This is guaranteed by [[findNodeIdx]]
+   * @return the first key >= candidate. (keys.last >= candidate makes this always possible)
+   */
+  def binarySearch(
+      start: Int, length: Int,
+      keys: Int => InternalRow, candidate: InternalRow,
+      compare: (InternalRow, InternalRow) => Int): (Int, Boolean) = {
+    var s = 0
+    var e = length - 1
+    var found = false
+    var m = s
+    while (s <= e & !found) {
+      assert(s + e >= 0, "too large array size caused overflow")
+      m = (s + e) / 2
+      val cmp = compare(keys(m), candidate)
+      if (cmp == 0) found = true
+      else if (cmp < 0) s = m + 1
+      else e = m - 1
+    }
+    if (!found) m = s
+    (m, found)
+  }
 }
