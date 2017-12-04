@@ -4,7 +4,7 @@ package org.apache.parquet.io;
 import org.apache.parquet.column.impl.ColumnReadStoreImpl;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.io.api.RecordMaterializer;
-import org.apache.parquet.it.unimi.dsi.fastutil.longs.LongList;
+import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 import java.util.List;
 
@@ -15,7 +15,7 @@ public class RecordReaderFactory {
     public static <T> RecordReader<T> getRecordReader(MessageColumnIO root, PageReadStore columns,
                                                RecordMaterializer<T> recordMaterializer,
                                                String createdBy,
-                                               LongList rowIdList) {
+                                                      IntList rowIdList) {
         checkNotNull(root, "messageColumnIO");
         checkNotNull(columns, "columns");
         checkNotNull(recordMaterializer, "recordMaterializer");

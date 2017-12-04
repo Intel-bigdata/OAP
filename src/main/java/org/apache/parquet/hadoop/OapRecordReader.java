@@ -34,14 +34,14 @@ import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
 import com.google.common.collect.Lists;
-import org.apache.parquet.it.unimi.dsi.fastutil.longs.LongArrayList;
-import org.apache.parquet.it.unimi.dsi.fastutil.longs.LongList;
+import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
+import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 public class OapRecordReader<T> implements RecordReader<T> {
 
     private Configuration configuration;
     private Path file;
-    private long[] globalRowIds;
+    private int[] globalRowIds;
     private ParquetMetadata footer;
 
     private InternalOapRecordReader<T> internalReader;
@@ -51,7 +51,7 @@ public class OapRecordReader<T> implements RecordReader<T> {
     OapRecordReader(ReadSupport<T> readSupport,
                         Path file,
                         Configuration configuration,
-                        long[] globalRowIds,
+                        int[] globalRowIds,
                         ParquetMetadata footer) {
         Preconditions.checkNotNull(globalRowIds,"index collection can not be null!");
         this.readSupport = readSupport;
@@ -86,18 +86,18 @@ public class OapRecordReader<T> implements RecordReader<T> {
 
         List<BlockMetaData> inputBlockList = Lists.newArrayList();
 
-        List<LongList> rowIdsList = Lists.newArrayList();
+        List<IntList> rowIdsList = Lists.newArrayList();
 
-        long nextRowGroupStartRowId = 0;
+        int nextRowGroupStartRowId = 0;
         int totalCount = globalRowIds.length;
         int index = 0;
 
         for (BlockMetaData block : blocks) {
-            long currentRowGroupStartRowId = nextRowGroupStartRowId;
+            int currentRowGroupStartRowId = nextRowGroupStartRowId;
             nextRowGroupStartRowId += block.getRowCount();
-            LongList rowIdList = new LongArrayList();
+            IntList rowIdList = new IntArrayList();
             while (index < totalCount) {
-                long globalRowGroupId = globalRowIds[index];
+                int globalRowGroupId = globalRowIds[index];
                 if (globalRowGroupId < nextRowGroupStartRowId) {
                     rowIdList.add(globalRowGroupId - currentRowGroupStartRowId);
                     index++;

@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.io.api.Binary
+
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
 import org.apache.spark.SparkConf
@@ -199,7 +200,7 @@ private[oap] class OapDataReader(
 
     filterScanners match {
       case Some(indexScanners) if indexScanners.indexIsAvailable(path, conf) =>
-        def getRowIds(options: Map[String, String]): Array[Long] = {
+        def getRowIds(options: Map[String, String]): Array[Int] = {
           indexScanners.initialize(path, conf)
 
           // total Row count can be get from the index scanner

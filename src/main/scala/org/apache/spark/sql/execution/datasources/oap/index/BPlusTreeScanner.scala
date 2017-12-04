@@ -48,5 +48,5 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
 
   override def hasNext: Boolean = recordReader.hasNext
 
-  override def next(): Long = recordReader.next()
+  override def next(): Int = recordReader.next()
 }

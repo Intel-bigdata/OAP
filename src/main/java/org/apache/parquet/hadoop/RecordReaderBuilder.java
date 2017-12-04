@@ -16,7 +16,7 @@ public class RecordReaderBuilder<T> {
     private final ReadSupport<T> readSupport;
     private final Path file;
     private Configuration conf;
-    private long[] globalRowIds = new long[0];
+    private int[] globalRowIds = new int[0];
     private ParquetMetadata footer;
 
     private RecordReaderBuilder(ReadSupport<T> readSupport, Path path, Configuration conf) {
@@ -31,7 +31,7 @@ public class RecordReaderBuilder<T> {
         this.conf = new Configuration();
     }
 
-    public RecordReaderBuilder<T> withGlobalRowIds(long[] globalRowIds) {
+    public RecordReaderBuilder<T> withGlobalRowIds(int[] globalRowIds) {
         this.globalRowIds = globalRowIds;
         return this;
     }

@@ -38,7 +38,7 @@ private[oap] object IndexScanner {
 }
 
 private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
-  extends Iterator[Long] with Serializable with Logging{
+  extends Iterator[Int] with Serializable with Logging{
 
   // TODO Currently, only B+ tree supports indexs, so this flag is toggled only in
   // BPlusTreeScanner we can add other index-aware stats for other type of index later
@@ -138,7 +138,7 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
 private[oap] object DUMMY_SCANNER extends IndexScanner(null) {
   override def initialize(path: Path, configuration: Configuration): IndexScanner = { this }
   override def hasNext: Boolean = false
-  override def next(): Long = throw new NoSuchElementException("end of iterating.")
+  override def next(): Int = throw new NoSuchElementException("end of iterating.")
   override def meta: IndexMeta = throw new NotImplementedError()
 }
 

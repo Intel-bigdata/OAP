@@ -38,7 +38,7 @@ abstract class DataFile {
   def createDataFileHandle(): DataFileHandle
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
-  def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Long])
+  def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int])
   : Iterator[InternalRow]
   def getDictionary(fiberId: Int, conf: Configuration): Dictionary
 }
