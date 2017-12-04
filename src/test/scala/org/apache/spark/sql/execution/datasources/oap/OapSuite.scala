@@ -37,8 +37,8 @@ import org.apache.spark.util.Utils
 
 class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
   import testImplicits._
-  private var path: File = null
-  private var parquetPath: File = null
+  private var path: File = _
+  private var parquetPath: File = _
 
   sparkConf.set("spark.memory.offHeap.size", "100m")
 
@@ -64,6 +64,10 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
       super.afterAll()
     }
   }
+
+  // Override afterEach because we don't want to check open streams
+  override def beforeEach(): Unit = {}
+  override def afterEach(): Unit = {}
 
   test("reading oap file") {
     verifyFrame(sqlContext.read.format("oap").load(path.getAbsolutePath))
@@ -93,12 +97,12 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
         sqlContext.conf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
       val fileNameIterator = path.listFiles()
       for (fileName <- fileNameIterator) {
-        if (fileName.toString().endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
+        if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
           // If the OAP data file is uncompressed, keep the original file name.
           if (!codec.matches("UNCOMPRESSED")) {
-            assert(fileName.toString().contains(compressionType) == true)
+            assert(fileName.toString.contains(compressionType))
           } else {
-            assert(fileName.toString().contains(compressionType) == false)
+            assert(!fileName.toString.contains(compressionType))
           }
         }
       }
@@ -115,8 +119,8 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
     var oapDataFile: File = null
     var oapMetaFile: File = null
     files.foreach { fileName =>
-      if (fileName.toString().endsWith(OapFileFormat.OAP_DATA_EXTENSION)) oapDataFile = fileName
-      if (fileName.toString().endsWith(OapFileFormat.OAP_META_FILE)) oapMetaFile = fileName
+      if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) oapDataFile = fileName
+      if (fileName.toString.endsWith(OapFileFormat.OAP_META_FILE)) oapMetaFile = fileName
     }
     val df = sqlContext.read.format("oap").load(dir.getAbsolutePath)
     df.createOrReplaceTempView("oap_table")

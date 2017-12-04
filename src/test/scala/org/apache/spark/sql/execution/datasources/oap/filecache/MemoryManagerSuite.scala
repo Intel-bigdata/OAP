@@ -23,45 +23,59 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
-import org.apache.spark.{SparkConf, SparkContext, SparkFunSuite}
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.index.IndexUtils
+import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.{ByteBufferOutputStream, Utils}
 
-class MemoryManagerSuite extends SparkFunSuite {
-  new SparkContext(
-    "local[2]",
-    "MemoryManagerSuite",
-    new SparkConf().set("spark.memory.offHeap.size", "100m"))
+class MemoryManagerSuite extends SharedSQLContext {
 
-  private val random = new Random(0)
-  private val values = {
-    val booleans: Seq[Boolean] = Seq(true, false)
-    val bytes: Seq[Byte] = Seq(Byte.MinValue, 0, 10, 30, Byte.MaxValue)
-    val shorts: Seq[Short] = Seq(Short.MinValue, -100, 0, 10, 200, Short.MaxValue)
-    val ints: Seq[Int] = Seq(Int.MinValue, -100, 0, 100, 12346, Int.MaxValue)
-    val longs: Seq[Long] = Seq(Long.MinValue, -10000, 0, 20, Long.MaxValue)
-    val floats: Seq[Float] = Seq(Float.MinValue, Float.MinPositiveValue, Float.MaxValue)
-    val doubles: Seq[Double] = Seq(Double.MinValue, Double.MinPositiveValue, Double.MaxValue)
-    val strings: Seq[UTF8String] =
-      Seq("", "test", "b plus tree", "MemoryManagerSuite").map(UTF8String.fromString)
-    val binaries: Seq[Array[Byte]] = (0 until 20 by 5).map{ size =>
-      val buf = new Array[Byte](size)
-      random.nextBytes(buf)
-      buf
+  sparkConf.set("spark.memory.offHeap.size", "100m")
+  private var random: Random = _
+  private var values: Seq[Any] = _
+  private var fiberCache: FiberCache = _
+
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+
+    random = new Random(0)
+    values = {
+      val booleans: Seq[Boolean] = Seq(true, false)
+      val bytes: Seq[Byte] = Seq(Byte.MinValue, 0, 10, 30, Byte.MaxValue)
+      val shorts: Seq[Short] = Seq(Short.MinValue, -100, 0, 10, 200, Short.MaxValue)
+      val ints: Seq[Int] = Seq(Int.MinValue, -100, 0, 100, 12346, Int.MaxValue)
+      val longs: Seq[Long] = Seq(Long.MinValue, -10000, 0, 20, Long.MaxValue)
+      val floats: Seq[Float] = Seq(Float.MinValue, Float.MinPositiveValue, Float.MaxValue)
+      val doubles: Seq[Double] = Seq(Double.MinValue, Double.MinPositiveValue, Double.MaxValue)
+      val strings: Seq[UTF8String] =
+        Seq("", "test", "b plus tree", "MemoryManagerSuite").map(UTF8String.fromString)
+      val binaries: Seq[Array[Byte]] = (0 until 20 by 5).map{ size =>
+        val buf = new Array[Byte](size)
+        random.nextBytes(buf)
+        buf
+      }
+      booleans ++ bytes ++ shorts ++ ints ++ longs ++
+          floats ++ doubles ++ strings ++ binaries ++ Nil
     }
-    val values = booleans ++ bytes ++ shorts ++ ints ++ longs ++
-        floats ++ doubles ++ strings ++ binaries ++ Nil
     random.shuffle(values)
+
+    fiberCache = {
+      val buf = new ByteBufferOutputStream()
+      val writer = new LittleEndianDataOutputStream(buf)
+      values.foreach(value => IndexUtils.writeBasedOnDataType(writer, value))
+      MemoryManager.putToDataFiberCache(buf.toByteArray)
+    }
   }
-  private val fiberCache = {
-    val buf = new ByteBufferOutputStream()
-    val writer = new LittleEndianDataOutputStream(buf)
-    values.foreach(value => IndexUtils.writeBasedOnDataType(writer, value))
-    MemoryManager.putToDataFiberCache(buf.toByteArray)
+
+  protected override def afterAll(): Unit = {
+    super.afterAll()
   }
+
+  // Override afterEach because we don't want to check open streams
+  override def beforeEach(): Unit = {}
+  override def afterEach(): Unit = {}
 
   test("test data in IndexFiberCache") {
     // TODO: find a nice way to create FSDataInputStream

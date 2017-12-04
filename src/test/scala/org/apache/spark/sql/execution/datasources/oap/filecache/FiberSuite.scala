@@ -23,7 +23,7 @@ import java.io.File
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapreduce.lib.input.FileSplit
-import org.apache.spark.SparkConf
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
@@ -50,6 +50,10 @@ class FiberSuite extends SharedSQLContext with Logging {
     Utils.deleteRecursively(file)
     super.afterAll()
   }
+
+  // Override afterEach because we don't want to check open streams
+  override def beforeEach(): Unit = {}
+  override def afterEach(): Unit = {}
 
   test("test reading / writing oap file") {
     val schema = (new StructType)

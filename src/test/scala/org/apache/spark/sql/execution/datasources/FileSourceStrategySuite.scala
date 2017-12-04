@@ -42,7 +42,12 @@ import org.apache.spark.util.Utils
 class FileSourceStrategySuite extends QueryTest with SharedSQLContext with PredicateHelper {
   import testImplicits._
 
-  protected override val sparkConf = new SparkConf().set("spark.default.parallelism", "1")
+  protected override val sparkConf =
+    new SparkConf().set("spark.default.parallelism", "1").set("spark.memory.offHeap.size", "100m")
+
+  // Override afterEach because we don't want to check open streams
+  override def beforeEach(): Unit = {}
+  override def afterEach(): Unit = {}
 
   test("unpartitioned table, single partition") {
     val table =
