@@ -253,11 +253,11 @@ private[oap] object ScannerBuilder extends Logging {
 }
 
 private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
-  extends Iterator[Long] with Serializable with Logging{
+  extends Iterator[Int] with Serializable with Logging{
 
   private var actualUsedScanners: Seq[IndexScanner] = _
 
-  private var backend: Iterator[Long] = _
+  private var backendIter: Iterator[Int] = _
 
   def indexIsAvailable(dataPath: Path, conf: Configuration): Boolean = {
     actualUsedScanners = scanners.filter(_.indexIsAvailable(dataPath, conf))
@@ -268,7 +268,7 @@ private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanners = {
     actualUsedScanners.map(_.initialize(dataPath, conf))
-    backend = actualUsedScanners.length match {
+    backendIter = actualUsedScanners.length match {
       case 0 => Iterator.empty
       case 1 => actualUsedScanners.head.toArray.toIterator
       case _ => actualUsedScanners.par.map(_.toArray).seq
@@ -281,9 +281,9 @@ private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
     this
   }
 
-  override def hasNext: Boolean = backend.hasNext
+  override def hasNext: Boolean = backendIter.hasNext
 
-  override def next(): Long = backend.next
+  override def next(): Int = backendIter.next
 
   override def toString(): String = scanners.map(_.toString()).mkString("|")
 
