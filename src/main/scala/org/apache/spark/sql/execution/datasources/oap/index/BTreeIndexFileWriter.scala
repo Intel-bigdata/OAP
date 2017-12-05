@@ -55,12 +55,12 @@ private case class BTreeIndexFileWriter(
 
   def writeRowIdList(buf: Array[Byte]): Unit = {
     writer.write(buf)
-    rowIdListSize = buf.length
+    rowIdListSize += buf.length
   }
 
   def writeFooter(footer: Array[Byte]): Unit = {
     writer.write(footer)
-    footerSize = footer.length
+    footerSize += footer.length
   }
 
   def end(): Unit = {

@@ -100,6 +100,7 @@ class StatisticsManager {
   }
 
   def addOapKey(key: Key): Unit = {
+    if (key.anyNull) return // stats info does not collect null keys
     content.append(key)
     stats.foreach(_.addOapKey(key))
   }

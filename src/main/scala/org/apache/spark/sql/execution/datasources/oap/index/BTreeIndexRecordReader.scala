@@ -27,6 +27,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.filecache.{BTreeFiber, FiberCache, FiberCacheManager}
 import org.apache.spark.sql.types._
 
+
 private[index] case class BTreeIndexRecordReader(
     configuration: Configuration,
     schema: StructType) extends Iterator[Int] {
@@ -62,16 +63,19 @@ private[index] case class BTreeIndexRecordReader(
     internalIterator = intervalArray.toIterator.flatMap { interval =>
       val (start, end) = findRowIdRange(interval)
       (start until end).toIterator.map(rowIdList.getRowId)
-    }
+    } // get the row ids
   }
-
+  // find the row id list start pos, end pos of the range interval
   private[index] def findRowIdRange(interval: RangeInterval): (Int, Int) = {
+    val recordCount = footer.getNonNullKeyRecordCount
+    if (interval.isNullPredicate) { // process "isNull" predicate
+      return (recordCount, recordCount + footer.getNullKeyRecordCount)
+    }
     val (nodeIdxForStart, isStartFound) = findNodeIdx(interval.start, isStart = true)
     val (nodeIdxForEnd, isEndFound) = findNodeIdx(interval.end, isStart = false)
 
-    val recordCount = footer.getRecordCount
     if (nodeIdxForStart == nodeIdxForEnd && !isStartFound && !isEndFound) {
-      (0, 0)
+      (0, 0) // not found in B+ tree
     } else {
       val start = if (interval.start == IndexScanner.DUMMY_KEY_START) 0
       else {
@@ -113,7 +117,7 @@ private[index] case class BTreeIndexRecordReader(
 
     val rowPos =
       if (keyPos == keyCount) {
-        if (nodeIdx + 1 == footer.getNodesCount) footer.getRecordCount
+        if (nodeIdx + 1 == footer.getNodesCount) footer.getNonNullKeyRecordCount
         else {
           val offset = footer.getNodeOffset(nodeIdx + 1)
           val size = footer.getNodeSize(nodeIdx + 1)
@@ -141,11 +145,13 @@ private[index] case class BTreeIndexRecordReader(
    */
   private def findNodeIdx(candidate: InternalRow, isStart: Boolean): (Option[Int], Boolean) = {
     val idxOption = (0 until footer.getNodesCount).find { idx =>
-      rowOrdering(candidate, footer.getMaxValue(idx, schema), isStart) <= 0
+      footer.getRowCountOfNode(idx) > 0 && // ensure this node is not an empty node
+        rowOrdering(candidate, footer.getMaxValue(idx, schema), isStart) <= 0
     }
 
     (idxOption, idxOption.exists { idx =>
-      rowOrdering(candidate, footer.getMinValue(idx, schema), isStart) >= 0
+      footer.getRowCountOfNode(idx) > 0 && // ensure this node is not an empty node
+        rowOrdering(candidate, footer.getMinValue(idx, schema), isStart) >= 0
     })
   }
 
@@ -226,12 +232,14 @@ private[index] object BTreeIndexRecordReader {
     private val nodeSizeOffset = Integer.SIZE / 8 * 2
     private val minPosOffset = Integer.SIZE / 8 * 3
     private val maxPosOffset = Integer.SIZE / 8 * 4
-    private val nodeMetaStart = Integer.SIZE / 8 * 2
+    private val nodeMetaStart = Integer.SIZE / 8 * 3
     private val nodeMetaByteSize = Integer.SIZE / 8 * 5
     private val statsLengthSize = Integer.SIZE / 8
 
-    def getRecordCount: Int = fiberCache.getInt(0)
-    def getNodesCount: Int = fiberCache.getInt(Integer.SIZE / 8)
+    def getNonNullKeyRecordCount: Int = fiberCache.getInt(0)
+    def getNullKeyRecordCount: Int = fiberCache.getInt(Integer.SIZE / 8)
+    def getNodesCount: Int = fiberCache.getInt(Integer.SIZE / 8 * 2)
+    // get idx Node's max value
     def getMaxValue(idx: Int, schema: StructType): InternalRow =
       IndexUtils.readBasedOnSchema(fiberCache, getMaxValueOffset(idx), schema)
     def getMinValue(idx: Int, schema: StructType): InternalRow =
@@ -241,12 +249,14 @@ private[index] object BTreeIndexRecordReader {
           nodeMetaStart + nodeMetaByteSize * getNodesCount + statsLengthSize + getStatsLength
     def getMaxValueOffset(idx: Int): Int =
       fiberCache.getInt(nodeMetaStart + nodeMetaByteSize * idx + maxPosOffset) +
-          nodeMetaStart + nodeMetaByteSize * getNodesCount + statsLengthSize + getStatsLength
+        nodeMetaStart + nodeMetaByteSize * getNodesCount + statsLengthSize + getStatsLength
+    def getRowCountOfNode(idx: Int): Int =
+      fiberCache.getInt(nodeMetaStart + idx * nodeMetaByteSize)
     def getNodeOffset(idx: Int): Int =
       fiberCache.getInt(nodeMetaStart + idx * nodeMetaByteSize + nodePosOffset)
     def getNodeSize(idx: Int): Int =
       fiberCache.getInt(nodeMetaStart + idx * nodeMetaByteSize + nodeSizeOffset)
-    def getStatsOffset: Int = Integer.SIZE / 8 * 3 + nodeMetaByteSize * getNodesCount
+    def getStatsOffset: Int = nodeMetaStart + nodeMetaByteSize * getNodesCount + statsLengthSize
     private def getStatsLength: Int = fiberCache.getInt(
       nodeMetaStart + nodeMetaByteSize * getNodesCount)
   }

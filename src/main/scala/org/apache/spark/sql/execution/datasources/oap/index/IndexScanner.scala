@@ -190,8 +190,7 @@ private[oap] object ScannerBuilder extends Logging {
     leftMap
   }
 
-  def optimizeFilterBound(filter: Filter, ic: IndexContext)
-  : mutable.HashMap[String, ArrayBuffer[RangeInterval]] = {
+  def optimizeFilterBound(filter: Filter, ic: IndexContext): IntervalArrayMap = {
     filter match {
       case And(leftFilter, rightFilter) =>
         val leftMap = optimizeFilterBound(leftFilter, ic)
@@ -203,27 +202,60 @@ private[oap] object ScannerBuilder extends Logging {
         combineIntervalMaps(leftMap, rightMap, ic, needMerge = false)
       case In(attribute, ic(keys)) =>
         val eqBounds = keys.distinct
-          .map(key => new RangeInterval(key, key, true, true))
+          .map(key => RangeInterval(key, key, includeStart = true, includeEnd = true))
           .to[ArrayBuffer]
-        scala.collection.mutable.HashMap(attribute -> eqBounds)
+        mutable.HashMap(attribute -> eqBounds)
       case EqualTo(attribute, ic(key)) =>
-        val ranger = new RangeInterval(key, key, true, true)
-        scala.collection.mutable.HashMap(attribute -> ArrayBuffer(ranger))
+        val ranger = RangeInterval(key, key, includeStart = true, includeEnd = true)
+        mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case GreaterThanOrEqual(attribute, ic(key)) =>
-        val ranger = new RangeInterval(key, IndexScanner.DUMMY_KEY_END, true, true)
+        val ranger =
+          RangeInterval(
+            key,
+            IndexScanner.DUMMY_KEY_END,
+            includeStart = true,
+            includeEnd = true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case GreaterThan(attribute, ic(key)) =>
-        val ranger = new RangeInterval(key, IndexScanner.DUMMY_KEY_END, false, true)
+        val ranger =
+          RangeInterval(
+            key,
+            IndexScanner.DUMMY_KEY_END,
+            includeStart = false,
+            includeEnd = true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case LessThanOrEqual(attribute, ic(key)) =>
-        val ranger = new RangeInterval(IndexScanner.DUMMY_KEY_START, key, true, true)
+        val ranger =
+          RangeInterval(
+            IndexScanner.DUMMY_KEY_START,
+            key,
+            includeStart = true,
+            includeEnd = true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case LessThan(attribute, ic(key)) =>
-        val ranger = new RangeInterval(IndexScanner.DUMMY_KEY_START, key, true, false)
+        val ranger =
+          RangeInterval(
+            IndexScanner.DUMMY_KEY_START,
+            key,
+            includeStart = true,
+            includeEnd = false)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case IsNotNull(attribute) =>
         val ranger =
-          new RangeInterval(IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END, true, true)
+          RangeInterval(
+            IndexScanner.DUMMY_KEY_START,
+            IndexScanner.DUMMY_KEY_END,
+            includeStart = true,
+            includeEnd = true)
+        mutable.HashMap(attribute -> ArrayBuffer(ranger))
+      case IsNull(attribute) =>
+        val ranger =
+          RangeInterval(
+            IndexScanner.DUMMY_KEY_START,
+            IndexScanner.DUMMY_KEY_END,
+            includeStart = true,
+            includeEnd = true,
+            isNull = true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case _ => mutable.HashMap.empty
     }
@@ -250,7 +282,7 @@ private[oap] object ScannerBuilder extends Logging {
     if (filters == null || filters.isEmpty) return filters
     logDebug("Transform filters into Intervals:")
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
-    // reduce multiple hashMap to one hashMap(AND operation)
+    // reduce multiple hashMap to one hashMap("AND" operation)
     val intervalMap = intervalMapArray.reduce(
       (leftMap, rightMap) =>
         if (leftMap == null || leftMap.isEmpty) rightMap

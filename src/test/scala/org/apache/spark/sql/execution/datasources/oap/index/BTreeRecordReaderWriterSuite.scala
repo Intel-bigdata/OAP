@@ -22,14 +22,13 @@ import scala.util.Random
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.types.UTF8String
-import org.apache.spark.util.{ByteBufferOutputStream, Utils}
+import org.apache.spark.util.Utils
+
 
 class BTreeRecordReaderWriterSuite extends SparkFunSuite {
 
@@ -51,12 +50,14 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
   }
   // Only test simple Int type since read/write based on schema can cover data type test
   private val schema = StructType(StructField("col", IntegerType) :: Nil)
-  private val records = (0 until 1000).map(_ => random.nextInt(1000 / 2))
+  private val nonNullKeyRecords = (0 until 1000).map(_ => random.nextInt(1000 / 2))
+  private val nullKeyRecords = (1 to 5).map(_ => null)
   private val fileWriter = {
     val configuration = new Configuration()
     val fileWriter = new TestBTreeIndexFileWriter(configuration)
     val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
-    records.map(InternalRow(_)).foreach(writer.write(null, _))
+    nonNullKeyRecords.map(InternalRow(_)).foreach(writer.write(null, _))
+    nullKeyRecords.map(InternalRow(_)).foreach(writer.write(null, _))
     writer.close(null)
     fileWriter
   }
@@ -67,18 +68,23 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
       val node = BTreeIndexRecordReader.BTreeNodeData(FiberCache(buf))
       (0 until node.getKeyCount).map(i => (node.getRowIdPos(i), node.getKey(i, schema).getInt(0)))
     }
-    assert(answer === records.sorted.distinct.map(v => (records.sorted.indexOf(v), v)))
+    assert(answer ===
+      nonNullKeyRecords.sorted.distinct.map(v => (nonNullKeyRecords.sorted.indexOf(v), v)))
   }
 
   test("check read/write rowIdList") {
     val rowIdList = BTreeIndexRecordReader.BTreeRowIdList(FiberCache(fileWriter.rowIdList))
-    assert(records.sorted === records.indices.map(rowIdList.getRowId).map(records(_)))
+    assert(nonNullKeyRecords.sorted ===
+      nonNullKeyRecords.indices.map(rowIdList.getRowId).map(nonNullKeyRecords(_)))
+    assert(nullKeyRecords.indices.map(idx => nonNullKeyRecords.size + idx) ===
+      nullKeyRecords.indices.map(idx => rowIdList.getRowId(nonNullKeyRecords.size + idx)))
   }
 
   test("check read/write footer") {
     val footer = BTreeIndexRecordReader.BTreeFooter(FiberCache(fileWriter.footer))
     val nodeCount = footer.getNodesCount
-    assert(footer.getRecordCount === records.size)
+    assert(footer.getNonNullKeyRecordCount === nonNullKeyRecords.size)
+    assert(footer.getNullKeyRecordCount === nullKeyRecords.size)
     assert(nodeCount === fileWriter.nodes.size)
 
     val nodeSizeSeq = (0 until nodeCount).map(footer.getNodeSize)
@@ -89,7 +95,7 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
     val keyOffsetSeq = (0 until nodeCount).map ( i =>
       BTreeIndexRecordReader.BTreeNodeData(FiberCache(fileWriter.nodes(i))).getKeyCount
     ).scanLeft(0)(_ + _)
-    val uniqueValues = records.sorted.distinct
+    val uniqueValues = nonNullKeyRecords.sorted.distinct
     (0 until nodeCount).foreach { i =>
       assert(uniqueValues(keyOffsetSeq(i)) === footer.getMinValue(i, schema).getInt(0))
       assert(uniqueValues(keyOffsetSeq(i + 1) - 1) === footer.getMaxValue(i, schema).getInt(0))

@@ -27,7 +27,9 @@ import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.util.Utils
+
 
 class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
   import testImplicits._
@@ -640,5 +642,171 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       "inner join parquet_test t2 on t1.a = t2.a " +
       "group by t2.a"),
       Row(3, 3450.0) :: Nil)
+  }
+
+  test("filtering null key") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is row $i") }
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
+      if (i <= 5) Seq(null, s"this is row $i")
+      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nullKeyRows = (1 to 5).map(i => Row(null, s"this is row $i"))
+
+    sql("insert overwrite table oap_test select * from t")
+
+    sql("create oindex idx1 on oap_test (a)")
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a is null"), nullKeyRows)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 11 AND a <= 13"),
+      Row(12, "this is row 12") :: Row(13, "this is row 13") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a <= 2"), Nil)
+
+    sql("insert into table oap_test values(null, 'this is row 400')")
+    sql("insert into table oap_test values(null, 'this is row 500')")
+    sql("refresh oindex on oap_test")
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a is null"),
+      nullKeyRows :+ Row(null, "this is row 400") :+ Row(null, "this is row 500"))
+
+    sql("drop oindex idx1 on oap_test")
+  }
+
+  test("filtering null key in Parquet format") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is row $i") }
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
+      if (i <= 5) Seq(null, s"this is row $i")
+      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nullKeyRows = (1 to 5).map(i => Row(null, s"this is row $i"))
+
+    sql("insert overwrite table parquet_test select * from t")
+
+    sql("create oindex idx1 on parquet_test (a)")
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a is null"), nullKeyRows)
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 11 AND a <= 13"),
+      Row(12, "this is row 12") :: Row(13, "this is row 13") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a <= 2"), Nil)
+
+    sql("insert into table parquet_test values(null, 'this is row 400')")
+    sql("insert into table parquet_test values(null, 'this is row 500')")
+    sql("refresh oindex on parquet_test")
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a is null"),
+      nullKeyRows :+ Row(null, "this is row 400") :+ Row(null, "this is row 500"))
+
+    sql("drop oindex idx1 on parquet_test")
+  }
+
+  test("filtering non-null key") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 10).map(i =>
+      if (i <= 3) Seq(null, s"this is row $i")
+      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nonNullKeyRows = (4 to 10).map(i => Row(i, s"this is row $i"))
+
+    sql("insert overwrite table oap_test select * from t")
+
+    sql("create oindex idx1 on oap_test (a)")
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a is not null"), nonNullKeyRows)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 7 AND a <= 9"),
+      Row(8, "this is row 8") :: Row(9, "this is row 9") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a <= 2"), Nil)
+
+    sql("drop oindex idx1 on oap_test")
+  }
+
+  test("filtering non-null key in Parquet format") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 10).map(i =>
+      if (i <= 3) Seq(null, s"this is row $i")
+      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nonNullKeyRows = (4 to 10).map(i => Row(i, s"this is row $i"))
+
+    sql("insert overwrite table parquet_test select * from t")
+
+    sql("create oindex idx1 on parquet_test (a)")
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a is not null"), nonNullKeyRows)
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 7 AND a <= 9"),
+      Row(8, "this is row 8") :: Row(9, "this is row 9") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a <= 2"), Nil)
+
+    sql("drop oindex idx1 on parquet_test")
+  }
+
+  test("filtering null key and normal key mixed") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
+      if (i <= 5) Seq(null, s"this is row $i")
+      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nullKeyRows = (1 to 5).map(i => Row(null, s"this is row $i"))
+
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex idx1 on oap_test (a)")
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 11 AND a <= 13 or a is null"),
+      Row(12, "this is row 12") :: Row(13, "this is row 13") :: Nil ++ nullKeyRows)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 23 and a is null"), Nil)
+
+    sql("drop oindex idx1 on oap_test")
+  }
+
+  test("filtering null key and normal key mixed in Parquet format") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
+      if (i <= 5) Seq(null, s"this is row $i")
+      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nullKeyRows = (1 to 5).map(i => Row(null, s"this is row $i"))
+
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create oindex idx1 on parquet_test (a)")
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 11 AND a <= 13 or a is null"),
+      Row(12, "this is row 12") :: Row(13, "this is row 13") :: Nil ++ nullKeyRows)
+
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 23 and a is null"), Nil)
+
+    sql("drop oindex idx1 on parquet_test")
   }
 }
