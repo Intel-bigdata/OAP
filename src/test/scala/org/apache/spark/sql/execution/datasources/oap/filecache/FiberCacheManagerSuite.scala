@@ -21,10 +21,9 @@ import scala.util.Random
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.execution.datasources.oap.SharedOapContext
 
-class FiberCacheManagerSuite extends SharedSQLContext {
-  sparkConf.set("spark.memory.offHeap.size", "100m")
+class FiberCacheManagerSuite extends SharedOapContext {
   private val random = new Random(0)
   private def generateData(size: Int): Array[Byte] = {
     val bytes = new Array[Byte](size)

@@ -27,16 +27,13 @@ import org.scalatest.BeforeAndAfter
 
 import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
 
 
-class DataSourceMetaSuite extends SharedSQLContext with BeforeAndAfter {
+class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
   import testImplicits._
   private var tmpDir: File = null
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeAll(): Unit = {
     super.beforeAll()

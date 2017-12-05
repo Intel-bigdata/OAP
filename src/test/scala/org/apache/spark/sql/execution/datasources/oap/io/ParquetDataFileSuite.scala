@@ -23,10 +23,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.column.ParquetProperties
 import org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_2_0
-import org.apache.parquet.example.data.Group
 import org.apache.parquet.example.data.simple.SimpleGroupFactory
 import org.apache.parquet.hadoop.ParquetWriter
-import org.apache.parquet.hadoop.example.GroupWriteSupport
+import org.apache.parquet.hadoop.example.{ExampleParquetWriter, GroupWriteSupport}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.hadoop.metadata.CompressionCodecName.UNCOMPRESSED
 import org.apache.parquet.schema.MessageTypeParser.parseMessageType
@@ -197,8 +196,16 @@ object DataGenerator {
       + "} ")
     GroupWriteSupport.setSchema(schema, configuration)
     val f = new SimpleGroupFactory(schema)
-    val writer = new ParquetWriter[ Group ](outFile, new GroupWriteSupport(), codec,
-      blockSize, pageSize, DICT_PAGE_SIZE, true, false, version, configuration)
+    val writer = ExampleParquetWriter.builder(outFile)
+      .withCompressionCodec(codec)
+      .withRowGroupSize(blockSize)
+      .withPageSize(pageSize)
+      .withDictionaryPageSize(DICT_PAGE_SIZE)
+      .withDictionaryEncoding(true)
+      .withValidation(false)
+      .withWriterVersion(version)
+      .withConf(configuration)
+      .build()
     for (i <- 0 until nRows) {
       writer.write(f.newGroup()
         .append("int32_field", i)

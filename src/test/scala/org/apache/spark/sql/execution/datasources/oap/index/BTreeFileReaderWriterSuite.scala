@@ -20,11 +20,10 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.execution.datasources.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
-class BTreeFileReaderWriterSuite extends SharedSQLContext {
-  sparkConf.set("spark.memory.offHeap.size", "100m")
+class BTreeFileReaderWriterSuite extends  {
 
   // Override afterEach because we don't want to check open streams
   override def beforeEach(): Unit = {}

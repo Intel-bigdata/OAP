@@ -25,22 +25,18 @@ import org.scalatest.BeforeAndAfter
 import org.apache.spark.scheduler.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
-import org.apache.spark.sql.execution.datasources.oap.io.{OapIndexInfo, OapIndexInfoStatus}
-import org.apache.spark.sql.execution.datasources.oap.io.OapDataReader
+import org.apache.spark.sql.execution.datasources.oap.io.{OapDataReader, OapIndexInfo, OapIndexInfoStatus}
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
 
 
-class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
+class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
   import testImplicits._
   private var path: File = _
   private var parquetPath: File = _
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeAll(): Unit = {
     super.beforeAll()

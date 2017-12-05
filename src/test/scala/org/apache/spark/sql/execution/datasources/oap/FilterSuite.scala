@@ -26,13 +26,11 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 
-class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
 
-  sparkConf.set("spark.memory.offHeap.size", "100m")
   private var currentPath: String = _
 
   override def beforeEach(): Unit = {

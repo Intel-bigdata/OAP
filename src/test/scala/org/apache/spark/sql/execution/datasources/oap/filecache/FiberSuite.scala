@@ -26,19 +26,16 @@ import org.apache.hadoop.mapreduce.lib.input.FileSplit
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
-import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
+import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat, SharedOapContext}
 import org.apache.spark.sql.execution.datasources.oap.io._
-import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
 
 
-class FiberSuite extends SharedSQLContext with Logging {
+class FiberSuite extends SharedOapContext with Logging {
   private var file: File = _
   val conf: Configuration = new Configuration()
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeAll(): Unit = {
     super.beforeAll()

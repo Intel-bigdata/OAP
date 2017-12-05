@@ -23,22 +23,17 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat, SharedOapContext}
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 
 
-class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
+class IndexSelectionSuite extends SharedOapContext with BeforeAndAfterEach{
 
   import testImplicits._
   private var tempDir: File = null
   private var path: Path = null
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     val data = (1 to 300).map(i => (i, i + 100, i + 200, i + 300, s"this is row $i"))

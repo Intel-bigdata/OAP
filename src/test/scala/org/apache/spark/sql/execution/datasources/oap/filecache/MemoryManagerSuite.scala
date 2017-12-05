@@ -24,15 +24,14 @@ import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.SharedOapContext
 import org.apache.spark.sql.execution.datasources.oap.index.IndexUtils
-import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.{ByteBufferOutputStream, Utils}
 
-class MemoryManagerSuite extends SharedSQLContext {
+class MemoryManagerSuite extends SharedOapContext {
 
-  sparkConf.set("spark.memory.offHeap.size", "100m")
   private var random: Random = _
   private var values: Seq[Any] = _
   private var fiberCache: FiberCache = _

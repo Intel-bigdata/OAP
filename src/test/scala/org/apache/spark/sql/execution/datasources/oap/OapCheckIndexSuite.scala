@@ -25,14 +25,10 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql.{AnalysisException, QueryTest, Row, SaveMode}
 import org.apache.spark.sql.execution.datasources.oap.index.IndexUtils
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
-import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 
-class OapCheckIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     val path1 = Utils.createTempDir().getAbsolutePath

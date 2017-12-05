@@ -17,27 +17,23 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, DataOutputStream, FileInputStream,
-  FileOutputStream, ObjectInputStream, ObjectOutputStream}
-import java.io.File
+import java.io._
 import java.util
+
+import scala.collection.mutable
+
 import org.roaringbitmap.RoaringBitmap
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.test.SharedSQLContext
-import org.apache.spark.util.collection
-import org.apache.spark.util.Utils
-
-import scala.collection.mutable
+import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, SharedOapContext}
+import org.apache.spark.util.{collection, Utils}
 
 
 /**
  * Microbenchmark for Bitmap index with different bitmap implementations.
  */
-class BitmapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class BitmapMicroBenchmarkSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
   private var dir: File = null
   private var path: String = null
