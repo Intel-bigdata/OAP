@@ -17,20 +17,21 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
-import java.io.OutputStream
+import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
+import org.apache.parquet.bytes.LittleEndianDataOutputStream
+
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.unsafe.Platform
+
 
 private[oap] class MinMaxStatistics extends Statistics {
   override val id: Int = MinMaxStatisticsType.id
-  @transient private lazy val converter = UnsafeProjection.create(schema)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
   protected var min: Key = _
@@ -52,27 +53,34 @@ private[oap] class MinMaxStatistics extends Statistics {
     }
   }
 
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
     var offset = super.write(writer, sortedKeys)
     if (min != null) {
-      offset += Statistics.writeInternalRow(converter, min, writer)
-      offset += Statistics.writeInternalRow(converter, max, writer)
+      val tempWriter = new ByteArrayOutputStream()
+      val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
+      IndexUtils.writeBasedOnSchema(littleEndianWriter, min, schema)
+      IndexUtils.writeInt(writer, tempWriter.size)
+      IndexUtils.writeBasedOnSchema(littleEndianWriter, max, schema)
+      IndexUtils.writeInt(writer, tempWriter.size)
+      offset += Integer.SIZE / 8 * 2
+      writer.write(tempWriter.toByteArray)
+      offset += tempWriter.size
     }
     offset
   }
 
-  override def read(bytes: Array[Byte], baseOffset: Long): Long = {
-    var offset = super.read(bytes, baseOffset) + baseOffset // offset after super.read
+  override def read(fiberCache: FiberCache, offset: Int): Int = {
+    var readOffset = super.read(fiberCache, offset) + offset // offset after super.read
 
-    val minSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    min = Statistics.getUnsafeRow(schema.length, bytes, offset, minSize).copy()
-    offset += (4 + minSize)
+    val minSize = fiberCache.getInt(readOffset)
+    readOffset += 4
+    val totalSize = fiberCache.getInt(readOffset)
+    readOffset += 4
+    min = IndexUtils.readBasedOnSchema(fiberCache, readOffset, schema)
+    max = IndexUtils.readBasedOnSchema(fiberCache, readOffset + minSize, schema)
+    readOffset += totalSize
 
-    val maxSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    max = Statistics.getUnsafeRow(schema.length, bytes, offset, maxSize).copy()
-    offset += (4 + maxSize)
-
-    offset - baseOffset
+    readOffset - offset
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {

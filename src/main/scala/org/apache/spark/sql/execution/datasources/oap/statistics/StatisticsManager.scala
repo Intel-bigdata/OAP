@@ -25,10 +25,10 @@ import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.Platform
 
 /**
  * Manange all statistics info, use case:
@@ -82,7 +82,7 @@ class StatisticsManager {
         SQLConf.OAP_BLOOMFILTER_NUMHASHFUNC.defaultValue.get)
     )
 
-    val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter{ statType =>
+    val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter { statType =>
       val typeFromConfig = conf.get(SQLConf.OAP_STATISTICS_TYPES.key,
         SQLConf.OAP_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
       typeFromConfig.contains(statType.name)
@@ -104,8 +104,8 @@ class StatisticsManager {
     stats.foreach(_.addOapKey(key))
   }
 
-  def write(out: OutputStream): Long = {
-    var offset = 0L
+  def write(out: OutputStream): Int = {
+    var offset = 0
 
     IndexUtils.writeLong(out, StatisticsManager.STATISTICSMASK)
     offset += 8
@@ -128,30 +128,30 @@ class StatisticsManager {
 
   private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
 
-  def read(bytes: Array[Byte], s: StructType): Unit = {
-    var offset = 0L
-    val mask = Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    offset += 8
+  def read(fiberCache: FiberCache, offset: Int, s: StructType): Unit = {
+    var readOffset = 0
+    val mask = fiberCache.getLong(offset + readOffset)
+    readOffset += 8
     if (mask != StatisticsManager.STATISTICSMASK) {
       invalidStatistics = true
     } else {
-      val numOfStats = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-      offset += 4
+      val numOfStats = fiberCache.getInt(offset + readOffset)
+      readOffset += 4
       stats = new Array[Statistics](numOfStats)
 
       for (i <- 0 until numOfStats) {
-        Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset) match {
+        fiberCache.getInt(offset + readOffset) match {
           case MinMaxStatisticsType.id => stats(i) = new MinMaxStatistics
           case SampleBasedStatisticsType.id => stats(i) = new SampleBasedStatistics
           case PartByValueStatisticsType.id => stats(i) = new PartByValueStatistics
           case BloomFilterStatisticsType.id => stats(i) = new BloomFilterStatistics
           case _ => throw new UnsupportedOperationException("unsupport statistics id")
         }
-        offset += 4
+        readOffset += 4
       }
       for (stat <- stats) {
         stat.initialize(s)
-        offset += stat.read(bytes, offset)
+        readOffset += stat.read(fiberCache, offset + readOffset)
       }
     }
   }
@@ -193,7 +193,9 @@ object StatisticsManager {
 
   val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[StatisticsType]] =
     scala.collection.mutable.Map(
-      BTreeIndexType -> Array.empty,
+      BTreeIndexType -> Array(
+        MinMaxStatisticsType, SampleBasedStatisticsType,
+        BloomFilterStatisticsType, PartByValueStatisticsType),
       BitMapIndexType -> Array.empty)
 
   /**
