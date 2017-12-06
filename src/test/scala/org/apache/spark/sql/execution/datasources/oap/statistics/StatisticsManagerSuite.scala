@@ -30,8 +30,9 @@ import org.apache.spark.util.Utils
 class StatisticsManagerSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
   import testImplicits._
 
+  sparkConf.set("spark.memory.offHeap.size", "100m")
+
   override def beforeEach(): Unit = {
-    sparkConf.set("spark.memory.offHeap.size", "100m")
     val path = Utils.createTempDir().getAbsolutePath
 
     sql(s"""CREATE TEMPORARY VIEW oap_test

@@ -44,6 +44,8 @@ class FiberCacheManagerSuite extends SharedSQLContext {
       val fiberCache2 = FiberCacheManager.get(fiber, configuration)
       assert(fiberCache.toArray sameElements data)
       assert(fiberCache2.toArray sameElements data)
+      fiberCache.release()
+      fiberCache2.release()
     }
     val stats = FiberCacheManager.getStats.minus(origStats)
     assert(stats.missCount() == memorySizeInMB * 2)
@@ -64,8 +66,10 @@ class FiberCacheManagerSuite extends SharedSQLContext {
       val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #$i")
       val fiberCache = FiberCacheManager.get(fiber, configuration)
       assert(fiberCache.toArray sameElements data)
+      fiberCache.release()
     }
-    assert(fiberCacheInUse.isDisposed)
+    assert(!fiberCacheInUse.isDisposed)
+    fiberCacheInUse.release()
   }
 
   test("add a very large fiber") {
@@ -76,11 +80,12 @@ class FiberCacheManagerSuite extends SharedSQLContext {
     val data = generateData(memorySizeInMB * 1024 * 1024 / 8)
     val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #0")
     val fiberCache = FiberCacheManager.get(fiber, configuration)
+    fiberCache.release()
     assert(!fiberCache.isDisposed)
 
     val data1 = generateData(memorySizeInMB * 1024 * 1024 / 2)
     val fiber1 = TestFiber(() => MemoryManager.putToDataFiberCache(data1), s"test fiber #1")
     val fiberCache1 = FiberCacheManager.get(fiber1, configuration)
-    assert(fiberCache1.isDisposed)
+    assert(fiberCache1 == null)
   }
 }

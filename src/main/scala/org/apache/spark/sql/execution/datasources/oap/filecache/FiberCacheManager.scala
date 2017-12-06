@@ -49,8 +49,17 @@ object FiberCacheManager extends Logging {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
       // TODO: Change the log more readable
       logDebug(s"Removing Cache ${notification.getKey}")
-      // TODO: Investigate lock mechanism to secure in-used FiberCache
-      notification.getValue.dispose()
+      val fiberCache = notification.getValue
+      if (fiberCache.lock.writeLock().tryLock()) {
+        notification.getValue.dispose()
+        fiberCache.lock.writeLock().unlock()
+        logDebug("\tRemoved")
+      } else {
+        // TODO: This will update the accessQueue. But I don't have a better solution
+        // Maybe it's time to get rid of Guava
+        cache.put(notification.getKey, notification.getValue)
+        logDebug("\tCan't remove in-used FiberCache")
+      }
     }
   }
   private val weigher = new Weigher[Fiber, FiberCache] {
@@ -69,11 +78,16 @@ object FiberCacheManager extends Logging {
     new Callable[FiberCache] {
       override def call(): FiberCache = {
         logDebug(s"Loading Cache $fiber")
+        // A better way is to create a dummy FiberCache with only size and delay the reading file
+        // operation until it is inserted into cache manager successfully.
+        // But, to get a DataFiber's length, we have to read the file, decompress and decode it
+        // Also, since insert into cache failure means there is no enough memory, most time this
+        // means OOME. So the time saved by delayed reading isn't critical.
         fiber.fiber2Data(configuration)
       }
     }
 
-  private val cache = CacheBuilder.newBuilder()
+  private val cache: Cache[Fiber, FiberCache] = CacheBuilder.newBuilder()
       .recordStats()
       .concurrencyLevel(4)
       .removalListener(removalListener)
@@ -83,7 +97,18 @@ object FiberCacheManager extends Logging {
 
   def get(fiber: Fiber, conf: Configuration): FiberCache = {
     // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
-    cache.get(fiber, cacheLoader(fiber, conf))
+    val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
+    fiberCache.lock.readLock().lock()
+    if (fiberCache.isDisposed) {
+      fiberCache.lock.readLock().unlock()
+      // TODO: need the caller to handle no enough memory problem
+      // TODO: or just return an exception?
+      null
+      } else {
+      // we have inserted FiberCache into Cache Manager, so we've acquire memory. load
+      fiberCache
+      }
+
   }
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly

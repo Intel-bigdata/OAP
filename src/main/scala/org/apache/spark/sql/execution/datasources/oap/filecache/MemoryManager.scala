@@ -17,10 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import org.apache.hadoop.fs.FSDataInputStream
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.SparkEnv
@@ -37,14 +37,20 @@ trait FiberCache {
   protected def fiberData: MemoryBlock
 
   // TODO: need a flag to avoid accessing disposed FiberCache
-  private var disposed = false
-  def isDisposed: Boolean = disposed
+  private val disposed = new AtomicBoolean()
+  def isDisposed: Boolean = disposed.get()
   def dispose(): Unit = {
-    if (!disposed) MemoryManager.free(fiberData)
-    disposed = true
+    if (disposed.compareAndSet(false, true)) {
+      MemoryManager.free(fiberData)
+    } else {
+      throw new OapException("FiberCache has already been disposed")
+    }
   }
 
+  val lock = new ReentrantReadWriteLock()
+
   /** For debug purpose */
+  @deprecated
   def toArray: Array[Byte] = {
     // TODO: Handle overflow
     val bytes = new Array[Byte](fiberData.size().toInt)
@@ -55,7 +61,7 @@ trait FiberCache {
   private def getBaseObj: AnyRef = {
     // NOTE: A trick here. Since every function need to get memory data has to get here first.
     // So, here check the if the memory has been freed.
-    if (disposed) throw new OapException("Try to access a freed memory")
+    if (disposed.get()) throw new OapException("Try to access a freed memory")
     fiberData.getBaseObject
   }
   private def getBaseOffset: Long = fiberData.getBaseOffset
@@ -97,6 +103,11 @@ trait FiberCache {
     copyMemory(offset, dst, Platform.BYTE_ARRAY_OFFSET, dst.length)
 
   def size(): Long = fiberData.size()
+
+  def release(): Unit = {
+    // TODO: maybe a readLock + refCount is better.
+    lock.readLock().unlock()
+  }
 }
 
 object FiberCache {
@@ -143,7 +154,8 @@ private[oap] object MemoryManager extends Logging {
       if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
         oapMaxMemory
       } else {
-        throw new OapException("Can't acquire memory from spark Memory Manager")
+        throw new OapException("Can't acquire memory from spark Memory Manager." +
+            "Increase spark.memory.offHeap.size for a larger off-heap memory.")
       }
     }
   }
