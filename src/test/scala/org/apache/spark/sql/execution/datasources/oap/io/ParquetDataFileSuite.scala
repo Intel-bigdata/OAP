@@ -31,7 +31,7 @@ import org.apache.parquet.hadoop.metadata.CompressionCodecName.UNCOMPRESSED
 import org.apache.parquet.schema.MessageTypeParser.parseMessageType
 
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 
 
 class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
@@ -48,6 +48,10 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
     """.stripMargin
 
   val requestStructType: StructType = StructType.fromString(requestSchema)
+
+  val requestStructType2: StructType = {
+    new StructType().add(StructField("int32_field", IntegerType))
+  }
 
   val fileName: String = DataGenerator.TARGET_DIR + "/PARQUET-TEST"
 
@@ -68,7 +72,7 @@ class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
 
     val iterator = reader.iterator(DataGenerator.configuration, requiredIds, rowIds)
 
-    val result = ArrayBuffer[ Int ]()
+    val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val row = iterator.next
       assert(row.numFields == 2)
