@@ -171,11 +171,12 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     endIdxOffset
   }
 
+ // TODO: The key list is unique and sorted. Binary search may be more efficient than traversing.
   private def getBitmapIdx(keySeq: IndexedSeq[InternalRow],
       range: RangeInterval): (Int, Int) = {
     val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
-      // diff from which startIdx not found, so here startIdx = -2
-      -2
+      // If no starting key, assume to start from the first key.
+      0
     } else {
       // find first key which >= start key, can't find return -1
       if (range.startInclude) {
@@ -185,7 +186,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       }
     }
     val endIdx = if (range.end == IndexScanner.DUMMY_KEY_END) {
-      keySeq.size
+      // If no end key, assume to end with the last key.
+      keySeq.length - 1
     } else {
       // find last key which <= end key, can't find return -1
       if (range.endInclude) {
