@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.execution.datasources.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
-class BTreeFileReaderWriterSuite extends  {
+class BTreeFileReaderWriterSuite extends SharedOapContext {
 
   // Override afterEach because we don't want to check open streams
   override def beforeEach(): Unit = {}
