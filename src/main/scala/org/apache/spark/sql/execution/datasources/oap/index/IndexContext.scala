@@ -19,9 +19,10 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, JoinedRow}
+import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.types.StructType
@@ -245,8 +246,13 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
   def isSingleValueInterval(interval: RangeInterval): Boolean =
     interval.start == interval.end && interval.startInclude && interval.endInclude
 
-  // compare two intervals
+  // compare two intervals: return true if interval1.start < interval2.start
+  // isNullPredicate is assumed to be "smallest"
   def compareRangeInterval(interval1: RangeInterval, interval2: RangeInterval): Boolean = {
+    if (interval1.isNullPredicate || interval2.isNullPredicate) {
+      if (interval1.isNullPredicate) return true
+      else return false
+    }
     if ((interval1.start eq IndexScanner.DUMMY_KEY_START) &&
       (interval2.start ne IndexScanner.DUMMY_KEY_START)) {
       return true
@@ -257,7 +263,8 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
     order.compare(interval1.start, interval2.start) < 0
   }
   // unite interval extra to interval base
-  // return: if two intervals is unioned
+  // return: true if two intervals are unioned together
+  //         false if these two intervals cannot be unioned, since they do not overlap
   def intervalUnion(base: RangeInterval, extra: RangeInterval): Boolean = {
     def union: Boolean = {// union two intervals
       if ((extra.end eq IndexScanner.DUMMY_KEY_END) || order.compare(extra.end, base.end)>0) {
@@ -271,9 +278,17 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
       true
     }// end def union
 
+    // isNull U isNull => isNull
+    if (base.isNullPredicate && extra.isNullPredicate) return true
+    // isNull U otherFilterPredicate => isNull U otherFilterPredicate
+    if (base.isNullPredicate ^ extra.isNullPredicate) return false
+
     if (base.start eq IndexScanner.DUMMY_KEY_START) {
       if (base.end eq IndexScanner.DUMMY_KEY_END) {
-        return true
+        // base is isNotNullPredicate
+        // isNotNull U isNull => isNotNull U isNull
+        if (extra.isNullPredicate) return false
+        else return true // isNotNull U otherFilterPredicate => isNotNull
       }
       if (extra.start ne IndexScanner.DUMMY_KEY_START) {
         val cmp = order.compare(extra.start, base.end)
@@ -299,7 +314,7 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
       union
     }
   }
-  // Or operation: (union multiple range intervals which may overlap)
+  // "Or" operation: (union multiple range intervals which may overlap)
   def addBound(intervalArray1: ArrayBuffer[RangeInterval],
                intervalArray2: ArrayBuffer[RangeInterval] ): ArrayBuffer[RangeInterval] = {
     // firstly, put all intervals to intervalArray1
@@ -308,15 +323,21 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
       return intervalArray1
     }
 
+    // sort the array of interval according to the interval's start key
+    // After sorted, isNullPredicate(if have) will be put at the front of the array
     val sortedArray = intervalArray1.sortWith(compareRangeInterval)
 
     val result = ArrayBuffer(sortedArray.head)
     for(i <- 1 until sortedArray.length) {
       val interval = result.last
-      if ((interval.end eq IndexScanner.DUMMY_KEY_END) && interval.startInclude) {
+      // attr >= value, so it is unnecessary to do subsequent union, just return the result
+      if (!interval.isNullPredicate &&
+        (interval.end eq IndexScanner.DUMMY_KEY_END) && interval.startInclude) {
         return result
       }
       if(!intervalUnion(interval, sortedArray(i))) {
+        // these two intervals do not overlap, thus cannot be unioned,
+        // just add the second interval to the result list
         result += sortedArray(i)
       }
 
@@ -363,26 +384,36 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
     true
   }
 
-  // And operation: (intersect multiple range intervals)
+  // "And" operation: (intersect multiple range intervals)
   def mergeBound(intervalArray1: ArrayBuffer[RangeInterval],
                  intervalArray2: ArrayBuffer[RangeInterval] ): ArrayBuffer[RangeInterval] = {
     val intervalArray = for {
       interval1 <- intervalArray1
       interval2 <- intervalArray2
+      // isNull & otherPredicate => empty
+      if !(interval1.isNullPredicate ^ interval2.isNullPredicate)
     } yield {
-      val interval = new RangeInterval(
-        IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END, true, true)
+      // isNull & isNull => isNull
+      if (interval1.isNullPredicate && interval2.isNullPredicate) interval1
+      else {
+        // this condition contains isNotNull & normalInterval => normalInterval
+        val interval = RangeInterval(
+          IndexScanner.DUMMY_KEY_START,
+          IndexScanner.DUMMY_KEY_END,
+          includeStart = true,
+          includeEnd = true)
 
-      val re1 = intersect(interval1.start, interval2.start,
-        interval1.startInclude, interval2.startInclude, false)
-      interval.start = re1._1
-      interval.startInclude = re1._2
+        val re1 = intersect(interval1.start, interval2.start,
+          interval1.startInclude, interval2.startInclude, isEndKey = false)
+        interval.start = re1._1
+        interval.startInclude = re1._2
 
-      val re2 = intersect(interval1.end, interval2.end,
-        interval1.endInclude, interval2.endInclude, true)
-      interval.end = re2._1
-      interval.endInclude = re2._2
-      interval
+        val re2 = intersect(interval1.end, interval2.end,
+          interval1.endInclude, interval2.endInclude, isEndKey = true)
+        interval.end = re2._1
+        interval.endInclude = re2._2
+        interval
+      }
     }
     // retain non-empty intervals
     intervalArray.filter(validate)

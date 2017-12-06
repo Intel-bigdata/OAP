@@ -27,6 +27,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
+import org.apache.spark.sql.execution.datasources.oap.statistics.StaticsAnalysisResult
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
@@ -112,12 +113,11 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       val dataFileSize = dataPath.getFileSystem(conf).getContentSummary(dataPath).getLength
       val ratio = conf.getDouble(SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
         SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
-      indexFileSize <= dataFileSize * ratio
+      if (indexFileSize > dataFileSize * ratio) return false
 
       // Policy 2: statistics tells the scan cost
-      // TODO: Get statistics info after statistics is enabled.
-      // val statsAnalyseResult = tryToReadStatistics(indexPath, conf)
-      // statsAnalyseResult == StaticsAnalysisResult.USE_INDEX
+      val statsAnalyseResult = tryToReadStatistics(indexPath, conf)
+      statsAnalyseResult == StaticsAnalysisResult.USE_INDEX
 
       // More Policies
     } else {
@@ -125,6 +125,24 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       true
     }
   }
+
+  /**
+   * Through getting statistics from related index file,
+   * judging if we should bypass this datafile or full scan or by index.
+   * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
+   * called before invoking [[initialize]].
+   */
+  private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
+    if (!canBeOptimizedByStatistics) {
+      StaticsAnalysisResult.USE_INDEX
+    } else if (intervalArray.isEmpty) {
+      StaticsAnalysisResult.SKIP_INDEX
+    } else {
+      readStatistics(indexPath, conf)
+    }
+  }
+
+  protected def readStatistics(indexPath: Path, conf: Configuration): Double = 0
 
   def withKeySchema(schema: StructType): IndexScanner = {
     this.keySchema = schema
@@ -172,8 +190,7 @@ private[oap] object ScannerBuilder extends Logging {
     leftMap
   }
 
-  def optimizeFilterBound(filter: Filter, ic: IndexContext)
-  : mutable.HashMap[String, ArrayBuffer[RangeInterval]] = {
+  def optimizeFilterBound(filter: Filter, ic: IndexContext): IntervalArrayMap = {
     filter match {
       case And(leftFilter, rightFilter) =>
         val leftMap = optimizeFilterBound(leftFilter, ic)
@@ -185,27 +202,60 @@ private[oap] object ScannerBuilder extends Logging {
         combineIntervalMaps(leftMap, rightMap, ic, needMerge = false)
       case In(attribute, ic(keys)) =>
         val eqBounds = keys.distinct
-          .map(key => new RangeInterval(key, key, true, true))
+          .map(key => RangeInterval(key, key, includeStart = true, includeEnd = true))
           .to[ArrayBuffer]
-        scala.collection.mutable.HashMap(attribute -> eqBounds)
+        mutable.HashMap(attribute -> eqBounds)
       case EqualTo(attribute, ic(key)) =>
-        val ranger = new RangeInterval(key, key, true, true)
-        scala.collection.mutable.HashMap(attribute -> ArrayBuffer(ranger))
+        val ranger = RangeInterval(key, key, includeStart = true, includeEnd = true)
+        mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case GreaterThanOrEqual(attribute, ic(key)) =>
-        val ranger = new RangeInterval(key, IndexScanner.DUMMY_KEY_END, true, true)
+        val ranger =
+          RangeInterval(
+            key,
+            IndexScanner.DUMMY_KEY_END,
+            includeStart = true,
+            includeEnd = true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case GreaterThan(attribute, ic(key)) =>
-        val ranger = new RangeInterval(key, IndexScanner.DUMMY_KEY_END, false, true)
+        val ranger =
+          RangeInterval(
+            key,
+            IndexScanner.DUMMY_KEY_END,
+            includeStart = false,
+            includeEnd = true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case LessThanOrEqual(attribute, ic(key)) =>
-        val ranger = new RangeInterval(IndexScanner.DUMMY_KEY_START, key, true, true)
+        val ranger =
+          RangeInterval(
+            IndexScanner.DUMMY_KEY_START,
+            key,
+            includeStart = true,
+            includeEnd = true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case LessThan(attribute, ic(key)) =>
-        val ranger = new RangeInterval(IndexScanner.DUMMY_KEY_START, key, true, false)
+        val ranger =
+          RangeInterval(
+            IndexScanner.DUMMY_KEY_START,
+            key,
+            includeStart = true,
+            includeEnd = false)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case IsNotNull(attribute) =>
         val ranger =
-          new RangeInterval(IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END, true, true)
+          RangeInterval(
+            IndexScanner.DUMMY_KEY_START,
+            IndexScanner.DUMMY_KEY_END,
+            includeStart = true,
+            includeEnd = true)
+        mutable.HashMap(attribute -> ArrayBuffer(ranger))
+      case IsNull(attribute) =>
+        val ranger =
+          RangeInterval(
+            IndexScanner.DUMMY_KEY_START,
+            IndexScanner.DUMMY_KEY_END,
+            includeStart = true,
+            includeEnd = true,
+            isNull = true)
         mutable.HashMap(attribute -> ArrayBuffer(ranger))
       case _ => mutable.HashMap.empty
     }
@@ -231,7 +281,7 @@ private[oap] object ScannerBuilder extends Logging {
     if (filters == null || filters.isEmpty) return filters
     logDebug("Transform filters into Intervals:")
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
-    // reduce multiple hashMap to one hashMap(AND operation)
+    // reduce multiple hashMap to one hashMap("AND" operation)
     val intervalMap = intervalMapArray.reduce(
       (leftMap, rightMap) =>
         if (leftMap == null || leftMap.isEmpty) rightMap

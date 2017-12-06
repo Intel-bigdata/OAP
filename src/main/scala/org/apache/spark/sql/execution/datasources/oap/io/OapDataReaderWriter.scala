@@ -30,7 +30,6 @@ import org.apache.spark.sql.catalyst.expressions.Ascending
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.execution.datasources.oap.statistics._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.types._
 import org.apache.spark.util.TimeStampedHashMap
@@ -216,7 +215,7 @@ private[oap] class OapDataReader(
           } else indexScanner.toArray
 
           // Parquet reader does not support backward scan, so rowIds must be sorted.
-          if (meta.dataReaderClassName contains("ParquetDataFile")) rowIds.sorted
+          if (meta.dataReaderClassName.contains("ParquetDataFile")) rowIds.sorted
           else rowIds
         }
 
@@ -232,22 +231,6 @@ private[oap] class OapDataReader(
         logDebug("Construct File Iterator: " + (end - start) + "ms")
 
         iter
-    }
-  }
-
-  /**
-   * Through getting statistics from related index file,
-   * judging if we should bypass this datafile or full scan or by index.
-   * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
-   */
-  private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
-    if (!filterScanner.get.canBeOptimizedByStatistics) {
-      StaticsAnalysisResult.USE_INDEX
-    } else if (filterScanner.get.intervalArray.isEmpty) {
-      StaticsAnalysisResult.SKIP_INDEX
-    } else {
-      // TODO: Remove StatisticsManager
-      StaticsAnalysisResult.USE_INDEX
     }
   }
 }

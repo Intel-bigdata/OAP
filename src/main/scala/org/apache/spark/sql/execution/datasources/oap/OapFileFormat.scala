@@ -132,6 +132,7 @@ private[sql] class OapFileFormat extends FileFormat
           + m.dataReaderClassName.substring(m.dataReaderClassName.lastIndexOf(".") + 1)
           + " ...")
 
+        // Check whether this filter conforms to certain patterns that could benefit from index
         def canTriggerIndex(filter: Filter): Boolean = {
           var attr: String = null
           def checkAttribute(filter: Filter): Boolean = filter match {
@@ -151,7 +152,11 @@ private[sql] class OapFileFormat extends FileFormat
               if (attr ==  null || attr == attribute) {attr = attribute; true} else false
             case In(attribute, _) =>
               if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-            case _ => true
+            case IsNull(attribute) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case IsNotNull(attribute) =>
+              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+            case _ => false
           }
 
           checkAttribute(filter)
@@ -285,8 +290,7 @@ private[sql] class OapFileFormat extends FileFormat
    */
   def hasAvailableIndex(
       expressions: Seq[Expression],
-      requiredTypes: Seq[IndexType] = Nil
-  ): Boolean = {
+      requiredTypes: Seq[IndexType] = Nil): Boolean = {
     if (expressions.nonEmpty && sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX)) {
       meta match {
         case Some(m) if requiredTypes.isEmpty =>

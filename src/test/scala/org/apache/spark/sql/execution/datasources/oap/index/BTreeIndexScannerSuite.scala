@@ -22,14 +22,20 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
-import org.apache.spark.util.{ByteBufferOutputStream, Utils}
+import org.apache.spark.util.Utils
 
-class BTreeIndexScannerSuite extends SparkFunSuite {
+
+class BTreeIndexScannerSuite extends SharedSQLContext {
+  sparkConf.set("spark.memory.offHeap.size", "100m")
+
+  // Override afterEach because we do not want to check open streams
+  override def beforeEach(): Unit = {}
+  override def afterEach(): Unit = {}
 
   test("test rowOrdering") {
     // Only check Integer is enough. We use [[GenerateOrdering]] to handle different data types.
@@ -103,10 +109,10 @@ class BTreeIndexScannerSuite extends SparkFunSuite {
     assertPosition(91, 9, exists = true)
   }
 
-  test("test findRowIdRange") {
+  test("test findRowIdRange for normal case") {
     val configuration = new Configuration()
     val schema = StructType(StructField("col", IntegerType) :: Nil)
-    val path = new Path(Utils.createTempDir().getAbsolutePath, "temp")
+    val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
     val fileWriter = BTreeIndexFileWriter(configuration, path)
     val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
     // Values structure depends on BTreeUtils.generate2()
@@ -149,5 +155,97 @@ class BTreeIndexScannerSuite extends SparkFunSuite {
     // 1 <= x <= 1
     assert(reader.findRowIdRange(RangeInterval(
       InternalRow(1), InternalRow(1), includeStart = true, includeEnd = true)) === (0, 1))
+  }
+
+  test("findRowIdRange for isNull filter predicate: empty result") {
+    val configuration = new Configuration()
+    val schema = StructType(StructField("col", IntegerType) :: Nil)
+    val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
+    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
+
+    (1 to 300 by 2).map(InternalRow(_)).foreach(writer.write(null, _))
+    writer.close(null)
+
+    val reader = BTreeIndexRecordReader(configuration, schema)
+    reader.initialize(path, new ArrayBuffer[RangeInterval]())
+
+    assert(
+      reader.findRowIdRange(
+        RangeInterval(
+          IndexScanner.DUMMY_KEY_START,
+          IndexScanner.DUMMY_KEY_END,
+          includeStart = true,
+          includeEnd = true,
+          isNull = true)) === (150, 150))
+  }
+
+  test("findRowIdRange for isNull filter predicate") {
+    val configuration = new Configuration()
+    val schema = StructType(StructField("col", IntegerType) :: Nil)
+    val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
+    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
+
+    (1 to 300 by 2).map(InternalRow(_)).foreach(writer.write(null, _))
+    (1 to 5).map(_ => InternalRow(null)).foreach(writer.write(null, _))
+    writer.close(null)
+
+    val reader = BTreeIndexRecordReader(configuration, schema)
+    reader.initialize(path, new ArrayBuffer[RangeInterval]())
+
+    assert(
+      reader.findRowIdRange(
+        RangeInterval(
+          IndexScanner.DUMMY_KEY_START,
+          IndexScanner.DUMMY_KEY_END,
+          includeStart = true,
+          includeEnd = true,
+          isNull = true)) === (150, 155))
+  }
+
+  test("findRowIdRange for isNotNull filter predicate: empty result") {
+    val configuration = new Configuration()
+    val schema = StructType(StructField("col", IntegerType) :: Nil)
+    val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
+    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
+
+    (1 to 5).map(_ => InternalRow(null)).foreach(writer.write(null, _))
+    writer.close(null)
+
+    val reader = BTreeIndexRecordReader(configuration, schema)
+    reader.initialize(path, new ArrayBuffer[RangeInterval]())
+
+    assert(
+      reader.findRowIdRange(
+        RangeInterval(
+          IndexScanner.DUMMY_KEY_START,
+          IndexScanner.DUMMY_KEY_END,
+          includeStart = true,
+          includeEnd = true)) === (0, 0))
+  }
+
+  test("findRowIdRange for isNotNull filter predicate") {
+    val configuration = new Configuration()
+    val schema = StructType(StructField("col", IntegerType) :: Nil)
+    val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
+    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
+
+    (1 to 300 by 2).map(InternalRow(_)).foreach(writer.write(null, _))
+    (1 to 5).map(_ => InternalRow(null)).foreach(writer.write(null, _))
+    writer.close(null)
+
+    val reader = BTreeIndexRecordReader(configuration, schema)
+    reader.initialize(path, new ArrayBuffer[RangeInterval]())
+
+    assert(
+      reader.findRowIdRange(
+        RangeInterval(
+          IndexScanner.DUMMY_KEY_START,
+          IndexScanner.DUMMY_KEY_END,
+          includeStart = true,
+          includeEnd = true)) === (0, 150))
   }
 }

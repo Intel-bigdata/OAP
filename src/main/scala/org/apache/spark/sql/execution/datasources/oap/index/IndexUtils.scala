@@ -145,6 +145,7 @@ private[oap] object IndexUtils {
 
   def writeBasedOnSchema(
       writer: LittleEndianDataOutputStream, row: InternalRow, schema: StructType): Unit = {
+    require(row != null)
     schema.zipWithIndex.foreach {
       case (field, index) => writeBasedOnDataType(writer, row.get(index, field.dataType))
     }

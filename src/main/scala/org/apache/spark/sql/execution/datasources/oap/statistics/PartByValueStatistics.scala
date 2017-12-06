@@ -17,17 +17,18 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
-import java.io.OutputStream
+import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.parquet.bytes.LittleEndianDataOutputStream
+
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.unsafe.Platform
 
 // PartedByValueStatistics gives statistics with the value interval.
 // for example, in an array where all internal rows appear only once
@@ -43,18 +44,17 @@ import org.apache.spark.unsafe.Platform
 
 private[oap] class PartByValueStatistics extends Statistics {
   override val id: Int = PartByValueStatisticsType.id
-  @transient private lazy val converter = UnsafeProjection.create(schema)
 
   private lazy val maxPartNum: Int = StatisticsManager.partNumber
   @transient private lazy val ordering = GenerateOrdering.create(schema)
   @transient private lazy val partialOrdering =
     GenerateOrdering.create(StructType(schema.dropRight(1)))
 
-  protected case class PartedByValueMeta(idx: Int, row: InternalRow,
-                                         curMaxId: Int, accumulatorCnt: Int)
+  protected case class PartedByValueMeta(
+      idx: Int, row: InternalRow, curMaxId: Int, accumulatorCnt: Int)
   protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
 
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
     var offset = super.write(writer, sortedKeys)
     val hashMap = new java.util.HashMap[Key, Int]()
     val uniqueKeys: ArrayBuffer[Key] = new ArrayBuffer[Key]()
@@ -85,31 +85,37 @@ private[oap] class PartByValueStatistics extends Statistics {
 
     // start writing
     IndexUtils.writeInt(writer, metas.length)
+    val tempWriter = new ByteArrayOutputStream()
+    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
     metas.foreach(meta => {
-      offset += Statistics.writeInternalRow(converter, meta.row, writer)
+      IndexUtils.writeBasedOnSchema(littleEndianWriter, meta.row, schema)
       IndexUtils.writeInt(writer, meta.curMaxId)
       IndexUtils.writeInt(writer, meta.accumulatorCnt)
-      offset += 8
+      IndexUtils.writeInt(writer, tempWriter.size())
+      offset += 12
     })
+    offset += tempWriter.size
+    writer.write(tempWriter.toByteArray)
     offset
   }
 
-  override def read(bytes: Array[Byte], baseOffset: Long): Long = {
-    var offset = super.read(bytes, baseOffset) + baseOffset
+  override def read(fiberCache: FiberCache, offset: Int): Int = {
+    var readOffset = super.read(fiberCache, offset) + offset
 
-    val size = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-    offset += 4
+    val size = fiberCache.getInt(readOffset)
+    readOffset += 4
 
+    var rowOffset = 0
     for (i <- 0 until size) {
-      val rowSize = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-      val row = Statistics.getUnsafeRow(schema.length, bytes, offset, rowSize).copy()
-      offset += rowSize + 4
-      val index = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset)
-      val count = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + offset + 4)
-      offset += 8
+      val row = IndexUtils.readBasedOnSchema(
+        fiberCache, readOffset + size * 12 + rowOffset, schema)
+      val index = fiberCache.getInt(readOffset + i * 12)
+      val count = fiberCache.getInt(readOffset + i * 12 + 4)
+      rowOffset = fiberCache.getInt(readOffset + i * 12 + 8)
       metas.append(PartedByValueMeta(i, row, index, count))
     }
-    offset - baseOffset
+    readOffset += (size * 12 + rowOffset)
+    readOffset - offset
   }
 
   //  meta id:             0       1       2       3       4       5

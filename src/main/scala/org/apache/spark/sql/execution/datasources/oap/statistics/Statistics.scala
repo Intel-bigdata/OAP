@@ -17,17 +17,17 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
-import java.io.{ByteArrayOutputStream, OutputStream}
+import java.io.OutputStream
 
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.BaseOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.Platform
+
 
 abstract class Statistics {
   val id: Int
@@ -54,22 +54,22 @@ abstract class Statistics {
    * @param sortedKeys sorted keys stored related to this statistics
    * @return number of bytes written in writer
    */
-  def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Long = {
+  def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
     IndexUtils.writeInt(writer, id)
-    4L
+    4
   }
 
   /**
    * Statistics read function, by default, statistics id should be same with
    * current statistics
-   * @param bytes bytes read from file
-   * @param baseOffset start offset to read the statistics
+   * @param fiberCache fiber read from file
+   * @param offset start offset to read the statistics
    * @return number of bytes read from `bytes` array
    */
-  def read(bytes: Array[Byte], baseOffset: Long): Long = {
-    val idFromFile = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + baseOffset)
+  def read(fiberCache: FiberCache, offset: Int): Int = {
+    val idFromFile = fiberCache.getInt(offset)
     assert(idFromFile == id)
-    4L
+    4
   }
 
   /**
@@ -84,38 +84,10 @@ abstract class Statistics {
 
 // tool function for Statistics class
 object Statistics {
-  def getUnsafeRow(schemaLen: Int, array: Array[Byte], offset: Long, size: Int): UnsafeRow = {
-    UnsafeIndexNode.getUnsafeRow(schemaLen, array, Platform.BYTE_ARRAY_OFFSET + offset + 4, size)
-  }
-
-  /**
-   * This method help oap convert InternalRow type to UnsafeRow type
-   * @param internalRow
-   * @param keyBuf
-   * @return unsafeRow
-   */
-  def convertHelper(converter: UnsafeProjection,
-                    internalRow: InternalRow,
-                    keyBuf: ByteArrayOutputStream): UnsafeRow = {
-    converter.apply(internalRow)
-  }
-
-  def writeInternalRow(converter: UnsafeProjection,
-                       internalRow: InternalRow,
-                       writer: OutputStream): Int = {
-    val keyBuf = new ByteArrayOutputStream()
-    val value = convertHelper(converter, internalRow, keyBuf)
-
-    IndexUtils.writeInt(keyBuf, value.getSizeInBytes)
-    value.writeToStream(keyBuf, null)
-    writer.write(keyBuf.toByteArray)
-    keyBuf.close()
-    4 + value.getSizeInBytes
-  }
-
-  // logic is complex, needs to be refactored :(
-  def rowInSingleInterval(row: InternalRow, interval: RangeInterval,
-                          startOrder: BaseOrdering, endOrder: BaseOrdering): Boolean = {
+  // TODO logic is complex, needs to be refactored :(
+  def rowInSingleInterval(
+      row: InternalRow, interval: RangeInterval,
+      startOrder: BaseOrdering, endOrder: BaseOrdering): Boolean = {
     // Only two cases are accepted, or something is wrong.
     // 1. row = [1, "aaa"], start = [1, "bbb"] => row.numFields == start.numFields
     // 2. row = [1, "aaa"], start = [1, DUMMY_KEY_START] => row.numFields -1 = start.numFields
@@ -142,8 +114,9 @@ object Statistics {
     withinStart && withinEnd
   }
 
-  def rowInIntervalArray(row: InternalRow, intervalArray: ArrayBuffer[RangeInterval],
-                         fullOrder: BaseOrdering, partialOrder: BaseOrdering): Boolean = {
+  def rowInIntervalArray(
+      row: InternalRow, intervalArray: ArrayBuffer[RangeInterval],
+      fullOrder: BaseOrdering, partialOrder: BaseOrdering): Boolean = {
     if (intervalArray == null || intervalArray.isEmpty) false
     else intervalArray.exists{interval =>
       val startOrder =
