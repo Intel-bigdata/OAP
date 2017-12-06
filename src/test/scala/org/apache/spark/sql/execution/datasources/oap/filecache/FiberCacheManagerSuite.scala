@@ -21,7 +21,7 @@ import scala.util.Random
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.sql.execution.datasources.oap.SharedOapContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 
 class FiberCacheManagerSuite extends SharedOapContext {
   private val random = new Random(0)

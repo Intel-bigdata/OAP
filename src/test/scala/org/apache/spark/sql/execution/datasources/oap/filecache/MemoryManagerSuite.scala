@@ -24,8 +24,8 @@ import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.SharedOapContext
 import org.apache.spark.sql.execution.datasources.oap.index.IndexUtils
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.{ByteBufferOutputStream, Utils}

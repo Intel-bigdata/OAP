@@ -27,7 +27,7 @@ import org.roaringbitmap.buffer.{ImmutableRoaringBitmap, MutableRoaringBitmap}
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.execution.datasources.oap.SharedOapContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 /**

@@ -25,6 +25,7 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql.{AnalysisException, QueryTest, Row, SaveMode}
 import org.apache.spark.sql.execution.datasources.oap.index.IndexUtils
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {

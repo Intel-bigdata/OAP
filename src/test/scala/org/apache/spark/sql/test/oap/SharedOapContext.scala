@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.oap
+package org.apache.spark.sql.test.oap
 
 import org.apache.spark.sql.test.SharedSQLContext
 

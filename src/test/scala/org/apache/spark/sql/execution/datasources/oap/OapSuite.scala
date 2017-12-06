@@ -29,6 +29,7 @@ import org.apache.spark.sql.execution.datasources.oap.io.{OapDataReader, OapInde
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
 

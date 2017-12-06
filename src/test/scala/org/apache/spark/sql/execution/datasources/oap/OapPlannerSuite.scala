@@ -21,6 +21,7 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 case class Source(name: String, age: Int, addr: String, phone: String, height: Int)

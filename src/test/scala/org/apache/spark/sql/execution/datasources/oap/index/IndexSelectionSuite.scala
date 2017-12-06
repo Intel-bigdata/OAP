@@ -24,8 +24,9 @@ import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.SaveMode
-import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat, SharedOapContext}
+import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.sources._
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 

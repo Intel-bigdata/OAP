@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql.execution.datasources.oap.SharedOapContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 class BTreeFileReaderWriterSuite extends SharedOapContext {

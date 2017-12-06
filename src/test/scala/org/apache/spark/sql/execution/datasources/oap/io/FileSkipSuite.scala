@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap.io
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.execution.datasources.oap.SharedOapContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 class FileSkipSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {

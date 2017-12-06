@@ -26,8 +26,9 @@ import org.apache.hadoop.mapreduce.lib.input.FileSplit
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
-import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat, SharedOapContext}
+import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.io._
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils

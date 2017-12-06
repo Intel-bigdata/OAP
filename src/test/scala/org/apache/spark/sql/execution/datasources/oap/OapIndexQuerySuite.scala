@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {

@@ -27,165 +27,40 @@ import org.apache.parquet.hadoop.ParquetWriter
 import org.apache.parquet.hadoop.example.{ExampleParquetWriter, GroupWriteSupport}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.hadoop.metadata.CompressionCodecName.UNCOMPRESSED
+import org.scalatest.BeforeAndAfterEach
 
+import org.apache.spark.SparkFunSuite
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types._
 
 
-class NestedDataParquetDataFileSuite extends org.apache.spark.SparkFunSuite
-  with org.scalatest.BeforeAndAfterAll with org.apache.spark.internal.Logging {
+class NestedDataParquetDataFileSuite extends SparkFunSuite
+  with BeforeAndAfterEach with Logging {
 
-  val requestSchema: String =
-    """{
-      |    "type": "struct",
-      |    "fields": [
-      |        {
-      |            "name": "DocId",
-      |            "type": "long",
-      |            "nullable": true,
-      |            "metadata": {}
-      |        },
-      |        {
-      |            "name": "Links",
-      |            "type": {
-      |                "type": "struct",
-      |                "fields": [
-      |                    {
-      |                        "name": "Backward",
-      |                        "type": {
-      |                            "type": "array",
-      |                            "elementType": "long",
-      |                            "containsNull": true
-      |                        },
-      |                        "nullable": true,
-      |                        "metadata": {}
-      |                    },
-      |                    {
-      |                        "name": "Forward",
-      |                        "type": {
-      |                            "type": "array",
-      |                            "elementType": "long",
-      |                            "containsNull": true
-      |                        },
-      |                        "nullable": true,
-      |                        "metadata": {}
-      |                    }
-      |                ]
-      |            },
-      |            "nullable": true,
-      |            "metadata": {}
-      |        },
-      |        {
-      |            "name": "Name",
-      |            "type": {
-      |                "type": "array",
-      |                "elementType": {
-      |                    "type": "struct",
-      |                    "fields": [
-      |                        {
-      |                            "name": "Language",
-      |                            "type": {
-      |                                "type": "array",
-      |                                "elementType": {
-      |                                    "type": "struct",
-      |                                    "fields": [
-      |                                        {
-      |                                            "name": "Code",
-      |                                            "type": "binary",
-      |                                            "nullable": true,
-      |                                            "metadata": {}
-      |                                        },
-      |                                        {
-      |                                            "name": "Country",
-      |                                            "type": "binary",
-      |                                            "nullable": true,
-      |                                            "metadata": {}
-      |                                        }
-      |                                    ]
-      |                                },
-      |                                "containsNull": true
-      |                            },
-      |                            "nullable": true,
-      |                            "metadata": {}
-      |                        },
-      |                        {
-      |                            "name": "Url",
-      |                            "type": "binary",
-      |                            "nullable": true,
-      |                            "metadata": {}
-      |                        }
-      |                    ]
-      |                },
-      |                "containsNull": true
-      |            },
-      |            "nullable": true,
-      |            "metadata": {}
-      |        }
-      |    ]
-      |}
-    """.stripMargin
-
-  val requestStructType: StructType = StructType.fromString(requestSchema)
+  val requestStructType: StructType = new StructType()
+    .add(StructField("DocId", LongType))
+    .add("Links", new StructType()
+      .add(new StructField("Backward", new ArrayType(LongType, true)))
+      .add(new StructField("Forward", new ArrayType(LongType, true))))
+    .add("Name", new ArrayType(new StructType()
+      .add(new StructField("Language",
+        new ArrayType(new StructType()
+          .add(new StructField("Code", BinaryType))
+          .add(new StructField("Country", BinaryType)), true)))
+      .add(new StructField("Url", BinaryType))
+      , true))
 
   val fileName: String = DataGenerator.TARGET_DIR + "/Paper.parquet"
 
-  override protected def beforeAll(): Unit = {
+  override def beforeEach(): Unit = {
     DataGenerator.clean()
     DataGenerator.generate()
   }
 
-  override protected def afterAll(): Unit = DataGenerator.clean()
+  override def afterEach(): Unit = DataGenerator.clean()
 
-  test("skip read record 1") {
 
-    val reader = ParquetDataFile(fileName, requestStructType, new Configuration())
-
-    val requiredIds = Array(0, 1, 2)
-
-    val rowIds = Array(1)
-
-    val iterator = reader.iterator(DataGenerator.configuration, requiredIds, rowIds)
-
-    assert(iterator.hasNext)
-
-    val row = iterator.next
-
-    assert(row.numFields == 3)
-
-    val docId = row.getLong(0)
-
-    assert(docId == 20L)
-
-  }
-
-  test("read all ") {
-
-    val reader = ParquetDataFile(fileName, requestStructType, new Configuration())
-
-    val requiredIds = Array(0, 2)
-
-    val iterator = reader.iterator(DataGenerator.configuration, requiredIds)
-
-    assert(iterator.hasNext)
-
-    val rowOne = iterator.next
-
-    assert(rowOne.numFields == 2)
-
-    val docIdOne = rowOne.getLong(0)
-
-    assert(docIdOne == 10L)
-
-    assert(iterator.hasNext)
-
-    val rowTwo = iterator.next
-
-    assert(rowTwo.numFields == 2)
-
-    val docIdTwo = rowTwo.getLong(0)
-
-    assert(docIdTwo == 20L)
-  }
 
 
 

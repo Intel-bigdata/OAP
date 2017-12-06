@@ -24,8 +24,8 @@ import java.util.zip.GZIPOutputStream
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{BlockLocation, FileStatus, Path, RawLocalFileSystem}
 import org.apache.hadoop.mapreduce.Job
-
 import org.apache.spark.{SparkConf, SparkException}
+
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
@@ -36,13 +36,13 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StructType}
 import org.apache.spark.util.Utils
 
-class FileSourceStrategySuite extends QueryTest with SharedSQLContext with PredicateHelper {
+class FileSourceStrategySuite extends QueryTest with SharedOapContext with PredicateHelper {
   import testImplicits._
   sparkConf.set("spark.default.parallelism", "1")
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   // Override afterEach because we don't want to check open streams
   override def beforeEach(): Unit = {}

@@ -18,15 +18,16 @@
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import java.io._
-import java.util
 
+import java.util
 import scala.collection.mutable
 
 import org.roaringbitmap.RoaringBitmap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, SharedOapContext}
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.{collection, Utils}
 
 
