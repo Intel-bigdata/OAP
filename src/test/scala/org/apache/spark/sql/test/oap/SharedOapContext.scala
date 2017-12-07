@@ -27,7 +27,7 @@ trait SharedOapContext extends SharedSQLContext {
   // avoid the overflow of offHeap memory
   sparkConf.set("spark.memory.offHeap.size", "100m")
 
-  protected val configuration: Configuration = new Configuration()
+  protected lazy val configuration: Configuration = sparkContext.hadoopConfiguration
 
   protected implicit def sqlConf: SQLConf = sqlContext.conf
 }
