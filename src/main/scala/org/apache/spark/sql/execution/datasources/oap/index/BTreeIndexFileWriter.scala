@@ -19,7 +19,6 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 
@@ -64,9 +63,8 @@ private case class BTreeIndexFileWriter(
   }
 
   def end(): Unit = {
-    val littleEndianWriter = new LittleEndianDataOutputStream(writer)
-    littleEndianWriter.writeInt(rowIdListSize)
-    littleEndianWriter.writeInt(footerSize)
+    IndexUtils.writeInt(writer, rowIdListSize)
+    IndexUtils.writeInt(writer, footerSize)
   }
 
   def close(): Unit = writer.close()

@@ -20,7 +20,6 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import java.io.OutputStream
 
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
@@ -46,13 +45,6 @@ private[oap] object IndexUtils {
     IndexFile.indexFileHeaderLength
   }
 
-  def writeInt(out: OutputStream, v: Int): Unit = {
-    out.write((v >>>  0) & 0xFF)
-    out.write((v >>>  8) & 0xFF)
-    out.write((v >>> 16) & 0xFF)
-    out.write((v >>> 24) & 0xFF)
-  }
-
   def indexFileFromDataFile(dataFile: Path, name: String, time: String): Path = {
     import OapFileFormat._
     val dataFileName = dataFile.getName
@@ -66,15 +58,37 @@ private[oap] object IndexUtils {
       dataFile.getParent, "." + indexFileName + "." + time + "." +  name + OAP_INDEX_EXTENSION)
   }
 
-  def writeLong(writer: OutputStream, v: Long): Unit = {
-    writer.write((v >>>  0).toInt & 0xFF)
-    writer.write((v >>>  8).toInt & 0xFF)
-    writer.write((v >>> 16).toInt & 0xFF)
-    writer.write((v >>> 24).toInt & 0xFF)
-    writer.write((v >>> 32).toInt & 0xFF)
-    writer.write((v >>> 40).toInt & 0xFF)
-    writer.write((v >>> 48).toInt & 0xFF)
-    writer.write((v >>> 56).toInt & 0xFF)
+  def writeFloat(out: OutputStream, v: Float): Unit =
+    writeInt(out, java.lang.Float.floatToIntBits(v))
+
+  def writeDouble(out: OutputStream, v: Double): Unit =
+    writeLong(out, java.lang.Double.doubleToLongBits(v))
+
+  def writeBoolean(out: OutputStream, v: Boolean): Unit = out.write(if (v) 1 else 0)
+
+  def writeByte(out: OutputStream, v: Int): Unit = out.write(v)
+
+  def writeShort(out: OutputStream, v: Int): Unit = {
+    out.write(v >>> 0 & 0XFF)
+    out.write(v >>> 8 & 0xFF)
+  }
+
+  def writeInt(out: OutputStream, v: Int): Unit = {
+    out.write((v >>>  0) & 0xFF)
+    out.write((v >>>  8) & 0xFF)
+    out.write((v >>> 16) & 0xFF)
+    out.write((v >>> 24) & 0xFF)
+  }
+
+  def writeLong(out: OutputStream, v: Long): Unit = {
+    out.write((v >>>  0).toInt & 0xFF)
+    out.write((v >>>  8).toInt & 0xFF)
+    out.write((v >>> 16).toInt & 0xFF)
+    out.write((v >>> 24).toInt & 0xFF)
+    out.write((v >>> 32).toInt & 0xFF)
+    out.write((v >>> 40).toInt & 0xFF)
+    out.write((v >>> 48).toInt & 0xFF)
+    out.write((v >>> 56).toInt & 0xFF)
   }
 
   /**
@@ -85,28 +99,6 @@ private[oap] object IndexUtils {
       inputFile: Path, outputPath: Path, attemptPath: Path, indexFile: String): Path = {
     new Path(inputFile.getParent.toString.replace(
       outputPath.toString, attemptPath.toString), indexFile)
-  }
-
-  def writeBasedOnDataType(
-      writer: LittleEndianDataOutputStream,
-      value: Any): Unit = {
-    value match {
-      case int: Boolean => writer.writeBoolean(int)
-      case short: Short => writer.writeShort(short)
-      case byte: Byte => writer.writeByte(byte)
-      case int: Int => writer.writeInt(int)
-      case long: Long => writer.writeLong(long)
-      case float: Float => writer.writeFloat(float)
-      case double: Double => writer.writeDouble(double)
-      case string: UTF8String =>
-        val bytes = string.getBytes
-        writer.writeInt(bytes.length)
-        writer.write(bytes)
-      case binary: Array[Byte] =>
-        writer.writeInt(binary.length)
-        writer.write(binary)
-      case other => throw new OapException(s"OAP index currently doesn't support data type $other")
-    }
   }
 
   def readBasedOnDataType(
@@ -122,12 +114,12 @@ private[oap] object IndexUtils {
       case DateType => (fiberCache.getInt(offset), DateType.defaultSize)
       case StringType =>
         val length = fiberCache.getInt(offset)
-        val string = fiberCache.getUTF8String(offset + Integer.SIZE / 8, length)
-        (string, Integer.SIZE / 8 + length)
+        val string = fiberCache.getUTF8String(offset + INT_SIZE, length)
+        (string, INT_SIZE + length)
       case BinaryType =>
         val length = fiberCache.getInt(offset)
-        val bytes = fiberCache.getBytes(offset + Integer.SIZE / 8, length)
-        (bytes, Integer.SIZE / 8 + bytes.length)
+        val bytes = fiberCache.getBytes(offset + INT_SIZE, length)
+        (bytes, INT_SIZE + bytes.length)
       case other => throw new OapException(s"OAP index currently doesn't support data type $other")
     }
   }
@@ -143,11 +135,37 @@ private[oap] object IndexUtils {
     InternalRow.fromSeq(values)
   }
 
-  def writeBasedOnSchema(
-      writer: LittleEndianDataOutputStream, row: InternalRow, schema: StructType): Unit = {
-    require(row != null)
-    schema.zipWithIndex.foreach {
-      case (field, index) => writeBasedOnDataType(writer, row.get(index, field.dataType))
+  def writeBasedOnDataType(
+      out: OutputStream,
+      value: Any): Unit = {
+    value match {
+      case null => throw new OapException(s"trying to write null key!")
+      case boolean: Boolean => writeBoolean(out, boolean)
+      case short: Short => writeShort(out, short)
+      case byte: Byte => writeByte(out, byte)
+      case int: Int => writeInt(out, int)
+      case long: Long => writeLong(out, long)
+      case float: Float => writeFloat(out, float)
+      case double: Double => writeDouble(out, double)
+      case string: UTF8String =>
+        val bytes = string.getBytes
+        writeInt(out, bytes.length)
+        out.write(bytes)
+      case binary: Array[Byte] =>
+        writeInt(out, binary.length)
+        out.write(binary)
+      case other => throw new OapException(s"OAP index currently doesn't support data type $other")
     }
   }
+
+  def writeBasedOnSchema(
+      out: OutputStream, row: InternalRow, schema: StructType): Unit = {
+    require(row != null)
+    schema.zipWithIndex.foreach {
+      case (field, index) => writeBasedOnDataType(out, row.get(index, field.dataType))
+    }
+  }
+
+  val INT_SIZE = 4
+  val LONG_SIZE = 8
 }

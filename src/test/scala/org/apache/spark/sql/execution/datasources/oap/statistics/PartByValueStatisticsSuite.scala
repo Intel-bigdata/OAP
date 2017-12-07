@@ -21,8 +21,6 @@ import java.io.ByteArrayOutputStream
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
@@ -85,9 +83,8 @@ class PartByValueStatisticsSuite extends StatisticsTest{
     IndexUtils.writeInt(out, PartByValueStatisticsType.id)
     IndexUtils.writeInt(out, partNum)
     val tempWriter = new ByteArrayOutputStream()
-    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
     for (i <- content.indices) {
-      IndexUtils.writeBasedOnSchema(littleEndianWriter, rowGen(content(i)), schema)
+      IndexUtils.writeBasedOnSchema(tempWriter, rowGen(content(i)), schema)
       IndexUtils.writeInt(out, curMaxId(i))
       IndexUtils.writeInt(out, curAccumuCount(i))
       IndexUtils.writeInt(out, tempWriter.size())

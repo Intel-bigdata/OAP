@@ -25,22 +25,19 @@ import org.scalatest.BeforeAndAfter
 import org.apache.spark.scheduler.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
-import org.apache.spark.sql.execution.datasources.oap.io.{OapIndexInfo, OapIndexInfoStatus}
-import org.apache.spark.sql.execution.datasources.oap.io.OapDataReader
+import org.apache.spark.sql.execution.datasources.oap.io.{OapDataReader, OapIndexInfo, OapIndexInfoStatus}
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
 
 
-class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
+class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
   import testImplicits._
   private var path: File = _
   private var parquetPath: File = _
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -76,13 +73,13 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
   test("No Lease Exception on Parquet File Format in Index Building (#243)") {
     val df = sqlContext.read.format("parquet").load(parquetPath.getAbsolutePath)
     df.createOrReplaceTempView("parquet_table")
-    val defaultMaxBytes = sqlContext.conf.getConf(SQLConf.FILES_MAX_PARTITION_BYTES)
-    sqlContext.conf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, 100L)
+    val defaultMaxBytes = sqlConf.getConf(SQLConf.FILES_MAX_PARTITION_BYTES)
+    sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, 100L)
     val numTasks = sql("select * from parquet_table").queryExecution.toRdd.partitions.length
     try {
       sql("create oindex parquet_idx on parquet_table (a)")
       assert(numTasks == parquetPath.listFiles().count(_.getName.endsWith(".index")))
-      sqlContext.conf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, defaultMaxBytes)
+      sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, defaultMaxBytes)
     } finally {
       sql("drop oindex parquet_idx on parquet_table")
     }
@@ -90,11 +87,11 @@ class OapSuite extends QueryTest with SharedSQLContext with BeforeAndAfter {
 
   test("Add the corresponding compression type for the OAP data file name if any") {
     Seq("GZIP", "SNAPPY", "LZO", "UNCOMPRESSED").foreach (codec => {
-      sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, codec)
+      sqlConf.setConfString(SQLConf.OAP_COMPRESSION.key, codec)
       val df = sqlContext.read.format("oap").load(path.getAbsolutePath)
       df.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
       val compressionType =
-        sqlContext.conf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
+        sqlConf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
       val fileNameIterator = path.listFiles()
       for (fileName <- fileNameIterator) {
         if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {

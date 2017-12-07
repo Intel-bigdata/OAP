@@ -17,30 +17,27 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, DataOutputStream, FileInputStream,
-  FileOutputStream, ObjectInputStream, ObjectOutputStream}
-import java.io.File
+import java.io._
 import java.util
+
+import scala.collection.mutable
+
 import org.roaringbitmap.RoaringBitmap
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.test.SharedSQLContext
-import org.apache.spark.util.collection
-import org.apache.spark.util.Utils
-
-import scala.collection.mutable
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
+import org.apache.spark.sql.test.oap.SharedOapContext
+import org.apache.spark.util.{collection, Utils}
 
 
 /**
  * Microbenchmark for Bitmap index with different bitmap implementations.
  */
-class BitmapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class BitmapMicroBenchmarkSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
-  private var dir: File = null
-  private var path: String = null
+  private var dir: File = _
+  private var path: String = _
   private val intArray: Array[Int] =
     Array(100000000, 10000000, 1000000, 100000, 10000, 1000, 100, 10, 1)
   private val sparkBs = new collection.BitSet(100000001)
@@ -119,17 +116,17 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with Bef
     val fileHeader = 4
 
     val scalaStartTime = System.nanoTime
-    val scalaFile = path + "scalaBitSet.bin";
+    val scalaFile = path + "scalaBitSet.bin"
     val scalaFos = new FileOutputStream(scalaFile)
     scalaFos.write(fileHeader)
     val scalaBos = new ByteArrayOutputStream()
-    val scalaOos = new ObjectOutputStream(scalaBos);
+    val scalaOos = new ObjectOutputStream(scalaBos)
     scalaOos.writeObject(scalaBs)
     scalaFos.write(scalaBos.toByteArray)
     scalaBos.close()
     scalaOos.close()
     scalaFos.close()
-    val scalaByteArraySize = scalaBos.toByteArray.size
+    val scalaByteArraySize = scalaBos.toByteArray.length
     val scalaFis = new FileInputStream(scalaFile)
     val scalaHeaderRead = scalaFis.read()
     assert(scalaHeaderRead == fileHeader)
@@ -146,12 +143,12 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with Bef
     assert(scalaBsRead == scalaBs)
 
     val javaStartTime = System.nanoTime
-    val javaFile = path + "javaBitSet.bin";
+    val javaFile = path + "javaBitSet.bin"
     val javaFos = new FileOutputStream(javaFile)
     javaFos.write(fileHeader)
-    javaFos.write(javaBs.toByteArray())
+    javaFos.write(javaBs.toByteArray)
     javaFos.close()
-    val javaByteArraySize = javaBs.toByteArray.size
+    val javaByteArraySize = javaBs.toByteArray.length
     val javaFis = new FileInputStream(javaFile)
     val javaHeaderRead = javaFis.read()
     assert(javaHeaderRead == fileHeader)
@@ -164,7 +161,7 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with Bef
     assert(javaBsRead == javaBs)
 
     val sparkStartTime = System.nanoTime
-    val sparkFile = path + "sparkBitSet.bin";
+    val sparkFile = path + "sparkBitSet.bin"
     val sparkBos = new ByteArrayOutputStream()
     val sparkFos = new FileOutputStream(sparkFile)
     sparkFos.write(fileHeader)
@@ -174,7 +171,7 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with Bef
     sparkBos.close()
     sparkOos.close()
     sparkFos.close()
-    val sparkByteArraySize = sparkBos.toByteArray.size
+    val sparkByteArraySize = sparkBos.toByteArray.length
     val sparkFis = new FileInputStream(sparkFile)
     val sparkHeaderRead = sparkFis.read()
     assert(sparkHeaderRead == fileHeader)
@@ -190,8 +187,8 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with Bef
     val sparkTime = (sparkEndTime - sparkStartTime) / 1000
 
     val rbStartTime = System.nanoTime
-    val rbFile = path + "roaringbitmaps.bin";
-    rb.runOptimize();
+    val rbFile = path + "roaringbitmaps.bin"
+    rb.runOptimize()
     val rbFos = new FileOutputStream(rbFile)
     rbFos.write(fileHeader)
     val rbBos = new ByteArrayOutputStream()
@@ -200,22 +197,22 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with Bef
     rbBos.writeTo(rbFos)
     rbBos.close()
     rbDos.close()
-    rbFos.close();
+    rbFos.close()
     val rbFis = new FileInputStream(rbFile)
     val rbHeaderRead = rbFis.read()
     assert(rbHeaderRead == fileHeader)
     val rbByteArrayRead = new Array[Byte](rbBos.size)
     rbFis.read(rbByteArrayRead)
     val rbBis = new ByteArrayInputStream(rbByteArrayRead)
-    val rbDis = new DataInputStream(rbBis);
-    val rbRead = new RoaringBitmap();
-    rbRead.deserialize(rbDis);
+    val rbDis = new DataInputStream(rbBis)
+    val rbRead = new RoaringBitmap()
+    rbRead.deserialize(rbDis)
     rbBis.close()
     rbDis.close()
-    rbFis.close();
+    rbFis.close()
     val rbEndTime = System.nanoTime
     val rbTime = (rbEndTime - rbStartTime) / 1000
-    if(!rbRead.equals(rb)) throw new RuntimeException("rb r/w is not equal!");
+    if(!rbRead.equals(rb)) throw new RuntimeException("rb r/w is not equal!")
 
     /* The result is below. The unit is us. The configuration is the same as the above.
      * spark r/w time is 57412.
@@ -244,7 +241,7 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedSQLContext with Bef
     val fileNameIterator = dir.listFiles()
     var fileSize = 0
     for (fileName <- fileNameIterator) {
-      if (fileName.toString().endsWith(OapFileFormat.OAP_INDEX_EXTENSION)) {
+      if (fileName.toString.endsWith(OapFileFormat.OAP_INDEX_EXTENSION)) {
         fileSize = fileName.length.toInt
       }
     }

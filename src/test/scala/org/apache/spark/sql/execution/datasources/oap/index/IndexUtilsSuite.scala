@@ -22,7 +22,6 @@ import java.io.{ByteArrayOutputStream, DataOutputStream}
 import scala.util.Random
 
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
 import org.junit.Assert._
 
 import org.apache.spark.SparkFunSuite
@@ -146,8 +145,7 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
       })
       val row = InternalRow.fromSeq(valueSeq)
       val buf = new ByteBufferOutputStream()
-      val writer = new LittleEndianDataOutputStream(buf)
-      IndexUtils.writeBasedOnSchema(writer, row, schema)
+      IndexUtils.writeBasedOnSchema(buf, row, schema)
       val answerRow = IndexUtils.readBasedOnSchema(
         FiberCache(buf.toByteArray), 0L, schema)
       assert(row.equals(answerRow))
@@ -157,8 +155,7 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
   test("Read/Write Based On Data Type") {
     values.foreach { value =>
       val buf = new ByteBufferOutputStream()
-      val writer = new LittleEndianDataOutputStream(buf)
-      IndexUtils.writeBasedOnDataType(writer, value)
+      IndexUtils.writeBasedOnDataType(buf, value)
 
       val (answerValue, offset) = IndexUtils.readBasedOnDataType(
         FiberCache(buf.toByteArray), 0L, toSparkDataType(value))
@@ -166,9 +163,9 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
       assert(value === answerValue, s"value: $value")
       value match {
         case x: UTF8String =>
-          assert(offset === x.getBytes.length + Integer.SIZE / 8, s"string: $x")
+          assert(offset === x.getBytes.length + IndexUtils.INT_SIZE, s"string: $x")
         case y: Array[Byte] =>
-          assert(offset === y.length + Integer.SIZE / 8, s"binary: ${y.mkString(",")}")
+          assert(offset === y.length + IndexUtils.INT_SIZE, s"binary: ${y.mkString(",")}")
         case other =>
           assert(offset === toSparkDataType(other).defaultSize, s"value $other")
       }

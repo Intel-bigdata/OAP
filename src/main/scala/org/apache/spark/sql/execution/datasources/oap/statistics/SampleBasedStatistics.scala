@@ -21,8 +21,6 @@ import java.io.{ByteArrayOutputStream, OutputStream}
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
@@ -55,13 +53,12 @@ private[oap] class SampleBasedStatistics extends Statistics {
     sampleArray = takeSample(sortedKeys, size)
 
     IndexUtils.writeInt(writer, size)
-    offset += 4
+    offset += IndexUtils.INT_SIZE
     val tempWriter = new ByteArrayOutputStream()
-    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
     sampleArray.foreach(key => {
-      IndexUtils.writeBasedOnSchema(littleEndianWriter, key, schema)
+      IndexUtils.writeBasedOnSchema(tempWriter, key, schema)
       IndexUtils.writeInt(writer, tempWriter.size())
-      offset += 4
+      offset += IndexUtils.INT_SIZE
     })
     offset += tempWriter.size()
     writer.write(tempWriter.toByteArray)
@@ -80,10 +77,10 @@ private[oap] class SampleBasedStatistics extends Statistics {
     var rowOffset = 0
     for (i <- 0 until size) {
       sampleArray(i) = IndexUtils.readBasedOnSchema(
-        fiberCache, readOffset + size * 4 + rowOffset, schema)
-      rowOffset = fiberCache.getInt(readOffset + i * 4)
+        fiberCache, readOffset + size * IndexUtils.INT_SIZE + rowOffset, schema)
+      rowOffset = fiberCache.getInt(readOffset + i * IndexUtils.INT_SIZE)
     }
-    readOffset += (rowOffset + size * 4)
+    readOffset += (rowOffset + size * IndexUtils.INT_SIZE)
     readOffset - offset
   }
 

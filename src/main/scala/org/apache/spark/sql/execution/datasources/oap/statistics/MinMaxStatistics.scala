@@ -21,8 +21,6 @@ import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
-
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
@@ -57,12 +55,11 @@ private[oap] class MinMaxStatistics extends Statistics {
     var offset = super.write(writer, sortedKeys)
     if (min != null) {
       val tempWriter = new ByteArrayOutputStream()
-      val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
-      IndexUtils.writeBasedOnSchema(littleEndianWriter, min, schema)
+      IndexUtils.writeBasedOnSchema(tempWriter, min, schema)
       IndexUtils.writeInt(writer, tempWriter.size)
-      IndexUtils.writeBasedOnSchema(littleEndianWriter, max, schema)
+      IndexUtils.writeBasedOnSchema(tempWriter, max, schema)
       IndexUtils.writeInt(writer, tempWriter.size)
-      offset += Integer.SIZE / 8 * 2
+      offset += IndexUtils.INT_SIZE * 2
       writer.write(tempWriter.toByteArray)
       offset += tempWriter.size
     }

@@ -22,8 +22,6 @@ import java.io.ByteArrayOutputStream
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.execution.datasources.oap._
@@ -68,9 +66,8 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     IndexUtils.writeInt(out, size)
 
     val tempWriter = new ByteArrayOutputStream()
-    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
     for (idx <- 0 until size) {
-      IndexUtils.writeBasedOnSchema(littleEndianWriter, keys(idx), schema)
+      IndexUtils.writeBasedOnSchema(tempWriter, keys(idx), schema)
       IndexUtils.writeInt(out, tempWriter.size)
     }
     out.write(tempWriter.toByteArray)

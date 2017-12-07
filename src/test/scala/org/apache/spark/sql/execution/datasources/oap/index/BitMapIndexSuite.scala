@@ -20,17 +20,15 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 
 /**
  * Index suite for BitMap Index
  */
-class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class BitMapIndexSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     val path = Utils.createTempDir().getAbsolutePath

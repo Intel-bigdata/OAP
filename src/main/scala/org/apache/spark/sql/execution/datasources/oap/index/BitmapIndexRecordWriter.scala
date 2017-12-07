@@ -19,15 +19,13 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import java.io.{ByteArrayOutputStream, DataOutputStream, OutputStream}
 
-import scala.collection.mutable
 import scala.collection.immutable
-import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.roaringbitmap.buffer.MutableRoaringBitmap
 
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
 import org.apache.spark.sql.catalyst.InternalRow
@@ -100,9 +98,8 @@ private[oap] class BitmapIndexRecordWriter(
     assert(keySchema.fields.size == 1)
     bmUniqueKeyList = rowMapBitmap.keySet.toList.sorted(ordering)
     val bos = new ByteArrayOutputStream()
-    val leDos = new LittleEndianDataOutputStream(bos)
     bmUniqueKeyList.foreach(key => {
-      IndexUtils.writeBasedOnDataType(leDos, key.get(0, keySchema.fields(0).dataType))
+      IndexUtils.writeBasedOnDataType(bos, key.get(0, keySchema.fields(0).dataType))
     })
     bmUniqueKeyListTotalSize = bos.size()
     bmUniqueKeyListCount = bmUniqueKeyList.size

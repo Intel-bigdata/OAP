@@ -228,17 +228,17 @@ private[index] object BTreeIndexRecordReader {
 
   private[index] case class BTreeFooter(fiberCache: FiberCache) {
     // TODO move to companion object
-    private val nodePosOffset = Integer.SIZE / 8
-    private val nodeSizeOffset = Integer.SIZE / 8 * 2
-    private val minPosOffset = Integer.SIZE / 8 * 3
-    private val maxPosOffset = Integer.SIZE / 8 * 4
-    private val nodeMetaStart = Integer.SIZE / 8 * 3
-    private val nodeMetaByteSize = Integer.SIZE / 8 * 5
-    private val statsLengthSize = Integer.SIZE / 8
+    private val nodePosOffset = IndexUtils.INT_SIZE
+    private val nodeSizeOffset = IndexUtils.INT_SIZE * 2
+    private val minPosOffset = IndexUtils.INT_SIZE * 3
+    private val maxPosOffset = IndexUtils.INT_SIZE * 4
+    private val nodeMetaStart = IndexUtils.INT_SIZE * 3
+    private val nodeMetaByteSize = IndexUtils.INT_SIZE * 5
+    private val statsLengthSize = IndexUtils.INT_SIZE
 
     def getNonNullKeyRecordCount: Int = fiberCache.getInt(0)
-    def getNullKeyRecordCount: Int = fiberCache.getInt(Integer.SIZE / 8)
-    def getNodesCount: Int = fiberCache.getInt(Integer.SIZE / 8 * 2)
+    def getNullKeyRecordCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE)
+    def getNodesCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 2)
     // get idx Node's max value
     def getMaxValue(idx: Int, schema: StructType): InternalRow =
       IndexUtils.readBasedOnSchema(fiberCache, getMaxValueOffset(idx), schema)
@@ -262,12 +262,12 @@ private[index] object BTreeIndexRecordReader {
   }
 
   private[index] case class BTreeRowIdList(fiberCache: FiberCache) {
-    def getRowId(idx: Int): Int = fiberCache.getInt(idx * Integer.SIZE / 8)
+    def getRowId(idx: Int): Int = fiberCache.getInt(idx * IndexUtils.INT_SIZE)
   }
 
   private[index] case class BTreeNodeData(fiberCache: FiberCache) {
-    private val posSectionStart = Integer.SIZE / 8
-    private val posEntrySize = Integer.SIZE / 8 * 2
+    private val posSectionStart = IndexUtils.INT_SIZE
+    private val posEntrySize = IndexUtils.INT_SIZE * 2
     private def valueSectionStart = posSectionStart + getKeyCount * posEntrySize
 
     def getKeyCount: Int = fiberCache.getInt(0)
@@ -277,6 +277,6 @@ private[index] object BTreeIndexRecordReader {
       IndexUtils.readBasedOnSchema(fiberCache, offset, schema)
     }
     def getRowIdPos(idx: Int): Int =
-      fiberCache.getInt(posSectionStart + idx * posEntrySize + Integer.SIZE / 8)
+      fiberCache.getInt(posSectionStart + idx * posEntrySize + IndexUtils.INT_SIZE)
   }
 }

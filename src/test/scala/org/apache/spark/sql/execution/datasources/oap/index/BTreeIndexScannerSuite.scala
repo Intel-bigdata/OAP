@@ -19,19 +19,17 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.apache.spark.util.Utils
 
 
-class BTreeIndexScannerSuite extends SharedSQLContext {
-  sparkConf.set("spark.memory.offHeap.size", "100m")
+class BTreeIndexScannerSuite extends SharedOapContext {
 
   // Override afterEach because we do not want to check open streams
   override def beforeEach(): Unit = {}
@@ -40,8 +38,8 @@ class BTreeIndexScannerSuite extends SharedSQLContext {
   test("test rowOrdering") {
     // Only check Integer is enough. We use [[GenerateOrdering]] to handle different data types.
     val fields = StructField("col1", IntegerType) :: StructField("col2", IntegerType) :: Nil
-    val singleColumnReader = BTreeIndexRecordReader(new Configuration(), StructType(fields.take(1)))
-    val multiColumnReader = BTreeIndexRecordReader(new Configuration(), StructType(fields))
+    val singleColumnReader = BTreeIndexRecordReader(configuration, StructType(fields.take(1)))
+    val multiColumnReader = BTreeIndexRecordReader(configuration, StructType(fields))
     // Compare DUMMY_START
     val x1 = IndexScanner.DUMMY_KEY_START
     val y1 = InternalRow(Int.MinValue)
@@ -78,7 +76,7 @@ class BTreeIndexScannerSuite extends SharedSQLContext {
 
   test("test binarySearch") {
     val schema = StructType(StructField("col1", IntegerType) :: Nil)
-    val reader = BTreeIndexRecordReader(new Configuration(), schema)
+    val reader = BTreeIndexRecordReader(configuration, schema)
     val values = Seq(1, 11, 21, 31, 41, 51, 61, 71, 81, 91)
     def keyAt(idx: Int): InternalRow = InternalRow(values(idx))
     val ordering = GenerateOrdering.create(schema)
@@ -110,7 +108,6 @@ class BTreeIndexScannerSuite extends SharedSQLContext {
   }
 
   test("test findRowIdRange for normal case") {
-    val configuration = new Configuration()
     val schema = StructType(StructField("col", IntegerType) :: Nil)
     val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
     val fileWriter = BTreeIndexFileWriter(configuration, path)
@@ -158,7 +155,6 @@ class BTreeIndexScannerSuite extends SharedSQLContext {
   }
 
   test("findRowIdRange for isNull filter predicate: empty result") {
-    val configuration = new Configuration()
     val schema = StructType(StructField("col", IntegerType) :: Nil)
     val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
     val fileWriter = BTreeIndexFileWriter(configuration, path)
@@ -181,7 +177,6 @@ class BTreeIndexScannerSuite extends SharedSQLContext {
   }
 
   test("findRowIdRange for isNull filter predicate") {
-    val configuration = new Configuration()
     val schema = StructType(StructField("col", IntegerType) :: Nil)
     val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
     val fileWriter = BTreeIndexFileWriter(configuration, path)
@@ -205,7 +200,6 @@ class BTreeIndexScannerSuite extends SharedSQLContext {
   }
 
   test("findRowIdRange for isNotNull filter predicate: empty result") {
-    val configuration = new Configuration()
     val schema = StructType(StructField("col", IntegerType) :: Nil)
     val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
     val fileWriter = BTreeIndexFileWriter(configuration, path)
@@ -227,7 +221,6 @@ class BTreeIndexScannerSuite extends SharedSQLContext {
   }
 
   test("findRowIdRange for isNotNull filter predicate") {
-    val configuration = new Configuration()
     val schema = StructType(StructField("col", IntegerType) :: Nil)
     val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
     val fileWriter = BTreeIndexFileWriter(configuration, path)

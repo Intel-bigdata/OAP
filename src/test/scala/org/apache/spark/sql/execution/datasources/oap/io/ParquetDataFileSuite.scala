@@ -17,137 +17,38 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import java.io.File
+
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.column.ParquetProperties
 import org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_2_0
 import org.apache.parquet.example.data.Group
-import org.apache.parquet.example.data.simple.SimpleGroupFactory
-import org.apache.parquet.hadoop.ParquetWriter
-import org.apache.parquet.hadoop.example.GroupWriteSupport
-import org.apache.parquet.hadoop.metadata.CompressionCodecName
+import org.apache.parquet.example.data.simple.{SimpleGroup, SimpleGroupFactory}
+import org.apache.parquet.example.Paper
+import org.apache.parquet.hadoop.example.{ExampleParquetWriter, GroupWriteSupport}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName.UNCOMPRESSED
-import org.apache.parquet.schema.MessageTypeParser.parseMessageType
+import org.apache.parquet.schema.{MessageType, PrimitiveType}
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
+import org.apache.parquet.schema.Type.Repetition.REQUIRED
+import org.scalatest.BeforeAndAfterEach
 
+import org.apache.spark.SparkFunSuite
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types._
+import org.apache.spark.util.Utils
 
 
-class ParquetDataFileSuite extends org.apache.spark.SparkFunSuite
-  with org.scalatest.BeforeAndAfterAll with org.apache.spark.internal.Logging {
+abstract class ParquetDataFileSuite extends SparkFunSuite
+  with BeforeAndAfterEach with Logging {
 
-  val requestSchema: String =
-    """{"type": "struct",
-          "fields": [{"name": "int32_field","type": "integer","nullable": true,"metadata": {}},
-                     {"name": "int64_field","type": "long","nullable": true,"metadata": {}},
-                     {"name": "boolean_field","type": "boolean","nullable": true,"metadata": {}},
-                     {"name": "float_field","type": "float","nullable": true,"metadata": {}}
-                    ]
-          }
-    """.stripMargin
+  protected val fileDir: File = Utils.createTempDir()
 
-  val requestStructType: StructType = StructType.fromString(requestSchema)
+  protected val fileName: String = Utils.tempFileWith(fileDir).getAbsolutePath
 
-  val fileName: String = DataGenerator.TARGET_DIR + "/PARQUET-TEST"
-
-  override protected def beforeAll(): Unit = {
-    DataGenerator.clean()
-    DataGenerator.generate()
-  }
-
-  override protected def afterAll(): Unit = DataGenerator.clean()
-
-  test("read by columnIds and rowIds") {
-
-    val reader = ParquetDataFile(fileName, requestStructType, DataGenerator.configuration)
-
-    val requiredIds = Array(0, 1)
-
-    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
-
-    val iterator = reader.iterator(DataGenerator.configuration, requiredIds, rowIds)
-
-    val result = ArrayBuffer[ Int ]()
-    while (iterator.hasNext) {
-      val row = iterator.next
-      assert(row.numFields == 2)
-      result += row.getInt(0)
-    }
-
-    assert(rowIds.length == result.length)
-
-    for (i <- rowIds.indices) {
-      assert(rowIds(i) == result(i))
-    }
-  }
-
-  test("read by columnIds and empty rowIds array") {
-
-    val reader = ParquetDataFile(fileName, requestStructType, DataGenerator.configuration)
-
-    val requiredIds = Array(0, 1)
-
-    val rowIds = Array.emptyIntArray
-
-    val iterator = reader.iterator(DataGenerator.configuration, requiredIds, rowIds)
-
-    assert(!iterator.hasNext)
-
-    val e = intercept[java.util.NoSuchElementException] {
-      iterator.next()
-    }.getMessage
-
-    assert(e.contains("next on empty iterator"))
-  }
-
-  test("read by columnIds ") {
-
-    val reader = ParquetDataFile(fileName, requestStructType, DataGenerator.configuration)
-
-    val requiredIds = Array(0)
-
-    val iterator = reader.iterator(DataGenerator.configuration, requiredIds)
-
-    val result = ArrayBuffer[ Int ]()
-
-    while (iterator.hasNext) {
-      val row = iterator.next
-      result += row.getInt(0)
-    }
-
-    assert(DataGenerator.ONE_K == result.length)
-
-    for (i <- 0 until DataGenerator.ONE_K) {
-      assert(i == result(i))
-    }
-  }
-
-  test("createDataFileHandle") {
-    val reader = ParquetDataFile(fileName, requestStructType, DataGenerator.configuration)
-    val meta = reader.createDataFileHandle()
-    val footer = meta.footer
-
-    assert(footer.getFileMetaData != null)
-    assert(footer.getBlocks != null)
-    assert(!footer.getBlocks.isEmpty)
-    assert(footer.getBlocks.size() == 1)
-    assert(footer.getBlocks.get(0).getRowCount == DataGenerator.ONE_K)
-  }
-
-}
-
-
-object DataGenerator {
-
-  val DICT_PAGE_SIZE = 512
-
-  val TARGET_DIR = "target/tests/ParquetBenchmarks"
-
-  val FILE_TEST = new Path(TARGET_DIR + "/PARQUET-TEST")
-
-  val configuration = {
+  protected val configuration: Configuration = {
     val conf = new Configuration()
     conf.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING.key,
       SQLConf.PARQUET_BINARY_AS_STRING.defaultValue.get)
@@ -158,55 +59,203 @@ object DataGenerator {
     conf
   }
 
-  val BLOCK_SIZE_DEFAULT = ParquetWriter.DEFAULT_BLOCK_SIZE
+  protected def data: Seq[Group]
 
-  val PAGE_SIZE_DEFAULT = ParquetWriter.DEFAULT_PAGE_SIZE
+  protected def parquetSchema: MessageType
 
-  val FIXED_LEN_BYTEARRAY_SIZE = 1024
+  override def beforeEach(): Unit = prepareData()
 
-  val ONE_K = 1000
+  override def afterEach(): Unit = cleanDir()
 
-  def generate() : Unit = {
-    generateData(FILE_TEST, configuration, PARQUET_2_0, BLOCK_SIZE_DEFAULT, PAGE_SIZE_DEFAULT,
-      FIXED_LEN_BYTEARRAY_SIZE, UNCOMPRESSED, ONE_K)
-  }
+  private def prepareData(): Unit = {
+    val dictPageSize = 512
+    val blockSize = 128 * 1024 * 1024
+    val pageSize = 1024 * 1024
+    GroupWriteSupport.setSchema(parquetSchema, configuration)
+    val writer = ExampleParquetWriter.builder(new Path(fileName))
+      .withCompressionCodec(UNCOMPRESSED)
+      .withRowGroupSize(blockSize)
+      .withPageSize(pageSize)
+      .withDictionaryPageSize(dictPageSize)
+      .withDictionaryEncoding(true)
+      .withValidation(false)
+      .withWriterVersion(PARQUET_2_0)
+      .withConf(configuration)
+      .build()
 
-  private def deleteIfExists(conf: Configuration, path: Path) = {
-    val fs = path.getFileSystem(conf)
-    if (fs.exists(path)) {
-      fs.delete(path, true)
-    }
-  }
-
-  def clean() : Unit = deleteIfExists(configuration, FILE_TEST)
-
-  def generateData(outFile: Path,
-                   configuration: Configuration,
-                   version: ParquetProperties.WriterVersion,
-                   blockSize: Int,
-                   pageSize: Int,
-                   fixedLenByteArraySize: Int,
-                   codec: CompressionCodecName,
-                   nRows: Int) : Unit = {
-    val schema = parseMessageType("message test { "
-      + "required int32 int32_field; "
-      + "required int64 int64_field; "
-      + "required boolean boolean_field; "
-      + "required float float_field; "
-      + "required double double_field; "
-      + "} ")
-    GroupWriteSupport.setSchema(schema, configuration)
-    val f = new SimpleGroupFactory(schema)
-    val writer = new ParquetWriter[ Group ](outFile, new GroupWriteSupport(), codec,
-      blockSize, pageSize, DICT_PAGE_SIZE, true, false, version, configuration)
-    for (i <- 0 until nRows) {
-      writer.write(f.newGroup()
-        .append("int32_field", i)
-        .append("int64_field", 64L)
-        .append("boolean_field", true)
-        .append("float_field", 1.0f)
-        .append("double_field", 2.0d))
-    }
+    data.foreach(writer.write)
     writer.close()
   }
+
+  private def cleanDir(): Unit = {
+    val path = new Path(fileName)
+    val fs = path.getFileSystem(configuration)
+    if (fs.exists(path.getParent)) {
+      fs.delete(path.getParent, true)
+    }
+  }
 }
+
+class SimpleDataSuite extends ParquetDataFileSuite {
+
+  private val requestSchema: StructType = new StructType()
+    .add(StructField("int32_field", IntegerType))
+    .add(StructField("int64_field", LongType))
+    .add(StructField("boolean_field", BooleanType))
+    .add(StructField("float_field", FloatType))
+
+  override def parquetSchema: MessageType = new MessageType("test",
+    new PrimitiveType(REQUIRED, INT32, "int32_field"),
+    new PrimitiveType(REQUIRED, INT64, "int64_field"),
+    new PrimitiveType(REQUIRED, BOOLEAN, "boolean_field"),
+    new PrimitiveType(REQUIRED, FLOAT, "float_field"),
+    new PrimitiveType(REQUIRED, DOUBLE, "double_field")
+  )
+
+  override def data: Seq[Group] = {
+    val factory = new SimpleGroupFactory(parquetSchema)
+    (0 until 1000).map(i => factory.newGroup()
+      .append("int32_field", i)
+      .append("int64_field", 64L)
+      .append("boolean_field", true)
+      .append("float_field", 1.0f)
+      .append("double_field", 2.0d))
+  }
+
+  test("read by columnIds and rowIds") {
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    val requiredIds = Array(0, 1)
+    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
+    val iterator = reader.iterator(configuration, requiredIds, rowIds)
+    val result = ArrayBuffer[Int]()
+    while (iterator.hasNext) {
+      val row = iterator.next
+      assert(row.numFields == 2)
+      result += row.getInt(0)
+    }
+    assert(rowIds.length == result.length)
+    for (i <- rowIds.indices) {
+      assert(rowIds(i) == result(i))
+    }
+  }
+
+  test("read by columnIds and empty rowIds array") {
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    val requiredIds = Array(0, 1)
+    val rowIds = Array.emptyIntArray
+    val iterator = reader.iterator(configuration, requiredIds, rowIds)
+    assert(!iterator.hasNext)
+    val e = intercept[java.util.NoSuchElementException] {
+      iterator.next()
+    }.getMessage
+    assert(e.contains("next on empty iterator"))
+  }
+
+  test("read by columnIds ") {
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    val requiredIds = Array(0)
+    val iterator = reader.iterator(configuration, requiredIds)
+    val result = ArrayBuffer[ Int ]()
+    while (iterator.hasNext) {
+      val row = iterator.next
+      result += row.getInt(0)
+    }
+    val length = data.length
+    assert(length == result.length)
+    for (i <- 0 until length) {
+      assert(i == result(i))
+    }
+  }
+
+  test("createDataFileHandle") {
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    val meta = reader.createDataFileHandle()
+    val footer = meta.footer
+    assert(footer.getFileMetaData != null)
+    assert(footer.getBlocks != null)
+    assert(!footer.getBlocks.isEmpty)
+    assert(footer.getBlocks.size() == 1)
+    assert(footer.getBlocks.get(0).getRowCount == data.length)
+  }
+}
+
+class NestedDataSuite extends ParquetDataFileSuite {
+
+  private val requestStructType: StructType = new StructType()
+    .add(StructField("DocId", LongType))
+    .add("Links", new StructType()
+      .add(StructField("Backward", ArrayType(LongType)))
+      .add(StructField("Forward", ArrayType(LongType))))
+    .add("Name", ArrayType(new StructType()
+      .add(StructField("Language",
+          ArrayType(new StructType()
+          .add(StructField("Code", BinaryType))
+          .add(StructField("Country", BinaryType)))))
+      .add(StructField("Url", BinaryType))
+      ))
+
+  override def parquetSchema: MessageType = Paper.schema
+
+  override def data: Seq[Group] = {
+    val r1 = new SimpleGroup(parquetSchema)
+      r1.add("DocId", 10L)
+      r1.addGroup("Links")
+        .append("Forward", 20L)
+        .append("Forward", 40L)
+        .append("Forward", 60L)
+      var name = r1.addGroup("Name")
+      name.addGroup("Language")
+        .append("Code", "en-us")
+        .append("Country", "us")
+      name.addGroup("Language")
+        .append("Code", "en")
+      name.append("Url", "http://A")
+
+      name = r1.addGroup("Name")
+      name.append("Url", "http://B")
+
+      name = r1.addGroup("Name")
+      name.addGroup("Language")
+        .append("Code", "en-gb")
+        .append("Country", "gb")
+
+      val r2 = new SimpleGroup(parquetSchema)
+      r2.add("DocId", 20L)
+      r2.addGroup("Links")
+        .append("Backward", 10L)
+        .append("Backward", 30L)
+        .append("Forward", 80L)
+      r2.addGroup("Name")
+        .append("Url", "http://C")
+    Seq(r1, r2)
+  }
+
+  test("skip read record 1") {
+    val reader = ParquetDataFile(fileName, requestStructType, configuration)
+    val requiredIds = Array(0, 1, 2)
+    val rowIds = Array(1)
+    val iterator = reader.iterator(configuration, requiredIds, rowIds)
+    assert(iterator.hasNext)
+    val row = iterator.next
+    assert(row.numFields == 3)
+    val docId = row.getLong(0)
+    assert(docId == 20L)
+  }
+
+  test("read all ") {
+    val reader = ParquetDataFile(fileName, requestStructType, configuration)
+    val requiredIds = Array(0, 2)
+    val iterator = reader.iterator(configuration, requiredIds)
+    assert(iterator.hasNext)
+    val rowOne = iterator.next
+    assert(rowOne.numFields == 2)
+    val docIdOne = rowOne.getLong(0)
+    assert(docIdOne == 10L)
+    assert(iterator.hasNext)
+    val rowTwo = iterator.next
+    assert(rowTwo.numFields == 2)
+    val docIdTwo = rowTwo.getLong(0)
+    assert(docIdTwo == 20L)
+  }
+}
+

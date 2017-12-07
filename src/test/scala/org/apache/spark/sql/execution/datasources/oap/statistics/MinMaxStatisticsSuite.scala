@@ -20,8 +20,6 @@ import java.io.ByteArrayOutputStream
 
 import scala.util.Random
 
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
 
@@ -70,10 +68,9 @@ class MinMaxStatisticsSuite extends StatisticsTest {
 
     IndexUtils.writeInt(out, MinMaxStatisticsType.id)
     val tempWriter = new ByteArrayOutputStream()
-    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
-    IndexUtils.writeBasedOnSchema(littleEndianWriter, rowGen(1), schema)
+    IndexUtils.writeBasedOnSchema(tempWriter, rowGen(1), schema)
     IndexUtils.writeInt(out, tempWriter.size)
-    IndexUtils.writeBasedOnSchema(littleEndianWriter, rowGen(300), schema)
+    IndexUtils.writeBasedOnSchema(tempWriter, rowGen(300), schema)
     IndexUtils.writeInt(out, tempWriter.size)
     out.write(tempWriter.toByteArray)
 

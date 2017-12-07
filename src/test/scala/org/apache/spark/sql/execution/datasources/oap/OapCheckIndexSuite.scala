@@ -25,14 +25,11 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql.{AnalysisException, QueryTest, Row, SaveMode}
 import org.apache.spark.sql.execution.datasources.oap.index.IndexUtils
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
-import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
-class OapCheckIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     val path1 = Utils.createTempDir().getAbsolutePath
@@ -104,7 +101,7 @@ class OapCheckIndexSuite extends QueryTest with SharedSQLContext with BeforeAndA
     checkAnswer(sql("check oindex on oap_partition_table"), Nil)
 
     val partitionPath =
-      new Path(spark.sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
+      new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
     Utils.deleteRecursively(new File(partitionPath.toUri.getPath, OapFileFormat.OAP_META_FILE))
 
     checkAnswer(sql("check oindex on oap_partition_table"),
@@ -195,8 +192,8 @@ class OapCheckIndexSuite extends QueryTest with SharedSQLContext with BeforeAndA
         |SELECT key from t where value == 4
       """.stripMargin)
 
-    val path1 = new Path(spark.sqlContext.conf.warehousePath + "/oap_partition_table/b=1/c=c1")
-    val path2 = new Path(spark.sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
+    val path1 = new Path(sqlConf.warehousePath + "/oap_partition_table/b=1/c=c1")
+    val path2 = new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
 
     checkAnswer(sql("check oindex on oap_partition_table"),
       Seq(Row(s"Meta file not found in partition: ${path1.toUri.getPath}"),
@@ -230,7 +227,7 @@ class OapCheckIndexSuite extends QueryTest with SharedSQLContext with BeforeAndA
     checkAnswer(sql("check oindex on oap_partition_table"), Nil)
 
     // Delete a data file
-    val partitionPath = new Path(spark.sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
+    val partitionPath = new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
     val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, partitionPath)
     assert(metaOpt.nonEmpty)
     assert(metaOpt.get.fileMetas.nonEmpty)
@@ -266,7 +263,7 @@ class OapCheckIndexSuite extends QueryTest with SharedSQLContext with BeforeAndA
     checkAnswer(sql("check oindex on oap_partition_table"), Nil)
 
     // Delete an index file
-    val partitionPath = new Path(spark.sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
+    val partitionPath = new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
     val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, partitionPath)
     assert(metaOpt.nonEmpty)
     assert(metaOpt.get.fileMetas.nonEmpty)
@@ -306,8 +303,8 @@ class OapCheckIndexSuite extends QueryTest with SharedSQLContext with BeforeAndA
         |SELECT key from t where value == 104
       """.stripMargin)
 
-    val path1 = new Path(spark.sqlContext.conf.warehousePath + "/oap_partition_table/b=1/c=c1")
-    val path2 = new Path(spark.sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
+    val path1 = new Path(sqlConf.warehousePath + "/oap_partition_table/b=1/c=c1")
+    val path2 = new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
 
     checkAnswer(sql("check oindex on oap_partition_table"),
       Seq(Row(s"Meta file not found in partition: ${path1.toUri.getPath}"),
@@ -348,7 +345,7 @@ class OapCheckIndexSuite extends QueryTest with SharedSQLContext with BeforeAndA
       """.stripMargin)
 
     val partitionPath =
-      new Path(spark.sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
+      new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
     checkAnswer(
       sql("check oindex on oap_partition_table partition(b=2, c='c2')"),
       Row(s"Meta file not found in partition: ${partitionPath.toUri.getPath}"))
@@ -388,7 +385,7 @@ class OapCheckIndexSuite extends QueryTest with SharedSQLContext with BeforeAndA
     checkAnswer(sql("check oindex on oap_partition_table partition(b=2, c='c2')"), Nil)
 
     val partitionPath =
-      new Path(spark.sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
+      new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
     // Delete a data file
     val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, partitionPath)
     assert(metaOpt.nonEmpty)
@@ -426,7 +423,7 @@ class OapCheckIndexSuite extends QueryTest with SharedSQLContext with BeforeAndA
     checkAnswer(sql("check oindex on oap_partition_table partition(b=2, c='c2')"), Nil)
 
     // Delete an index file
-    val partitionPath = new Path(spark.sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
+    val partitionPath = new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
     val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, partitionPath)
     assert(metaOpt.nonEmpty)
     assert(metaOpt.get.fileMetas.nonEmpty)

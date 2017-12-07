@@ -20,13 +20,11 @@ package org.apache.spark.sql.execution.datasources.oap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
-class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     val path1 = Utils.createTempDir().getAbsolutePath
@@ -49,7 +47,7 @@ class OapIndexQuerySuite extends QueryTest with SharedSQLContext with BeforeAndA
 
   test("index integrity") {
       val data: Seq[(Int, String)] =
-        scala.util.Random.shuffle(1 to 300).map{ i => (i, s"this is test $i") }.toSeq
+        scala.util.Random.shuffle(1 to 300).map{ i => (i, s"this is test $i") }
       data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table oap_test_1 select * from t")
       sql("create oindex index1 on oap_test_1 (a) using bitmap")
