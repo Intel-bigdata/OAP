@@ -34,7 +34,7 @@ import org.apache.spark.util.Utils
 
 class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
   import testImplicits._
-  private var tmpDir: File = null
+  private var tmpDir: File = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -101,21 +101,21 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
     assert(indexMetas(0).indexType.isInstanceOf[BTreeIndex])
     val index1 = indexMetas(0).indexType.asInstanceOf[BTreeIndex]
     assert(index1.entries.size === 2)
-    assert(index1.entries(0).ordinal === 0)
-    assert(index1.entries(0).dir === Descending)
+    assert(index1.entries.head.ordinal === 0)
+    assert(index1.entries.head.dir === Descending)
     assert(index1.entries(1).ordinal === 1)
     assert(index1.entries(1).dir === Ascending)
     val index3 = indexMetas(2).indexType.asInstanceOf[BTreeIndex]
     assert(index3.entries.size === 2)
-    assert(index3.entries(0).ordinal === 1)
-    assert(index3.entries(0).dir === Descending)
+    assert(index3.entries.head.ordinal === 1)
+    assert(index3.entries.head.dir === Descending)
 
     assert(indexMetas(1).name === "index2")
     assert(indexMetas(1).time === "15cc47fb3d9")
     assert(indexMetas(1).indexType.isInstanceOf[BitMapIndex])
     val index2 = indexMetas(1).indexType.asInstanceOf[BitMapIndex]
     assert(index2.entries.size === 2)
-    assert(index2.entries(0) === 1)
+    assert(index2.entries.head === 1)
     assert(index2.entries(1) === 2)
 
     assert(oapMeta.schema === new StructType()
@@ -388,7 +388,7 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
     for (idxMeta <- meta.indexMetas) {
       idxMeta.indexType match {
         case BTreeIndex(entries) =>
-          bTreeIndexAttrSet.add(meta.schema(entries(0).ordinal).name)
+          bTreeIndexAttrSet.add(meta.schema(entries.head.ordinal).name)
         case BitMapIndex(entries) =>
           entries.map(ordinal => meta.schema(ordinal).name).foreach(bitmapIndexAttrSet.add)
         case _ => // we don't support other types of index
