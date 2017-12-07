@@ -19,6 +19,7 @@ package org.apache.spark.sql.test.oap
 
 import org.apache.hadoop.conf.Configuration
 
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 
 trait SharedOapContext extends SharedSQLContext {
@@ -27,4 +28,6 @@ trait SharedOapContext extends SharedSQLContext {
   sparkConf.set("spark.memory.offHeap.size", "100m")
 
   protected val configuration: Configuration = new Configuration()
+
+  protected val sqlConf: SQLConf = sqlContext.conf
 }

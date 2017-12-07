@@ -73,13 +73,13 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
   test("No Lease Exception on Parquet File Format in Index Building (#243)") {
     val df = sqlContext.read.format("parquet").load(parquetPath.getAbsolutePath)
     df.createOrReplaceTempView("parquet_table")
-    val defaultMaxBytes = sqlContext.conf.getConf(SQLConf.FILES_MAX_PARTITION_BYTES)
-    sqlContext.conf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, 100L)
+    val defaultMaxBytes = sqlConf.getConf(SQLConf.FILES_MAX_PARTITION_BYTES)
+    sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, 100L)
     val numTasks = sql("select * from parquet_table").queryExecution.toRdd.partitions.length
     try {
       sql("create oindex parquet_idx on parquet_table (a)")
       assert(numTasks == parquetPath.listFiles().count(_.getName.endsWith(".index")))
-      sqlContext.conf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, defaultMaxBytes)
+      sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, defaultMaxBytes)
     } finally {
       sql("drop oindex parquet_idx on parquet_table")
     }
@@ -87,11 +87,11 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
 
   test("Add the corresponding compression type for the OAP data file name if any") {
     Seq("GZIP", "SNAPPY", "LZO", "UNCOMPRESSED").foreach (codec => {
-      sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, codec)
+      sqlConf.setConfString(SQLConf.OAP_COMPRESSION.key, codec)
       val df = sqlContext.read.format("oap").load(path.getAbsolutePath)
       df.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
       val compressionType =
-        sqlContext.conf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
+        sqlConf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
       val fileNameIterator = path.listFiles()
       for (fileName <- fileNameIterator) {
         if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
