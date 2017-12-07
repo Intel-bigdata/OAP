@@ -34,8 +34,8 @@ import org.apache.spark.util.Utils
  * The usage for RoaringBitmap.
  */
 class BitmapUsageSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
-  private var dir: File = null
-  private var path: String = null
+  private var dir: File = _
+  private var path: String = _
 
   override def beforeEach(): Unit = {
     dir = Utils.createTempDir()
@@ -50,9 +50,9 @@ class BitmapUsageSuite extends QueryTest with SharedOapContext with BeforeAndAft
     val rb1 = new RoaringBitmap()
     val rb2 = new RoaringBitmap()
     val rb3 = new RoaringBitmap()
-    (0 until 100000).map(rb1.add)
-    (100000 until 200000).map(element => rb2.add(3 * element))
-    (700000 until 800000).map(rb3.add)
+    (0 until 100000).foreach(rb1.add)
+    (100000 until 200000).foreach(element => rb2.add(3 * element))
+    (700000 until 800000).foreach(rb3.add)
     val file = path + "roaringbitmaps.bin"
     val out = new DataOutputStream(new FileOutputStream(file))
     val headerLength = 4
@@ -105,13 +105,13 @@ class BitmapUsageSuite extends QueryTest with SharedOapContext with BeforeAndAft
     val pos2 = Bitmap1.serializedSizeInBytes() // bitmap 2 will be right after it
     Bitmap2.runOptimize()
     Bitmap2.serialize(new DataOutputStream(fos))
-    val totalcount = fos.getChannel().position()
+    val totalcount = fos.getChannel.position()
     if (totalcount != Bitmap1.serializedSizeInBytes() + Bitmap2.serializedSizeInBytes()) {
       throw new RuntimeException("This will not happen.")
     }
     fos.close()
     val memoryMappedFile = new RandomAccessFile(tmpfile, "r")
-    val bb = memoryMappedFile.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalcount)
+    val bb = memoryMappedFile.getChannel.map(FileChannel.MapMode.READ_ONLY, 0, totalcount)
     memoryMappedFile.close() // we can safely close
     bb.position(pos1)
     val mapped1 = new ImmutableRoaringBitmap(bb)
