@@ -219,8 +219,6 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
       Row(1, "this is test 1") :: Nil)
 
-    val result = sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3").collect()
-
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
   }
@@ -643,7 +641,6 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering null key") {
-    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is row $i") }
     val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
       if (i <= 5) Seq(null, s"this is row $i")
       else Seq(i, s"this is row $i")).map(Row.fromSeq)
@@ -677,7 +674,6 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering null key in Parquet format") {
-    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is row $i") }
     val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
       if (i <= 5) Seq(null, s"this is row $i")
       else Seq(i, s"this is row $i")).map(Row.fromSeq)
