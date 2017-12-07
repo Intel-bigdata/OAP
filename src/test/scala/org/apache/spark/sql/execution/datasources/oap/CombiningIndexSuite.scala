@@ -19,13 +19,12 @@ package org.apache.spark.sql.execution.datasources.oap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
-class CombiningIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach{
+class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach{
   import testImplicits._
 
-  sparkConf.set("spark.memory.offHeap.size", "100m")
   private var currentPath: String = _
 
   override def beforeEach(): Unit = {
@@ -74,7 +73,6 @@ class CombiningIndexSuite extends QueryTest with SharedSQLContext with BeforeAnd
     sql("drop oindex index2 on parquet_test")
   }
 
-
   test("filtering oap") {
     val data: Seq[(Int, Int, Int)] = (1 to 200).map { i => (i % 13, (300 - i) % 17, i) }
     data.toDF("a", "b", "c").createOrReplaceTempView("t")
@@ -105,5 +103,5 @@ class CombiningIndexSuite extends QueryTest with SharedSQLContext with BeforeAnd
     sql("drop oindex index2 on oap_test")
 
   }
-
 }
+

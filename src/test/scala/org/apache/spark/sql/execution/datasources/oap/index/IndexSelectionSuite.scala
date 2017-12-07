@@ -235,7 +235,7 @@ class IndexSelectionSuite extends SharedOapContext with BeforeAndAfterEach{
     sql("create oindex idxe on oap_test(e)")
     sql("create oindex idxABC on oap_test(a, b, c)")
     sql("create oindex idxACD on oap_test(a, c, d)")
-    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
     val ic = new IndexContext(oapMeta)
     val filters: Array[Filter] = Array(
       EqualTo("a", 8), GreaterThanOrEqual("d", 10), EqualTo("e", 3))
