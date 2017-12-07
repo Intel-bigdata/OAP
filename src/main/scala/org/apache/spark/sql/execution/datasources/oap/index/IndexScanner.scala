@@ -317,16 +317,19 @@ private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
   def order: SortDirection = actualUsedScanners.head.meta.indexType.indexOrder.head
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanners = {
-    actualUsedScanners.map(_.initialize(dataPath, conf))
     backendIter = actualUsedScanners.length match {
       case 0 => Iterator.empty
-      case 1 => actualUsedScanners.head.toArray.toIterator
-      case _ => actualUsedScanners.par.map(_.toArray).seq
-        .sortBy(_.length)
-        .reduce((left, right) => {
-          if (left.isEmpty) left
-          else left.intersect(right)
-        }).toIterator
+      case 1 =>
+        actualUsedScanners.head.initialize(dataPath, conf)
+        actualUsedScanners.head.toArray.iterator
+      case _ =>
+        actualUsedScanners.par.foreach(_.initialize(dataPath, conf))
+        actualUsedScanners.map(_.toArray)
+          .sortBy(_.length)
+          .reduce((left, right) => {
+            if (left.isEmpty) left
+            else left.intersect(right)
+          }).iterator
     }
     this
   }
