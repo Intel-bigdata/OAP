@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.test.oap.SharedOapContext
@@ -31,7 +30,6 @@ class BTreeFileReaderWriterSuite extends SharedOapContext {
 
   test("BTree File Read/Write") {
     val path = new Path(Utils.createTempDir().getAbsolutePath, "index")
-    val configuration = new Configuration()
     val footer = "footer".getBytes("UTF-8")
     val rowIdList = "rowIdList".getBytes("UTF-8")
     val nodes = (0 until 5).map(i => s"node$i".getBytes("UTF-8"))
