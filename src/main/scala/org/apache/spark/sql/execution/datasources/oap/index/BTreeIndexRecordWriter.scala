@@ -81,6 +81,9 @@ private[index] case class BTreeIndexRecordWriter(
     assert(uniqueKeys.size == partitionUniqueSize)
     val (nullKeys, nonNullKeys) = uniqueKeys.partition(_.anyNull)
     assert(nullKeys.length + nonNullKeys.length == partitionUniqueSize)
+    require(
+      nullKeys.isEmpty || keySchema.length == 1,
+      "No support for multi-column index building with null keys!")
     lazy val comparator: Comparator[InternalRow] = new Comparator[InternalRow]() {
       override def compare(o1: InternalRow, o2: InternalRow): Int = {
         if (o1 == null && o2 == null) {
