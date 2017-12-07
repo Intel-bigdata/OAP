@@ -646,7 +646,12 @@ object SQLConf {
         "If you want to add more than one type, just use comma " +
         "to separate, eg. \"MINMAX, SAMPLE, PARTBYVALUE, BLOOM\"")
       .stringConf
-      .createWithDefault("MINMAX, SAMPLE, PARTBYVALUE, BLOOM")
+      .transform(_.toUpperCase)
+      .toSequence
+      .transform(_.sorted)
+      .checkValues(
+        Set("MINMAX", "SAMPLE", "PARTBYVALUE", "BLOOM").subsets().map(_.toSeq.sorted).toSet)
+      .createWithDefault(Seq("BLOOM", "MINMAX", "PARTBYVALUE", "SAMPLE"))
 
   val OAP_STATISTICS_PART_NUM =
     SQLConfigBuilder("spark.sql.oap.Statistics.partNum")

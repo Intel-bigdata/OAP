@@ -47,7 +47,7 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     this
   }
 
-  override protected def readStatistics(indexPath: Path, conf: Configuration): Double = {
+  override protected def analyzeStatistics(indexPath: Path, conf: Configuration): Double = {
     // TODO decouple with btreeindexrecordreader
     // This is called before the scanner call `initialize`
     val reader = BTreeIndexFileReader(conf, indexPath)

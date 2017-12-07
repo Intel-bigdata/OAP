@@ -191,8 +191,9 @@ private[oap] class OapDataReader(
   filterScanners: Option[IndexScanners],
   requiredIds: Array[Int]) extends Logging {
 
-  def initialize(conf: Configuration,
-                 options: Map[String, String] = Map.empty): Iterator[InternalRow] = {
+  def initialize(
+      conf: Configuration,
+      options: Map[String, String] = Map.empty): Iterator[InternalRow] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)

@@ -49,7 +49,7 @@ class MinMaxStatisticsSuite extends StatisticsTest {
     val fiber = wrapToFiberCache(out)
     var offset = 0
 
-    assert(fiber.getInt(0) == MinMaxStatisticsType.id)
+    assert(fiber.getInt(0) == StatisticsType.TYPE_MIN_MAX)
     offset += 4
     val minSize = fiber.getInt(offset)
     offset += 4
@@ -66,7 +66,7 @@ class MinMaxStatisticsSuite extends StatisticsTest {
   test("read function test") {
     val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
-    IndexUtils.writeInt(out, MinMaxStatisticsType.id)
+    IndexUtils.writeInt(out, StatisticsType.TYPE_MIN_MAX)
     val tempWriter = new ByteArrayOutputStream()
     nnkw.writeKey(tempWriter, rowGen(1))
     IndexUtils.writeInt(out, tempWriter.size)

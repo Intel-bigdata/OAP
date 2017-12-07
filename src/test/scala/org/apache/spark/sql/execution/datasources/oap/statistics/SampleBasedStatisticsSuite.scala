@@ -44,7 +44,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
 
     var offset = 0
     val fiber = wrapToFiberCache(out)
-    assert(fiber.getInt(offset) == SampleBasedStatisticsType.id)
+    assert(fiber.getInt(offset) == StatisticsType.TYPE_SAMPLE_BASE)
     offset += 4
     val size = fiber.getInt(offset)
     offset += 4
@@ -62,7 +62,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     val size = (Random.nextInt() % 200 + 200) % 200 + 10 // assert nonEmpty sample
     assert(size >= 0 && size <= 300)
 
-    IndexUtils.writeInt(out, SampleBasedStatisticsType.id)
+    IndexUtils.writeInt(out, StatisticsType.TYPE_SAMPLE_BASE)
     IndexUtils.writeInt(out, size)
 
     val tempWriter = new ByteArrayOutputStream()

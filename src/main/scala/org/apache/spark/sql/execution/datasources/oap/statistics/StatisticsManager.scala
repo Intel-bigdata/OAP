@@ -57,9 +57,6 @@ class StatisticsManager {
 
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
-  // for read with incorrect mask, the statistics is invalid
-  private var invalidStatistics: Boolean = false
-
   def initialize(indexType: AnyIndexType, s: StructType, conf: Configuration): Unit = {
 
     StatisticsManager.setPartNumber(
@@ -85,14 +82,11 @@ class StatisticsManager {
     val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter { statType =>
       val typeFromConfig = conf.get(SQLConf.OAP_STATISTICS_TYPES.key,
         SQLConf.OAP_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
-      typeFromConfig.contains(statType.name)
+      typeFromConfig.contains(statType)
     }
     schema = s
     stats = statsTypes.map {
-      case MinMaxStatisticsType => new MinMaxStatistics(s)
-      case SampleBasedStatisticsType => new SampleBasedStatistics(s)
-      case PartByValueStatisticsType => new PartByValueStatistics(s)
-      case BloomFilterStatisticsType => new BloomFilterStatistics(s)
+      case StatisticsType(st) => st(s)
       case t => throw new UnsupportedOperationException(s"non-supported statistic type $t")
     }
     content = new ArrayBuffer[Key]()
@@ -112,17 +106,17 @@ class StatisticsManager {
 
     IndexUtils.writeInt(out, stats.length)
     offset += 4
-    for (stat <- stats) {
+    stats.foreach { stat =>
       IndexUtils.writeInt(out, stat.id)
       offset += 4
     }
 
     val sortedKeys = sortKeys
-    stats.foreach(stat => {
+    stats.foreach { stat =>
       val off = stat.write(out, sortedKeys)
       assert(off >= 0)
       offset += off
-    })
+    }
     offset
   }
 
@@ -132,26 +126,23 @@ class StatisticsManager {
     var readOffset = 0
     val mask = fiberCache.getLong(offset + readOffset)
     readOffset += 8
-    if (mask != StatisticsManager.STATISTICSMASK) {
-      invalidStatistics = true
+    stats = if (mask != StatisticsManager.STATISTICSMASK) {
+      Array.empty[Statistics]
     } else {
       val numOfStats = fiberCache.getInt(offset + readOffset)
       readOffset += 4
-      stats = new Array[Statistics](numOfStats)
-
+      val statsArray = new Array[Statistics](numOfStats)
       for (i <- 0 until numOfStats) {
-        fiberCache.getInt(offset + readOffset) match {
-          case MinMaxStatisticsType.id => stats(i) = new MinMaxStatistics(s)
-          case SampleBasedStatisticsType.id => stats(i) = new SampleBasedStatistics(s)
-          case PartByValueStatisticsType.id => stats(i) = new PartByValueStatistics(s)
-          case BloomFilterStatisticsType.id => stats(i) = new BloomFilterStatistics(s)
+        stats(i) = fiberCache.getInt(offset + readOffset) match {
+          case StatisticsType(stat) => stat(s)
           case _ => throw new UnsupportedOperationException("unsupport statistics id")
         }
         readOffset += 4
       }
-      for (stat <- stats) {
-        readOffset += stat.read(fiberCache, offset + readOffset)
-      }
+      statsArray
+    }
+    stats.foreach { stat =>
+      readOffset += stat.read(fiberCache, offset + readOffset)
     }
   }
 
@@ -163,9 +154,9 @@ class StatisticsManager {
       conf.getDouble(SQLConf.OAP_FULL_SCAN_THRESHOLD.key,
         SQLConf.OAP_FULL_SCAN_THRESHOLD.defaultValue.get))
 
-    if (invalidStatistics) StaticsAnalysisResult.USE_INDEX // use index if no statistics
+    if (stats.isEmpty) StaticsAnalysisResult.USE_INDEX // use index if no statistics
     else {
-      for (stat <- stats) {
+      stats.foreach { stat =>
         val res = stat.analyse(intervalArray)
 
         if (res == StaticsAnalysisResult.SKIP_INDEX) {
@@ -190,11 +181,10 @@ class StatisticsManager {
 object StatisticsManager {
   val STATISTICSMASK: Long = 0x20170524abcdefabL // a random mask for statistics begin
 
-  val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[StatisticsType]] =
+  val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[String]] =
     scala.collection.mutable.Map(
       BTreeIndexType -> Array(
-        MinMaxStatisticsType, SampleBasedStatisticsType,
-        BloomFilterStatisticsType, PartByValueStatisticsType),
+        "MINMAX", "SAMPLE", "BLOOM", "PARTBYVALUE"),
       BitMapIndexType -> Array.empty)
 
   /**
@@ -218,7 +208,7 @@ object StatisticsManager {
   var FULLSCANTHRESHOLD: Double = SQLConf.OAP_FULL_SCAN_THRESHOLD.defaultValue.get
 
   // TODO we need to find better ways to configure these parameters
-  def setStatisticsType(indexType: AnyIndexType, statisticsType: Array[StatisticsType]): Unit =
+  def setStatisticsType(indexType: AnyIndexType, statisticsType: Array[String]): Unit =
     statisticsTypeMap.update(indexType, statisticsType)
   def setSampleRate(rate: Double): Unit = this.sampleRate = rate
   def setPartNumber(num: Int): Unit = this.partNumber = num

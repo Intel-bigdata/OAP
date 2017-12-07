@@ -167,7 +167,7 @@ private[oap] class BitmapIndexRecordWriter(
     writeBmEntryList()
     writeBmOffsetList()
     // The index end is also the starting position of stats file.
-    statisticsManager.write(writer)
+    // statisticsManager.write(writer)
     writeBmFooter()
   }
 }

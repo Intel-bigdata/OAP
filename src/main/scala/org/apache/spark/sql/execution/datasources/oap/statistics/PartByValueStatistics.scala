@@ -41,7 +41,7 @@ import org.apache.spark.sql.types.StructType
 // (300,  "test#300")   299            300
 
 private[oap] class PartByValueStatistics(schema: StructType) extends Statistics(schema) {
-  override val id: Int = PartByValueStatisticsType.id
+  override val id: Int = StatisticsType.TYPE_PART_BY_VALUE
 
   private lazy val maxPartNum: Int = StatisticsManager.partNumber
   @transient private lazy val ordering = GenerateOrdering.create(schema)

@@ -30,7 +30,7 @@ import org.apache.spark.sql.types.StructType
 
 
 private[oap] class SampleBasedStatistics(schema: StructType) extends Statistics(schema) {
-  override val id: Int = SampleBasedStatisticsType.id
+  override val id: Int = StatisticsType.TYPE_SAMPLE_BASE
 
   lazy val sampleRate: Double = StatisticsManager.sampleRate
   @transient private lazy val ordering = GenerateOrdering.create(schema)

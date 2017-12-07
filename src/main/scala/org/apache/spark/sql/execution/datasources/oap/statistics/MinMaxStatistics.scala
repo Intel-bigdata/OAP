@@ -29,7 +29,7 @@ import org.apache.spark.sql.types.StructType
 
 
 private[oap] class MinMaxStatistics(schema: StructType) extends Statistics(schema) {
-  override val id: Int = MinMaxStatisticsType.id
+  override val id: Int = StatisticsType.TYPE_MIN_MAX
   @transient
   private lazy val ordering = GenerateOrdering.create(schema)
 

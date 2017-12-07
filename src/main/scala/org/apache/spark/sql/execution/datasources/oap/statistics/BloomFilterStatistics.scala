@@ -29,7 +29,7 @@ import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types._
 
 private[oap] class BloomFilterStatistics(schema: StructType) extends Statistics(schema) {
-  override val id: Int = BloomFilterStatisticsType.id
+  override val id: Int = StatisticsType.TYPE_BLOOM_FILTER
 
   protected var bfIndex: BloomFilter = new BloomFilter(bfMaxBits, bfHashFuncs)()
 

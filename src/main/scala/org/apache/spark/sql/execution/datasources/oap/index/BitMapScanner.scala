@@ -103,7 +103,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     MemoryManager.putToIndexFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE)
   }
 
-  override protected def readStatistics(indexPath: Path, conf: Configuration): Double = {
+  override protected def analyzeStatistics(indexPath: Path, conf: Configuration): Double = {
     // TODO implement
     StaticsAnalysisResult.USE_INDEX
   }

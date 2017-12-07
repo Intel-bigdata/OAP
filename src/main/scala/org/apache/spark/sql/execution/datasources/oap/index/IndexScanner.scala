@@ -120,7 +120,7 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       if (indexFileSize > dataFileSize * ratio) return StaticsAnalysisResult.FULL_SCAN
 
       // Policy 2: statistics tells the scan cost
-      tryToReadStatistics(indexPath, conf)
+      tryAnalyzeStatistics(indexPath, conf)
 
       // More Policies
     } else {
@@ -135,17 +135,17 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
    * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
    * called before invoking [[initialize]].
    */
-  private def tryToReadStatistics(indexPath: Path, conf: Configuration): Double = {
+  private def tryAnalyzeStatistics(indexPath: Path, conf: Configuration): Double = {
     if (!canBeOptimizedByStatistics) {
       StaticsAnalysisResult.USE_INDEX
     } else if (intervalArray.isEmpty) {
       StaticsAnalysisResult.SKIP_INDEX
     } else {
-      readStatistics(indexPath, conf)
+      analyzeStatistics(indexPath, conf)
     }
   }
 
-  protected def readStatistics(indexPath: Path, conf: Configuration): Double = 0
+  protected def analyzeStatistics(indexPath: Path, conf: Configuration): Double = 0
 
   def withKeySchema(schema: StructType): IndexScanner = {
     this.keySchema = schema

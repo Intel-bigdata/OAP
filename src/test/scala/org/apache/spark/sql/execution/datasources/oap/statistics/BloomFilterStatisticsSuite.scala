@@ -64,8 +64,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
     val fiber = wrapToFiberCache(out)
     var offset = 0L
 
-    assert(fiber.getInt(offset)
-      == BloomFilterStatisticsType.id)
+    assert(fiber.getInt(offset) == StatisticsType.TYPE_BLOOM_FILTER)
     offset += 4
 
     val bitArrayLength = fiber.getInt(offset)
@@ -98,7 +97,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
       projectors.foreach(p => bfIndex.addValue(p(key).getBytes))
     }
 
-    IndexUtils.writeInt(out, BloomFilterStatisticsType.id)
+    IndexUtils.writeInt(out, StatisticsType.TYPE_BLOOM_FILTER)
     IndexUtils.writeInt(out, bfIndex.getBitMapLongArray.length)
     IndexUtils.writeInt(out, bfIndex.getNumOfHashFunc)
 

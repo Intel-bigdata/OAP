@@ -52,7 +52,7 @@ class PartByValueStatisticsSuite extends StatisticsTest{
 
     var offset = 0
     val fiber = wrapToFiberCache(out)
-    assert(fiber.getInt(offset) == PartByValueStatisticsType.id)
+    assert(fiber.getInt(offset) == StatisticsType.TYPE_PART_BY_VALUE)
     offset += 4
 
     val part = StatisticsManager.partNumber + 1
@@ -80,7 +80,7 @@ class PartByValueStatisticsSuite extends StatisticsTest{
 
     val partNum = 6
 
-    IndexUtils.writeInt(out, PartByValueStatisticsType.id)
+    IndexUtils.writeInt(out, StatisticsType.TYPE_PART_BY_VALUE)
     IndexUtils.writeInt(out, partNum)
     val tempWriter = new ByteArrayOutputStream()
     for (i <- content.indices) {

@@ -17,27 +17,27 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
-sealed abstract class StatisticsType {
-  val name: String
-  val id: Int
-}
+import org.apache.spark.sql.types.StructType
 
-case object MinMaxStatisticsType extends StatisticsType {
-  val name: String = "MINMAX"
-  val id: Int = 0
-}
+private[oap] object StatisticsType {
+  val TYPE_MIN_MAX: Int = 0
+  val TYPE_SAMPLE_BASE: Int = 1
+  val TYPE_PART_BY_VALUE: Int = 2
+  val TYPE_BLOOM_FILTER: Int = 3
 
-case object SampleBasedStatisticsType extends StatisticsType {
-  val name: String = "SAMPLE"
-  val id: Int = 1
-}
+  def unapply(t: Int): Option[StructType => Statistics] = t match {
+    case TYPE_MIN_MAX => Some(new MinMaxStatistics(_))
+    case TYPE_SAMPLE_BASE => Some(new SampleBasedStatistics(_))
+    case TYPE_PART_BY_VALUE => Some(new PartByValueStatistics(_))
+    case TYPE_BLOOM_FILTER => Some(new BloomFilterStatistics(_))
+    case _ => None
+  }
 
-case object PartByValueStatisticsType extends StatisticsType {
-  val name: String = "PARTBYVALUE"
-  val id: Int = 2
-}
-
-case object BloomFilterStatisticsType extends StatisticsType {
-  val name: String = "BLOOM"
-  val id: Int = 3
+  def unapply(name: String): Option[StructType => Statistics] = name match {
+    case "MINMAX" => Some(new MinMaxStatistics(_))
+    case "SAMPLE" => Some(new SampleBasedStatistics(_))
+    case "PARTBYVALUE" => Some(new PartByValueStatistics(_))
+    case "BLOOM" => Some(new BloomFilterStatistics(_))
+    case _ => None
+  }
 }
