@@ -29,13 +29,8 @@ import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types._
 
 
-abstract class Statistics {
+abstract class Statistics(schema: StructType) {
   val id: Int
-  protected var schema: StructType = _
-
-  def initialize(schema: StructType): Unit = {
-    this.schema = schema
-  }
 
   /**
    * For MinMax & Bloom Filter, every time a key is inserted, then

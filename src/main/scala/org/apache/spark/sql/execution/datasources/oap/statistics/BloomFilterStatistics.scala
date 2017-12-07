@@ -28,29 +28,22 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types._
 
-private[oap] class BloomFilterStatistics extends Statistics {
+private[oap] class BloomFilterStatistics(schema: StructType) extends Statistics(schema) {
   override val id: Int = BloomFilterStatisticsType.id
 
-  protected var bfIndex: BloomFilter = _
+  protected var bfIndex: BloomFilter = new BloomFilter(bfMaxBits, bfHashFuncs)()
 
   private lazy val bfMaxBits: Int = StatisticsManager.bloomFilterMaxBits
   private lazy val bfHashFuncs: Int = StatisticsManager.bloomFilterHashFuncs
 
-  @transient private var projectors: Array[UnsafeProjection] = _ // for write
-  @transient private lazy val converter: UnsafeProjection = UnsafeProjection.create(schema)
-  @transient private lazy val ordering = GenerateOrdering.create(schema)
-
-  override def initialize(schema: StructType): Unit = {
-    super.initialize(schema)
-    bfIndex = new BloomFilter(bfMaxBits, bfHashFuncs)()
-    val boundReference = schema.zipWithIndex.map(x =>
-      BoundReference(x._2, x._1.dataType, nullable = true))
-    // for multi-column index, add all subsets into bloom filter
-    // For example, a column with a = 1, b = 2, a and b are index columns
-    // then three records: a = 1, b = 2, a = 1 b = 2, are inserted to bf
-    projectors = boundReference.toSet.subsets().filter(_.nonEmpty).map(s =>
-      UnsafeProjection.create(s.toArray)).toArray
-  }
+  @transient
+  private lazy val projectors: Array[UnsafeProjection] = schema.zipWithIndex.map(x =>
+    BoundReference(x._2, x._1.dataType, nullable = true)).toSet.subsets().filter(
+    _.nonEmpty).map(s => UnsafeProjection.create(s.toArray)).toArray
+  @transient
+  private lazy val converter: UnsafeProjection = UnsafeProjection.create(schema)
+  @transient
+  private lazy val ordering = GenerateOrdering.create(schema)
 
   override def addOapKey(key: Key): Unit = {
     assert(bfIndex != null, "Please initialize the statistics")

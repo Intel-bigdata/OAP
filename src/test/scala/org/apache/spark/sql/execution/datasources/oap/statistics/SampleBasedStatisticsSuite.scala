@@ -26,11 +26,12 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
+import org.apache.spark.sql.types.StructType
 
 
 class SampleBasedStatisticsSuite extends StatisticsTest{
 
-  class TestSample extends SampleBasedStatistics {
+  class TestSample(schema: StructType) extends SampleBasedStatistics(schema) {
     override def takeSample(keys: ArrayBuffer[Key], size: Int): Array[Key] = keys.take(size).toArray
     def getSampleArray: Array[Key] = sampleArray
   }
@@ -38,8 +39,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
   test("test write function") {
     val keys = (1 to 300).map(i => rowGen(i)).toArray // keys needs to be sorted
 
-    val testSample = new TestSample
-    testSample.initialize(schema)
+    val testSample = new TestSample(schema)
     testSample.write(out, keys.to[ArrayBuffer])
 
     var offset = 0L
@@ -74,8 +74,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
 
     val fiber = wrapToFiberCache(out)
 
-    val testSample = new TestSample
-    testSample.initialize(schema)
+    val testSample = new TestSample(schema)
     testSample.read(fiber, 0)
 
     val array = testSample.getSampleArray
@@ -88,14 +87,12 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
   test("read and write") {
     val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
-    val sampleWrite = new TestSample
-    sampleWrite.initialize(schema)
+    val sampleWrite = new TestSample(schema)
     sampleWrite.write(out, keys.to[ArrayBuffer])
 
     val fiber = wrapToFiberCache(out)
 
-    val sampleRead = new TestSample
-    sampleRead.initialize(schema)
+    val sampleRead = new TestSample(schema)
     sampleRead.read(fiber, 0)
 
     val array = sampleRead.getSampleArray
@@ -111,14 +108,12 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     val dummyStart = new JoinedRow(InternalRow(1), IndexScanner.DUMMY_KEY_START)
     val dummyEnd = new JoinedRow(InternalRow(300), IndexScanner.DUMMY_KEY_END)
 
-    val sampleWrite = new TestSample
-    sampleWrite.initialize(schema)
+    val sampleWrite = new TestSample(schema)
     sampleWrite.write(out, keys.to[ArrayBuffer])
 
     val fiber = wrapToFiberCache(out)
 
-    val sampleRead = new TestSample
-    sampleRead.initialize(schema)
+    val sampleRead = new TestSample(schema)
     sampleRead.read(fiber, 0)
 
     generateInterval(rowGen(-10), rowGen(-1), startInclude = true, endInclude = true)

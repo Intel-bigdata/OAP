@@ -21,11 +21,12 @@ import scala.util.Random
 
 import org.apache.spark.sql.catalyst.expressions.{BoundReference, UnsafeProjection}
 import org.apache.spark.sql.execution.datasources.oap.index.{BloomFilter, IndexUtils}
+import org.apache.spark.sql.types.StructType
 
 
 class BloomFilterStatisticsSuite extends StatisticsTest {
 
-  class TestBloomFilter extends BloomFilterStatistics {
+  class TestBloomFilter(schema: StructType) extends BloomFilterStatistics(schema) {
     def getBloomFilter: BloomFilter = bfIndex
   }
 
@@ -53,8 +54,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
     val projectors = boundReference.toSet.subsets().filter(_.nonEmpty).map(s =>
       UnsafeProjection.create(s.toArray)).toArray
 
-    val testBloomFilter = new TestBloomFilter
-    testBloomFilter.initialize(schema)
+    val testBloomFilter = new TestBloomFilter(schema)
     for (key <- keys) {
       testBloomFilter.addOapKey(key)
       projectors.foreach(p => bfIndex.addValue(p(key).getBytes))
@@ -106,8 +106,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
 
     val fiber = wrapToFiberCache(out)
 
-    val testBloomFilter = new TestBloomFilter
-    testBloomFilter.initialize(schema)
+    val testBloomFilter = new TestBloomFilter(schema)
     testBloomFilter.read(fiber, 0)
 
     checkBloomFilter(testBloomFilter.getBloomFilter, bfIndex)
@@ -128,8 +127,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
       projectors.foreach(p => bfIndex.addValue(p(key).getBytes))
     }
 
-    val bloomFilterWrite = new TestBloomFilter
-    bloomFilterWrite.initialize(schema)
+    val bloomFilterWrite = new TestBloomFilter(schema)
     for (key <- keys) {
       bloomFilterWrite.addOapKey(key)
     }
@@ -137,8 +135,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
 
     val fiber = wrapToFiberCache(out)
 
-    val bloomFilterRead = new TestBloomFilter
-    bloomFilterRead.initialize(schema)
+    val bloomFilterRead = new TestBloomFilter(schema)
     bloomFilterRead.read(fiber, 0)
 
     val bfIndexFromFile = bloomFilterRead.getBloomFilter
@@ -163,8 +160,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
       projectors.foreach(p => bfIndex.addValue(p(key).getBytes))
     }
 
-    val bloomFilterWrite = new TestBloomFilter
-    bloomFilterWrite.initialize(schema)
+    val bloomFilterWrite = new TestBloomFilter(schema)
     for (key <- keys) {
       bloomFilterWrite.addOapKey(key)
     }
@@ -172,8 +168,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
 
     val fiber = wrapToFiberCache(out)
 
-    val bloomFilterRead = new TestBloomFilter
-    bloomFilterRead.initialize(schema)
+    val bloomFilterRead = new TestBloomFilter(schema)
     bloomFilterRead.read(fiber, 0)
 
     for (i <- 1 until 300) {

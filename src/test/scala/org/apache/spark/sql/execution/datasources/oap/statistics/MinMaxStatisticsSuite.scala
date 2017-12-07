@@ -22,11 +22,12 @@ import scala.util.Random
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
+import org.apache.spark.sql.types.StructType
 
 
 class MinMaxStatisticsSuite extends StatisticsTest {
 
-  private class TestMinMax extends MinMaxStatistics {
+  private class TestMinMax(schema: StructType) extends MinMaxStatistics(schema) {
     def getMin: InternalRow = min
     def getMax: InternalRow = max
   }
@@ -34,8 +35,7 @@ class MinMaxStatisticsSuite extends StatisticsTest {
   test("write function test") {
     val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
-    val testMinMax = new TestMinMax
-    testMinMax.initialize(schema)
+    val testMinMax = new TestMinMax(schema)
     for (key <- keys) testMinMax.addOapKey(key)
     testMinMax.write(out, null) // MinMax does not need sortKeys parameter
 
@@ -76,8 +76,7 @@ class MinMaxStatisticsSuite extends StatisticsTest {
 
     val fiber = wrapToFiberCache(out)
 
-    val testMinMax = new TestMinMax
-    testMinMax.initialize(schema)
+    val testMinMax = new TestMinMax(schema)
     testMinMax.read(fiber, 0)
 
     val min = testMinMax.getMin
@@ -95,15 +94,13 @@ class MinMaxStatisticsSuite extends StatisticsTest {
   test("read and write") {
     val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
-    val minmaxWrite = new TestMinMax
-    minmaxWrite.initialize(schema)
+    val minmaxWrite = new TestMinMax(schema)
     for (key <- keys) minmaxWrite.addOapKey(key)
     minmaxWrite.write(out, null) // MinMax does not need sortKeys parameter
 
     val fiber = wrapToFiberCache(out)
 
-    val minmaxRead = new TestMinMax
-    minmaxRead.initialize(schema)
+    val minmaxRead = new TestMinMax(schema)
     minmaxRead.read(fiber, 0)
     val min = minmaxRead.getMin
     val max = minmaxRead.getMax
@@ -120,15 +117,13 @@ class MinMaxStatisticsSuite extends StatisticsTest {
   test("analyse function test") {
     val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
-    val minmaxWrite = new TestMinMax
-    minmaxWrite.initialize(schema)
+    val minmaxWrite = new TestMinMax(schema)
     for (key <- keys) minmaxWrite.addOapKey(key)
     minmaxWrite.write(out, null) // MinMax does not need sortKeys parameter
 
     val fiber = wrapToFiberCache(out)
 
-    val minmaxRead = new TestMinMax
-    minmaxRead.initialize(schema)
+    val minmaxRead = new TestMinMax(schema)
     minmaxRead.read(fiber, 0)
 
     generateInterval(rowGen(-10), rowGen(-1), startInclude = true, endInclude = true)

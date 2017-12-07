@@ -24,11 +24,12 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
+import org.apache.spark.sql.types.StructType
 
 
 class PartByValueStatisticsSuite extends StatisticsTest{
 
-  class TestPartByValue extends PartByValueStatistics {
+  class TestPartByValue(schema: StructType) extends PartByValueStatistics(schema) {
     def getMetas: ArrayBuffer[PartedByValueMeta] = metas
   }
 
@@ -46,8 +47,7 @@ class PartByValueStatisticsSuite extends StatisticsTest{
   test("test write function") {
     val keys = (1 to 300).map(i => rowGen(i)).toArray // keys needs to be sorted
 
-    val testPartByValue = new TestPartByValue
-    testPartByValue.initialize(schema)
+    val testPartByValue = new TestPartByValue(schema)
     testPartByValue.write(out, keys.to[ArrayBuffer])
 
     var offset = 0L
@@ -92,8 +92,7 @@ class PartByValueStatisticsSuite extends StatisticsTest{
     out.write(tempWriter.toByteArray)
 
     val fiber = wrapToFiberCache(out)
-    val testPartByValue = new TestPartByValue
-    testPartByValue.initialize(schema)
+    val testPartByValue = new TestPartByValue(schema)
     testPartByValue.read(fiber, 0)
 
     val metas = testPartByValue.getMetas
@@ -110,14 +109,12 @@ class PartByValueStatisticsSuite extends StatisticsTest{
   test("read and write") {
     val keys = (1 to 300).map(i => rowGen(i)).toArray // keys needs to be sorted
 
-    val partByValueWrite = new TestPartByValue
-    partByValueWrite.initialize(schema)
+    val partByValueWrite = new TestPartByValue(schema)
     partByValueWrite.write(out, keys.to[ArrayBuffer])
 
     val fiber = wrapToFiberCache(out)
 
-    val partByValueRead = new TestPartByValue
-    partByValueRead.initialize(schema)
+    val partByValueRead = new TestPartByValue(schema)
     partByValueRead.read(fiber, 0)
 
     val content = Array(1, 61, 121, 181, 241, 300)
@@ -139,14 +136,12 @@ class PartByValueStatisticsSuite extends StatisticsTest{
     val dummyStart = new JoinedRow(InternalRow(1), IndexScanner.DUMMY_KEY_START)
     val dummyEnd = new JoinedRow(InternalRow(300), IndexScanner.DUMMY_KEY_END)
 
-    val partByValueWrite = new TestPartByValue
-    partByValueWrite.initialize(schema)
+    val partByValueWrite = new TestPartByValue(schema)
     partByValueWrite.write(out, keys.to[ArrayBuffer])
 
     val fiber = wrapToFiberCache(out)
 
-    val partByValueRead = new TestPartByValue
-    partByValueRead.initialize(schema)
+    val partByValueRead = new TestPartByValue(schema)
     partByValueRead.read(fiber, 0)
 
     generateInterval(dummyStart, dummyEnd, true, true)

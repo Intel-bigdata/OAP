@@ -29,7 +29,7 @@ import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
 
 
-private[oap] class SampleBasedStatistics extends Statistics {
+private[oap] class SampleBasedStatistics(schema: StructType) extends Statistics(schema) {
   override val id: Int = SampleBasedStatisticsType.id
 
   lazy val sampleRate: Double = StatisticsManager.sampleRate

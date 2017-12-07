@@ -35,13 +35,12 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
   val row2 = InternalRow(2.0)
   val row3 = InternalRow(3.0)
 
-  class TestStatistics extends Statistics {
+  class TestStatistics(schema: StructType) extends Statistics(schema) {
     override val id: Int = 6662
   }
 
   test("Statistics write function test") {
-    val test = new TestStatistics
-    test.initialize(schema)
+    val test = new TestStatistics(schema)
     val writtenBytes = test.write(out, null)
     assert(writtenBytes == 4)
 
@@ -51,7 +50,7 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
   }
 
   test("Statistics read function test") {
-    val test = new TestStatistics
+    val test = new TestStatistics(schema)
     IndexUtils.writeInt(out, test.id)
 
     val fiber = wrapToFiberCache(out)
@@ -61,7 +60,7 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
   }
 
   test("Statistics default analyzer test") {
-    val test = new TestStatistics
+    val test = new TestStatistics(schema)
     IndexUtils.writeInt(out, test.id)
 
     val fiber = wrapToFiberCache(out)

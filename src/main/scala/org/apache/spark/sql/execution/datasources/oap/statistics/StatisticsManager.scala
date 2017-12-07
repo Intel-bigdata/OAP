@@ -87,16 +87,15 @@ class StatisticsManager {
         SQLConf.OAP_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
       typeFromConfig.contains(statType.name)
     }
+    schema = s
     stats = statsTypes.map {
-      case MinMaxStatisticsType => new MinMaxStatistics
-      case SampleBasedStatisticsType => new SampleBasedStatistics
-      case PartByValueStatisticsType => new PartByValueStatistics
-      case BloomFilterStatisticsType => new BloomFilterStatistics
+      case MinMaxStatisticsType => new MinMaxStatistics(s)
+      case SampleBasedStatisticsType => new SampleBasedStatistics(s)
+      case PartByValueStatisticsType => new PartByValueStatistics(s)
+      case BloomFilterStatisticsType => new BloomFilterStatistics(s)
       case t => throw new UnsupportedOperationException(s"non-supported statistic type $t")
     }
-    schema = s
     content = new ArrayBuffer[Key]()
-    stats.foreach(stat => stat.initialize(schema))
   }
 
   def addOapKey(key: Key): Unit = {
@@ -142,16 +141,15 @@ class StatisticsManager {
 
       for (i <- 0 until numOfStats) {
         fiberCache.getInt(offset + readOffset) match {
-          case MinMaxStatisticsType.id => stats(i) = new MinMaxStatistics
-          case SampleBasedStatisticsType.id => stats(i) = new SampleBasedStatistics
-          case PartByValueStatisticsType.id => stats(i) = new PartByValueStatistics
-          case BloomFilterStatisticsType.id => stats(i) = new BloomFilterStatistics
+          case MinMaxStatisticsType.id => stats(i) = new MinMaxStatistics(s)
+          case SampleBasedStatisticsType.id => stats(i) = new SampleBasedStatistics(s)
+          case PartByValueStatisticsType.id => stats(i) = new PartByValueStatistics(s)
+          case BloomFilterStatisticsType.id => stats(i) = new BloomFilterStatistics(s)
           case _ => throw new UnsupportedOperationException("unsupport statistics id")
         }
         readOffset += 4
       }
       for (stat <- stats) {
-        stat.initialize(s)
         readOffset += stat.read(fiberCache, offset + readOffset)
       }
     }

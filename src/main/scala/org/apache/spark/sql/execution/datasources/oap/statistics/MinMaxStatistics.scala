@@ -28,18 +28,12 @@ import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
 
 
-private[oap] class MinMaxStatistics extends Statistics {
+private[oap] class MinMaxStatistics(schema: StructType) extends Statistics(schema) {
   override val id: Int = MinMaxStatisticsType.id
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
   protected var min: Key = _
   protected var max: Key = _
-
-  override def initialize(schema: StructType): Unit = {
-    super.initialize(schema)
-    min = null
-    max = null
-  }
 
   override def addOapKey(key: Key): Unit = {
     if (min == null || max == null) {

@@ -40,7 +40,7 @@ import org.apache.spark.sql.types.StructType
 // (241,  "test#241")   240            241
 // (300,  "test#300")   299            300
 
-private[oap] class PartByValueStatistics extends Statistics {
+private[oap] class PartByValueStatistics(schema: StructType) extends Statistics(schema) {
   override val id: Int = PartByValueStatisticsType.id
 
   private lazy val maxPartNum: Int = StatisticsManager.partNumber
