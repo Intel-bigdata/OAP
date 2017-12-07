@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
@@ -116,10 +115,10 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Nil)
 
     assert(path.getFileSystem(
-      new Configuration()).globStatus(new Path(path,
+      configuration).globStatus(new Path(path,
         "oap_partition_table/b=1/c=c1/*.index")).length != 0)
     assert(path.getFileSystem(
-      new Configuration()).globStatus(new Path(path,
+      configuration).globStatus(new Path(path,
         "oap_partition_table/b=2/c=c2/*.index")).length == 0)
 
     sql("create oindex index1 on oap_partition_table (a) partition (b=2, c='c2')")
@@ -128,10 +127,10 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     checkAnswer(sql("select * from oap_partition_table"),
       Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Row(4, 2, "c2") :: Nil)
     assert(path.getFileSystem(
-      new Configuration()).globStatus(new Path(path,
+      configuration).globStatus(new Path(path,
       "oap_partition_table/b=1/c=c1/*.index")).length == 0)
     assert(path.getFileSystem(
-      new Configuration()).globStatus(new Path(path,
+      configuration).globStatus(new Path(path,
       "oap_partition_table/b=2/c=c2/*.index")).length != 0)
   }
 

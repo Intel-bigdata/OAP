@@ -47,7 +47,7 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
 
   test("index integrity") {
       val data: Seq[(Int, String)] =
-        scala.util.Random.shuffle(1 to 300).map{ i => (i, s"this is test $i") }.toSeq
+        scala.util.Random.shuffle(1 to 300).map{ i => (i, s"this is test $i") }
       data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table oap_test_1 select * from t")
       sql("create oindex index1 on oap_test_1 (a) using bitmap")
