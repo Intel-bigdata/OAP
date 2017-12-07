@@ -17,10 +17,14 @@
 
 package org.apache.spark.sql.test.oap
 
+import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.sql.test.SharedSQLContext
 
 trait SharedOapContext extends SharedSQLContext {
 
   // avoid the overflow of offHeap memory
   sparkConf.set("spark.memory.offHeap.size", "100m")
+
+  protected val configuration: Configuration = new Configuration()
 }
