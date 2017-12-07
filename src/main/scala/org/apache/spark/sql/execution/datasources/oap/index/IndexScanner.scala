@@ -276,9 +276,11 @@ private[oap] object ScannerBuilder extends Logging {
     }
   }
 
-  def build(filters: Array[Filter], ic: IndexContext,
-            maxChooseSize: Int = 2,
-            scannerOptions: Map[String, String] = Map.empty): Array[Filter] = {
+  def build(
+      filters: Array[Filter],
+      ic: IndexContext,
+      scannerOptions: Map[String, String] = Map.empty,
+      maxChooseSize: Int = 1): Array[Filter] = {
     if (filters == null || filters.isEmpty) return filters
     logDebug("Transform filters into Intervals:")
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
@@ -294,7 +296,7 @@ private[oap] object ScannerBuilder extends Logging {
       intervalMap.foreach(intervals =>
         logDebug("\t" + intervals._1 + ": " + intervals._2.mkString(" - ")))
 
-      ic.buildScanners(intervalMap, scannerOptions)
+      ic.buildScanners(intervalMap, scannerOptions, maxChooseSize)
     }
 
     filters.filterNot(canSupport(_, ic))

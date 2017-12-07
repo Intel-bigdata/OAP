@@ -115,7 +115,9 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
    *         actually result size could less than n and the Int is
    *         the index of the last matched attribute in the index entries
    */
-  def getAvailableIndexers(attrNum: Int, maxChooseSize: Int = 2): Seq[(Int, IndexMeta)] = {
+  def getAvailableIndexers(
+      attrNum: Int,
+      maxChooseSize: Int = 1): Seq[(Int, IndexMeta)] = {
     logDebug("Get Available Indexers: maxChooseSize = " + maxChooseSize)
 
     def takeRatioAndUsedFields(attrNum: Int,
@@ -180,9 +182,10 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
 
   def buildScanners(
       intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]],
-      options: Map[String, String] = Map.empty): Unit = {
+      options: Map[String, String] = Map.empty,
+      maxChooseSize: Int = 1): Unit = {
     selectAvailableIndex(intervalMap)
-    val availableIndexers = getAvailableIndexers(intervalMap.size)
+    val availableIndexers = getAvailableIndexers(intervalMap.size, maxChooseSize)
 
     //    intervalArray.sortWith(compare)
     logDebug("Building Index Scanners with IndexMeta and IntervalMap ...")

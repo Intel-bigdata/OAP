@@ -19,15 +19,16 @@ package org.apache.spark.sql.execution.datasources.oap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach{
   import testImplicits._
-
   private var currentPath: String = _
 
   override def beforeEach(): Unit = {
+    spark.conf.set(SQLConf.OAP_INDEXER_CHOICE_MAX_SIZE.key, "2")
     val path = Utils.createTempDir().getAbsolutePath
     currentPath = path
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b INT, c INT)
@@ -42,6 +43,7 @@ class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAnd
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("oap_test")
     sqlContext.dropTempTable("parquet_test")
+    spark.conf.set(SQLConf.OAP_INDEXER_CHOICE_MAX_SIZE.key, "1")
   }
 
   test("filtering parquet") {
@@ -101,7 +103,6 @@ class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAnd
 
     sql("drop oindex index1 on oap_test")
     sql("drop oindex index2 on oap_test")
-
   }
 }
 

@@ -733,7 +733,7 @@ object SQLConf {
       .internal()
       .doc("The max availabe indexer choose size.")
       .intConf
-      .createWithDefault(2)
+      .createWithDefault(1)
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
