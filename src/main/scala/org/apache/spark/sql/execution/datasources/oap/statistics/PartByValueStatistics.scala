@@ -85,7 +85,7 @@ private[oap] class PartByValueStatistics(schema: StructType) extends Statistics(
     IndexUtils.writeInt(writer, metas.length)
     val tempWriter = new ByteArrayOutputStream()
     metas.foreach(meta => {
-      IndexUtils.writeBasedOnSchema(tempWriter, meta.row, schema)
+      nnkw.writeKey(tempWriter, meta.row)
       IndexUtils.writeInt(writer, meta.curMaxId)
       IndexUtils.writeInt(writer, meta.accumulatorCnt)
       IndexUtils.writeInt(writer, tempWriter.size())

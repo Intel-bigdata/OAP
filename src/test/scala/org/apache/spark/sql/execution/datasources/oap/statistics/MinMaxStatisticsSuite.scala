@@ -68,9 +68,9 @@ class MinMaxStatisticsSuite extends StatisticsTest {
 
     IndexUtils.writeInt(out, MinMaxStatisticsType.id)
     val tempWriter = new ByteArrayOutputStream()
-    IndexUtils.writeBasedOnSchema(tempWriter, rowGen(1), schema)
+    nnkw.writeKey(tempWriter, rowGen(1))
     IndexUtils.writeInt(out, tempWriter.size)
-    IndexUtils.writeBasedOnSchema(tempWriter, rowGen(300), schema)
+    nnkw.writeKey(tempWriter, rowGen(300))
     IndexUtils.writeInt(out, tempWriter.size)
     out.write(tempWriter.toByteArray)
 

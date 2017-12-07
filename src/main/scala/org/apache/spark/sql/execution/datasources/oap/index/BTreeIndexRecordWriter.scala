@@ -30,7 +30,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
-import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils}
+import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils, NonNullKeyWriter}
 import org.apache.spark.sql.types._
 
 
@@ -40,6 +40,7 @@ private[index] case class BTreeIndexRecordWriter(
     keySchema: StructType) extends RecordWriter[Void, InternalRow] {
 
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
+  private lazy val nnkw = new NonNullKeyWriter(keySchema)
 
   private val multiHashMap = ArrayListMultimap.create[InternalRow, Int]()
   private var recordCount: Int = 0
@@ -171,7 +172,7 @@ private[index] case class BTreeIndexRecordWriter(
     uniqueKeys.foreach { key =>
       IndexUtils.writeInt(buffer, keyBuffer.size())
       IndexUtils.writeInt(buffer, rowPos)
-      IndexUtils.writeBasedOnSchema(keyBuffer, key, keySchema)
+      nnkw.writeKey(keyBuffer, key)
       rowPos += multiHashMap.get(key).size()
     }
     buffer.toByteArray ++ keyBuffer.toByteArray
@@ -239,12 +240,12 @@ private[index] case class BTreeIndexRecordWriter(
       // Min Key Pos for each Child
       IndexUtils.writeInt(buffer, keyBuffer.size())
       if (node.min != null) {
-        IndexUtils.writeBasedOnSchema(keyBuffer, node.min, keySchema)
+        nnkw.writeKey(keyBuffer, node.min)
       }
       // Max Key Pos for each Child
       IndexUtils.writeInt(buffer, keyBuffer.size())
       if (node.max != null) {
-        IndexUtils.writeBasedOnSchema(keyBuffer, node.max, keySchema)
+        nnkw.writeKey(keyBuffer, node.max)
       }
       offset += node.byteSize
     }

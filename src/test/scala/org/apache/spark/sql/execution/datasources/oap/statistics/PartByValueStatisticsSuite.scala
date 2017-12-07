@@ -84,7 +84,7 @@ class PartByValueStatisticsSuite extends StatisticsTest{
     IndexUtils.writeInt(out, partNum)
     val tempWriter = new ByteArrayOutputStream()
     for (i <- content.indices) {
-      IndexUtils.writeBasedOnSchema(tempWriter, rowGen(content(i)), schema)
+      nnkw.writeKey(tempWriter, rowGen(content(i)))
       IndexUtils.writeInt(out, curMaxId(i))
       IndexUtils.writeInt(out, curAccumuCount(i))
       IndexUtils.writeInt(out, tempWriter.size())

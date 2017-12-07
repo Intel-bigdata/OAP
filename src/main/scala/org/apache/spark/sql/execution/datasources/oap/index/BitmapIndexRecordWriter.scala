@@ -31,6 +31,7 @@ import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
+import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
 import org.apache.spark.sql.types._
 
 /* Below is the bitmap index general layout and sections.
@@ -58,6 +59,7 @@ private[oap] class BitmapIndexRecordWriter(
     keySchema: StructType) extends RecordWriter[Void, InternalRow] {
 
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
+  @transient private lazy val nnkw = new NonNullKeyWriter(keySchema)
 
   private val rowMapBitmap = new mutable.HashMap[InternalRow, MutableRoaringBitmap]()
   private var recordCount: Int = 0
@@ -99,7 +101,7 @@ private[oap] class BitmapIndexRecordWriter(
     bmUniqueKeyList = rowMapBitmap.keySet.toList.sorted(ordering)
     val bos = new ByteArrayOutputStream()
     bmUniqueKeyList.foreach(key => {
-      IndexUtils.writeBasedOnDataType(bos, key.get(0, keySchema.fields(0).dataType))
+      nnkw.writeKey(bos, keySchema))
     })
     bmUniqueKeyListTotalSize = bos.size()
     bmUniqueKeyListCount = bmUniqueKeyList.size

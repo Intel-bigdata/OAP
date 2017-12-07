@@ -67,7 +67,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
 
     val tempWriter = new ByteArrayOutputStream()
     for (idx <- 0 until size) {
-      IndexUtils.writeBasedOnSchema(tempWriter, keys(idx), schema)
+      nnkw.writeKey(tempWriter, keys(idx))
       IndexUtils.writeInt(out, tempWriter.size)
     }
     out.write(tempWriter.toByteArray)

@@ -28,8 +28,9 @@ import org.apache.spark.sql.types.{DoubleType, StructField, StructType}
 class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
   override def beforeAll(): Unit = {
     super.beforeAll()
-    schema = StructType(StructField("test", DoubleType, nullable = true) :: Nil)
   }
+  override protected lazy val schema =
+    StructType(StructField("test", DoubleType, nullable = true) :: Nil)
 
   val row1 = InternalRow(1.0)
   val row2 = InternalRow(2.0)

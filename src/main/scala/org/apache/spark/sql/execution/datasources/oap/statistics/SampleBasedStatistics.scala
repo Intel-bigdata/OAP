@@ -56,7 +56,7 @@ private[oap] class SampleBasedStatistics(schema: StructType) extends Statistics(
     offset += IndexUtils.INT_SIZE
     val tempWriter = new ByteArrayOutputStream()
     sampleArray.foreach(key => {
-      IndexUtils.writeBasedOnSchema(tempWriter, key, schema)
+      nnkw.writeKey(tempWriter, key)
       IndexUtils.writeInt(writer, tempWriter.size())
       offset += IndexUtils.INT_SIZE
     })
