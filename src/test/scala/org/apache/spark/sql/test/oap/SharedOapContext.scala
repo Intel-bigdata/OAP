@@ -29,5 +29,5 @@ trait SharedOapContext extends SharedSQLContext {
 
   protected val configuration: Configuration = new Configuration()
 
-  protected val sqlConf: SQLConf = sqlContext.conf
+  protected implicit def sqlConf: SQLConf = sqlContext.conf
 }
