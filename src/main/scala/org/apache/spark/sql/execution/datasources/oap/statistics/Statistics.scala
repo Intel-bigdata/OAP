@@ -26,7 +26,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.BaseOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
+import org.apache.spark.sql.execution.datasources.oap.utils.{NonNullKeyReader, NonNullKeyWriter}
 import org.apache.spark.sql.types._
 
 
@@ -35,6 +35,8 @@ abstract class Statistics(schema: StructType) {
 
   @transient
   protected lazy val nnkw = new NonNullKeyWriter(schema)
+  @transient
+  protected lazy val nnkr: NonNullKeyReader = new NonNullKeyReader(schema)
 
   /**
    * For MinMax & Bloom Filter, every time a key is inserted, then

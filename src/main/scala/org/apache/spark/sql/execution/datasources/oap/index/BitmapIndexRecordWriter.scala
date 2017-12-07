@@ -100,9 +100,7 @@ private[oap] class BitmapIndexRecordWriter(
     assert(keySchema.fields.size == 1)
     bmUniqueKeyList = rowMapBitmap.keySet.toList.sorted(ordering)
     val bos = new ByteArrayOutputStream()
-    bmUniqueKeyList.foreach(key => {
-      nnkw.writeKey(bos, keySchema))
-    })
+    bmUniqueKeyList.foreach(key => nnkw.writeKey(bos, key))
     bmUniqueKeyListTotalSize = bos.size()
     bmUniqueKeyListCount = bmUniqueKeyList.size
     writer.write(bos.toByteArray)

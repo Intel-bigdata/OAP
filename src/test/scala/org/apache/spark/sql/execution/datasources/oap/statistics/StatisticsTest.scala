@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.{BaseOrdering, GenerateOrdering}
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index.RangeInterval
-import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
+import org.apache.spark.sql.execution.datasources.oap.utils.{NonNullKeyReader, NonNullKeyWriter}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.MemoryBlock
@@ -42,6 +42,8 @@ abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
     :: StructField("b", StringType) :: Nil)
   @transient
   protected lazy val nnkw: NonNullKeyWriter = new NonNullKeyWriter(schema)
+  @transient
+  protected lazy val nnkr: NonNullKeyReader = new NonNullKeyReader(schema)
   @transient
   protected lazy val ordering: BaseOrdering = GenerateOrdering.create(schema)
   @transient

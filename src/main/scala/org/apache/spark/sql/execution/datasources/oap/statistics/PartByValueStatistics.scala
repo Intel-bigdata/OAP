@@ -104,8 +104,7 @@ private[oap] class PartByValueStatistics(schema: StructType) extends Statistics(
 
     var rowOffset = 0
     for (i <- 0 until size) {
-      val row = IndexUtils.readBasedOnSchema(
-        fiberCache, readOffset + size * 12 + rowOffset, schema)
+      val row = nnkr.readKey(fiberCache, readOffset + size * 12 + rowOffset)._1
       val index = fiberCache.getInt(readOffset + i * 12)
       val count = fiberCache.getInt(readOffset + i * 12 + 4)
       rowOffset = fiberCache.getInt(readOffset + i * 12 + 8)

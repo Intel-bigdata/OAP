@@ -42,7 +42,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     val testSample = new TestSample(schema)
     testSample.write(out, keys.to[ArrayBuffer])
 
-    var offset = 0L
+    var offset = 0
     val fiber = wrapToFiberCache(out)
     assert(fiber.getInt(offset) == SampleBasedStatisticsType.id)
     offset += 4
@@ -51,7 +51,7 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
 
     var rowOffset = 0
     for (i <- 0 until size) {
-      val row = IndexUtils.readBasedOnSchema(fiber, offset + size * 4 + rowOffset, schema)
+      val row = nnkr.readKey(fiber, offset + size * 4 + rowOffset)._1
       rowOffset = fiber.getInt(offset + i * 4)
       assert(ordering.compare(row, keys(i)) == 0)
     }

@@ -68,8 +68,8 @@ private[oap] class MinMaxStatistics(schema: StructType) extends Statistics(schem
     readOffset += 4
     val totalSize = fiberCache.getInt(readOffset)
     readOffset += 4
-    min = IndexUtils.readBasedOnSchema(fiberCache, readOffset, schema)
-    max = IndexUtils.readBasedOnSchema(fiberCache, readOffset + minSize, schema)
+    min = nnkr.readKey(fiberCache, readOffset)._1
+    max = nnkr.readKey(fiberCache, readOffset + minSize)._1
     readOffset += totalSize
 
     readOffset - offset

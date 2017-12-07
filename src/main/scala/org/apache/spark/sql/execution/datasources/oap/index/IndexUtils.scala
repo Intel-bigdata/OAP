@@ -21,13 +21,8 @@ import java.io.OutputStream
 
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
-import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.types.UTF8String
 
 
 /**
@@ -99,71 +94,6 @@ private[oap] object IndexUtils {
       inputFile: Path, outputPath: Path, attemptPath: Path, indexFile: String): Path = {
     new Path(inputFile.getParent.toString.replace(
       outputPath.toString, attemptPath.toString), indexFile)
-  }
-
-  def readBasedOnDataType(
-      fiberCache: FiberCache, offset: Long, dataType: DataType): (Any, Long) = {
-    dataType match {
-      case BooleanType => (fiberCache.getBoolean(offset), BooleanType.defaultSize)
-      case ByteType => (fiberCache.getByte(offset), ByteType.defaultSize)
-      case ShortType => (fiberCache.getShort(offset), ShortType.defaultSize)
-      case IntegerType => (fiberCache.getInt(offset), IntegerType.defaultSize)
-      case LongType => (fiberCache.getLong(offset), LongType.defaultSize)
-      case FloatType => (fiberCache.getFloat(offset), FloatType.defaultSize)
-      case DoubleType => (fiberCache.getDouble(offset), DoubleType.defaultSize)
-      case DateType => (fiberCache.getInt(offset), DateType.defaultSize)
-      case StringType =>
-        val length = fiberCache.getInt(offset)
-        val string = fiberCache.getUTF8String(offset + INT_SIZE, length)
-        (string, INT_SIZE + length)
-      case BinaryType =>
-        val length = fiberCache.getInt(offset)
-        val bytes = fiberCache.getBytes(offset + INT_SIZE, length)
-        (bytes, INT_SIZE + bytes.length)
-      case other => throw new OapException(s"OAP index currently doesn't support data type $other")
-    }
-  }
-
-  def readBasedOnSchema(
-      fiberCache: FiberCache, offset: Long, schema: StructType): InternalRow = {
-    var pos = offset
-    val values = schema.map(_.dataType).map { dataType =>
-      val (value, length) = readBasedOnDataType(fiberCache, pos, dataType)
-      pos += length
-      value
-    }
-    InternalRow.fromSeq(values)
-  }
-
-  def writeBasedOnDataType(
-      out: OutputStream,
-      value: Any): Unit = {
-    value match {
-      case null => throw new OapException(s"trying to write null key!")
-      case boolean: Boolean => writeBoolean(out, boolean)
-      case short: Short => writeShort(out, short)
-      case byte: Byte => writeByte(out, byte)
-      case int: Int => writeInt(out, int)
-      case long: Long => writeLong(out, long)
-      case float: Float => writeFloat(out, float)
-      case double: Double => writeDouble(out, double)
-      case string: UTF8String =>
-        val bytes = string.getBytes
-        writeInt(out, bytes.length)
-        out.write(bytes)
-      case binary: Array[Byte] =>
-        writeInt(out, binary.length)
-        out.write(binary)
-      case other => throw new OapException(s"OAP index currently doesn't support data type $other")
-    }
-  }
-
-  def writeBasedOnSchema(
-      out: OutputStream, row: InternalRow, schema: StructType): Unit = {
-    require(row != null)
-    schema.zipWithIndex.foreach {
-      case (field, index) => writeBasedOnDataType(out, row.get(index, field.dataType))
-    }
   }
 
   val INT_SIZE = 4

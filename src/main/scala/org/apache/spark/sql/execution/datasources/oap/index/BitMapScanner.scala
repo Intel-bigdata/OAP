@@ -32,6 +32,7 @@ import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StaticsAnalysisResult
+import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
 import org.apache.spark.unsafe.Platform
 
 private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
@@ -40,6 +41,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   // TODO: use hash instead of order compare.
   @transient protected var ordering: Ordering[Key] = _
+  @transient
+  protected lazy val nnkr: NonNullKeyReader = new NonNullKeyReader(keySchema)
 
   private val BITMAP_FOOTER_SIZE = 5 * 8
 
@@ -116,12 +119,12 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   private def readBmUniqueKeyListFromCache(data: FiberCache): IndexedSeq[InternalRow] = {
-    var curOffset = 0L
+    var curOffset = 0
     (0 until bmUniqueKeyListCount).map( idx => {
       val (value, length) =
-        IndexUtils.readBasedOnDataType(data, curOffset, keySchema.fields(0).dataType)
+        nnkr.readKey(data, curOffset)
       curOffset += length
-      InternalRow.apply(value)
+      value
     })
   }
 

@@ -73,9 +73,9 @@ private[oap] class NonNullKeyWriter(schema: StructType) {
 }
 
 private[oap] class NonNullKeyReader(schema: StructType) {
-  private lazy val internalReaders: Seq[(FiberCache, Int) => (Any, Long)] =
+  private lazy val internalReaders: Seq[(FiberCache, Int) => (Any, Int)] =
     schema.toSeq.map(_.dataType).map(getReaderFunctionBasedOnType)
-  private def getReaderFunctionBasedOnType(dt: DataType): (FiberCache, Int) => (Any, Long) =
+  private def getReaderFunctionBasedOnType(dt: DataType): (FiberCache, Int) => (Any, Int) =
     (fiberCache: FiberCache, offset: Int) => dt match {
       case BooleanType => (fiberCache.getBoolean(offset), BooleanType.defaultSize)
       case ByteType => (fiberCache.getByte(offset), ByteType.defaultSize)
@@ -96,13 +96,13 @@ private[oap] class NonNullKeyReader(schema: StructType) {
       case other => throw new OapException(s"OAP index currently doesn't support data type $other")
     }
 
-  def readKey(fiberCache: FiberCache, offset: Int): InternalRow = {
+  def readKey(fiberCache: FiberCache, offset: Int): (InternalRow, Int) = {
     var pos = offset
     val values = internalReaders.map { reader =>
       val (value, length) = reader(fiberCache, pos)
       pos += length
       value
     }
-    InternalRow.fromSeq(values)
+    (InternalRow.fromSeq(values), pos - offset)
   }
 }
