@@ -18,8 +18,8 @@
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import java.io._
-
 import java.util
+
 import scala.collection.mutable
 
 import org.roaringbitmap.RoaringBitmap
