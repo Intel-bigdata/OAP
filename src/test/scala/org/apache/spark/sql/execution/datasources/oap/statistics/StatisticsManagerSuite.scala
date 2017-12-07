@@ -23,15 +23,14 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 // integration test for all statistics
-class StatisticsManagerSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class StatisticsManagerSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
 
   override def beforeEach(): Unit = {
-    sparkConf.set("spark.memory.offHeap.size", "100m")
     val path = Utils.createTempDir().getAbsolutePath
 
     sql(s"""CREATE TEMPORARY VIEW oap_test
