@@ -16,6 +16,9 @@
  */
 package org.apache.spark.sql.execution.datasources.oap.index
 
+import java.io.DataInput
+import java.io.EOFException
+import java.lang.IndexOutOfBoundsException
 import java.nio.ByteBuffer
 
 import scala.collection.mutable
@@ -23,8 +26,8 @@ import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
-import org.roaringbitmap.buffer.BufferFastAggregation
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap
+import org.roaringbitmap.FastAggregation
+import org.roaringbitmap.RoaringBitmap
 
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.InternalRow
@@ -200,35 +203,30 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     (startIdx, endIdx)
   }
 
-  /**
-   * To get the bitmaps, we have to deserialize the data in off-heap memory
-   * TODO: Find a way to use bitmap in off-heap
-   */
-  private def getDesiredBitmaps(byteArray: Array[Byte], position: Int,
-      startIdx: Int, endIdx: Int): IndexedSeq[ImmutableRoaringBitmap] = {
-    val rawBb = ByteBuffer.wrap(byteArray)
-    var curPosition = position
-    rawBb.position(curPosition)
+  private def getDesiredBitmaps(byteCache: FiberCache, position: Int,
+      startIdx: Int, endIdx: Int): IndexedSeq[RoaringBitmap] = {
+     val bmStream = new BitmapDataInputStream(byteCache)
+     bmStream.skipBytes(position)
     (startIdx until endIdx).map( idx => {
-      // Below is directly constructed from byte buffer rather than deserializing into java object.
-      val bmEntry = new ImmutableRoaringBitmap(rawBb)
-      curPosition += bmEntry.serializedSizeInBytes
-      rawBb.position(curPosition)
+      val bmEntry = new RoaringBitmap()
+      // Below is directly reading from byte array rather than deserializing into java object.
+      bmEntry.deserialize(bmStream)
+      bmStream.skipBytes(bmEntry.serializedSizeInBytes)
       bmEntry
     })
   }
 
-  private def getDesiredBitmapArray: mutable.ArrayBuffer[ImmutableRoaringBitmap] = {
+  private def getDesiredBitmapArray: mutable.ArrayBuffer[RoaringBitmap] = {
     val keySeq = readBmUniqueKeyListFromCache(bmUniqueKeyListCache)
     intervalArray.flatMap(range => {
       val (startIdx, endIdx) = getBitmapIdx(keySeq, range)
       if (startIdx == -1 || endIdx == -1) {
         // range not fond in cur bitmap, return empty for performance consideration
-        Seq.empty[ImmutableRoaringBitmap]
+        Seq.empty[RoaringBitmap]
       } else {
         val startIdxOffset = getStartIdxOffset(bmOffsetListCache, 0L, startIdx)
         val curPosition = startIdxOffset - bmEntryListOffset
-        getDesiredBitmaps(bmEntryListCache.toArray, curPosition, startIdx, endIdx + 1)
+        getDesiredBitmaps(bmEntryListCache, curPosition, startIdx, endIdx + 1)
       }
     })
   }
@@ -242,7 +240,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
           bm.iterator.asScala.take(internalLimit)).iterator
       } else {
         bmRowIdIterator =
-          bitmapArray.reduceLeft(BufferFastAggregation.or(_, _)).iterator.asScala
+          bitmapArray.reduceLeft(FastAggregation.or(_, _)).iterator.asScala
       }
       empty = false
     } else {
@@ -265,4 +263,105 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   override def toString: String = "BitMapScanner"
+}
+
+// Below class is used to directly decode bitmap from FiberCache(either offheap/onheap memory).
+private[oap] class BitmapDataInputStream(bitsStream: FiberCache) extends DataInput {
+
+ private val bitsSize: Int = bitsStream.size.toInt
+ // The current position to read from FiberCache.
+ private var pos: Int = 0
+
+ // The reading byte order is big endian.
+ override def readShort(): Short = {
+   val curPos = pos
+   pos += 2
+   (((bitsStream.getByte(curPos) & 0xFF) << 8) |
+     ((bitsStream.getByte(curPos + 1) & 0xFF)) & 0xFFFF).toShort
+ }
+
+ override def readInt(): Int = {
+   val curPos = pos
+   pos += 4
+   ((bitsStream.getByte(curPos) & 0xFF) << 24) |
+     ((bitsStream.getByte(curPos + 1) & 0xFF) << 16) |
+     ((bitsStream.getByte(curPos + 2) & 0xFF) << 8) |
+     (bitsStream.getByte(curPos + 3) & 0xFF)
+ }
+
+ override def readLong(): Long = {
+   val curPos = pos
+   pos += 8
+   ((bitsStream.getByte(curPos) & 0xFF) << 56) |
+     ((bitsStream.getByte(curPos + 1) & 0xFF) << 48) |
+     ((bitsStream.getByte(curPos + 2) & 0xFF) << 40) |
+     ((bitsStream.getByte(curPos + 3) & 0xFF) << 32) |
+     ((bitsStream.getByte(curPos + 4) & 0xFF) << 24) |
+     ((bitsStream.getByte(curPos + 5) & 0xFF) << 16) |
+     ((bitsStream.getByte(curPos + 6) & 0xFF) << 8) |
+     (bitsStream.getByte(curPos + 7) & 0xFF)
+ }
+
+ override def readFully(readBuffer: Array[Byte], offset: Int, length: Int): Unit = {
+   if (length < 0) throw new IndexOutOfBoundsException("read length is inlegal for bitmap index.\n")
+   var curPos = pos
+   pos += length
+   if (pos > bitsSize - 1) throw new EOFException("read is ending of file for bitmap index.\n")
+   (offset until (offset + length)).foreach(idx => {
+     readBuffer(idx) = bitsStream.getByte(curPos)
+     curPos += 1
+   })
+ }
+
+ override def skipBytes(n: Int): Int = {
+   pos += n
+   n
+ }
+
+ // Below are not needed by roaring bitmap, just implement them for DataInput interface.
+ override def readBoolean(): Boolean = {
+   val curPos = pos
+   pos += 1
+   if (bitsStream.getByte(curPos).toInt != 0) true else false
+ }
+
+ override def readByte(): Byte = {
+   val curPos = pos
+   pos += 1
+   bitsStream.getByte(curPos)
+ }
+
+ override def readUnsignedByte(): Int = {
+   readByte().toInt
+ }
+
+ override def readUnsignedShort(): Int = {
+   readShort().toInt
+ }
+
+ override def readChar(): Char = {
+   readShort().toChar
+ }
+
+ override def readDouble(): Double = {
+   readLong().toDouble
+ }
+
+ override def readFloat(): Float = {
+   readInt().toFloat
+ }
+
+ override def readFully(readBuffer: Array[Byte]): Unit = {
+   readFully(readBuffer, 0, readBuffer.length)
+ }
+
+ override def readLine(): String = {
+   throw new UnsupportedOperationException("Bitmap doesn't need this." +
+     "It's inlegal to use it in bitmap!!!")
+ }
+
+ override def readUTF(): String = {
+   throw new UnsupportedOperationException("Bitmap doesn't need this." +
+     "It' inlegal to use it in bitmap!!!")
+ }
 }

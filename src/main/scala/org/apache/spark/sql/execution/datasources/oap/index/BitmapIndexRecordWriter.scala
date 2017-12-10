@@ -24,7 +24,7 @@ import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
-import org.roaringbitmap.buffer.MutableRoaringBitmap
+import org.roaringbitmap.RoaringBitmap
 
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
@@ -61,7 +61,7 @@ private[oap] class BitmapIndexRecordWriter(
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
   @transient private lazy val nnkw = new NonNullKeyWriter(keySchema)
 
-  private val rowMapBitmap = new mutable.HashMap[InternalRow, MutableRoaringBitmap]()
+  private val rowMapBitmap = new mutable.HashMap[InternalRow, RoaringBitmap]()
   private var recordCount: Int = 0
 
   private var bmUniqueKeyListOffset: Int = _
@@ -80,7 +80,7 @@ private[oap] class BitmapIndexRecordWriter(
   override def write(key: Void, value: InternalRow): Unit = {
     val v = genericProjector(value).copy()
     if (!rowMapBitmap.contains(v)) {
-      val bm = new MutableRoaringBitmap()
+      val bm = new RoaringBitmap()
       bm.add(recordCount)
       rowMapBitmap.put(v, bm)
     } else {
