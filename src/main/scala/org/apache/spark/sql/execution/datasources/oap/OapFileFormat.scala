@@ -78,6 +78,9 @@ private[sql] class OapFileFormat extends FileFormat
   // TODO inferSchema could be lazy computed
   var inferSchema: Option[StructType] = _
   var meta: Option[DataSourceMeta] = _
+  var columnsHitIndex: Map[String, IndexType] = _
+
+  def getHitIndexColumns: Map[String, IndexType] = this.columnsHitIndex
 
   override def prepareWrite(
       sparkSession: SparkSession,
@@ -244,6 +247,14 @@ private[sql] class OapFileFormat extends FileFormat
         }
 
         val filterScanners = ic.getScanners
+        columnsHitIndex = filterScanners match {
+          case Some(s) =>
+            s.scanners.flatMap { scanner =>
+              scanner.keyNames.map( n => n -> scanner.meta.indexType)
+            }.toMap
+          case _ => Map.empty
+        }
+
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
         hadoopConf.setDouble(SQLConf.OAP_FULL_SCAN_THRESHOLD.key,

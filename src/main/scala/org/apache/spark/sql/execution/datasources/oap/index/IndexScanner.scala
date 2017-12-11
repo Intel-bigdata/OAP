@@ -49,6 +49,8 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
 
   protected var keySchema: StructType = _
 
+  def keyNames: Seq[String] = keySchema.fieldNames
+
   /**
    * Scan N items from each index entry.
    */
