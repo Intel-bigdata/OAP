@@ -169,11 +169,6 @@ case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends 
 }
 
 private[oap]
-case class IndexFiber(file: IndexFile) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = file.getIndexFiberData(conf)
-}
-
-private[oap]
 case class BTreeFiber(
     getFiberData: () => FiberCache,
     file: String,
@@ -181,14 +176,13 @@ case class BTreeFiber(
     idx: Int) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
 
-  override def hashCode(): Int = (getFiberData.toString() + file + section + idx).hashCode
+  override def hashCode(): Int = (file + section + idx).hashCode
 
   override def equals(obj: Any): Boolean = obj match {
     case another: BTreeFiber =>
       another.section == section &&
         another.idx == idx &&
-        another.file == file &&
-        another.getFiberData.toString() == getFiberData.toString()
+        another.file == file
     case _ => false
   }
 }
@@ -203,15 +197,13 @@ case class BitmapFiber(
     loadUnitIdxOfSection: Int) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
 
-  override def hashCode(): Int =
-    (getFiberData.toString() + file + sectionIdxOfFile + loadUnitIdxOfSection).hashCode
+  override def hashCode(): Int = (file + sectionIdxOfFile + loadUnitIdxOfSection).hashCode
 
   override def equals(obj: Any): Boolean = obj match {
     case another: BitmapFiber =>
       another.sectionIdxOfFile == sectionIdxOfFile &&
         another.loadUnitIdxOfSection == loadUnitIdxOfSection &&
-        another.file == file &&
-        another.getFiberData.toString() == getFiberData.toString()
+        another.file == file
     case _ => false
   }
 }

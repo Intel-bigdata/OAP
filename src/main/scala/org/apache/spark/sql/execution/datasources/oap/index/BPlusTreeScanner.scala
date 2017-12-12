@@ -33,7 +33,6 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
   @transient protected var currentKeyArray: Array[CurrentKey] = _
 
   var currentKeyIdx = 0
-  var indexFiber: IndexFiber = _
   var recordReader: BTreeIndexRecordReader = _
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
@@ -52,7 +51,8 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     // TODO decouple with btreeindexrecordreader
     // This is called before the scanner call `initialize`
     val reader = BTreeIndexFileReader(conf, indexPath)
-    val footerFiber = BTreeFiber(() => reader.readFooter(), reader.file.toString, 0, 0)
+    val footerFiber = BTreeFiber(
+      () => reader.readFooter(), reader.file.toString, reader.footerSectionId, 0)
     val footerCache = FiberCacheManager.get(footerFiber, conf)
     val footer = BTreeFooter(footerCache, keySchema)
     val offset = footer.getStatsOffset

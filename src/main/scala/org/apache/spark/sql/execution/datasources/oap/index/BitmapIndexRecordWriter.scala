@@ -34,16 +34,25 @@ import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManag
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
 import org.apache.spark.sql.types._
 
+private[oap] object BitmapIndexSectionId {
+  val headerSection       : Int = 1 // header
+  val keyListSection      : Int = 2 // sorted unique key list (index column unique values)
+  val entryListSection    : Int = 3 // bitmap entry list
+  val entryOffsetsSection : Int = 4 // bitmap entry offset list
+  val statisticsSection   : Int = 5 // keep the original statistics, not changed than before.
+  val footerSection       : Int = 6 // footer to save total key list size and length, total entry
+}
+
 /* Below is the bitmap index general layout and sections.
- * #section id     section size(B) section description
- *    1              4               header
- *    2              varied          sorted unique key list (index column unique values)
- *    3              varied          bitmap entry list
- *    4              varied          bitmap entry offset list
- *    5              varied          keep the original statistics, not changed than before.
- *    6              40(5*8)         footer to save total key list size and length, total entry
- *                                   list size and total offset list size, and also the original
- *                                   index end.
+ * #section id        section size(B) section description
+ * headerSection      4               header
+ * keyListSection     varied          sorted unique key list (index column unique values)
+ * entryListSection   varied          bitmap entry list
+ * entryOffsetSection varied          bitmap entry offset list
+ * statisticsSection  varied          keep the original statistics, not changed than before.
+ * footerSection      40(5*8)         footer to save total key list size and length, total entry
+ *                                    list size and total offset list size, and also the original
+ *                                    index end.
  *
  * TODO: 1. Bitmap index is suitable for the enumeration columns which actually has not many
  *          unique values, thus we will load the key list and offset list respectively as a
@@ -64,9 +73,7 @@ private[oap] class BitmapIndexRecordWriter(
   private val rowMapBitmap = new mutable.HashMap[InternalRow, MutableRoaringBitmap]()
   private var recordCount: Int = 0
 
-  private var bmUniqueKeyListOffset: Int = _
   private var bmEntryListOffset: Int = _
-  private var bmOffsetListOffset: Int = _
 
   private var bmUniqueKeyList: immutable.List[InternalRow] = _
   private var bmOffsetListBuffer: mutable.ListBuffer[Int] = _
