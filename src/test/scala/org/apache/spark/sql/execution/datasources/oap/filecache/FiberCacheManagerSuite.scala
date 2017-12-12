@@ -73,4 +73,15 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val fiberCache1 = FiberCacheManager.get(fiber1, configuration)
     assert(fiberCache1.isDisposed)
   }
+
+  test("fiber key equality test") {
+    val data = generateData(kbSize)
+    val origStats = FiberCacheManager.cacheStats
+    val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber")
+    FiberCacheManager.get(fiber, configuration)
+    assert(FiberCacheManager.cacheStats.minus(origStats).missCount() == 1)
+    val sameFiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber")
+    FiberCacheManager.get(sameFiber, configuration)
+    assert(FiberCacheManager.cacheStats.minus(origStats).hitCount() == 1)
+  }
 }

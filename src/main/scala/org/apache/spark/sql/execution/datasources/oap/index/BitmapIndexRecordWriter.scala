@@ -39,7 +39,7 @@ private[oap] object BitmapIndexSectionId {
   val keyListSection      : Int = 2 // sorted unique key list (index column unique values)
   val entryListSection    : Int = 3 // bitmap entry list
   val entryOffsetsSection : Int = 4 // bitmap entry offset list
-  val statisticsSection   : Int = 5 // keep the original statistics, not changed than before.
+  val statisticsSection   : Int = 5 // keep the original statistics, not changed than before
   val footerSection       : Int = 6 // footer to save total key list size and length
 }
 

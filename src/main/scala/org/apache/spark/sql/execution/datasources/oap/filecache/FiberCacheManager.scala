@@ -210,4 +210,11 @@ case class BitmapFiber(
 
 private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache = getData()
+
+  override def hashCode(): Int = name.hashCode()
+
+  override def equals(obj: Any): Boolean = obj match {
+    case another: TestFiber => name == another.name
+    case _ => false
+  }
 }
