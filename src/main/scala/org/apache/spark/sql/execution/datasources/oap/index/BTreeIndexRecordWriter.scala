@@ -195,8 +195,8 @@ private[index] case class BTreeIndexRecordWriter(
    */
   private def serializeRowIdLists(uniqueKeys: Seq[InternalRow]): Array[Byte] = {
     val buffer = new ByteArrayOutputStream()
-    uniqueKeys.flatMap(key =>
-      multiHashMap.get(key).asScala).foreach(IndexUtils.writeInt(buffer, _))
+    uniqueKeys.map(key => multiHashMap.get(key).asScala)
+      .foreach(_.foreach(IndexUtils.writeInt(buffer, _)))
     buffer.toByteArray
   }
 
