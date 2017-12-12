@@ -29,6 +29,8 @@ class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAnd
 
   override def beforeEach(): Unit = {
     spark.conf.set(SQLConf.OAP_INDEXER_CHOICE_MAX_SIZE.key, "2")
+    spark.conf.set(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")
+    spark.conf.set(SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key, "1000")
     val path = Utils.createTempDir().getAbsolutePath
     currentPath = path
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b INT, c INT)
@@ -43,7 +45,9 @@ class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAnd
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("oap_test")
     sqlContext.dropTempTable("parquet_test")
-    spark.conf.set(SQLConf.OAP_INDEXER_CHOICE_MAX_SIZE.key, "1")
+    spark.conf.unset(SQLConf.OAP_INDEXER_CHOICE_MAX_SIZE.key)
+    spark.conf.unset(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key)
+    spark.conf.unset(SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key)
   }
 
   test("filtering parquet") {
@@ -70,6 +74,9 @@ class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAnd
 
     checkAnswer(sql("SELECT c FROM parquet_test WHERE a = 3 and b > 14 and c > 30"),
       Row(81) :: Nil)
+
+    checkAnswer(sql("SELECT c FROM parquet_test WHERE a = 3 and b > 14 and c > 300"),
+      Nil)
 
     sql("drop oindex index1 on parquet_test")
     sql("drop oindex index2 on parquet_test")
@@ -100,6 +107,8 @@ class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAnd
 
     checkAnswer(sql("SELECT c FROM oap_test WHERE a = 3 and b > 14 and c > 30"),
       Row(81) :: Nil)
+
+    checkAnswer(sql("SELECT c FROM oap_test WHERE a = 3 and b > 14 and c > 300"), Nil)
 
     sql("drop oindex index1 on oap_test")
     sql("drop oindex index2 on oap_test")

@@ -66,28 +66,31 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
 
   def getSchema: StructType = keySchema
 
-  def indexIsAvailable(dataPath: Path, conf: Configuration): Boolean = {
+  def readBehavior(dataPath: Path, conf: Configuration): Double = {
     val indexPath = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     if (!indexPath.getFileSystem(conf).exists(indexPath)) {
       logDebug("No index file exist for data file: " + dataPath)
-      false
+      StaticsAnalysisResult.FULL_SCAN
     } else {
       val start = System.currentTimeMillis()
       val enableOIndex = conf.getBoolean(SQLConf.OAP_ENABLE_OINDEX.key,
         SQLConf.OAP_ENABLE_OINDEX.defaultValue.get)
-      val useIndex = enableOIndex && canUseIndex(indexPath, dataPath, conf)
+      var behavior: Double = StaticsAnalysisResult.FULL_SCAN
+      val useIndex = enableOIndex && {
+        behavior = readBehavior(indexPath, dataPath, conf)
+        behavior != StaticsAnalysisResult.FULL_SCAN
+      }
       val end = System.currentTimeMillis()
       logDebug("Index Selection Time (Executor): " + (end - start) + "ms")
       if (!useIndex) {
         logWarning("OAP index is skipped. Set below flags to force enable index,\n" +
             "sqlContext.conf.setConfString(SQLConf.OAP_USE_INDEX_FOR_DEVELOPERS.key, true) or \n" +
             "sqlContext.conf.setConfString(SQLConf.OAP_EXECUTOR_INDEX_SELECTION.key, false)")
-        false
       } else {
         OapIndexInfo.partitionOapIndex.put(dataPath.toString, true)
         logInfo("Partition File " + dataPath.toString + " will use OAP index.\n")
-        true
       }
+      behavior
     }
   }
 
@@ -101,9 +104,10 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
    *
    * @param indexPath: index file path.
    * @param conf: configurations
-   * @return Boolean to indicate if executor chooses to use index.
+   * @return Double to indicate if executor use index behavior,
+    *         like FULL_SCAN, USE_INDEX or SKIP_INDEX
    */
-  private def canUseIndex(indexPath: Path, dataPath: Path, conf: Configuration): Boolean = {
+  private def readBehavior(indexPath: Path, dataPath: Path, conf: Configuration): Double = {
     if (conf.getBoolean(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key,
       SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.defaultValue.get)) {
       // Index selection is enabled, executor chooses index according to policy.
@@ -113,16 +117,15 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       val dataFileSize = dataPath.getFileSystem(conf).getContentSummary(dataPath).getLength
       val ratio = conf.getDouble(SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
         SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
-      if (indexFileSize > dataFileSize * ratio) return false
+      if (indexFileSize > dataFileSize * ratio) return StaticsAnalysisResult.FULL_SCAN
 
       // Policy 2: statistics tells the scan cost
-      val statsAnalyseResult = tryToReadStatistics(indexPath, conf)
-      statsAnalyseResult == StaticsAnalysisResult.USE_INDEX
+      tryToReadStatistics(indexPath, conf)
 
       // More Policies
     } else {
       // Index selection is disabled, executor always uses index.
-      true
+      StaticsAnalysisResult.USE_INDEX
     }
   }
 
@@ -312,8 +315,18 @@ private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
   private var backendIter: Iterator[Int] = _
 
   def indexIsAvailable(dataPath: Path, conf: Configuration): Boolean = {
-    actualUsedScanners = scanners.filter(_.indexIsAvailable(dataPath, conf))
-    actualUsedScanners.nonEmpty
+    val scannersAndStatics = scanners
+      .map(scanner => (scanner, scanner.readBehavior(dataPath, conf)))
+      // _ is (scanner, StaticsAnalysisResult)
+      .filter(_._2 != StaticsAnalysisResult.FULL_SCAN)
+    scannersAndStatics.length match {
+      case 0 => false
+      case _ if scannersAndStatics.exists(_._2 == StaticsAnalysisResult.SKIP_INDEX) =>
+        actualUsedScanners = Seq.empty
+        true
+      case _ => actualUsedScanners = scannersAndStatics.map(_._1)
+        true
+    }
   }
 
   def order: SortDirection = actualUsedScanners.head.meta.indexType.indexOrder.head
