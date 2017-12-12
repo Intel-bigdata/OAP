@@ -40,7 +40,7 @@ private[oap] object BitmapIndexSectionId {
   val entryListSection    : Int = 3 // bitmap entry list
   val entryOffsetsSection : Int = 4 // bitmap entry offset list
   val statisticsSection   : Int = 5 // keep the original statistics, not changed than before.
-  val footerSection       : Int = 6 // footer to save total key list size and length, total entry
+  val footerSection       : Int = 6 // footer to save total key list size and length
 }
 
 /* Below is the bitmap index general layout and sections.
