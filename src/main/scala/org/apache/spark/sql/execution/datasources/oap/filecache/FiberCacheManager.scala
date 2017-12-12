@@ -51,6 +51,7 @@ object FiberCacheManager extends Logging {
       logDebug(s"Removing Cache ${notification.getKey}")
       // TODO: Investigate lock mechanism to secure in-used FiberCache
       notification.getValue.dispose()
+      _cacheSize -= notification.getValue.size()
     }
   }
   private val weigher = new Weigher[Fiber, FiberCache] {
@@ -61,6 +62,9 @@ object FiberCacheManager extends Logging {
   private val MB: Double = 1024 * 1024
   private val MAX_WEIGHT = (MemoryManager.maxMemory / MB).toInt
 
+  // cached size
+  private var _cacheSize: Long = 0
+
   /**
    * To avoid storing configuration in each Cache, use a loader.
    * After all, configuration is not a part of Fiber.
@@ -69,7 +73,9 @@ object FiberCacheManager extends Logging {
     new Callable[FiberCache] {
       override def call(): FiberCache = {
         logDebug(s"Loading Cache $fiber")
-        fiber.fiber2Data(configuration)
+        val fiberCache = fiber.fiber2Data(configuration)
+        _cacheSize += fiberCache.size()
+        fiberCache
       }
     }
 
@@ -104,11 +110,16 @@ object FiberCacheManager extends Logging {
     CacheStatusSerDe.serialize(statusRawData)
   }
 
-  def getStats: CacheStats = cache.stats()
+  def cacheStats: CacheStats = cache.stats()
+
+  def cacheSize : Long = _cacheSize
 }
 
 private[oap] object DataFileHandleCacheManager extends Logging {
   type ENTRY = DataFile
+
+  private var _cacheSize: Long = 0
+
   private val cache =
     CacheBuilder
       .newBuilder()
@@ -118,6 +129,7 @@ private[oap] object DataFileHandleCacheManager extends Logging {
         override def onRemoval(n: RemovalNotification[ENTRY, DataFileHandle])
         : Unit = {
           logDebug(s"Evicting Data File Handle ${n.getKey.path}")
+          _cacheSize -= n.getValue.len
           n.getValue.close
         }
       })
@@ -125,7 +137,9 @@ private[oap] object DataFileHandleCacheManager extends Logging {
         override def load(entry: ENTRY)
         : DataFileHandle = {
           logDebug(s"Loading Data File Handle ${entry.path}")
-          entry.createDataFileHandle()
+          val handle = entry.createDataFileHandle()
+          _cacheSize += handle.len
+          handle
         }
       })
 
@@ -142,6 +156,16 @@ private[oap]
 case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache =
     file.getFiberData(rowGroupId, columnIndex, conf)
+
+  override def hashCode(): Int = (file.path + columnIndex + rowGroupId).hashCode
+
+  override def equals(obj: Any): Boolean = obj match {
+    case another: DataFiber =>
+      another.columnIndex == columnIndex &&
+        another.rowGroupId == rowGroupId &&
+        another.file.path == file.path
+    case _ => false
+  }
 }
 
 private[oap]
@@ -156,6 +180,17 @@ case class BTreeFiber(
     section: Int,
     idx: Int) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+
+  override def hashCode(): Int = (getFiberData.toString() + file + section + idx).hashCode
+
+  override def equals(obj: Any): Boolean = obj match {
+    case another: BTreeFiber =>
+      another.section == section &&
+        another.idx == idx &&
+        another.file == file &&
+        another.getFiberData.toString() == getFiberData.toString()
+    case _ => false
+  }
 }
 
 private[oap]
@@ -167,6 +202,18 @@ case class BitmapFiber(
     // "0" means no smaller loading units.
     loadUnitIdxOfSection: Int) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+
+  override def hashCode(): Int =
+    (getFiberData.toString() + file + sectionIdxOfFile + loadUnitIdxOfSection).hashCode
+
+  override def equals(obj: Any): Boolean = obj match {
+    case another: BitmapFiber =>
+      another.sectionIdxOfFile == sectionIdxOfFile &&
+        another.loadUnitIdxOfSection == loadUnitIdxOfSection &&
+        another.file == file &&
+        another.getFiberData.toString() == getFiberData.toString()
+    case _ => false
+  }
 }
 
 private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
