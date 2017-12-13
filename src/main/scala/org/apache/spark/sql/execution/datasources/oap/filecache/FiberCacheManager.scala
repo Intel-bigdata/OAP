@@ -17,9 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import com.google.common.cache._
 import java.util.concurrent.{Callable, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
+
+import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
 import scala.collection.JavaConverters._
 
@@ -164,7 +165,7 @@ case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends 
     case another: DataFiber =>
       another.columnIndex == columnIndex &&
         another.rowGroupId == rowGroupId &&
-        another.file.path == file.path
+        another.file.path.equals(file.path)
     case _ => false
   }
 }
@@ -183,7 +184,7 @@ case class BTreeFiber(
     case another: BTreeFiber =>
       another.section == section &&
         another.idx == idx &&
-        another.file == file
+        another.file.equals(file)
     case _ => false
   }
 }
@@ -204,7 +205,7 @@ case class BitmapFiber(
     case another: BitmapFiber =>
       another.sectionIdxOfFile == sectionIdxOfFile &&
         another.loadUnitIdxOfSection == loadUnitIdxOfSection &&
-        another.file == file
+        another.file.equals(file)
     case _ => false
   }
 }
@@ -215,7 +216,7 @@ private[oap] case class TestFiber(getData: () => FiberCache, name: String) exten
   override def hashCode(): Int = name.hashCode()
 
   override def equals(obj: Any): Boolean = obj match {
-    case another: TestFiber => name == another.name
+    case another: TestFiber => name.equals(another.name)
     case _ => false
   }
 }
