@@ -17,12 +17,11 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.util.concurrent.{Callable, TimeUnit}
-
-import scala.collection.JavaConverters._
-
 import com.google.common.cache._
+import java.util.concurrent.{Callable, TimeUnit}
+import java.util.concurrent.atomic.AtomicLong
 import org.apache.hadoop.conf.Configuration
+import scala.collection.JavaConverters._
 
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
@@ -51,7 +50,7 @@ object FiberCacheManager extends Logging {
       logDebug(s"Removing Cache ${notification.getKey}")
       // TODO: Investigate lock mechanism to secure in-used FiberCache
       notification.getValue.dispose()
-      _cacheSize -= notification.getValue.size()
+      _cacheSize.addAndGet(-notification.getValue.size())
     }
   }
   private val weigher = new Weigher[Fiber, FiberCache] {
@@ -62,8 +61,8 @@ object FiberCacheManager extends Logging {
   private val MB: Double = 1024 * 1024
   private val MAX_WEIGHT = (MemoryManager.maxMemory / MB).toInt
 
-  // cached size
-  private var _cacheSize: Long = 0
+  // Total cached size for debug purpose
+  private val _cacheSize: AtomicLong = new AtomicLong(0)
 
   /**
    * To avoid storing configuration in each Cache, use a loader.
@@ -74,7 +73,7 @@ object FiberCacheManager extends Logging {
       override def call(): FiberCache = {
         logDebug(s"Loading Cache $fiber")
         val fiberCache = fiber.fiber2Data(configuration)
-        _cacheSize += fiberCache.size()
+        _cacheSize.addAndGet(fiberCache.size())
         fiberCache
       }
     }
@@ -112,13 +111,15 @@ object FiberCacheManager extends Logging {
 
   def cacheStats: CacheStats = cache.stats()
 
-  def cacheSize : Long = _cacheSize
+  def cacheSize : Long = _cacheSize.get()
 }
 
 private[oap] object DataFileHandleCacheManager extends Logging {
   type ENTRY = DataFile
 
-  private var _cacheSize: Long = 0
+  private val _cacheSize: AtomicLong = new AtomicLong(0)
+
+  def cacheSize: Long = _cacheSize.get()
 
   private val cache =
     CacheBuilder
@@ -129,7 +130,7 @@ private[oap] object DataFileHandleCacheManager extends Logging {
         override def onRemoval(n: RemovalNotification[ENTRY, DataFileHandle])
         : Unit = {
           logDebug(s"Evicting Data File Handle ${n.getKey.path}")
-          _cacheSize -= n.getValue.len
+          _cacheSize.addAndGet(-n.getValue.len)
           n.getValue.close
         }
       })
@@ -138,7 +139,7 @@ private[oap] object DataFileHandleCacheManager extends Logging {
         : DataFileHandle = {
           logDebug(s"Loading Data File Handle ${entry.path}")
           val handle = entry.createDataFileHandle()
-          _cacheSize += handle.len
+          _cacheSize.addAndGet(handle.len)
           handle
         }
       })
