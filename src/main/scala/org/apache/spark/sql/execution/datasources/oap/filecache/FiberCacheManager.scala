@@ -20,9 +20,10 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.util.concurrent.{Callable, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
 
+import scala.collection.JavaConverters._
+
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
-import scala.collection.JavaConverters._
 
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
