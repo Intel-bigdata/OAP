@@ -288,6 +288,56 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(5, 1) :: Row(4, 2) :: Nil)
   }
 
+  test("test refresh in parquet format on a partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE t_refresh_parquet
+        |partition (b=1)
+        |SELECT key from t where value < 3
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh_parquet
+        |partition (b=2)
+        |SELECT key from t where value == 2
+      """.stripMargin)
+
+
+    sql("create oindex index1 on t_refresh_parquet (a)")
+
+    checkAnswer(sql("select * from t_refresh_parquet"),
+      Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Nil)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh_parquet
+        |partition (b=2)
+        |SELECT key from t where value == 3
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh_parquet
+        |partition (b=3)
+        |SELECT key from t where value == 4
+      """.stripMargin)
+
+    sql("refresh oindex on t_refresh_parquet partition (b=2)")
+
+    val fs = new Path(currentPath).getFileSystem(new Configuration())
+    val tablePath = sqlConf.warehousePath + "/t_refresh_parquet/"
+    assert(fs.globStatus(new Path(tablePath + "b=1/*.index")).length == 1)
+    assert(fs.globStatus(new Path(tablePath + "b=2/*.index")).length == 2)
+    assert(fs.globStatus(new Path(tablePath + "b=3/*.index")).length == 0)
+
+    checkAnswer(sql("select * from t_refresh_parquet"),
+      Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Row(3, 2) :: Row(4, 3) :: Nil)
+  }
+
   test("test refresh in oap format on same partition") {
     val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
     data.toDF("key", "value").createOrReplaceTempView("t")
@@ -351,6 +401,56 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("select * from t_refresh"),
       Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 2) :: Row(5, 1) :: Nil)
+  }
+
+  test("test refresh in oap format on a partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE t_refresh
+        |partition (b=1)
+        |SELECT key from t where value < 3
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh
+        |partition (b=2)
+        |SELECT key from t where value == 2
+      """.stripMargin)
+
+
+    sql("create oindex index1 on t_refresh (a)")
+
+    checkAnswer(sql("select * from t_refresh"),
+      Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Nil)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh
+        |partition (b=2)
+        |SELECT key from t where value == 3
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh
+        |partition (b=3)
+        |SELECT key from t where value == 4
+      """.stripMargin)
+
+    sql("refresh oindex on t_refresh partition (b=2)")
+
+    val fs = new Path(currentPath).getFileSystem(new Configuration())
+    val tablePath = sqlConf.warehousePath + "/t_refresh/"
+    assert(fs.globStatus(new Path(tablePath + "b=1/*.index")).length == 1)
+    assert(fs.globStatus(new Path(tablePath + "b=2/*.index")).length == 2)
+    assert(fs.globStatus(new Path(tablePath + "b=3/*.index")).length == 0)
+
+    checkAnswer(sql("select * from t_refresh"),
+      Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Row(3, 2) :: Row(4, 3) :: Nil)
   }
 
   test("refresh table of oap format without partition") {

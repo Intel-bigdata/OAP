@@ -1452,7 +1452,8 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
 
   override def visitOapRefreshIndices(ctx: OapRefreshIndicesContext): LogicalPlan =
     withOrigin(ctx) {
-      RefreshIndex(visitTableIdentifier(ctx.tableIdentifier))
+      RefreshIndex(visitTableIdentifier(ctx.tableIdentifier),
+        Option(ctx.partitionSpec).map(visitNonOptionalPartitionSpec))
     }
 
   override def visitOapShowIndex(ctx: OapShowIndexContext): LogicalPlan = withOrigin(ctx) {
