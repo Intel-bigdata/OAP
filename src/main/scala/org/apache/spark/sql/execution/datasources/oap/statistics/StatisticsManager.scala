@@ -133,7 +133,7 @@ class StatisticsManager {
       readOffset += 4
       val statsArray = new Array[Statistics](numOfStats)
       for (i <- 0 until numOfStats) {
-        stats(i) = fiberCache.getInt(offset + readOffset) match {
+        statsArray(i) = fiberCache.getInt(offset + readOffset) match {
           case StatisticsType(stat) => stat(s)
           case _ => throw new UnsupportedOperationException("unsupport statistics id")
         }
