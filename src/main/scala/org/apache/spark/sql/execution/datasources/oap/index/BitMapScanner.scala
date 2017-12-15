@@ -207,7 +207,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     // If invalid starting index, just return.
     if (startIdx == -1 || startIdx == keyLength) return (-1, -1)
     // If equal query, no need to find endIdx.
-    if (range.start == range.end) return (startIdx, startIdx)
+    if (range.start == range.end && range.start != IndexScanner.DUMMY_KEY_START) {
+      return (startIdx, startIdx)
+    }
+
     val endIdx = if (range.end == IndexScanner.DUMMY_KEY_END) {
       // If no ending key, assume to end with the last key.
       keyLength - 1
@@ -232,7 +235,6 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
         val bmEntry = new RoaringBitmap()
         // Below is directly reading from byte array rather than deserializing into java object.
         bmEntry.deserialize(bmStream)
-        bmStream.skipBytes(bmEntry.serializedSizeInBytes)
         bmEntry
       })
     } else IndexedSeq.empty
@@ -252,7 +254,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
           getDesiredBitmaps(bmEntryListCache, curPosition, startIdx, endIdx + 1)
         }
       case range if range.isNullPredicate =>
-        getDesiredBitmaps(bmNullListCache, 0, 0, 0)
+        getDesiredBitmaps(bmNullListCache, 0, 0, 1)
     }
   }
 
