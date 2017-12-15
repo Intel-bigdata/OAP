@@ -38,9 +38,10 @@ private[oap] object BitmapIndexSectionId {
   val headerSection       : Int = 1 // header
   val keyListSection      : Int = 2 // sorted unique key list (index column unique values)
   val entryListSection    : Int = 3 // bitmap entry list
-  val entryOffsetsSection : Int = 4 // bitmap entry offset list
-  val statisticsSection   : Int = 5 // keep the original statistics, not changed than before
-  val footerSection       : Int = 6 // footer to save total key list size and length
+  val entryNullSection    : Int = 4 // bitmap entry for null value rows
+  val entryOffsetsSection : Int = 5 // bitmap entry offset list
+  val statisticsSection   : Int = 6 // keep the original statistics, not changed than before.
+  val footerSection       : Int = 7 // footer to save total key list size and length, total entry
 }
 
 /* Below is the bitmap index general layout and sections.
@@ -76,7 +77,10 @@ private[oap] class BitmapIndexRecordWriter(
   private var bmEntryListOffset: Int = _
 
   private var bmUniqueKeyList: immutable.List[InternalRow] = _
+  private var bmNullKeyList: immutable.List[InternalRow] = _
   private var bmOffsetListBuffer: mutable.ListBuffer[Int] = _
+  private var bmNullEntryOffset: Int = _
+  private var bmNullEntrySize: Int = _
 
   private var bmUniqueKeyListTotalSize: Int = _
   private var bmUniqueKeyListCount: Int = _
@@ -105,7 +109,11 @@ private[oap] class BitmapIndexRecordWriter(
     val ordering = GenerateOrdering.create(keySchema)
     // Currently OAP index type supports the column with one single field.
     assert(keySchema.fields.size == 1)
-    bmUniqueKeyList = rowMapBitmap.keySet.toList.sorted(ordering)
+    // val (bmNullKeyList, bmUniqueKeyList) =
+    val (nullKeyList, uniqueKeyList) = rowMapBitmap.keySet.toList.partition(_.anyNull)
+    bmNullKeyList = nullKeyList
+    assert(bmNullKeyList.size <= 1) // At most one null key exists.
+    bmUniqueKeyList = uniqueKeyList.sorted(ordering)
     val bos = new ByteArrayOutputStream()
     bmUniqueKeyList.foreach(key => nnkw.writeKey(bos, key))
     bmUniqueKeyListTotalSize = bos.size()
@@ -136,8 +144,22 @@ private[oap] class BitmapIndexRecordWriter(
       dos.close()
       bos.close()
     })
-    bmOffsetListBuffer.append(bmEntryListOffset + totalBitmapSize)
     bmEntryListTotalSize = totalBitmapSize
+
+    // Write entry for null value rows if exists
+    if (bmNullKeyList.nonEmpty) {
+      bmNullEntryOffset = bmEntryListOffset + totalBitmapSize
+      val bm = rowMapBitmap.get(bmNullKeyList.head).get
+      bm.runOptimize()
+      val bos = new ByteArrayOutputStream()
+      val dos = new DataOutputStream(bos)
+      bm.serialize(dos)
+      dos.flush()
+      bmNullEntrySize = bos.size
+      writer.write(bos.toByteArray)
+      dos.close()
+      bos.close()
+    }
   }
 
   private def writeBmOffsetList(): Unit = {
@@ -149,12 +171,13 @@ private[oap] class BitmapIndexRecordWriter(
   private def writeBmFooter(): Unit = {
     // The beginning of the footer are bitmap total size, key list size and offset total size.
     // Others keep back compatible and not changed than before.
-    bmIndexEnd = bmEntryListOffset + bmEntryListTotalSize + bmOffsetListTotalSize
+    bmIndexEnd = bmEntryListOffset + bmEntryListTotalSize + bmNullEntrySize + bmOffsetListTotalSize
     IndexUtils.writeInt(writer, bmUniqueKeyListTotalSize)
     IndexUtils.writeInt(writer, bmUniqueKeyListCount)
     IndexUtils.writeInt(writer, bmEntryListTotalSize)
     IndexUtils.writeInt(writer, bmOffsetListTotalSize)
-    IndexUtils.writeLong(writer, bmIndexEnd)
+    IndexUtils.writeInt(writer, bmNullEntryOffset)
+    IndexUtils.writeInt(writer, bmNullEntrySize)
     IndexUtils.writeLong(writer, bmIndexEnd)
     IndexUtils.writeLong(writer, bmIndexEnd)
   }

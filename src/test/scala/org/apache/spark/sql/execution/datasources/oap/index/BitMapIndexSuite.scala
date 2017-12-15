@@ -159,4 +159,51 @@ class BitMapIndexSuite extends QueryTest with SharedOapContext with BeforeAndAft
 
     sql("drop oindex index_bf on oap_test")
   }
+
+  test("BitMap index for null value") {
+    val data: Seq[(Int, String)] = (0 to 200).map {
+      case i if (i % 100 != 0) => (i, s"this is test $i")
+      case j => (j, null)
+    }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bf on oap_test (b) USING BITMAP")
+
+    val nullResult: Seq[(Int, String)] = (0, null) :: (100, null) :: (200, null) :: Nil
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b is null"), nullResult.toDF("key", "value"))
+
+    val nonNullResult: Seq[(Int, String)] = (99, "this is test 99") :: Nil
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b is not null and a = 99"),
+      nonNullResult.toDF("key", "value"))
+
+    sql("drop oindex index_bf on oap_test")
+  }
+
+  test("BitMap index for no null value") {
+    val data: Seq[(Int, String)] = (0 to 200).map {i => (i, s"this is test $i")}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bf on oap_test (b) USING BITMAP")
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b is null"), Nil)
+
+    val nonNullResult: Seq[(Int, String)] = (99, "this is test 99") :: Nil
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b is not null and a = 99"),
+      nonNullResult.toDF("key", "value"))
+
+    sql("drop oindex index_bf on oap_test")
+  }
+
+  test("BitMap index for full null value") {
+    val data: Seq[(Int, String)] = (0 to 200).map {i => (i, null)}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bf on oap_test (b) USING BITMAP")
+
+    val nullResult: Seq[(Int, String)] = (99, null) :: Nil
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b is null and a = 99"),
+      nullResult.toDF("key", "value"))
+
+    sql("drop oindex index_bf on oap_test")
+  }
 }

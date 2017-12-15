@@ -18,8 +18,6 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import java.io.DataInput
 import java.io.EOFException
-import java.lang.IndexOutOfBoundsException
-import java.nio.ByteBuffer
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -36,7 +34,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StaticsAnalysisResult
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
-import org.apache.spark.unsafe.Platform
 
 private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
 
@@ -56,6 +53,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private var bmUniqueKeyListOffset: Int = _
   private var bmEntryListOffset: Int = _
+
+  private var bmNullEntryOffset: Int = _
+  private var bmNullEntrySize: Int = _
+
   private var bmOffsetListOffset: Int = _
   private var bmFooterOffset: Int = _
 
@@ -67,6 +68,9 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private var bmOffsetListFiber: BitmapFiber = _
   private var bmOffsetListCache: FiberCache = _
+
+  private var bmNullListFiber: BitmapFiber = _
+  private var bmNullListCache: FiberCache = _
 
   private var bmEntryListFiber: BitmapFiber = _
   private var bmEntryListCache: FiberCache = _
@@ -113,6 +117,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     bmUniqueKeyListCount = data.getInt(4)
     bmEntryListTotalSize = data.getInt(8)
     bmOffsetListTotalSize = data.getInt(12)
+    bmNullEntryOffset = data.getInt(16)
+    bmNullEntrySize = data.getInt(20)
   }
 
   private def loadBmKeyList(fin: FSDataInputStream): FiberCache = {
@@ -139,6 +145,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     MemoryManager.putToIndexFiberCache(fin, bmOffsetListOffset, bmOffsetListTotalSize)
   }
 
+  private def loadBmNullList(fin: FSDataInputStream): FiberCache = {
+    MemoryManager.putToIndexFiberCache(fin, bmNullEntryOffset, bmNullEntrySize)
+  }
+
   private def cacheBitmapAllSegments(idxPath: Path, conf: Configuration): Unit = {
     val fs = idxPath.getFileSystem(conf)
     val fin = fs.open(idxPath)
@@ -153,7 +163,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     // Get the offset for the different segments in bitmap index file.
     bmUniqueKeyListOffset = IndexFile.indexFileHeaderLength
     bmEntryListOffset = bmUniqueKeyListOffset + bmUniqueKeyListTotalSize
-    bmOffsetListOffset = bmEntryListOffset + bmEntryListTotalSize
+    bmOffsetListOffset = bmEntryListOffset + bmEntryListTotalSize + bmNullEntrySize
 
     bmUniqueKeyListFiber = BitmapFiber(
         () => loadBmKeyList(fin), idxPath.toString, BitmapIndexSectionId.keyListSection, 0)
@@ -166,6 +176,11 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     bmOffsetListFiber = BitmapFiber(
       () => loadBmOffsetList(fin), idxPath.toString, BitmapIndexSectionId.entryOffsetsSection, 0)
     bmOffsetListCache = FiberCacheManager.get(bmOffsetListFiber, conf)
+
+    bmNullListFiber = BitmapFiber(
+      () => loadBmNullList(fin), idxPath.toString, BitmapIndexSectionId.entryNullSection, 0)
+    bmNullListCache = FiberCacheManager.get(bmNullListFiber, conf)
+
     fin.close()
   }
 
@@ -210,30 +225,35 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private def getDesiredBitmaps(byteCache: FiberCache, position: Int,
       startIdx: Int, endIdx: Int): IndexedSeq[RoaringBitmap] = {
-     val bmStream = new BitmapDataInputStream(byteCache)
-     bmStream.skipBytes(position)
-    (startIdx until endIdx).map( idx => {
-      val bmEntry = new RoaringBitmap()
-      // Below is directly reading from byte array rather than deserializing into java object.
-      bmEntry.deserialize(bmStream)
-      bmStream.skipBytes(bmEntry.serializedSizeInBytes)
-      bmEntry
-    })
+    if (byteCache.size() != 0) {
+      val bmStream = new BitmapDataInputStream(byteCache)
+      bmStream.skipBytes(position)
+      (startIdx until endIdx).map( idx => {
+        val bmEntry = new RoaringBitmap()
+        // Below is directly reading from byte array rather than deserializing into java object.
+        bmEntry.deserialize(bmStream)
+        bmStream.skipBytes(bmEntry.serializedSizeInBytes)
+        bmEntry
+      })
+    } else IndexedSeq.empty
   }
 
   private def getDesiredBitmapArray: mutable.ArrayBuffer[RoaringBitmap] = {
     val keySeq = readBmUniqueKeyListFromCache(bmUniqueKeyListCache)
-    intervalArray.flatMap(range => {
-      val (startIdx, endIdx) = getBitmapIdx(keySeq, range)
-      if (startIdx == -1 || endIdx == -1) {
-        // range not fond in cur bitmap, return empty for performance consideration
-        Seq.empty[RoaringBitmap]
-      } else {
-        val startIdxOffset = getStartIdxOffset(bmOffsetListCache, 0L, startIdx)
-        val curPosition = startIdxOffset - bmEntryListOffset
-        getDesiredBitmaps(bmEntryListCache, curPosition, startIdx, endIdx + 1)
-      }
-    })
+    intervalArray.flatMap{
+      case range if !range.isNullPredicate =>
+        val (startIdx, endIdx) = getBitmapIdx(keySeq, range)
+        if (startIdx == -1 || endIdx == -1) {
+          // range not fond in cur bitmap, return empty for performance consideration
+          Seq.empty[RoaringBitmap]
+        } else {
+          val startIdxOffset = getStartIdxOffset(bmOffsetListCache, 0L, startIdx)
+          val curPosition = startIdxOffset - bmEntryListOffset
+          getDesiredBitmaps(bmEntryListCache, curPosition, startIdx, endIdx + 1)
+        }
+      case range if range.isNullPredicate =>
+        getDesiredBitmaps(bmNullListCache, 0, 0, 0)
+    }
   }
 
   private def initDesiredRowIdIterator(): Unit = {
