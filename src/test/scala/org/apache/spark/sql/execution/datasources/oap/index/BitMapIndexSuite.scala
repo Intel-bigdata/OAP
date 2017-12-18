@@ -100,32 +100,20 @@ class BitMapIndexSuite extends QueryTest with SharedOapContext with BeforeAndAft
     sql("drop oindex index_bf on oap_test")
   }
 
-  test("BitMap index for range predicate which over multi partitions") {
-    val data: Seq[(Int, String)] = (1 to 200).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").createOrReplaceTempView("t")
-    sql("insert overwrite table oap_test select * from t")
-    sql("create oindex index_bf on oap_test (a) USING BITMAP")
-    val result: Seq[(Int, String)] = (46 to 150).map { i => (i, s"this is test $i") }
-
-    checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 3 AND a <= 150 AND a > 45"),
-      result.toDF("key", "value"))
-    sql("drop oindex index_bf on oap_test")
-  }
-
   test("BitMap index for or(like,like) bug") {
     val data: Seq[(Int, String)] = (1 to 200).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test select * from t")
     sql("create oindex index_bf on oap_test (a) USING BITMAP")
-    val result: Seq[(Int, String)] = (180 to 199).map { i => (i, s"this is test $i") }
+    val result: Seq[(Int, String)] = Array(180, 200).map { i => (i, s"this is test $i") }
     val emptyResult : Seq[(Int, String)] = Seq.empty
 
-    checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 180 and a < 200 " +
+    checkAnswer(sql("SELECT * FROM oap_test WHERE (a == 180 or a == 200) " +
           "AND (b like '%22%' or b like '%21%')"),
           emptyResult.toDF("key", "value"))
 
-    checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 180 and a < 200 " +
-      "AND (b like '%18%' or b like '%19%')"),
+    checkAnswer(sql("SELECT * FROM oap_test WHERE (a == 180 or a == 200) " +
+      "AND (b like '%18%' or b like '%20%')"),
       result.toDF("key", "value"))
     sql("drop oindex index_bf on oap_test")
   }
