@@ -30,8 +30,6 @@ import org.apache.spark.util.Utils
 class StatisticsManagerSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
 
-  sparkConf.set("spark.memory.offHeap.size", "100m")
-
   override def beforeEach(): Unit = {
     val path = Utils.createTempDir().getAbsolutePath
 
