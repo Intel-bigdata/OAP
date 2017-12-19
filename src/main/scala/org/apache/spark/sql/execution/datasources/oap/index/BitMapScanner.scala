@@ -97,6 +97,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       if (bmEntryListFiber != null) {
         bmEntryListCache.release()
       }
+
+      if (bmNullListFiber != null) {
+        bmNullListCache.release()
+      }
       false
     }
   }

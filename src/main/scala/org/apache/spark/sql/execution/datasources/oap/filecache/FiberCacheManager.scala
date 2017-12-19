@@ -52,27 +52,40 @@ object FiberCacheManager extends Logging {
       // TODO: Change the log more readable
       logDebug(s"Removing Cache ${notification.getKey}")
       val fiberCache = notification.getValue
-      // Consider this case:
-      // Thread A put Fiber #1.1, Fiber #1.2 and Thread B put Fiber #2.1, Fiber #2.2 into cache
-      // Assume cache is full and current entries are (LRU order): #1.1, #1.2, #2.1, #2.2
-      // Then Thread A want to put Fiber #1.3 and cause fiber #1.1 eviction.
-      // Then wait fiber #1.1 release. During this time, Thread B released it's fibers.
-      // But since fiber #1.1 can't be released (Thread A is waiting), so failed at last even though
-      // there is enough memory.
-      if (fiberCache.lock.writeLock().tryLock(1000, TimeUnit.MILLISECONDS)) {
-        try {
-          notification.getValue.dispose()
-          _cacheSize.addAndGet(-notification.getValue.size())
-        } finally {
-          fiberCache.lock.writeLock().unlock()
+      try {
+        fiberCache.lock.writeLock().lock()
+        // Consider this case:
+        // Thread A, put Fiber #1, #2, #3 into cache. Then cache is full.
+        // Thread A released Fiber #2, #3 so they are ok to removed.
+        // Thread A want to put Fiber #4 into cache. So it wait on Fiber #1 to release.
+        // Timeout happens even though we can remove Fiber #2, #3.
+        val maxRetries = 3
+        var attempts = 0
+        while (attempts < maxRetries && !fiberCache.isDisposed) {
+          attempts += 1
+          if (fiberCache.refCount.get() == 0) {
+            fiberCache.dispose()
+            _cacheSize.addAndGet(-notification.getValue.size())
+            logDebug("\tRemoved")
+          } else {
+            Thread.sleep(1000)
+          }
         }
-        logDebug("\tRemoved")
-      } else {
-        // TODO: before throw exception, thread A need to release all it's fibers
-        throw new OapException("Wait fiber release timeout, please increase off-heap memory")
+        // Still can't remove fiber here.
+        if (fiberCache.refCount.get() > 0) {
+          // Guava cache will cache exception in onRemoval. So this case is unhandled.
+          // Mark the fiber to dispose later after read lock is released.
+          // TODO: marked fiber is using un-tracked off-heap memory
+          fiberCache.markForRemoved()
+          // Only log it since exception will be caught by guava
+          logWarning("Wait fiber release timeout, please increase off-heap memory")
+        }
+      } finally {
+        fiberCache.lock.writeLock().unlock()
       }
     }
   }
+
   private val weigher = new Weigher[Fiber, FiberCache] {
     override def weigh(key: Fiber, value: FiberCache): Int =
       math.ceil(value.size() / MB).toInt
@@ -114,7 +127,12 @@ object FiberCacheManager extends Logging {
     if (fiberCache.isDisposed) {
       throw new OapException("fiber size is larger than max off-heap memory, please increase.")
     } else {
-      fiberCache.lock.readLock().lock()
+      try {
+        fiberCache.lock.readLock().lock()
+        fiberCache.refCount.incrementAndGet()
+      } finally {
+        fiberCache.lock.readLock().unlock()
+      }
       fiberCache
     }
   }
