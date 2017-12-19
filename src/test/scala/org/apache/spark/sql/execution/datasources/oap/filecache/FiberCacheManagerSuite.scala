@@ -18,9 +18,8 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import scala.util.Random
-
 import org.apache.hadoop.conf.Configuration
-
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.test.SharedSQLContext
 
 class FiberCacheManagerSuite extends SharedSQLContext {
@@ -85,7 +84,10 @@ class FiberCacheManagerSuite extends SharedSQLContext {
 
     val data1 = generateData(memorySizeInMB * 1024 * 1024 / 2)
     val fiber1 = TestFiber(() => MemoryManager.putToDataFiberCache(data1), s"test fiber #1")
-    val fiberCache1 = FiberCacheManager.get(fiber1, configuration)
-    assert(fiberCache1 == null)
+    val exception = intercept[OapException]{
+      FiberCacheManager.get(fiber1, configuration)
+    }
+    assert(
+      exception.getMessage == "fiber size is larger than max off-heap memory, please increase.")
   }
 }
