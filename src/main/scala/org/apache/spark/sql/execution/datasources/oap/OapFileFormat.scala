@@ -78,9 +78,10 @@ private[sql] class OapFileFormat extends FileFormat
   // TODO inferSchema could be lazy computed
   var inferSchema: Option[StructType] = _
   var meta: Option[DataSourceMeta] = _
-  var columnsHitIndex: Map[String, IndexType] = _
+  // { BTree(a,b,c)->(a,b), BTree(d)->(d), Bitmap(e)->(e), ... }
+  var columnsHitIndex: Map[IndexType, Seq[String]] = _
 
-  def getHitIndexColumns: Map[String, IndexType] = this.columnsHitIndex
+  def getHitIndexColumns: Map[IndexType, Seq[String]] = this.columnsHitIndex
 
   override def prepareWrite(
       sparkSession: SparkSession,
@@ -249,8 +250,8 @@ private[sql] class OapFileFormat extends FileFormat
         val filterScanners = ic.getScanners
         columnsHitIndex = filterScanners match {
           case Some(s) =>
-            s.scanners.flatMap { scanner =>
-              scanner.keyNames.map( n => n -> scanner.meta.indexType)
+            s.scanners.map{ scanner =>
+              (scanner.meta.indexType, scanner.keyNames)
             }.toMap
           case _ => Map.empty
         }
