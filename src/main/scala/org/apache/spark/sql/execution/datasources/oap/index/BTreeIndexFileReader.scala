@@ -64,7 +64,12 @@ private[oap] case class BTreeIndexFileReader(
 
   def readRowIdList(partIdx: Int): FiberCache = {
     val partSize = rowIdListSizePerSection * Integer.SIZE / 8
-    MemoryManager.putToIndexFiberCache(reader, rowIdListIndex + partIdx * partSize, partSize)
+    val readLength = if (partIdx * partSize + partSize > rowIdListLength) {
+      rowIdListLength % rowIdListSizePerSection
+    } else {
+      partSize
+    }
+    MemoryManager.putToIndexFiberCache(reader, rowIdListIndex + partIdx * partSize, readLength)
   }
 
   @deprecated("no need to read the whole row id list", "v0.3")
