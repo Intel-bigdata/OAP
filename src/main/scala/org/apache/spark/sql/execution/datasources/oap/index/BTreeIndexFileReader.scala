@@ -36,6 +36,8 @@ private[oap] case class BTreeIndexFileReader(
   val rowIdListSectionId: Int = 1
   val nodeSectionId: Int = 2
 
+  val rowIdListSizePerSection: Int = 1024 * 1024
+
   private val (reader, fileLength) = {
     val fs = file.getFileSystem(configuration)
     (fs.open(file), fs.getFileStatus(file).getLen)
@@ -60,6 +62,12 @@ private[oap] case class BTreeIndexFileReader(
   def readFooter(): FiberCache =
     MemoryManager.putToIndexFiberCache(reader, footerIndex, footerLength)
 
+  def readRowIdList(partIdx: Int): FiberCache = {
+    val partSize = rowIdListSizePerSection * Integer.SIZE / 8
+    MemoryManager.putToIndexFiberCache(reader, rowIdListIndex + partIdx * partSize, partSize)
+  }
+
+  @deprecated("no need to read the whole row id list", "v0.3")
   def readRowIdList(): FiberCache =
     MemoryManager.putToIndexFiberCache(reader, rowIdListIndex, rowIdListLength)
 
