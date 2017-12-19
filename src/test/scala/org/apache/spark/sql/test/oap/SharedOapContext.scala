@@ -15,27 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.oap.io
+package org.apache.spark.sql.test.oap
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataInputStream, Path}
-import org.apache.parquet.format.converter.ParquetMetadataConverter._
-import org.apache.parquet.hadoop.ParquetFileReader
-import org.apache.parquet.hadoop.metadata.ParquetMetadata
 
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.test.SharedSQLContext
 
-private[oap] class ParquetDataFileHandle(
-  var footer: ParquetMetadata = null)
-  extends DataFileHandle {
+trait SharedOapContext extends SharedSQLContext {
 
-  override def fin: FSDataInputStream = null
+  // avoid the overflow of offHeap memory
+  sparkConf.set("spark.memory.offHeap.size", "100m")
 
-  override def len: Long = 0
+  protected lazy val configuration: Configuration = sparkContext.hadoopConfiguration
 
-  def read(conf: Configuration, path: Path): ParquetDataFileHandle = {
-    this.footer = ParquetFileReader.readFooter(conf, path, NO_FILTER)
-    this
-  }
-
+  protected implicit def sqlConf: SQLConf = sqlContext.conf
 }
-

@@ -19,32 +19,41 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import java.io.{ByteArrayOutputStream, DataOutputStream, OutputStream}
 
-import scala.collection.mutable
 import scala.collection.immutable
-import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
-import org.roaringbitmap.buffer.MutableRoaringBitmap
+import org.roaringbitmap.RoaringBitmap
 
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
+import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
 import org.apache.spark.sql.types._
 
+private[oap] object BitmapIndexSectionId {
+  val headerSection       : Int = 1 // header
+  val keyListSection      : Int = 2 // sorted unique key list (index column unique values)
+  val entryListSection    : Int = 3 // bitmap entry list
+  val entryNullSection    : Int = 4 // bitmap entry for null value rows
+  val entryOffsetsSection : Int = 5 // bitmap entry offset list
+  val statisticsSection   : Int = 6 // keep the original statistics, not changed than before.
+  val footerSection       : Int = 7 // footer to save total key list size and length, total entry
+}
+
 /* Below is the bitmap index general layout and sections.
- * #section id     section size(B) section description
- *    1              4               header
- *    2              varied          sorted unique key list (index column unique values)
- *    3              varied          bitmap entry list
- *    4              varied          bitmap entry offset list
- *    5              varied          keep the original statistics, not changed than before.
- *    6              40(5*8)         footer to save total key list size and length, total entry
- *                                   list size and total offset list size, and also the original
- *                                   index end.
+ * #section id        section size(B) section description
+ * headerSection      4               header
+ * keyListSection     varied          sorted unique key list (index column unique values)
+ * entryListSection   varied          bitmap entry list
+ * entryOffsetSection varied          bitmap entry offset list
+ * statisticsSection  varied          keep the original statistics, not changed than before.
+ * footerSection      40(5*8)         footer to save total key list size and length, total entry
+ *                                    list size and total offset list size, and also the original
+ *                                    index end.
  *
  * TODO: 1. Bitmap index is suitable for the enumeration columns which actually has not many
  *          unique values, thus we will load the key list and offset list respectively as a
@@ -60,16 +69,18 @@ private[oap] class BitmapIndexRecordWriter(
     keySchema: StructType) extends RecordWriter[Void, InternalRow] {
 
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
+  @transient private lazy val nnkw = new NonNullKeyWriter(keySchema)
 
-  private val rowMapBitmap = new mutable.HashMap[InternalRow, MutableRoaringBitmap]()
+  private val rowMapBitmap = new mutable.HashMap[InternalRow, RoaringBitmap]()
   private var recordCount: Int = 0
 
-  private var bmUniqueKeyListOffset: Int = _
   private var bmEntryListOffset: Int = _
-  private var bmOffsetListOffset: Int = _
 
   private var bmUniqueKeyList: immutable.List[InternalRow] = _
+  private var bmNullKeyList: immutable.List[InternalRow] = _
   private var bmOffsetListBuffer: mutable.ListBuffer[Int] = _
+  private var bmNullEntryOffset: Int = _
+  private var bmNullEntrySize: Int = _
 
   private var bmUniqueKeyListTotalSize: Int = _
   private var bmUniqueKeyListCount: Int = _
@@ -80,7 +91,7 @@ private[oap] class BitmapIndexRecordWriter(
   override def write(key: Void, value: InternalRow): Unit = {
     val v = genericProjector(value).copy()
     if (!rowMapBitmap.contains(v)) {
-      val bm = new MutableRoaringBitmap()
+      val bm = new RoaringBitmap()
       bm.add(recordCount)
       rowMapBitmap.put(v, bm)
     } else {
@@ -98,12 +109,13 @@ private[oap] class BitmapIndexRecordWriter(
     val ordering = GenerateOrdering.create(keySchema)
     // Currently OAP index type supports the column with one single field.
     assert(keySchema.fields.size == 1)
-    bmUniqueKeyList = rowMapBitmap.keySet.toList.sorted(ordering)
+    // val (bmNullKeyList, bmUniqueKeyList) =
+    val (nullKeyList, uniqueKeyList) = rowMapBitmap.keySet.toList.partition(_.anyNull)
+    bmNullKeyList = nullKeyList
+    assert(bmNullKeyList.size <= 1) // At most one null key exists.
+    bmUniqueKeyList = uniqueKeyList.sorted(ordering)
     val bos = new ByteArrayOutputStream()
-    val leDos = new LittleEndianDataOutputStream(bos)
-    bmUniqueKeyList.foreach(key => {
-      IndexUtils.writeBasedOnDataType(leDos, key.get(0, keySchema.fields(0).dataType))
-    })
+    bmUniqueKeyList.foreach(key => nnkw.writeKey(bos, key))
     bmUniqueKeyListTotalSize = bos.size()
     bmUniqueKeyListCount = bmUniqueKeyList.size
     writer.write(bos.toByteArray)
@@ -132,8 +144,22 @@ private[oap] class BitmapIndexRecordWriter(
       dos.close()
       bos.close()
     })
-    bmOffsetListBuffer.append(bmEntryListOffset + totalBitmapSize)
     bmEntryListTotalSize = totalBitmapSize
+
+    // Write entry for null value rows if exists
+    if (bmNullKeyList.nonEmpty) {
+      bmNullEntryOffset = bmEntryListOffset + totalBitmapSize
+      val bm = rowMapBitmap.get(bmNullKeyList.head).get
+      bm.runOptimize()
+      val bos = new ByteArrayOutputStream()
+      val dos = new DataOutputStream(bos)
+      bm.serialize(dos)
+      dos.flush()
+      bmNullEntrySize = bos.size
+      writer.write(bos.toByteArray)
+      dos.close()
+      bos.close()
+    }
   }
 
   private def writeBmOffsetList(): Unit = {
@@ -145,12 +171,13 @@ private[oap] class BitmapIndexRecordWriter(
   private def writeBmFooter(): Unit = {
     // The beginning of the footer are bitmap total size, key list size and offset total size.
     // Others keep back compatible and not changed than before.
-    bmIndexEnd = bmEntryListOffset + bmEntryListTotalSize + bmOffsetListTotalSize
+    bmIndexEnd = bmEntryListOffset + bmEntryListTotalSize + bmNullEntrySize + bmOffsetListTotalSize
     IndexUtils.writeInt(writer, bmUniqueKeyListTotalSize)
     IndexUtils.writeInt(writer, bmUniqueKeyListCount)
     IndexUtils.writeInt(writer, bmEntryListTotalSize)
     IndexUtils.writeInt(writer, bmOffsetListTotalSize)
-    IndexUtils.writeLong(writer, bmIndexEnd)
+    IndexUtils.writeInt(writer, bmNullEntryOffset)
+    IndexUtils.writeInt(writer, bmNullEntrySize)
     IndexUtils.writeLong(writer, bmIndexEnd)
     IndexUtils.writeLong(writer, bmIndexEnd)
   }
@@ -163,7 +190,7 @@ private[oap] class BitmapIndexRecordWriter(
     writeBmEntryList()
     writeBmOffsetList()
     // The index end is also the starting position of stats file.
-    statisticsManager.write(writer)
+    // statisticsManager.write(writer)
     writeBmFooter()
   }
 }

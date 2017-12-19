@@ -21,8 +21,6 @@ import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
-
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
@@ -30,18 +28,13 @@ import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
 
 
-private[oap] class MinMaxStatistics extends Statistics {
-  override val id: Int = MinMaxStatisticsType.id
-  @transient private lazy val ordering = GenerateOrdering.create(schema)
+private[oap] class MinMaxStatistics(schema: StructType) extends Statistics(schema) {
+  override val id: Int = StatisticsType.TYPE_MIN_MAX
+  @transient
+  private lazy val ordering = GenerateOrdering.create(schema)
 
   protected var min: Key = _
   protected var max: Key = _
-
-  override def initialize(schema: StructType): Unit = {
-    super.initialize(schema)
-    min = null
-    max = null
-  }
 
   override def addOapKey(key: Key): Unit = {
     if (min == null || max == null) {
@@ -57,12 +50,11 @@ private[oap] class MinMaxStatistics extends Statistics {
     var offset = super.write(writer, sortedKeys)
     if (min != null) {
       val tempWriter = new ByteArrayOutputStream()
-      val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
-      IndexUtils.writeBasedOnSchema(littleEndianWriter, min, schema)
+      nnkw.writeKey(tempWriter, min)
       IndexUtils.writeInt(writer, tempWriter.size)
-      IndexUtils.writeBasedOnSchema(littleEndianWriter, max, schema)
+      nnkw.writeKey(tempWriter, max)
       IndexUtils.writeInt(writer, tempWriter.size)
-      offset += Integer.SIZE / 8 * 2
+      offset += IndexUtils.INT_SIZE * 2
       writer.write(tempWriter.toByteArray)
       offset += tempWriter.size
     }
@@ -76,8 +68,8 @@ private[oap] class MinMaxStatistics extends Statistics {
     readOffset += 4
     val totalSize = fiberCache.getInt(readOffset)
     readOffset += 4
-    min = IndexUtils.readBasedOnSchema(fiberCache, readOffset, schema)
-    max = IndexUtils.readBasedOnSchema(fiberCache, readOffset + minSize, schema)
+    min = nnkr.readKey(fiberCache, readOffset)._1
+    max = nnkr.readKey(fiberCache, readOffset + minSize)._1
     readOffset += totalSize
 
     readOffset - offset

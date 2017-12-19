@@ -646,7 +646,12 @@ object SQLConf {
         "If you want to add more than one type, just use comma " +
         "to separate, eg. \"MINMAX, SAMPLE, PARTBYVALUE, BLOOM\"")
       .stringConf
-      .createWithDefault("MINMAX, SAMPLE, PARTBYVALUE, BLOOM")
+      .transform(_.toUpperCase)
+      .toSequence
+      .transform(_.sorted)
+      .checkValues(
+        Set("MINMAX", "SAMPLE", "PARTBYVALUE", "BLOOM").subsets().map(_.toSeq.sorted).toSet)
+      .createWithDefault(Seq("BLOOM", "MINMAX", "PARTBYVALUE", "SAMPLE"))
 
   val OAP_STATISTICS_PART_NUM =
     SQLConfigBuilder("spark.sql.oap.Statistics.partNum")
@@ -727,6 +732,13 @@ object SQLConf {
       .doc("To indicate if enable/disable index cbo which helps to choose a fast query path")
       .doubleConf
       .createWithDefault(0.7)
+
+  val OAP_INDEXER_CHOICE_MAX_SIZE =
+    SQLConfigBuilder("spark.sql.oap.indexer.max.use.size")
+      .internal()
+      .doc("The max availabe indexer choose size.")
+      .intConf
+      .createWithDefault(1)
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"

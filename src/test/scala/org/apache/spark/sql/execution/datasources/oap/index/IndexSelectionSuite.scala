@@ -19,26 +19,23 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import java.io.File
 
-import org.apache.hadoop.conf.Configuration
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 
-class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
+class IndexSelectionSuite extends SharedOapContext with BeforeAndAfterEach{
 
   import testImplicits._
-  private var tempDir: File = null
-  private var path: Path = null
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
+  private var tempDir: File = _
+  private var path: Path = _
 
   override def beforeEach(): Unit = {
     val data = (1 to 300).map(i => (i, i + 100, i + 200, i + 300, s"this is row $i"))
@@ -68,14 +65,23 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
   }
 
   private def assertIndexer(ic: IndexContext, attrNum: Int,
-                            targetIdxName: String, targetLastIdx: Int): Unit = {
-    val (lastIdx, idxMeta) = ic.getBestIndexer(attrNum)
+                            targetIdxName: String, targetLastIdx: Int,
+                            maxChooseSize: Int = 1): Unit = {
+    val availableIndexers = ic.getAvailableIndexers(attrNum, maxChooseSize)
+    val lastIdx = availableIndexers.headOption match {
+      case Some(v) => v._1
+      case _ => -1
+    }
+    val idxMeta = availableIndexers.headOption match {
+      case Some(v) => v._2
+      case _ => null
+    }
     assert(lastIdx == targetLastIdx)
     if (idxMeta != null) assert(idxMeta.name equals targetIdxName)
   }
 
   test("Non-Index Test") {
-    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
     val ic = new IndexContext(oapMeta)
     val filters: Array[Filter] = Array(
       Or(And(GreaterThan("a", 9), LessThan("a", 14)),
@@ -87,7 +93,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
 
   test("Single Column Index Test") {
     sql("create oindex idxa on oap_test(a)")
-    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
     val ic = new IndexContext(oapMeta)
     val filters: Array[Filter] = Array(
       Or(And(GreaterThan("a", 9), LessThan("a", 14)),
@@ -100,7 +106,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
   test("Multiple Indexes Test1") {
     sql("create oindex idxa on oap_test(a)")
     sql("create oindex idxb on oap_test(b)")
-    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
     val ic = new IndexContext(oapMeta)
     val filters: Array[Filter] = Array(
       Or(And(GreaterThan("b", 9), LessThan("b", 14)),
@@ -114,7 +120,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
     sql("create oindex idxa on oap_test(a)")
     sql("create oindex idxb on oap_test(b)")
     sql("create oindex idxe on oap_test(e)")
-    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
     val ic = new IndexContext(oapMeta)
     val filters: Array[Filter] = Array(EqualTo("e", "this is row 3"))
     ScannerBuilder.build(filters, ic)
@@ -126,7 +132,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
     sql("create oindex idxb on oap_test(b)")
     sql("create oindex idxe on oap_test(e)")
     sql("create oindex idxABC on oap_test(a, b, c)")
-    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
     val ic = new IndexContext(oapMeta)
     val filters: Array[Filter] = Array(
       Or(And(GreaterThan("a", 9), LessThan("a", 14)),
@@ -141,7 +147,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
     sql("create oindex idxb on oap_test(b)")
     sql("create oindex idxe on oap_test(e)")
     sql("create oindex idxABC on oap_test(a, b, c)")
-    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
     val ic = new IndexContext(oapMeta)
     val filters: Array[Filter] = Array(EqualTo("a", 8), GreaterThanOrEqual("b", 10))
     ScannerBuilder.build(filters, ic)
@@ -185,7 +191,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
     sql("create oindex idxe on oap_test(e)")
     sql("create oindex idxABC on oap_test(a, b, c)")
     sql("create oindex idxACD on oap_test(a, c, d)")
-    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
     val ic = new IndexContext(oapMeta)
     val filters: Array[Filter] = Array(
       EqualTo("a", 8), GreaterThanOrEqual("b", 10), EqualTo("c", 3))
@@ -199,7 +205,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
     sql("create oindex idxe on oap_test(e)")
     sql("create oindex idxABC on oap_test(a, b, c)")
     sql("create oindex idxACD on oap_test(a, c, d)")
-    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
     val ic = new IndexContext(oapMeta)
     val filters: Array[Filter] = Array(
       EqualTo("a", 8), GreaterThanOrEqual("d", 10), EqualTo("c", 3))
@@ -209,7 +215,7 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
 
   test("Bitmap Scanner only supports equal query.") {
     sql("create oindex idxa on oap_test(a) USING BITMAP")
-    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
     val ic = new IndexContext(oapMeta)
     val nonEqualFilters: Array[Filter] = Array(
       Or(And(GreaterThan("a", 9), LessThan("a", 14)),
@@ -217,9 +223,30 @@ class IndexSelectionSuite extends SharedSQLContext with BeforeAndAfterEach{
     )
     ScannerBuilder.build(nonEqualFilters, ic)
     // Non equal filters won't build BitmapScanner.
-    assert(ic.getScanner == None)
+    assert(ic.getScanners.isEmpty)
     val equalFilters: Array[Filter] = Array(Or(EqualTo("a", 14), EqualTo("b", 166)))
     ScannerBuilder.build(equalFilters, ic)
-    assert(ic.getScanner.get.isInstanceOf[BitMapScanner])
+    assert(ic.getScanners.get.scanners.head.isInstanceOf[BitMapScanner])
+  }
+
+  test("Multiple Indexes Test7") {
+    sql("create oindex idxa on oap_test(a)")
+    sql("create oindex idxb on oap_test(b)")
+    sql("create oindex idxe on oap_test(e)")
+    sql("create oindex idxABC on oap_test(a, b, c)")
+    sql("create oindex idxACD on oap_test(a, c, d)")
+    val oapMeta = DataSourceMeta.initialize(path, configuration)
+    val ic = new IndexContext(oapMeta)
+    val filters: Array[Filter] = Array(
+      EqualTo("a", 8), GreaterThanOrEqual("d", 10), EqualTo("e", 3))
+    ScannerBuilder.build(filters, ic)
+    val expectIdxs: ArrayBuffer[(Int, String)] = ArrayBuffer()
+    expectIdxs += ((0, "idxa"), (0, "idxe"))
+    val availableIndexers = ic.getAvailableIndexers(3, 2)
+    val availIdxs = new ArrayBuffer[(Int, String)]()
+    for (indexer <- availableIndexers) {
+      availIdxs.append((indexer._1, indexer._2.name))
+    }
+    assert(availIdxs sameElements expectIdxs)
   }
 }

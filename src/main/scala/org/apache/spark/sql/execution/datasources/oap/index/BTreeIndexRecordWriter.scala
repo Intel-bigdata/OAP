@@ -25,13 +25,12 @@ import scala.collection.JavaConverters._
 import com.google.common.collect.ArrayListMultimap
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
-import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils}
+import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils, NonNullKeyWriter}
 import org.apache.spark.sql.types._
 
 
@@ -41,6 +40,7 @@ private[index] case class BTreeIndexRecordWriter(
     keySchema: StructType) extends RecordWriter[Void, InternalRow] {
 
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
+  private lazy val nnkw = new NonNullKeyWriter(keySchema)
 
   private val multiHashMap = ArrayListMultimap.create[InternalRow, Int]()
   private var recordCount: Int = 0
@@ -82,6 +82,9 @@ private[index] case class BTreeIndexRecordWriter(
     assert(uniqueKeys.size == partitionUniqueSize)
     val (nullKeys, nonNullKeys) = uniqueKeys.partition(_.anyNull)
     assert(nullKeys.length + nonNullKeys.length == partitionUniqueSize)
+    require(
+      nullKeys.isEmpty || keySchema.length == 1,
+      "No support for multi-column index building with null keys!")
     lazy val comparator: Comparator[InternalRow] = new Comparator[InternalRow]() {
       override def compare(o1: InternalRow, o2: InternalRow): Int = {
         if (o1 == null && o2 == null) {
@@ -165,16 +168,14 @@ private[index] case class BTreeIndexRecordWriter(
   private[index] def serializeNode(
       uniqueKeys: Seq[InternalRow], startPosInRowList: Int): Array[Byte] = {
     val buffer = new ByteArrayOutputStream()
-    val output = new LittleEndianDataOutputStream(buffer)
     val keyBuffer = new ByteArrayOutputStream()
-    val keyOutput = new LittleEndianDataOutputStream(keyBuffer)
 
-    output.writeInt(uniqueKeys.length)
+    IndexUtils.writeInt(buffer, uniqueKeys.length)
     var rowPos = startPosInRowList
     uniqueKeys.foreach { key =>
-      output.writeInt(keyBuffer.size())
-      output.writeInt(rowPos)
-      IndexUtils.writeBasedOnSchema(keyOutput, key, keySchema)
+      IndexUtils.writeInt(buffer, keyBuffer.size())
+      IndexUtils.writeInt(buffer, rowPos)
+      nnkw.writeKey(keyBuffer, key)
       rowPos += multiHashMap.get(key).size()
     }
     buffer.toByteArray ++ keyBuffer.toByteArray
@@ -194,8 +195,8 @@ private[index] case class BTreeIndexRecordWriter(
    */
   private def serializeRowIdLists(uniqueKeys: Seq[InternalRow]): Array[Byte] = {
     val buffer = new ByteArrayOutputStream()
-    val out = new LittleEndianDataOutputStream(buffer)
-    uniqueKeys.flatMap(key => multiHashMap.get(key).asScala).foreach(out.writeInt)
+    uniqueKeys.flatMap(key =>
+      multiHashMap.get(key).asScala).foreach(IndexUtils.writeInt(buffer, _))
     buffer.toByteArray
   }
 
@@ -221,46 +222,42 @@ private[index] case class BTreeIndexRecordWriter(
    */
   private def serializeFooter(nullKeyRowCount: Int, nodes: Seq[BTreeNodeMetaData]): Array[Byte] = {
     val buffer = new ByteArrayOutputStream()
-    val output = new LittleEndianDataOutputStream(buffer)
-
     val keyBuffer = new ByteArrayOutputStream()
-    val keyOutput = new LittleEndianDataOutputStream(keyBuffer)
-
     val statsBuffer = new ByteArrayOutputStream()
 
     // Record Count(all with non-null key) of all nodes in B+ tree
-    output.writeInt(nodes.map(_.rowCount).sum)
+    IndexUtils.writeInt(buffer, nodes.map(_.rowCount).sum)
     // Count of Record(s) that have null key
-    output.writeInt(nullKeyRowCount)
+    IndexUtils.writeInt(buffer, nullKeyRowCount)
     // Child Count
-    output.writeInt(nodes.size)
+    IndexUtils.writeInt(buffer, nodes.size)
 
     var offset = 0
     nodes.foreach { node =>
       // Row Count for each Child
-      output.writeInt(node.rowCount)
+      IndexUtils.writeInt(buffer, node.rowCount)
       // Start Pos for each Child
-      output.writeInt(offset)
+      IndexUtils.writeInt(buffer, offset)
       // Size for each Child
-      output.writeInt(node.byteSize)
+      IndexUtils.writeInt(buffer, node.byteSize)
       // Min Key Pos for each Child
-      output.writeInt(keyBuffer.size())
+      IndexUtils.writeInt(buffer, keyBuffer.size())
       if (node.min != null) {
-        IndexUtils.writeBasedOnSchema(keyOutput, node.min, keySchema)
+        nnkw.writeKey(keyBuffer, node.min)
       }
       // Max Key Pos for each Child
-      output.writeInt(keyBuffer.size())
+      IndexUtils.writeInt(buffer, keyBuffer.size())
       if (node.max != null) {
-        IndexUtils.writeBasedOnSchema(keyOutput, node.max, keySchema)
+        nnkw.writeKey(keyBuffer, node.max)
       }
       offset += node.byteSize
     }
     // the return of write should be equal to statsBuffer.size
     statisticsManager.write(statsBuffer)
-    output.writeInt(statsBuffer.size)
+    IndexUtils.writeInt(buffer, statsBuffer.size)
     buffer.toByteArray ++ statsBuffer.toByteArray ++ keyBuffer.toByteArray
   }
 }
 
-private case class
-BTreeNodeMetaData(rowCount: Int, byteSize: Int, min: InternalRow, max: InternalRow)
+private case class BTreeNodeMetaData(
+    rowCount: Int, byteSize: Int, min: InternalRow, max: InternalRow)

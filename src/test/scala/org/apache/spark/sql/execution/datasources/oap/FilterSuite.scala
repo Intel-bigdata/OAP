@@ -26,15 +26,14 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.util.Utils
 
+class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
 
-class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
   import testImplicits._
 
-  sparkConf.set("spark.memory.offHeap.size", "100m")
   private var currentPath: String = _
 
   override def beforeEach(): Unit = {
@@ -86,9 +85,9 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   }
 
   test("test oap row group size change") {
-    val previousRowGroupSize = sqlContext.conf.getConfString(SQLConf.OAP_ROW_GROUP_SIZE.key)
+    val previousRowGroupSize = sqlConf.getConfString(SQLConf.OAP_ROW_GROUP_SIZE.key)
     // change default row group size
-    sqlContext.conf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key, "1025")
+    sqlConf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key, "1025")
     val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     checkAnswer(sql("SELECT * FROM oap_test"), Seq.empty[Row])
@@ -96,10 +95,10 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM oap_test"), data.map { row => Row(row._1, row._2) })
     // set back to default value
     if (previousRowGroupSize == null) {
-      sqlContext.conf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key,
+      sqlConf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key,
         SQLConf.OAP_ROW_GROUP_SIZE.defaultValueString)
     } else {
-      sqlContext.conf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key,
+      sqlConf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key,
         previousRowGroupSize)
     }
   }
@@ -220,8 +219,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
       Row(1, "this is test 1") :: Nil)
 
-    val result = sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3").collect()
-
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
   }
@@ -291,6 +288,56 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(5, 1) :: Row(4, 2) :: Nil)
   }
 
+  test("test refresh in parquet format on a partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE t_refresh_parquet
+        |partition (b=1)
+        |SELECT key from t where value < 3
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh_parquet
+        |partition (b=2)
+        |SELECT key from t where value == 2
+      """.stripMargin)
+
+
+    sql("create oindex index1 on t_refresh_parquet (a)")
+
+    checkAnswer(sql("select * from t_refresh_parquet"),
+      Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Nil)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh_parquet
+        |partition (b=2)
+        |SELECT key from t where value == 3
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh_parquet
+        |partition (b=3)
+        |SELECT key from t where value == 4
+      """.stripMargin)
+
+    sql("refresh oindex on t_refresh_parquet partition (b=2)")
+
+    val fs = new Path(currentPath).getFileSystem(new Configuration())
+    val tablePath = sqlConf.warehousePath + "/t_refresh_parquet/"
+    assert(fs.globStatus(new Path(tablePath + "b=1/*.index")).length == 1)
+    assert(fs.globStatus(new Path(tablePath + "b=2/*.index")).length == 2)
+    assert(fs.globStatus(new Path(tablePath + "b=3/*.index")).length == 0)
+
+    checkAnswer(sql("select * from t_refresh_parquet"),
+      Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Row(3, 2) :: Row(4, 3) :: Nil)
+  }
+
   test("test refresh in oap format on same partition") {
     val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
     data.toDF("key", "value").createOrReplaceTempView("t")
@@ -354,6 +401,56 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
 
     checkAnswer(sql("select * from t_refresh"),
       Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 2) :: Row(5, 1) :: Nil)
+  }
+
+  test("test refresh in oap format on a partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE t_refresh
+        |partition (b=1)
+        |SELECT key from t where value < 3
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh
+        |partition (b=2)
+        |SELECT key from t where value == 2
+      """.stripMargin)
+
+
+    sql("create oindex index1 on t_refresh (a)")
+
+    checkAnswer(sql("select * from t_refresh"),
+      Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Nil)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh
+        |partition (b=2)
+        |SELECT key from t where value == 3
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT INTO TABLE t_refresh
+        |partition (b=3)
+        |SELECT key from t where value == 4
+      """.stripMargin)
+
+    sql("refresh oindex on t_refresh partition (b=2)")
+
+    val fs = new Path(currentPath).getFileSystem(new Configuration())
+    val tablePath = sqlConf.warehousePath + "/t_refresh/"
+    assert(fs.globStatus(new Path(tablePath + "b=1/*.index")).length == 1)
+    assert(fs.globStatus(new Path(tablePath + "b=2/*.index")).length == 2)
+    assert(fs.globStatus(new Path(tablePath + "b=3/*.index")).length == 0)
+
+    checkAnswer(sql("select * from t_refresh"),
+      Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Row(3, 2) :: Row(4, 3) :: Nil)
   }
 
   test("refresh table of oap format without partition") {
@@ -445,7 +542,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     assert(check_path.getFileSystem(
       new Configuration()).globStatus(new Path(check_path, "*.index")).length == 4)
 
-    val a = sql("SELECT * FROM oap_test WHERE a = 1")
     checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
       Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
 
@@ -645,7 +741,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   }
 
   test("filtering null key") {
-    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is row $i") }
     val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
       if (i <= 5) Seq(null, s"this is row $i")
       else Seq(i, s"this is row $i")).map(Row.fromSeq)
@@ -679,7 +774,6 @@ class FilterSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
   }
 
   test("filtering null key in Parquet format") {
-    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is row $i") }
     val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
       if (i <= 5) Seq(null, s"this is row $i")
       else Seq(i, s"this is row $i")).map(Row.fromSeq)

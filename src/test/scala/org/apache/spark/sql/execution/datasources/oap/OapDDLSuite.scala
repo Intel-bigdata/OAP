@@ -17,20 +17,16 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row, SaveMode}
-import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 
-class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     val path1 = Utils.createTempDir().getAbsolutePath
@@ -97,7 +93,7 @@ class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     val data: Seq[(Int, Int)] = (1 to 10).map { i => (i, i) }
     data.toDF("key", "value").createOrReplaceTempView("t")
 
-    val path = new Path(spark.sqlContext.conf.warehousePath)
+    val path = new Path(sqlConf.warehousePath)
 
     sql(
       """
@@ -119,10 +115,10 @@ class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
       Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Nil)
 
     assert(path.getFileSystem(
-      new Configuration()).globStatus(new Path(path,
+      configuration).globStatus(new Path(path,
         "oap_partition_table/b=1/c=c1/*.index")).length != 0)
     assert(path.getFileSystem(
-      new Configuration()).globStatus(new Path(path,
+      configuration).globStatus(new Path(path,
         "oap_partition_table/b=2/c=c2/*.index")).length == 0)
 
     sql("create oindex index1 on oap_partition_table (a) partition (b=2, c='c2')")
@@ -131,10 +127,10 @@ class OapDDLSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEac
     checkAnswer(sql("select * from oap_partition_table"),
       Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Row(4, 2, "c2") :: Nil)
     assert(path.getFileSystem(
-      new Configuration()).globStatus(new Path(path,
+      configuration).globStatus(new Path(path,
       "oap_partition_table/b=1/c=c1/*.index")).length == 0)
     assert(path.getFileSystem(
-      new Configuration()).globStatus(new Path(path,
+      configuration).globStatus(new Path(path,
       "oap_partition_table/b=2/c=c2/*.index")).length != 0)
   }
 

@@ -268,7 +268,8 @@ case class DropIndex(
  * Refreshes an index for table
  */
 case class RefreshIndex(
-    table: TableIdentifier) extends RunnableCommand with Logging {
+    table: TableIdentifier,
+    partitionSpec: Option[TablePartitionSpec]) extends RunnableCommand with Logging {
 
   override val output: Seq[Attribute] = Seq.empty
 
@@ -290,7 +291,7 @@ case class RefreshIndex(
     }
 
     val configuration = sparkSession.sessionState.newHadoopConf()
-    val partitions = OapUtils.getPartitions(fileCatalog).filter(_.files.nonEmpty)
+    val partitions = OapUtils.getPartitions(fileCatalog, partitionSpec).filter(_.files.nonEmpty)
     // TODO currently we ignore empty partitions, so each partition may have different indexes,
     // this may impact index updating. It may also fail index existence check. Should put index
     // info at table level also.
@@ -355,7 +356,10 @@ case class RefreshIndex(
           new MetadataBuilder().putBoolean("isAscending", indexColumn.isAscending).build())
       }
 
-      val ds = Dataset.ofRows(sparkSession, Project(projectList, relation))
+      var ds = Dataset.ofRows(sparkSession, Project(projectList, relation))
+      partitionSpec.getOrElse(Map.empty).foreach { case (k, v) =>
+        ds = ds.filter(s"$k='$v'")
+      }
 
       val outPutPath = fileCatalog.rootPaths.head
       assert(outPutPath != null, "Expected exactly one path to be specified, but no value")

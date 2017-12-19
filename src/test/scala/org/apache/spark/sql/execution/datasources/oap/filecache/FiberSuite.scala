@@ -20,7 +20,6 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.io.File
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapreduce.lib.input.FileSplit
 
@@ -28,17 +27,14 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.io._
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
 
 
-class FiberSuite extends SharedSQLContext with Logging {
+class FiberSuite extends SharedOapContext with Logging {
   private var file: File = _
-  val conf: Configuration = new Configuration()
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -65,7 +61,7 @@ class FiberSuite extends SharedSQLContext with Logging {
     val path = new Path(file.getAbsolutePath, "test1")
     writeData(path, schema, recordCount)
     val split = new FileSplit(
-      path, 0, FileSystem.get(conf).getFileStatus(path).getLen, Array.empty[String])
+      path, 0, FileSystem.get(configuration).getFileStatus(path).getLen, Array.empty[String])
     assertData(path, schema, Array(0, 1, 2), split, recordCount)
     assertData(path, schema, Array(0, 2, 1), split, recordCount)
     assertData(path, schema, Array(0, 1), split, recordCount)
@@ -90,16 +86,18 @@ class FiberSuite extends SharedSQLContext with Logging {
       .add("j", StringType)
     writeData(childPath, schema, recordCount)
     val split = new FileSplit(
-      childPath, 0, FileSystem.get(conf).getFileStatus(childPath).getLen, Array.empty[String])
+      childPath, 0,
+      FileSystem.get(configuration).getFileStatus(childPath).getLen,
+      Array.empty[String])
     assertData(childPath, schema, Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), split,
       recordCount)
 
   }
 
   test("test data file meta") {
-    val previousRowGroupSize = conf.get(OapFileFormat.ROW_GROUP_SIZE)
+    val previousRowGroupSize = configuration.get(OapFileFormat.ROW_GROUP_SIZE)
     // change default row group size
-    conf.set(OapFileFormat.ROW_GROUP_SIZE, "1024")
+    configuration.set(OapFileFormat.ROW_GROUP_SIZE, "1024")
     val schema = new StructType()
       .add("a", IntegerType)
       .add("b", StringType)
@@ -110,19 +108,19 @@ class FiberSuite extends SharedSQLContext with Logging {
     for (i <- rowCounts.indices) {
       val path = new Path(file.getAbsolutePath, rowCounts(i).toString)
       writeData(path, schema, rowCounts(i))
-      val meta = OapDataFile(path.toString, schema, conf).createDataFileHandle()
+      val meta = OapDataFile(path.toString, schema, configuration).createDataFileHandle()
       assert(meta.totalRowCount() === rowCounts(i))
       assert(meta.rowCountInLastGroup === rowCountInLastGroups(i))
       assert(meta.rowGroupsMeta.length === rowGroupCounts(i))
     }
-    if (previousRowGroupSize == null) conf.unset(OapFileFormat.ROW_GROUP_SIZE)
-    else conf.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
+    if (previousRowGroupSize == null) configuration.unset(OapFileFormat.ROW_GROUP_SIZE)
+    else configuration.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
   }
 
   test("test oap row group configuration") {
-    val previousRowGroupSize = conf.get(OapFileFormat.ROW_GROUP_SIZE)
+    val previousRowGroupSize = configuration.get(OapFileFormat.ROW_GROUP_SIZE)
     // change default row group size
-    conf.set(OapFileFormat.ROW_GROUP_SIZE, "12345")
+    configuration.set(OapFileFormat.ROW_GROUP_SIZE, "12345")
     val schema = new StructType()
       .add("a", IntegerType)
       .add("b", StringType)
@@ -131,14 +129,14 @@ class FiberSuite extends SharedSQLContext with Logging {
     val path = new Path(file.getAbsolutePath, 10.toString)
     writeData(path, schema, 10)
 
-    val meta = OapDataFile(path.toString, schema, conf).createDataFileHandle()
+    val meta = OapDataFile(path.toString, schema, configuration).createDataFileHandle()
     assert(meta.totalRowCount() === 10)
     assert(meta.rowCountInEachGroup === 12345)
     assert(meta.rowCountInLastGroup === 10)
     assert(meta.rowGroupsMeta.length === 1)
     // set back to default value
-    if (previousRowGroupSize == null) conf.unset(OapFileFormat.ROW_GROUP_SIZE)
-    else conf.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
+    if (previousRowGroupSize == null) configuration.unset(OapFileFormat.ROW_GROUP_SIZE)
+    else configuration.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
   }
 
   // a simple algorithm to check if it's should be null
@@ -149,8 +147,8 @@ class FiberSuite extends SharedSQLContext with Logging {
   def writeData(
       path: Path,
       schema: StructType, count: Int): Unit = {
-    val out = FileSystem.get(conf).create(path, true)
-    val writer = new OapDataWriter(false, out, schema, conf)
+    val out = FileSystem.get(configuration).create(path, true)
+    val writer = new OapDataWriter(false, out, schema, configuration)
     val row = new GenericInternalRow(schema.fields.length)
     for(i <- 0 until count) {
       schema.fields.zipWithIndex.foreach { entry =>
@@ -159,24 +157,24 @@ class FiberSuite extends SharedSQLContext with Logging {
           row.setNullAt(entry._2)
         } else {
           entry match {
-            case (StructField(name, BinaryType, true, _), idx) =>
+            case (StructField(_, BinaryType, true, _), idx) =>
               row.update(idx, Array[Byte](i.toByte, i.toByte))
-            case (StructField(name, BooleanType, true, _), idx) =>
+            case (StructField(_, BooleanType, true, _), idx) =>
               val bool = if (i % 2 == 0) true else false
               row.setBoolean(idx, bool)
-            case (StructField(name, ByteType, true, _), idx) =>
+            case (StructField(_, ByteType, true, _), idx) =>
               row.setByte(idx, i.toByte)
-            case (StructField(name, DateType, true, _), idx) =>
+            case (StructField(_, DateType, true, _), idx) =>
               row.setInt(idx, i)
-            case (StructField(name, DoubleType, true, _), idx) =>
+            case (StructField(_, DoubleType, true, _), idx) =>
               row.setDouble(idx, i.toDouble / 3)
-            case (StructField(name, FloatType, true, _), idx) =>
+            case (StructField(_, FloatType, true, _), idx) =>
               row.setFloat(idx, i.toFloat / 3)
-            case (StructField(name, IntegerType, true, _), idx) =>
+            case (StructField(_, IntegerType, true, _), idx) =>
               row.setInt(idx, i)
-            case (StructField(name, LongType, true, _), idx) =>
+            case (StructField(_, LongType, true, _), idx) =>
               row.setLong(idx, i.toLong * 41)
-            case (StructField(name, ShortType, true, _), idx) =>
+            case (StructField(_, ShortType, true, _), idx) =>
               row.setShort(idx, i.toShort)
             case (StructField(name, StringType, true, _), idx) =>
               row.update(idx, UTF8String.fromString(s"$name Row $i"))
@@ -199,7 +197,7 @@ class FiberSuite extends SharedSQLContext with Logging {
       withNewSchema(schema).
       withNewDataReaderClassName(OapFileFormat.OAP_DATA_FILE_CLASSNAME).build()
     val reader = new OapDataReader(path, m, None, requiredIds)
-    val it = reader.initialize(conf)
+    val it = reader.initialize(configuration)
 
     var idx = 0
     while (it.hasNext) {
@@ -210,24 +208,24 @@ class FiberSuite extends SharedSQLContext with Logging {
           assert(row.isNullAt(outputId))
         } else {
           schema(fid) match {
-            case StructField(name, BinaryType, true, _) =>
+            case StructField(_, BinaryType, true, _) =>
               assert(Array[Byte](idx.toByte, idx.toByte) === row.getBinary(outputId))
-            case StructField(name, BooleanType, true, _) =>
+            case StructField(_, BooleanType, true, _) =>
               val bool = if (idx % 2 == 0) true else false
               assert(bool === row.getBoolean(outputId))
-            case StructField(name, ByteType, true, _) =>
+            case StructField(_, ByteType, true, _) =>
               assert(idx.toByte === row.getByte(outputId))
-            case StructField(name, DateType, true, _) =>
+            case StructField(_, DateType, true, _) =>
               assert(idx === row.get(outputId, DateType))
-            case StructField(name, DoubleType, true, _) =>
+            case StructField(_, DoubleType, true, _) =>
               assert(idx.toDouble / 3 === row.getDouble(outputId))
-            case StructField(name, FloatType, true, _) =>
+            case StructField(_, FloatType, true, _) =>
               assert(idx.toFloat / 3 === row.getFloat(outputId))
-            case StructField(name, IntegerType, true, _) =>
+            case StructField(_, IntegerType, true, _) =>
               assert(idx === row.getInt(outputId))
-            case StructField(name, LongType, true, _) =>
+            case StructField(_, LongType, true, _) =>
               assert(idx.toLong * 41 === row.getLong(outputId))
-            case StructField(name, ShortType, true, _) =>
+            case StructField(_, ShortType, true, _) =>
               assert(idx.toShort === row.getShort(outputId))
             case StructField(name, StringType, true, _) =>
               assert(s"$name Row $idx" === row.getString(outputId))

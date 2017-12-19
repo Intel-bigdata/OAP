@@ -22,17 +22,16 @@ import java.io.ByteArrayOutputStream
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
+import org.apache.spark.sql.types.StructType
 
 
 class SampleBasedStatisticsSuite extends StatisticsTest{
 
-  class TestSample extends SampleBasedStatistics {
+  class TestSample(schema: StructType) extends SampleBasedStatistics(schema) {
     override def takeSample(keys: ArrayBuffer[Key], size: Int): Array[Key] = keys.take(size).toArray
     def getSampleArray: Array[Key] = sampleArray
   }
@@ -40,20 +39,19 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
   test("test write function") {
     val keys = (1 to 300).map(i => rowGen(i)).toArray // keys needs to be sorted
 
-    val testSample = new TestSample
-    testSample.initialize(schema)
+    val testSample = new TestSample(schema)
     testSample.write(out, keys.to[ArrayBuffer])
 
-    var offset = 0L
+    var offset = 0
     val fiber = wrapToFiberCache(out)
-    assert(fiber.getInt(offset) == SampleBasedStatisticsType.id)
+    assert(fiber.getInt(offset) == StatisticsType.TYPE_SAMPLE_BASE)
     offset += 4
     val size = fiber.getInt(offset)
     offset += 4
 
     var rowOffset = 0
     for (i <- 0 until size) {
-      val row = IndexUtils.readBasedOnSchema(fiber, offset + size * 4 + rowOffset, schema)
+      val row = nnkr.readKey(fiber, offset + size * 4 + rowOffset)._1
       rowOffset = fiber.getInt(offset + i * 4)
       assert(ordering.compare(row, keys(i)) == 0)
     }
@@ -64,21 +62,19 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     val size = (Random.nextInt() % 200 + 200) % 200 + 10 // assert nonEmpty sample
     assert(size >= 0 && size <= 300)
 
-    IndexUtils.writeInt(out, SampleBasedStatisticsType.id)
+    IndexUtils.writeInt(out, StatisticsType.TYPE_SAMPLE_BASE)
     IndexUtils.writeInt(out, size)
 
     val tempWriter = new ByteArrayOutputStream()
-    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
     for (idx <- 0 until size) {
-      IndexUtils.writeBasedOnSchema(littleEndianWriter, keys(idx), schema)
+      nnkw.writeKey(tempWriter, keys(idx))
       IndexUtils.writeInt(out, tempWriter.size)
     }
     out.write(tempWriter.toByteArray)
 
     val fiber = wrapToFiberCache(out)
 
-    val testSample = new TestSample
-    testSample.initialize(schema)
+    val testSample = new TestSample(schema)
     testSample.read(fiber, 0)
 
     val array = testSample.getSampleArray
@@ -91,14 +87,12 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
   test("read and write") {
     val keys = Random.shuffle(1 to 300).map(i => rowGen(i)).toArray
 
-    val sampleWrite = new TestSample
-    sampleWrite.initialize(schema)
+    val sampleWrite = new TestSample(schema)
     sampleWrite.write(out, keys.to[ArrayBuffer])
 
     val fiber = wrapToFiberCache(out)
 
-    val sampleRead = new TestSample
-    sampleRead.initialize(schema)
+    val sampleRead = new TestSample(schema)
     sampleRead.read(fiber, 0)
 
     val array = sampleRead.getSampleArray
@@ -114,14 +108,12 @@ class SampleBasedStatisticsSuite extends StatisticsTest{
     val dummyStart = new JoinedRow(InternalRow(1), IndexScanner.DUMMY_KEY_START)
     val dummyEnd = new JoinedRow(InternalRow(300), IndexScanner.DUMMY_KEY_END)
 
-    val sampleWrite = new TestSample
-    sampleWrite.initialize(schema)
+    val sampleWrite = new TestSample(schema)
     sampleWrite.write(out, keys.to[ArrayBuffer])
 
     val fiber = wrapToFiberCache(out)
 
-    val sampleRead = new TestSample
-    sampleRead.initialize(schema)
+    val sampleRead = new TestSample(schema)
     sampleRead.read(fiber, 0)
 
     generateInterval(rowGen(-10), rowGen(-1), startInclude = true, endInclude = true)

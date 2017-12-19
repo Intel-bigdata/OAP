@@ -28,8 +28,13 @@ private[oap] case class BTreeIndexFileReader(
     file: Path) {
 
   private val VERSION_SIZE = 8
-  private val FOOTER_LENGTH_SIZE = Integer.SIZE / 8
-  private val ROW_ID_LIST_LENGTH_SIZE = Integer.SIZE / 8
+  private val FOOTER_LENGTH_SIZE = IndexUtils.INT_SIZE
+  private val ROW_ID_LIST_LENGTH_SIZE = IndexUtils.INT_SIZE
+
+  // Section ID for fiber cache reading.
+  val footerSectionId: Int = 0
+  val rowIdListSectionId: Int = 1
+  val nodeSectionId: Int = 2
 
   private val (reader, fileLength) = {
     val fs = file.getFileSystem(configuration)

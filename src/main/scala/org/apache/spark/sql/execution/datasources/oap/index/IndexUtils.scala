@@ -20,15 +20,10 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import java.io.OutputStream
 
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
-import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.types.UTF8String
+import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 
 
 /**
@@ -46,13 +41,6 @@ private[oap] object IndexUtils {
     IndexFile.indexFileHeaderLength
   }
 
-  def writeInt(out: OutputStream, v: Int): Unit = {
-    out.write((v >>>  0) & 0xFF)
-    out.write((v >>>  8) & 0xFF)
-    out.write((v >>> 16) & 0xFF)
-    out.write((v >>> 24) & 0xFF)
-  }
-
   def indexFileFromDataFile(dataFile: Path, name: String, time: String): Path = {
     import OapFileFormat._
     val dataFileName = dataFile.getName
@@ -66,15 +54,37 @@ private[oap] object IndexUtils {
       dataFile.getParent, "." + indexFileName + "." + time + "." +  name + OAP_INDEX_EXTENSION)
   }
 
-  def writeLong(writer: OutputStream, v: Long): Unit = {
-    writer.write((v >>>  0).toInt & 0xFF)
-    writer.write((v >>>  8).toInt & 0xFF)
-    writer.write((v >>> 16).toInt & 0xFF)
-    writer.write((v >>> 24).toInt & 0xFF)
-    writer.write((v >>> 32).toInt & 0xFF)
-    writer.write((v >>> 40).toInt & 0xFF)
-    writer.write((v >>> 48).toInt & 0xFF)
-    writer.write((v >>> 56).toInt & 0xFF)
+  def writeFloat(out: OutputStream, v: Float): Unit =
+    writeInt(out, java.lang.Float.floatToIntBits(v))
+
+  def writeDouble(out: OutputStream, v: Double): Unit =
+    writeLong(out, java.lang.Double.doubleToLongBits(v))
+
+  def writeBoolean(out: OutputStream, v: Boolean): Unit = out.write(if (v) 1 else 0)
+
+  def writeByte(out: OutputStream, v: Int): Unit = out.write(v)
+
+  def writeShort(out: OutputStream, v: Int): Unit = {
+    out.write(v >>> 0 & 0XFF)
+    out.write(v >>> 8 & 0xFF)
+  }
+
+  def writeInt(out: OutputStream, v: Int): Unit = {
+    out.write((v >>>  0) & 0xFF)
+    out.write((v >>>  8) & 0xFF)
+    out.write((v >>> 16) & 0xFF)
+    out.write((v >>> 24) & 0xFF)
+  }
+
+  def writeLong(out: OutputStream, v: Long): Unit = {
+    out.write((v >>>  0).toInt & 0xFF)
+    out.write((v >>>  8).toInt & 0xFF)
+    out.write((v >>> 16).toInt & 0xFF)
+    out.write((v >>> 24).toInt & 0xFF)
+    out.write((v >>> 32).toInt & 0xFF)
+    out.write((v >>> 40).toInt & 0xFF)
+    out.write((v >>> 48).toInt & 0xFF)
+    out.write((v >>> 56).toInt & 0xFF)
   }
 
   /**
@@ -87,67 +97,30 @@ private[oap] object IndexUtils {
       outputPath.toString, attemptPath.toString), indexFile)
   }
 
-  def writeBasedOnDataType(
-      writer: LittleEndianDataOutputStream,
-      value: Any): Unit = {
-    value match {
-      case int: Boolean => writer.writeBoolean(int)
-      case short: Short => writer.writeShort(short)
-      case byte: Byte => writer.writeByte(byte)
-      case int: Int => writer.writeInt(int)
-      case long: Long => writer.writeLong(long)
-      case float: Float => writer.writeFloat(float)
-      case double: Double => writer.writeDouble(double)
-      case string: UTF8String =>
-        val bytes = string.getBytes
-        writer.writeInt(bytes.length)
-        writer.write(bytes)
-      case binary: Array[Byte] =>
-        writer.writeInt(binary.length)
-        writer.write(binary)
-      case other => throw new OapException(s"OAP index currently doesn't support data type $other")
-    }
-  }
+  val INT_SIZE = 4
+  val LONG_SIZE = 8
 
-  def readBasedOnDataType(
-      fiberCache: FiberCache, offset: Long, dataType: DataType): (Any, Long) = {
-    dataType match {
-      case BooleanType => (fiberCache.getBoolean(offset), BooleanType.defaultSize)
-      case ByteType => (fiberCache.getByte(offset), ByteType.defaultSize)
-      case ShortType => (fiberCache.getShort(offset), ShortType.defaultSize)
-      case IntegerType => (fiberCache.getInt(offset), IntegerType.defaultSize)
-      case LongType => (fiberCache.getLong(offset), LongType.defaultSize)
-      case FloatType => (fiberCache.getFloat(offset), FloatType.defaultSize)
-      case DoubleType => (fiberCache.getDouble(offset), DoubleType.defaultSize)
-      case DateType => (fiberCache.getInt(offset), DateType.defaultSize)
-      case StringType =>
-        val length = fiberCache.getInt(offset)
-        val string = fiberCache.getUTF8String(offset + Integer.SIZE / 8, length)
-        (string, Integer.SIZE / 8 + length)
-      case BinaryType =>
-        val length = fiberCache.getInt(offset)
-        val bytes = fiberCache.getBytes(offset + Integer.SIZE / 8, length)
-        (bytes, Integer.SIZE / 8 + bytes.length)
-      case other => throw new OapException(s"OAP index currently doesn't support data type $other")
+  /**
+   * Constrain: keys.last >= candidate must be true. This is guaranteed by [[findNodeIdx]]
+   * @return the first key >= candidate. (keys.last >= candidate makes this always possible)
+   */
+  def binarySearch(
+      start: Int, length: Int,
+      keys: Int => InternalRow, candidate: InternalRow,
+      compare: (InternalRow, InternalRow) => Int): (Int, Boolean) = {
+    var s = 0
+    var e = length - 1
+    var found = false
+    var m = s
+    while (s <= e & !found) {
+      assert(s + e >= 0, "too large array size caused overflow")
+      m = (s + e) / 2
+      val cmp = compare(keys(m), candidate)
+      if (cmp == 0) found = true
+      else if (cmp < 0) s = m + 1
+      else e = m - 1
     }
-  }
-
-  def readBasedOnSchema(
-      fiberCache: FiberCache, offset: Long, schema: StructType): InternalRow = {
-    var pos = offset
-    val values = schema.map(_.dataType).map { dataType =>
-      val (value, length) = readBasedOnDataType(fiberCache, pos, dataType)
-      pos += length
-      value
-    }
-    InternalRow.fromSeq(values)
-  }
-
-  def writeBasedOnSchema(
-      writer: LittleEndianDataOutputStream, row: InternalRow, schema: StructType): Unit = {
-    require(row != null)
-    schema.zipWithIndex.foreach {
-      case (field, index) => writeBasedOnDataType(writer, row.get(index, field.dataType))
-    }
+    if (!found) m = s
+    (m, found)
   }
 }

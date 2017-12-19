@@ -65,7 +65,7 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
   test("check read/write nodes") {
     // answer stores sorted unique key list, and the start pos in (sorted) row id list
     val answer = fileWriter.nodes.flatMap { buf =>
-      val node = BTreeIndexRecordReader.BTreeNodeData(FiberCache(buf))
+      val node = BTreeIndexRecordReader.BTreeNodeData(FiberCache(buf), schema)
       (0 until node.getKeyCount).map(i => (node.getRowIdPos(i), node.getKey(i, schema).getInt(0)))
     }
     assert(answer ===
@@ -81,7 +81,7 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
   }
 
   test("check read/write footer") {
-    val footer = BTreeIndexRecordReader.BTreeFooter(FiberCache(fileWriter.footer))
+    val footer = BTreeIndexRecordReader.BTreeFooter(FiberCache(fileWriter.footer), schema)
     val nodeCount = footer.getNodesCount
     assert(footer.getNonNullKeyRecordCount === nonNullKeyRecords.size)
     assert(footer.getNullKeyRecordCount === nullKeyRecords.size)
@@ -93,7 +93,7 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
     assert(nodeOffsetSeq === nodeSizeSeq.scanLeft(0)(_ + _).dropRight(1))
 
     val keyOffsetSeq = (0 until nodeCount).map ( i =>
-      BTreeIndexRecordReader.BTreeNodeData(FiberCache(fileWriter.nodes(i))).getKeyCount
+      BTreeIndexRecordReader.BTreeNodeData(FiberCache(fileWriter.nodes(i)), schema).getKeyCount
     ).scanLeft(0)(_ + _)
     val uniqueValues = nonNullKeyRecords.sorted.distinct
     (0 until nodeCount).foreach { i =>

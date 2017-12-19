@@ -38,9 +38,9 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
   // then the Int represents the last matched column indice of the Index entries
   private val availableIndexes = new mutable.ArrayBuffer[(Int, IndexMeta)]()
   private val filterMap = new mutable.HashMap[String, FilterOptimizer]()
-  private var scanner: IndexScanner = _
+  private var scanners: IndexScanners = _
 
-  def getScanner: Option[IndexScanner] = Option(scanner)
+  def getScanners: Option[IndexScanners] = Option(scanners)
 
   /**
    * clear the available indexes and filter info, reset index scanner
@@ -48,7 +48,7 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
   def clear(): Unit = {
     availableIndexes.clear()
     filterMap.clear()
-    scanner = null
+    scanners = null
   }
 
   private def selectAvailableIndex(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]])
@@ -100,7 +100,7 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
   }
 
   /**
-   * A simple approach to select best indexer:
+   * A simple approach to select available indexers:
    * For B+ tree index, we expect to make full use of index:
    * On one hand, match as many attributes as possible in a SQL statement;
    * On the other hand, use as many attributes as possible in a B+ tree index
@@ -109,53 +109,111 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
    * and the total number of entries in a B+ tree index candidate
    * we introduce a variable ratio to indicate the match extent
    * ratio = totalAttributes/matchedAttributed + totalIndexEntries/matchedAttributes
-   * @param attrNum: the total number of attributes in the SQL statement
-   * @return (Int, IndexMeta): the best indexMeta,
-   *         and the Int is the index of the last matched attribute in the index entries
+   * @param attrNum       : the total number of attributes in the SQL statement
+   * @param maxChooseSize : the max availabe indexer choose size
+   * @return Seq[(Int, IndexMeta)]: the topN available indexMetas order by ratio,
+   *         actually result size could less than n and the Int is
+   *         the index of the last matched attribute in the index entries
    */
-  def getBestIndexer(attrNum: Int): (Int, IndexMeta) = {
-    var lastIdx = -1
-    var bestIndexer: IndexMeta = null
-    var ratio: Double = 0.0
-    var isFirst = true
-    logDebug("Get Best Index:")
-    for ((idx, indexMeta) <- availableIndexes) {
+  def getAvailableIndexers(
+      attrNum: Int,
+      maxChooseSize: Int = 1): Seq[(Int, IndexMeta)] = {
+    logDebug("Get Available Indexers: maxChooseSize = " + maxChooseSize)
+
+    def takeRatioAndUsedFields(attrNum: Int,
+                               idx: Int,
+                               entryNames: Seq[String]): (Double, Seq[String]) = {
+      val matchedAttr: Double = idx + 1
+      // (ratio, usedFields)
+      (attrNum / matchedAttr + entryNames.length / matchedAttr, entryNames.take(idx + 1))
+    }
+
+    // get names of field used.
+    def takeIndexEntryNames(indexMeta: IndexMeta): Seq[String] = {
       indexMeta.indexType match {
         case BTreeIndex(entries) =>
-          val matchedAttr: Double = idx + 1
-          val currentRatio = attrNum/matchedAttr + entries.length/matchedAttr
-          if (isFirst || ratio > currentRatio) {
-            ratio = currentRatio
-            bestIndexer = indexMeta
-            lastIdx = idx
-            isFirst = false
-          }
-        case _ =>
+          entries.map(entry => meta.schema(entry.ordinal).name)
+        case BitMapIndex(entries) =>
+          entries.map(entry => meta.schema(entry).name)
+        case _ => Seq.empty
       }
     }
-    if (bestIndexer == null && availableIndexes.nonEmpty) {
-      lastIdx = availableIndexes.head._1
-      bestIndexer = availableIndexes.head._2
+
+    // Only leave an indexer (the minimum radio) among a group indexers
+    // holding some of the same attributes.
+    def isUsableIndexer(hasUsedAttrs: mutable.Set[String], attrs: Set[String]): Boolean = {
+      if (hasUsedAttrs.intersect(attrs).isEmpty) {
+        attrs.foreach(hasUsedAttrs.add)
+        true
+      } else false
     }
-    if (bestIndexer != null) {
-      logDebug("\t" + bestIndexer.toString + "; lastIdx: " + lastIdx)
+
+    def takeCandidateSet = {
+      availableIndexes
+        // indexer = (idx, IndexMeta)
+        .map(indexer => (indexer, takeIndexEntryNames(indexer._2)))
+        // indexerAndNames = ((idx, IndexMeta), Seq[indexEntryNames])
+        .filter(indexerAndNames => indexerAndNames._2.nonEmpty)
+        .map(indexerAndNames =>
+          (indexerAndNames._1,
+            takeRatioAndUsedFields(attrNum, indexerAndNames._1._1, indexerAndNames._2)))
+        // item = ((idx, IndexMeta), (ratio, Seq[indexEntryNames]))
+        .sortBy(item => item._2._1)
+    }
+
+    // save usedFields for removing duplicate key.
+    val attrs = mutable.Set[String]()
+
+    val result = takeCandidateSet
+      // item = ((idx, IndexMeta), (ratio, Seq[indexEntryNames]))
+      .withFilter(item => isUsableIndexer(attrs, item._2._2.toSet))
+      .map(item => item._1)
+      .take(maxChooseSize)
+
+    if (result != null && result.nonEmpty) {
+      result.foreach(indices =>
+        logDebug("\t" + "Idx: " + indices._1 + "indexMeta: " + indices._2.toString))
     } else {
-      logDebug("\t" + "No best indexer is found.")
+      logDebug("\t" + "No available indexer is found.")
     }
-    (lastIdx, bestIndexer)
+
+    result
   }
 
-  def buildScanner(
+  def buildScanners(
       intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]],
-      options: Map[String, String] = Map.empty): Unit = {
+      options: Map[String, String] = Map.empty,
+      maxChooseSize: Int = 1): Unit = {
     selectAvailableIndex(intervalMap)
-    val (lastIdx, bestIndexer) = getBestIndexer(intervalMap.size)
+    val availableIndexers = getAvailableIndexers(intervalMap.size, maxChooseSize)
 
     //    intervalArray.sortWith(compare)
-    logDebug("Building Index Scanner with IndexMeta and IntervalMap ...")
+    logDebug("Building Index Scanners with IndexMeta and IntervalMap ...")
 
-    if (lastIdx == -1 && bestIndexer == null) return
+    if (availableIndexers == null || availableIndexers.isEmpty) return
+
+    val availableScanners = availableIndexers.map(availableIndexer =>
+      buildScanner(availableIndexer._1, availableIndexer._2, intervalMap, options))
+      .filter(_ != null)
+
+    if(availableScanners.nonEmpty) {
+      logDebug("Index Scanner Intervals: "
+        + availableScanners.map(_.intervalArray.mkString(", ")).mkString(" | "))
+
+      scanners = new IndexScanners(availableScanners)
+    } else {
+      logDebug("No availableScanners to use")
+    }
+
+  }
+
+  private def buildScanner(lastIdx: Int, bestIndexer: IndexMeta, intervalMap:
+    mutable.HashMap[String, ArrayBuffer[RangeInterval]],
+    options: Map[String, String] = Map.empty): IndexScanner = {
+
+    if (lastIdx == -1 && bestIndexer == null) return null
     var keySchema: StructType = null
+    var scanner: IndexScanner = null
     bestIndexer.indexType match {
       case BTreeIndex(entries) if entries.length == 1 =>
         keySchema = new StructType().add(meta.schema(entries(lastIdx).ordinal))
@@ -217,6 +275,7 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
       scanner.internalLimit_=(
         options.getOrElse(OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY, "0").toInt)
     }
+    scanner
   }
 
   def unapply(attribute: String): Option[FilterOptimizer] = {
@@ -235,7 +294,7 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
 }
 
 private[oap] object DummyIndexContext extends IndexContext(null) {
-  override def getScanner: Option[IndexScanner] = None
+  override def getScanners: Option[IndexScanners] = None
   override def unapply(attribute: String): Option[FilterOptimizer] = None
   override def unapply(value: Any): Option[Key] = None
 }

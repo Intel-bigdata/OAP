@@ -238,11 +238,12 @@ private[sql] class OapFileFormat extends FileFormat
             supportFilters.foreach(filter => logDebug("\t" + filter.toString))
             // get index options such as limit, order, etc.
             val indexOptions = options.filterKeys(OapFileFormat.oapOptimizationKeySeq.contains(_))
-            ScannerBuilder.build(supportFilters, ic, indexOptions)
+            val maxChooseSize = sparkSession.conf.get(SQLConf.OAP_INDEXER_CHOICE_MAX_SIZE)
+            ScannerBuilder.build(supportFilters, ic, indexOptions, maxChooseSize)
           }
         }
 
-        val filterScanner = ic.getScanner
+        val filterScanners = ic.getScanners
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
         hadoopConf.setDouble(SQLConf.OAP_FULL_SCAN_THRESHOLD.key,
@@ -264,7 +265,7 @@ private[sql] class OapFileFormat extends FileFormat
           } else {
             OapIndexInfo.partitionOapIndex.put(file.filePath, false)
             val iter = new OapDataReader(
-              new Path(new URI(file.filePath)), m, filterScanner, requiredIds)
+              new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
               .initialize(conf, options)
 
             val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes

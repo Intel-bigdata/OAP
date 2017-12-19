@@ -17,14 +17,13 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.util.Utils
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
+import org.apache.spark.util.Utils
 
-class FileSkipSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class FileSkipSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
 
   override def beforeEach(): Unit = {

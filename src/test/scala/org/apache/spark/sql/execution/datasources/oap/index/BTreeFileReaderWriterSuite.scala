@@ -17,14 +17,12 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
-class BTreeFileReaderWriterSuite extends SharedSQLContext {
-  sparkConf.set("spark.memory.offHeap.size", "100m")
+class BTreeFileReaderWriterSuite extends SharedOapContext {
 
   // Override afterEach because we don't want to check open streams
   override def beforeEach(): Unit = {}
@@ -32,7 +30,6 @@ class BTreeFileReaderWriterSuite extends SharedSQLContext {
 
   test("BTree File Read/Write") {
     val path = new Path(Utils.createTempDir().getAbsolutePath, "index")
-    val configuration = new Configuration()
     val footer = "footer".getBytes("UTF-8")
     val rowIdList = "rowIdList".getBytes("UTF-8")
     val nodes = (0 until 5).map(i => s"node$i".getBytes("UTF-8"))

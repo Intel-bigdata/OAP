@@ -21,8 +21,6 @@ import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.parquet.bytes.LittleEndianDataOutputStream
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
@@ -42,8 +40,8 @@ import org.apache.spark.sql.types.StructType
 // (241,  "test#241")   240            241
 // (300,  "test#300")   299            300
 
-private[oap] class PartByValueStatistics extends Statistics {
-  override val id: Int = PartByValueStatisticsType.id
+private[oap] class PartByValueStatistics(schema: StructType) extends Statistics(schema) {
+  override val id: Int = StatisticsType.TYPE_PART_BY_VALUE
 
   private lazy val maxPartNum: Int = StatisticsManager.partNumber
   @transient private lazy val ordering = GenerateOrdering.create(schema)
@@ -86,9 +84,8 @@ private[oap] class PartByValueStatistics extends Statistics {
     // start writing
     IndexUtils.writeInt(writer, metas.length)
     val tempWriter = new ByteArrayOutputStream()
-    val littleEndianWriter = new LittleEndianDataOutputStream(tempWriter)
     metas.foreach(meta => {
-      IndexUtils.writeBasedOnSchema(littleEndianWriter, meta.row, schema)
+      nnkw.writeKey(tempWriter, meta.row)
       IndexUtils.writeInt(writer, meta.curMaxId)
       IndexUtils.writeInt(writer, meta.accumulatorCnt)
       IndexUtils.writeInt(writer, tempWriter.size())
@@ -107,8 +104,7 @@ private[oap] class PartByValueStatistics extends Statistics {
 
     var rowOffset = 0
     for (i <- 0 until size) {
-      val row = IndexUtils.readBasedOnSchema(
-        fiberCache, readOffset + size * 12 + rowOffset, schema)
+      val row = nnkr.readKey(fiberCache, readOffset + size * 12 + rowOffset)._1
       val index = fiberCache.getInt(readOffset + i * 12)
       val count = fiberCache.getInt(readOffset + i * 12 + 4)
       rowOffset = fiberCache.getInt(readOffset + i * 12 + 8)

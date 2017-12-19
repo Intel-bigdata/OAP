@@ -44,9 +44,8 @@ class CodecFactoryCheck extends Properties("CodecFactory") {
       val compressor = codecFactory.getCompressor(codec)
       val decompressor = codecFactory.getDecompressor(codec)
 
-      !(0 until times).exists{ _ =>
-        !decompressor.decompress(compressor.compress(bytes), bytes.length).sameElements(bytes)
-      }
+      (0 until times).forall(_ => decompressor.decompress(compressor.compress(bytes), bytes.length)
+        .sameElements(bytes))
   }
 
   implicit lazy val arbCompressionCodec: Arbitrary[CompressionCodec] = {

@@ -28,6 +28,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.{BaseOrdering, GenerateOrdering}
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index.RangeInterval
+import org.apache.spark.sql.execution.datasources.oap.utils.{NonNullKeyReader, NonNullKeyWriter}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.MemoryBlock
@@ -37,11 +38,16 @@ abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
 
   protected def rowGen(i: Int): InternalRow = InternalRow(i, UTF8String.fromString(s"test#$i"))
 
-  protected var schema: StructType = StructType(StructField("a", IntegerType)
+  protected lazy val schema: StructType = StructType(StructField("a", IntegerType)
     :: StructField("b", StringType) :: Nil)
-
-  @transient lazy protected val ordering: BaseOrdering = GenerateOrdering.create(schema)
-  @transient lazy protected val partialOrdering: BaseOrdering =
+  @transient
+  protected lazy val nnkw: NonNullKeyWriter = new NonNullKeyWriter(schema)
+  @transient
+  protected lazy val nnkr: NonNullKeyReader = new NonNullKeyReader(schema)
+  @transient
+  protected lazy val ordering: BaseOrdering = GenerateOrdering.create(schema)
+  @transient
+  protected lazy val partialOrdering: BaseOrdering =
     GenerateOrdering.create(StructType(schema.dropRight(1)))
   protected var out: ByteArrayOutputStream = _
 

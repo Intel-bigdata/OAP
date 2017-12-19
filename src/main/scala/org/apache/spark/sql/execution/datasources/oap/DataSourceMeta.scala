@@ -24,6 +24,7 @@ import scala.collection.mutable.{ArrayBuffer, BitSet}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
+
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFile
 import org.apache.spark.sql.types._

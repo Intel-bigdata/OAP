@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.{Callable, TimeUnit}
+import java.util.concurrent.atomic.AtomicLong
 
 import scala.collection.JavaConverters._
 
@@ -61,6 +62,7 @@ object FiberCacheManager extends Logging {
       if (fiberCache.lock.writeLock().tryLock(1000, TimeUnit.MILLISECONDS)) {
         try {
           notification.getValue.dispose()
+          _cacheSize.addAndGet(-notification.getValue.size())
         } finally {
           fiberCache.lock.writeLock().unlock()
         }
@@ -79,6 +81,9 @@ object FiberCacheManager extends Logging {
   private val MB: Double = 1024 * 1024
   private val MAX_WEIGHT = (MemoryManager.maxMemory / MB).toInt
 
+  // Total cached size for debug purpose
+  private val _cacheSize: AtomicLong = new AtomicLong(0)
+
   /**
    * To avoid storing configuration in each Cache, use a loader.
    * After all, configuration is not a part of Fiber.
@@ -88,7 +93,9 @@ object FiberCacheManager extends Logging {
       override def call(): FiberCache = {
         logDebug(s"Loading Cache $fiber")
         // TODO: fiber2Data will use extra off-heap memory if cache is full. So we need a buffer
-        fiber.fiber2Data(configuration)
+        val fiberCache = fiber.fiber2Data(configuration)
+        _cacheSize.addAndGet(fiberCache.size())
+        fiberCache
       }
     }
 
@@ -130,11 +137,18 @@ object FiberCacheManager extends Logging {
     CacheStatusSerDe.serialize(statusRawData)
   }
 
-  def getStats: CacheStats = cache.stats()
+  def cacheStats: CacheStats = cache.stats()
+
+  def cacheSize : Long = _cacheSize.get()
 }
 
 private[oap] object DataFileHandleCacheManager extends Logging {
   type ENTRY = DataFile
+
+  private val _cacheSize: AtomicLong = new AtomicLong(0)
+
+  def cacheSize: Long = _cacheSize.get()
+
   private val cache =
     CacheBuilder
       .newBuilder()
@@ -144,6 +158,7 @@ private[oap] object DataFileHandleCacheManager extends Logging {
         override def onRemoval(n: RemovalNotification[ENTRY, DataFileHandle])
         : Unit = {
           logDebug(s"Evicting Data File Handle ${n.getKey.path}")
+          _cacheSize.addAndGet(-n.getValue.len)
           n.getValue.close
         }
       })
@@ -151,7 +166,9 @@ private[oap] object DataFileHandleCacheManager extends Logging {
         override def load(entry: ENTRY)
         : DataFileHandle = {
           logDebug(s"Loading Data File Handle ${entry.path}")
-          entry.createDataFileHandle()
+          val handle = entry.createDataFileHandle()
+          _cacheSize.addAndGet(handle.len)
+          handle
         }
       })
 
@@ -168,11 +185,16 @@ private[oap]
 case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache =
     file.getFiberData(rowGroupId, columnIndex, conf)
-}
 
-private[oap]
-case class IndexFiber(file: IndexFile) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = file.getIndexFiberData(conf)
+  override def hashCode(): Int = (file.path + columnIndex + rowGroupId).hashCode
+
+  override def equals(obj: Any): Boolean = obj match {
+    case another: DataFiber =>
+      another.columnIndex == columnIndex &&
+        another.rowGroupId == rowGroupId &&
+        another.file.path.equals(file.path)
+    case _ => false
+  }
 }
 
 private[oap]
@@ -182,6 +204,16 @@ case class BTreeFiber(
     section: Int,
     idx: Int) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+
+  override def hashCode(): Int = (file + section + idx).hashCode
+
+  override def equals(obj: Any): Boolean = obj match {
+    case another: BTreeFiber =>
+      another.section == section &&
+        another.idx == idx &&
+        another.file.equals(file)
+    case _ => false
+  }
 }
 
 private[oap]
@@ -193,8 +225,25 @@ case class BitmapFiber(
     // "0" means no smaller loading units.
     loadUnitIdxOfSection: Int) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+
+  override def hashCode(): Int = (file + sectionIdxOfFile + loadUnitIdxOfSection).hashCode
+
+  override def equals(obj: Any): Boolean = obj match {
+    case another: BitmapFiber =>
+      another.sectionIdxOfFile == sectionIdxOfFile &&
+        another.loadUnitIdxOfSection == loadUnitIdxOfSection &&
+        another.file.equals(file)
+    case _ => false
+  }
 }
 
 private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache = getData()
+
+  override def hashCode(): Int = name.hashCode()
+
+  override def equals(obj: Any): Boolean = obj match {
+    case another: TestFiber => name.equals(another.name)
+    case _ => false
+  }
 }

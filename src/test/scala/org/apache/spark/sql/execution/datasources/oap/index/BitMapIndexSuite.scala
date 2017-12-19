@@ -20,17 +20,15 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
 
 /**
  * Index suite for BitMap Index
  */
-class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAfterEach {
+class BitMapIndexSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
-
-  sparkConf.set("spark.memory.offHeap.size", "100m")
 
   override def beforeEach(): Unit = {
     val path = Utils.createTempDir().getAbsolutePath
@@ -129,6 +127,83 @@ class BitMapIndexSuite extends QueryTest with SharedSQLContext with BeforeAndAft
     checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 180 and a < 200 " +
       "AND (b like '%18%' or b like '%19%')"),
       result.toDF("key", "value"))
+    sql("drop oindex index_bf on oap_test")
+  }
+
+  test("BitMap index for range predicate involving boundaries") {
+    val data: Seq[(Int, String)] = (1 to 200).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bf on oap_test (a) USING BITMAP")
+    val greatThanResult: Seq[(Int, String)] = (45 to 200).map { i => (i, s"this is test $i") }
+    val littleThanResult: Seq[(Int, String)] = (1 to 44).map { i => (i, s"this is test $i") }
+    val emptyResult : Seq[(Int, String)] = Seq.empty
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 45"),
+      greatThanResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a < 45"),
+      littleThanResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a <= 1"),
+      Row(1, "this is test 1") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 200"),
+      Row(200, "this is test 200") :: Nil)
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a < 1"),
+      emptyResult.toDF("key", "value"))
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 200"),
+      emptyResult.toDF("key", "value"))
+
+    sql("drop oindex index_bf on oap_test")
+  }
+
+  test("BitMap index for null value") {
+    val data: Seq[(Int, String)] = (0 to 200).map {
+      case i if (i % 100 != 0) => (i, s"this is test $i")
+      case j => (j, null)
+    }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bf on oap_test (b) USING BITMAP")
+
+    val nullResult: Seq[(Int, String)] = (0, null) :: (100, null) :: (200, null) :: Nil
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b is null"), nullResult.toDF("key", "value"))
+
+    val nonNullResult: Seq[(Int, String)] = (99, "this is test 99") :: Nil
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b is not null and a = 99"),
+      nonNullResult.toDF("key", "value"))
+
+    sql("drop oindex index_bf on oap_test")
+  }
+
+  test("BitMap index for no null value") {
+    val data: Seq[(Int, String)] = (0 to 200).map {i => (i, s"this is test $i")}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bf on oap_test (b) USING BITMAP")
+
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b is null"), Nil)
+
+    val nonNullResult: Seq[(Int, String)] = (99, "this is test 99") :: Nil
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b is not null and a = 99"),
+      nonNullResult.toDF("key", "value"))
+
+    sql("drop oindex index_bf on oap_test")
+  }
+
+  test("BitMap index for full null value") {
+    val data: Seq[(Int, String)] = (0 to 200).map {i => (i, null)}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bf on oap_test (b) USING BITMAP")
+
+    val nullResult: Seq[(Int, String)] = (99, null) :: Nil
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b is null and a = 99"),
+      nullResult.toDF("key", "value"))
+
     sql("drop oindex index_bf on oap_test")
   }
 }

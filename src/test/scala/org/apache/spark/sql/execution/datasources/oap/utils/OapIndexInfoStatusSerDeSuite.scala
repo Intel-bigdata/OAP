@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap.utils
 
-import org.json4s.jackson.JsonMethods._
-
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfoStatus
 

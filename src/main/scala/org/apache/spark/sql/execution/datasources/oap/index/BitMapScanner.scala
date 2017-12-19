@@ -16,23 +16,24 @@
  */
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import java.nio.ByteBuffer
+import java.io.DataInput
+import java.io.EOFException
 
-import scala.collection.mutable
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
-import org.roaringbitmap.buffer.BufferFastAggregation
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap
+import org.roaringbitmap.FastAggregation
+import org.roaringbitmap.RoaringBitmap
 
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StaticsAnalysisResult
-import org.apache.spark.unsafe.Platform
+import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
 
 private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
 
@@ -40,6 +41,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   // TODO: use hash instead of order compare.
   @transient protected var ordering: Ordering[Key] = _
+  @transient
+  protected lazy val nnkr: NonNullKeyReader = new NonNullKeyReader(keySchema)
 
   private val BITMAP_FOOTER_SIZE = 5 * 8
 
@@ -50,6 +53,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private var bmUniqueKeyListOffset: Int = _
   private var bmEntryListOffset: Int = _
+
+  private var bmNullEntryOffset: Int = _
+  private var bmNullEntrySize: Int = _
+
   private var bmOffsetListOffset: Int = _
   private var bmFooterOffset: Int = _
 
@@ -61,6 +68,9 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private var bmOffsetListFiber: BitmapFiber = _
   private var bmOffsetListCache: FiberCache = _
+
+  private var bmNullListFiber: BitmapFiber = _
+  private var bmNullListCache: FiberCache = _
 
   private var bmEntryListFiber: BitmapFiber = _
   private var bmEntryListCache: FiberCache = _
@@ -97,7 +107,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     MemoryManager.putToIndexFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE)
   }
 
-  override protected def readStatistics(indexPath: Path, conf: Configuration): Double = {
+  override protected def analyzeStatistics(indexPath: Path, conf: Configuration): Double = {
     // TODO implement
     StaticsAnalysisResult.USE_INDEX
   }
@@ -107,6 +117,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     bmUniqueKeyListCount = data.getInt(4)
     bmEntryListTotalSize = data.getInt(8)
     bmOffsetListTotalSize = data.getInt(12)
+    bmNullEntryOffset = data.getInt(16)
+    bmNullEntrySize = data.getInt(20)
   }
 
   private def loadBmKeyList(fin: FSDataInputStream): FiberCache = {
@@ -116,12 +128,12 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   private def readBmUniqueKeyListFromCache(data: FiberCache): IndexedSeq[InternalRow] = {
-    var curOffset = 0L
+    var curOffset = 0
     (0 until bmUniqueKeyListCount).map( idx => {
       val (value, length) =
-        IndexUtils.readBasedOnDataType(data, curOffset, keySchema.fields(0).dataType)
+        nnkr.readKey(data, curOffset)
       curOffset += length
-      InternalRow.apply(value)
+      value
     })
   }
 
@@ -133,29 +145,42 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     MemoryManager.putToIndexFiberCache(fin, bmOffsetListOffset, bmOffsetListTotalSize)
   }
 
+  private def loadBmNullList(fin: FSDataInputStream): FiberCache = {
+    MemoryManager.putToIndexFiberCache(fin, bmNullEntryOffset, bmNullEntrySize)
+  }
+
   private def cacheBitmapAllSegments(idxPath: Path, conf: Configuration): Unit = {
     val fs = idxPath.getFileSystem(conf)
     val fin = fs.open(idxPath)
     val idxFileSize = fs.getFileStatus(idxPath).getLen.toInt
     bmFooterOffset = idxFileSize - BITMAP_FOOTER_SIZE
     // Cache the segments after first loading from file.
-    bmFooterFiber = BitmapFiber(() => loadBmFooter(fin), idxPath.toString, 6, 0)
+    bmFooterFiber = BitmapFiber(
+      () => loadBmFooter(fin), idxPath.toString, BitmapIndexSectionId.footerSection, 0)
     bmFooterCache = FiberCacheManager.get(bmFooterFiber, conf)
     readBmFooterFromCache(bmFooterCache)
 
     // Get the offset for the different segments in bitmap index file.
     bmUniqueKeyListOffset = IndexFile.indexFileHeaderLength
     bmEntryListOffset = bmUniqueKeyListOffset + bmUniqueKeyListTotalSize
-    bmOffsetListOffset = bmEntryListOffset + bmEntryListTotalSize
+    bmOffsetListOffset = bmEntryListOffset + bmEntryListTotalSize + bmNullEntrySize
 
-    bmUniqueKeyListFiber = BitmapFiber(() => loadBmKeyList(fin), idxPath.toString, 2, 0)
+    bmUniqueKeyListFiber = BitmapFiber(
+        () => loadBmKeyList(fin), idxPath.toString, BitmapIndexSectionId.keyListSection, 0)
     bmUniqueKeyListCache = FiberCacheManager.get(bmUniqueKeyListFiber, conf)
 
-    bmEntryListFiber = BitmapFiber(() => loadBmEntryList(fin), idxPath.toString, 3, 0)
+    bmEntryListFiber = BitmapFiber(
+      () => loadBmEntryList(fin), idxPath.toString, BitmapIndexSectionId.entryListSection, 0)
     bmEntryListCache = FiberCacheManager.get(bmEntryListFiber, conf)
 
-    bmOffsetListFiber = BitmapFiber(() => loadBmOffsetList(fin), idxPath.toString, 4, 0)
+    bmOffsetListFiber = BitmapFiber(
+      () => loadBmOffsetList(fin), idxPath.toString, BitmapIndexSectionId.entryOffsetsSection, 0)
     bmOffsetListCache = FiberCacheManager.get(bmOffsetListFiber, conf)
+
+    bmNullListFiber = BitmapFiber(
+      () => loadBmNullList(fin), idxPath.toString, BitmapIndexSectionId.entryNullSection, 0)
+    bmNullListCache = FiberCacheManager.get(bmNullListFiber, conf)
+
     fin.close()
   }
 
@@ -165,69 +190,72 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     startIdxOffset
   }
 
-  private def getEndIdxOffset(fiberCache: FiberCache, baseOffset: Long, endIdx: Int): Int = {
-    val idxOffset = baseOffset + endIdx * 4
-    val endIdxOffset = Platform.getInt(FiberCache, idxOffset)
-    endIdxOffset
-  }
-
   private def getBitmapIdx(keySeq: IndexedSeq[InternalRow],
       range: RangeInterval): (Int, Int) = {
+    val keyLength = keySeq.length
     val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
-      // diff from which startIdx not found, so here startIdx = -2
-      -2
+      // If no starting key, assume to start from the first key.
+      0
     } else {
-      // find first key which >= start key, can't find return -1
-      if (range.startInclude) {
-        keySeq.indexWhere(ordering.compare(range.start, _) <= 0)
-      } else {
-        keySeq.indexWhere(ordering.compare(range.start, _) < 0)
-      }
+      // If no found, return -1.
+      val (idx, found) =
+         IndexUtils.binarySearch(0, keyLength, keySeq(_), range.start, ordering.compare(_, _))
+      if (found) {
+        if (range.startInclude) idx else idx + 1
+      } else -1
     }
+    // If invalid starting index, just return.
+    if (startIdx == -1 || startIdx == keyLength) return (-1, -1)
+    // If equal query, no need to find endIdx.
+    if (range.start == range.end && range.start != IndexScanner.DUMMY_KEY_START) {
+      return (startIdx, startIdx)
+    }
+
     val endIdx = if (range.end == IndexScanner.DUMMY_KEY_END) {
-      keySeq.size
+      // If no ending key, assume to end with the last key.
+      keyLength - 1
     } else {
-      // find last key which <= end key, can't find return -1
-      if (range.endInclude) {
-        keySeq.lastIndexWhere(ordering.compare(_, range.end) <= 0)
-      } else {
-        keySeq.lastIndexWhere(ordering.compare(_, range.end) < 0)
-      }
+      // The range may be invalid. I.e. endIdx may be little than startIdx.
+      // So find endIdx from the beginning.
+      val (idx, found) =
+         IndexUtils.binarySearch(0, keyLength, keySeq(_), range.end, ordering.compare(_, _))
+      if (found) {
+        if (range.endInclude) idx else idx - 1
+      } else -1
     }
     (startIdx, endIdx)
   }
 
-  /**
-   * To get the bitmaps, we have to deserialize the data in off-heap memory
-   * TODO: Find a way to use bitmap in off-heap
-   */
-  private def getDesiredBitmaps(byteArray: Array[Byte], position: Int,
-      startIdx: Int, endIdx: Int): IndexedSeq[ImmutableRoaringBitmap] = {
-    val rawBb = ByteBuffer.wrap(byteArray)
-    var curPosition = position
-    rawBb.position(curPosition)
-    (startIdx until endIdx).map( idx => {
-      // Below is directly constructed from byte buffer rather than deserializing into java object.
-      val bmEntry = new ImmutableRoaringBitmap(rawBb)
-      curPosition += bmEntry.serializedSizeInBytes
-      rawBb.position(curPosition)
-      bmEntry
-    })
+  private def getDesiredBitmaps(byteCache: FiberCache, position: Int,
+      startIdx: Int, endIdx: Int): IndexedSeq[RoaringBitmap] = {
+    if (byteCache.size() != 0) {
+      val bmStream = new BitmapDataInputStream(byteCache)
+      bmStream.skipBytes(position)
+      (startIdx until endIdx).map( idx => {
+        val bmEntry = new RoaringBitmap()
+        // Below is directly reading from byte array rather than deserializing into java object.
+        bmEntry.deserialize(bmStream)
+        bmEntry
+      })
+    } else IndexedSeq.empty
   }
 
-  private def getDesiredBitmapArray: mutable.ArrayBuffer[ImmutableRoaringBitmap] = {
+  private def getDesiredBitmapArray: mutable.ArrayBuffer[RoaringBitmap] = {
     val keySeq = readBmUniqueKeyListFromCache(bmUniqueKeyListCache)
-    intervalArray.flatMap(range => {
-      val (startIdx, endIdx) = getBitmapIdx(keySeq, range)
-      if (startIdx == -1 || endIdx == -1) {
-        // range not fond in cur bitmap, return empty for performance consideration
-        Seq.empty[ImmutableRoaringBitmap]
-      } else {
-        val startIdxOffset = getStartIdxOffset(bmOffsetListCache, 0L, startIdx)
-        val curPosition = startIdxOffset - bmEntryListOffset
-        getDesiredBitmaps(bmEntryListCache.toArray, curPosition, startIdx, endIdx + 1)
-      }
-    })
+    intervalArray.flatMap{
+      case range if !range.isNullPredicate =>
+        val (startIdx, endIdx) = getBitmapIdx(keySeq, range)
+        if (startIdx == -1 || endIdx == -1) {
+          // range not fond in cur bitmap, return empty for performance consideration
+          Seq.empty[RoaringBitmap]
+        } else {
+          val startIdxOffset = getStartIdxOffset(bmOffsetListCache, 0L, startIdx)
+          val curPosition = startIdxOffset - bmEntryListOffset
+          getDesiredBitmaps(bmEntryListCache, curPosition, startIdx, endIdx + 1)
+        }
+      case range if range.isNullPredicate =>
+        getDesiredBitmaps(bmNullListCache, 0, 0, 1)
+    }
   }
 
   private def initDesiredRowIdIterator(): Unit = {
@@ -239,7 +267,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
           bm.iterator.asScala.take(internalLimit)).iterator
       } else {
         bmRowIdIterator =
-          bitmapArray.reduceLeft(BufferFastAggregation.or(_, _)).iterator.asScala
+          bitmapArray.reduceLeft(FastAggregation.or(_, _)).iterator.asScala
       }
       empty = false
     } else {
@@ -262,4 +290,105 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   override def toString: String = "BitMapScanner"
+}
+
+// Below class is used to directly decode bitmap from FiberCache(either offheap/onheap memory).
+private[oap] class BitmapDataInputStream(bitsStream: FiberCache) extends DataInput {
+
+ private val bitsSize: Int = bitsStream.size.toInt
+ // The current position to read from FiberCache.
+ private var pos: Int = 0
+
+ // The reading byte order is big endian.
+ override def readShort(): Short = {
+   val curPos = pos
+   pos += 2
+   (((bitsStream.getByte(curPos) & 0xFF) << 8) |
+     ((bitsStream.getByte(curPos + 1) & 0xFF)) & 0xFFFF).toShort
+ }
+
+ override def readInt(): Int = {
+   val curPos = pos
+   pos += 4
+   ((bitsStream.getByte(curPos) & 0xFF) << 24) |
+     ((bitsStream.getByte(curPos + 1) & 0xFF) << 16) |
+     ((bitsStream.getByte(curPos + 2) & 0xFF) << 8) |
+     (bitsStream.getByte(curPos + 3) & 0xFF)
+ }
+
+ override def readLong(): Long = {
+   val curPos = pos
+   pos += 8
+   ((bitsStream.getByte(curPos) & 0xFF) << 56) |
+     ((bitsStream.getByte(curPos + 1) & 0xFF) << 48) |
+     ((bitsStream.getByte(curPos + 2) & 0xFF) << 40) |
+     ((bitsStream.getByte(curPos + 3) & 0xFF) << 32) |
+     ((bitsStream.getByte(curPos + 4) & 0xFF) << 24) |
+     ((bitsStream.getByte(curPos + 5) & 0xFF) << 16) |
+     ((bitsStream.getByte(curPos + 6) & 0xFF) << 8) |
+     (bitsStream.getByte(curPos + 7) & 0xFF)
+ }
+
+ override def readFully(readBuffer: Array[Byte], offset: Int, length: Int): Unit = {
+   if (length < 0) throw new IndexOutOfBoundsException("read length is inlegal for bitmap index.\n")
+   var curPos = pos
+   pos += length
+   if (pos > bitsSize - 1) throw new EOFException("read is ending of file for bitmap index.\n")
+   (offset until (offset + length)).foreach(idx => {
+     readBuffer(idx) = bitsStream.getByte(curPos)
+     curPos += 1
+   })
+ }
+
+ override def skipBytes(n: Int): Int = {
+   pos += n
+   n
+ }
+
+ // Below are not needed by roaring bitmap, just implement them for DataInput interface.
+ override def readBoolean(): Boolean = {
+   val curPos = pos
+   pos += 1
+   if (bitsStream.getByte(curPos).toInt != 0) true else false
+ }
+
+ override def readByte(): Byte = {
+   val curPos = pos
+   pos += 1
+   bitsStream.getByte(curPos)
+ }
+
+ override def readUnsignedByte(): Int = {
+   readByte().toInt
+ }
+
+ override def readUnsignedShort(): Int = {
+   readShort().toInt
+ }
+
+ override def readChar(): Char = {
+   readShort().toChar
+ }
+
+ override def readDouble(): Double = {
+   readLong().toDouble
+ }
+
+ override def readFloat(): Float = {
+   readInt().toFloat
+ }
+
+ override def readFully(readBuffer: Array[Byte]): Unit = {
+   readFully(readBuffer, 0, readBuffer.length)
+ }
+
+ override def readLine(): String = {
+   throw new UnsupportedOperationException("Bitmap doesn't need this." +
+     "It's inlegal to use it in bitmap!!!")
+ }
+
+ override def readUTF(): String = {
+   throw new UnsupportedOperationException("Bitmap doesn't need this." +
+     "It' inlegal to use it in bitmap!!!")
+ }
 }
