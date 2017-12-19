@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
@@ -50,15 +51,23 @@ object FiberCacheManager extends Logging {
       // TODO: Change the log more readable
       logDebug(s"Removing Cache ${notification.getKey}")
       val fiberCache = notification.getValue
-      if (fiberCache.lock.writeLock().tryLock()) {
-        notification.getValue.dispose()
-        fiberCache.lock.writeLock().unlock()
+      // Consider this case:
+      // Thread A put Fiber #1.1, Fiber #1.2 and Thread B put Fiber #2.1, Fiber #2.2 into cache
+      // Assume cache is full and current entries are (LRU order): #1.1, #1.2, #2.1, #2.2
+      // Then Thread A want to put Fiber #1.3 and cause fiber #1.1 eviction.
+      // Then wait fiber #1.1 release. During this time, Thread B released it's fibers.
+      // But since fiber #1.1 can't be released (Thread A is waiting), so failed at last even though
+      // there is enough memory.
+      if (fiberCache.lock.writeLock().tryLock(1000, TimeUnit.MILLISECONDS)) {
+        try {
+          notification.getValue.dispose()
+        } finally {
+          fiberCache.lock.writeLock().unlock()
+        }
         logDebug("\tRemoved")
       } else {
-        // TODO: This will update the accessQueue. But I don't have a better solution
-        // Maybe it's time to get rid of Guava
-        cache.put(notification.getKey, notification.getValue)
-        logDebug("\tCan't remove in-used FiberCache")
+        // TODO: before throw exception, thread A need to release all it's fibers
+        throw new OapException("Wait fiber release timeout, please increase off-heap memory")
       }
     }
   }
@@ -78,11 +87,7 @@ object FiberCacheManager extends Logging {
     new Callable[FiberCache] {
       override def call(): FiberCache = {
         logDebug(s"Loading Cache $fiber")
-        // A better way is to create a dummy FiberCache with only size and delay the reading file
-        // operation until it is inserted into cache manager successfully.
-        // But, to get a DataFiber's length, we have to read the file, decompress and decode it
-        // Also, since insert into cache failure means there is no enough memory, most time this
-        // means OOME. So the time saved by delayed reading isn't critical.
+        // TODO: fiber2Data will use extra off-heap memory if cache is full. So we need a buffer
         fiber.fiber2Data(configuration)
       }
     }
@@ -96,19 +101,15 @@ object FiberCacheManager extends Logging {
       .build[Fiber, FiberCache]()
 
   def get(fiber: Fiber, conf: Configuration): FiberCache = {
-    // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
     val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
-    fiberCache.lock.readLock().lock()
+    // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
+    // fiberCache.isDisposed = true means fiberCache.size > cache.maxWeight, and it's evicted.
     if (fiberCache.isDisposed) {
-      fiberCache.lock.readLock().unlock()
-      // TODO: need the caller to handle no enough memory problem
-      // TODO: or just return an exception?
-      null
-      } else {
-      // we have inserted FiberCache into Cache Manager, so we've acquire memory. load
+      throw new OapException("fiber size is larger than max off-heap memory, please increase.")
+    } else {
+      fiberCache.lock.readLock().lock()
       fiberCache
-      }
-
+    }
   }
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly
