@@ -22,12 +22,9 @@ import scala.collection.mutable
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, SparkPlan}
-import org.apache.spark.sql.execution.datasources.HadoopFsRelation
 import org.apache.spark.sql.execution.datasources.oap.{IndexType, OapFileFormat}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
-
-
 
 trait SharedOapContext extends SharedSQLContext {
 
