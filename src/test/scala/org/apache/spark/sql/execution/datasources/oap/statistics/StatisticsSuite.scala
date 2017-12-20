@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.statistics
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.hadoop.conf.Configuration
 import org.scalatest.BeforeAndAfterAll
 
 import org.apache.spark.sql.catalyst.InternalRow
@@ -36,12 +37,17 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
   val row2 = InternalRow(2.0)
   val row3 = InternalRow(3.0)
 
-  class TestStatistics(schema: StructType) extends Statistics(schema) {
+  class TestStatisticsWriter(schema: StructType)
+    extends StatisticsWriter(schema, new Configuration()) {
+    override val id: Int = 6662
+  }
+
+  class TestStatisticsReader(schema: StructType) extends StatisticsReader(schema) {
     override val id: Int = 6662
   }
 
   test("Statistics write function test") {
-    val test = new TestStatistics(schema)
+    val test = new TestStatisticsWriter(schema)
     val writtenBytes = test.write(out, null)
     assert(writtenBytes == 4)
 
@@ -51,7 +57,7 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
   }
 
   test("Statistics read function test") {
-    val test = new TestStatistics(schema)
+    val test = new TestStatisticsReader(schema)
     IndexUtils.writeInt(out, test.id)
 
     val fiber = wrapToFiberCache(out)
@@ -61,7 +67,7 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
   }
 
   test("Statistics default analyzer test") {
-    val test = new TestStatistics(schema)
+    val test = new TestStatisticsReader(schema)
     IndexUtils.writeInt(out, test.id)
 
     val fiber = wrapToFiberCache(out)

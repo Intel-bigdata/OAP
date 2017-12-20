@@ -21,6 +21,8 @@ import java.io.OutputStream
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.BaseOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
@@ -30,35 +32,10 @@ import org.apache.spark.sql.execution.datasources.oap.utils.{NonNullKeyReader, N
 import org.apache.spark.sql.types._
 
 
-abstract class Statistics(schema: StructType) {
+abstract class StatisticsReader(schema: StructType) {
   val id: Int
-
-  @transient
-  protected lazy val nnkw = new NonNullKeyWriter(schema)
   @transient
   protected lazy val nnkr: NonNullKeyReader = new NonNullKeyReader(schema)
-
-  /**
-   * For MinMax & Bloom Filter, every time a key is inserted, then
-   * the info should be updated, for SampleBase and PartByValue statistics,
-   * nothing done in this function, a in-memory key array is stored in
-   * `StatisticsManager`. This function does nothing for most cases.
-   * @param key an InternalRow from index partition
-   */
-  def addOapKey(key: Key): Unit = {
-  }
-
-  /**
-   * Statistics write function, by default, only a Statistics id should be
-   * written into the writer.
-   * @param writer IndexOutputWrite, where to write the information
-   * @param sortedKeys sorted keys stored related to this statistics
-   * @return number of bytes written in writer
-   */
-  def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
-    IndexUtils.writeInt(writer, id)
-    4
-  }
 
   /**
    * Statistics read function, by default, statistics id should be same with
@@ -81,6 +58,34 @@ abstract class Statistics(schema: StructType) {
    */
   def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double =
     StaticsAnalysisResult.USE_INDEX
+}
+
+abstract class StatisticsWriter(schema: StructType, conf: Configuration) {
+  val id: Int
+  @transient
+  protected lazy val nnkw = new NonNullKeyWriter(schema)
+
+  /**
+   * For MinMax & Bloom Filter, every time a key is inserted, then
+   * the info should be updated, for SampleBase and PartByValue statistics,
+   * nothing done in this function, a in-memory key array is stored in
+   * `StatisticsManager`. This function does nothing for most cases.
+   * @param key an InternalRow from index partition
+   */
+  def addOapKey(key: Key): Unit = {
+  }
+
+  /**
+   * Statistics write function, by default, only a Statistics id should be
+   * written into the writer.
+   * @param writer IndexOutputWrite, where to write the information
+   * @param sortedKeys sorted keys stored related to this statistics
+   * @return number of bytes written in writer
+   */
+  def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
+    IndexUtils.writeInt(writer, id)
+    4
+  }
 }
 
 // tool function for Statistics class

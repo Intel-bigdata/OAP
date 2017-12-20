@@ -21,58 +21,27 @@ import java.io.OutputStream
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
-private[oap] class BloomFilterStatistics(schema: StructType) extends Statistics(schema) {
+
+private[oap] class BloomFilterStatisticsReader(
+    schema: StructType) extends StatisticsReader(schema) {
   override val id: Int = StatisticsType.TYPE_BLOOM_FILTER
 
-  protected var bfIndex: BloomFilter = new BloomFilter(bfMaxBits, bfHashFuncs)()
+  protected var bfIndex: BloomFilter = _
 
-  private lazy val bfMaxBits: Int = StatisticsManager.bloomFilterMaxBits
-  private lazy val bfHashFuncs: Int = StatisticsManager.bloomFilterHashFuncs
-
-  @transient
-  private lazy val projectors: Array[UnsafeProjection] = schema.zipWithIndex.map(x =>
-    BoundReference(x._2, x._1.dataType, nullable = true)).toSet.subsets().filter(
-    _.nonEmpty).map(s => UnsafeProjection.create(s.toArray)).toArray
   @transient
   private lazy val converter: UnsafeProjection = UnsafeProjection.create(schema)
   @transient
   private lazy val ordering = GenerateOrdering.create(schema)
-
-  override def addOapKey(key: Key): Unit = {
-    assert(bfIndex != null, "Please initialize the statistics")
-    projectors.foreach(p => bfIndex.addValue(p(key).getBytes))
-  }
-
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
-    var offset = super.write(writer, sortedKeys)
-
-    // Bloom filter index file format:
-    // numOfLong            4 Bytes, Int, record the total number of Longs in bit array
-    // numOfHashFunction    4 Bytes, Int, record the total number of Hash Functions
-    // elementCount         4 Bytes, Int, number of elements stored in the
-    //                      related DataFile
-    //
-    // long 1               8 Bytes, Long, the first element in bit array
-    // long 2               8 Bytes, Long, the second element in bit array
-    // ...
-    // long $numOfLong      8 Bytes, Long, the $numOfLong -th element in bit array
-    val bfBitArray = bfIndex.getBitMapLongArray
-    IndexUtils.writeInt(writer, bfBitArray.length) // bfBitArray length
-    IndexUtils.writeInt(writer, bfIndex.getNumOfHashFunc) // numOfHashFunc
-    offset += 8
-    bfBitArray.foreach(l => {
-      IndexUtils.writeLong(writer, l)
-      offset += 8
-    })
-    offset
-  }
 
   override def read(fiberCache: FiberCache, offset: Int): Int = {
     var readOffset = super.read(fiberCache, offset) + offset
@@ -116,7 +85,7 @@ private[oap] class BloomFilterStatistics(schema: StructType) extends Statistics(
       val numFields = math.min(interval.start.numFields, interval.end.numFields)
       if (schema.length > 1) {
         if (numFields == schema.length && ordering.compare(interval.start, interval.end) == 0) {
-            !bfIndex.checkExist(converter(interval.start).getBytes)
+          !bfIndex.checkExist(converter(interval.start).getBytes)
         } else !bfIndex.checkExist(partialConverter(interval.start).getBytes)
       } else {
         if (numFields == 1 && ordering.compare(interval.start, interval.end) == 0) {
@@ -127,5 +96,51 @@ private[oap] class BloomFilterStatistics(schema: StructType) extends Statistics(
 
     if (skipIndex) StaticsAnalysisResult.SKIP_INDEX
     else StaticsAnalysisResult.USE_INDEX
+  }
+}
+
+private[oap] class BloomFilterStatisticsWriter(
+    schema: StructType, conf: Configuration) extends StatisticsWriter(schema, conf) {
+  override val id: Int = StatisticsType.TYPE_BLOOM_FILTER
+
+  protected var bfIndex: BloomFilter = new BloomFilter(bfMaxBits, bfHashFuncs)()
+
+  private lazy val bfMaxBits: Int = conf.getInt(
+    OapConf.OAP_BLOOMFILTER_MAXBITS.key, OapConf.OAP_BLOOMFILTER_MAXBITS.defaultValue.get)
+  private lazy val bfHashFuncs: Int = conf.getInt(
+    OapConf.OAP_BLOOMFILTER_NUMHASHFUNC.key, OapConf.OAP_BLOOMFILTER_NUMHASHFUNC.defaultValue.get)
+
+  @transient
+  private lazy val projectors: Array[UnsafeProjection] = schema.zipWithIndex.map(x =>
+    BoundReference(x._2, x._1.dataType, nullable = true)).toSet.subsets().filter(
+    _.nonEmpty).map(s => UnsafeProjection.create(s.toArray)).toArray
+
+  override def addOapKey(key: Key): Unit = {
+    assert(bfIndex != null, "Please initialize the statistics")
+    projectors.foreach(p => bfIndex.addValue(p(key).getBytes))
+  }
+
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
+    var offset = super.write(writer, sortedKeys)
+
+    // Bloom filter index file format:
+    // numOfLong            4 Bytes, Int, record the total number of Longs in bit array
+    // numOfHashFunction    4 Bytes, Int, record the total number of Hash Functions
+    // elementCount         4 Bytes, Int, number of elements stored in the
+    //                      related DataFile
+    //
+    // long 1               8 Bytes, Long, the first element in bit array
+    // long 2               8 Bytes, Long, the second element in bit array
+    // ...
+    // long $numOfLong      8 Bytes, Long, the $numOfLong -th element in bit array
+    val bfBitArray = bfIndex.getBitMapLongArray
+    IndexUtils.writeInt(writer, bfBitArray.length) // bfBitArray length
+    IndexUtils.writeInt(writer, bfIndex.getNumOfHashFunc) // numOfHashFunc
+    offset += 8
+    bfBitArray.foreach(l => {
+      IndexUtils.writeLong(writer, l)
+      offset += 8
+    })
+    offset
   }
 }

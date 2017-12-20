@@ -21,6 +21,8 @@ import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
@@ -28,38 +30,11 @@ import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
 
 
-private[oap] class MinMaxStatistics(schema: StructType) extends Statistics(schema) {
+private[oap] class MinMaxStatisticsReader(schema: StructType) extends StatisticsReader(schema) {
   override val id: Int = StatisticsType.TYPE_MIN_MAX
-  @transient
-  private lazy val ordering = GenerateOrdering.create(schema)
 
   protected var min: Key = _
   protected var max: Key = _
-
-  override def addOapKey(key: Key): Unit = {
-    if (min == null || max == null) {
-      min = key
-      max = key
-    } else {
-      if (ordering.compare(key, min) < 0) min = key
-      if (ordering.compare(key, max) > 0) max = key
-    }
-  }
-
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
-    var offset = super.write(writer, sortedKeys)
-    if (min != null) {
-      val tempWriter = new ByteArrayOutputStream()
-      nnkw.writeKey(tempWriter, min)
-      IndexUtils.writeInt(writer, tempWriter.size)
-      nnkw.writeKey(tempWriter, max)
-      IndexUtils.writeInt(writer, tempWriter.size)
-      offset += IndexUtils.INT_SIZE * 2
-      writer.write(tempWriter.toByteArray)
-      offset += tempWriter.size
-    }
-    offset
-  }
 
   override def read(fiberCache: FiberCache, offset: Int): Int = {
     var readOffset = super.read(fiberCache, offset) + offset // offset after super.read
@@ -94,5 +69,40 @@ private[oap] class MinMaxStatistics(schema: StructType) extends Statistics(schem
 
     if (startOutOfBound || endOutOfBound) StaticsAnalysisResult.SKIP_INDEX
     else StaticsAnalysisResult.USE_INDEX
+  }
+}
+
+private[oap] class MinMaxStatisticsWriter(
+    schema: StructType, conf: Configuration) extends StatisticsWriter(schema, conf) {
+  override val id: Int = StatisticsType.TYPE_MIN_MAX
+  @transient
+  private lazy val ordering = GenerateOrdering.create(schema)
+
+  protected var min: Key = _
+  protected var max: Key = _
+
+  override def addOapKey(key: Key): Unit = {
+    if (min == null || max == null) {
+      min = key
+      max = key
+    } else {
+      if (ordering.compare(key, min) < 0) min = key
+      if (ordering.compare(key, max) > 0) max = key
+    }
+  }
+
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
+    var offset = super.write(writer, sortedKeys)
+    if (min != null) {
+      val tempWriter = new ByteArrayOutputStream()
+      nnkw.writeKey(tempWriter, min)
+      IndexUtils.writeInt(writer, tempWriter.size)
+      nnkw.writeKey(tempWriter, max)
+      IndexUtils.writeInt(writer, tempWriter.size)
+      offset += IndexUtils.INT_SIZE * 2
+      writer.write(tempWriter.toByteArray)
+      offset += tempWriter.size
+    }
+    offset
   }
 }

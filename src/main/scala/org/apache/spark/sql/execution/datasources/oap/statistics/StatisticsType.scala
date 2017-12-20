@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.statistics
 
+import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.sql.types.StructType
 
 private[oap] object StatisticsType {
@@ -25,19 +27,26 @@ private[oap] object StatisticsType {
   val TYPE_PART_BY_VALUE: Int = 2
   val TYPE_BLOOM_FILTER: Int = 3
 
-  def unapply(t: Int): Option[StructType => Statistics] = t match {
-    case TYPE_MIN_MAX => Some(new MinMaxStatistics(_))
-    case TYPE_SAMPLE_BASE => Some(new SampleBasedStatistics(_))
-    case TYPE_PART_BY_VALUE => Some(new PartByValueStatistics(_))
-    case TYPE_BLOOM_FILTER => Some(new BloomFilterStatistics(_))
+  def unapply(t: Int): Option[StructType => StatisticsReader] = t match {
+    case TYPE_MIN_MAX => Some(new MinMaxStatisticsReader(_))
+    case TYPE_SAMPLE_BASE => Some(new SampleBasedStatisticsReader(_))
+    case TYPE_PART_BY_VALUE => Some(new PartByValueStatisticsReader(_))
+    case TYPE_BLOOM_FILTER => Some(new BloomFilterStatisticsReader(_))
     case _ => None
   }
 
-  def unapply(name: String): Option[StructType => Statistics] = name match {
-    case "MINMAX" => Some(new MinMaxStatistics(_))
-    case "SAMPLE" => Some(new SampleBasedStatistics(_))
-    case "PARTBYVALUE" => Some(new PartByValueStatistics(_))
-    case "BLOOM" => Some(new BloomFilterStatistics(_))
+  def unapply(name: String): Option[(StructType, Configuration) => StatisticsWriter] = name match {
+    case "MINMAX" =>
+      Some((schema: StructType, conf: Configuration) => new MinMaxStatisticsWriter(schema, conf))
+    case "SAMPLE" =>
+      Some((schema: StructType, conf: Configuration) =>
+        new SampleBasedStatisticsWriter(schema, conf))
+    case "PARTBYVALUE" =>
+      Some((schema: StructType, conf: Configuration) =>
+        new PartByValueStatisticsWriter(schema, conf))
+    case "BLOOM" =>
+      Some((schema: StructType, conf: Configuration) =>
+        new BloomFilterStatisticsWriter(schema, conf))
     case _ => None
   }
 }

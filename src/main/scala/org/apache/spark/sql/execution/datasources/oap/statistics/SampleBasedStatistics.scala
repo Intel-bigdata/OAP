@@ -21,49 +21,24 @@ import java.io.{ByteArrayOutputStream, OutputStream}
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
+import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
 
 
-private[oap] class SampleBasedStatistics(schema: StructType) extends Statistics(schema) {
+private[oap] class SampleBasedStatisticsReader(
+    schema: StructType) extends StatisticsReader(schema) {
   override val id: Int = StatisticsType.TYPE_SAMPLE_BASE
 
-  lazy val sampleRate: Double = StatisticsManager.sampleRate
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
-
   protected var sampleArray: Array[Key] = _
-
-  // SampleBasedStatistics file structure
-  // statistics_id        4 Bytes, Int, specify the [[Statistic]] type
-  // sample_size          4 Bytes, Int, number of UnsafeRow
-  //
-  // | unsafeRow-1 sizeInBytes | unsafeRow-1 content |   (4 + u1_sizeInBytes) Bytes, unsafeRow-1
-  // | unsafeRow-2 sizeInBytes | unsafeRow-2 content |   (4 + u2_sizeInBytes) Bytes, unsafeRow-2
-  // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |   (4 + u3_sizeInBytes) Bytes, unsafeRow-3
-  // ...
-  // | unsafeRow-(sample_size) sizeInBytes | unsafeRow-(sample_size) content |
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
-    var offset = super.write(writer, sortedKeys)
-    val size = (sortedKeys.size * sampleRate).toInt
-    sampleArray = takeSample(sortedKeys, size)
-
-    IndexUtils.writeInt(writer, size)
-    offset += IndexUtils.INT_SIZE
-    val tempWriter = new ByteArrayOutputStream()
-    sampleArray.foreach(key => {
-      nnkw.writeKey(tempWriter, key)
-      IndexUtils.writeInt(writer, tempWriter.size())
-      offset += IndexUtils.INT_SIZE
-    })
-    offset += tempWriter.size()
-    writer.write(tempWriter.toByteArray)
-    offset
-  }
 
   override def read(fiberCache: FiberCache, offset: Int): Int = {
     var readOffset = super.read(fiberCache, offset) + offset
@@ -95,6 +70,43 @@ private[oap] class SampleBasedStatistics(schema: StructType) extends Statistics(
       }
       hitCnt * 1.0 / sampleArray.length
     }
+  }
+}
+
+private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configuration)
+  extends StatisticsWriter(schema, conf) {
+  override val id: Int = StatisticsType.TYPE_SAMPLE_BASE
+
+  lazy val sampleRate: Double = conf.getDouble(
+    OapConf.OAP_STATISTICS_SAMPLE_RATE.key, OapConf.OAP_STATISTICS_SAMPLE_RATE.defaultValue.get)
+
+  protected var sampleArray: Array[Key] = _
+
+  // SampleBasedStatistics file structure
+  // statistics_id        4 Bytes, Int, specify the [[Statistic]] type
+  // sample_size          4 Bytes, Int, number of UnsafeRow
+  //
+  // | unsafeRow-1 sizeInBytes | unsafeRow-1 content |   (4 + u1_sizeInBytes) Bytes, unsafeRow-1
+  // | unsafeRow-2 sizeInBytes | unsafeRow-2 content |   (4 + u2_sizeInBytes) Bytes, unsafeRow-2
+  // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |   (4 + u3_sizeInBytes) Bytes, unsafeRow-3
+  // ...
+  // | unsafeRow-(sample_size) sizeInBytes | unsafeRow-(sample_size) content |
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
+    var offset = super.write(writer, sortedKeys)
+    val size = (sortedKeys.size * sampleRate).toInt
+    sampleArray = takeSample(sortedKeys, size)
+
+    IndexUtils.writeInt(writer, size)
+    offset += IndexUtils.INT_SIZE
+    val tempWriter = new ByteArrayOutputStream()
+    sampleArray.foreach(key => {
+      nnkw.writeKey(tempWriter, key)
+      IndexUtils.writeInt(writer, tempWriter.size())
+      offset += IndexUtils.INT_SIZE
+    })
+    offset += tempWriter.size()
+    writer.write(tempWriter.toByteArray)
+    offset
   }
 
   protected def takeSample(keys: ArrayBuffer[InternalRow], size: Int): Array[InternalRow] =

@@ -27,27 +27,85 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
+
 /**
- * Manange all statistics info, use case:
- * Statistics build:
+ * Statistics read:
  * {{{
- * val statisticsManager = new StatisticsManager
+ * val statisticsManager = new StatisticsReadManager
+ * statisticsManager.read(file)
+ * }}}
+ */
+class StatisticsReadManager {
+  protected var stats: Array[StatisticsReader] = _
+
+  def read(fiberCache: FiberCache, offset: Int, s: StructType): Unit = {
+    var readOffset = 0
+    val mask = fiberCache.getLong(offset + readOffset)
+    readOffset += 8
+    stats = if (mask != StatisticsManager.STATISTICSMASK) {
+      Array.empty[StatisticsReader]
+    } else {
+      val numOfStats = fiberCache.getInt(offset + readOffset)
+      readOffset += 4
+      val statsArray = new Array[StatisticsReader](numOfStats)
+      for (i <- 0 until numOfStats) {
+        statsArray(i) = fiberCache.getInt(offset + readOffset) match {
+          case StatisticsType(stat) => stat(s)
+          case _ => throw new UnsupportedOperationException("unsupport statistics id")
+        }
+        readOffset += 4
+      }
+      statsArray
+    }
+    stats.foreach { stat =>
+      readOffset += stat.read(fiberCache, offset + readOffset)
+    }
+  }
+
+  def analyse(intervalArray: ArrayBuffer[RangeInterval], conf: Configuration): Double = {
+    var resSum: Double = 0.0
+    var resNum: Int = 0
+
+    if (stats.isEmpty) StaticsAnalysisResult.USE_INDEX // use index if no statistics
+    else {
+      stats.foreach { stat =>
+        val res = stat.analyse(intervalArray)
+
+        if (res == StaticsAnalysisResult.SKIP_INDEX) {
+          resSum = StaticsAnalysisResult.SKIP_INDEX
+        } else {
+          resSum += res
+          resNum += 1
+        }
+      }
+
+      val fullScanConf = OapConf.OAP_FULL_SCAN_THRESHOLD
+      if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
+        StaticsAnalysisResult.SKIP_INDEX
+      } else if (resNum == 0 || resSum / resNum <= conf.getDouble(
+        fullScanConf.key, fullScanConf.defaultValue.get)) {
+        StaticsAnalysisResult.USE_INDEX
+      } else {
+        StaticsAnalysisResult.FULL_SCAN
+      }
+    }
+  }
+}
+
+/**
+ * Statistics write:
+ * {{{
+ * val statisticsManager = new StatisticsWriteManager
  * statisticsManager.initialize(BTreeIndexType, schema)
  * for (key <- keys) statisticsManager.addOapKey(key)
  * statisticsManager.write(out)
  * }}}
- *
- * Statistics read:
- * {{{
- * val statisticsManager = new StatisticsManager
- * statisticsManager.read(file)
- * }}}
  */
-class StatisticsManager {
-  protected var stats: Array[Statistics] = _
+class StatisticsWriteManager {
+  protected var stats: Array[StatisticsWriter] = _
   protected var schema: StructType = _
 
   // share key store for all statistics
@@ -59,34 +117,14 @@ class StatisticsManager {
 
   def initialize(indexType: AnyIndexType, s: StructType, conf: Configuration): Unit = {
 
-    StatisticsManager.setPartNumber(
-      conf.getInt(SQLConf.OAP_STATISTICS_PART_NUM.key,
-        SQLConf.OAP_STATISTICS_PART_NUM.defaultValue.get)
-    )
-
-    StatisticsManager.setSampleRate(
-      conf.getDouble(SQLConf.OAP_STATISTICS_SAMPLE_RATE.key,
-        SQLConf.OAP_STATISTICS_SAMPLE_RATE.defaultValue.get)
-    )
-
-    StatisticsManager.setBloomFilterMaxBits(
-      conf.getInt(SQLConf.OAP_BLOOMFILTER_MAXBITS.key,
-        SQLConf.OAP_BLOOMFILTER_MAXBITS.defaultValue.get)
-    )
-
-    StatisticsManager.setBloomFilterHashFuncs(
-      conf.getInt(SQLConf.OAP_BLOOMFILTER_NUMHASHFUNC.key,
-        SQLConf.OAP_BLOOMFILTER_NUMHASHFUNC.defaultValue.get)
-    )
-
     val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter { statType =>
-      val typeFromConfig = conf.get(SQLConf.OAP_STATISTICS_TYPES.key,
-        SQLConf.OAP_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
+      val typeFromConfig = conf.get(OapConf.OAP_STATISTICS_TYPES.key,
+        OapConf.OAP_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
       typeFromConfig.contains(statType)
     }
     schema = s
     stats = statsTypes.map {
-      case StatisticsType(st) => st(s)
+      case StatisticsType(st) => st(s, conf)
       case t => throw new UnsupportedOperationException(s"non-supported statistic type $t")
     }
     content = new ArrayBuffer[Key]()
@@ -121,61 +159,6 @@ class StatisticsManager {
   }
 
   private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
-
-  def read(fiberCache: FiberCache, offset: Int, s: StructType): Unit = {
-    var readOffset = 0
-    val mask = fiberCache.getLong(offset + readOffset)
-    readOffset += 8
-    stats = if (mask != StatisticsManager.STATISTICSMASK) {
-      Array.empty[Statistics]
-    } else {
-      val numOfStats = fiberCache.getInt(offset + readOffset)
-      readOffset += 4
-      val statsArray = new Array[Statistics](numOfStats)
-      for (i <- 0 until numOfStats) {
-        statsArray(i) = fiberCache.getInt(offset + readOffset) match {
-          case StatisticsType(stat) => stat(s)
-          case _ => throw new UnsupportedOperationException("unsupport statistics id")
-        }
-        readOffset += 4
-      }
-      statsArray
-    }
-    stats.foreach { stat =>
-      readOffset += stat.read(fiberCache, offset + readOffset)
-    }
-  }
-
-  def analyse(intervalArray: ArrayBuffer[RangeInterval], conf: Configuration): Double = {
-    var resSum: Double = 0.0
-    var resNum: Int = 0
-
-    StatisticsManager.setFullScanThreshold(
-      conf.getDouble(SQLConf.OAP_FULL_SCAN_THRESHOLD.key,
-        SQLConf.OAP_FULL_SCAN_THRESHOLD.defaultValue.get))
-
-    if (stats.isEmpty) StaticsAnalysisResult.USE_INDEX // use index if no statistics
-    else {
-      stats.foreach { stat =>
-        val res = stat.analyse(intervalArray)
-
-        if (res == StaticsAnalysisResult.SKIP_INDEX) {
-          resSum = StaticsAnalysisResult.SKIP_INDEX
-        } else {
-          resSum += res
-          resNum += 1
-        }
-      }
-
-      if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
-        StaticsAnalysisResult.SKIP_INDEX
-      } else if (resNum == 0 || resSum / resNum <= StatisticsManager.FULLSCANTHRESHOLD) {
-        StaticsAnalysisResult.USE_INDEX
-      } else {
-        StaticsAnalysisResult.FULL_SCAN
-      }
-    }
-  }
 }
 
 object StatisticsManager {
@@ -186,33 +169,4 @@ object StatisticsManager {
       BTreeIndexType -> Array(
         "MINMAX", "SAMPLE", "BLOOM", "PARTBYVALUE"),
       BitMapIndexType -> Array.empty)
-
-  /**
-   * Using a static object to store parameter is not a good idea, some reasons:
-   * 1. In local mode, driver and worker will use one same object, but in cluster they are different
-   * 2. object.setXXX() then val a = object.XXX can be realized by Configuration.set and get
-   * But
-   * 1. current Statistics has no interface to set parameters by Configuration and many test suites
-   * depend on this static object.
-   * 2. the `initialize()` in each Statistics is depended by both `read` and `write` while `read`
-   * should get parameter from disk and doesn't need Configuration.
-   * 3. Some test suites only init specific Statistics and not init StatisticsManager, so remove
-   * this object will need interface change in every Statistics sub classes, this means more changes
-   * So, TODO: Let's address all of this latter.
-   */
-  var sampleRate: Double = SQLConf.OAP_STATISTICS_SAMPLE_RATE.defaultValue.get
-  var partNumber: Int = SQLConf.OAP_STATISTICS_PART_NUM.defaultValue.get
-  var bloomFilterMaxBits: Int = SQLConf.OAP_BLOOMFILTER_MAXBITS.defaultValue.get
-  var bloomFilterHashFuncs: Int = SQLConf.OAP_BLOOMFILTER_NUMHASHFUNC.defaultValue.get
-
-  var FULLSCANTHRESHOLD: Double = SQLConf.OAP_FULL_SCAN_THRESHOLD.defaultValue.get
-
-  // TODO we need to find better ways to configure these parameters
-  def setStatisticsType(indexType: AnyIndexType, statisticsType: Array[String]): Unit =
-    statisticsTypeMap.update(indexType, statisticsType)
-  def setSampleRate(rate: Double): Unit = this.sampleRate = rate
-  def setPartNumber(num: Int): Unit = this.partNumber = num
-  def setFullScanThreshold(rate: Double): Unit = this.FULLSCANTHRESHOLD = rate
-  def setBloomFilterMaxBits(maxBits: Int): Unit = this.bloomFilterMaxBits = maxBits
-  def setBloomFilterHashFuncs(num: Int): Unit = this.bloomFilterHashFuncs = num
 }

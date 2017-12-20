@@ -30,7 +30,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
-import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
+import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsWriteManager
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
 import org.apache.spark.sql.types._
 
@@ -183,8 +183,8 @@ private[oap] class BitmapIndexRecordWriter(
   }
 
   private def flushToFile(): Unit = {
-    val statisticsManager = new StatisticsManager
-    statisticsManager.initialize(BitMapIndexType, keySchema, configuration)
+    val statisticsWriteManager = new StatisticsWriteManager
+    statisticsWriteManager.initialize(BitMapIndexType, keySchema, configuration)
     IndexUtils.writeHead(writer, IndexFile.INDEX_VERSION)
     writeUniqueKeyList()
     writeBmEntryList()

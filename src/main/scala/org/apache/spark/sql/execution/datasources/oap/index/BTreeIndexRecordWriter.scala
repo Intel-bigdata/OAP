@@ -29,7 +29,7 @@ import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
+import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsWriteManager
 import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils, NonNullKeyWriter}
 import org.apache.spark.sql.types._
 
@@ -44,7 +44,7 @@ private[index] case class BTreeIndexRecordWriter(
 
   private val multiHashMap = ArrayListMultimap.create[InternalRow, Int]()
   private var recordCount: Int = 0
-  private lazy val statisticsManager = new StatisticsManager {
+  private lazy val statisticsManager = new StatisticsWriteManager {
     this.initialize(BTreeIndexType, keySchema, configuration)
   }
 

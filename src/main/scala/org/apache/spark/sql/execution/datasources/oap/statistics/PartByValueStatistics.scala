@@ -21,11 +21,14 @@ import java.io.{ByteArrayOutputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
 
 // PartedByValueStatistics gives statistics with the value interval.
@@ -40,10 +43,10 @@ import org.apache.spark.sql.types.StructType
 // (241,  "test#241")   240            241
 // (300,  "test#300")   299            300
 
-private[oap] class PartByValueStatistics(schema: StructType) extends Statistics(schema) {
+private[oap] class PartByValueStatisticsReader(schema: StructType)
+  extends StatisticsReader(schema) {
   override val id: Int = StatisticsType.TYPE_PART_BY_VALUE
 
-  private lazy val maxPartNum: Int = StatisticsManager.partNumber
   @transient private lazy val ordering = GenerateOrdering.create(schema)
   @transient private lazy val partialOrdering =
     GenerateOrdering.create(StructType(schema.dropRight(1)))
@@ -51,50 +54,6 @@ private[oap] class PartByValueStatistics(schema: StructType) extends Statistics(
   protected case class PartedByValueMeta(
       idx: Int, row: InternalRow, curMaxId: Int, accumulatorCnt: Int)
   protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
-
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
-    var offset = super.write(writer, sortedKeys)
-    val hashMap = new java.util.HashMap[Key, Int]()
-    val uniqueKeys: ArrayBuffer[Key] = new ArrayBuffer[Key]()
-
-    var prev: Key = null
-    var prevCnt: Int = 0
-
-    for (key <- sortedKeys) {
-      if (prev == null) {
-        prev = key
-        prevCnt += 1
-      } else {
-        if (ordering.compare(prev, key) == 0) prevCnt += 1
-        else {
-          hashMap.put(prev, prevCnt)
-          uniqueKeys.append(prev)
-          prevCnt = 1
-          prev = key
-        }
-      }
-    }
-    if (prev != null) {
-      hashMap.put(prev, prevCnt)
-      uniqueKeys.append(prev)
-    }
-
-    buildPartMeta(uniqueKeys, hashMap)
-
-    // start writing
-    IndexUtils.writeInt(writer, metas.length)
-    val tempWriter = new ByteArrayOutputStream()
-    metas.foreach(meta => {
-      nnkw.writeKey(tempWriter, meta.row)
-      IndexUtils.writeInt(writer, meta.curMaxId)
-      IndexUtils.writeInt(writer, meta.accumulatorCnt)
-      IndexUtils.writeInt(writer, tempWriter.size())
-      offset += 12
-    })
-    offset += tempWriter.size
-    writer.write(tempWriter.toByteArray)
-    offset
-  }
 
   override def read(fiberCache: FiberCache, offset: Int): Int = {
     var readOffset = super.read(fiberCache, offset) + offset
@@ -174,6 +133,63 @@ private[oap] class PartByValueStatistics(schema: StructType) extends Statistics(
       else if (cover < 0) 0.0
       else cover / wholeCount
     }
+  }
+}
+
+private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configuration)
+  extends StatisticsWriter(schema, conf) {
+  override val id: Int = StatisticsType.TYPE_PART_BY_VALUE
+
+  private lazy val maxPartNum: Int = conf.getInt(
+    OapConf.OAP_STATISTICS_PART_NUM.key, OapConf.OAP_STATISTICS_PART_NUM.defaultValue.get)
+  @transient private lazy val ordering = GenerateOrdering.create(schema)
+
+  protected case class PartedByValueMeta(
+      idx: Int, row: InternalRow, curMaxId: Int, accumulatorCnt: Int)
+  protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
+
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
+    var offset = super.write(writer, sortedKeys)
+    val hashMap = new java.util.HashMap[Key, Int]()
+    val uniqueKeys: ArrayBuffer[Key] = new ArrayBuffer[Key]()
+
+    var prev: Key = null
+    var prevCnt: Int = 0
+
+    for (key <- sortedKeys) {
+      if (prev == null) {
+        prev = key
+        prevCnt += 1
+      } else {
+        if (ordering.compare(prev, key) == 0) prevCnt += 1
+        else {
+          hashMap.put(prev, prevCnt)
+          uniqueKeys.append(prev)
+          prevCnt = 1
+          prev = key
+        }
+      }
+    }
+    if (prev != null) {
+      hashMap.put(prev, prevCnt)
+      uniqueKeys.append(prev)
+    }
+
+    buildPartMeta(uniqueKeys, hashMap)
+
+    // start writing
+    IndexUtils.writeInt(writer, metas.length)
+    val tempWriter = new ByteArrayOutputStream()
+    metas.foreach(meta => {
+      nnkw.writeKey(tempWriter, meta.row)
+      IndexUtils.writeInt(writer, meta.curMaxId)
+      IndexUtils.writeInt(writer, meta.accumulatorCnt)
+      IndexUtils.writeInt(writer, tempWriter.size())
+      offset += 12
+    })
+    offset += tempWriter.size
+    writer.write(tempWriter.toByteArray)
+    offset
   }
 
   // TODO needs refactor, kept for easy debug

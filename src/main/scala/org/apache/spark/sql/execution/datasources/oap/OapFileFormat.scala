@@ -38,6 +38,7 @@ import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, Scann
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.util.SerializableConfiguration
@@ -246,8 +247,8 @@ private[sql] class OapFileFormat extends FileFormat
         val filterScanners = ic.getScanners
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
-        hadoopConf.setDouble(SQLConf.OAP_FULL_SCAN_THRESHOLD.key,
-          sparkSession.conf.get(SQLConf.OAP_FULL_SCAN_THRESHOLD))
+        hadoopConf.setDouble(OapConf.OAP_FULL_SCAN_THRESHOLD.key,
+          sparkSession.conf.get(OapConf.OAP_FULL_SCAN_THRESHOLD))
         hadoopConf.setBoolean(SQLConf.OAP_ENABLE_OINDEX.key,
           sparkSession.conf.get(SQLConf.OAP_ENABLE_OINDEX))
         val broadcastedHadoopConf =
