@@ -17,10 +17,17 @@
 
 package org.apache.spark.sql.test.oap
 
+import scala.collection.mutable
+
 import org.apache.hadoop.conf.Configuration
 
+import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, SparkPlan}
+import org.apache.spark.sql.execution.datasources.HadoopFsRelation
+import org.apache.spark.sql.execution.datasources.oap.{IndexType, OapFileFormat}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
+
+
 
 trait SharedOapContext extends SharedSQLContext {
 
@@ -30,4 +37,30 @@ trait SharedOapContext extends SharedSQLContext {
   protected lazy val configuration: Configuration = sparkContext.hadoopConfiguration
 
   protected implicit def sqlConf: SQLConf = sqlContext.conf
+
+  protected def getColumnsHitIndex(sparkPlan: SparkPlan): Map[String, IndexType] = {
+    val ret = new mutable.HashMap[String, IndexType]()
+    def getOapFileFormat(node: SparkPlan): Option[OapFileFormat] = {
+      node match {
+        case f: FileSourceScanExec =>
+          f.relation.fileFormat match {
+            case format: OapFileFormat =>
+              f.inputRDDs()
+              Some(format)
+            case _ => None
+          }
+        case _ => None
+      }
+    }
+
+    sparkPlan.foreach(node => {
+      if (node.isInstanceOf[FilterExec]) {
+        node.foreach(s => {
+          ret ++= getOapFileFormat(s).map(f => f.getHitIndexColumns).getOrElse(Nil)
+        })
+      }
+    })
+
+    ret.toMap
+  }
 }
