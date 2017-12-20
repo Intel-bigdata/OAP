@@ -78,10 +78,17 @@ private[sql] class OapFileFormat extends FileFormat
   // TODO inferSchema could be lazy computed
   var inferSchema: Option[StructType] = _
   var meta: Option[DataSourceMeta] = _
-  // { a->BTree(a,b,c), d->BTree(d)->(d), e->Bitmap(e), ... }
-  var columnsHitIndex: Map[String, IndexType] = _
+  // map of columns->IndexType
+  var hitIndexColumns: Map[String, IndexType] = _
 
-  def getHitIndexColumns: Map[String, IndexType] = this.columnsHitIndex
+  def getHitIndexColumns: Map[String, IndexType] = {
+    if (this.hitIndexColumns == null) {
+      logWarning("Trigger buildReaderWithPartitionValues before getHitIndexColumns")
+      Map.empty
+    } else {
+      this.hitIndexColumns
+    }
+  }
 
   override def prepareWrite(
       sparkSession: SparkSession,
@@ -248,7 +255,7 @@ private[sql] class OapFileFormat extends FileFormat
         }
 
         val filterScanners = ic.getScanners
-        columnsHitIndex = filterScanners match {
+        hitIndexColumns = filterScanners match {
           case Some(s) =>
             s.scanners.flatMap { scanner =>
               scanner.keyNames.map( n => n -> scanner.meta.indexType)

@@ -918,19 +918,17 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql("create oindex idx1 on parquet_test (a)")
     sql("create oindex idx2 on parquet_test (a, b)")
 
-    var ret = getColumnsHitIndex(
-      sql("SELECT * FROM parquet_test WHERE a = 1")
-        .queryExecution.sparkPlan)
-    assert(ret.keySet.size == 1)
-    assert(ret.keySet.head == "a")
-    assert(ret.values.head.toString == BTreeIndex(BTreeIndexEntry(0)::Nil).toString)
+    val df1 = sql("SELECT * FROM parquet_test WHERE a = 1")
+    checkAnswer(df1, Row(1, "this is row 1") :: Nil)
+    val ret1 = getColumnsHitIndex(df1.queryExecution.sparkPlan)
+    assert(ret1.keySet.size == 1 && ret1.keySet.head == "a")
+    assert(ret1.values.head.toString == BTreeIndex(BTreeIndexEntry(0)::Nil).toString)
 
-    ret = getColumnsHitIndex(
-      sql("SELECT * FROM parquet_test WHERE a = 1 AND b = 'sda'")
-        .queryExecution.sparkPlan)
-    assert(ret.keySet.size == 2)
-    assert(ret.contains("a") && ret.contains("b"))
-    assert(ret("a") == ret("b") && ret("a").toString
+    val df2 = sql("SELECT * FROM parquet_test WHERE a = 1 AND b = 'this is row 1'")
+    checkAnswer(df2, Row(1, "this is row 1") :: Nil)
+    val ret2 = getColumnsHitIndex(df2.queryExecution.sparkPlan)
+    assert(ret2.keySet.size == 2 && ret2.contains("a") && ret2.contains("b"))
+    assert(ret2("a") == ret2("b") && ret2("a").toString
       == BTreeIndex(BTreeIndexEntry(0)::BTreeIndexEntry(1)::Nil).toString)
     sql("drop oindex idx1 on parquet_test")
     sql("drop oindex idx2 on parquet_test")

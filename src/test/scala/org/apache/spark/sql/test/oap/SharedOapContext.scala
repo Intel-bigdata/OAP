@@ -42,7 +42,6 @@ trait SharedOapContext extends SharedSQLContext {
         case f: FileSourceScanExec =>
           f.relation.fileFormat match {
             case format: OapFileFormat =>
-              f.inputRDDs()
               Some(format)
             case _ => None
           }
@@ -52,7 +51,7 @@ trait SharedOapContext extends SharedSQLContext {
 
     sparkPlan.foreach(node => {
       if (node.isInstanceOf[FilterExec]) {
-        node.foreach(s => {
+        node.children.foreach(s => {
           ret ++= getOapFileFormat(s).map(f => f.getHitIndexColumns).getOrElse(Nil)
         })
       }
