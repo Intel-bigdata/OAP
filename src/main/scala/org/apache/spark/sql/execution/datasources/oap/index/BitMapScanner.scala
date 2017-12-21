@@ -83,19 +83,23 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       true
     } else {
       if (bmFooterFiber != null) {
-        // TODO: release bmFooterCache usage number
+        bmFooterCache.release()
       }
 
       if (bmUniqueKeyListFiber != null) {
-        // TODO: release bmUniqueKeyListCache usage number
+        bmUniqueKeyListCache.release()
       }
 
       if (bmOffsetListFiber != null) {
-        // TODO: release bmOffsetListCache usage number
+        bmOffsetListCache.release()
       }
 
       if (bmEntryListFiber != null) {
-        // TODO: release bmEntryListCache usage number
+        bmEntryListCache.release()
+      }
+
+      if (bmNullListFiber != null) {
+        bmNullListCache.release()
       }
       false
     }

@@ -133,11 +133,11 @@ private[index] case class BTreeIndexRecordReader(
           val nextNodeCache = FiberCacheManager.get(nextNodeFiber, configuration)
           val nextNode = BTreeNodeData(nextNodeCache, schema)
           val rowPos = nextNode.getRowIdPos(0)
-          releaseCache(nextNodeCache, nextNodeFiber)
+          releaseCache(nextNodeCache)
           rowPos
         }
       } else node.getRowIdPos(keyPos)
-    releaseCache(nodeCache, nodeFiber)
+    releaseCache(nodeCache)
     rowPos
   }
 
@@ -178,13 +178,13 @@ private[index] case class BTreeIndexRecordReader(
     }
   }
 
-  private def releaseCache(cache: FiberCache, fiber: BTreeFiber): Unit = {
-    // TODO: Release FiberCache's usage number
+  private def releaseCache(cache: FiberCache): Unit = {
+    cache.release()
   }
 
   def close(): Unit = {
-    releaseCache(footerCache, footerFiber)
-    releaseCache(rowIdListCache, rowIdListFiber)
+    releaseCache(footerCache)
+    releaseCache(rowIdListCache)
     reader.close()
   }
 

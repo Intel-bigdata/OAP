@@ -17,7 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicLong}
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import org.apache.hadoop.fs.FSDataInputStream
 
@@ -31,20 +32,45 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
 import org.apache.spark.unsafe.types.UTF8String
 
-// TODO: make it an alias of MemoryBlock
 trait FiberCache {
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
 
-  // TODO: need a flag to avoid accessing disposed FiberCache
-  private var disposed = false
-  def isDisposed: Boolean = disposed
+  // Lock variables
+  val refCount = new AtomicInteger(0)
+  val lock = new ReentrantReadWriteLock()
+
+  // Flag to indicate if this is removed from cache
+  @volatile private var removed = false
+  // It's ok to mark this flag multiple times
+  def markForRemoved(): Unit = {
+    removed = true
+    // check again in case fiber released right before we mark removed flag.
+    if (refCount.get() == 0 && !isDisposed) {
+      dispose()
+    }
+  }
+
+  // Flag to indicate if this is disposed
+  private val disposed = new AtomicBoolean()
+  def isDisposed: Boolean = disposed.get()
   def dispose(): Unit = {
-    if (!disposed) MemoryManager.free(fiberData)
-    disposed = true
+    if (disposed.compareAndSet(false, true)) {
+      MemoryManager.free(fiberData)
+    } else {
+      throw new OapException("FiberCache has already been disposed")
+    }
+  }
+
+  def release(): Unit = {
+    assert(refCount.get() > 0)
+    if (refCount.decrementAndGet() == 0 && removed && !isDisposed) {
+      dispose()
+    }
   }
 
   /** For debug purpose */
+  @deprecated("only for debug purpose", "v0.3")
   def toArray: Array[Byte] = {
     // TODO: Handle overflow
     val bytes = new Array[Byte](fiberData.size().toInt)
@@ -55,7 +81,7 @@ trait FiberCache {
   private def getBaseObj: AnyRef = {
     // NOTE: A trick here. Since every function need to get memory data has to get here first.
     // So, here check the if the memory has been freed.
-    if (disposed) throw new OapException("Try to access a freed memory")
+    if (disposed.get()) throw new OapException("Try to access a freed memory")
     fiberData.getBaseObject
   }
   private def getBaseOffset: Long = fiberData.getBaseOffset
@@ -143,10 +169,13 @@ private[oap] object MemoryManager extends Logging {
       if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
         oapMaxMemory
       } else {
-        throw new OapException("Can't acquire memory from spark Memory Manager")
+        throw new OapException("Can't acquire memory from spark Memory Manager." +
+            "Increase spark.memory.offHeap.size for a larger off-heap memory.")
       }
     }
   }
+
+  val totalCount = new AtomicInteger(0)
 
   // TODO: Atomic is really needed?
   private val _memoryUsed = new AtomicLong(0)

@@ -107,8 +107,8 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     MemoryManager.putToDataFiberCache(data)
   }
 
-  def closeRowGroup(fiber: Fiber, fiberCache: FiberCache): Unit = {
-    // TODO: Release fiberCache's usage number
+  def closeRowGroup(fiberCache: FiberCache): Unit = {
+    fiberCache.release()
   }
 
   // full file scan
@@ -131,9 +131,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
           row.reset(meta.rowCountInLastGroup, columns).toIterator
         }
         CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
-          fiberCacheGroup.zip(requiredIds).foreach {
-            case (fiberCache, id) => closeRowGroup(DataFiber(this, id, groupId), fiberCache)
-          }
+          fiberCacheGroup.foreach(closeRowGroup)
         )
       }
     CompletionIterator[InternalRow, Iterator[InternalRow]](iterator, close())
@@ -165,9 +163,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
             subRowIds.iterator.map(rowId => row.moveToRow(rowId % meta.rowCountInEachGroup))
 
           CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
-            fiberCacheGroup.zip(requiredIds).foreach {
-              case (fiberCache, id) => closeRowGroup(DataFiber(this, id, groupId), fiberCache)
-            }
+            fiberCacheGroup.foreach(closeRowGroup)
           )
       }
     CompletionIterator[InternalRow, Iterator[InternalRow]](iterator, close())

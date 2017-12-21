@@ -28,6 +28,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
@@ -50,11 +51,41 @@ object FiberCacheManager extends Logging {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
       // TODO: Change the log more readable
       logDebug(s"Removing Cache ${notification.getKey}")
-      // TODO: Investigate lock mechanism to secure in-used FiberCache
-      notification.getValue.dispose()
-      _cacheSize.addAndGet(-notification.getValue.size())
+      val fiberCache = notification.getValue
+      try {
+        fiberCache.lock.writeLock().lock()
+        // Consider this case:
+        // Thread A, put Fiber #1, #2, #3 into cache. Then cache is full.
+        // Thread A released Fiber #2, #3 so they are ok to removed.
+        // Thread A want to put Fiber #4 into cache. So it wait on Fiber #1 to release.
+        // Timeout happens even though we can remove Fiber #2, #3.
+        val maxRetries = 3
+        var attempts = 0
+        while (attempts < maxRetries && !fiberCache.isDisposed) {
+          attempts += 1
+          if (fiberCache.refCount.get() == 0) {
+            fiberCache.dispose()
+            _cacheSize.addAndGet(-notification.getValue.size())
+            logDebug("\tRemoved")
+          } else {
+            Thread.sleep(1000)
+          }
+        }
+        // Still can't remove fiber here.
+        if (fiberCache.refCount.get() > 0) {
+          // Guava cache will cache exception in onRemoval. So this case is unhandled.
+          // Mark the fiber to dispose later after read lock is released.
+          // TODO: marked fiber is using un-tracked off-heap memory
+          fiberCache.markForRemoved()
+          // Only log it since exception will be caught by guava
+          logWarning("Wait fiber release timeout, please increase off-heap memory")
+        }
+      } finally {
+        fiberCache.lock.writeLock().unlock()
+      }
     }
   }
+
   private val weigher = new Weigher[Fiber, FiberCache] {
     override def weigh(key: Fiber, value: FiberCache): Int =
       math.ceil(value.size() / MB).toInt
@@ -74,13 +105,14 @@ object FiberCacheManager extends Logging {
     new Callable[FiberCache] {
       override def call(): FiberCache = {
         logDebug(s"Loading Cache $fiber")
+        // TODO: fiber2Data will use extra off-heap memory if cache is full. So we need a buffer
         val fiberCache = fiber.fiber2Data(configuration)
         _cacheSize.addAndGet(fiberCache.size())
         fiberCache
       }
     }
 
-  private val cache = CacheBuilder.newBuilder()
+  private val cache: Cache[Fiber, FiberCache] = CacheBuilder.newBuilder()
       .recordStats()
       .concurrencyLevel(4)
       .removalListener(removalListener)
@@ -89,8 +121,20 @@ object FiberCacheManager extends Logging {
       .build[Fiber, FiberCache]()
 
   def get(fiber: Fiber, conf: Configuration): FiberCache = {
+    val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
     // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
-    cache.get(fiber, cacheLoader(fiber, conf))
+    // fiberCache.isDisposed = true means fiberCache.size > cache.maxWeight, and it's evicted.
+    if (fiberCache.isDisposed) {
+      throw new OapException("fiber size is larger than max off-heap memory, please increase.")
+    } else {
+      try {
+        fiberCache.lock.readLock().lock()
+        fiberCache.refCount.incrementAndGet()
+      } finally {
+        fiberCache.lock.readLock().unlock()
+      }
+      fiberCache
+    }
   }
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly
