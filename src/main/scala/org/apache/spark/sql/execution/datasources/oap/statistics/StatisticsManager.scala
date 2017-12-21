@@ -32,70 +32,6 @@ import org.apache.spark.sql.types._
 
 
 /**
- * Statistics read:
- * {{{
- * val statisticsManager = new StatisticsReadManager
- * statisticsManager.read(file)
- * }}}
- */
-class StatisticsReadManager {
-  protected var stats: Array[StatisticsReader] = _
-
-  def read(fiberCache: FiberCache, offset: Int, s: StructType): Unit = {
-    var readOffset = 0
-    val mask = fiberCache.getLong(offset + readOffset)
-    readOffset += 8
-    stats = if (mask != StatisticsManager.STATISTICSMASK) {
-      Array.empty[StatisticsReader]
-    } else {
-      val numOfStats = fiberCache.getInt(offset + readOffset)
-      readOffset += 4
-      val statsArray = new Array[StatisticsReader](numOfStats)
-      for (i <- 0 until numOfStats) {
-        statsArray(i) = fiberCache.getInt(offset + readOffset) match {
-          case StatisticsType(stat) => stat(s)
-          case _ => throw new UnsupportedOperationException("unsupport statistics id")
-        }
-        readOffset += 4
-      }
-      statsArray
-    }
-    stats.foreach { stat =>
-      readOffset += stat.read(fiberCache, offset + readOffset)
-    }
-  }
-
-  def analyse(intervalArray: ArrayBuffer[RangeInterval], conf: Configuration): Double = {
-    var resSum: Double = 0.0
-    var resNum: Int = 0
-
-    if (stats.isEmpty) StaticsAnalysisResult.USE_INDEX // use index if no statistics
-    else {
-      stats.foreach { stat =>
-        val res = stat.analyse(intervalArray)
-
-        if (res == StaticsAnalysisResult.SKIP_INDEX) {
-          resSum = StaticsAnalysisResult.SKIP_INDEX
-        } else {
-          resSum += res
-          resNum += 1
-        }
-      }
-
-      val fullScanConf = SQLConf.OAP_FULL_SCAN_THRESHOLD
-      if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
-        StaticsAnalysisResult.SKIP_INDEX
-      } else if (resNum == 0 || resSum / resNum <= conf.getDouble(
-        fullScanConf.key, fullScanConf.defaultValue.get)) {
-        StaticsAnalysisResult.USE_INDEX
-      } else {
-        StaticsAnalysisResult.FULL_SCAN
-      }
-    }
-  }
-}
-
-/**
  * Statistics write:
  * {{{
  * val statisticsManager = new StatisticsWriteManager
@@ -170,4 +106,60 @@ object StatisticsManager {
       BTreeIndexType -> Array(
         "MINMAX", "SAMPLE", "BLOOM", "PARTBYVALUE"),
       BitMapIndexType -> Array.empty)
+
+  def read(fiberCache: FiberCache, offset: Int, s: StructType): Array[StatisticsReader] = {
+    var readOffset = 0
+    val mask = fiberCache.getLong(offset + readOffset)
+    readOffset += 8
+    if (mask != StatisticsManager.STATISTICSMASK) {
+      Array.empty[StatisticsReader]
+    } else {
+      val numOfStats = fiberCache.getInt(offset + readOffset)
+      readOffset += 4
+      val statsArray = new Array[StatisticsReader](numOfStats)
+      for (i <- 0 until numOfStats) {
+        statsArray(i) = fiberCache.getInt(offset + readOffset) match {
+          case StatisticsType(stat) => stat(s)
+          case _ => throw new UnsupportedOperationException("unsupport statistics id")
+        }
+        readOffset += 4
+      }
+      statsArray
+    }.map { stat =>
+      readOffset += stat.read(fiberCache, offset + readOffset)
+      stat
+    }
+  }
+
+  def analyse(
+      stats: Array[StatisticsReader],
+      intervalArray: ArrayBuffer[RangeInterval],
+      conf: Configuration): Double = {
+    var resSum: Double = 0.0
+    var resNum: Int = 0
+
+    if (stats.isEmpty) StaticsAnalysisResult.USE_INDEX // use index if no statistics
+    else {
+      stats.foreach { stat =>
+        val res = stat.analyse(intervalArray)
+
+        if (res == StaticsAnalysisResult.SKIP_INDEX) {
+          resSum = StaticsAnalysisResult.SKIP_INDEX
+        } else {
+          resSum += res
+          resNum += 1
+        }
+      }
+
+      val fullScanConf = SQLConf.OAP_FULL_SCAN_THRESHOLD
+      if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
+        StaticsAnalysisResult.SKIP_INDEX
+      } else if (resNum == 0 || resSum / resNum <= conf.getDouble(
+        fullScanConf.key, fullScanConf.defaultValue.get)) {
+        StaticsAnalysisResult.USE_INDEX
+      } else {
+        StaticsAnalysisResult.FULL_SCAN
+      }
+    }
+  }
 }
