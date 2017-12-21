@@ -79,7 +79,7 @@ private[sql] class OapFileFormat extends FileFormat
   var inferSchema: Option[StructType] = _
   var meta: Option[DataSourceMeta] = _
   // map of columns->IndexType
-  var hitIndexColumns: Map[String, IndexType] = _
+  private var hitIndexColumns: Map[String, IndexType] = _
 
   def getHitIndexColumns: Map[String, IndexType] = {
     if (this.hitIndexColumns == null) {
