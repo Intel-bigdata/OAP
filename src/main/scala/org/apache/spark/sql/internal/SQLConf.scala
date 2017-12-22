@@ -724,7 +724,21 @@ object SQLConf {
       .internal()
       .doc("To indicate if enable/disable index cbo which helps to choose a fast query path")
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
+
+  val OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY =
+    SQLConfigBuilder("spark.sql.oap.oindex.file.policy")
+      .internal()
+      .doc("To indicate if enable/disable file based index selection")
+      .booleanConf
+      .createWithDefault(true)
+
+  val OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY =
+    SQLConfigBuilder("spark.sql.oap.oindex.statistics.policy")
+      .internal()
+      .doc("To indicate if enable/disable statistics based index selection")
+      .booleanConf
+      .createWithDefault(true)
 
   val OAP_INDEX_FILE_SIZE_MAX_RATIO =
     SQLConfigBuilder("spark.sql.oap.oindex.size.ratio")

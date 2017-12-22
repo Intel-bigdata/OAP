@@ -119,11 +119,24 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       val dataFileSize = dataPath.getFileSystem(conf).getContentSummary(dataPath).getLength
       val ratio = conf.getDouble(SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
         SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
-      if (indexFileSize > dataFileSize * ratio) return StaticsAnalysisResult.FULL_SCAN
+
+      val filePolicyEnable =
+        conf.getBoolean(SQLConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key,
+        SQLConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.defaultValue.get)
+      if (filePolicyEnable && indexFileSize > dataFileSize * ratio) {
+        return StaticsAnalysisResult.FULL_SCAN
+      }
+
+      val statsPolicyEnable =
+        conf.getBoolean(SQLConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY.key,
+          SQLConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY.defaultValue.get)
 
       // Policy 2: statistics tells the scan cost
-      tryAnalyzeStatistics(indexPath, conf)
-
+      if (statsPolicyEnable) {
+        tryAnalyzeStatistics(indexPath, conf)
+      } else {
+        StaticsAnalysisResult.USE_INDEX
+      }
       // More Policies
     } else {
       // Index selection is disabled, executor always uses index.

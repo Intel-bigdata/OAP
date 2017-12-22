@@ -55,6 +55,51 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
       idx: Int, row: InternalRow, curMaxId: Int, accumulatorCnt: Int)
   protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
 
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
+    var offset = super.write(writer, sortedKeys)
+    val hashMap = new java.util.HashMap[Key, Int]()
+    val uniqueKeys: ArrayBuffer[Key] = new ArrayBuffer[Key]()
+
+    var prev: Key = null
+    var prevCnt: Int = 0
+
+    for (key <- sortedKeys) {
+      if (prev == null) {
+        prev = key
+        prevCnt += 1
+      } else {
+        if (ordering.compare(prev, key) == 0) prevCnt += 1
+        else {
+          hashMap.put(prev, prevCnt)
+          uniqueKeys.append(prev)
+          prevCnt = 1
+          prev = key
+        }
+      }
+    }
+    if (prev != null) {
+      hashMap.put(prev, prevCnt)
+      uniqueKeys.append(prev)
+    }
+
+    buildPartMeta(uniqueKeys, hashMap)
+
+    // start writing
+    IndexUtils.writeInt(writer, metas.length)
+    offset += IndexUtils.INT_SIZE
+    val tempWriter = new ByteArrayOutputStream()
+    metas.foreach(meta => {
+      nnkw.writeKey(tempWriter, meta.row)
+      IndexUtils.writeInt(writer, meta.curMaxId)
+      IndexUtils.writeInt(writer, meta.accumulatorCnt)
+      IndexUtils.writeInt(writer, tempWriter.size())
+      offset += 12
+    })
+    writer.write(tempWriter.toByteArray)
+    offset += tempWriter.size
+    offset
+  }
+
   override def read(fiberCache: FiberCache, offset: Int): Int = {
     var readOffset = super.read(fiberCache, offset) + offset
 
@@ -105,33 +150,37 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
-    val wholeCount = metas.last.accumulatorCnt
+    if (metas.nonEmpty) {
+      val wholeCount = metas.last.accumulatorCnt
 
-    val start = intervalArray.head
-    val end = intervalArray.last
+      val start = intervalArray.head
+      val end = intervalArray.last
 
-    val left = getIntervalIdxForStart(start.start, start.startInclude)
-    val right = getIntervalIdxForEnd(end.end, end.endInclude)
+      val left = getIntervalIdxForStart(start.start, start.startInclude)
+      val right = getIntervalIdxForEnd(end.end, end.endInclude)
 
-    if (left == -1 || right == 0) {
-      // interval.min > partition.max || interval.max < partition.min
-      StaticsAnalysisResult.SKIP_INDEX
+      if (left == -1 || right == 0) {
+        // interval.min > partition.max || interval.max < partition.min
+        StaticsAnalysisResult.SKIP_INDEX
+      } else {
+        var cover: Double =
+          if (right != -1) metas(right).accumulatorCnt else metas.last.accumulatorCnt
+
+        if (left > 0) {
+          cover -= metas(left - 1).accumulatorCnt
+          cover += 0.5 * (metas(left).accumulatorCnt - metas(left - 1).accumulatorCnt)
+        }
+
+        if (right != -1) {
+          cover -= 0.5 * (metas(right).accumulatorCnt - metas(right - 1).accumulatorCnt)
+        }
+
+        if (cover > wholeCount) StaticsAnalysisResult.FULL_SCAN
+        else if (cover < 0) StaticsAnalysisResult.USE_INDEX
+        else cover / wholeCount
+      }
     } else {
-      var cover: Double =
-        if (right != -1) metas(right).accumulatorCnt else metas.last.accumulatorCnt
-
-      if (left > 0) {
-        cover -= metas(left - 1).accumulatorCnt
-        cover += 0.5 * (metas(left).accumulatorCnt - metas(left - 1).accumulatorCnt)
-      }
-
-      if (right != -1) {
-        cover -= 0.5 * (metas(right).accumulatorCnt - metas(right - 1).accumulatorCnt)
-      }
-
-      if (cover > wholeCount) 1.0
-      else if (cover < 0) 0.0
-      else cover / wholeCount
+      StaticsAnalysisResult.USE_INDEX
     }
   }
 }

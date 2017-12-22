@@ -51,6 +51,7 @@ class OapPlannerSuite
            | USING oap
            | OPTIONS (path '$path3')""".stripMargin)
 
+    spark.conf.set(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, false)
     spark.experimental.extraStrategies = oapStrategies
   }
 

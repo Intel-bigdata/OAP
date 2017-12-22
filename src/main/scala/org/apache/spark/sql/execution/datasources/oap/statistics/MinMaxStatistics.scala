@@ -36,21 +36,54 @@ private[oap] class MinMaxStatisticsReader(schema: StructType) extends Statistics
   protected var min: Key = _
   protected var max: Key = _
 
+  override def addOapKey(key: Key): Unit = {
+    if (min == null || max == null) {
+      min = key
+      max = key
+    } else {
+      if (ordering.compare(key, min) < 0) min = key
+      if (ordering.compare(key, max) > 0) max = key
+    }
+  }
+
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
+    var offset = super.write(writer, sortedKeys)
+    if (min != null) {
+      val tempWriter = new ByteArrayOutputStream()
+      nnkw.writeKey(tempWriter, min)
+      IndexUtils.writeInt(writer, tempWriter.size)
+      nnkw.writeKey(tempWriter, max)
+      IndexUtils.writeInt(writer, tempWriter.size)
+      offset += IndexUtils.INT_SIZE * 2
+      writer.write(tempWriter.toByteArray)
+      offset += tempWriter.size
+    } else {
+      // No valid min/max.
+      IndexUtils.writeInt(writer, 0)
+      offset += IndexUtils.INT_SIZE
+    }
+    offset
+  }
+
   override def read(fiberCache: FiberCache, offset: Int): Int = {
     var readOffset = super.read(fiberCache, offset) + offset // offset after super.read
 
     val minSize = fiberCache.getInt(readOffset)
     readOffset += 4
-    val totalSize = fiberCache.getInt(readOffset)
-    readOffset += 4
-    min = nnkr.readKey(fiberCache, readOffset)._1
-    max = nnkr.readKey(fiberCache, readOffset + minSize)._1
-    readOffset += totalSize
+    if (minSize != 0) {
+      val totalSize = fiberCache.getInt(readOffset)
+      readOffset += 4
+      min = nnkr.readKey(fiberCache, readOffset)._1
+      max = nnkr.readKey(fiberCache, readOffset + minSize)._1
+      readOffset += totalSize
+    }
 
     readOffset - offset
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
+    if (min == null || max == null) return StaticsAnalysisResult.USE_INDEX
+
     val start = intervalArray.head
     val end = intervalArray.last
 
