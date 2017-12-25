@@ -148,19 +148,19 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     dir.delete()
   }
 
-  ignore("OapIndexInfo status and update") {
+  test("OapIndexInfo status and update") {
     val path1 = "partitionFile1"
     val useIndex1 = true
     val path2 = "partitionFile2"
     val useIndex2 = false
     val rawData1 = OapIndexInfoStatus(path1, useIndex1)
     val rawData2 = OapIndexInfoStatus(path2, useIndex2)
-    val indexInfoStatusSeq = Seq(rawData1, rawData2)
     OapIndexInfo.partitionOapIndex.clear
     OapIndexInfo.partitionOapIndex.put(path1, useIndex1)
     OapIndexInfo.partitionOapIndex.put(path2, useIndex2)
     val indexInfoStatusSerializeStr = OapIndexInfo.status
-    assert(indexInfoStatusSerializeStr == OapIndexInfoStatusSerDe.serialize(indexInfoStatusSeq))
+    assert(Seq(Seq(rawData1, rawData2), Seq(rawData2, rawData1)).map(
+      OapIndexInfoStatusSerDe.serialize).contains(indexInfoStatusSerializeStr))
     val host = "host1"
     val executorId = "executorId1"
     val oapIndexInfo =

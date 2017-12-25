@@ -197,12 +197,12 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       // If no starting key, assume to start from the first key.
       0
     } else {
-      // If no found, return -1.
+     // Find the first index to be > or >= range.start. If no found, return -1.
       val (idx, found) =
          IndexUtils.binarySearch(0, keyLength, keySeq(_), range.start, ordering.compare(_, _))
       if (found) {
         if (range.startInclude) idx else idx + 1
-      } else -1
+      } else if (ordering.compare(keySeq.head, range.start) > 0) 0 else -1
     }
     // If invalid starting index, just return.
     if (startIdx == -1 || startIdx == keyLength) return (-1, -1)
@@ -221,7 +221,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
          IndexUtils.binarySearch(0, keyLength, keySeq(_), range.end, ordering.compare(_, _))
       if (found) {
         if (range.endInclude) idx else idx - 1
-      } else -1
+      } else if (ordering.compare(keySeq.last, range.end) < 0) keyLength - 1 else -1
     }
     (startIdx, endIdx)
   }

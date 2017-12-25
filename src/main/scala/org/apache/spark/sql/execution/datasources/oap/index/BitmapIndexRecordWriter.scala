@@ -29,6 +29,7 @@ import org.roaringbitmap.RoaringBitmap
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsWriteManager
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
@@ -96,6 +97,9 @@ private[oap] class BitmapIndexRecordWriter(
       rowMapBitmap.put(v, bm)
     } else {
       rowMapBitmap.get(v).get.add(recordCount)
+    }
+    if (recordCount == Int.MaxValue) {
+      throw new OapException("Cannot support indexing more than 2G rows!")
     }
     recordCount += 1
   }

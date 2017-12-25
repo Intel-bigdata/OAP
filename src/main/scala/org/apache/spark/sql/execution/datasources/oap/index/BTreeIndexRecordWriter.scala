@@ -29,6 +29,7 @@ import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsWriteManager
 import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils, NonNullKeyWriter}
 import org.apache.spark.sql.types._
@@ -52,6 +53,9 @@ private[index] case class BTreeIndexRecordWriter(
     val v = genericProjector(value).copy()
     multiHashMap.put(v, recordCount)
     statisticsManager.addOapKey(v)
+    if (recordCount == Int.MaxValue) {
+      throw new OapException("Cannot support indexing more than 2G rows!")
+    }
     recordCount += 1
   }
 

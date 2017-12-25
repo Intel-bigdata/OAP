@@ -903,4 +903,34 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     sql("drop oindex idx1 on parquet_test")
   }
+
+  test("get columns hit index") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
+      Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create oindex idx1 on parquet_test (a)")
+    sql("create oindex idx2 on parquet_test (a, b)")
+
+    val df1 = sql("SELECT * FROM parquet_test WHERE a = 1")
+    checkAnswer(df1, Row(1, "this is row 1") :: Nil)
+    val ret1 = getColumnsHitIndex(df1.queryExecution.sparkPlan)
+    assert(ret1.keySet.size == 1 && ret1.keySet.head == "a")
+    assert(ret1.values.head.toString == BTreeIndex(BTreeIndexEntry(0)::Nil).toString)
+
+    val df2 = sql("SELECT * FROM parquet_test WHERE a = 1 AND b = 'this is row 1'")
+    checkAnswer(df2, Row(1, "this is row 1") :: Nil)
+    val ret2 = getColumnsHitIndex(df2.queryExecution.sparkPlan)
+    assert(ret2.keySet.size == 2 && ret2.contains("a") && ret2.contains("b"))
+    assert(ret2("a") == ret2("b") && ret2("a").toString
+      == BTreeIndex(BTreeIndexEntry(0)::BTreeIndexEntry(1)::Nil).toString)
+    sql("drop oindex idx1 on parquet_test")
+    sql("drop oindex idx2 on parquet_test")
+  }
 }
