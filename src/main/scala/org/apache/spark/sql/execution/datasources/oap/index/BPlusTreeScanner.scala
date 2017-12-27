@@ -58,7 +58,9 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     val offset = footer.getStatsOffset
 
     val stats = StatisticsManager.read(footerCache, offset, keySchema)
-    StatisticsManager.analyse(stats, intervalArray, conf)
+    val result = StatisticsManager.analyse(stats, intervalArray, conf)
+    footerCache.release()
+    result
   }
 
   override def hasNext: Boolean = recordReader.hasNext

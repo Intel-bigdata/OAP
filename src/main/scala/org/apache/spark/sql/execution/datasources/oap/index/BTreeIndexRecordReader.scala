@@ -186,7 +186,7 @@ private[index] case class BTreeIndexRecordReader(
   }
 
   private def releaseCache(cache: FiberCache, fiber: BTreeFiber): Unit = {
-    // TODO: Release FiberCache's usage number
+    cache.release()
   }
 
   def close(): Unit = {

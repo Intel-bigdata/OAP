@@ -108,7 +108,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
   }
 
   def closeRowGroup(fiber: Fiber, fiberCache: FiberCache): Unit = {
-    // TODO: Release fiberCache's usage number
+    fiberCache.release()
   }
 
   // full file scan

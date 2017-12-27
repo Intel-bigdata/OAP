@@ -39,6 +39,8 @@ class FiberCacheManagerSuite extends SharedOapContext {
       val fiberCache2 = FiberCacheManager.get(fiber, configuration)
       assert(fiberCache.toArray sameElements data)
       assert(fiberCache2.toArray sameElements data)
+      fiberCache.release()
+      fiberCache2.release()
     }
     val stats = FiberCacheManager.cacheStats.minus(origStats)
     assert(stats.missCount() == memorySizeInMB * 2)
@@ -56,8 +58,10 @@ class FiberCacheManagerSuite extends SharedOapContext {
       val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #$i")
       val fiberCache = FiberCacheManager.get(fiber, configuration)
       assert(fiberCache.toArray sameElements data)
+      fiberCache.release()
     }
     assert(fiberCacheInUse.isDisposed)
+    fiberCacheInUse.release()
   }
 
   test("add a very large fiber") {
@@ -66,6 +70,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val data = generateData(memorySizeInMB * mbSize / 8)
     val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #0")
     val fiberCache = FiberCacheManager.get(fiber, configuration)
+    fiberCache.release()
     assert(!fiberCache.isDisposed)
 
     val data1 = generateData(memorySizeInMB * mbSize / 2)
