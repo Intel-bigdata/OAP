@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import java.net.URI
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
@@ -75,8 +76,8 @@ private[sql] class OapFileFormat extends FileFormat
     // OapFileFormat.serializeDataSourceMeta(hadoopConf, meta)
     inferSchema = meta.map(_.schema)
 
-    skippedRows = sparkSession.sparkContext.longAccumulator("Skipped Rows")
-    selectedRows = sparkSession.sparkContext.longAccumulator("Selected Rows")
+    selectedRows = sparkSession.sparkContext.longAccumulator("Selected Row Count")
+    skippedRows = sparkSession.sparkContext.longAccumulator("Skipped Row Count")
 
     this
   }
@@ -284,30 +285,31 @@ private[sql] class OapFileFormat extends FileFormat
           val dataFile = DataFile(file.filePath, m.schema, m.dataReaderClassName, conf)
           val dataFileHandle: DataFileHandle = DataFileHandleCacheManager(dataFile)
 
+
           // read total records from metaFile
-          def getTotalRecordsOfFile(dataFile: PartitionedFile): Long = {
-            val partitionMeta = DataSourceMeta.initialize(new Path(
-              new Path(dataFile.filePath).getParent, OapFileFormat.OAP_META_FILE), conf)
-            val fileName = new Path(dataFile.filePath).getName
-            val fileMeta = partitionMeta.fileMetas.filter(
-              f => f.dataFileName == fileName)
-            if (fileMeta.nonEmpty) fileMeta.head.recordCount else 0L
+          val totalRows = dataFileHandle match {
+            case oap: OapDataFileHandle =>
+              oap.totalRowCount()
+            case parquet: ParquetDataFileHandle =>
+              parquet.footer.getBlocks.asScala.foldLeft(0L) {
+                (sum, block) => sum + block.getRowCount
+              }
+            case _ => 0L
           }
-          val totalRecords = getTotalRecordsOfFile(file)
 
           if (dataFileHandle.isInstanceOf[OapDataFileHandle] && filters.exists(filter =>
             canSkipFile(dataFileHandle.asInstanceOf[OapDataFileHandle].columnsMeta.map(
               _.statistics), filter, m.schema))) {
             selectedRows.add(0)
-            skippedRows.add(totalRecords)
+            skippedRows.add(totalRows)
             Iterator.empty
           } else {
             OapIndexInfo.partitionOapIndex.put(file.filePath, false)
             val reader = new OapDataReader(
               new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
             val iter = reader.initialize(conf, options)
-            selectedRows.add(reader.getSelectedRecords)
-            skippedRows.add(totalRecords - reader.getSelectedRecords)
+            selectedRows.add(reader.selectedRows.getOrElse(totalRows))
+            skippedRows.add(totalRows - reader.selectedRows.getOrElse(totalRows))
 
             val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
             val joinedRow = new JoinedRow()

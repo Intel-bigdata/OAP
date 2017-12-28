@@ -191,8 +191,7 @@ private[oap] class OapDataReader(
   filterScanners: Option[IndexScanners],
   requiredIds: Array[Int]) extends Logging {
 
-  private var selectedRows: Long = 0L
-  def getSelectedRecords: Long = selectedRows
+  var selectedRows: Option[Long] = None
 
   def initialize(
       conf: Configuration,
@@ -229,7 +228,7 @@ private[oap] class OapDataReader(
         val iter = fileScanner.iterator(conf, requiredIds, rows)
         val end = System.currentTimeMillis()
 
-        selectedRows = rows.length
+        selectedRows = Some(rows.length)
         logDebug("Construct File Iterator: " + (end - start) + "ms")
         iter
       case _ =>
