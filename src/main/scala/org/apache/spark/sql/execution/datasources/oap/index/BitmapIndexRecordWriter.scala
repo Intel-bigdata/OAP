@@ -103,8 +103,6 @@ private[oap] class BitmapIndexRecordWriter(
 
   private def writeUniqueKeyList(): Unit = {
     val ordering = GenerateOrdering.create(keySchema)
-    // Currently OAP index type supports the column with one single field.
-    assert(keySchema.fields.size == 1)
     bmUniqueKeyList = rowMapBitmap.keySet.toList.sorted(ordering)
     val bos = new ByteArrayOutputStream()
     bmUniqueKeyList.foreach(key => nnkw.writeKey(bos, key))
