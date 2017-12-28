@@ -40,12 +40,15 @@ import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
-import org.apache.spark.util.SerializableConfiguration
+import org.apache.spark.util.{LongAccumulator, SerializableConfiguration}
 
 private[sql] class OapFileFormat extends FileFormat
   with DataSourceRegister
   with Logging
   with Serializable {
+
+  var selectedRows: LongAccumulator = _
+  var skippedRows: LongAccumulator = _
 
   override def initialize(
       sparkSession: SparkSession,
@@ -71,6 +74,9 @@ private[sql] class OapFileFormat extends FileFormat
 
     // OapFileFormat.serializeDataSourceMeta(hadoopConf, meta)
     inferSchema = meta.map(_.schema)
+
+    skippedRows = sparkSession.sparkContext.longAccumulator("Skipped Rows")
+    selectedRows = sparkSession.sparkContext.longAccumulator("Selected Rows")
 
     this
   }
@@ -277,15 +283,31 @@ private[sql] class OapFileFormat extends FileFormat
           val conf = broadcastedHadoopConf.value.value
           val dataFile = DataFile(file.filePath, m.schema, m.dataReaderClassName, conf)
           val dataFileHandle: DataFileHandle = DataFileHandleCacheManager(dataFile)
+
+          // read total records from metaFile
+          def getTotalRecordsOfFile(dataFile: PartitionedFile): Long = {
+            val partitionMeta = DataSourceMeta.initialize(new Path(
+              new Path(dataFile.filePath).getParent, OapFileFormat.OAP_META_FILE), conf)
+            val fileName = new Path(dataFile.filePath).getName
+            val fileMeta = partitionMeta.fileMetas.filter(
+              f => f.dataFileName == fileName)
+            if (fileMeta.nonEmpty) fileMeta.head.recordCount else 0L
+          }
+          val totalRecords = getTotalRecordsOfFile(file)
+
           if (dataFileHandle.isInstanceOf[OapDataFileHandle] && filters.exists(filter =>
             canSkipFile(dataFileHandle.asInstanceOf[OapDataFileHandle].columnsMeta.map(
               _.statistics), filter, m.schema))) {
+            selectedRows.add(0)
+            skippedRows.add(totalRecords)
             Iterator.empty
           } else {
             OapIndexInfo.partitionOapIndex.put(file.filePath, false)
-            val iter = new OapDataReader(
+            val reader = new OapDataReader(
               new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
-              .initialize(conf, options)
+            val iter = reader.initialize(conf, options)
+            selectedRows.add(reader.getSelectedRecords)
+            skippedRows.add(totalRecords - reader.getSelectedRecords)
 
             val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
             val joinedRow = new JoinedRow()
