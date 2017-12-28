@@ -933,4 +933,55 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql("drop oindex idx1 on parquet_test")
     sql("drop oindex idx2 on parquet_test")
   }
+
+  test("skipped rows and selected rows") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
+      Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("b", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+
+    val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t1")
+
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create oindex idx1 on parquet_test (a)")
+
+    val df1 = sql("SELECT * FROM parquet_test WHERE a = 1")
+    checkAnswer(df1, Row(1, "this is row 1") :: Nil)
+    val ret1 = getColumnsHitIndex(df1.queryExecution.sparkPlan)
+    assert(ret1.keySet.size == 1 && ret1.keySet.head == "a")
+    assert(ret1.values.head.toString == BTreeIndex(BTreeIndexEntry(0)::Nil).toString)
+
+    // check accumulator
+    var fileFormats = getOapFileFormat(df1.queryExecution.sparkPlan)
+    fileFormats.foreach(f => assert(f.orNull != null))
+    assert(1L == fileFormats.foldLeft(0L)((sum, of) =>
+      sum + of.map(f => f.selectedRows.sum).getOrElse(0L)
+    ))
+    assert(99L == fileFormats.foldLeft(0L)(
+      (sum, of) => sum + of.map(f => f.skippedRows.sum).getOrElse(0L)
+    ))
+
+    // check 2 format
+    val df2 = sql("select t2.a, t2.b " +
+      "from (select a from parquet_test where a = 1 ) t1 " +
+      "inner join parquet_test t2 on t1.a = t2.a")
+    checkAnswer(df2, Row(1, "this is row 1") :: Nil)
+
+    // check accumulator
+    fileFormats = getOapFileFormat(df2.queryExecution.sparkPlan)
+    fileFormats.foreach(f => assert(f.orNull != null))
+    assert(2 * 1L == fileFormats.foldLeft(0L)(
+      (sum, of) => sum + of.map(f => f.selectedRows.sum).getOrElse(0L)
+    ))
+    assert(2 * 99L == fileFormats.foldLeft(0L)(
+      (sum, of) => sum + of.map(f => f.skippedRows.sum).getOrElse(0L)
+    ))
+
+    sql("drop oindex idx1 on parquet_test")
+  }
 }

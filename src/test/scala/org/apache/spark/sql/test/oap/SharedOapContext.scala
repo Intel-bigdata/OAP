@@ -39,9 +39,8 @@ trait SharedOapContext extends SharedSQLContext {
 
   protected implicit def sqlConf: SQLConf = sqlContext.conf
 
-  protected def getColumnsHitIndex(sparkPlan: SparkPlan): Map[String, IndexType] = {
-    val ret = new mutable.HashMap[String, IndexType]()
-    def getOapFileFormat(node: SparkPlan): Option[OapFileFormat] = {
+  protected def getOapFileFormat(sparkPlan: SparkPlan): Set[Option[OapFileFormat]] = {
+    def getOapFileFormatFromSource(node: SparkPlan): Option[OapFileFormat] = {
       node match {
         case f: FileSourceScanExec =>
           f.relation.fileFormat match {
@@ -53,14 +52,20 @@ trait SharedOapContext extends SharedSQLContext {
       }
     }
 
+    val ret = new mutable.HashSet[Option[OapFileFormat]]()
     sparkPlan.foreach(node => {
       if (node.isInstanceOf[FilterExec]) {
-        node.children.foreach(s => {
-          ret ++= getOapFileFormat(s).map(f => f.getHitIndexColumns).getOrElse(Nil)
-        })
+        node.children.foreach(s => ret.add(getOapFileFormatFromSource(s))
+        )
       }
     })
+    ret.filter(_.isDefined).toSet
+  }
 
-    ret.toMap
+  protected def getColumnsHitIndex(sparkPlan: SparkPlan): Map[String, IndexType] = {
+    getOapFileFormat(sparkPlan).map(_1 => _1.map(f => f.getHitIndexColumns))
+      .foldLeft(Map.empty[String, IndexType]) { (ret, set) =>
+        ret ++ set.getOrElse(Nil)
+      }
   }
 }
