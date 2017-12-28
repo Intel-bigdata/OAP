@@ -211,9 +211,9 @@ class BitMapIndexSuite extends QueryTest with SharedOapContext with BeforeAndAft
     val data: Seq[(Int, String)] = (0 to 200).map {i => (i, null)}
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test select * from t")
-    val message = intercept[RuntimeException] {
+    val message = intercept[AssertionError] {
       sql("create oindex index_bf on oap_test (a, b) USING BITMAP")
     }.getMessage
-    assert(message.equals("BitMapIndexType supports the column with one single field"))
+    assert(message.equals("assertion failed: BitMapIndexType only supports one single column"))
   }
 }
