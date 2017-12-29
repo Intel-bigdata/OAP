@@ -39,12 +39,12 @@ import org.apache.spark.util.Utils
 trait OapStrategies extends Logging {
 
   def oapStrategies: Seq[Strategy] = {
-      // BtreeIndex applicable strategies.
-      OapSortLimitStrategy ::
-      // BitMapIndex applicable strategies.
-      OapSemiJoinStrategy ::
-      // No requirement.
-      OapGroupAggregateStrategy :: Nil
+    // BtreeIndex applicable strategies.
+    OapSortLimitStrategy ::
+    // BitMapIndex applicable strategies.
+    OapSemiJoinStrategy ::
+    // No requirement.
+    OapGroupAggregateStrategy :: Nil
   }
 
   /**
