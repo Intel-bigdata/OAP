@@ -35,18 +35,26 @@ class OapSessionState(sparkSession: OapSession) extends HiveSessionState(sparkSe
 
   override def planner: SparkPlanner = {
     new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies)
-    with OapStrategies
+    with HiveStrategies with OapStrategies
     {
+      override val sparkSession: SparkSession = self.sparkSession
+
       override def strategies: Seq[Strategy] = {
-            experimentalMethods.extraStrategies ++ oapStrategies ++ (
-              FileSourceStrategy ::
-              DataSourceStrategy ::
-              DDLStrategy ::
-              SpecialLimits ::
-              Aggregation ::
-              JoinSelection ::
-              InMemoryScans ::
-              BasicOperators :: Nil)
+        experimentalMethods.extraStrategies ++
+          oapStrategies ++
+          Seq(
+            FileSourceStrategy,
+            DataSourceStrategy,
+            DDLStrategy,
+            SpecialLimits,
+            InMemoryScans,
+            HiveTableScans,
+            DataSinks,
+            Scripts,
+            Aggregation,
+            JoinSelection,
+            BasicOperators
+          )
       }
     }
   }
