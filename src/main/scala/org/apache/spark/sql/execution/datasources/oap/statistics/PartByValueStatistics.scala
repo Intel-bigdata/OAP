@@ -55,51 +55,6 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
       idx: Int, row: InternalRow, curMaxId: Int, accumulatorCnt: Int)
   protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
 
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
-    var offset = super.write(writer, sortedKeys)
-    val hashMap = new java.util.HashMap[Key, Int]()
-    val uniqueKeys: ArrayBuffer[Key] = new ArrayBuffer[Key]()
-
-    var prev: Key = null
-    var prevCnt: Int = 0
-
-    for (key <- sortedKeys) {
-      if (prev == null) {
-        prev = key
-        prevCnt += 1
-      } else {
-        if (ordering.compare(prev, key) == 0) prevCnt += 1
-        else {
-          hashMap.put(prev, prevCnt)
-          uniqueKeys.append(prev)
-          prevCnt = 1
-          prev = key
-        }
-      }
-    }
-    if (prev != null) {
-      hashMap.put(prev, prevCnt)
-      uniqueKeys.append(prev)
-    }
-
-    buildPartMeta(uniqueKeys, hashMap)
-
-    // start writing
-    IndexUtils.writeInt(writer, metas.length)
-    offset += IndexUtils.INT_SIZE
-    val tempWriter = new ByteArrayOutputStream()
-    metas.foreach(meta => {
-      nnkw.writeKey(tempWriter, meta.row)
-      IndexUtils.writeInt(writer, meta.curMaxId)
-      IndexUtils.writeInt(writer, meta.accumulatorCnt)
-      IndexUtils.writeInt(writer, tempWriter.size())
-      offset += 12
-    })
-    writer.write(tempWriter.toByteArray)
-    offset += tempWriter.size
-    offset
-  }
-
   override def read(fiberCache: FiberCache, offset: Int): Int = {
     var readOffset = super.read(fiberCache, offset) + offset
 
@@ -228,6 +183,7 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
 
     // start writing
     IndexUtils.writeInt(writer, metas.length)
+    offset += IndexUtils.INT_SIZE
     val tempWriter = new ByteArrayOutputStream()
     metas.foreach(meta => {
       nnkw.writeKey(tempWriter, meta.row)
@@ -236,8 +192,8 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
       IndexUtils.writeInt(writer, tempWriter.size())
       offset += 12
     })
-    offset += tempWriter.size
     writer.write(tempWriter.toByteArray)
+    offset += tempWriter.size
     offset
   }
 

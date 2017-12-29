@@ -86,7 +86,6 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       logDebug("Index Selection Time (Executor): " + (end - start) + "ms")
       if (!useIndex) {
         logWarning("OAP index is skipped. Set below flags to force enable index,\n" +
-            "sqlContext.conf.setConfString(SQLConf.OAP_USE_INDEX_FOR_DEVELOPERS.key, true) or \n" +
             "sqlContext.conf.setConfString(SQLConf.OAP_EXECUTOR_INDEX_SELECTION.key, false)")
       } else {
         OapIndexInfo.partitionOapIndex.put(dataPath.toString, true)
