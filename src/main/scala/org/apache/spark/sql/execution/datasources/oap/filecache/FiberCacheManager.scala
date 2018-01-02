@@ -21,13 +21,12 @@ import java.util.concurrent.{Callable, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
 
 import scala.collection.JavaConverters._
-
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
@@ -51,8 +50,15 @@ object FiberCacheManager extends Logging {
       // TODO: Change the log more readable
       logDebug(s"Removing Cache ${notification.getKey}")
       // TODO: Investigate lock mechanism to secure in-used FiberCache
-      notification.getValue.dispose()
-      _cacheSize.addAndGet(-notification.getValue.size())
+      val fiberCache = notification.getValue
+      if (fiberCache.refCount.get() > 0) {
+        if (fiberCache.nonUsed.await(3000, TimeUnit.MILLISECONDS)) {
+          fiberCache.dispose()
+          _cacheSize.addAndGet(-notification.getValue.size())
+        } else {
+          throw new OapException("not release in 3 second")
+        }
+      }
     }
   }
   private val weigher = new Weigher[Fiber, FiberCache] {
@@ -90,7 +96,9 @@ object FiberCacheManager extends Logging {
 
   def get(fiber: Fiber, conf: Configuration): FiberCache = {
     // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
-    cache.get(fiber, cacheLoader(fiber, conf))
+    val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
+    fiberCache.refCount.incrementAndGet()
+    fiberCache
   }
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly

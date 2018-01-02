@@ -18,9 +18,9 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.{Condition, ReentrantLock}
 
 import org.apache.hadoop.fs.FSDataInputStream
-
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
@@ -35,6 +35,15 @@ import org.apache.spark.unsafe.types.UTF8String
 trait FiberCache {
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
+
+  val refCount = new AtomicLong(0)
+  val nonUsed: Condition = new ReentrantLock().newCondition()
+
+  def release(): Unit = {
+    if (refCount.decrementAndGet() == 0) {
+      nonUsed.signal()
+    }
+  }
 
   // TODO: need a flag to avoid accessing disposed FiberCache
   private var disposed = false
