@@ -38,11 +38,17 @@ trait FiberCache {
   protected def fiberData: MemoryBlock
 
   val refCount = new AtomicLong(0)
-  val nonUsed: Condition = new ReentrantLock().newCondition()
+  val lock = new ReentrantLock()
+  val nonUsed: Condition = lock.newCondition()
 
   def release(): Unit = {
     if (refCount.decrementAndGet() == 0) {
-      nonUsed.signal()
+      lock.lock()
+      try {
+        nonUsed.signal()
+      } finally {
+        lock.unlock()
+      }
     }
   }
 

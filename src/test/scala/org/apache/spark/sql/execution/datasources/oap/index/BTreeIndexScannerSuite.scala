@@ -76,7 +76,6 @@ class BTreeIndexScannerSuite extends SharedOapContext {
 
   test("test binarySearch") {
     val schema = StructType(StructField("col1", IntegerType) :: Nil)
-    val reader = BTreeIndexRecordReader(configuration, schema)
     val values = Seq(1, 11, 21, 31, 41, 51, 61, 71, 81, 91)
     def keyAt(idx: Int): InternalRow = InternalRow(values(idx))
     val ordering = GenerateOrdering.create(schema)
@@ -152,6 +151,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
     // 1 <= x <= 1
     assert(reader.findRowIdRange(RangeInterval(
       InternalRow(1), InternalRow(1), includeStart = true, includeEnd = true)) === (0, 1))
+    reader.close()
   }
 
   test("findRowIdRange for isNull filter predicate: empty result") {
@@ -174,6 +174,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
           includeStart = true,
           includeEnd = true,
           isNull = true)) === (150, 150))
+    reader.close()
   }
 
   test("findRowIdRange for isNull filter predicate") {
@@ -197,6 +198,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
           includeStart = true,
           includeEnd = true,
           isNull = true)) === (150, 155))
+    reader.close()
   }
 
   test("findRowIdRange for isNotNull filter predicate: empty result") {
@@ -218,6 +220,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
           IndexScanner.DUMMY_KEY_END,
           includeStart = true,
           includeEnd = true)) === (0, 0))
+    reader.close()
   }
 
   test("findRowIdRange for isNotNull filter predicate") {
@@ -240,5 +243,6 @@ class BTreeIndexScannerSuite extends SharedOapContext {
           IndexScanner.DUMMY_KEY_END,
           includeStart = true,
           includeEnd = true)) === (0, 150))
+    reader.close()
   }
 }

@@ -21,8 +21,10 @@ import java.util.concurrent.{Callable, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
 
 import scala.collection.JavaConverters._
+
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
+
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
@@ -45,6 +47,9 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
  */
 object FiberCacheManager extends Logging {
 
+  // Set this to true if we need to throw an exception in removalListener
+  private[filecache] var exceptionFlag = false
+
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
       // TODO: Change the log more readable
@@ -52,12 +57,21 @@ object FiberCacheManager extends Logging {
       // TODO: Investigate lock mechanism to secure in-used FiberCache
       val fiberCache = notification.getValue
       if (fiberCache.refCount.get() > 0) {
-        if (fiberCache.nonUsed.await(3000, TimeUnit.MILLISECONDS)) {
-          fiberCache.dispose()
-          _cacheSize.addAndGet(-notification.getValue.size())
-        } else {
-          throw new OapException("not release in 3 second")
+        fiberCache.lock.lock()
+        try {
+          // lock will be released in await and acquired after thread wake up.
+          if (fiberCache.nonUsed.await(3000, TimeUnit.MILLISECONDS)) {
+            fiberCache.dispose()
+            _cacheSize.addAndGet(-notification.getValue.size())
+          } else {
+            logWarning(s"Remove Cache ${notification.getKey} failed")
+            exceptionFlag = true
+          }
+        } finally {
+          fiberCache.lock.unlock()
         }
+      } else {
+        fiberCache.dispose()
       }
     }
   }
@@ -94,9 +108,10 @@ object FiberCacheManager extends Logging {
       .weigher(weigher)
       .build[Fiber, FiberCache]()
 
-  def get(fiber: Fiber, conf: Configuration): FiberCache = {
+  def get(fiber: Fiber, conf: Configuration): FiberCache = synchronized {
     // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
     val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
+    if (exceptionFlag) throw new OapException("Can't remove in-used fiber within 3 seconds")
     fiberCache.refCount.incrementAndGet()
     fiberCache
   }

@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
@@ -34,7 +35,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val origStats = FiberCacheManager.cacheStats
     (1 to memorySizeInMB * 2).foreach { i =>
       val data = generateData(kbSize)
-      val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #$i")
+      val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #0.$i")
       val fiberCache = FiberCacheManager.get(fiber, configuration)
       val fiberCache2 = FiberCacheManager.get(fiber, configuration)
       assert(fiberCache.toArray sameElements data)
@@ -51,31 +52,53 @@ class FiberCacheManagerSuite extends SharedOapContext {
   test("remove a fiber is in use") {
     val memorySizeInMB = (MemoryManager.maxMemory / mbSize).toInt
     val dataInUse = generateData(kbSize)
-    val fiberInUse = TestFiber(() => MemoryManager.putToDataFiberCache(dataInUse), s"test fiber #0")
+    val fiberInUse =
+      TestFiber(() => MemoryManager.putToDataFiberCache(dataInUse), s"test fiber #1.0")
     val fiberCacheInUse = FiberCacheManager.get(fiberInUse, configuration)
-    (1 to memorySizeInMB * 2).foreach { i =>
-      val data = generateData(1024)
-      val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #$i")
-      val fiberCache = FiberCacheManager.get(fiber, configuration)
-      assert(fiberCache.toArray sameElements data)
-      fiberCache.release()
+    val exception = intercept[OapException] {
+      (1 to memorySizeInMB * 2).foreach { i =>
+        val data = generateData(1024)
+        val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #1.$i")
+        val fiberCache = FiberCacheManager.get(fiber, configuration)
+        assert(fiberCache.toArray sameElements data)
+        fiberCache.release()
+      }
     }
-    assert(fiberCacheInUse.isDisposed)
+    assert(exception.getMessage == "Can't remove in-used fiber within 3 seconds")
+    // Set this flag to false for following test
+    FiberCacheManager.exceptionFlag = false
     fiberCacheInUse.release()
+  }
+
+  test("wait for other thread release the fiber") {
+    class FiberTestRunner(i: Int) extends Thread {
+      override def run(): Unit = {
+        val memorySizeInMB = (MemoryManager.maxMemory / mbSize).toInt
+        val data = generateData(memorySizeInMB / 4 * mbSize)
+        val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #2.$i")
+        val fiberCache = FiberCacheManager.get(fiber, configuration)
+        Thread.sleep(2000)
+        fiberCache.release()
+      }
+    }
+    val threads = (0 until 5).map(i => new FiberTestRunner(i))
+    threads.foreach(_.start())
+    threads.foreach(_.join())
   }
 
   test("add a very large fiber") {
     val memorySizeInMB = (MemoryManager.maxMemory / mbSize).toInt
     // Cache concurrency is 4, means maximum ENTRY size is memory size / 4
     val data = generateData(memorySizeInMB * mbSize / 8)
-    val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #0")
+    val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #3.0")
     val fiberCache = FiberCacheManager.get(fiber, configuration)
     fiberCache.release()
     assert(!fiberCache.isDisposed)
 
     val data1 = generateData(memorySizeInMB * mbSize / 2)
-    val fiber1 = TestFiber(() => MemoryManager.putToDataFiberCache(data1), s"test fiber #1")
+    val fiber1 = TestFiber(() => MemoryManager.putToDataFiberCache(data1), s"test fiber #3.1")
     val fiberCache1 = FiberCacheManager.get(fiber1, configuration)
+    fiberCache1.release()
     assert(fiberCache1.isDisposed)
   }
 
@@ -83,10 +106,12 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val data = generateData(kbSize)
     val origStats = FiberCacheManager.cacheStats
     val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber")
-    FiberCacheManager.get(fiber, configuration)
+    val fiberCache1 = FiberCacheManager.get(fiber, configuration)
     assert(FiberCacheManager.cacheStats.minus(origStats).missCount() == 1)
     val sameFiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber")
-    FiberCacheManager.get(sameFiber, configuration)
+    val fiberCache2 = FiberCacheManager.get(sameFiber, configuration)
     assert(FiberCacheManager.cacheStats.minus(origStats).hitCount() == 1)
+    fiberCache1.release()
+    fiberCache2.release()
   }
 }
