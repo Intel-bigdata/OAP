@@ -121,8 +121,6 @@ case class CreateIndex(
           val entries = indexColumns.map(col =>
             schema.map(_.name).toIndexedSeq.indexOf(col.columnName))
           metaBuilder.addIndexMeta(new IndexMeta(indexName, time, BitMapIndex(entries)))
-        case BitMapIndexType =>
-          sys.error(s"BitMapIndexType supports the column with one single field")
         case _ =>
           sys.error(s"Not supported index type $indexType")
       }
