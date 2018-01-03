@@ -154,6 +154,9 @@ private[oap] object MemoryManager extends Logging {
   def maxMemory: Long = _maxMemory
 
   private[filecache] def allocate(numOfBytes: Int): MemoryBlock = {
+    assert(numOfBytes <= maxMemory, "The off heap memory is overflow." +
+      " Please increase heap size using spark.memory.offHeap.enabled" +
+      " and spark.memory.offHeap.size in Spark configuration.")
     _memoryUsed.getAndAdd(numOfBytes)
     logDebug(s"allocate $numOfBytes memory, used: $memoryUsed")
     MemoryAllocator.UNSAFE.allocate(numOfBytes)
