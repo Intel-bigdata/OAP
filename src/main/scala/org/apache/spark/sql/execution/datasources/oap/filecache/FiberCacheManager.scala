@@ -111,7 +111,11 @@ object FiberCacheManager extends Logging {
   def get(fiber: Fiber, conf: Configuration): FiberCache = synchronized {
     // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
     val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
-    if (exceptionFlag) throw new OapException("Can't remove in-used fiber within 3 seconds")
+    if (exceptionFlag) {
+      // Here we don't check the refCount since we will throw exception
+      cache.asMap().values().asScala.foreach(_.dispose())
+      throw new OapException("Can't remove in-used fiber within 3 seconds")
+    }
     fiberCache.refCount.incrementAndGet()
     fiberCache
   }
