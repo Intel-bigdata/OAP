@@ -19,11 +19,10 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import org.scalatest.BeforeAndAfterEach
 
-import org.apache.spark.sql.{OapSession, QueryTest, Row, SparkSession}
+import org.apache.spark.sql._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SQLTestUtils
 import org.apache.spark.util.Utils
-import org.apache.spark.SparkConf
 
 /**
  * OapPlannerSuite has its own spark context which initializes OapSession
@@ -36,45 +35,9 @@ class OapPlannerSuite
   with BeforeAndAfterEach
 {
   import testImplicits._
+  import TestOap._
 
-  private var _spark: SparkSession = null
-
-  protected val sparkConf = new SparkConf()
-
-  protected override def spark: SparkSession = _spark
-
-  // avoid the overflow of offHeap memory
-  sparkConf.set("spark.memory.offHeap.size", "100m")
-  protected override def beforeAll(): Unit = {
-    SparkSession.sqlListener.set(null)
-    if (_spark == null) {
-      _spark = createOapSparkSession
-    }
-    super.beforeAll()
-    spark.sqlContext.setConf(SQLConf.OAP_BTREE_ROW_LIST_PART_SIZE, 64)
-    spark.sqlContext.setConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
-  }
-
-  /**
-   * Stop the underlying [[org.apache.spark.SparkContext]], if any.
-   */
-  protected override def afterAll(): Unit = {
-    try {
-      if (_spark != null) {
-        _spark.stop()
-        _spark = null
-      }
-    } finally {
-      super.afterAll()
-    }
-  }
-
-  protected def createOapSparkSession: SparkSession = {
-    sparkConf.set("spark.master", "local[2]")
-    sparkConf.set("spark.app.name", "test-oap-context")
-    sparkConf.set("spark.sql.testkey", "true")
-    OapSession.builder.config(sparkConf).enableHiveSupport().getOrCreate()
-  }
+  protected override def spark = sparkSession
 
   override def beforeEach(): Unit = {
     val path1 = Utils.createTempDir().getAbsolutePath

@@ -209,7 +209,8 @@ object OapSession {
       return session
     }
   }
-  def builder(): SparkSession.Builder = new OapSessionBuilder
+  // Default catelog implementation is hive.
+  def builder(): SparkSession.Builder = (new OapSessionBuilder).enableHiveSupport()
 
   private[sql] val sqlListener = new AtomicReference[SQLListener]()
   private val activeThreadSession = new InheritableThreadLocal[OapSession]
