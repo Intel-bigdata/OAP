@@ -16,8 +16,9 @@
  */
 package org.apache.spark.sql
 
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.SparkConf
+import org.apache.spark.sql.internal.SQLConf
+
 
 object TestOap
   extends TestOapContext(
