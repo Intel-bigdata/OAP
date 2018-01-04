@@ -52,6 +52,7 @@ class OapPlannerSuite
     }
     super.beforeAll()
     spark.sqlContext.setConf(SQLConf.OAP_BTREE_ROW_LIST_PART_SIZE, 64)
+    spark.sqlContext.setConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
   }
 
   /**
@@ -94,7 +95,6 @@ class OapPlannerSuite
   }
 
   override def afterEach(): Unit = {
-    spark.experimental.extraStrategies = Nil
     spark.sqlContext.dropTempTable("oap_sort_opt_table")
     spark.sqlContext.dropTempTable("oap_distinct_opt_table")
     spark.sqlContext.dropTempTable("oap_fix_length_schema_table")
@@ -219,7 +219,7 @@ class OapPlannerSuite
     sql("drop oindex index1 on oap_sort_opt_table")
   }
 
-  ignore("aggregations with group by test") {
+  test("aggregations with group by test") {
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
     val data = (1 to 300).map{ i =>
       (i % 101, i % 37)
@@ -239,12 +239,12 @@ class OapPlannerSuite
     checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
     val oapDF = sql(sqlString).collect
 
-    spark.experimental.extraStrategies = Nil
+    spark.sqlContext.setConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")
     checkKeywordsNotExist(sql("explain " + sqlString), "OapAggregationFileScanExec")
     val baseDF = sql(sqlString)
 
     checkAnswer(baseDF, oapDF)
-
+    spark.sqlContext.setConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
     sql("drop oindex index1 on oap_fix_length_schema_table")
   }
 }
