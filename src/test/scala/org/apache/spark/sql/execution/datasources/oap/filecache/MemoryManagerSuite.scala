@@ -169,4 +169,15 @@ class MemoryManagerSuite extends SharedOapContext {
 
     // 2. TODO: test Invalidate MemoryBlock
   }
+
+  test("check off-heap memory overflow") {
+    // The defalue value of 'spark.memory.offHeap.size' is 100M in test cases.
+    val bytes = new Array[Byte](1024*1024*1024)
+    val exception = intercept[AssertionError]{
+      val fiberCache = MemoryManager.putToDataFiberCache(bytes)
+    }
+    assert(exception.getMessage == "assertion failed: The off heap memory is overflow." +
+      " Please increase heap size using spark.memory.offHeap.enabled" +
+      " and spark.memory.offHeap.size in Spark configuration.")
+  }
 }
