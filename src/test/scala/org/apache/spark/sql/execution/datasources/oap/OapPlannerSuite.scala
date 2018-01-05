@@ -63,6 +63,11 @@ class OapPlannerSuite
     spark.sqlContext.dropTempTable("oap_fix_length_schema_table")
   }
 
+  override def afterAll(): Unit = {
+    TestOap.sparkSession.stop()
+    super.afterAll()
+  }
+
   test("SortPushDown Test") {
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
     val data = (1 to 300).map{ i => (i%102, s"this is test $i")}
@@ -187,7 +192,7 @@ class OapPlannerSuite
     val data = (1 to 300).map{ i =>
       (i % 101, i % 37)
     }
-    val dataRDD = spark.sparkContext.parallelize(data, 10)
+    val dataRDD = spark.sparkContext.parallelize(data, 2)
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_fix_length_schema_table select * from t")
@@ -200,7 +205,7 @@ class OapPlannerSuite
         "group by a"
 
     checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
-    val oapDF = sql(sqlString).collect
+    val oapDF = sql(sqlString).collect()
 
     spark.sqlContext.setConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")
     checkKeywordsNotExist(sql("explain " + sqlString), "OapAggregationFileScanExec")

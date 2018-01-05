@@ -85,8 +85,7 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       val end = System.currentTimeMillis()
       logDebug("Index Selection Time (Executor): " + (end - start) + "ms")
       if (!useIndex) {
-        logWarning("OAP index is skipped. Set below flags to force enable index,\n" +
-            "sqlContext.conf.setConfString(SQLConf.OAP_EXECUTOR_INDEX_SELECTION.key, false)")
+        logWarning("OAP index is skipped. Disable OAP_EXECUTOR_INDEX_SELECTION to use index.")
       } else {
         OapIndexInfo.partitionOapIndex.put(dataPath.toString, true)
         logInfo("Partition File " + dataPath.toString + " will use OAP index.\n")
