@@ -27,7 +27,7 @@ import org.apache.spark.util.Utils
 /**
  * OapPlannerSuite has its own spark context which initializes OapSession
  * instead of normal SparkSession. Now we have oapStrategies in planner
- * itself, so we don't need to
+ * itself, so we don't need to change extraStrategies.
  */
 class OapPlannerSuite
   extends QueryTest
@@ -35,9 +35,9 @@ class OapPlannerSuite
   with BeforeAndAfterEach
 {
   import testImplicits._
-  import TestOap._
 
-  protected override def spark = sparkSession
+  // Using TestOap as oap test context.
+  protected override def spark = TestOap.sparkSession
 
   override def beforeEach(): Unit = {
     val path1 = Utils.createTempDir().getAbsolutePath
@@ -64,7 +64,7 @@ class OapPlannerSuite
   }
 
   override def afterAll(): Unit = {
-    TestOap.sparkSession.stop()
+    spark.stop()
     super.afterAll()
   }
 
