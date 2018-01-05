@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.util.concurrent.Executors
+
 import scala.util.Random
 
 import org.apache.hadoop.conf.Configuration
@@ -81,7 +83,10 @@ class MemoryManagerSuite extends SharedOapContext {
       })
       val nnkw = new NonNullKeyWriter(schema)
       nnkw.writeKey(buf, InternalRow.fromSeq(values))
-      MemoryManager.putToDataFiberCache(buf.toByteArray)
+      val fiberCache = MemoryManager.putToDataFiberCache(buf.toByteArray)
+      // This means we move the FiberCache from buffer to CacheManager.
+      MemoryManager.releaseBufferMemory(fiberCache.size())
+      fiberCache
     }
   }
 
@@ -108,6 +113,8 @@ class MemoryManagerSuite extends SharedOapContext {
     random.nextBytes(bytes)
     val is = createInputStreamFromBytes(bytes)
     val indexFiberCache = MemoryManager.putToIndexFiberCache(is, 0, 10240)
+    // This means we move the FiberCache from buffer to CacheManager.
+    MemoryManager.releaseBufferMemory(indexFiberCache.size())
     assert(bytes === indexFiberCache.toArray)
   }
 
@@ -115,6 +122,8 @@ class MemoryManagerSuite extends SharedOapContext {
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
     val dataFiberCache = MemoryManager.putToDataFiberCache(bytes)
+    // This means we move the FiberCache from buffer to CacheManager.
+    MemoryManager.releaseBufferMemory(dataFiberCache.size())
     assert(bytes === dataFiberCache.toArray)
   }
 
@@ -161,6 +170,8 @@ class MemoryManagerSuite extends SharedOapContext {
     // 1. disposed FiberCache
     val bytes = new Array[Byte](1024)
     val fiberCache = MemoryManager.putToDataFiberCache(bytes)
+    // This means we move the FiberCache from buffer to CacheManager.
+    MemoryManager.releaseBufferMemory(fiberCache.size())
     fiberCache.dispose()
     val exception = intercept[OapException]{
       fiberCache.getByte(0)
@@ -168,5 +179,29 @@ class MemoryManagerSuite extends SharedOapContext {
     assert(exception.getMessage == "Try to access a freed memory")
 
     // 2. TODO: test Invalidate MemoryBlock
+  }
+
+  test("test buffer memory semaphore") {
+    class MemoryAllocateRunner(i: Int) extends Thread {
+      override def run(): Unit = {
+        val bytes = new Array[Byte](10 * 1024 * 1024)
+        val fiberCache = MemoryManager.putToDataFiberCache(bytes)
+        Thread.sleep(800)
+        MemoryManager.releaseBufferMemory(fiberCache.size())
+      }
+    }
+    val threads = (0 until 5).map(i => new MemoryAllocateRunner(i))
+    threads.foreach(_.start())
+    threads.foreach(_.join())
+  }
+
+  test("test buffer memory semaphore timeout") {
+    val exception = intercept[OapException] {
+      (0 until 10).foreach { _ =>
+        val bytes = new Array[Byte](1024 * 1024 * 4)
+        MemoryManager.putToDataFiberCache(bytes)
+      }
+    }
+    assert(exception.getMessage == "Can't acquire memory to allocate FiberCache")
   }
 }

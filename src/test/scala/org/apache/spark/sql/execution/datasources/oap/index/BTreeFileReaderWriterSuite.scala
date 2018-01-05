@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.fs.Path
 
+import org.apache.spark.sql.execution.datasources.oap.filecache.MemoryManager
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
@@ -43,15 +44,19 @@ class BTreeFileReaderWriterSuite extends SharedOapContext {
     writer.close()
     // Read content from File
     val reader = BTreeIndexFileReader(configuration, path)
-    val footerRead = reader.readFooter().toArray
-    val rowIdListRead = reader.readRowIdList().toArray
-    val nodesRead = (0 until 5).map(i =>
-      reader.readNode(nodes.slice(0, i).map(_.length).sum, nodes(i).length).toArray)
+    val footerFiber = reader.readFooter()
+    val rowIdListFiber = reader.readRowIdList()
+    val nodeFibers = (0 until 5).map(i =>
+      reader.readNode(nodes.slice(0, i).map(_.length).sum, nodes(i).length))
     // Check result
-    assert(footer === footerRead)
-    assert(rowIdList === rowIdListRead)
-    nodes.zip(nodesRead).foreach {
-      case (node, nodeRead) => assert(node === nodeRead)
+    assert(footer === footerFiber.toArray)
+    MemoryManager.releaseBufferMemory(footerFiber.size())
+    assert(rowIdList === rowIdListFiber.toArray)
+    MemoryManager.releaseBufferMemory(rowIdListFiber.size())
+    nodes.zip(nodeFibers).foreach {
+      case (node, nodeFiber) =>
+        assert(node === nodeFiber.toArray)
+        MemoryManager.releaseBufferMemory(nodeFiber.size())
     }
   }
 }

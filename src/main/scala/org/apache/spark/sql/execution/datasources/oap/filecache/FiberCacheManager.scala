@@ -73,7 +73,7 @@ object FiberCacheManager extends Logging {
   }
 
   private val MB: Double = 1024 * 1024
-  private val MAX_WEIGHT = (MemoryManager.maxMemory / MB).toInt
+  private val MAX_WEIGHT = (MemoryManager.cacheMemory / MB).toInt
 
   // Total cached size for debug purpose
   private val _cacheSize: AtomicLong = new AtomicLong(0)
@@ -100,9 +100,16 @@ object FiberCacheManager extends Logging {
       .weigher(weigher)
       .build[Fiber, FiberCache]()
 
-  def get(fiber: Fiber, conf: Configuration): FiberCache = {
+  // cache.get is a thread-safe function, but getIfPresent + put is not thread-safe
+  def get(fiber: Fiber, conf: Configuration): FiberCache = synchronized {
     // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
-    cache.get(fiber, cacheLoader(fiber, conf))
+    Option(cache.getIfPresent(fiber)).getOrElse {
+      val fiberCache = fiber.fiber2Data(conf)
+      cache.put(fiber, fiberCache)
+      // Release MemoryManager's buffer memory if we put the fiber into cache successfully
+      MemoryManager.releaseBufferMemory(fiberCache.size())
+      fiberCache
+    }
   }
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly

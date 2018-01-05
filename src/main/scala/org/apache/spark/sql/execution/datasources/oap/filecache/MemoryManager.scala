@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.{Semaphore, TimeUnit}
 
 import org.apache.hadoop.fs.FSDataInputStream
 
@@ -31,12 +31,10 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
 import org.apache.spark.unsafe.types.UTF8String
 
-// TODO: make it an alias of MemoryBlock
 trait FiberCache {
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
 
-  // TODO: need a flag to avoid accessing disposed FiberCache
   private var disposed = false
   def isDisposed: Boolean = disposed
   def dispose(): Unit = {
@@ -132,37 +130,55 @@ private[oap] object MemoryManager extends Logging {
    */
   private val DUMMY_BLOCK_ID = TestBlockId("oap_memory_request_block")
 
-  // TODO: a config to control max memory size
-  private val _maxMemory = {
+  private val (_cacheMemory, _bufferMemory) = {
     if (SparkEnv.get == null) {
       throw new OapException("No SparkContext is found")
     } else {
       val memoryManager = SparkEnv.get.memoryManager
-      // TODO: make 0.7 configurable
-      val oapMaxMemory = (memoryManager.maxOffHeapStorageMemory * 0.7).toLong
-      if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
-        oapMaxMemory
+      val fraction = SparkEnv.get.conf.getDouble("spark.oap.memory.offHeap.fraction", 0.7)
+      val oapCacheMemory = (memoryManager.maxOffHeapStorageMemory * fraction).toLong
+      val oapBufferMemory =
+        SparkEnv.get.conf.getLong("spark.oap.memory.buffer.size", 10 * 1024 * 1024)
+      assert(oapBufferMemory <= Int.MaxValue, "Buffer memory can't be larger than 2G Bytes")
+      if (memoryManager.acquireStorageMemory(
+        DUMMY_BLOCK_ID, oapCacheMemory + oapBufferMemory, MemoryMode.OFF_HEAP)) {
+        (oapCacheMemory, oapBufferMemory)
       } else {
         throw new OapException("Can't acquire memory from spark Memory Manager")
       }
     }
   }
 
-  // TODO: Atomic is really needed?
-  private val _memoryUsed = new AtomicLong(0)
-  def memoryUsed: Long = _memoryUsed.get()
-  def maxMemory: Long = _maxMemory
+  def cacheMemory: Long = _cacheMemory
+
+  private val bufferSem = new Semaphore(bufferMemory.toInt)
+
+  def bufferMemoryRemaining: Long = bufferSem.availablePermits()
+  def bufferMemory: Long = _bufferMemory
 
   private[filecache] def allocate(numOfBytes: Int): MemoryBlock = {
-    _memoryUsed.getAndAdd(numOfBytes)
-    logDebug(s"allocate $numOfBytes memory, used: $memoryUsed")
-    MemoryAllocator.UNSAFE.allocate(numOfBytes)
+    // use buffer memory to allocate fiber
+    assert(numOfBytes <= bufferMemory, "Fiber Size can't be larger than buffer memory size")
+    if (bufferMemoryRemaining < numOfBytes) {
+      logWarning("No enough buffer to allocate, wait until someone release buffer memory")
+    }
+    if (bufferSem.tryAcquire(numOfBytes, 1000, TimeUnit.MILLISECONDS)) {
+      logDebug(s"allocate $numOfBytes memory, remaining: $bufferMemoryRemaining")
+      MemoryAllocator.UNSAFE.allocate(numOfBytes)
+    } else {
+      throw new OapException("Can't acquire memory to allocate FiberCache")
+    }
   }
 
   private[filecache] def free(memoryBlock: MemoryBlock): Unit = {
     MemoryAllocator.UNSAFE.free(memoryBlock)
-    _memoryUsed.getAndAdd(-memoryBlock.size())
-    logDebug(s"freed ${memoryBlock.size()} memory, used: $memoryUsed")
+  }
+
+  def releaseBufferMemory(numOfBytes: Long): Unit = {
+    // Moved fiber to cache manager means release buffer memory
+    assert(numOfBytes <= Int.MaxValue)
+    bufferSem.release(numOfBytes.toInt)
+    logDebug(s"freed $numOfBytes memory, remaining: $bufferMemoryRemaining")
   }
 
   // Used by IndexFile
