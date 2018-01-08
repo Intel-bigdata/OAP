@@ -56,25 +56,15 @@ object FiberCacheManager extends Logging {
       logDebug(s"Removing Cache ${notification.getKey}")
       // TODO: Investigate lock mechanism to secure in-used FiberCache
       val fiberCache = notification.getValue
-      if (fiberCache.refCount.get() > 0) {
-        fiberCache.lock.lock()
-        try {
-          // lock will be released in await and acquired after thread wake up.
-          if (fiberCache.nonUsed.await(3000, TimeUnit.MILLISECONDS)) {
-            fiberCache.dispose()
-            _cacheSize.addAndGet(-notification.getValue.size())
-          } else {
-            logWarning(s"Remove Cache ${notification.getKey} failed")
-            exceptionFlag = true
-          }
-        } finally {
-          fiberCache.lock.unlock()
-        }
+      if (fiberCache.tryDispose(3000, TimeUnit.MILLISECONDS)) {
+        _cacheSize.addAndGet(-notification.getValue.size())
       } else {
-        fiberCache.dispose()
+        logWarning(s"Remove Cache ${notification.getKey} failed")
+        exceptionFlag = true
       }
     }
   }
+
   private val weigher = new Weigher[Fiber, FiberCache] {
     override def weigh(key: Fiber, value: FiberCache): Int =
       math.ceil(value.size() / MB).toInt
@@ -116,7 +106,7 @@ object FiberCacheManager extends Logging {
       cache.asMap().values().asScala.foreach(_.dispose())
       throw new OapException("Can't remove in-used fiber within 3 seconds")
     }
-    fiberCache.refCount.incrementAndGet()
+    fiberCache.occupy()
     fiberCache
   }
 
