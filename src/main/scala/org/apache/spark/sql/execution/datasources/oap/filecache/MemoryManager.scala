@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.{Condition, ReentrantLock}
 
 import org.apache.hadoop.fs.FSDataInputStream
+
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
@@ -38,37 +39,45 @@ trait FiberCache {
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
 
-  private val refCount = new AtomicLong(0)
+  private var _refCount: Long = 0L
+  def refCount: Long = _refCount
+
   private val lock = new ReentrantLock()
   private val nonUsed: Condition = lock.newCondition()
 
-  def occupy(): Unit = refCount.incrementAndGet()
-
-  def usage(): Long = refCount.get()
+  def occupy(): Unit = {
+    lock.lock()
+    _refCount += 1
+    lock.unlock()
+  }
 
   def release(): Unit = {
-    if (refCount.decrementAndGet() == 0) {
-      lock.lock()
-      try {
+    lock.lock()
+    try {
+      _refCount -= 1
+      if (_refCount == 0) {
         nonUsed.signal()
-      } finally {
-        lock.unlock()
       }
+    } finally {
+      lock.unlock()
     }
   }
 
-  def tryDispose(time: Long, unit: TimeUnit): Boolean = {
-    if (refCount.get() > 0) {
-      lock.lock()
-      try {
-        // lock will be released in await and acquired after thread wake up.
-        if (!nonUsed.await(time, unit)) return false
-      } finally {
-        lock.unlock()
+  def dispose(time: Long, unit: TimeUnit): Boolean = {
+    var nanos = unit.toNanos(time)
+    lock.lockInterruptibly()
+    try {
+      while (_refCount > 0) {
+        if (nanos < 0) {
+          return false
+        }
+        nanos = nonUsed.awaitNanos(nanos)
       }
+      dispose()
+      true
+    } finally {
+      lock.unlock()
     }
-    dispose()
-    true
   }
 
   // TODO: need a flag to avoid accessing disposed FiberCache

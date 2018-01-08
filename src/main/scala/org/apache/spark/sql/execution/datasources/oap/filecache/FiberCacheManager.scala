@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.util.concurrent.{Callable, TimeUnit}
+import java.util.concurrent.{Callable, PriorityBlockingQueue, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
 
 import scala.collection.JavaConverters._
@@ -28,7 +28,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkConf
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
@@ -47,21 +46,41 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
  */
 object FiberCacheManager extends Logging {
 
-  // Set this to true if we need to throw an exception in removalListener
-  private[filecache] var exceptionFlag = false
+  private val DEFAULT_QUEUE_INITIAL_CAPACITY = 11
+  private val removalPendingQueue =
+    new PriorityBlockingQueue[FiberCache](DEFAULT_QUEUE_INITIAL_CAPACITY, Ordering.by(_.refCount))
+
+  private class CacheGuardian(queue: PriorityBlockingQueue[FiberCache]) extends Thread {
+    override def run(): Unit = {
+      logWarning("started ...")
+      while (true) {
+        // Block until queue is not empty
+        val fiberCache = queue.take()
+        logWarning("get one entry")
+        // Block until fiberCache is disposed
+        while (!fiberCache.dispose(3000, TimeUnit.MILLISECONDS)) {
+          // logDebug("Can't remove in 3s, will try again")
+          logWarning("Can't remove in 3s, will try again")
+          val usedMemory = queue.asScala.map(_.size()).sum
+          if (usedMemory > 200 * MB) {
+            logWarning("Removal Pending Fiber used too much memory")
+          }
+        }
+        // logDebug("Fiber removed successfully")
+        logWarning("Fiber removed successfully")
+      }
+    }
+  }
+
+  private val cacheGuardian = new CacheGuardian(removalPendingQueue)
+  cacheGuardian.start()
 
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
       // TODO: Change the log more readable
       logDebug(s"Removing Cache ${notification.getKey}")
-      // TODO: Investigate lock mechanism to secure in-used FiberCache
-      val fiberCache = notification.getValue
-      if (fiberCache.tryDispose(3000, TimeUnit.MILLISECONDS)) {
-        _cacheSize.addAndGet(-notification.getValue.size())
-      } else {
-        logWarning(s"Remove Cache ${notification.getKey} failed")
-        exceptionFlag = true
-      }
+      removalPendingQueue.offer(notification.getValue)
+      _cacheSize.addAndGet(-notification.getValue.size())
     }
   }
 
@@ -90,22 +109,17 @@ object FiberCacheManager extends Logging {
       }
     }
 
-  private val cache = CacheBuilder.newBuilder()
-      .recordStats()
-      .concurrencyLevel(4)
-      .removalListener(removalListener)
-      .maximumWeight(MAX_WEIGHT)
-      .weigher(weigher)
-      .build[Fiber, FiberCache]()
+  private val cache = CacheBuilder
+    .newBuilder()
+    .recordStats()
+    .concurrencyLevel(4)
+    .removalListener(removalListener)
+    .maximumWeight(MAX_WEIGHT)
+    .weigher(weigher)
+    .build[Fiber, FiberCache]()
 
-  def get(fiber: Fiber, conf: Configuration): FiberCache = synchronized {
-    // Used a flag called disposed in FiberCache to indicate if this FiberCache is removed
+  def get(fiber: Fiber, conf: Configuration): FiberCache = {
     val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
-    if (exceptionFlag) {
-      // Here we don't check the refCount since we will throw exception
-      cache.asMap().values().asScala.foreach(_.dispose())
-      throw new OapException("Can't remove in-used fiber within 3 seconds")
-    }
     fiberCache.occupy()
     fiberCache
   }
@@ -130,7 +144,7 @@ object FiberCacheManager extends Logging {
 
   def cacheStats: CacheStats = cache.stats()
 
-  def cacheSize : Long = _cacheSize.get()
+  def cacheSize: Long = _cacheSize.get()
 }
 
 private[oap] object DataFileHandleCacheManager extends Logging {

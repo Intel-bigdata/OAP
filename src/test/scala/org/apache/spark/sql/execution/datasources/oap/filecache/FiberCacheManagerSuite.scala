@@ -65,8 +65,6 @@ class FiberCacheManagerSuite extends SharedOapContext {
       }
     }
     assert(exception.getMessage == "Can't remove in-used fiber within 3 seconds")
-    // Set this flag to false for following test
-    FiberCacheManager.exceptionFlag = false
     fiberCacheInUse.release()
   }
 
@@ -113,5 +111,25 @@ class FiberCacheManagerSuite extends SharedOapContext {
     assert(FiberCacheManager.cacheStats.minus(origStats).hitCount() == 1)
     fiberCache1.release()
     fiberCache2.release()
+  }
+
+  test("cache guardian") {
+    val memorySizeInMB = (MemoryManager.maxMemory / mbSize).toInt
+    val fibers = (1 to memorySizeInMB * 2).map { i =>
+      val data = generateData(mbSize)
+      val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #0.$i")
+      val fiberCache = FiberCacheManager.get(fiber, configuration)
+      val fiberCache2 = FiberCacheManager.get(fiber, configuration)
+      assert(fiberCache.toArray sameElements data)
+      assert(fiberCache2.toArray sameElements data)
+      (fiberCache, fiberCache2)
+    }
+    Thread.sleep(20000)
+    fibers.foreach {
+      case (fiberCache, fiberCache2) =>
+        fiberCache.release()
+        fiberCache2.release()
+    }
+    Thread.sleep(3000)
   }
 }
