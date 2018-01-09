@@ -23,6 +23,8 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.io.FileCommitProtocol
+import org.apache.spark.scheduler.cluster.CoarseGrainedSchedulerBackend
+import org.apache.spark.scheduler.local.LocalSchedulerBackend
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.analysis.EliminateSubqueryAliases
@@ -33,6 +35,8 @@ import org.apache.spark.sql.catalyst.plans.logical.Project
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap._
+import org.apache.spark.sql.execution.datasources.oap.OapMessages.CacheDrop
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.internal.SQLConf
@@ -121,8 +125,6 @@ case class CreateIndex(
           val entries = indexColumns.map(col =>
             schema.map(_.name).toIndexedSeq.indexOf(col.columnName))
           metaBuilder.addIndexMeta(new IndexMeta(indexName, time, BitMapIndex(entries)))
-        case BitMapIndexType =>
-          sys.error(s"BitMapIndexType supports the column with one single field")
         case _ =>
           sys.error(s"Not supported index type $indexType")
       }
@@ -217,6 +219,11 @@ case class DropIndex(
         case r: SimpleCatalogRelation => (new FindDataSourceTable(sparkSession))(r)
         case other => other
       }
+    sparkSession.sparkContext.schedulerBackend match {
+      case scheduler: CoarseGrainedSchedulerBackend =>
+          OapMessageUtils.sendMessageToExecutors(scheduler, CacheDrop(indexName))
+      case _: LocalSchedulerBackend => FiberCacheManager.removeIndexCache(indexName)
+    }
     relation match {
       case LogicalRelation(HadoopFsRelation(fileCatalog, _, _, _, format, _), _, identifier)
           if format.isInstanceOf[OapFileFormat] || format.isInstanceOf[ParquetFileFormat] =>

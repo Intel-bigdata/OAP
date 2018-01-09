@@ -56,6 +56,8 @@ private[index] case class BTreeIndexRecordReader(
     footerCache = FiberCacheManager.get(footerFiber, configuration)
     footer = BTreeFooter(footerCache, schema)
 
+    reader.checkVersionNum(footer.getVersionNum)
+
     internalIterator = intervalArray.toIterator.flatMap { interval =>
       val (start, end) = findRowIdRange(interval)
       val groupedPos = (start until end).groupBy(i => i / reader.rowIdListSizePerSection)
@@ -218,15 +220,16 @@ private[index] object BTreeIndexRecordReader {
     private val nodeSizeOffset = IndexUtils.INT_SIZE * 2
     private val minPosOffset = IndexUtils.INT_SIZE * 3
     private val maxPosOffset = IndexUtils.INT_SIZE * 4
-    private val nodeMetaStart = IndexUtils.INT_SIZE * 3
+    private val nodeMetaStart = IndexUtils.INT_SIZE * 4
     private val nodeMetaByteSize = IndexUtils.INT_SIZE * 5
     private val statsLengthSize = IndexUtils.INT_SIZE
 
     @transient protected lazy val nnkr: NonNullKeyReader = new NonNullKeyReader(schema)
 
-    def getNonNullKeyRecordCount: Int = fiberCache.getInt(0)
-    def getNullKeyRecordCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE)
-    def getNodesCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 2)
+    def getVersionNum: Int = fiberCache.getInt(0)
+    def getNonNullKeyRecordCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE)
+    def getNullKeyRecordCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 2)
+    def getNodesCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 3)
     // get idx Node's max value
     def getMaxValue(idx: Int, schema: StructType): InternalRow =
       nnkr.readKey(fiberCache, getMaxValueOffset(idx))._1

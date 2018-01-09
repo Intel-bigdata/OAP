@@ -89,11 +89,11 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
   test("writeHead to write common and consistent index version to all the index file headers") {
     val buf = new ByteArrayOutputStream(8)
     val out = new DataOutputStream(buf)
-    IndexUtils.writeHead(out, IndexFile.INDEX_VERSION)
+    IndexUtils.writeHead(out, IndexFile.VERSION_NUM)
     val bytes = buf.toByteArray
     assert(Platform.getByte(bytes, Platform.BYTE_ARRAY_OFFSET + 6) ==
-      (IndexFile.INDEX_VERSION >> 8).toByte)
+      (IndexFile.VERSION_NUM >> 8).toByte)
     assert(Platform.getByte(bytes, Platform.BYTE_ARRAY_OFFSET + 7) ==
-      (IndexFile.INDEX_VERSION & 0xFF).toByte)
+      (IndexFile.VERSION_NUM & 0xFF).toByte)
   }
 }

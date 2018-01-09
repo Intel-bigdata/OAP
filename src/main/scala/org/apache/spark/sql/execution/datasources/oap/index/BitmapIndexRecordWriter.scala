@@ -46,15 +46,22 @@ private[oap] object BitmapIndexSectionId {
 }
 
 /* Below is the bitmap index general layout and sections.
- * #section id        section size(B) section description
- * headerSection      4               header
- * keyListSection     varied          sorted unique key list (index column unique values)
- * entryListSection   varied          bitmap entry list
- * entryOffsetSection varied          bitmap entry offset list
- * statisticsSection  varied          keep the original statistics, not changed than before.
- * footerSection      40(5*8)         footer to save total key list size and length, total entry
- *                                    list size and total offset list size, and also the original
- *                                    index end.
+ * #section                size(B)       description
+ * headerSection           4             header
+ * keyListSection          varied        sorted unique key list (index column unique values)
+ * entryListSection        varied        bitmap entry list --
+ *                                       Null key's entries are appended to the end
+ * entryOffsetSection      varied        bitmap entry offset list
+ * statisticsSection       varied        keep the original statistics, not changed than before.
+ * footerSection           44(4 + 5*8)   footer to save total key list size and length, total entry
+ * Index version number    4             list size, total offset list size, and also the original
+ * Non-null key List Size  4             index end.
+ * Non-Null key count      4
+ * Non-null key Entry Size 4
+ * Offset Section Size     4
+ * Null key entries offset 4
+ * Null key entry size     4
+ * Footer's start position 8
  *
  * TODO: 1. Bitmap index is suitable for the enumeration columns which actually has not many
  *          unique values, thus we will load the key list and offset list respectively as a
@@ -127,7 +134,7 @@ private[oap] class BitmapIndexRecordWriter(
     /* TODO: 1. Use BitSet of Spark or Scala or Java to replace roaring bitmap.
      *       2. Optimize roaring bitmap usage to further reduce index file size.
      */
-    bmEntryListOffset = IndexFile.indexFileHeaderLength + bmUniqueKeyListTotalSize
+    bmEntryListOffset = IndexFile.VERSION_LENGTH + bmUniqueKeyListTotalSize
     bmOffsetListBuffer = new mutable.ListBuffer[Int]()
     // Get the bitmap total size, and write each bitmap entrys one by one.
     var totalBitmapSize = 0
@@ -174,6 +181,7 @@ private[oap] class BitmapIndexRecordWriter(
     // The beginning of the footer are bitmap total size, key list size and offset total size.
     // Others keep back compatible and not changed than before.
     bmIndexEnd = bmEntryListOffset + bmEntryListTotalSize + bmNullEntrySize + bmOffsetListTotalSize
+    IndexUtils.writeInt(writer, IndexFile.VERSION_NUM)
     IndexUtils.writeInt(writer, bmUniqueKeyListTotalSize)
     IndexUtils.writeInt(writer, bmUniqueKeyListCount)
     IndexUtils.writeInt(writer, bmEntryListTotalSize)
@@ -187,7 +195,7 @@ private[oap] class BitmapIndexRecordWriter(
   private def flushToFile(): Unit = {
     val statisticsWriteManager = new StatisticsWriteManager
     statisticsWriteManager.initialize(BitMapIndexType, keySchema, configuration)
-    IndexUtils.writeHead(writer, IndexFile.INDEX_VERSION)
+    IndexUtils.writeHead(writer, IndexFile.VERSION_NUM)
     writeUniqueKeyList()
     writeBmEntryList()
     writeBmOffsetList()

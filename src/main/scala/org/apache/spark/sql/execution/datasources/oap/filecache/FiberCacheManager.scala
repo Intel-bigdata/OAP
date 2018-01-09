@@ -25,7 +25,7 @@ import scala.collection.JavaConverters._
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.oap.io._
@@ -74,6 +74,18 @@ object FiberCacheManager extends Logging {
 
   private val cacheGuardian = new CacheGuardian(removalPendingQueue)
   cacheGuardian.start()
+
+  def removeIndexCache(indexName: String): Unit = {
+    logDebug(s"going to remove cache of $indexName, executor: ${SparkEnv.get.executorId}")
+    logDebug("cache size before remove: " + cache.size())
+    val fiberToBeRemoved = cache.asMap().keySet().asScala.filter {
+      case BTreeFiber(_, file, _, _) => file.contains(indexName)
+      case BitmapFiber(_, file, _, _) => file.contains(indexName)
+      case _ => false
+    }.asJava
+    cache.invalidateAll(fiberToBeRemoved)
+    logDebug("cache size after remove: " + cache.size())
+  }
 
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {

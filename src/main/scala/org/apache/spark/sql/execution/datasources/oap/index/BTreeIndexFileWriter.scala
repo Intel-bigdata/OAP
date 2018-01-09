@@ -45,7 +45,7 @@ private case class BTreeIndexFileWriter(
   private var footerSize = 0
 
   def start(): Unit = {
-    IndexUtils.writeHead(writer, IndexFile.INDEX_VERSION)
+    IndexUtils.writeHead(writer, IndexFile.VERSION_NUM)
   }
 
   def writeNode(buf: Array[Byte]): Unit = {
