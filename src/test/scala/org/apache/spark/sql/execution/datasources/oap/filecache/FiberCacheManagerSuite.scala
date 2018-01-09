@@ -106,6 +106,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
   }
 
   test("cache guardian remove pending fibers") {
+    Thread.sleep(500) // Wait some time for CacheGuardian to remove pending fibers
     val memorySizeInMB = (MemoryManager.cacheMemory / mbSize).toInt
     val fibers = (1 to memorySizeInMB * 2).map { i =>
       val data = generateData(mbSize)
