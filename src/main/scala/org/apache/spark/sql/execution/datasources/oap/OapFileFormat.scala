@@ -285,7 +285,6 @@ private[sql] class OapFileFormat extends FileFormat
           val dataFile = DataFile(file.filePath, m.schema, m.dataReaderClassName, conf)
           val dataFileHandle: DataFileHandle = DataFileHandleCacheManager(dataFile)
 
-
           // read total records from metaFile
           val totalRows = dataFileHandle match {
             case oap: OapDataFileHandle =>
