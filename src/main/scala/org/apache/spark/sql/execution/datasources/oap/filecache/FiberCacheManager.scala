@@ -128,15 +128,15 @@ object FiberCacheManager extends Logging {
   private val cache = CacheBuilder
     .newBuilder()
     .recordStats()
-    .concurrencyLevel(4)
+    .concurrencyLevel(4) // TODO: Make 4 configurable
     .removalListener(removalListener)
     .maximumWeight(MAX_WEIGHT)
     .weigher(weigher)
     .build[Fiber, FiberCache]()
 
   def get(fiber: Fiber, conf: Configuration): FiberCache = {
-    // TODO: Should avoid loading a fiber larger than MAX_WEIGHT
     val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
+    // Avoid loading a fiber larger than MAX_WEIGHT / 4, 4 is concurrency number
     assert(fiberCache.size() <= MAX_WEIGHT * MB / 4, "Can't cache fiber larger than MAX_WEIGHT / 4")
     fiberCache.occupy()
     fiberCache
