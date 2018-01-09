@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.{Condition, ReentrantLock}
+import javax.annotation.concurrent.GuardedBy
 
 import org.apache.hadoop.fs.FSDataInputStream
 
@@ -39,6 +40,7 @@ trait FiberCache {
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
 
+  @GuardedBy("lock")
   private var _refCount: Long = 0L
   def refCount: Long = _refCount
 
