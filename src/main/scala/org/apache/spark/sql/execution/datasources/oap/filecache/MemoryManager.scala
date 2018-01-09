@@ -54,6 +54,7 @@ trait FiberCache {
   def release(): Unit = {
     lock.lock()
     try {
+      assert(refCount > 0, "release a non-used fiber")
       _refCount -= 1
       if (_refCount == 0) {
         nonUsed.signal()
@@ -177,25 +178,26 @@ private[oap] object MemoryManager extends Logging {
   private val DUMMY_BLOCK_ID = TestBlockId("oap_memory_request_block")
 
   // TODO: a config to control max memory size
-  private val _maxMemory = {
-    if (SparkEnv.get == null) {
-      throw new OapException("No SparkContext is found")
+  private val (_cacheMemory, _cacheGuardianMemory) = {
+    assert(SparkEnv.get != null, "Oap can't run without SparkContext")
+    val memoryManager = SparkEnv.get.memoryManager
+    // TODO: make 0.7 configurable
+    val oapMemory = (memoryManager.maxOffHeapStorageMemory * 0.7).toLong
+    if (memoryManager.acquireStorageMemory(
+      DUMMY_BLOCK_ID, oapMemory, MemoryMode.OFF_HEAP)) {
+      // TODO: make 0.9, 0.1 configurable
+      ((oapMemory * 0.9).toLong, (oapMemory * 0.1).toLong)
     } else {
-      val memoryManager = SparkEnv.get.memoryManager
-      // TODO: make 0.7 configurable
-      val oapMaxMemory = (memoryManager.maxOffHeapStorageMemory * 0.7).toLong
-      if (memoryManager.acquireStorageMemory(DUMMY_BLOCK_ID, oapMaxMemory, MemoryMode.OFF_HEAP)) {
-        oapMaxMemory
-      } else {
-        throw new OapException("Can't acquire memory from spark Memory Manager")
-      }
+      throw new OapException("Can't acquire memory from spark Memory Manager")
     }
   }
 
   // TODO: Atomic is really needed?
   private val _memoryUsed = new AtomicLong(0)
   def memoryUsed: Long = _memoryUsed.get()
-  def maxMemory: Long = _maxMemory
+
+  def cacheMemory: Long = _cacheMemory
+  def cacheGuardianMemory: Long = _cacheGuardianMemory
 
   private[filecache] def allocate(numOfBytes: Int): MemoryBlock = {
     _memoryUsed.getAndAdd(numOfBytes)

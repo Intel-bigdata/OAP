@@ -46,33 +46,37 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
  */
 object FiberCacheManager extends Logging {
 
-  private val DEFAULT_QUEUE_INITIAL_CAPACITY = 11
-  private val removalPendingQueue =
-    new PriorityBlockingQueue[FiberCache](DEFAULT_QUEUE_INITIAL_CAPACITY, Ordering.by(_.refCount))
-
-  private class CacheGuardian(queue: PriorityBlockingQueue[FiberCache]) extends Thread {
+  private class CacheGuardian(
+      queue: PriorityBlockingQueue[FiberCache],
+      maxMemory: Long) extends Thread {
     override def run(): Unit = {
-      logWarning("started ...")
+      // Loop forever
       while (true) {
-        // Block until queue is not empty
+        // Block if there is no pending fibers
         val fiberCache = queue.take()
-        logWarning("get one entry")
-        // Block until fiberCache is disposed
+        logDebug(s"Removing fiber $fiberCache ...")
+        // Block if fiber is in use.
         while (!fiberCache.dispose(3000, TimeUnit.MILLISECONDS)) {
-          // logDebug("Can't remove in 3s, will try again")
-          logWarning("Can't remove in 3s, will try again")
-          val usedMemory = queue.asScala.map(_.size()).sum
-          if (usedMemory > 200 * MB) {
-            logWarning("Removal Pending Fiber used too much memory")
+          // Check memory usage every 3s while we are waiting fiber release.
+          if (queue.asScala.map(_.size()).sum > maxMemory) {
+            logWarning("Fibers pending on removal use too much memory")
           }
         }
-        // logDebug("Fiber removed successfully")
-        logWarning("Fiber removed successfully")
+        // TODO: Make log more readable
+        logDebug(s"Fiber $fiberCache removed successfully")
       }
     }
   }
 
-  private val cacheGuardian = new CacheGuardian(removalPendingQueue)
+  // Default parameter comes from PriorityBlockQueue constructor
+  private val DEFAULT_QUEUE_INITIAL_CAPACITY = 11
+  // Ordering.by() makes sure non-used FiberCache dequeue first, used by test suite.
+  private[filecache] val removalPendingQueue = new PriorityBlockingQueue[FiberCache](
+    DEFAULT_QUEUE_INITIAL_CAPACITY, Ordering.by(_.refCount))
+  // TODO: CacheGuardian can also track cache statistics periodically
+  private val cacheGuardian = new CacheGuardian(
+    removalPendingQueue, MemoryManager.cacheGuardianMemory)
+
   cacheGuardian.start()
 
   def removeIndexCache(indexName: String): Unit = {
@@ -90,7 +94,7 @@ object FiberCacheManager extends Logging {
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
       // TODO: Change the log more readable
-      logDebug(s"Removing Cache ${notification.getKey}")
+      logDebug(s"Add Cache ${notification.getKey} into removal list")
       removalPendingQueue.offer(notification.getValue)
       _cacheSize.addAndGet(-notification.getValue.size())
     }
@@ -102,7 +106,7 @@ object FiberCacheManager extends Logging {
   }
 
   private val MB: Double = 1024 * 1024
-  private val MAX_WEIGHT = (MemoryManager.maxMemory / MB).toInt
+  private val MAX_WEIGHT = (MemoryManager.cacheMemory / MB).toInt
 
   // Total cached size for debug purpose
   private val _cacheSize: AtomicLong = new AtomicLong(0)
@@ -131,7 +135,9 @@ object FiberCacheManager extends Logging {
     .build[Fiber, FiberCache]()
 
   def get(fiber: Fiber, conf: Configuration): FiberCache = {
+    // TODO: Should avoid loading a fiber larger than MAX_WEIGHT
     val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
+    assert(fiberCache.size() <= MAX_WEIGHT * MB / 4, "Can't cache fiber larger than MAX_WEIGHT / 4")
     fiberCache.occupy()
     fiberCache
   }
