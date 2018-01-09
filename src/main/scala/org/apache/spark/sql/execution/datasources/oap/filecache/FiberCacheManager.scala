@@ -96,6 +96,7 @@ object FiberCacheManager extends Logging {
       // TODO: Change the log more readable
       logDebug(s"Add Cache ${notification.getKey} into removal list")
       removalPendingQueue.offer(notification.getValue)
+      // TODO: Reduce cache size until CacheGuardian removed it?
       _cacheSize.addAndGet(-notification.getValue.size())
     }
   }
