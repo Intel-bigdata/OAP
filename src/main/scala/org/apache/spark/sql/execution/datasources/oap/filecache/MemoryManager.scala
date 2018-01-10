@@ -66,7 +66,7 @@ trait FiberCache {
     }
   }
 
-  def dispose(time: Long, unit: TimeUnit): Boolean = {
+  def tryDispose(time: Long, unit: TimeUnit): Boolean = {
     var nanos = unit.toNanos(time)
     lock.lockInterruptibly()
     try {

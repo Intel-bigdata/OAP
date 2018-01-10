@@ -56,7 +56,7 @@ object FiberCacheManager extends Logging {
         val fiberCache = queue.take()
         logDebug(s"Removing fiber $fiberCache ...")
         // Block if fiber is in use.
-        while (!fiberCache.dispose(3000, TimeUnit.MILLISECONDS)) {
+        while (!fiberCache.tryDispose(3000, TimeUnit.MILLISECONDS)) {
           // Check memory usage every 3s while we are waiting fiber release.
           if (queue.asScala.map(_.size()).sum > maxMemory) {
             logWarning("Fibers pending on removal use too much memory")
