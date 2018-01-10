@@ -161,7 +161,7 @@ class MemoryManagerSuite extends SharedOapContext {
     // 1. disposed FiberCache
     val bytes = new Array[Byte](1024)
     val fiberCache = MemoryManager.putToDataFiberCache(bytes)
-    fiberCache.dispose()
+    fiberCache.realDispose()
     val exception = intercept[OapException]{
       fiberCache.getByte(0)
     }

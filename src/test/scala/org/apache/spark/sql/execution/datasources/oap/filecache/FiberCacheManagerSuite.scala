@@ -106,22 +106,24 @@ class FiberCacheManagerSuite extends SharedOapContext {
   }
 
   test("cache guardian remove pending fibers") {
-    Thread.sleep(500) // Wait some time for CacheGuardian to remove pending fibers
+    Thread.sleep(1000) // Wait some time for CacheGuardian to remove pending fibers
     val memorySizeInMB = (MemoryManager.cacheMemory / mbSize).toInt
     val fibers = (1 to memorySizeInMB * 2).map { i =>
       val data = generateData(mbSize)
       TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #0.$i")
     }
-    // release some fibers so it has chance to be disposed immediately
+    // release fibers so it has chance to be disposed immediately
     fibers.foreach(FiberCacheManager.get(_, configuration).release())
-    assert(FiberCacheManager.removalPendingQueue.size() == 0)
+    Thread.sleep(1000)
+    assert(FiberCacheManager.removalPendingQueueSize == 0)
     // Hold the fiber, so it can't be disposed until release
     val fiberCaches = fibers.map(FiberCacheManager.get(_, configuration))
-    assert(FiberCacheManager.removalPendingQueue.size() > 0)
+    Thread.sleep(1000)
+    assert(FiberCacheManager.removalPendingQueueSize > 0)
     // After release, CacheGuardian should be back to work
     fiberCaches.foreach(_.release())
     // Wait some time for CacheGuardian being waken-up
-    Thread.sleep(500)
-    assert(FiberCacheManager.removalPendingQueue.size() == 0)
+    Thread.sleep(1000)
+    assert(FiberCacheManager.removalPendingQueueSize == 0)
   }
 }

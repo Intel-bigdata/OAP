@@ -17,9 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.locks.{Condition, ReentrantLock}
 import javax.annotation.concurrent.GuardedBy
 
 import org.apache.hadoop.fs.FSDataInputStream
@@ -35,58 +33,44 @@ import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
 import org.apache.spark.unsafe.types.UTF8String
 
 // TODO: make it an alias of MemoryBlock
-trait FiberCache {
+trait FiberCache extends Logging {
 
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
 
-  @GuardedBy("lock")
+  @GuardedBy("FiberCache.this")
   private var _refCount: Long = 0L
   def refCount: Long = _refCount
 
-  private val lock = new ReentrantLock()
-  private val nonUsed: Condition = lock.newCondition()
-
-  def occupy(): Unit = {
-    lock.lock()
+  def occupy(): Unit = synchronized {
     _refCount += 1
-    lock.unlock()
   }
 
-  def release(): Unit = {
-    lock.lock()
-    try {
-      assert(refCount > 0, "release a non-used fiber")
-      _refCount -= 1
-      if (_refCount == 0) {
-        nonUsed.signal()
+  def release(): Unit = synchronized {
+    assert(refCount > 0, "release a non-used fiber")
+    _refCount -= 1
+    notifyAll()
+  }
+
+  def tryDispose(timeout: Long): Boolean = synchronized {
+    val startTime = System.currentTimeMillis()
+    while (_refCount > 0) {
+      try {
+        // Give caller a chance to deal with the long wait case.
+        if (System.currentTimeMillis() - startTime > timeout) return false
+        wait(100)
+      } catch {
+        case _: InterruptedException =>
+          logWarning(s"Fiber Cache Dispose waiting detected for ${this}")
       }
-    } finally {
-      lock.unlock()
     }
+    realDispose()
+    true
   }
 
-  def tryDispose(time: Long, unit: TimeUnit): Boolean = {
-    var nanos = unit.toNanos(time)
-    lock.lockInterruptibly()
-    try {
-      while (_refCount > 0) {
-        if (nanos < 0) {
-          return false
-        }
-        nanos = nonUsed.awaitNanos(nanos)
-      }
-      dispose()
-      true
-    } finally {
-      lock.unlock()
-    }
-  }
-
-  // TODO: need a flag to avoid accessing disposed FiberCache
   private var disposed = false
   def isDisposed: Boolean = disposed
-  def dispose(): Unit = {
+  private[filecache] def realDispose(): Unit = {
     if (!disposed) MemoryManager.free(fiberData)
     disposed = true
   }
