@@ -103,6 +103,13 @@ object FiberCacheManager extends Logging {
     logDebug("cache size after remove: " + cache.size())
   }
 
+  // Used by test suite
+  private[filecache] def removeFiber(fiber: TestFiber): Unit = {
+    // cache may be removed by other thread before invalidate
+    // but it's ok since only used by test to simulate race condition
+    if (cache.getIfPresent(fiber) != null) cache.invalidate(fiber)
+  }
+
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
       // TODO: Change the log more readable

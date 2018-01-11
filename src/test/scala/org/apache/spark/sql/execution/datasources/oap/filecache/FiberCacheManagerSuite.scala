@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.util.concurrent.{Executors, TimeUnit}
+
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
@@ -125,5 +127,106 @@ class FiberCacheManagerSuite extends SharedOapContext {
     // Wait some time for CacheGuardian being waken-up
     Thread.sleep(1000)
     assert(FiberCacheManager.pendingSize == 0)
+  }
+
+  class TestRunner(work: => Any) extends Runnable {
+    override def run(): Unit = {
+      work
+    }
+  }
+  // Fiber should only load once
+  test("get same fiber simultaneously") {
+    val data = generateData(kbSize)
+    var loadTimes = 0
+    val fiber = TestFiber(() => {
+      loadTimes += 1
+      MemoryManager.putToDataFiberCache(data)
+    }, s"same fiber test")
+    val work: Unit = {
+      val fiberCache = FiberCacheManager.get(fiber, configuration)
+      Thread.sleep(100)
+      fiberCache.release()
+    }
+    val runner = new TestRunner(work)
+    val pool = Executors.newCachedThreadPool
+    (1 to 10).foreach(_ => pool.execute(runner))
+    pool.shutdown()
+    pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
+    assert(loadTimes == 1)
+  }
+
+  // request fibers exceed max memory at the same time
+  test("get different fiber simultaneously") {
+    val memorySizeInMB = (MemoryManager.cacheMemory / mbSize).toInt
+    val pool = Executors.newCachedThreadPool()
+    val runners = (1 to 6).map { i =>
+      val data = generateData(memorySizeInMB / 5 * mbSize)
+      val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"different test $i")
+      val work: Unit = {
+        val fiberCache = FiberCacheManager.get(fiber, configuration)
+        assert(fiberCache.toArray sameElements data)
+        Thread.sleep(100)
+        fiberCache.release()
+      }
+      new TestRunner(work)
+    }
+    runners.foreach(pool.execute)
+    pool.shutdown()
+    pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
+    Thread.sleep(100)
+    assert(FiberCacheManager.pendingSize == 0)
+  }
+
+  // refCount should be correct
+  test("release same fiber simultaneously") {
+    val pool = Executors.newCachedThreadPool()
+    val data = generateData(kbSize)
+    val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"release test")
+    val fiberCaches = (1 to 5).map(_ => FiberCacheManager.get(fiber, configuration))
+    fiberCaches.foreach{ fiberCache =>
+      pool.execute(new TestRunner(fiberCache.release()))
+    }
+    pool.shutdown()
+    pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
+    assert(fiberCaches.head.refCount == 0)
+  }
+
+  // refCount should be correct, and fiber can be disposed after get
+  test("get and release fiber simultaneously") {
+    val pool = Executors.newCachedThreadPool()
+    val data = generateData(kbSize)
+    val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"get release test")
+    val work: Unit = {
+      val fiberCache = FiberCacheManager.get(fiber, configuration)
+      assert(fiberCache.refCount > 0)
+      assert(!fiberCache.isDisposed)
+      fiberCache.release()
+    }
+    (1 to 10).foreach(_ => pool.execute(new TestRunner(work)))
+    pool.shutdown()
+    pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
+  }
+
+  // fiber must not be removed during get
+  test("get and remove fiber simultaneously") {
+    val pool = Executors.newCachedThreadPool()
+    val data = generateData(kbSize)
+    val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"get remove test")
+    val getWork: Unit = {
+      (1 to 1000).foreach { _ =>
+        val fiberCache = FiberCacheManager.get(fiber, configuration)
+        assert(!fiberCache.isDisposed)
+        fiberCache.release()
+      }
+    }
+    val removeWork: Unit = {
+      (1 to 1000).foreach { _ =>
+        FiberCacheManager.removeFiber(fiber)
+      }
+    }
+    pool.execute(new TestRunner(getWork))
+    pool.execute(new TestRunner(removeWork))
+    pool.shutdown()
+    pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
   }
 }
