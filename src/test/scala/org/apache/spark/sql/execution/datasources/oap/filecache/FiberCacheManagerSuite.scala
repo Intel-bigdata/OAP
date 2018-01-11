@@ -17,10 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.util.concurrent.{Callable, Executors, ThreadFactory, TimeUnit}
-import java.lang.Thread.UncaughtExceptionHandler
+import java.util.concurrent.{Callable, Executors, TimeUnit}
 
-import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 

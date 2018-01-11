@@ -17,10 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.util.concurrent.{Callable, LinkedBlockingQueue, TimeUnit}
+import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
-
-import scala.collection.JavaConverters._
 
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
@@ -28,6 +26,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.executor.custom.CustomManager
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
@@ -39,6 +38,43 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
   }
 }
 
+private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logging {
+
+  private val _pendingFiberSize: AtomicLong = new AtomicLong(0)
+
+  private val removalPendingQueue = new LinkedBlockingQueue[FiberCache]()
+
+  def pendingSize: Int = removalPendingQueue.size()
+
+  def addRemovalFiber(fiberCache: FiberCache): Unit = {
+    _pendingFiberSize.addAndGet(fiberCache.size())
+    removalPendingQueue.offer(fiberCache)
+    if (_pendingFiberSize.get() > maxMemory) {
+      logError("Fibers pending on removal use too much memory, " +
+          s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
+    }
+  }
+
+  override def run(): Unit = {
+    // Loop forever, TODO: provide a release function
+    while (true) {
+      val fiberCache = removalPendingQueue.take()
+      logDebug(s"Removing fiber $fiberCache ...")
+      // Block if fiber is in use.
+      while (!fiberCache.tryDispose(3000)) {
+        // Check memory usage every 3s while we are waiting fiber release.
+        if (_pendingFiberSize.get() > maxMemory) {
+          logError("Fibers pending on removal use too much memory, " +
+              s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
+        }
+      }
+      // TODO: Make log more readable
+      _pendingFiberSize.addAndGet(-fiberCache.size())
+      logDebug(s"Fiber $fiberCache removed successfully")
+    }
+  }
+}
+
 /**
  * Fiber Cache Manager
  *
@@ -46,123 +82,49 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
  */
 object FiberCacheManager extends Logging {
 
-  private class CacheGuardian(maxMemory: Long) extends Thread {
+  private val GUAVA_CACHE = "guava"
+  private val SIMPLE_CACHE = "simple"
+  private val DEFAULT_CACHE_STRATEGY = GUAVA_CACHE
 
-    private val _pendingFiberSize: AtomicLong = new AtomicLong(0)
-
-    private val removalPendingQueue = new LinkedBlockingQueue[FiberCache]()
-
-    def addRemovalFiber(fiberCache: FiberCache): Unit = {
-      _pendingFiberSize.addAndGet(fiberCache.size())
-      removalPendingQueue.offer(fiberCache)
-      if (_pendingFiberSize.get() > maxMemory) {
-        logError("Fibers pending on removal use too much memory, " +
-            s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
-      }
-    }
-
-    def pendingSize: Int = removalPendingQueue.size()
-
-    override def run(): Unit = {
-      // Loop forever, TODO: provide a release function
-      while (true) {
-        val fiberCache = removalPendingQueue.take()
-        logDebug(s"Removing fiber $fiberCache ...")
-        // Block if fiber is in use.
-        while (!fiberCache.tryDispose(3000)) {
-          // Check memory usage every 3s while we are waiting fiber release.
-          if (_pendingFiberSize.get() > maxMemory) {
-            logError("Fibers pending on removal use too much memory, " +
-                s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
-          }
-        }
-        // TODO: Make log more readable
-        _pendingFiberSize.addAndGet(-fiberCache.size())
-        logDebug(s"Fiber $fiberCache removed successfully")
-      }
+  private val cacheBackend: OapCache = {
+    val sparkEnv = SparkEnv.get
+    assert(sparkEnv != null, "Oap can't run without SparkContext")
+    val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
+    if (cacheName.equals(GUAVA_CACHE)) {
+      new GuavaOapCache(MemoryManager.cacheMemory, MemoryManager.cacheGuardianMemory)
+    } else if (cacheName.equals(SIMPLE_CACHE)) {
+      new SimpleOapCache()
+    } else {
+      throw new OapException("Unsupported cache strategy")
     }
   }
 
-  // TODO: CacheGuardian can also track cache statistics periodically
-  private val cacheGuardian = new CacheGuardian(MemoryManager.cacheGuardianMemory)
-
-  cacheGuardian.start()
-
-  // Used by test suite
-  private[filecache] def pendingSize: Int = cacheGuardian.pendingSize
+  def get(fiber: Fiber, conf: Configuration): FiberCache = {
+    cacheBackend.get(fiber, conf)
+  }
 
   def removeIndexCache(indexName: String): Unit = {
     logDebug(s"going to remove cache of $indexName, executor: ${SparkEnv.get.executorId}")
-    logDebug("cache size before remove: " + cache.size())
-    val fiberToBeRemoved = cache.asMap().keySet().asScala.filter {
+    logDebug("cache size before remove: " + cacheBackend.cacheCount)
+    val fiberToBeRemoved = cacheBackend.getFibers.filter {
       case BTreeFiber(_, file, _, _) => file.contains(indexName)
       case BitmapFiber(_, file, _, _) => file.contains(indexName)
       case _ => false
-    }.asJava
-    cache.invalidateAll(fiberToBeRemoved)
-    logDebug("cache size after remove: " + cache.size())
+    }
+    cacheBackend.invalidateAll(fiberToBeRemoved)
+    logDebug("cache size after remove: " + cacheBackend.cacheCount)
   }
 
   // Used by test suite
   private[filecache] def removeFiber(fiber: TestFiber): Unit = synchronized {
     // cache may be removed by other thread before invalidate
     // but it's ok since only used by test to simulate race condition
-    if (cache.getIfPresent(fiber) != null) cache.invalidate(fiber)
-  }
-
-  private val removalListener = new RemovalListener[Fiber, FiberCache] {
-    override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
-      // TODO: Change the log more readable
-      logDebug(s"Add Cache ${notification.getKey} into removal list")
-      cacheGuardian.addRemovalFiber(notification.getValue)
-      _cacheSize.addAndGet(-notification.getValue.size())
-    }
-  }
-
-  private val weigher = new Weigher[Fiber, FiberCache] {
-    override def weigh(key: Fiber, value: FiberCache): Int =
-      math.ceil(value.size() / MB).toInt
-  }
-
-  private val MB: Double = 1024 * 1024
-  private val MAX_WEIGHT = (MemoryManager.cacheMemory / MB).toInt
-
-  // Total cached size for debug purpose
-  private val _cacheSize: AtomicLong = new AtomicLong(0)
-
-  /**
-   * To avoid storing configuration in each Cache, use a loader.
-   * After all, configuration is not a part of Fiber.
-   */
-  private def cacheLoader(fiber: Fiber, configuration: Configuration) =
-    new Callable[FiberCache] {
-      override def call(): FiberCache = {
-        logDebug(s"Loading Cache $fiber")
-        val fiberCache = fiber.fiber2Data(configuration)
-        _cacheSize.addAndGet(fiberCache.size())
-        fiberCache
-      }
-    }
-
-  private val cache = CacheBuilder
-    .newBuilder()
-    .recordStats()
-    .removalListener(removalListener)
-    .maximumWeight(MAX_WEIGHT)
-    .weigher(weigher)
-    .build[Fiber, FiberCache]()
-
-  def get(fiber: Fiber, conf: Configuration): FiberCache = synchronized {
-    val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
-    // Avoid loading a fiber larger than MAX_WEIGHT / 4, 4 is concurrency number
-    assert(fiberCache.size() <= MAX_WEIGHT * MB / 4, "Can't cache fiber larger than MAX_WEIGHT / 4")
-    fiberCache.occupy()
-    fiberCache
+    if (cacheBackend.getIfPresent(fiber) != null) cacheBackend.invalidate(fiber)
   }
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly
   private[filecache] def status: String = {
-    val dataFibers = cache.asMap().keySet().asScala.collect {
+    val dataFibers = cacheBackend.getFibers.collect {
       case fiber: DataFiber => fiber
     }
 
@@ -178,9 +140,12 @@ object FiberCacheManager extends Logging {
     CacheStatusSerDe.serialize(statusRawData)
   }
 
-  def cacheStats: CacheStats = cache.stats()
+  def cacheStats: CacheStats = cacheBackend.cacheStats
 
-  def cacheSize: Long = _cacheSize.get()
+  def cacheSize: Long = cacheBackend.cacheSize
+
+  // Used by test suite
+  private[filecache] def pendingSize: Int = cacheBackend.pendingSize
 }
 
 private[oap] object DataFileHandleCacheManager extends Logging {
