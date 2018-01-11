@@ -54,18 +54,21 @@ trait FiberCache extends Logging {
 
   def tryDispose(timeout: Long): Boolean = synchronized {
     val startTime = System.currentTimeMillis()
-    while (_refCount > 0) {
-      try {
-        // Give caller a chance to deal with the long wait case.
-        if (System.currentTimeMillis() - startTime > timeout) return false
-        wait(100)
-      } catch {
-        case _: InterruptedException =>
-          logWarning(s"Fiber Cache Dispose waiting detected for ${this}")
+    // Give caller a chance to deal with the long wait case.
+    while (System.currentTimeMillis() - startTime > timeout) {
+      if (_refCount > 0) {
+        try {
+          wait(100)
+        } catch {
+          case _: InterruptedException =>
+            logWarning(s"Fiber Cache Dispose waiting detected for ${this}")
+        }
+      } else {
+        realDispose()
+        return true
       }
     }
-    realDispose()
-    true
+    false
   }
 
   private var disposed = false

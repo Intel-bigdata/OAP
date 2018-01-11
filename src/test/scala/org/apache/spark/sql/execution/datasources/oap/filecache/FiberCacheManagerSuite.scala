@@ -115,15 +115,15 @@ class FiberCacheManagerSuite extends SharedOapContext {
     // release fibers so it has chance to be disposed immediately
     fibers.foreach(FiberCacheManager.get(_, configuration).release())
     Thread.sleep(1000)
-    assert(FiberCacheManager.removalPendingQueueSize == 0)
+    assert(FiberCacheManager.pendingSize == 0)
     // Hold the fiber, so it can't be disposed until release
     val fiberCaches = fibers.map(FiberCacheManager.get(_, configuration))
     Thread.sleep(1000)
-    assert(FiberCacheManager.removalPendingQueueSize > 0)
+    assert(FiberCacheManager.pendingSize > 0)
     // After release, CacheGuardian should be back to work
     fiberCaches.foreach(_.release())
     // Wait some time for CacheGuardian being waken-up
     Thread.sleep(1000)
-    assert(FiberCacheManager.removalPendingQueueSize == 0)
+    assert(FiberCacheManager.pendingSize == 0)
   }
 }
