@@ -17,9 +17,15 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
+import java.io.File
+
+import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.catalog.CatalogTableType
+import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SQLTestUtils
 import org.apache.spark.util.Utils
@@ -28,6 +34,15 @@ import org.apache.spark.util.Utils
  * OapPlannerSuite has its own spark context which initializes OapSession
  * instead of normal SparkSession. Now we have oapStrategies in planner
  * itself, so we don't need to change extraStrategies.
+ *
+ * Note: This function test OapSession with TestOAP context which involves
+ * Hive context. As 'instantiating multiple copies of the hive metastore seems
+ * to lead to weird non-deterministic failures' (see TestHive.scala), we merge
+ * all Hive context related cases into this Suite to avoid multi contexts
+ * conflict.
+ *
+ * TODO: Another way to avoid Hive error is making different warehouse Dirs for
+ * each hive related cases, do it in future if hive cases grow rapidly.
  */
 class OapPlannerSuite
   extends QueryTest
@@ -214,5 +229,145 @@ class OapPlannerSuite
     checkAnswer(baseDF, oapDF)
     spark.sqlContext.setConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
     sql("drop oindex index1 on oap_fix_length_schema_table")
+  }
+
+  test("create oap index on external tables in default database") {
+    withTempDir { tmpDir =>
+      val tabName = "tab1"
+      withTable(tabName) {
+        assert(tmpDir.listFiles.isEmpty)
+        (1 to 300).map { i => (i, s"this is test $i") }.toDF("a", "b").createOrReplaceTempView("t")
+        sql(
+          s"""
+             |create table $tabName
+             |stored as parquet
+             |location '$tmpDir'
+             |as select * from t
+          """.stripMargin)
+
+        val hiveTable =
+          spark.sessionState.catalog.getTableMetadata(TableIdentifier(tabName, Some("default")))
+        assert(hiveTable.tableType == CatalogTableType.EXTERNAL)
+
+        assert(tmpDir.listFiles.nonEmpty)
+        checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
+
+        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE"))
+        sql(s"DROP TABLE $tabName")
+        assert(tmpDir.listFiles.nonEmpty)
+      }
+    }
+  }
+
+  test("drop oap index on external tables in default database") {
+    withTempDir { tmpDir =>
+      val tabName = "tab1"
+      withTable(tabName) {
+        assert(tmpDir.listFiles.isEmpty)
+        (1 to 300).map { i => (i, s"this is test $i") }.toDF("a", "b").createOrReplaceTempView("t")
+        sql(
+          s"""
+             |create table $tabName
+             |stored as parquet
+             |location '$tmpDir'
+             |as select * from t
+          """.stripMargin)
+
+        val hiveTable =
+          spark.sessionState.catalog.getTableMetadata(TableIdentifier(tabName, Some("default")))
+        assert(hiveTable.tableType == CatalogTableType.EXTERNAL)
+
+        assert(tmpDir.listFiles.nonEmpty)
+        checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
+
+        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE"))
+
+        sql(s"drop oindex idxa on $tabName")
+        checkAnswer(sql(s"show oindex from $tabName"), Nil)
+        sql(s"DROP TABLE $tabName")
+        assert(tmpDir.listFiles.nonEmpty)
+      }
+    }
+  }
+
+  test("refresh oap index on external tables in default database") {
+    withTempDir { tmpDir =>
+      val tabName = "tab1"
+      withTable(tabName) {
+        assert(tmpDir.listFiles.isEmpty)
+        (1 to 300).map { i => (i, s"this is test $i") }.toDF("a", "b").createOrReplaceTempView("t")
+        sql(
+          s"""
+             |create table $tabName
+             |stored as parquet
+             |location '$tmpDir'
+             |as select * from t
+          """.stripMargin)
+
+        val hiveTable =
+          spark.sessionState.catalog.getTableMetadata(TableIdentifier(tabName, Some("default")))
+        assert(hiveTable.tableType == CatalogTableType.EXTERNAL)
+
+        assert(tmpDir.listFiles.nonEmpty)
+        checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
+
+        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE"))
+
+        // test refresh oap index
+        (500 to 600).map { i => (i, s"this is test $i") }.toDF("a", "b")
+          .createOrReplaceTempView("t2")
+        sql(s"insert into table $tabName select * from t2")
+        sql(s"refresh oindex on $tabName")
+        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE"))
+        checkAnswer(sql(s"select a from $tabName where a=555"), Row(555))
+        sql(s"DROP TABLE $tabName")
+        assert(tmpDir.listFiles.nonEmpty)
+      }
+    }
+  }
+
+  test("check oap index on external tables in default database") {
+    withTempDir { tmpDir =>
+      val tabName = "tab1"
+      withTable(tabName) {
+        assert(tmpDir.listFiles.isEmpty)
+        (1 to 300).map { i => (i, s"this is test $i") }.toDF("a", "b").createOrReplaceTempView("t")
+        sql(
+          s"""
+             |create table $tabName
+             |stored as parquet
+             |location '$tmpDir'
+             |as select * from t
+          """.stripMargin)
+
+        val hiveTable =
+          spark.sessionState.catalog.getTableMetadata(TableIdentifier(tabName, Some("default")))
+        assert(hiveTable.tableType == CatalogTableType.EXTERNAL)
+
+        assert(tmpDir.listFiles.nonEmpty)
+        checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
+
+        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE"))
+
+        // test check oap index
+        checkAnswer(sql(s"check oindex on $tabName"), Nil)
+        val dirPath = tmpDir.getAbsolutePath
+        val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, new Path(dirPath))
+        assert(metaOpt.nonEmpty)
+        assert(metaOpt.get.fileMetas.nonEmpty)
+        assert(metaOpt.get.indexMetas.nonEmpty)
+        val dataFileName = metaOpt.get.fileMetas.head.dataFileName
+        // delete a data file
+        Utils.deleteRecursively(new File(dirPath, dataFileName))
+
+        // Check again
+        checkAnswer(
+          sql(s"check oindex on $tabName"),
+          Row(s"Data file: $dirPath/$dataFileName not found!"))
+
+        sql(s"DROP TABLE $tabName")
+        assert(tmpDir.listFiles.nonEmpty)
+      }
+    }
   }
 }

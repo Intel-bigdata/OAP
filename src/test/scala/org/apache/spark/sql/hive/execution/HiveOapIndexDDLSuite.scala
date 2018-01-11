@@ -20,9 +20,8 @@ package org.apache.spark.sql.hive.execution
 import java.io.File
 
 import org.apache.hadoop.fs.Path
-import org.scalatest.BeforeAndAfterEach
-
-import org.apache.spark.sql.{QueryTest, Row, SparkSession}
+import org.scalatest.{BeforeAndAfterEach, Ignore}
+import org.apache.spark.sql.{QueryTest, Row, SparkSession, TestOap}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTableType
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
@@ -31,7 +30,9 @@ import org.apache.spark.sql.test.SQLTestUtils
 import org.apache.spark.util.Utils
 
 
-// test OAP Index DDL&DML on Hive tables
+// test OAP Index DDL&DML on Hive tables. Ignored as cases were moved to OapPlannerSuite.
+// In future we can re-use this one if we offer individual warehouse dir for different suite.
+@Ignore
 class HiveOapIndexDDLSuite
   extends QueryTest with SQLTestUtils with BeforeAndAfterEach {
   import testImplicits._
