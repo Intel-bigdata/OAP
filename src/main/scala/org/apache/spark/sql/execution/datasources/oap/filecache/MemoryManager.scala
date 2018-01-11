@@ -55,7 +55,7 @@ trait FiberCache extends Logging {
   def tryDispose(timeout: Long): Boolean = synchronized {
     val startTime = System.currentTimeMillis()
     // Give caller a chance to deal with the long wait case.
-    while (System.currentTimeMillis() - startTime > timeout) {
+    while (System.currentTimeMillis() - startTime <= timeout) {
       if (_refCount > 0) {
         try {
           wait(100)
