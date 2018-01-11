@@ -104,6 +104,8 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
         }
       }
     })
+    // Restore compression type back to default.
+    sqlConf.setConfString(SQLConf.OAP_COMPRESSION.key, SQLConf.OAP_COMPRESSION.defaultValueString)
   }
 
   test("Enable/disable using OAP index after the index is created already") {
