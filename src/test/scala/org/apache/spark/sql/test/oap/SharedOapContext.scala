@@ -38,7 +38,7 @@ trait SharedOapContext extends SharedSQLContext {
   // disable file based cbo for all test suite, as it always fails.
   sparkConf.set(SQLConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "false")
 
-  protected lazy val configuration: Configuration = sparkContext.hadoopConfiguration
+  protected lazy val configuration: Configuration = spark.sessionState.newHadoopConf()
 
   protected implicit def sqlConf: SQLConf = sqlContext.conf
 
