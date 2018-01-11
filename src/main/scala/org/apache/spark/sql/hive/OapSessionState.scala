@@ -34,9 +34,10 @@ class OapSessionState(sparkSession: OapSession) extends HiveSessionState(sparkSe
   override lazy val sqlParser: ParserInterface = new OapSqlParser(conf)
 
   override def planner: SparkPlanner = {
-    new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies)
-    with HiveStrategies with OapStrategies
-    {
+    new SparkPlanner(
+      sparkSession.sparkContext, conf, experimentalMethods.extraStrategies)
+      with HiveStrategies
+      with OapStrategies {
       override val sparkSession: SparkSession = self.sparkSession
 
       override def strategies: Seq[Strategy] = {
@@ -58,7 +59,6 @@ class OapSessionState(sparkSession: OapSession) extends HiveSessionState(sparkSe
       }
     }
   }
-
 }
 
 /**
