@@ -136,6 +136,7 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
       And(GreaterThan("a", 9), LessThan("a", 14)))
     ScannerBuilder.build(filters, ic)
     val filterScanners = ic.getScanners
+    conf.setBoolean(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, false)
     val readerIndex = new OapDataReader(filePath, dataSourceMeta, filterScanners, requiredIds)
     val itIndex = readerIndex.initialize(conf)
     assert(itIndex.size == 4)
