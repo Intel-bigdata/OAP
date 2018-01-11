@@ -22,4 +22,5 @@
 target/
 dependency-reduced-pom.xml
 derby.log
+metastore_db/
 
