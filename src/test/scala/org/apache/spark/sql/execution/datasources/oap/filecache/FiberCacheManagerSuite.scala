@@ -80,7 +80,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
     }
     val threads = (0 until 5).map(i => new FiberTestRunner(i))
     threads.foreach(_.start())
-    threads.foreach(_.join(3000))
+    threads.foreach(_.join(5000))
     threads.foreach(t => assert(!t.isAlive))
   }
 
