@@ -80,7 +80,8 @@ class FiberCacheManagerSuite extends SharedOapContext {
     }
     val threads = (0 until 5).map(i => new FiberTestRunner(i))
     threads.foreach(_.start())
-    threads.foreach(_.join())
+    threads.foreach(_.join(3000))
+    threads.foreach(t => assert(!t.isAlive))
   }
 
   test("add a very large fiber") {
@@ -183,7 +184,8 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val data = generateData(kbSize)
     val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"release test")
     val fiberCaches = (1 to 5).map(_ => FiberCacheManager.get(fiber, configuration))
-    fiberCaches.foreach{ fiberCache =>
+    assert(fiberCaches.head.refCount == 5)
+    fiberCaches.foreach { fiberCache =>
       pool.execute(new TestRunner(fiberCache.release()))
     }
     pool.shutdown()
