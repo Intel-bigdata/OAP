@@ -99,11 +99,11 @@ object FiberCacheManager extends Logging {
     }
   }
 
-  def get(fiber: Fiber, conf: Configuration): FiberCache = {
+  def get(fiber: Fiber, conf: Configuration): FiberCache = synchronized {
     cacheBackend.get(fiber, conf)
   }
 
-  def removeIndexCache(indexName: String): Unit = {
+  def removeIndexCache(indexName: String): Unit = synchronized {
     logDebug(s"going to remove cache of $indexName, executor: ${SparkEnv.get.executorId}")
     logDebug("cache size before remove: " + cacheBackend.cacheCount)
     val fiberToBeRemoved = cacheBackend.getFibers.filter {

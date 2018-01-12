@@ -48,6 +48,7 @@ class SimpleOapCache extends OapCache with Logging {
 
   override def get(fiber: Fiber, conf: Configuration): FiberCache = {
     val fiberCache = fiber.fiber2Data(conf)
+    fiberCache.occupy()
     // We only use fiber for once, and CacheGuardian will dispose it after release.
     cacheGuardian.addRemovalFiber(fiberCache)
     fiberCache
@@ -121,7 +122,7 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
     .weigher(weigher)
     .build[Fiber, FiberCache]()
 
-  override def get(fiber: Fiber, conf: Configuration): FiberCache = synchronized {
+  override def get(fiber: Fiber, conf: Configuration): FiberCache = {
     val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
     // Avoid loading a fiber larger than MAX_WEIGHT / 4, 4 is concurrency number
     assert(fiberCache.size() <= MAX_WEIGHT * MB / 4, "Can't cache fiber larger than MAX_WEIGHT / 4")

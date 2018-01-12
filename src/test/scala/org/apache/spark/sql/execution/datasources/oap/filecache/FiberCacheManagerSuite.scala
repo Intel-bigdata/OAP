@@ -242,4 +242,15 @@ class FiberCacheManagerSuite extends SharedOapContext {
     pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
     assert(result.get())
   }
+
+  test("test Simple Cache Strategy") {
+    val cache = new SimpleOapCache()
+    val data = generateData(10 * kbSize)
+    val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), "test simple cache fiber")
+    val fiberCache = cache.get(fiber, configuration)
+    assert(fiberCache.toArray sameElements data)
+    fiberCache.release()
+    Thread.sleep(10)
+    assert(fiberCache.isDisposed)
+  }
 }
