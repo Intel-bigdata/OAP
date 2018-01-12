@@ -104,7 +104,7 @@ object FiberCacheManager extends Logging {
   }
 
   // Used by test suite
-  private[filecache] def removeFiber(fiber: TestFiber): Unit = {
+  private[filecache] def removeFiber(fiber: TestFiber): Unit = synchronized {
     // cache may be removed by other thread before invalidate
     // but it's ok since only used by test to simulate race condition
     if (cache.getIfPresent(fiber) != null) cache.invalidate(fiber)

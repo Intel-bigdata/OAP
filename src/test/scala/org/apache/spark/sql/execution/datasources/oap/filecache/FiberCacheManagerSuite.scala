@@ -17,8 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.util.concurrent.{Executors, TimeUnit}
+import java.util.concurrent.{Callable, Executors, ThreadFactory, TimeUnit}
+import java.lang.Thread.UncaughtExceptionHandler
 
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
@@ -130,11 +132,14 @@ class FiberCacheManagerSuite extends SharedOapContext {
     assert(FiberCacheManager.pendingSize == 0)
   }
 
-  class TestRunner(work: => Any) extends Runnable {
-    override def run(): Unit = {
-      work
-    }
+  class TestRunner(work: () => Unit) extends Runnable {
+    override def run(): Unit = work()
   }
+
+  class TestCaller(work: () => Boolean) extends Callable[Boolean] {
+    override def call(): Boolean = work()
+  }
+
   // Fiber should only load once
   test("get same fiber simultaneously") {
     val data = generateData(kbSize)
@@ -143,7 +148,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
       loadTimes += 1
       MemoryManager.putToDataFiberCache(data)
     }, s"same fiber test")
-    val work: Unit = {
+    def work(): Unit = {
       val fiberCache = FiberCacheManager.get(fiber, configuration)
       Thread.sleep(100)
       fiberCache.release()
@@ -163,18 +168,20 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val runners = (1 to 6).map { i =>
       val data = generateData(memorySizeInMB / 5 * mbSize)
       val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"different test $i")
-      val work: Unit = {
+      def work(): Boolean = {
         val fiberCache = FiberCacheManager.get(fiber, configuration)
-        assert(fiberCache.toArray sameElements data)
+        val flag = fiberCache.toArray sameElements data
         Thread.sleep(100)
         fiberCache.release()
+        flag
       }
-      new TestRunner(work)
+      new TestCaller(work)
     }
-    runners.foreach(pool.execute)
+    val results = runners.map(t => pool.submit(t))
     pool.shutdown()
     pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
     Thread.sleep(100)
+    results.foreach(r => r.get())
     assert(FiberCacheManager.pendingSize == 0)
   }
 
@@ -186,7 +193,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val fiberCaches = (1 to 5).map(_ => FiberCacheManager.get(fiber, configuration))
     assert(fiberCaches.head.refCount == 5)
     fiberCaches.foreach { fiberCache =>
-      pool.execute(new TestRunner(fiberCache.release()))
+      pool.execute(new TestRunner(() => fiberCache.release()))
     }
     pool.shutdown()
     pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
@@ -198,15 +205,16 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val pool = Executors.newCachedThreadPool()
     val data = generateData(kbSize)
     val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"get release test")
-    val work: Unit = {
+    def work(): Boolean = {
       val fiberCache = FiberCacheManager.get(fiber, configuration)
-      assert(fiberCache.refCount > 0)
-      assert(!fiberCache.isDisposed)
+      val flag = fiberCache.refCount > 0 || !fiberCache.isDisposed
       fiberCache.release()
+      flag
     }
-    (1 to 10).foreach(_ => pool.execute(new TestRunner(work)))
+    val results = (1 to 10).map(_ => pool.submit(new TestCaller(work)))
     pool.shutdown()
     pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
+    results.foreach(r => assert(r.get()))
   }
 
   // fiber must not be removed during get
@@ -214,21 +222,26 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val pool = Executors.newCachedThreadPool()
     val data = generateData(kbSize)
     val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"get remove test")
-    val getWork: Unit = {
-      (1 to 1000).foreach { _ =>
+    def occupyWork(): Boolean = {
+      (1 to 100000).foreach { _ =>
         val fiberCache = FiberCacheManager.get(fiber, configuration)
-        assert(!fiberCache.isDisposed)
+        if (fiberCache.isDisposed) {
+          fiberCache.release()
+          return false
+        }
         fiberCache.release()
       }
+      true
     }
-    val removeWork: Unit = {
-      (1 to 1000).foreach { _ =>
+    def removeWork(): Unit = {
+      (1 to 100000).foreach { _ =>
         FiberCacheManager.removeFiber(fiber)
       }
     }
-    pool.execute(new TestRunner(getWork))
+    val result = pool.submit(new TestCaller(occupyWork))
     pool.execute(new TestRunner(removeWork))
     pool.shutdown()
     pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
+    assert(result.get())
   }
 }
