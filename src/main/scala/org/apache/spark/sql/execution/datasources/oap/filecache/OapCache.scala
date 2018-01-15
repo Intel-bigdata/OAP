@@ -89,8 +89,7 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
 
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
-      // TODO: Change the log more readable
-      logDebug(s"Add Cache ${notification.getKey} into removal list")
+      logDebug(s"Add Cache into removal list: ${notification.getKey}")
       cacheGuardian.addRemovalFiber(notification.getValue)
       _cacheSize.addAndGet(-notification.getValue.size())
     }
@@ -108,7 +107,7 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
   private def cacheLoader(fiber: Fiber, configuration: Configuration) =
     new Callable[FiberCache] {
       override def call(): FiberCache = {
-        logDebug(s"Loading Cache $fiber")
+        logDebug(s"Loading Cache: $fiber")
         val fiberCache = fiber.fiber2Data(configuration)
         _cacheSize.addAndGet(fiberCache.size())
         fiberCache

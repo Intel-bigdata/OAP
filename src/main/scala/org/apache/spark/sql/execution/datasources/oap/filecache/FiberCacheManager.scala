@@ -201,6 +201,10 @@ case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends 
         another.file.path.equals(file.path)
     case _ => false
   }
+
+  override def toString: String = {
+    s"type: DataFiber rowGroup: $rowGroupId column: $columnIndex\n\tfile: ${file.path}"
+  }
 }
 
 private[oap]
@@ -219,6 +223,10 @@ case class BTreeFiber(
         another.idx == idx &&
         another.file.equals(file)
     case _ => false
+  }
+
+  override def toString: String = {
+    s"type: BTreeFiber section: $section idx: $idx\n\tfile: $file"
   }
 }
 
@@ -241,6 +249,10 @@ case class BitmapFiber(
         another.file.equals(file)
     case _ => false
   }
+
+  override def toString: String = {
+    s"type: BitmapFiber section: $sectionIdxOfFile idx: $loadUnitIdxOfSection\n\tfile: $file"
+  }
 }
 
 private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
@@ -251,5 +263,9 @@ private[oap] case class TestFiber(getData: () => FiberCache, name: String) exten
   override def equals(obj: Any): Boolean = obj match {
     case another: TestFiber => name.equals(another.name)
     case _ => false
+  }
+
+  override def toString: String = {
+    s"type: TestFiber name: $name"
   }
 }
