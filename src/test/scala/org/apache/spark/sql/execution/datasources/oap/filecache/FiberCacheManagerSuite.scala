@@ -250,7 +250,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val fiberCache = cache.get(fiber, configuration)
     assert(fiberCache.toArray sameElements data)
     fiberCache.release()
-    Thread.sleep(10)
+    Thread.sleep(100)
     assert(fiberCache.isDisposed)
   }
 }
