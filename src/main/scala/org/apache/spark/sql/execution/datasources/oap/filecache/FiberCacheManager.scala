@@ -29,6 +29,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
+import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
 
 // TODO need to register within the SparkContext
@@ -146,6 +147,19 @@ object FiberCacheManager extends Logging {
 
   // Used by test suite
   private[filecache] def pendingSize: Int = cacheBackend.pendingSize
+
+  // A description of this FiberCacheManager for debugging.
+  def toDebugString: String = {
+    "FiberCacheManager Statistics: { " +
+        s"cacheCount=${cacheBackend.cacheCount}, " +
+        s"usedMemory=${Utils.bytesToString(cacheSize)}, " +
+        s"hitCount=${cacheStats.hitCount}, " +
+        s"missCount=${cacheStats.missCount}, " +
+        s"loadCount=${cacheStats.loadCount}, " +
+        s"totalLoadTime=${cacheStats.totalLoadTime}ns, " +
+        s"evictionCount=${cacheStats.evictionCount}" +
+        " }"
+  }
 }
 
 private[oap] object DataFileHandleCacheManager extends Logging {

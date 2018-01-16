@@ -35,7 +35,6 @@ trait OapCache {
   def invalidateAll(fibers: Iterable[Fiber]): Unit
   def cacheSize: Long
   def cacheCount: Long
-  // TODO: To be compatible with some test cases. But we shouldn't rely on Guava in trait.
   def cacheStats: CacheStats
   def pendingSize: Int
 }
@@ -67,7 +66,7 @@ class SimpleOapCache extends OapCache with Logging {
   override def cacheSize: Long = 0
 
   override def cacheStats: CacheStats = {
-    new CacheStats(0, 0, 0, 0, 0, 0)
+    new CacheStats(0, 0, 0, 0, 0)
   }
 
   override def cacheCount: Long = 0
@@ -145,7 +144,7 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
 
   override def cacheSize: Long = _cacheSize.get()
 
-  override def cacheStats: CacheStats = cache.stats()
+  override def cacheStats: CacheStats = CacheStats(cache.stats())
 
   override def cacheCount: Long = cache.size()
 
