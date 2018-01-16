@@ -245,20 +245,25 @@ trait OapStrategies extends Logging {
           file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val groupingAttributes = AttributeSet(groupExpressions.map(_.toAttribute))
-        val oapOption = new CaseInsensitiveMap(file.options +
-          (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
 
-        // TODO:
-        // IsNotNull filters out the NULL value, we need another
-        // Expression case class to do index full scan (include NULL).
-        // If none in Spark, we can create one for OAP.
-        val indexHint = if (filterAttributes == groupingAttributes) filters
-                        else IsNotNull(groupingAttributes.head) :: Nil
+        if (filterAttributes.size == 1 ||
+          (filterAttributes.isEmpty || filterAttributes == groupingAttributes)) {
+          // TODO:
+          // IsNotNull filters out the NULL value, we need another
+          // Expression case class to do index full scan (include NULL).
+          // If none in Spark, we can create one for OAP.
+          val indexHint = if (filterAttributes == groupingAttributes) filters
+                          else IsNotNull(groupingAttributes.head) :: Nil
+          val oapOption = new CaseInsensitiveMap(file.options +
+            (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
 
-        createOapFileScanPlan(
-          projectList, indexHint, relation, file, table, oapOption, indexHint, Nil) match {
-          case Some(fastScan) => OapAggregationFileScanExec(aggExpressions, projectList, fastScan)
-          case _ => PlanLater(child)
+          createOapFileScanPlan(
+            projectList, indexHint, relation, file, table, oapOption, indexHint, Nil) match {
+            case Some(fastScan) => OapAggregationFileScanExec(aggExpressions, projectList, fastScan)
+            case _ => PlanLater(child)
+          }
+        } else {
+          PlanLater(child)
         }
       case _ => PlanLater(child)
     }
