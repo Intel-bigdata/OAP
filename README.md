@@ -19,7 +19,7 @@ spark.driver.extraClassPath        /path/to/oap-dir/oap-<version>.jar
 spark.memory.offHeap.enabled       true
 spark.memory.offHeap.size          2g
 ```
-4. Run spark by `bin/spark-sql`, `bin/spark-shell`, `sbin/start-thriftserver` or `bin/pyspark` and try our examples
+4. Run spark by `bin/spark-sql`, `bin/spark-shell`, `sbin/start-thriftserver` or `bin/pyspark` and try our examples.
 
 **NOTE**: For spark standalone mode, you have to put `oap-<version>.jar` to both driver and executor since `spark.files` is not working. Also don't forget to update `extraClassPath`.
 
