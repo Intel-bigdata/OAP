@@ -26,6 +26,7 @@ import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.util.Utils
 
 trait OapCache {
   def get(fiber: Fiber, conf: Configuration): FiberCache
@@ -49,7 +50,7 @@ class SimpleOapCache extends OapCache with Logging {
     val fiberCache = fiber.fiber2Data(conf)
     fiberCache.occupy()
     // We only use fiber for once, and CacheGuardian will dispose it after release.
-    cacheGuardian.addRemovalFiber(fiberCache)
+    cacheGuardian.addRemovalFiber(fiber, fiberCache)
     fiberCache
   }
 
@@ -88,8 +89,8 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
 
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
-      logDebug(s"Add Cache into removal list: ${notification.getKey}")
-      cacheGuardian.addRemovalFiber(notification.getValue)
+      logDebug(s"Put fiber into removal list. Fiber: ${notification.getKey}")
+      cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
       _cacheSize.addAndGet(-notification.getValue.size())
     }
   }
@@ -106,8 +107,10 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
   private def cacheLoader(fiber: Fiber, configuration: Configuration) =
     new Callable[FiberCache] {
       override def call(): FiberCache = {
-        logDebug(s"Loading Cache: $fiber")
+        val startLoadingTime = System.currentTimeMillis()
         val fiberCache = fiber.fiber2Data(configuration)
+        logDebug("Load missed fiber took %s. Fiber: %s"
+            .format(Utils.getUsedTimeMs(startLoadingTime), fiber))
         _cacheSize.addAndGet(fiberCache.size())
         fiberCache
       }
