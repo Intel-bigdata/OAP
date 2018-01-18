@@ -124,7 +124,8 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
   override def get(fiber: Fiber, conf: Configuration): FiberCache = {
     val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
     // Avoid loading a fiber larger than MAX_WEIGHT / 4, 4 is concurrency number
-    assert(fiberCache.size() <= MAX_WEIGHT * KB / 4, "Can't cache fiber larger than MAX_WEIGHT / 4")
+    assert(fiberCache.size() <= MAX_WEIGHT * KB / 4,
+      s"Can't cache fiber(${fiberCache.size()}) larger than MAX_WEIGHT($MAX_WEIGHT) / 4")
     fiberCache.occupy()
     fiberCache
   }

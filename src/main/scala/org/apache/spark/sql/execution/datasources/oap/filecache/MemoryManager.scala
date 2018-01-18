@@ -171,6 +171,7 @@ private[oap] object MemoryManager extends Logging {
     assert(SparkEnv.get != null, "Oap can't run without SparkContext")
     val memoryManager = SparkEnv.get.memoryManager
     // TODO: make 0.7 configurable
+    assert(memoryManager.maxOffHeapStorageMemory > 0, "Oap can't run without offHeap memory")
     val oapMemory = (memoryManager.maxOffHeapStorageMemory * 0.7).toLong
     if (memoryManager.acquireStorageMemory(
       DUMMY_BLOCK_ID, oapMemory, MemoryMode.OFF_HEAP)) {
