@@ -87,8 +87,8 @@ class FiberCacheManagerSuite extends SharedOapContext {
   test("add a very large fiber") {
     val memorySizeInMB = (MemoryManager.cacheMemory / mbSize).toInt
     val ASSERT_MESSAGE_REGEX =
-      """assertion failed: Failed to cache fiber\(\d+\.\d [TGMK]?B\) """ +
-        """with cache's MAX_WEIGHT\(\d+\.\d [TGMK]?B\) / 4""" r
+      ("""assertion failed: Failed to cache fiber\(\d+\.\d [TGMK]?B\) """ +
+        """with cache's MAX_WEIGHT\(\d+\.\d [TGMK]?B\) / 4""").r
     val exception = intercept[AssertionError] {
       val data = generateData(memorySizeInMB * mbSize / 2)
       val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #3.1")
