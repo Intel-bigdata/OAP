@@ -50,7 +50,7 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
     _pendingFiberSize.addAndGet(fiberCache.size())
     removalPendingQueue.offer(fiberCache)
     if (_pendingFiberSize.get() > maxMemory) {
-      logWarning("Fibers pending on removal use too much memory, " +
+      logInfo("Fibers pending on removal use too much memory, " +
           s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
     }
   }
@@ -64,7 +64,7 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
       while (!fiberCache.tryDispose(3000)) {
         // Check memory usage every 3s while we are waiting fiber release.
         if (_pendingFiberSize.get() > maxMemory) {
-          logWarning("Fibers pending on removal use too much memory, " +
+          logInfo("Fibers pending on removal use too much memory, " +
               s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
         }
       }
@@ -99,7 +99,7 @@ object FiberCacheManager extends Logging {
     }
   }
 
-  def get(fiber: Fiber, conf: Configuration): FiberCache = synchronized {
+  def get(fiber: Fiber, conf: Configuration): FiberCache = {
     cacheBackend.get(fiber, conf)
   }
 
