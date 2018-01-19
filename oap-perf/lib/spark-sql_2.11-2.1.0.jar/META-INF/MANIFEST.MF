@@ -1,0 +1,14 @@
+Manifest-Version: 1.0
+Implementation-Vendor: The Apache Software Foundation
+Implementation-Title: Spark Project SQL
+Implementation-Version: 2.1.0
+Implementation-Vendor-Id: org.apache.spark
+Built-By: jenkins
+Build-Jdk: 1.7.0_60
+Specification-Vendor: The Apache Software Foundation
+Specification-Title: Spark Project SQL
+Created-By: Apache Maven 3.3.9
+Implementation-URL: http://spark.apache.org/
+Specification-Version: 2.1.0
+Archiver-Version: Plexus Archiver
+
