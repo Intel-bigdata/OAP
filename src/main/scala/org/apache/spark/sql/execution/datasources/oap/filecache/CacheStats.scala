@@ -67,4 +67,9 @@ case class CacheStats(
       math.max(0, loadCount - other.loadCount),
       math.max(0, totalLoadTime - other.totalLoadTime),
       math.max(0, evictionCount - other.evictionCount))
+
+  def toDebugString: String = {
+    s"CacheStats: { hitCount=$hitCount, missCount=$missCount, " +
+      s"totalLoadTime=$totalLoadTime ns, evictionCount=$evictionCount }"
+  }
 }

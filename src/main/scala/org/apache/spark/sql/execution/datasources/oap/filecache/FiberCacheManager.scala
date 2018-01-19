@@ -153,14 +153,8 @@ object FiberCacheManager extends Logging {
 
   // A description of this FiberCacheManager for debugging.
   def toDebugString: String = {
-    s"""FiberCacheManager Statistics: {
-      |  cacheCount=${cacheBackend.cacheCount}
-      |  usedMemory=${Utils.bytesToString(cacheSize)}
-      |  hitCount=${cacheStats.hitCount}
-      |  missCount=${cacheStats.missCount}
-      |  totalLoadTime=${cacheStats.totalLoadTime}ns
-      |  evictionCount=${cacheStats.evictionCount}
-      |}""".stripMargin
+    s"FiberCacheManager Statistics: { cacheCount=${cacheBackend.cacheCount}, " +
+        s"usedMemory=${Utils.bytesToString(cacheSize)}, ${cacheStats.toDebugString} }"
   }
 }
 
