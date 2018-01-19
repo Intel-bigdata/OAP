@@ -110,7 +110,7 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
         val startLoadingTime = System.currentTimeMillis()
         val fiberCache = fiber.fiber2Data(configuration)
         logDebug("Load missed fiber took %s. Fiber: %s"
-            .format(Utils.getUsedTimeMs(startLoadingTime), fiber))
+          .format(Utils.getUsedTimeMs(startLoadingTime), fiber))
         _cacheSize.addAndGet(fiberCache.size())
         fiberCache
       }
@@ -147,7 +147,16 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
 
   override def cacheSize: Long = _cacheSize.get()
 
-  override def cacheStats: CacheStats = CacheStats(cache.stats())
+  override def cacheStats: CacheStats = {
+    val stats = cache.stats()
+    CacheStats(
+      stats.hitCount(),
+      stats.missCount(),
+      stats.loadCount(),
+      stats.totalLoadTime(),
+      stats.evictionCount()
+    )
+  }
 
   override def cacheCount: Long = cache.size()
 

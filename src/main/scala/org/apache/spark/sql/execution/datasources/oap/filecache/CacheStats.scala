@@ -17,21 +17,16 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import com.google.common.cache.AbstractCache.StatsCounter
-
 /**
- * Statistics about the performance of [[OapCache]]. Instances of this class are immutable.
- * Need another class like [[StatsCounter]] to record stats and return current [[CacheStats]].
- * Note: But for now, we don't need to record the stats since Guava has done it for us.
- *
- * @param hitCount incremented when a cache lookup encounters an existing cache entry
- * @param missCount incremented when a cache lookup first encounters a missing cache entry
- * @param loadCount incremented when a new entry is loaded
- * @param totalLoadTime incremented when a new entry is loaded
- * @param evictionCount incremented when an entry is evicted from the cache
+ * Immutable class to present statistics of Cache. To record the change of cache stat in runtime,
+ * please consider a counter class. [[CacheStats]] can be a snapshot of the counter class.
  */
 case class CacheStats(
-    hitCount: Long, missCount: Long, loadCount: Long, totalLoadTime: Long, evictionCount: Long) {
+    hitCount: Long,
+    missCount: Long,
+    loadCount: Long,
+    totalLoadTime: Long,
+    evictionCount: Long) {
 
   require(hitCount >= 0)
   require(missCount >= 0)
@@ -51,7 +46,7 @@ case class CacheStats(
     if (rc == 0) 0.0 else missCount.toDouble / rc
   }
 
-  def averageLoadPenalty: Double = if (loadCount == 0) 0.0 else totalLoadTime / loadCount
+  def averageLoadPenalty: Double = if (loadCount == 0) 0.0 else totalLoadTime.toDouble / loadCount
 
   def plus(other: CacheStats): CacheStats = this + other
 
@@ -72,14 +67,4 @@ case class CacheStats(
       math.max(0, loadCount - other.loadCount),
       math.max(0, totalLoadTime - other.totalLoadTime),
       math.max(0, evictionCount - other.evictionCount))
-}
-
-object CacheStats {
-  def apply(guavaCacheStats: com.google.common.cache.CacheStats): CacheStats =
-    CacheStats(
-      guavaCacheStats.hitCount(),
-      guavaCacheStats.missCount(),
-      guavaCacheStats.loadCount(),
-      guavaCacheStats.totalLoadTime(),
-      guavaCacheStats.evictionCount())
 }
