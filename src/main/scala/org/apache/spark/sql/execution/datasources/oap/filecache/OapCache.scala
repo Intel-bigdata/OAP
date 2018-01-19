@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.Callable
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 import scala.collection.JavaConverters._
 
@@ -121,11 +122,32 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
     .weigher(weigher)
     .build[Fiber, FiberCache]()
 
+  private val rwLock = new ReentrantReadWriteLock
+
+  private[this] def withLockScope[L <: Lock, U](lock: L)(body: => U): U = {
+    lock.lock()
+    val result = body
+    lock.unlock()
+    result
+  }
+
   override def get(fiber: Fiber, conf: Configuration): FiberCache = {
+    rwLock.writeLock().lock()
+    val fiberInCache = cache.getIfPresent(fiber)
+    if (fiberInCache != null) {
+      fiberInCache.occupy()
+      rwLock.writeLock().unlock()
+      return fiberInCache
+    }
+    rwLock.writeLock().unlock()
+
+    rwLock.readLock().lock()
     val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
     // Avoid loading a fiber larger than MAX_WEIGHT / 4, 4 is concurrency number
-    assert(fiberCache.size() <= MAX_WEIGHT * KB / 4, "Can't cache fiber larger than MAX_WEIGHT / 4")
     fiberCache.occupy()
+    rwLock.readLock().unlock()
+    assert(fiberCache.size() <= MAX_WEIGHT * KB / 4,
+      "Can't cache fiber larger than MAX_WEIGHT / 4")
     fiberCache
   }
 
