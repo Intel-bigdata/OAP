@@ -33,7 +33,8 @@ import org.apache.spark.util.CompletionIterator
 
 
 private[oap] case class OapDataFile(path: String, schema: StructType,
-                                    configuration: Configuration) extends DataFile {
+                                    configuration: Configuration,
+                                    context: Option[VectorizedContext] = None) extends DataFile {
 
   private val dictionaries = new Array[Dictionary](schema.length)
   private val codecFactory = new CodecFactory(configuration)
@@ -113,7 +114,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
 
   // full file scan
   // TODO: [linhong] two iterator functions are similar. Can we merge them?
-  def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
+  override def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
     val row = new BatchColumn()
     val iterator =
       (0 until meta.groupCount).iterator.flatMap { groupId =>
@@ -140,7 +141,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
   }
 
   // scan by given row ids, and we assume the rowIds are sorted
-  def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int])
+  override def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int])
   : Iterator[InternalRow] = {
     val row = new BatchColumn()
     val groupIds = rowIds.groupBy(rowId => rowId / meta.rowCountInEachGroup)
