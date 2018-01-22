@@ -129,7 +129,7 @@ class StatisticsManagerSuite extends QueryTest with SharedOapContext with Before
     sql("drop oindex index5 on oap_test")
   }
 
-  ignore("bitmap with statistics, data type int") {
+  test("bitmap with statistics, data type int") {
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
@@ -147,7 +147,7 @@ class StatisticsManagerSuite extends QueryTest with SharedOapContext with Before
     sql("drop oindex index1 on oap_test")
   }
 
-  ignore("bitmap with statistics, data type string") {
+  test("bitmap with statistics, data type string") {
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
@@ -160,7 +160,7 @@ class StatisticsManagerSuite extends QueryTest with SharedOapContext with Before
     sql("drop oindex index2 on oap_test")
   }
 
-  ignore("bitmap with statistics, data type double") {
+  test("bitmap with statistics, data type double") {
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
@@ -174,7 +174,7 @@ class StatisticsManagerSuite extends QueryTest with SharedOapContext with Before
     sql("drop oindex index3 on oap_test")
   }
 
-  ignore("bitmap with statistics, data type float") {
+  test("bitmap with statistics, data type float") {
     val data: Seq[(Int, String, Double, Float, Date)] =
       (1 to 500).map(i => rowGen(i))
     data.toDF("attr_int", "attr_str", "attr_double", "attr_float", "attr_date")
