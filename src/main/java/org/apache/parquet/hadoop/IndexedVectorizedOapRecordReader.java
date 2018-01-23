@@ -6,13 +6,10 @@ import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.column.ColumnDescriptor;
-import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.hadoop.api.InitContext;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
@@ -22,8 +19,6 @@ import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.spark.sql.execution.datasources.oap.io.OapReadSupportImpl;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper;
-import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReader;
-import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReaderWrapper;
 import org.apache.spark.sql.types.StructType$;
 
 import com.google.common.collect.Maps;
@@ -34,7 +29,6 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     private int currentPageNumber;
     private int[] globalRowIds;
     private Iterator<IntList> rowIdsIter;
-    private IntList currentIndexList;
 
     public IndexedVectorizedOapRecordReader(
             Path file,
@@ -76,44 +70,24 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
      * Advances to the next batch of rows. Returns false if there are no more.
      */
     public boolean nextBatch() throws IOException {
-        columnarBatch.reset();
-        if (rowsReturned >= totalRowCount) {
-            return false;
-        }
-        checkEndOfRowGroup();
-
-        int num = (int) Math.min((long) columnarBatch.capacity(), totalCountLoadedSoFar - rowsReturned);
-        for (int i = 0; i < columnReaders.length; ++i) {
-            if (columnReaders[i] == null) {
-                continue;
-            }
-            columnReaders[i].readBatch(num, columnarBatch.column(i));
-        }
-        rowsReturned += num;
-        columnarBatch.setNumRows(num);
-        numBatched = num;
-        batchIdx = 0;
-        return filterRowsWithIndex();
-    }
-
-    protected void checkEndOfRowGroup() throws IOException {
         // if idsMap is Empty, needn't read remaining data in this row group
         // rowsReturned = totalCountLoadedSoFar to skip remaining data
         if (idsMap.isEmpty()) {
             rowsReturned = totalCountLoadedSoFar;
         }
+        return super.nextBatch() && filterRowsWithIndex();
+    }
+
+    protected void checkEndOfRowGroup() throws IOException {
         super.checkEndOfRowGroup();
-        this.currentIndexList = rowIdsIter.next();
-        regroupRowIds();
-        this.currentPageNumber = 0;
+        this.collectRowIdsToPages();
     }
 
     private boolean filterRowsWithIndex() throws IOException {
         IntList ids = idsMap.remove(currentPageNumber);
         if (ids == null || ids.isEmpty()) {
             currentPageNumber++;
-            // correct logical ?
-            return nextBatch();
+            return this.nextBatch();
         } else {
             int current = 0;
             for (Integer target : ids) {
@@ -136,9 +110,11 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         }
     }
 
-    private void regroupRowIds() {
-        idsMap.clear();
+    private void collectRowIdsToPages() {
+        this.idsMap.clear();
+        this.currentPageNumber = 0;
         int pageSize = columnarBatch.capacity();
+        IntList currentIndexList = rowIdsIter.next();
         for (int rowId : currentIndexList) {
             int pageNumber = rowId / pageSize;
             if (idsMap.containsKey(pageNumber)) {
@@ -149,6 +125,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
                 idsMap.put(pageNumber, ids);
             }
         }
+
     }
 
 }
