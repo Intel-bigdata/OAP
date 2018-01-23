@@ -31,35 +31,29 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * Batch of rows that we assemble and the current index we've returned. Every time this
      * batch is used up (batchIdx == numBatched), we populated the batch.
      */
-    private int batchIdx = 0;
-    private int numBatched = 0;
-
-    private static final int DEFAULT_BATCH_SIZE = 4 * 1024;
-    private boolean indexedRead = false;
-    private Map<Integer,IntList> idsMap;
-    private int readBatchTimes;
-
+    protected int batchIdx = 0;
+    protected int numBatched = 0;
 
     /**
      * For each request column, the reader to read this column. This is NULL if this column
      * is missing from the file, in which case we populate the attribute with NULL.
      */
-    private VectorizedColumnReaderWrapper[] columnReaders;
+    protected VectorizedColumnReaderWrapper[] columnReaders;
 
     /**
      * The number of rows that have been returned.
      */
-    private long rowsReturned;
+    protected long rowsReturned;
 
     /**
      * The number of rows that have been reading, including the current in flight row group.
      */
-    private long totalCountLoadedSoFar = 0;
+    protected long totalCountLoadedSoFar = 0;
 
     /**
      * For each column, true if the column is missing in the file and we'll instead return NULLs.
      */
-    private boolean[] missingColumns;
+    protected boolean[] missingColumns;
 
     /**
      * columnBatch object that is used for batch decoding. This is created on first use and triggers
@@ -75,17 +69,17 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * TODOs:
      * - Implement v2 page formats (just make sure we create the correct decoders).
      */
-    private ColumnarBatch columnarBatch;
+    protected ColumnarBatch columnarBatch;
 
     /**
      * If true, this class returns batches instead of rows.
      */
-    private boolean returnColumnarBatch;
+    protected boolean returnColumnarBatch;
 
     /**
      * The default config on whether columnarBatch should be offheap.
      */
-    private static final MemoryMode DEFAULT_MEMORY_MODE = MemoryMode.ON_HEAP;
+    protected static final MemoryMode DEFAULT_MEMORY_MODE = MemoryMode.ON_HEAP;
 
 
     public VectorizedOapRecordReader(
@@ -194,22 +188,6 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         return columnarBatch;
     }
 
-    public void enableIndexedRead(int[] rowIds) {
-        idsMap = Maps.newHashMap();
-        for (int rowId : rowIds) {
-            int key = rowId / DEFAULT_BATCH_SIZE;
-            if (idsMap.containsKey(key)) {
-                idsMap.get(key).add(rowId - key * DEFAULT_BATCH_SIZE);
-            } else {
-                IntArrayList ids = new IntArrayList(DEFAULT_BATCH_SIZE / 2);
-                ids.add(rowId - key * DEFAULT_BATCH_SIZE);
-                idsMap.put(key, ids);
-            }
-
-        }
-        indexedRead = true;
-    }
-
     /*
      * Can be called before any rows are returned to enable returning columnar batches directly.
      */
@@ -234,40 +212,10 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         columnarBatch.setNumRows(num);
         numBatched = num;
         batchIdx = 0;
-        return filterRowsWithIndex();
-    }
-
-    private boolean filterRowsWithIndex() throws IOException {
-        if (indexedRead) {
-            IntList ids = idsMap.get(readBatchTimes);
-            if (ids == null || ids.isEmpty()) {
-                readBatchTimes++;
-                // correct logical ?
-                return nextBatch();
-            } else {
-                int current = 0;
-                for (Integer target : ids) {
-                    while (current < target) {
-                        columnarBatch.markFiltered(current);
-                        current++;
-                    }
-                    // skip this rows
-                    current++;
-                }
-                current ++;
-                while (current < numBatched) {
-                    columnarBatch.markFiltered(current);
-                    current++;
-                }
-                readBatchTimes++;
-                return true;
-            }
-        }
-        readBatchTimes++;
         return true;
     }
 
-    private void initializeInternal() throws IOException, UnsupportedOperationException {
+    protected void initializeInternal() throws IOException, UnsupportedOperationException {
         missingColumns = new boolean[requestedSchema.getFieldCount()];
         for (int i = 0; i < requestedSchema.getFieldCount(); ++i) {
             Type t = requestedSchema.getFields().get(i);
@@ -293,7 +241,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         }
     }
 
-    private void checkEndOfRowGroup() throws IOException {
+    protected void checkEndOfRowGroup() throws IOException {
         if (rowsReturned != totalCountLoadedSoFar) return;
         PageReadStore pages = reader.readNextRowGroup();
         if (pages == null) {

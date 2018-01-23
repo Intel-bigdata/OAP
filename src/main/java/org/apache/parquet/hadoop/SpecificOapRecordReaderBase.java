@@ -63,8 +63,8 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
                 configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
         this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
         //TODO this api deprecated
-        this.reader = new ParquetFileReader(
-                configuration, footer.getFileMetaData(), file, blocks, requestedSchema.getColumns());
+        this.reader = ParquetFileReader.open(configuration, file, footer);
+        this.reader.setRequestedSchema(requestedSchema);
         for (BlockMetaData block : blocks) {
             this.totalRowCount += block.getRowCount();
         }
@@ -78,7 +78,7 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
         }
     }
 
-    private static <K, V> Map<K, Set<V>> toSetMultiMap(Map<K, V> map) {
+    protected static <K, V> Map<K, Set<V>> toSetMultiMap(Map<K, V> map) {
         Map<K, Set<V>> setMultiMap = new HashMap<>();
         for (Map.Entry<K, V> entry : map.entrySet()) {
             Set<V> set = new HashSet<V>();

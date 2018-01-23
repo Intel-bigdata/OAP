@@ -82,37 +82,7 @@ public class OapRecordReader<T> implements RecordReader<T> {
             this.footer = readFooter(configuration, file, NO_FILTER);
         }
 
-        List<BlockMetaData> blocks = footer.getBlocks();
-
-        List<BlockMetaData> inputBlockList = Lists.newArrayList();
-
-        List<IntList> rowIdsList = Lists.newArrayList();
-
-        int nextRowGroupStartRowId = 0;
-        int totalCount = globalRowIds.length;
-        int index = 0;
-
-        for (BlockMetaData block : blocks) {
-            int currentRowGroupStartRowId = nextRowGroupStartRowId;
-            nextRowGroupStartRowId += block.getRowCount();
-            IntList rowIdList = new IntArrayList();
-            while (index < totalCount) {
-                int globalRowGroupId = globalRowIds[index];
-                if (globalRowGroupId < nextRowGroupStartRowId) {
-                    rowIdList.add(globalRowGroupId - currentRowGroupStartRowId);
-                    index++;
-                } else {
-                    break;
-                }
-
-            }
-            if (!rowIdList.isEmpty()) {
-                inputBlockList.add(block);
-                rowIdsList.add(rowIdList);
-            }
-        }
-        IndexedParquetMetadata indexedFooter =
-                new IndexedParquetMetadata(footer.getFileMetaData(), inputBlockList,rowIdsList);
+        IndexedParquetMetadata indexedFooter = IndexedParquetMetadata.from(footer, globalRowIds);
         ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file,
                 indexedFooter);
         this.internalReader = new InternalOapRecordReader<>(readSupport);

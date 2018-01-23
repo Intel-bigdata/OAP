@@ -21,7 +21,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.column.Dictionary
-import org.apache.parquet.hadoop.{RecordReaderBuilder, VectorizedOapRecordReader}
+import org.apache.parquet.hadoop.{IndexedVectorizedOapRecordReader, RecordReaderBuilder, VectorizedOapRecordReader}
 import org.apache.parquet.hadoop.api.RecordReader
 
 import org.apache.spark.sql.catalyst.InternalRow
@@ -76,13 +76,13 @@ private[oap] case class ParquetDataFile(path: String,
           addRequestSchemaToConf(conf, requiredIds)
           val file = new Path(StringUtils.unEscapeString(path))
           val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
-          val reader = new VectorizedOapRecordReader(file, configuration, meta.footer)
+          val reader =
+            new IndexedVectorizedOapRecordReader(file, configuration, meta.footer, rowIds)
           reader.initialize()
           reader.initBatch(c.partitionColumns, c.partitionValues)
           if (c.returningBatch) {
             reader.enableReturningBatches()
           }
-          reader.enableIndexedRead(rowIds)
           new FileRecordReaderIterator(reader).asInstanceOf[Iterator[InternalRow]]
         case _ =>
           val recordReader = recordReaderBuilder(conf, requiredIds)
