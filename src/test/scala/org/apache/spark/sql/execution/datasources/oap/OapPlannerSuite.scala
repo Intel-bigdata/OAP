@@ -269,6 +269,15 @@ class OapPlannerSuite
     checkKeywordsNotExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
   }
 
+  test("aggregations with filter on non-agg column") {
+    val sqlString =
+      "SELECT a, min(b), max(b) " +
+        "FROM oap_fix_length_schema_table " +
+        "where b > 3 " +
+        "group by a"
+
+    checkKeywordsNotExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
+  }
 
   test("create oap index on external tables in default database") {
     withTempDir { tmpDir =>

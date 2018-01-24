@@ -246,14 +246,17 @@ trait OapStrategies extends Logging {
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val groupingAttributes = AttributeSet(groupExpressions.map(_.toAttribute))
 
-        if (filterAttributes.size == 1 ||
+        if (groupingAttributes.size == 1 &&
           (filterAttributes.isEmpty || filterAttributes == groupingAttributes)) {
           // TODO:
           // IsNotNull filters out the NULL value, we need another
           // Expression case class to do index full scan (include NULL).
           // If none in Spark, we can create one for OAP.
-          val indexHint = if (filterAttributes == groupingAttributes) filters
-                          else IsNotNull(groupingAttributes.head) :: Nil
+          val indexHint = if (filterAttributes == groupingAttributes) {
+            filters
+          } else {
+            IsNotNull(groupingAttributes.head) :: Nil
+          }
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
 
