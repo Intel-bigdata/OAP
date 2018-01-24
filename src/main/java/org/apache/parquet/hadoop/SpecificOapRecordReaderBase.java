@@ -50,9 +50,6 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
         if(this.footer == null){
             footer = readFooter(configuration, file, NO_FILTER);
         }
-        MessageType fileSchema = footer.getFileMetaData().getSchema();
-        FilterCompat.Filter filter = getFilter(configuration);
-        List<BlockMetaData> blocks = filterRowGroups(filter, footer.getBlocks(), fileSchema);
         this.fileSchema = footer.getFileMetaData().getSchema();
 
         Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
@@ -62,10 +59,10 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
         String sparkRequestedSchemaString =
                 configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
         this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
-        //TODO this api deprecated
-        this.reader = ParquetFileReader.open(configuration, file, footer);
+        this.reader = ParquetFileReader.open(configuration, file,footer);
+        this.reader.filterRowGroups(getFilter(configuration));
         this.reader.setRequestedSchema(requestedSchema);
-        for (BlockMetaData block : blocks) {
+        for (BlockMetaData block : this.reader.getRowGroups()) {
             this.totalRowCount += block.getRowCount();
         }
     }

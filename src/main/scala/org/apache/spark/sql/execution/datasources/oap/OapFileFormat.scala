@@ -300,6 +300,7 @@ private[sql] class OapFileFormat extends FileFormat
             resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
         // Whole stage codegen (PhysicalRDD) is able to deal with batches directly
         val returningBatch = supportBatch(sparkSession, resultSchema)
+        val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
 
         (file: PartitionedFile) => {
           assert(file.partitionValues.numFields == partitionSchema.size)
@@ -327,6 +328,7 @@ private[sql] class OapFileFormat extends FileFormat
               Iterator.empty
             case _ =>
               OapIndexInfo.partitionOapIndex.put(file.filePath, false)
+              FilterHelper.setFilterIfExist(conf, pushed)
 
               val context = if (enableVectorizedReader) {
                 Some(VectorizedContext(partitionSchema,
