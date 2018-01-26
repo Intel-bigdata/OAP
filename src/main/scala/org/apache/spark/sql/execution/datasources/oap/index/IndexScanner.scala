@@ -114,7 +114,24 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
 
       // Policy 1: index file size < data file size.
       val indexFileSize = indexPath.getFileSystem(conf).getContentSummary(indexPath).getLength
-      val dataFileSize = dataPath.getFileSystem(conf).getContentSummary(dataPath).getLength
+      val dataFileSize = if (dataPath.getName.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
+        val fs = dataPath.getFileSystem(conf)
+        val fin = fs.open(dataPath)
+        val oapTotalSize = fs.getContentSummary(dataPath).getLength
+        val oapUncompressedSizeOffset = oapTotalSize - 12
+        fin.seek(oapUncompressedSizeOffset)
+        val oapUncompressedSize = fin.readLong()
+        fin.close()
+        oapUncompressedSize
+      } else {
+        // TODO: 1. Parquet file is compressed with snappy by default. It needs to figure out an
+        //          elegant approach to get the total uncompressed file size.
+        // 2. In the future, the index file may be compressed as well. At that time, this policy
+        //    will get polished or refined.
+        // 3. Below is the conservative expected compression ratio of snappy. It may need to adjust
+        //    after extensive testing for typical use cases in the next release.
+        dataPath.getFileSystem(conf).getContentSummary(dataPath).getLength * 3
+      }
       val ratio = conf.getDouble(SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
         SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
 

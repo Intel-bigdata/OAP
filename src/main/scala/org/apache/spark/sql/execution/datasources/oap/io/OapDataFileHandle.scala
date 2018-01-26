@@ -286,9 +286,15 @@ private[oap] class OapDataFileHandle(
     columnsMeta.foreach { case ColumnMeta(bytes) => os.write(bytes) }
 
     rowGroupsMeta.foreach(_.write(os))
-    val endPos = os.getPos
+    var totalUncompressedOapDataSize = 0L
+    rowGroupsMeta.foreach(meta => totalUncompressedOapDataSize += meta.fiberUncompressedLens.sum)
+
+    // "8" is the entry for total uncompressed data size.
+    val metaDataSize = os.getPos - startPos + 8
+    totalUncompressedOapDataSize += metaDataSize
+    os.writeLong(totalUncompressedOapDataSize)
     // Write down the length of meta data
-    os.writeInt((endPos - startPos).toInt)
+    os.writeInt(metaDataSize.toInt)
   }
 
   def read(is: FSDataInputStream, fileLen: Long): OapDataFileHandle = is.synchronized {
