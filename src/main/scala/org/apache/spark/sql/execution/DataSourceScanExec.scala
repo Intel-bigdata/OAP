@@ -23,16 +23,17 @@ import org.apache.commons.lang3.StringUtils
 import org.apache.hadoop.fs.{BlockLocation, FileStatus, LocatedFileStatus, Path}
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberSensor
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
-import org.apache.spark.sql.execution.metric.SQLMetrics
+import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.{BaseRelation, Filter}
 import org.apache.spark.sql.types.{DataType, StructType}
@@ -250,6 +251,27 @@ case class FileSourceScanExec(
   }
 
   private lazy val inputRDD: RDD[InternalRow] = {
+    relation.fileFormat match {
+      case format: OapFileFormat =>
+        def oapMetric(name: String): SQLMetric = {
+          metrics(name)
+        }
+        // set Accumulator
+        format.totalTasks = Some(oapMetric("totalTasks"))
+        format.skipForStatisticTasks = Some(oapMetric("skipForStatisticTasks"))
+        format.hitIndexTasks = Some(oapMetric("hitIndexTasks"))
+        format.ignoreIndexTasks = Some(oapMetric("ignoreIndexTasks"))
+        format.missIndexTasks = Some(oapMetric("missIndexTasks"))
+
+        format.totalRows = Some(oapMetric("totalRows"))
+        format.rowsSkippedForStatistic = Some(oapMetric("rowsSkippedForStatistic"))
+        format.rowsReadWhenHitIndex = Some(oapMetric("rowsReadWhenHitIndex"))
+        format.rowsSkippedWhenHitIndex = Some(oapMetric("rowsSkippedWhenHitIndex"))
+        format.rowsReadWhenIgnoreIndex = Some(oapMetric("rowsReadWhenIgnoreIndex"))
+        format.rowsReadWhenMissIndex = Some(oapMetric("rowsReadWhenMissIndex"))
+      case _ => Unit
+    }
+
     val readFile: (PartitionedFile) => Iterator[InternalRow] =
       relation.fileFormat.buildReaderWithPartitionValues(
         sparkSession = relation.sparkSession,
@@ -274,7 +296,32 @@ case class FileSourceScanExec(
 
   override lazy val metrics =
     Map("numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-      "scanTime" -> SQLMetrics.createTimingMetric(sparkContext, "scan time"))
+      "scanTime" -> SQLMetrics.createTimingMetric(sparkContext, "scan time"),
+
+      "totalTasks" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:tasks in total"),
+      "skipForStatisticTasks" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:tasks can skip"),
+      "hitIndexTasks" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:tasks hit index"),
+      "ignoreIndexTasks" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:tasks hit-ignore index"),
+      "missIndexTasks" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:tasks miss index"),
+
+      "totalRows" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:rows in total"),
+      "rowsSkippedForStatistic" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:rows in skip-tasks"),
+      "rowsReadWhenHitIndex" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:rows read when hit index"),
+      "rowsSkippedWhenHitIndex" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:rows skipped when hit index"),
+      "rowsReadWhenIgnoreIndex" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:rows read when ignore index"),
+      "rowsReadWhenMissIndex" ->
+        SQLMetrics.createMetric(sparkContext, "OAP:rows read when miss index")
+    )
 
   protected override def doExecute(): RDD[InternalRow] = {
     if (supportsBatch) {

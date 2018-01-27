@@ -21,6 +21,7 @@ import java.io.PrintStream
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
+import org.apache.spark.oap.ui.OapTab
 import org.apache.spark.sql.{OapSession, SQLContext}
 import org.apache.spark.sql.execution.datasources.oap.listener.{FiberInfoListener, OapIndexInfoListener}
 import org.apache.spark.sql.hive.{HiveUtils, OapSessionState}
@@ -70,6 +71,8 @@ private[hive] object OapEnv extends Logging {
 
     SparkSQLEnv.sparkContext = sparkContext
     SparkSQLEnv.sqlContext = sqlContext
+
+    sparkContext.ui.foreach(new OapTab(_))
   }
 
   /** Cleans up and shuts down the Spark SQL environments. */

@@ -38,18 +38,41 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCa
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
+import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
-import org.apache.spark.util.{LongAccumulator, SerializableConfiguration}
+import org.apache.spark.util.SerializableConfiguration
 
 private[sql] class OapFileFormat extends FileFormat
   with DataSourceRegister
   with Logging
   with Serializable {
 
-  var selectedRows: LongAccumulator = _
-  var skippedRows: LongAccumulator = _
+  /**
+   * 4 kinds of Tasks and 5 kinds of Rows:
+   *   1.skipForStatisticTasks
+   *     a.rowsSkippedForStatistic
+   *   2.hitIndexTasks
+   *     a.rowsReadWhenHitIndex
+   *     b.rowsSkippedWhenHitIndex
+   *   3.ignoreIndexTasks (hit index but ignore)
+   *     a.rowsReadWhenIgnoreIndex
+   *   4.missIndexTasks
+   *     a.rowsReadWhenMissIndex
+   */
+  var totalTasks: Option[SQLMetric] = None
+  var skipForStatisticTasks: Option[SQLMetric] = None
+  var hitIndexTasks: Option[SQLMetric] = None
+  var ignoreIndexTasks: Option[SQLMetric] = None
+  var missIndexTasks: Option[SQLMetric] = None
+
+  var totalRows: Option[SQLMetric] = None
+  var rowsSkippedForStatistic: Option[SQLMetric] = None
+  var rowsReadWhenHitIndex: Option[SQLMetric] = None
+  var rowsSkippedWhenHitIndex: Option[SQLMetric] = None
+  var rowsReadWhenIgnoreIndex: Option[SQLMetric] = None
+  var rowsReadWhenMissIndex: Option[SQLMetric] = None
 
   override def initialize(
       sparkSession: SparkSession,
@@ -75,9 +98,6 @@ private[sql] class OapFileFormat extends FileFormat
 
     // OapFileFormat.serializeDataSourceMeta(hadoopConf, meta)
     inferSchema = meta.map(_.schema)
-
-    selectedRows = sparkSession.sparkContext.longAccumulator("Selected Row Count")
-    skippedRows = sparkSession.sparkContext.longAccumulator("Skipped Row Count")
 
     this
   }
@@ -286,35 +306,45 @@ private[sql] class OapFileFormat extends FileFormat
           val dataFileHandle: DataFileHandle = DataFileHandleCacheManager(dataFile)
 
           // read total records from metaFile
-          val totalRows = dataFileHandle match {
+          val rowsInFile = dataFileHandle match {
             case oap: OapDataFileHandle =>
               oap.totalRowCount()
             case parquet: ParquetDataFileHandle =>
-              parquet.footer.getBlocks.asScala.foldLeft(0L) {
-                (sum, block) => sum + block.getRowCount
-              }
+              parquet.footer.getBlocks.asScala.foldLeft(0L)((s, b) => s + b.getRowCount)
             case _ => 0L
           }
+          totalRows.foreach(_.add(rowsInFile))
 
-          if (dataFileHandle.isInstanceOf[OapDataFileHandle] && filters.exists(filter =>
-            canSkipFile(dataFileHandle.asInstanceOf[OapDataFileHandle].columnsMeta.map(
-              _.statistics), filter, m.schema))) {
-            selectedRows.add(0)
-            skippedRows.add(totalRows)
-            Iterator.empty
-          } else {
-            OapIndexInfo.partitionOapIndex.put(file.filePath, false)
-            val reader = new OapDataReader(
-              new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
-            val iter = reader.initialize(conf, options)
-            selectedRows.add(reader.selectedRows.getOrElse(totalRows))
-            skippedRows.add(totalRows - reader.selectedRows.getOrElse(totalRows))
+          dataFileHandle match {
+            case handle: OapDataFileHandle if filters.exists(filter => canSkipFile(
+                handle.columnsMeta.map(_.statistics), filter, m.schema)) =>
+              skipForStatisticTasks.foreach(_.add(1L))
+              rowsSkippedForStatistic.foreach(_.add(rowsInFile))
+              Iterator.empty
+            case _ =>
+              OapIndexInfo.partitionOapIndex.put(file.filePath, false)
+              val reader = new OapDataReader(
+                new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
+              val iter = reader.initialize(conf, options)
 
-            val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
-            val joinedRow = new JoinedRow()
-            val appendPartitionColumns = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
+              (reader.rowsReadWhenHitIndex, reader.ignoreIndex) match {
+                case (Some(rows), false) =>
+                  hitIndexTasks.foreach(_.add(1L))
+                  rowsReadWhenHitIndex.foreach(_.add(rows))
+                  rowsSkippedWhenHitIndex.foreach(_.add(rowsInFile - rows))
+                case (_, true) =>
+                  ignoreIndexTasks.foreach(_.add(1L))
+                  rowsReadWhenIgnoreIndex.foreach(_.add(rowsInFile))
+                case _ =>
+                  missIndexTasks.foreach(_.add(1L))
+                  rowsReadWhenMissIndex.foreach(_.add(rowsInFile))
+              }
 
-            iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+              val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
+              val joinedRow = new JoinedRow()
+              val appendPartitionColumns = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
+
+              iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
           }
         }
       case None => (_: PartitionedFile) => {

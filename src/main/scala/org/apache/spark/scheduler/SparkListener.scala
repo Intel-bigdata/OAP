@@ -141,6 +141,7 @@ private[spark] case class SparkListenerLogStart(sparkVersion: String) extends Sp
 case class SparkListenerCustomInfoUpdate(
     hostName: String,
     executorId: String,
+    clazzName: String,
     customizedInfo: String) extends SparkListenerEvent
 
 /**

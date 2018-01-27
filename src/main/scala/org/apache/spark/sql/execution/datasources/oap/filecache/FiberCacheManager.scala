@@ -40,20 +40,19 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
   }
 }
 
-private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logging {
-
-  private val _pendingFiberSize: AtomicLong = new AtomicLong(0)
+private[filecache] class CacheGuardian(maxMemory: Long, oapCache: OapCache)
+  extends Thread with Logging {
 
   private val removalPendingQueue = new LinkedBlockingQueue[(Fiber, FiberCache)]()
 
-  def pendingSize: Int = removalPendingQueue.size()
+  def pendingFiberCount: Int = removalPendingQueue.size()
 
   def addRemovalFiber(fiber: Fiber, fiberCache: FiberCache): Unit = {
-    _pendingFiberSize.addAndGet(fiberCache.size())
-    removalPendingQueue.offer(fiber, fiberCache)
-    if (_pendingFiberSize.get() > maxMemory) {
+    oapCache.pendingFiberSize.addAndGet(fiberCache.size())
+    removalPendingQueue.offer((fiber, fiberCache))
+    if (oapCache.pendingFiberSize.get() > maxMemory) {
       logWarning("Fibers pending on removal use too much memory, " +
-          s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
+          s"current: ${oapCache.pendingFiberSize.get()}, max: $maxMemory")
     }
   }
 
@@ -66,13 +65,15 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
       while (!fiberCache.tryDispose(fiber, 3000)) {
         // Check memory usage every 3s while we are waiting fiber release.
         logDebug(s"Waiting fiber to be released timeout. Fiber: $fiber")
-        if (_pendingFiberSize.get() > maxMemory) {
+        if (oapCache.pendingFiberSize.get() > maxMemory) {
           logWarning("Fibers pending on removal use too much memory, " +
-            s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
+              s"current: ${oapCache.pendingFiberSize.get()}, max: $maxMemory")
         }
+
       }
       // TODO: Make log more readable
-      _pendingFiberSize.addAndGet(-fiberCache.size())
+      oapCache.addFiber(fiber, -1, -fiberCache.size())
+      oapCache.pendingFiberSize.addAndGet(-fiberCache.size())
       logDebug(s"Fiber removed successfully. Fiber: $fiber")
     }
   }
@@ -83,6 +84,11 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
  *
  * TODO: change object to class for better initialization
  */
+class FiberCacheManagerMessager extends CustomManager {
+  override def status(conf: SparkConf): String =
+    CacheStats.status(FiberCacheManager.cacheStats, conf)
+}
+
 object FiberCacheManager extends Logging {
 
   private val GUAVA_CACHE = "guava"
@@ -150,7 +156,7 @@ object FiberCacheManager extends Logging {
   def cacheSize: Long = cacheBackend.cacheSize
 
   // Used by test suite
-  private[filecache] def pendingSize: Int = cacheBackend.pendingSize
+  private[filecache] def pendingCount: Int = cacheBackend.pendingFiberCount
 
   // A description of this FiberCacheManager for debugging.
   def toDebugString: String = {
