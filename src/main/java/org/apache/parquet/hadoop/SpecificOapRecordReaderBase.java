@@ -30,20 +30,27 @@ import org.apache.spark.sql.types.StructType$;
 
 public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> {
 
+    /**
+     * From SpecificParquetRecordReaderBase.
+     */
     protected Path file;
     protected MessageType fileSchema;
     protected MessageType requestedSchema;
     protected StructType sparkSchema;
-    protected Configuration configuration;
-    protected ParquetMetadata footer;
 
     /**
      * The total number of rows this RecordReader will eventually read. The sum of the
      * rows of all the row groups.
      */
     protected long totalRowCount;
-
     protected ParquetFileReader reader;
+
+    /**
+     * SpecificOapRecordReaderBase need
+     */
+    protected Configuration configuration;
+    protected ParquetMetadata footer;
+
 
     @Override
     public void initialize() throws IOException, InterruptedException {
@@ -75,6 +82,9 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
         }
     }
 
+    /**
+     * From SpecificParquetRecordReaderBase, change private to protected.
+     */
     protected static <K, V> Map<K, Set<V>> toSetMultiMap(Map<K, V> map) {
         Map<K, Set<V>> setMultiMap = new HashMap<>();
         for (Map.Entry<K, V> entry : map.entrySet()) {

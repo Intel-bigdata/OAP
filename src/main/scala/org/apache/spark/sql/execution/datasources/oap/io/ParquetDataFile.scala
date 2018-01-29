@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import java.io.Closeable
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
@@ -24,6 +26,7 @@ import org.apache.parquet.column.Dictionary
 import org.apache.parquet.hadoop.{IndexedVectorizedOapRecordReader, RecordReaderBuilder, VectorizedOapRecordReader}
 import org.apache.parquet.hadoop.api.RecordReader
 
+import org.apache.spark.TaskContext
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap.filecache._
@@ -55,7 +58,9 @@ private[oap] case class ParquetDataFile(path: String,
         if (c.returningBatch) {
           reader.enableReturningBatches()
         }
-        new FileRecordReaderIterator(reader).asInstanceOf[Iterator[InternalRow]]
+        val iter = new FileRecordReaderIterator(reader)
+        Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
+        iter.asInstanceOf[Iterator[InternalRow]]
       case _ =>
         val recordReader = recordReaderBuilder(conf, requiredIds)
           .buildDefault()
@@ -83,7 +88,9 @@ private[oap] case class ParquetDataFile(path: String,
           if (c.returningBatch) {
             reader.enableReturningBatches()
           }
-          new FileRecordReaderIterator(reader).asInstanceOf[Iterator[InternalRow]]
+          val iter = new FileRecordReaderIterator(reader)
+          Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
+          iter.asInstanceOf[Iterator[InternalRow]]
         case _ =>
           val recordReader = recordReaderBuilder(conf, requiredIds)
             .withGlobalRowIds(rowIds).buildIndexed()
@@ -115,8 +122,8 @@ private[oap] case class ParquetDataFile(path: String,
       .withFooter(meta.footer)
   }
 
-  private class FileRecordReaderIterator[V](rowReader: RecordReader[V])
-    extends Iterator[V] {
+  private class FileRecordReaderIterator[V](private[this] var rowReader: RecordReader[V])
+    extends Iterator[V] with Closeable {
     private[this] var havePair = false
     private[this] var finished = false
 
@@ -124,7 +131,7 @@ private[oap] case class ParquetDataFile(path: String,
       if (!finished && !havePair) {
         finished = !rowReader.nextKeyValue
         if (finished) {
-          rowReader.close()
+          close()
         }
         havePair = !finished
       }
@@ -137,6 +144,16 @@ private[oap] case class ParquetDataFile(path: String,
       }
       havePair = false
       rowReader.getCurrentValue
+    }
+
+    override def close(): Unit = {
+      if (rowReader != null) {
+        try {
+          rowReader.close()
+        } finally {
+          rowReader = null
+        }
+      }
     }
   }
 

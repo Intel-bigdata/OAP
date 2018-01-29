@@ -387,24 +387,13 @@ public final class ColumnarBatch {
     if (this.numRowsFiltered > 0) {
       Arrays.fill(filteredRows, false);
     }
+    if(this.numRowsValid > 0) {
+        Arrays.fill(filteredRows, true);
+        this.numRowsValid = 0;
+    }
     this.numRows = 0;
     this.numRowsFiltered = 0;
   }
-
-  /**
-   * Resets the batch for writing.
-   */
-  public void resetWithAllFiltered() {
-    for (int i = 0; i < numCols(); ++i) {
-      columns[i].reset();
-    }
-    if (this.numRowsValid > 0) {
-      Arrays.fill(filteredRows, true);
-    }
-    this.numRows = 0;
-    this.numRowsValid = 0;
-  }
-
 
   /**
    * Sets the number of rows that are valid. Additionally, marks all rows as "filtered" if one or
@@ -495,6 +484,10 @@ public final class ColumnarBatch {
     ++numRowsValid;
   }
 
+  public void markAllFiltered() {
+      Arrays.fill(filteredRows, true);
+  }
+
   /**
    * Marks a given column as non-nullable. Any row that has a NULL value for the corresponding
    * attribute is filtered out.
@@ -509,7 +502,6 @@ public final class ColumnarBatch {
     this.columns = new ColumnVector[schema.size()];
     this.nullFilteredColumns = new HashSet<>();
     this.filteredRows = new boolean[maxRows];
-    this.numRowsValid = maxRows;
 
     for (int i = 0; i < schema.fields().length; ++i) {
       StructField field = schema.fields()[i];

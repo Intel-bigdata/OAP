@@ -3,14 +3,12 @@ package org.apache.parquet.hadoop;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.schema.Type;
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.catalyst.InternalRow;
@@ -21,37 +19,41 @@ import org.apache.spark.sql.execution.vectorized.ColumnarBatch;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
-
-import com.google.common.collect.Maps;
-
 public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Object> {
 
     /**
      * Batch of rows that we assemble and the current index we've returned. Every time this
      * batch is used up (batchIdx == numBatched), we populated the batch.
+     * From VectorizedParquetRecordReader, change private to protected.
      */
     protected int batchIdx = 0;
+    /**
+     * From VectorizedParquetRecordReader, change private to protected
+     */
     protected int numBatched = 0;
 
     /**
      * For each request column, the reader to read this column. This is NULL if this column
      * is missing from the file, in which case we populate the attribute with NULL.
+     * From VectorizedParquetRecordReader, change private to protected, wrapper VectorizedColumnReader.
      */
     protected VectorizedColumnReaderWrapper[] columnReaders;
 
     /**
      * The number of rows that have been returned.
+     * From VectorizedParquetRecordReader, change private to protected.
      */
     protected long rowsReturned;
 
     /**
      * The number of rows that have been reading, including the current in flight row group.
+     * From VectorizedParquetRecordReader, change private to protected.
      */
     protected long totalCountLoadedSoFar = 0;
 
     /**
      * For each column, true if the column is missing in the file and we'll instead return NULLs.
+     * From VectorizedParquetRecordReader, change private to protected.
      */
     protected boolean[] missingColumns;
 
@@ -68,16 +70,19 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * <p>
      * TODOs:
      * - Implement v2 page formats (just make sure we create the correct decoders).
+     * From VectorizedParquetRecordReader, change private to protected.
      */
     protected ColumnarBatch columnarBatch;
 
     /**
      * If true, this class returns batches instead of rows.
+     * From VectorizedParquetRecordReader, change private to protected.
      */
     protected boolean returnColumnarBatch;
 
     /**
      * The default config on whether columnarBatch should be offheap.
+     * From VectorizedParquetRecordReader, change private to protected.
      */
     protected static final MemoryMode DEFAULT_MEMORY_MODE = MemoryMode.ON_HEAP;
 
@@ -91,15 +96,16 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         this.footer = footer;
     }
 
-    /**
-     * Implementation of RecordReader API.
-     */
     @Override
     public void initialize() throws IOException, InterruptedException {
         super.initialize();
         initializeInternal();
     }
 
+    /**
+     * From VectorizedParquetRecordReader,no change.
+     * @throws IOException
+     */
     @Override
     public void close() throws IOException {
         if (columnarBatch != null) {
@@ -109,6 +115,12 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         super.close();
     }
 
+    /**
+     * From VectorizedParquetRecordReader,no change.
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     */
     @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
         resultBatch();
@@ -122,12 +134,24 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         return true;
     }
 
+    /**
+     * From VectorizedParquetRecordReader,no change.
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     */
     @Override
     public Object getCurrentValue() throws IOException, InterruptedException {
         if (returnColumnarBatch) return columnarBatch;
         return columnarBatch.getRow(batchIdx - 1);
     }
 
+    /**
+     * From VectorizedParquetRecordReader,no change.
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     */
     @Override
     public float getProgress() throws IOException, InterruptedException {
         return (float) rowsReturned / totalRowCount;
@@ -137,6 +161,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * Returns the ColumnarBatch object that will be used for all rows returned by this reader.
      * This object is reused. Calling this enables the vectorized reader. This should be called
      * before any calls to nextKeyValue/nextBatch.
+     * From VectorizedParquetRecordReader,no change.
      */
 
     // Creates a columnar batch that includes the schema from the data files and the additional
@@ -175,14 +200,26 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         }
     }
 
+    /**
+     * From VectorizedParquetRecordReader,no change.
+     */
     public void initBatch() {
         initBatch(DEFAULT_MEMORY_MODE, null, null);
     }
 
+    /**
+     * From VectorizedParquetRecordReader,no change.
+     * @param partitionColumns
+     * @param partitionValues
+     */
     public void initBatch(StructType partitionColumns, InternalRow partitionValues) {
         initBatch(DEFAULT_MEMORY_MODE, partitionColumns, partitionValues);
     }
 
+    /**
+     * From VectorizedParquetRecordReader,no change.
+     * @return
+     */
     public ColumnarBatch resultBatch() {
         if (columnarBatch == null) initBatch();
         return columnarBatch;
@@ -197,13 +234,10 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
 
     /**
      * Advances to the next batch of rows. Returns false if there are no more.
+     * From VectorizedParquetRecordReader, chanage private -> protected.
      */
     public boolean nextBatch() throws IOException {
         columnarBatch.reset();
-        return nextBatch0();
-    }
-
-    protected boolean nextBatch0() throws IOException {
         if (rowsReturned >= totalRowCount) return false;
         checkEndOfRowGroup();
 
@@ -219,6 +253,11 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         return true;
     }
 
+    /**
+     * From VectorizedParquetRecordReader, chanage private -> protected.
+     * @throws IOException
+     * @throws UnsupportedOperationException
+     */
     protected void initializeInternal() throws IOException, UnsupportedOperationException {
         missingColumns = new boolean[requestedSchema.getFieldCount()];
         for (int i = 0; i < requestedSchema.getFieldCount(); ++i) {
@@ -245,6 +284,10 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         }
     }
 
+    /**
+     * From VectorizedParquetRecordReader, chanage private -> protected.
+     * @throws IOException
+     */
     protected void checkEndOfRowGroup() throws IOException {
         if (rowsReturned != totalCountLoadedSoFar) return;
         PageReadStore pages = reader.readNextRowGroup();

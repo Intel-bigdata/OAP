@@ -1,6 +1,5 @@
 package org.apache.parquet.hadoop;
 
-import static org.apache.parquet.filter2.compat.RowGroupFilter.filterRowGroups;
 import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
 import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 
@@ -17,8 +16,10 @@ import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
+import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.datasources.oap.io.OapReadSupportImpl;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper;
+import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructType$;
 
 import com.google.common.collect.Maps;
@@ -39,9 +40,6 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         this.globalRowIds = globalRowIds;
     }
 
-    /**
-     * Implementation of RecordReader API.
-     */
     @Override
     public void initialize() throws IOException, InterruptedException {
         if (this.footer == null) {
@@ -76,13 +74,18 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         if (idsMap.isEmpty()) {
             rowsReturned = totalCountLoadedSoFar;
         }
-        columnarBatch.resetWithAllFiltered();
-        return super.nextBatch0() && filterRowsWithIndex();
+        return super.nextBatch() && filterRowsWithIndex();
     }
 
     protected void checkEndOfRowGroup() throws IOException {
         super.checkEndOfRowGroup();
         this.collectRowIdsToPages();
+    }
+
+    @Override
+    public void initBatch(StructType partitionColumns, InternalRow partitionValues) {
+        super.initBatch(partitionColumns, partitionValues);
+        columnarBatch.markAllFiltered();
     }
 
     private boolean filterRowsWithIndex() throws IOException {
@@ -114,7 +117,5 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
                 idsMap.put(pageNumber, ids);
             }
         }
-
     }
-
 }
