@@ -290,6 +290,10 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      */
     protected void checkEndOfRowGroup() throws IOException {
         if (rowsReturned != totalCountLoadedSoFar) return;
+        readNextRowGroup();
+    }
+
+    protected void readNextRowGroup() throws IOException {
         PageReadStore pages = reader.readNextRowGroup();
         if (pages == null) {
             throw new IOException("expecting more rows but reached last block. Read "

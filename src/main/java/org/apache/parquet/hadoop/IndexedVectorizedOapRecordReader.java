@@ -78,7 +78,8 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     }
 
     protected void checkEndOfRowGroup() throws IOException {
-        super.checkEndOfRowGroup();
+        if (rowsReturned != totalCountLoadedSoFar) return;
+        super.readNextRowGroup();
         this.collectRowIdsToPages();
     }
 
