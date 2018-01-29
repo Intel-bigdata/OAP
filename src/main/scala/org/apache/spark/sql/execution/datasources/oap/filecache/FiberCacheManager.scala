@@ -18,7 +18,7 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue, TimeUnit}
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.google.common.cache._
@@ -46,7 +46,12 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
   private val removalPendingQueue = new LinkedBlockingQueue[(Fiber, FiberCache)]()
 
-  def pendingSize: Int = removalPendingQueue.size()
+  // Tell if guardian thread is trying to remove one Fiber.
+  val bRemoving: AtomicBoolean = new AtomicBoolean(false)
+
+  def pendingSize: Int =
+    if (bRemoving.get()) removalPendingQueue.size() + 1
+    else removalPendingQueue.size()
 
   def addRemovalFiber(fiber: Fiber, fiberCache: FiberCache): Unit = {
     _pendingFiberSize.addAndGet(fiberCache.size())
@@ -61,19 +66,23 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
     // Loop forever, TODO: provide a release function
     while (true) {
       val (fiber, fiberCache) = removalPendingQueue.take()
+      bRemoving.set(true)
       logDebug(s"Removing fiber: $fiber")
       // Block if fiber is in use.
-      while (!fiberCache.tryDispose(fiber, 3000)) {
+      if (!fiberCache.tryDispose(fiber, 3000)) {
         // Check memory usage every 3s while we are waiting fiber release.
         logDebug(s"Waiting fiber to be released timeout. Fiber: $fiber")
+        removalPendingQueue.offer((fiber, fiberCache))
         if (_pendingFiberSize.get() > maxMemory) {
           logWarning("Fibers pending on removal use too much memory, " +
             s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
         }
+      } else {
+        // TODO: Make log more readable
+        _pendingFiberSize.addAndGet(-fiberCache.size())
+        logDebug(s"Fiber removed successfully. Fiber: $fiber")
       }
-      // TODO: Make log more readable
-      _pendingFiberSize.addAndGet(-fiberCache.size())
-      logDebug(s"Fiber removed successfully. Fiber: $fiber")
+      bRemoving.set(false)
     }
   }
 }

@@ -260,4 +260,35 @@ class FiberCacheManagerSuite extends SharedOapContext {
     Thread.sleep(500)
     assert(fiberCache.isDisposed)
   }
+
+  test("LRU blocks memory free") {
+    spark.sparkContext.setLogLevel("OFF")
+    val memorySizeInMB = (MemoryManager.cacheMemory / mbSize).toInt
+    val dataInUse = generateData(mbSize)
+    val fiberInUse =
+      TestFiber(() => MemoryManager.putToDataFiberCache(dataInUse), s"test fiber #1.0")
+
+    // Put into cache and make it use
+    val fiberCacheInUse = FiberCacheManager.get(fiberInUse, configuration)
+    assert(FiberCacheManager.pendingSize == 0)
+
+    // make fiber in use the 1st element in release queue.
+    FiberCacheManager.removeFiber(fiberInUse)
+
+    (1 to memorySizeInMB * 2).foreach { i =>
+      val data = generateData(mbSize)
+      val fiber = TestFiber(() => MemoryManager.putToDataFiberCache(data), s"test fiber #1.$i")
+      val fiberCache = FiberCacheManager.get(fiber, configuration)
+      assert(fiberCache.toArray sameElements data)
+      fiberCache.release()
+    }
+
+    // Wait for clean.
+    Thread.sleep(4000)
+    // There should be only one in-use fiber.
+    assert(FiberCacheManager.pendingSize == 1)
+    fiberCacheInUse.release()
+    Thread.sleep(4000)
+    assert(FiberCacheManager.pendingSize == 0)
+  }
 }
