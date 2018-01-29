@@ -69,13 +69,15 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     /**
      * Advances to the next batch of rows. Returns false if there are no more.
      */
+    @Override
     public boolean nextBatch() throws IOException {
         // if idsMap is Empty, needn't read remaining data in this row group
         // rowsReturned = totalCountLoadedSoFar to skip remaining data
         if (idsMap.isEmpty()) {
             rowsReturned = totalCountLoadedSoFar;
         }
-        return super.nextBatch() && filterRowsWithIndex();
+        columnarBatch.resetWithAllFiltered();
+        return super.nextBatch0() && filterRowsWithIndex();
     }
 
     protected void checkEndOfRowGroup() throws IOException {
@@ -89,21 +91,8 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
             currentPageNumber++;
             return this.nextBatch();
         } else {
-            int current = 0;
-            for (Integer target : ids) {
-                while (current < target) {
-                    columnarBatch.markFiltered(current);
-                    current++;
-                }
-                // skip this row
-                current++;
-            }
-            // skip this row
-            current++;
-            while (current < numBatched) {
-                columnarBatch.markFiltered(current);
-                // skip this row
-                current++;
+            for (Integer rowid : ids) {
+                columnarBatch.markValid(rowid);
             }
             currentPageNumber++;
             return true;

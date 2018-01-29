@@ -200,6 +200,10 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      */
     public boolean nextBatch() throws IOException {
         columnarBatch.reset();
+        return nextBatch0();
+    }
+
+    protected boolean nextBatch0() throws IOException {
         if (rowsReturned >= totalRowCount) return false;
         checkEndOfRowGroup();
 

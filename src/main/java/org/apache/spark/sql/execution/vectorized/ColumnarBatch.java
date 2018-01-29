@@ -65,6 +65,9 @@ public final class ColumnarBatch {
   // Total number of rows that have been filtered.
   private int numRowsFiltered = 0;
 
+  // Total number of rows that have been not filtered.
+  private int numRowsValid = 0;
+
   // Staging row returned from getRow.
   final Row row;
 
@@ -389,6 +392,21 @@ public final class ColumnarBatch {
   }
 
   /**
+   * Resets the batch for writing.
+   */
+  public void resetWithAllFiltered() {
+    for (int i = 0; i < numCols(); ++i) {
+      columns[i].reset();
+    }
+    if (this.numRowsValid > 0) {
+      Arrays.fill(filteredRows, true);
+    }
+    this.numRows = 0;
+    this.numRowsValid = 0;
+  }
+
+
+  /**
    * Sets the number of rows that are valid. Additionally, marks all rows as "filtered" if one or
    * more of their attributes are part of a non-nullable column.
    */
@@ -468,6 +486,16 @@ public final class ColumnarBatch {
   }
 
   /**
+   * Marks this row not filtered out. This means a subsequent iteration over the rows
+   * in this batch will include this row.
+   */
+  public void markValid(int rowId) {
+    assert(filteredRows[rowId]);
+    filteredRows[rowId] = false;
+    ++numRowsValid;
+  }
+
+  /**
    * Marks a given column as non-nullable. Any row that has a NULL value for the corresponding
    * attribute is filtered out.
    */
@@ -481,6 +509,7 @@ public final class ColumnarBatch {
     this.columns = new ColumnVector[schema.size()];
     this.nullFilteredColumns = new HashSet<>();
     this.filteredRows = new boolean[maxRows];
+    this.numRowsValid = maxRows;
 
     for (int i = 0; i < schema.fields().length; ++i) {
       StructField field = schema.fields()[i];
