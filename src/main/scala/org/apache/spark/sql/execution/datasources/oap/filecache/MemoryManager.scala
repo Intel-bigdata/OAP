@@ -60,18 +60,23 @@ trait FiberCache extends Logging {
     val writeLock = FiberLockManager.getFiberLock(fiber).writeLock()
     // Give caller a chance to deal with the long wait case.
     while (System.currentTimeMillis() - startTime <= timeout) {
-      if (writeLock.tryLock(200, TimeUnit.MILLISECONDS)) {
-        try {
-          if (refCount == 0) {
-            realDispose(fiber)
-            return true
+      if (refCount != 0) {
+        // LRU access done, but fiber was not released.
+        Thread.sleep(200)
+      } else {
+        if (writeLock.tryLock(200, TimeUnit.MILLISECONDS)) {
+          try {
+            if (refCount == 0) {
+              realDispose(fiber)
+              return true
+            }
+          } finally {
+            writeLock.unlock()
           }
-        } finally {
-          writeLock.unlock()
         }
       }
-      logWarning(s"Fiber Cache Dispose waiting detected for ${this}")
     }
+    logWarning(s"Fiber Cache Dispose waiting detected for ${fiber}")
     false
   }
 
