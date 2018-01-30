@@ -13,18 +13,17 @@ You should have [Apache Spark](http://spark.apache.org/) of version 2.1.0 instal
 2. Deploy `oap-<version>.jar` to master machine.
 3. Put below configurations to _$SPARK_HOME/conf/spark-defaults.conf_
 ```
-spark.files                      file:///path/to/oap-dir/oap-<version>.jar
-spark.executor.extraClassPath      ./oap-<version>.jar
-spark.driver.extraClassPath        /path/to/oap-dir/oap-<version>.jar
-spark.memory.offHeap.enabled       true
-spark.memory.offHeap.size          2g
-spark.driver.memory                2g
-spark.yarn.executor.memoryOverhead 2g
+spark.files                         file:///path/to/oap-dir/oap-<version>.jar
+spark.executor.extraClassPath       ./oap-<version>.jar
+spark.driver.extraClassPath         /path/to/oap-dir/oap-<version>.jar
+spark.memory.offHeap.enabled        true
+spark.memory.offHeap.size           20g
 ```
 4. Run spark by `bin/spark-sql`, `bin/spark-shell`, `sbin/start-thriftserver` or `bin/pyspark` and try our examples
 
 **NOTE**: 1. For spark standalone mode, you have to put `oap-<version>.jar` to both driver and executor since `spark.files` is not working. Also don't forget to update `extraClassPath`.
-          2. For yarn mode, we need to config all spark.driver.memory, spark.memory.offHeap.size and spark.yarn.executor.memoryOverhead to enable cache fiber. See Configuration and Performance Tuning part for more detail. Briefly speaking, the recommanded configuration is one executor in one node with fully memory/computation capability.
+          2. For yarn mode, we need to config all spark.driver.memory, spark.memory.offHeap.size and spark.yarn.executor.memoryOverhead to enable fiber cache.
+          3. The comprehensive guidence and example of OAP configuration can be referred @https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide. Briefly speaking, the recommanded configuration is one executor per one node with fully memory/computation capability.
 
 ## Example
 ```
@@ -79,8 +78,8 @@ Full Scan Threshold - If the analysis result is above this threshold, it will go
 
 Row Group Size - Row count for each row group
 * Default: 1048576
-* Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key, "1025")`
-* Usage2: `CREATE TABLE t USING oap OPTIONS ('rowgroup' '1024')`
+* Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key, "1048576")`
+* Usage2: `CREATE TABLE t USING oap OPTIONS ('rowgroup' '1048576')`
 
 Compression Codec - Choose compression type for OAP data files.
 * Default: GZIP
