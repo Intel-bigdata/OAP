@@ -70,7 +70,7 @@ trait FiberCache extends Logging {
           writeLock.unlock()
         }
       }
-      logDebug(s"Fiber Cache Dispose waiting detected for ${this}")
+      logWarning(s"Fiber Cache Dispose waiting detected for ${this}")
     }
     false
   }

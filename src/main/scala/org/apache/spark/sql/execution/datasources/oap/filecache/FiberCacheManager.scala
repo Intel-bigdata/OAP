@@ -18,7 +18,7 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue, TimeUnit}
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.google.common.cache._
@@ -47,11 +47,13 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
   private val removalPendingQueue = new LinkedBlockingQueue[(Fiber, FiberCache)]()
 
   // Tell if guardian thread is trying to remove one Fiber.
-  val bRemoving: AtomicBoolean = new AtomicBoolean(false)
+  @volatile var bRemoving: Boolean = false
 
-  def pendingSize: Int =
-    if (bRemoving.get()) removalPendingQueue.size() + 1
-    else removalPendingQueue.size()
+  def pendingSize: Int = if (bRemoving) {
+    removalPendingQueue.size() + 1
+  } else {
+    removalPendingQueue.size()
+  }
 
   def addRemovalFiber(fiber: Fiber, fiberCache: FiberCache): Unit = {
     _pendingFiberSize.addAndGet(fiberCache.size())
@@ -66,7 +68,7 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
     // Loop forever, TODO: provide a release function
     while (true) {
       val (fiber, fiberCache) = removalPendingQueue.take()
-      bRemoving.set(true)
+      bRemoving = true
       logDebug(s"Removing fiber: $fiber")
       // Block if fiber is in use.
       if (!fiberCache.tryDispose(fiber, 3000)) {
@@ -82,7 +84,7 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
         _pendingFiberSize.addAndGet(-fiberCache.size())
         logDebug(s"Fiber removed successfully. Fiber: $fiber")
       }
-      bRemoving.set(false)
+      bRemoving = false
     }
   }
 }
