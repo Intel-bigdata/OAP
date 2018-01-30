@@ -250,25 +250,28 @@ case class FileSourceScanExec(
     withOptPartitionCount
   }
 
+  private def initOapAccumulator(format: OapFileFormat): Unit = {
+    // set Task-level Accumulator
+    format.totalTasks = Some(metrics("totalTasks"))
+    format.skipForStatisticTasks = Some(metrics("skipForStatisticTasks"))
+    format.hitIndexTasks = Some(metrics("hitIndexTasks"))
+    format.ignoreIndexTasks = Some(metrics("ignoreIndexTasks"))
+    format.missIndexTasks = Some(metrics("missIndexTasks"))
+
+    // set row-level Accumulator
+    format.totalRows = Some(metrics("totalRows"))
+    format.rowsSkippedForStatistic = Some(metrics("rowsSkippedForStatistic"))
+    format.rowsReadWhenHitIndex = Some(metrics("rowsReadWhenHitIndex"))
+    format.rowsSkippedWhenHitIndex = Some(metrics("rowsSkippedWhenHitIndex"))
+    format.rowsReadWhenIgnoreIndex = Some(metrics("rowsReadWhenIgnoreIndex"))
+    format.rowsReadWhenMissIndex = Some(metrics("rowsReadWhenMissIndex"))
+  }
+
   private lazy val inputRDD: RDD[InternalRow] = {
+    // init accumulator before buildReader
     relation.fileFormat match {
       case format: OapFileFormat =>
-        def oapMetric(name: String): SQLMetric = {
-          metrics(name)
-        }
-        // set Accumulator
-        format.totalTasks = Some(oapMetric("totalTasks"))
-        format.skipForStatisticTasks = Some(oapMetric("skipForStatisticTasks"))
-        format.hitIndexTasks = Some(oapMetric("hitIndexTasks"))
-        format.ignoreIndexTasks = Some(oapMetric("ignoreIndexTasks"))
-        format.missIndexTasks = Some(oapMetric("missIndexTasks"))
-
-        format.totalRows = Some(oapMetric("totalRows"))
-        format.rowsSkippedForStatistic = Some(oapMetric("rowsSkippedForStatistic"))
-        format.rowsReadWhenHitIndex = Some(oapMetric("rowsReadWhenHitIndex"))
-        format.rowsSkippedWhenHitIndex = Some(oapMetric("rowsSkippedWhenHitIndex"))
-        format.rowsReadWhenIgnoreIndex = Some(oapMetric("rowsReadWhenIgnoreIndex"))
-        format.rowsReadWhenMissIndex = Some(oapMetric("rowsReadWhenMissIndex"))
+        initOapAccumulator(format)
       case _ => Unit
     }
 

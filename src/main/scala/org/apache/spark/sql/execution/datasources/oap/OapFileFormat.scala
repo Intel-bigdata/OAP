@@ -318,27 +318,14 @@ private[sql] class OapFileFormat extends FileFormat
           dataFileHandle match {
             case handle: OapDataFileHandle if filters.exists(filter => canSkipFile(
                 handle.columnsMeta.map(_.statistics), filter, m.schema)) =>
-              skipForStatisticTasks.foreach(_.add(1L))
-              rowsSkippedForStatistic.foreach(_.add(rowsInFile))
+              metrics(None, rowsInFile)
               Iterator.empty
             case _ =>
               OapIndexInfo.partitionOapIndex.put(file.filePath, false)
               val reader = new OapDataReader(
                 new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
               val iter = reader.initialize(conf, options)
-
-              (reader.rowsReadWhenHitIndex, reader.ignoreIndex) match {
-                case (Some(rows), false) =>
-                  hitIndexTasks.foreach(_.add(1L))
-                  rowsReadWhenHitIndex.foreach(_.add(rows))
-                  rowsSkippedWhenHitIndex.foreach(_.add(rowsInFile - rows))
-                case (_, true) =>
-                  ignoreIndexTasks.foreach(_.add(1L))
-                  rowsReadWhenIgnoreIndex.foreach(_.add(rowsInFile))
-                case _ =>
-                  missIndexTasks.foreach(_.add(1L))
-                  rowsReadWhenMissIndex.foreach(_.add(rowsInFile))
-              }
+              metrics(Some(reader), rowsInFile)
 
               val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
               val joinedRow = new JoinedRow()
@@ -351,6 +338,27 @@ private[sql] class OapFileFormat extends FileFormat
         // TODO need to think about when there is no oap.meta file at all
         Iterator.empty
       }
+    }
+  }
+
+  private def metrics(r: Option[OapDataReader], rowsInFile: Long): Unit = {
+    r match {
+      case Some(reader) =>
+        (reader.rowsReadWhenHitIndex, reader.ignoreIndex) match {
+          case (Some(rows), false) =>
+            hitIndexTasks.foreach(_.add(1L))
+            rowsReadWhenHitIndex.foreach(_.add(rows))
+            rowsSkippedWhenHitIndex.foreach(_.add(rowsInFile - rows))
+          case (_, true) =>
+            ignoreIndexTasks.foreach(_.add(1L))
+            rowsReadWhenIgnoreIndex.foreach(_.add(rowsInFile))
+          case _ =>
+            missIndexTasks.foreach(_.add(1L))
+            rowsReadWhenMissIndex.foreach(_.add(rowsInFile))
+        }
+      case None =>
+        skipForStatisticTasks.foreach(_.add(1L))
+        rowsSkippedForStatistic.foreach(_.add(rowsInFile))
     }
   }
 
