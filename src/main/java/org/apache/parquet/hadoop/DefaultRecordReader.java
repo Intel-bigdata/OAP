@@ -41,7 +41,7 @@ public class DefaultRecordReader<T> implements RecordReader<T> {
 
     private ParquetMetadata footer;
 
-    DefaultRecordReader(ReadSupport<T> readSupport,
+    public DefaultRecordReader(ReadSupport<T> readSupport,
                         Path file,
                         Configuration configuration,
                         ParquetMetadata footer) {

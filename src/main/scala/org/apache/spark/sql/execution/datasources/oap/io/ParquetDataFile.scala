@@ -23,8 +23,8 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.column.Dictionary
-import org.apache.parquet.hadoop.{IndexedVectorizedOapRecordReader, RecordReaderBuilder, VectorizedOapRecordReader}
-import org.apache.parquet.hadoop.api.RecordReader
+import org.apache.parquet.hadoop._
+import org.apache.parquet.hadoop.api.{RecordReader, VectorizedRecordReader}
 
 import org.apache.spark.TaskContext
 import org.apache.spark.sql.catalyst.InternalRow
@@ -47,26 +47,18 @@ private[oap] case class ParquetDataFile(path: String,
 
   override def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
 
+    addRequestSchemaToConf(conf, requiredIds)
+    val file = new Path(StringUtils.unEscapeString(path))
+    val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
+
     context match {
       case  Some(c) =>
-        addRequestSchemaToConf(conf, requiredIds)
-        val file = new Path(StringUtils.unEscapeString(path))
-        val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
-        val reader = new VectorizedOapRecordReader(file, configuration, meta.footer)
-        reader.initialize()
-        reader.initBatch(c.partitionColumns, c.partitionValues)
-        if (c.returningBatch) {
-          reader.enableReturningBatches()
-        }
-        val iter = new FileRecordReaderIterator(reader)
-        Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
-        iter.asInstanceOf[Iterator[InternalRow]]
+        initVectorizedReader(c,
+          new VectorizedOapRecordReader(file, conf, meta.footer))
       case _ =>
-        val recordReader = recordReaderBuilder(conf, requiredIds)
-          .buildDefault()
-        recordReader.initialize()
-        new FileRecordReaderIterator[InternalRow](
-          recordReader.asInstanceOf[RecordReader[InternalRow]])
+        initRecordReader(
+          new DefaultRecordReader[UnsafeRow](new OapReadSupportImpl,
+            file, conf, meta.footer))
     }
   }
 
@@ -76,27 +68,19 @@ private[oap] case class ParquetDataFile(path: String,
     if (rowIds == null || rowIds.length == 0) {
       Iterator.empty
     } else {
+      addRequestSchemaToConf(conf, requiredIds)
+      val file = new Path(StringUtils.unEscapeString(path))
+      val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
+
       context match {
         case  Some(c) =>
-          addRequestSchemaToConf(conf, requiredIds)
-          val file = new Path(StringUtils.unEscapeString(path))
-          val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
-          val reader =
-            new IndexedVectorizedOapRecordReader(file, configuration, meta.footer, rowIds)
-          reader.initialize()
-          reader.initBatch(c.partitionColumns, c.partitionValues)
-          if (c.returningBatch) {
-            reader.enableReturningBatches()
-          }
-          val iter = new FileRecordReaderIterator(reader)
-          Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
-          iter.asInstanceOf[Iterator[InternalRow]]
+          initVectorizedReader(c,
+            new IndexedVectorizedOapRecordReader(file,
+              conf, meta.footer, rowIds))
         case _ =>
-          val recordReader = recordReaderBuilder(conf, requiredIds)
-            .withGlobalRowIds(rowIds).buildIndexed()
-          recordReader.initialize()
-          new FileRecordReaderIterator[UnsafeRow](
-            recordReader.asInstanceOf[RecordReader[UnsafeRow]])
+          initRecordReader(
+            new OapRecordReader[UnsafeRow](new OapReadSupportImpl,
+              file, conf, rowIds, meta.footer))
       }
     }
   }
@@ -112,14 +96,21 @@ private[oap] case class ParquetDataFile(path: String,
     conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
   }
 
-  private def recordReaderBuilder(conf: Configuration,
-                                  requiredIds: Array[Int]): RecordReaderBuilder[UnsafeRow] = {
-    addRequestSchemaToConf(conf, requiredIds)
-    val readSupport = new OapReadSupportImpl
-    val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
-    RecordReaderBuilder
-      .builder(readSupport, new Path(StringUtils.unEscapeString(path)), conf)
-      .withFooter(meta.footer)
+  private def initRecordReader(recordReader: RecordReader[UnsafeRow]) = {
+    recordReader.initialize()
+    new FileRecordReaderIterator[UnsafeRow](
+      recordReader.asInstanceOf[RecordReader[UnsafeRow]])
+  }
+
+  private def initVectorizedReader(c: VectorizedContext, reader: VectorizedRecordReader[AnyRef]) = {
+    reader.initialize()
+    reader.initBatch(c.partitionColumns, c.partitionValues)
+    if (c.returningBatch) {
+      reader.enableReturningBatches()
+    }
+    val iter = new FileRecordReaderIterator(reader)
+    Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
+    iter.asInstanceOf[Iterator[InternalRow]]
   }
 
   private class FileRecordReaderIterator[V](private[this] var rowReader: RecordReader[V])

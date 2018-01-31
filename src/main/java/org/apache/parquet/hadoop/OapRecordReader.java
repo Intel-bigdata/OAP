@@ -48,7 +48,7 @@ public class OapRecordReader<T> implements RecordReader<T> {
 
     private ReadSupport<T> readSupport;
 
-    OapRecordReader(ReadSupport<T> readSupport,
+    public OapRecordReader(ReadSupport<T> readSupport,
                         Path file,
                         Configuration configuration,
                         int[] globalRowIds,
