@@ -107,13 +107,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         super.readNextRowGroup();
         this.divideRowIdsIntoPages();
     }
-
-    @Override
-    public void initBatch(StructType partitionColumns, InternalRow partitionValues) {
-        super.initBatch(partitionColumns, partitionValues);
-        columnarBatch.markAllFiltered();
-    }
-
+    
     private boolean filterRowsWithIndex() throws IOException {
         IntList ids = idsMap.remove(currentPageNumber);
         if (ids == null || ids.isEmpty()) {

@@ -27,7 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.api.InitContext;
 import org.apache.parquet.hadoop.api.ReadSupport;
-import org.apache.parquet.hadoop.api.VectorizedRecordReader;
+import org.apache.parquet.hadoop.api.RecordReader;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.utils.Collections3;
@@ -37,7 +37,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelp
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructType$;
 
-public abstract class SpecificOapRecordReaderBase<T> implements VectorizedRecordReader<T> {
+public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> {
 
     /**
      * From SpecificParquetRecordReaderBase.
