@@ -66,6 +66,7 @@ public final class ColumnarBatch {
   private int numRowsFiltered = 0;
 
   // Total number of rows that have been not filtered.
+  // For IndexedVectorizedOapRecordReader.
   private int numRowsValid = 0;
 
   // Staging row returned from getRow.
@@ -387,6 +388,7 @@ public final class ColumnarBatch {
     if (this.numRowsFiltered > 0) {
       Arrays.fill(filteredRows, false);
     }
+    // For IndexedVectorizedOapRecordReader
     if(this.numRowsValid > 0) {
         Arrays.fill(filteredRows, true);
         this.numRowsValid = 0;
@@ -477,6 +479,7 @@ public final class ColumnarBatch {
   /**
    * Marks this row not filtered out. This means a subsequent iteration over the rows
    * in this batch will include this row.
+   * For IndexedVectorizedOapRecordReader.
    */
   public void markValid(int rowId) {
     assert(filteredRows[rowId]);
@@ -484,6 +487,9 @@ public final class ColumnarBatch {
     ++numRowsValid;
   }
 
+  /**
+   * For IndexedVectorizedOapRecordReader.
+   */
   public void markAllFiltered() {
       Arrays.fill(filteredRows, true);
   }
