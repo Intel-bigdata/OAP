@@ -280,7 +280,6 @@ class FiberCacheManagerSuite extends SharedOapContext {
   }
 
   test("LRU blocks memory free") {
-    spark.sparkContext.setLogLevel("OFF")
     val memorySizeInMB = (MemoryManager.cacheMemory / mbSize).toInt
     val dataInUse = generateData(mbSize)
     val fiberInUse = TestFiber(

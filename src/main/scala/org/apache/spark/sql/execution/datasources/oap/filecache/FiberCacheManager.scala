@@ -47,7 +47,7 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
   private val removalPendingQueue = new LinkedBlockingQueue[(Fiber, FiberCache)]()
 
   // Tell if guardian thread is trying to remove one Fiber.
-  @volatile var bRemoving: Boolean = false
+  @volatile private var bRemoving: Boolean = false
 
   def pendingSize: Int = if (bRemoving) {
     removalPendingQueue.size() + 1

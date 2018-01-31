@@ -61,8 +61,11 @@ trait FiberCache extends Logging {
     // Give caller a chance to deal with the long wait case.
     while (System.currentTimeMillis() - startTime <= timeout) {
       if (refCount != 0) {
-        // LRU access done, but fiber was not released.
-        Thread.sleep(200)
+        // LRU access (get and occupy) done, but fiber was still occupied by at least one reader,
+        // so it needs to sleep some time to see if the reader done.
+        // Otherwise, it becomes a polling loop.
+        // TODO: use lock/sync-obj to leverage the concurrency APIs instead of explicit sleep.
+        Thread.sleep(100)
       } else {
         if (writeLock.tryLock(200, TimeUnit.MILLISECONDS)) {
           try {
