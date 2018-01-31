@@ -26,11 +26,14 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManage
 import org.apache.spark.util.Utils
 
 private[spark] object OapMessageUtils {
+
+  private lazy val executorDataMapField =
+    classOf[CoarseGrainedSchedulerBackend].getDeclaredFields.find(
+      filed => filed.getName.endsWith("executorDataMap"))
+
   def sendMessageToExecutors(
       scheduler: CoarseGrainedSchedulerBackend, message: OapMessage): Unit = {
     // TODO: why we can't just use executorDataMap?
-    val executorDataMapField = classOf[CoarseGrainedSchedulerBackend].getDeclaredFields
-      .find(filed => filed.getName.endsWith("executorDataMap"))
     executorDataMapField match {
       case Some(field) =>
         field.setAccessible(true)
