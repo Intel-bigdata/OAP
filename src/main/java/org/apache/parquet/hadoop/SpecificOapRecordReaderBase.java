@@ -21,20 +21,16 @@ import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.api.InitContext;
 import org.apache.parquet.hadoop.api.ReadSupport;
-import org.apache.parquet.hadoop.api.RecordReader;
 import org.apache.parquet.hadoop.api.VectorizedRecordReader;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.schema.MessageType;
 import org.apache.spark.sql.execution.datasources.oap.io.OapReadSupportImpl;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper;
@@ -74,7 +70,7 @@ public abstract class SpecificOapRecordReaderBase<T> implements VectorizedRecord
 
         Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
         ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(
-                configuration, toSetMultiMap(fileMetadata), fileSchema));
+                configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
         this.requestedSchema = readContext.getRequestedSchema();
         String sparkRequestedSchemaString =
                 configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
@@ -94,18 +90,4 @@ public abstract class SpecificOapRecordReaderBase<T> implements VectorizedRecord
             reader = null;
         }
     }
-
-    /**
-     * From SpecificParquetRecordReaderBase, change private to protected.
-     */
-    protected static <K, V> Map<K, Set<V>> toSetMultiMap(Map<K, V> map) {
-        Map<K, Set<V>> setMultiMap = new HashMap<>();
-        for (Map.Entry<K, V> entry : map.entrySet()) {
-            Set<V> set = new HashSet<V>();
-            set.add(entry.getValue());
-            setMultiMap.put(entry.getKey(), Collections.unmodifiableSet(set));
-        }
-        return Collections.unmodifiableMap(setMultiMap);
-    }
-
 }

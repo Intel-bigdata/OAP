@@ -30,6 +30,7 @@ import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.spark.sql.catalyst.InternalRow;
@@ -66,7 +67,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         this.fileSchema = footer.getFileMetaData().getSchema();
         Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
         ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(
-                configuration, toSetMultiMap(fileMetadata), fileSchema));
+                configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
         this.requestedSchema = readContext.getRequestedSchema();
         String sparkRequestedSchemaString =
                 configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
