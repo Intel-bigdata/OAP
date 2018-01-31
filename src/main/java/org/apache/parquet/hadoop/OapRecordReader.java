@@ -22,20 +22,14 @@ import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FI
 import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 
 import java.io.IOException;
-import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.Preconditions;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
-import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-
-import com.google.common.collect.Lists;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 public class OapRecordReader<T> implements RecordReader<T> {
 
