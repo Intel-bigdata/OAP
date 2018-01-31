@@ -50,9 +50,9 @@ public class IndexedParquetMetadata extends ParquetMetadata {
             nextRowGroupStartRowId += block.getRowCount();
             IntList rowIdList = new IntArrayList();
             while (index < totalCount) {
-                int globalRowGroupId = globalRowIds[index];
-                if (globalRowGroupId < nextRowGroupStartRowId) {
-                    rowIdList.add(globalRowGroupId - currentRowGroupStartRowId);
+                int globalRowId = globalRowIds[index];
+                if (globalRowId < nextRowGroupStartRowId) {
+                    rowIdList.add(globalRowId - currentRowGroupStartRowId);
                     index++;
                 } else {
                     break;

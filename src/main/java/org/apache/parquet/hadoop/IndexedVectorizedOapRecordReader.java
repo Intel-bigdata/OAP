@@ -39,6 +39,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelp
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructType$;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 
 public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader {
@@ -47,6 +48,10 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     private int currentPageNumber;
     private int[] globalRowIds;
     private Iterator<IntList> rowIdsIter;
+    private static final String IDS_MAP_STATE_ERROR_MSG =
+            "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
+    private static final String IDS_ITER_STATE_ERROR_MSG =
+            "The divideRowIdsIntoPages method should not be called when rowIdsIter hasNext if false.";
 
     public IndexedVectorizedOapRecordReader(
             Path file,
@@ -94,10 +99,13 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         return super.nextBatch() && filterRowsWithIndex();
     }
 
+    @Override
     protected void checkEndOfRowGroup() throws IOException {
         if (rowsReturned != totalCountLoadedSoFar) return;
+        // if rowsReturned == totalCountLoadedSoFar
+        // readNextRowGroup & divideRowIdsIntoPages
         super.readNextRowGroup();
-        this.collectRowIdsToPages();
+        this.divideRowIdsIntoPages();
     }
 
     @Override
@@ -112,6 +120,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
             currentPageNumber++;
             return this.nextBatch();
         } else {
+            columnarBatch.markAllFiltered();
             for (Integer rowid : ids) {
                 columnarBatch.markValid(rowid);
             }
@@ -120,8 +129,9 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         }
     }
 
-    private void collectRowIdsToPages() {
-        this.idsMap.clear();
+    private void divideRowIdsIntoPages() {
+        Preconditions.checkState(idsMap.isEmpty(), IDS_MAP_STATE_ERROR_MSG);
+        Preconditions.checkState(rowIdsIter.hasNext(), IDS_ITER_STATE_ERROR_MSG);
         this.currentPageNumber = 0;
         int pageSize = columnarBatch.capacity();
         IntList currentIndexList = rowIdsIter.next();

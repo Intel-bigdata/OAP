@@ -250,7 +250,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
 
     /**
      * Advances to the next batch of rows. Returns false if there are no more.
-     * From VectorizedParquetRecordReader, chanage private -> protected.
+     * From VectorizedParquetRecordReader, no change.
      */
     public boolean nextBatch() throws IOException {
         columnarBatch.reset();
