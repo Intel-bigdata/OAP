@@ -53,8 +53,11 @@ private[spark] object FiberCacheManagerPage {
     val hostPort = status.blockManagerId.hostPort
     val memUsed = status.memUsed
     val maxMem = status.maxMem
-    val cacheStats = FiberCacheManagerSensor.executorToCacheManager
-      .getOrDefault(execId, CacheStats())
+    val cacheStats = if (FiberCacheManagerSensor.executorToCacheManager.containsKey(execId)) {
+      FiberCacheManagerSensor.executorToCacheManager.get(execId)
+    } else {
+      CacheStats()
+    }
 
     new FiberCacheManagerSummary(
       execId,
