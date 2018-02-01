@@ -94,14 +94,11 @@ trait OapStrategies extends Logging {
           file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
-        if (orderAttributes.size == 1 &&
-            (filterAttributes.isEmpty || filterAttributes == orderAttributes)) {
+        if (orderAttributes.size == 1 && filterAttributes == orderAttributes) {
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY -> limit.toString) +
             (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
-          val indexHint = if (filters.nonEmpty) filters
-            else IsNotNull(orderAttributes.head) :: Nil
-          val indexRequirement = indexHint.map(_ => BTreeIndex())
+          val indexRequirement = filters.map(_ => BTreeIndex())
 
           createOapFileScanPlan(
             projectList,
@@ -110,7 +107,7 @@ trait OapStrategies extends Logging {
             file,
             table,
             oapOption,
-            indexHint,
+            filters,
             indexRequirement) match {
             case Some(fastScan) => OapOrderLimitFileScanExec(limit, order, projectList, fastScan)
             case None => PlanLater(child)
@@ -161,13 +158,10 @@ trait OapStrategies extends Logging {
           file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table)) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
-        if (orderAttributes.size == 1 &&
-          (filterAttributes.isEmpty || filterAttributes == orderAttributes)) {
+        if (orderAttributes.size == 1 || filterAttributes == orderAttributes) {
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY -> "1"))
-          val indexHint = if (filters.nonEmpty) filters
-            else IsNotNull(orderAttributes.head) :: Nil
-          val indexRequirement = indexHint.map(_ => BitMapIndex())
+          val indexRequirement = filters.map(_ => BitMapIndex())
 
           createOapFileScanPlan(
             projectList,
@@ -176,7 +170,7 @@ trait OapStrategies extends Logging {
             file,
             table,
             oapOption,
-            indexHint,
+            filters,
             indexRequirement) match {
             case Some(fastScan) => OapDistinctFileScanExec(scanNumber = 1, projectList, fastScan)
             case None => PlanLater(child)
@@ -246,22 +240,12 @@ trait OapStrategies extends Logging {
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val groupingAttributes = AttributeSet(groupExpressions.map(_.toAttribute))
 
-        if (groupingAttributes.size == 1 &&
-          (filterAttributes.isEmpty || filterAttributes == groupingAttributes)) {
-          // TODO:
-          // IsNotNull filters out the NULL value, we need another
-          // Expression case class to do index full scan (include NULL).
-          // If none in Spark, we can create one for OAP.
-          val indexHint = if (filterAttributes == groupingAttributes) {
-            filters
-          } else {
-            IsNotNull(groupingAttributes.head) :: Nil
-          }
+        if (groupingAttributes.size == 1 && filterAttributes == groupingAttributes) {
           val oapOption = new CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
 
           createOapFileScanPlan(
-            projectList, indexHint, relation, file, table, oapOption, indexHint, Nil) match {
+            projectList, filters, relation, file, table, oapOption, filters, Nil) match {
             case Some(fastScan) => OapAggregationFileScanExec(aggExpressions, projectList, fastScan)
             case _ => PlanLater(child)
           }
