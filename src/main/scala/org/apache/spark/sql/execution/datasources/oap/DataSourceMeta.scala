@@ -340,7 +340,7 @@ private[oap] case class DataSourceMeta(
     @transient fileHeader: FileHeader) extends Serializable {
 
     // Check whether this expression is supported by index or not
-    def isSupportedByIndex(exp: Expression, requirement: Option[IndexType] = None): Boolean = {
+  def isSupportedByIndex(exp: Expression, requirement: Option[IndexType] = None): Boolean = {
     var attr: String = null
     def checkInMetaSet(attrRef: AttributeReference): Boolean = {
       if (attr ==  null || attr == attrRef.name) {
@@ -385,8 +385,9 @@ private[oap] case class DataSourceMeta(
         checkInMetaSet(attrRef)
       case In(attrRef: AttributeReference, _) =>
         checkInMetaSet(attrRef)
-      case IsNotNull(attrRef: AttributeReference) =>
-        checkInMetaSet(attrRef)
+      // TODO: only ParquetFileFormat use this function, details in #555
+      // case IsNotNull(attrRef: AttributeReference) =>
+      //   checkInMetaSet(attrRef)
       case IsNull(attrRef: AttributeReference) =>
         checkInMetaSet(attrRef)
       case _ => false

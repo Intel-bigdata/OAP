@@ -399,7 +399,8 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
     hashSetList.append(bitmapIndexAttrSet)
 
     // Query "select * from t where b == 1" will generate IsNotNull expr which is unsupportted
-    val isNotNull = Seq(IsNotNull(AttributeReference("b", IntegerType)()))
+    val isNotNull = Seq(IsNotNull(AttributeReference("b", IntegerType)()),
+      IsNotNull(AttributeReference("a", IntegerType)()))
     val eq = Seq(EqualTo(AttributeReference("a", IntegerType)(), Literal(1)))
     val eq2 = Seq(EqualTo(AttributeReference("b", IntegerType)(), Literal(1)))
     val eq3 = Seq(EqualTo(Literal(1), AttributeReference("a", IntegerType)()))
