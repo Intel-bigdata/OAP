@@ -45,7 +45,14 @@ private[filecache] class CacheGuardian(maxMemory: Long, oapCache: OapCache)
 
   private val removalPendingQueue = new LinkedBlockingQueue[(Fiber, FiberCache)]()
 
-  def pendingFiberCount: Int = removalPendingQueue.size()
+  // Tell if guardian thread is trying to remove one Fiber.
+  @volatile private var bRemoving: Boolean = false
+
+  def pendingFiberCount: Int = if (bRemoving) {
+    removalPendingQueue.size() + 1
+  } else {
+    removalPendingQueue.size()
+  }
 
   def addRemovalFiber(fiber: Fiber, fiberCache: FiberCache): Unit = {
     oapCache.pendingFiberSize.addAndGet(fiberCache.size())
@@ -60,21 +67,24 @@ private[filecache] class CacheGuardian(maxMemory: Long, oapCache: OapCache)
     // Loop forever, TODO: provide a release function
     while (true) {
       val (fiber, fiberCache) = removalPendingQueue.take()
+      bRemoving = true
       logDebug(s"Removing fiber: $fiber")
       // Block if fiber is in use.
-      while (!fiberCache.tryDispose(fiber, 3000)) {
+      if (!fiberCache.tryDispose(fiber, 3000)) {
         // Check memory usage every 3s while we are waiting fiber release.
         logDebug(s"Waiting fiber to be released timeout. Fiber: $fiber")
+        removalPendingQueue.offer((fiber, fiberCache))
         if (oapCache.pendingFiberSize.get() > maxMemory) {
           logWarning("Fibers pending on removal use too much memory, " +
               s"current: ${oapCache.pendingFiberSize.get()}, max: $maxMemory")
         }
-
+      } else {
+        // TODO: Make log more readable
+        oapCache.addFiber(fiber, -1, -fiberCache.size())
+        oapCache.pendingFiberSize.addAndGet(-fiberCache.size())
+        logDebug(s"Fiber removed successfully. Fiber: $fiber")
       }
-      // TODO: Make log more readable
-      oapCache.addFiber(fiber, -1, -fiberCache.size())
-      oapCache.pendingFiberSize.addAndGet(-fiberCache.size())
-      logDebug(s"Fiber removed successfully. Fiber: $fiber")
+      bRemoving = false
     }
   }
 }
