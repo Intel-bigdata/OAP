@@ -21,17 +21,18 @@ import scala.util.Random
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
+import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.{ByteBufferOutputStream, Utils}
 
 class MemoryManagerSuite extends SharedOapContext {
-
   private var random: Random = _
   private var values: Seq[Any] = _
   private var fiberCache: FiberCache = _
@@ -81,7 +82,7 @@ class MemoryManagerSuite extends SharedOapContext {
       })
       val nnkw = new NonNullKeyWriter(schema)
       nnkw.writeKey(buf, InternalRow.fromSeq(values))
-      MemoryManager.putToDataFiberCache(buf.toByteArray)
+      MemoryManager.putToDataFiberCache(buf.toByteArray, false)
     }
   }
 
@@ -93,29 +94,59 @@ class MemoryManagerSuite extends SharedOapContext {
   override def beforeEach(): Unit = {}
   override def afterEach(): Unit = {}
 
+  def getValues: Array[Byte] = {
+    fiberCache.toArray
+  }
+
+  // TODO: find a nice way to create FSDataInputStream
+  def createInputStreamFromBytes(bytes: Array[Byte]): FSDataInputStream = {
+    val tempDir = Utils.createTempDir().getAbsolutePath
+    val fileName = new Path(tempDir, "temp")
+    val fs = fileName.getFileSystem(new Configuration())
+    val writer = fs.create(fileName)
+    writer.write(bytes)
+    writer.close()
+    fs.open(fileName)
+  }
+
   test("test data in IndexFiberCache") {
-    // TODO: find a nice way to create FSDataInputStream
-    def createInputStreamFromBytes(bytes: Array[Byte]): FSDataInputStream = {
-      val tempDir = Utils.createTempDir().getAbsolutePath
-      val fileName = new Path(tempDir, "temp")
-      val fs = fileName.getFileSystem(new Configuration())
-      val writer = fs.create(fileName)
-      writer.write(bytes)
-      writer.close()
-      fs.open(fileName)
-    }
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
     val is = createInputStreamFromBytes(bytes)
-    val indexFiberCache = MemoryManager.putToIndexFiberCache(is, 0, 10240)
+    val indexFiberCache = MemoryManager.putToIndexFiberCache(is, 0, 10240, false)
     assert(bytes === indexFiberCache.toArray)
+  }
+
+  test("test compressed data in IndexFiberCache") {
+    FiberCacheManager.setCompressionConf(indexEnable = true, indexCodec = "SNAPPY")
+    val bytes = new Array[Byte](10240)
+    random.nextBytes(bytes)
+    val is = createInputStreamFromBytes(bytes)
+    val indexFiberCache = MemoryManager.putToIndexFiberCache(is, 0, 10240, true)
+    val compressor = FiberCacheManager.getCodecFactory.getCompressor(
+      CompressionCodec.valueOf(FiberCacheManager.indexCacheCompressionCodec))
+    val compressedBytes = compressor.compress(bytes)
+    assert(compressedBytes === indexFiberCache.toArray)
+    FiberCacheManager.setCompressionConf()
   }
 
   test("test data in DataFiberCache") {
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
-    val dataFiberCache = MemoryManager.putToDataFiberCache(bytes)
+    val dataFiberCache = MemoryManager.putToDataFiberCache(bytes, false)
     assert(bytes === dataFiberCache.toArray)
+  }
+
+  test("test compressed data in DataFiberCache") {
+    FiberCacheManager.setCompressionConf(dataEnable = true, dataCodec = "SNAPPY")
+    val bytes = new Array[Byte](10240)
+    random.nextBytes(bytes)
+    val compressor = FiberCacheManager.getCodecFactory.getCompressor(
+      CompressionCodec.valueOf(FiberCacheManager.dataCacheCompressionCodec))
+    val compressedBytes = compressor.compress(bytes)
+    val dataFiberCache = MemoryManager.putToDataFiberCache(bytes, true)
+    assert(compressedBytes === dataFiberCache.toArray)
+    FiberCacheManager.setCompressionConf()
   }
 
   test("test FiberCache readInt") {
@@ -157,10 +188,58 @@ class MemoryManagerSuite extends SharedOapContext {
     }
   }
 
+  test("test compressed FiberCache readInt") {
+    FiberCacheManager.setCompressionConf(dataEnable = true, dataCodec = "SNAPPY")
+    val compressedFiber =
+      TestFiber((enableCompress: Boolean) =>
+        MemoryManager.putToDataFiberCache(getValues, enableCompress),
+        s"test fiber #1.0", enableCompress = true)
+    // Return DecompressFiberCache
+    val decompressFiberCache = FiberCacheManager.get(compressedFiber, new Configuration())
+    assert(decompressFiberCache.isInstanceOf[DecompressFiberCache])
+    var offset = 0
+    values.foreach {
+      case bool: Boolean =>
+        assert(decompressFiberCache.getBoolean(offset) === bool)
+        offset += BooleanType.defaultSize
+      case short: Short =>
+        assert(decompressFiberCache.getShort(offset) === short)
+        offset += ShortType.defaultSize
+      case byte: Byte =>
+        assert(decompressFiberCache.getByte(offset) === byte)
+        offset += ByteType.defaultSize
+      case int: Int =>
+        assert(decompressFiberCache.getInt(offset) === int)
+        offset += IntegerType.defaultSize
+      case long: Long =>
+        assert(decompressFiberCache.getLong(offset) === long)
+        offset += LongType.defaultSize
+      case float: Float =>
+        assert(decompressFiberCache.getFloat(offset) === float)
+        offset += FloatType.defaultSize
+      case double: Double =>
+        assert(decompressFiberCache.getDouble(offset) === double)
+        offset += DoubleType.defaultSize
+      case string: UTF8String =>
+        val length = decompressFiberCache.getInt(offset)
+        assert(length === string.numBytes())
+        offset += IntegerType.defaultSize
+        assert(decompressFiberCache.getUTF8String(offset, length) === string)
+        offset += length
+      case bytes: Array[Byte] =>
+        val length = decompressFiberCache.getInt(offset)
+        assert(length === bytes.length)
+        offset += IntegerType.defaultSize
+        assert(decompressFiberCache.getBytes(offset, length) === bytes)
+        offset += length
+    }
+    FiberCacheManager.setCompressionConf()
+  }
+
   test("check invalidate FiberCache") {
     // 1. disposed FiberCache
     val bytes = new Array[Byte](1024)
-    val fiberCache = MemoryManager.putToDataFiberCache(bytes)
+    val fiberCache = MemoryManager.putToDataFiberCache(bytes, false)
     fiberCache.realDispose()
     val exception = intercept[OapException]{
       fiberCache.getByte(0)

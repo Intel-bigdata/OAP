@@ -761,6 +761,40 @@ object SQLConf {
         .intConf
         .createWithDefault(1024 * 1024)
 
+  val OAP_ENABLE_INDEX_FIBER_CACHE_COMPRESSION =
+    SQLConfigBuilder("spark.oap.index.fiber.cache.compress.enable")
+      .internal()
+      .doc("To indicate if enable/disable index fiber cache compression")
+      .booleanConf
+      .createWithDefault(false)
+
+  val OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION =
+    SQLConfigBuilder("spark.oap.data.fiber.cache.compress.enable")
+      .internal()
+      .doc("To indicate if enable/disable data fiber cache compression")
+      .booleanConf
+      .createWithDefault(false)
+
+  val OAP_INDEX_FIBER_CACHE_COMPRESSION_Codec =
+    SQLConfigBuilder("spark.oap.index.fiber.cache.compression.codec")
+    .internal()
+    .doc("Sets the compression codec use when writing index fiber cache. " +
+      "Acceptable values include: uncompressed, snappy, gzip, lzo.")
+    .stringConf
+    .transform(_.toUpperCase())
+    .checkValues(Set("UNCOMPRESSED", "SNAPPY", "GZIP", "LZO"))
+    .createWithDefault("GZIP")
+
+  val OAP_DATA_FIBER_CACHE_COMPRESSION_Codec =
+    SQLConfigBuilder("spark.oap.data.fiber.cache.compression.codec")
+      .internal()
+      .doc("Sets the compression codec use when writing data fiber cache." +
+        " Acceptable values include: uncompressed, snappy, gzip, lzo.")
+      .stringConf
+      .transform(_.toUpperCase())
+      .checkValues(Set("UNCOMPRESSED", "SNAPPY", "GZIP", "LZO"))
+      .createWithDefault("GZIP")
+
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
   }

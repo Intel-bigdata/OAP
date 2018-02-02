@@ -63,7 +63,8 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     } else dictionaries(fiberId)
   }
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache = {
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration,
+                   enableCompress: Boolean): FiberCache = {
     val groupMeta = meta.rowGroupsMeta(groupId)
     val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
 
@@ -104,7 +105,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     // We have to read Array[Byte] from file and decode/decompress it before putToFiberCache
     // TODO: Try to finish this in off-heap memory
     val data = fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
-    MemoryManager.putToDataFiberCache(data)
+    MemoryManager.putToDataFiberCache(data, enableCompress)
   }
 
   def closeRowGroup(fiber: Fiber, fiberCache: FiberCache): Unit = {
@@ -118,7 +119,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     val iterator =
       (0 until meta.groupCount).iterator.flatMap { groupId =>
         val fiberCacheGroup = requiredIds.map(id =>
-          FiberCacheManager.get(DataFiber(this, id, groupId), conf))
+          FiberCacheManager.get(DataFiber(this, id, groupId, enableCompress = true), conf))
 
         val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
           new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache)
@@ -132,7 +133,8 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
         }
         CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
           fiberCacheGroup.zip(requiredIds).foreach {
-            case (fiberCache, id) => closeRowGroup(DataFiber(this, id, groupId), fiberCache)
+            case (fiberCache, id) => closeRowGroup(DataFiber(this, id, groupId,
+              enableCompress = true), fiberCache)
           }
         )
       }
@@ -148,7 +150,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
       groupIds.iterator.flatMap {
         case (groupId, subRowIds) =>
           val fiberCacheGroup = requiredIds.map(id =>
-            FiberCacheManager.get(DataFiber(this, id, groupId), conf))
+            FiberCacheManager.get(DataFiber(this, id, groupId, enableCompress = true), conf))
 
           val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
             new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache)
@@ -166,7 +168,8 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
 
           CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
             fiberCacheGroup.zip(requiredIds).foreach {
-              case (fiberCache, id) => closeRowGroup(DataFiber(this, id, groupId), fiberCache)
+              case (fiberCache, id) => closeRowGroup(DataFiber(this, id, groupId,
+                enableCompress = true), fiberCache)
             }
           )
       }

@@ -108,8 +108,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   override def next(): Int = bmRowIdIterator.next()
 
-  private def loadBmFooter(fin: FSDataInputStream): FiberCache = {
-    MemoryManager.putToIndexFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE)
+  private def loadBmFooter(fin: FSDataInputStream, enableCompress: Boolean): FiberCache = {
+    MemoryManager.putToIndexFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE, enableCompress)
   }
 
   override protected def analyzeStatistics(indexPath: Path, conf: Configuration): Double = {
@@ -126,10 +126,11 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     bmNullEntrySize = data.getInt(IndexUtils.INT_SIZE * 6)
   }
 
-  private def loadBmKeyList(fin: FSDataInputStream): FiberCache = {
+  private def loadBmKeyList(fin: FSDataInputStream, enableCompress: Boolean): FiberCache = {
     // TODO: seems not supported yet on my local dev machine(hadoop is 2.7.3).
     // fin.setReadahead(bmUniqueKeyListTotalSize)
-    MemoryManager.putToIndexFiberCache(fin, bmUniqueKeyListOffset, bmUniqueKeyListTotalSize)
+    MemoryManager.putToIndexFiberCache(fin, bmUniqueKeyListOffset, bmUniqueKeyListTotalSize,
+      enableCompress)
   }
 
   private def readBmUniqueKeyListFromCache(data: FiberCache): IndexedSeq[InternalRow] = {
@@ -142,16 +143,17 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     })
   }
 
-  private def loadBmEntryList(fin: FSDataInputStream): FiberCache = {
-    MemoryManager.putToIndexFiberCache(fin, bmEntryListOffset, bmEntryListTotalSize)
+  private def loadBmEntryList(fin: FSDataInputStream, enableCompress: Boolean): FiberCache = {
+    MemoryManager.putToIndexFiberCache(fin, bmEntryListOffset, bmEntryListTotalSize, enableCompress)
   }
 
-  private def loadBmOffsetList(fin: FSDataInputStream): FiberCache = {
-    MemoryManager.putToIndexFiberCache(fin, bmOffsetListOffset, bmOffsetListTotalSize)
+  private def loadBmOffsetList(fin: FSDataInputStream, enableCompress: Boolean): FiberCache = {
+    MemoryManager.putToIndexFiberCache(fin, bmOffsetListOffset, bmOffsetListTotalSize,
+      enableCompress)
   }
 
-  private def loadBmNullList(fin: FSDataInputStream): FiberCache = {
-    MemoryManager.putToIndexFiberCache(fin, bmNullEntryOffset, bmNullEntrySize)
+  private def loadBmNullList(fin: FSDataInputStream, enableCompress: Boolean): FiberCache = {
+    MemoryManager.putToIndexFiberCache(fin, bmNullEntryOffset, bmNullEntrySize, enableCompress)
   }
 
   private def checkVersionNum(versionNum: Int, fin: FSDataInputStream): Unit = {
@@ -172,8 +174,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     val idxFileSize = fs.getFileStatus(idxPath).getLen.toInt
     bmFooterOffset = idxFileSize - BITMAP_FOOTER_SIZE
     // Cache the segments after first loading from file.
+    // UniqueKeyList and EntryList are suitable for compression, others not.
     bmFooterFiber = BitmapFiber(
-      () => loadBmFooter(fin), idxPath.toString, BitmapIndexSectionId.footerSection, 0)
+      (enableCompress: Boolean) => loadBmFooter(fin, enableCompress), idxPath.toString,
+      BitmapIndexSectionId.footerSection, 0, enableCompress = false)
     bmFooterCache = FiberCacheManager.get(bmFooterFiber, conf)
     checkVersionNum(getIndexVersionNum, fin)
     readBmFooterFromCache(bmFooterCache)
@@ -184,19 +188,23 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     bmOffsetListOffset = bmEntryListOffset + bmEntryListTotalSize + bmNullEntrySize
 
     bmUniqueKeyListFiber = BitmapFiber(
-        () => loadBmKeyList(fin), idxPath.toString, BitmapIndexSectionId.keyListSection, 0)
+        (enableCompress: Boolean) => loadBmKeyList(fin, enableCompress), idxPath.toString,
+      BitmapIndexSectionId.keyListSection, 0, enableCompress = true)
     bmUniqueKeyListCache = FiberCacheManager.get(bmUniqueKeyListFiber, conf)
 
     bmEntryListFiber = BitmapFiber(
-      () => loadBmEntryList(fin), idxPath.toString, BitmapIndexSectionId.entryListSection, 0)
+      (enableCompress: Boolean) => loadBmEntryList(fin, enableCompress), idxPath.toString,
+      BitmapIndexSectionId.entryListSection, 0, enableCompress = true)
     bmEntryListCache = FiberCacheManager.get(bmEntryListFiber, conf)
 
     bmOffsetListFiber = BitmapFiber(
-      () => loadBmOffsetList(fin), idxPath.toString, BitmapIndexSectionId.entryOffsetsSection, 0)
+      ( enableCompress: Boolean) => loadBmOffsetList(fin, enableCompress), idxPath.toString,
+      BitmapIndexSectionId.entryOffsetsSection, 0, enableCompress = false)
     bmOffsetListCache = FiberCacheManager.get(bmOffsetListFiber, conf)
 
     bmNullListFiber = BitmapFiber(
-      () => loadBmNullList(fin), idxPath.toString, BitmapIndexSectionId.entryNullSection, 0)
+      (enableCompress: Boolean) => loadBmNullList(fin, enableCompress), idxPath.toString,
+      BitmapIndexSectionId.entryNullSection, 0, enableCompress = false)
     bmNullListCache = FiberCacheManager.get(bmNullListFiber, conf)
 
     fin.close()

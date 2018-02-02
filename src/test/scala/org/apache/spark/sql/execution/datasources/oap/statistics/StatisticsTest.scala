@@ -79,5 +79,6 @@ abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
       val bytes = out.toByteArray
       override protected def fiberData: MemoryBlock =
         new MemoryBlock(bytes, Platform.BYTE_ARRAY_OFFSET, bytes.length)
+      override def decompressLength: Int = bytes.length
     }
 }

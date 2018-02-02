@@ -73,10 +73,10 @@ private[oap] case class BTreeIndexFileReader(
     }
   }
 
-  def readFooter(): FiberCache =
-    MemoryManager.putToIndexFiberCache(reader, footerIndex, footerLength)
+  def readFooter(enableCompress: Boolean): FiberCache =
+    MemoryManager.putToIndexFiberCache(reader, footerIndex, footerLength, enableCompress)
 
-  def readRowIdList(partIdx: Int): FiberCache = {
+  def readRowIdList(partIdx: Int, enableCompress: Boolean): FiberCache = {
     val partSize = rowIdListSizePerSection.toLong * IndexUtils.INT_SIZE
     val readLength = if (partIdx * partSize + partSize > rowIdListLength) {
       rowIdListLength % partSize
@@ -85,15 +85,16 @@ private[oap] case class BTreeIndexFileReader(
     }
     assert(readLength <= Int.MaxValue, "Size of each row id list partition is too large!")
     MemoryManager.putToIndexFiberCache(reader, rowIdListIndex + partIdx * partSize,
-      readLength.toInt)
+      readLength.toInt, enableCompress)
   }
 
   @deprecated("no need to read the whole row id list", "v0.3")
-  def readRowIdList(): FiberCache =
-    MemoryManager.putToIndexFiberCache(reader, rowIdListIndex, rowIdListLength.toInt)
+  def readRowIdList(enableCompress: Boolean): FiberCache =
+    MemoryManager.putToIndexFiberCache(reader, rowIdListIndex, rowIdListLength.toInt,
+      enableCompress)
 
-  def readNode(offset: Int, size: Int): FiberCache =
-    MemoryManager.putToIndexFiberCache(reader, nodesIndex + offset, size)
+  def readNode(offset: Int, size: Int, enableCompress: Boolean): FiberCache =
+    MemoryManager.putToIndexFiberCache(reader, nodesIndex + offset, size, enableCompress)
 
   def close(): Unit = reader.close()
 }

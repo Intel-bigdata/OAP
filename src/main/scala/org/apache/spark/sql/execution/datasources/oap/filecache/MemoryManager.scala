@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.annotation.concurrent.GuardedBy
 
 import org.apache.hadoop.fs.FSDataInputStream
+import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
@@ -37,6 +38,7 @@ trait FiberCache extends Logging {
 
   // In our design, fiberData should be a internal member.
   protected def fiberData: MemoryBlock
+  def decompressLength: Int
 
   @GuardedBy("FiberCache.this")
   private var _refCount: Long = 0L
@@ -137,15 +139,25 @@ object FiberCache {
   // Give test suite a way to convert Array[Byte] to FiberCache. For test purpose.
   private[oap] def apply(data: Array[Byte]): FiberCache = {
     val memoryBlock = new MemoryBlock(data, Platform.BYTE_ARRAY_OFFSET, data.length)
-    DataFiberCache(memoryBlock)
+    DataFiberCache(memoryBlock, data.length)
   }
 }
 
 // Data fiber caching, the in-memory representation can be found at [[DataFiberBuilder]]
-case class DataFiberCache(fiberData: MemoryBlock) extends FiberCache
+case class DataFiberCache(fiberData: MemoryBlock,
+                          decompressLength: Int) extends FiberCache
 
 // Index fiber caching, only used internally by Oap
-private[oap] case class IndexFiberCache(fiberData: MemoryBlock) extends FiberCache
+private[oap] case class IndexFiberCache(fiberData: MemoryBlock,
+                                        decompressLength: Int) extends FiberCache
+
+// Decompression fiber caching, only used when fiberCache enable compression.
+private [oap] case class DecompressFiberCache(fiberData: MemoryBlock,
+                                              decompressLength: Int,
+                                              fiberCache: FiberCache) extends FiberCache {
+  // fiberCache is really be managed by Cache, so its release function should by called.
+  override def release(): Unit = fiberCache.release()
+}
 
 /**
  * Memory Manager
@@ -203,29 +215,51 @@ private[oap] object MemoryManager extends Logging {
 
   // Used by IndexFile
   // TODO: putToFiberCache(in: Stream, position: Long, length: Int, type: FiberType)
-  def putToIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): IndexFiberCache = {
-    val bytes = new Array[Byte](length)
+  def putToIndexFiberCache(in: FSDataInputStream, position: Long, length: Int,
+                           enableCompress: Boolean): IndexFiberCache = {
+    var bytes = new Array[Byte](length)
     in.readFully(position, bytes)
-    val memoryBlock = allocate(bytes.length)
+    val realBytes = if (FiberCacheManager.indexCacheCompressEnable &&
+      enableCompress) {
+      // put compressed data to off-heap
+      val compressor = FiberCacheManager.getCodecFactory.getCompressor(
+        CompressionCodec.valueOf(FiberCacheManager.indexCacheCompressionCodec))
+      compressor.compress(bytes)
+    } else {
+      bytes
+    }
+    logDebug(s"IndexCache original length = ${bytes.length}," +
+      s"compressed length = ${realBytes.length}")
+    val memoryBlock = allocate(realBytes.length)
     Platform.copyMemory(
-      bytes,
+      realBytes,
       Platform.BYTE_ARRAY_OFFSET,
       memoryBlock.getBaseObject,
       memoryBlock.getBaseOffset,
-      bytes.length)
-    IndexFiberCache(memoryBlock)
+      realBytes.length)
+    IndexFiberCache(memoryBlock, bytes.length)
   }
 
   // Used by OapDataFile since we need to parse the raw data in on-heap memory before put it into
   // off-heap memory
-  def putToDataFiberCache(bytes: Array[Byte]): DataFiberCache = {
-    val memoryBlock = allocate(bytes.length)
+  def putToDataFiberCache(bytes: Array[Byte], enableCompress: Boolean): DataFiberCache = {
+    val realBytes = if ((FiberCacheManager.dataCacheCompressEnable) && enableCompress) {
+      // put compressed data to off-heap
+      val compressor = FiberCacheManager.getCodecFactory.getCompressor(
+        CompressionCodec.valueOf(FiberCacheManager.dataCacheCompressionCodec))
+      compressor.compress(bytes)
+    } else {
+      bytes
+    }
+    logDebug(s"DataCache original length = ${bytes.length}," +
+      s"compressed length = ${realBytes.length}")
+    val memoryBlock = allocate(realBytes.length)
     Platform.copyMemory(
-      bytes,
+      realBytes,
       Platform.BYTE_ARRAY_OFFSET,
       memoryBlock.getBaseObject,
       memoryBlock.getBaseOffset,
-      bytes.length)
-    DataFiberCache(memoryBlock)
+      realBytes.length)
+    DataFiberCache(memoryBlock, bytes.length)
   }
 }

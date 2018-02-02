@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.executor.custom.CustomManager
@@ -29,6 +30,9 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.unsafe.Platform
+import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
 
@@ -88,32 +92,87 @@ object FiberCacheManager extends Logging {
   private val SIMPLE_CACHE = "simple"
   private val DEFAULT_CACHE_STRATEGY = GUAVA_CACHE
 
-  private val cacheBackend: OapCache = {
+  private var (_cacheStrategy: String,
+    _indexCacheCompressEnable: Boolean,
+    _dataCacheCompressEnable: Boolean,
+    _indexCacheCompressionCodec: String,
+    _dataCacheCompressionCodec: String) = {
     val sparkEnv = SparkEnv.get
+    // Different options enable users to separately configure cache compression as needed.
     assert(sparkEnv != null, "Oap can't run without SparkContext")
-    val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
-    if (cacheName.equals(GUAVA_CACHE)) {
+    (sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY),
+      sparkEnv.conf.get(SQLConf.OAP_ENABLE_INDEX_FIBER_CACHE_COMPRESSION),
+      sparkEnv.conf.get(SQLConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION),
+      sparkEnv.conf.get(SQLConf.OAP_INDEX_FIBER_CACHE_COMPRESSION_Codec),
+      sparkEnv.conf.get(SQLConf.OAP_DATA_FIBER_CACHE_COMPRESSION_Codec))
+  }
+
+  private lazy val codecFactory = new CodecFactory(new Configuration())
+  def getCodecFactory: CodecFactory = {
+    codecFactory
+  }
+
+  private val cacheBackend: OapCache = {
+    if (_cacheStrategy.equals(GUAVA_CACHE)) {
       new GuavaOapCache(MemoryManager.cacheMemory, MemoryManager.cacheGuardianMemory)
-    } else if (cacheName.equals(SIMPLE_CACHE)) {
+    } else if (_cacheStrategy.equals(SIMPLE_CACHE)) {
+      _indexCacheCompressEnable = false
+      _dataCacheCompressEnable = false
       new SimpleOapCache()
     } else {
       throw new OapException("Unsupported cache strategy")
     }
   }
 
+  def indexCacheCompressEnable: Boolean = _indexCacheCompressEnable
+  def dataCacheCompressEnable: Boolean = _dataCacheCompressEnable
+  def indexCacheCompressionCodec: String = _indexCacheCompressionCodec
+  def dataCacheCompressionCodec: String = _dataCacheCompressionCodec
+
   // NOTE: all members' init should be placed before this line.
-  logDebug(s"Initialized FiberCacheManager")
+  logInfo(s"Initialized FiberCacheManager: " +
+    s"indexCacheCompressEnable = ${_indexCacheCompressEnable} " +
+    s"dataCacheCompressEnable = ${_dataCacheCompressEnable} " +
+    s"indexCacheCompressionCodec = ${_indexCacheCompressionCodec} " +
+    s"dataCacheCompressionCodec = ${_dataCacheCompressionCodec}")
 
   def get(fiber: Fiber, conf: Configuration): FiberCache = synchronized {
     logDebug(s"Getting Fiber: $fiber")
-    cacheBackend.get(fiber, conf)
+    val fiberCache = cacheBackend.get(fiber, conf)
+
+    val (enbaleCompress, decompressor) = if (_indexCacheCompressEnable &&
+      (fiber.isInstanceOf[BitmapFiber] || fiber.isInstanceOf[BTreeFiber])) {
+      (fiber.isCompress(), codecFactory.getDecompressor(
+        CompressionCodec.valueOf(_indexCacheCompressionCodec)))
+    } else if (_dataCacheCompressEnable && fiber.isInstanceOf[DataFiber]) {
+      (fiber.isCompress(), codecFactory.getDecompressor(
+        CompressionCodec.valueOf(_dataCacheCompressionCodec)))
+      // For Unit Test
+    } else if (fiber.isInstanceOf[TestFiber]) {
+      (fiber.isCompress(), codecFactory.getDecompressor(
+        CompressionCodec.valueOf(_dataCacheCompressionCodec)))
+    } else {
+      (false, null)
+    }
+
+    if (enbaleCompress && decompressor != null) {
+      // First, copy compressed data from off-heap to on-heap, then decompress the data.
+      val bytes = new Array[Byte](fiberCache.size().toInt)
+      fiberCache.copyMemoryToBytes(0, bytes)
+      val decompressBytes = decompressor.decompress(bytes, fiberCache.decompressLength)
+      val memoryBlock = new MemoryBlock(decompressBytes, Platform.BYTE_ARRAY_OFFSET,
+        decompressBytes.length)
+      DecompressFiberCache(memoryBlock, decompressBytes.length, fiberCache)
+    } else {
+      fiberCache
+    }
   }
 
   def removeIndexCache(indexName: String): Unit = synchronized {
     logDebug(s"Going to remove all index cache of $indexName")
     val fiberToBeRemoved = cacheBackend.getFibers.filter {
-      case BTreeFiber(_, file, _, _) => file.contains(indexName)
-      case BitmapFiber(_, file, _, _) => file.contains(indexName)
+      case BTreeFiber(_, file, _, _, _) => file.contains(indexName)
+      case BitmapFiber(_, file, _, _, _) => file.contains(indexName)
       case _ => false
     }
     cacheBackend.invalidateAll(fiberToBeRemoved)
@@ -156,6 +215,15 @@ object FiberCacheManager extends Logging {
     s"FiberCacheManager Statistics: { cacheCount=${cacheBackend.cacheCount}, " +
         s"usedMemory=${Utils.bytesToString(cacheSize)}, ${cacheStats.toDebugString} }"
   }
+
+  // Unit Test
+  def setCompressionConf(indexEnable: Boolean = false, dataEnable: Boolean = false,
+                    indexCodec: String = "GZIP", dataCodec: String = "GZIP"): Unit = {
+    _indexCacheCompressEnable = indexEnable
+    _dataCacheCompressEnable = dataEnable
+    _indexCacheCompressionCodec = indexCodec
+    _dataCacheCompressionCodec = dataCodec
+  }
 }
 
 private[oap] object DataFileHandleCacheManager extends Logging {
@@ -195,12 +263,15 @@ private[oap] object DataFileHandleCacheManager extends Logging {
 
 private[oap] trait Fiber {
   def fiber2Data(conf: Configuration): FiberCache
+  // To identify whether corresponding cache will be compressed.
+  def isCompress(): Boolean
 }
 
 private[oap]
-case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
+case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int,
+                     enableCompress: Boolean) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache =
-    file.getFiberData(rowGroupId, columnIndex, conf)
+    file.getFiberData(rowGroupId, columnIndex, conf, enableCompress)
 
   override def hashCode(): Int = (file.path + columnIndex + rowGroupId).hashCode
 
@@ -213,17 +284,23 @@ case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends 
   }
 
   override def toString: String = {
-    s"type: DataFiber rowGroup: $rowGroupId column: $columnIndex\n\tfile: ${file.path}"
+    s"type: DataFiber rowGroup: $rowGroupId column: $columnIndex " +
+      s"enableCompress: $enableCompress\n\tfile: ${file.path}"
+  }
+
+  override def isCompress(): Boolean = {
+    enableCompress
   }
 }
 
 private[oap]
 case class BTreeFiber(
-    getFiberData: () => FiberCache,
+    getFiberData: (Boolean) => FiberCache,
     file: String,
     section: Int,
-    idx: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+    idx: Int,
+    enableCompress: Boolean) extends Fiber {
+  override def fiber2Data(conf: Configuration): FiberCache = getFiberData(enableCompress)
 
   override def hashCode(): Int = (file + section + idx).hashCode
 
@@ -236,19 +313,24 @@ case class BTreeFiber(
   }
 
   override def toString: String = {
-    s"type: BTreeFiber section: $section idx: $idx\n\tfile: $file"
+    s"type: BTreeFiber section: $section idx: $idx enableCompress: $enableCompress \n\tfile: $file"
+  }
+
+  override def isCompress(): Boolean = {
+    enableCompress
   }
 }
 
 private[oap]
 case class BitmapFiber(
-    getFiberData: () => FiberCache,
+    getFiberData: (Boolean) => FiberCache,
     file: String,
     // "0" means no split sections within file.
     sectionIdxOfFile: Int,
     // "0" means no smaller loading units.
-    loadUnitIdxOfSection: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+    loadUnitIdxOfSection: Int,
+    enableCompress: Boolean) extends Fiber {
+  override def fiber2Data(conf: Configuration): FiberCache = getFiberData(enableCompress)
 
   override def hashCode(): Int = (file + sectionIdxOfFile + loadUnitIdxOfSection).hashCode
 
@@ -261,12 +343,18 @@ case class BitmapFiber(
   }
 
   override def toString: String = {
-    s"type: BitmapFiber section: $sectionIdxOfFile idx: $loadUnitIdxOfSection\n\tfile: $file"
+    s"type: BitmapFiber section: $sectionIdxOfFile idx: $loadUnitIdxOfSection" +
+      s" enableCompress: $enableCompress \n\tfile: $file"
+  }
+
+  override def isCompress(): Boolean = {
+    enableCompress
   }
 }
 
-private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getData()
+private[oap] case class TestFiber(getData: (Boolean) => FiberCache, name: String,
+                                  enableCompress: Boolean) extends Fiber {
+  override def fiber2Data(conf: Configuration): FiberCache = getData(enableCompress)
 
   override def hashCode(): Int = name.hashCode()
 
@@ -276,6 +364,10 @@ private[oap] case class TestFiber(getData: () => FiberCache, name: String) exten
   }
 
   override def toString: String = {
-    s"type: TestFiber name: $name"
+    s"type: TestFiber name: $name enableCompress: $enableCompress"
+  }
+
+  override def isCompress(): Boolean = {
+    enableCompress
   }
 }

@@ -51,8 +51,10 @@ private[index] case class BTreeIndexRecordReader(
   def initialize(path: Path, intervalArray: ArrayBuffer[RangeInterval]): Unit = {
     reader = BTreeIndexFileReader(configuration, path)
 
+    // Footer is suitable for compression.
     footerFiber = BTreeFiber(
-      () => reader.readFooter(), reader.file.toString, reader.footerSectionId, 0)
+      (enableCompress: Boolean) => reader.readFooter(enableCompress), reader.file.toString,
+      reader.footerSectionId, 0, enableCompress = true)
     footerCache = FiberCacheManager.get(footerFiber, configuration)
     footer = BTreeFooter(footerCache, schema)
 
@@ -63,10 +65,12 @@ private[index] case class BTreeIndexRecordReader(
       val groupedPos = (start until end).groupBy(i => i / reader.rowIdListSizePerSection)
       groupedPos.toIterator.flatMap {
         case (partIdx, subPosList) =>
+          // RowIdList is not suitable for compression.
           val rowIdListFiber = BTreeFiber(
-            () => reader.readRowIdList(partIdx),
+            (enableCompress: Boolean) => reader.readRowIdList(partIdx, enableCompress),
             reader.file.toString,
-            reader.rowIdListSectionId, partIdx)
+            reader.rowIdListSectionId, partIdx,
+            enableCompress = false)
 
           val rowIdListCache = FiberCacheManager.get(rowIdListFiber, configuration)
           val rowIdList = BTreeRowIdList(rowIdListCache)
@@ -111,11 +115,14 @@ private[index] case class BTreeIndexRecordReader(
       isStart: Boolean,
       findNext: Boolean): Int = {
 
+    // Node is suitable for compression.
     val nodeFiber = BTreeFiber(
-      () => reader.readNode(footer.getNodeOffset(nodeIdx), footer.getNodeSize(nodeIdx)),
+      (enableCompress: Boolean) => reader.readNode(footer.getNodeOffset(nodeIdx),
+        footer.getNodeSize(nodeIdx), enableCompress),
       reader.file.toString,
       reader.nodeSectionId,
-      nodeIdx
+      nodeIdx,
+      enableCompress = true
     )
     val nodeCache = FiberCacheManager.get(nodeFiber, configuration)
     val node = BTreeNodeData(nodeCache, schema)
@@ -135,10 +142,11 @@ private[index] case class BTreeIndexRecordReader(
           val offset = footer.getNodeOffset(nodeIdx + 1)
           val size = footer.getNodeSize(nodeIdx + 1)
           val nextNodeFiber = BTreeFiber(
-            () => reader.readNode(offset, size),
+            (enableCompress: Boolean) => reader.readNode(offset, size, enableCompress),
             reader.file.toString,
             reader.nodeSectionId,
-            nodeIdx + 1)
+            nodeIdx + 1,
+            enableCompress = true)
           val nextNodeCache = FiberCacheManager.get(nextNodeFiber, configuration)
           val nextNode = BTreeNodeData(nextNodeCache, schema)
           val rowPos = nextNode.getRowIdPos(0)

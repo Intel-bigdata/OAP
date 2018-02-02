@@ -44,7 +44,7 @@ private[oap] case class IndexFile(file: Path) extends CommonIndexFile {
     // TODO check if enough to fit in Int
     val fileLength = fs.getContentSummary(file).getLength
 
-    val fiberCache = MemoryManager.putToIndexFiberCache(fin, 0, fileLength.toInt)
+    val fiberCache = MemoryManager.putToIndexFiberCache(fin, 0, fileLength.toInt, false)
     fin.close()
     fiberCache
   }

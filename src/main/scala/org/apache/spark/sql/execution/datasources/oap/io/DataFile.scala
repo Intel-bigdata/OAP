@@ -36,7 +36,8 @@ abstract class DataFile {
   def configuration: Configuration
 
   def createDataFileHandle(): DataFileHandle
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache
+  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration,
+                   enableCompress: Boolean): FiberCache
   def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
   def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int])
   : Iterator[InternalRow]
