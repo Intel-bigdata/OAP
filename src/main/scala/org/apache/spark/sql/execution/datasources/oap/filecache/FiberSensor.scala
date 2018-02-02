@@ -19,6 +19,9 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.ConcurrentHashMap
 
+import com.google.common.base.Throwables
+import scala.collection.JavaConverters._
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
 import org.apache.spark.sql.execution.datasources.oap.IndexMeta
@@ -87,3 +90,25 @@ private[oap] trait AbstractFiberSensor extends Logging {
 }
 
 object FiberSensor extends AbstractFiberSensor
+
+object FiberCacheManagerSensor extends AbstractFiberSensor {
+  val executorToCacheManager = new ConcurrentHashMap[String, CacheStats]()
+
+  def summary(): CacheStats = executorToCacheManager.asScala.toMap.values
+    .foldLeft(CacheStats())((sum, cache) => sum + cache)
+
+  override def update(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
+    if (fiberInfo.customizedInfo.nonEmpty) {
+      try {
+        val cacheMetrics = CacheStats(fiberInfo.customizedInfo)
+        executorToCacheManager.put(fiberInfo.executorId, cacheMetrics)
+        logDebug(s"execID:${fiberInfo.executorId}, host:${fiberInfo.hostName}," +
+          s" ${cacheMetrics.toDebugString}")
+      } catch {
+        case t: Throwable =>
+          val stack = Throwables.getStackTraceAsString(t)
+          logError(s"FiberCacheManagerSensor parse json failed, $stack")
+      }
+    }
+  }
+}

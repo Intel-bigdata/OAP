@@ -136,7 +136,9 @@ private[spark] class Executor(
 
   private val customInfoClassNameSeq = Seq(
     "org.apache.spark.sql.execution.datasources.oap.filecache.OapFiberCacheHeartBeatMessager",
-    "org.apache.spark.sql.execution.datasources.oap.io.OapIndexHeartBeatMessager")
+    "org.apache.spark.sql.execution.datasources.oap.io.OapIndexHeartBeatMessager",
+    "org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManagerMessager"
+  )
   private val customManagerSeq: Seq[CustomManager] = customInfoClassNameSeq.map(cIC =>
     Utils.classForName(cIC).newInstance().asInstanceOf[CustomManager])
 
@@ -544,7 +546,8 @@ private[spark] class Executor(
       executorId,
       accumUpdates.toArray,
       env.blockManager.blockManagerId,
-      customManagerSeq.map(_.status(conf)))
+      customManagerSeq.map(m => (m.getClass.getName, m.status(conf)))
+        .filter(_._2.nonEmpty))
 
     try {
       val response = heartbeatReceiverRef.askWithRetry[HeartbeatResponse](

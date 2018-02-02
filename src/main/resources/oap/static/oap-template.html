@@ -1,0 +1,76 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<script id="cms-summary-template" type="text/html">
+  <h4 style="clear: left; display: inline-block;">Summary</h4>
+  <div class="container-fluid">
+    <div class="container-fluid">
+      <table id="summary-cms-table" class="table table-striped compact">
+        <thead>
+        <th></th>
+        <th><span data-toggle="tooltip"
+                  title="Memory used / total available memory for storage of data like RDD partitions cached in memory. ">Storage Memory</span>
+        </th>
+        <th>Cache Size/Count</th>
+        <th>BackendCache Size/Count</th>
+        <th>DataFiber Size/Count</th>
+        <th>IndexFiber Size/Count</th>
+        <th>PendingFiber Size/Count</th>
+        <th>Hit Rate(hit/miss)</th>
+        <th>Load Count</th>
+        <th><span data-toggle="tooltip"
+                  title="average time of load fiber">Load AvgTime(ms)</span></th>
+        <th>Eviction Count</th>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <h4 style="clear: left; display: inline-block;">Executors</h4>
+  <div class="container-fluid">
+    <div class="container-fluid">
+      <table id="active-cms-table" class="table table-striped compact">
+        <thead>
+        <tr>
+          <th><span data-toggle="tooltip" data-placement="right" title="ID of the executor">Executor ID</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="Address">Address</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="Status">Status</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="Storage Memory">Storage Memory</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="CacheSize/Count">
+              Cache Size/Count</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="BackendCache Size/Count">
+              BackendCache Size/Count</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="DataFiber Size/Count">
+              DataFiber Size/Count</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="IndexFiber Size/Count">
+              IndexFiber Size/Count</span></th>
+          <th><span data-toggle="tooltip" data-placement="top"
+                    title="PendingFiber Size/Count">PendingFiber Size/Count</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="Hit Rate (hit/miss)">Hit Rate
+              (hit/miss)</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="Load Count">Load Count</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="Load AvgTime">Load AvgTime(ms)</span></th>
+          <th><span data-toggle="tooltip" data-placement="top" title="Load AvgTime">Eviction Count</span></th>
+        </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</script>

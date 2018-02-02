@@ -14,21 +14,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.spark.status.api.v1
 
-package org.apache.spark.sql.execution.datasources.oap.listener
+import javax.ws.rs.{GET, Produces}
+import javax.ws.rs.core.MediaType
 
-import org.apache.spark.scheduler.{SparkListener, SparkListenerCustomInfoUpdate}
-import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCacheManagerSensor, FiberSensor}
+import org.apache.spark.oap.ui.{FiberCacheManagerPage, FiberCacheManagerSummary}
+import org.apache.spark.ui.SparkUI
 
-class FiberInfoListener extends SparkListener {
-  override def onCustomInfoUpdate(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
-    if (fiberInfo.clazzName.contains("OapFiberCacheHeartBeatMessager")) {
-      FiberSensor.update(fiberInfo)
-    } else if (fiberInfo.clazzName.contains("FiberCacheManagerMessager")) {
-      FiberCacheManagerSensor.update(fiberInfo)
+@Produces(Array(MediaType.APPLICATION_JSON))
+private[v1] class AllFiberCacheManagerListResource(ui: SparkUI) {
+
+  @GET
+  def executorList(): Seq[FiberCacheManagerSummary] = {
+    val listener = ui.executorsListener
+    listener.synchronized {
+      // The follow codes should be protected by `listener` to make sure no executors will be
+      // removed before we query their status. See SPARK-12784.
+      (0 until listener.activeStorageStatusList.size).map { statusId =>
+        FiberCacheManagerPage.getFiberCacheManagerInfo(listener, statusId)
+      }
     }
   }
-
-  // TODO: implements other events like `onExecutorAdded`, `onExecutorRemoved`, etc. to maintain
-  // the whole info picture on driver side.
 }
