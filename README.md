@@ -22,7 +22,7 @@ spark.memory.offHeap.size           20g
 4. Run spark by `bin/spark-sql`, `bin/spark-shell`, `sbin/start-thriftserver` or `bin/pyspark` and try our examples
 
 **NOTE**: 1. For spark standalone mode, you have to put `oap-<version>.jar` to both driver and executor since `spark.files` is not working. Also don't forget to update `extraClassPath`.
-          2. For yarn mode, we need to config all spark.driver.memory, spark.memory.offHeap.size and spark.yarn.executor.memoryOverhead to enable fiber cache.
+          2. For yarn mode, we need to config all spark.driver.memory, spark.memory.offHeap.size and spark.yarn.executor.memoryOverhead (should be close to offHeap.size) to enable fiber cache.
           3. The comprehensive guidence and example of OAP configuration can be referred @https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide. Briefly speaking, the recommanded configuration is one executor per one node with fully memory/computation capability.
 
 ## Example
@@ -68,9 +68,9 @@ Parquet Support - Enable OAP support for parquet files
 * Default: true
 * Usage: `sqlContext.conf.setConfString(SQLConf.OAP_PARQUET_ENABLED.key, "false")`
 
-Fiber Cache Size - Total Memory size to cache Fiber, configured by 'spark.memory.offHeap.size'
-* Default: `spark.memory.offHeap.size * 0.35`
-* Usage: Fiber cache locates in off heap storage memory, basically this size is about spark.memory.offHeap.size * spark.memory.storageFraction (default 0.5) * 0.7
+Fiber Cache Size - Total Memory size to cache Fiber, configured implicitly by 'spark.memory.offHeap.size'
+* Default Size: `spark.memory.offHeap.size * 0.7`
+* Usage: Fiber cache locates in off heap storage memory, basically this size is spark.memory.offHeap.size * 0.7. But as execution can borrow a few memory from storage in UnifiedMemoryManager mode, it may vary during execution.
 
 Full Scan Threshold - If the analysis result is above this threshold, it will go through the whole data file instead of read index data.
 * Default: 0.8
