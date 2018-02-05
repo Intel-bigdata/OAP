@@ -286,7 +286,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   override def data: Seq[Group] = {
     val factory = new SimpleGroupFactory(parquetSchema)
-    (0 until 1000).map(i => factory.newGroup()
+    (0 until 5000).map(i => factory.newGroup()
       .append("int32_field", i)
       .append("int64_field", 64L)
       .append("boolean_field", true)
@@ -321,13 +321,6 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val batch = iterator.next.asInstanceOf[ColumnarBatch]
-      (0 until 1000).foreach { idx =>
-        if (rowIds.contains(idx)) {
-          assert(!batch.isFiltered(idx))
-        } else {
-          assert(batch.isFiltered(idx))
-        }
-      }
       val rowIterator = batch.rowIterator()
       while (rowIterator.hasNext) {
         val row = rowIterator.next()
@@ -338,6 +331,70 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
     assert(rowIds.length == result.length)
     for (i <- rowIds.indices) {
       assert(rowIds(i) == result(i))
+    }
+  }
+
+  test("read by columnIds and empty rowIds array disable returningBatch") {
+    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration, context)
+    val requiredIds = Array(0, 1)
+    val rowIds = Array.emptyIntArray
+    val iterator = reader.iterator(configuration, requiredIds, rowIds)
+    assert(!iterator.hasNext)
+    val e = intercept[java.util.NoSuchElementException] {
+      iterator.next()
+    }.getMessage
+    assert(e.contains("next on empty iterator"))
+  }
+
+  test("read by columnIds and empty rowIds array enable returningBatch") {
+    val context = Some(VectorizedContext(null, null, returningBatch = true))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration, context)
+    val requiredIds = Array(0, 1)
+    val rowIds = Array.emptyIntArray
+    val iterator = reader.iterator(configuration, requiredIds, rowIds)
+    assert(!iterator.hasNext)
+    val e = intercept[java.util.NoSuchElementException] {
+      iterator.next()
+    }.getMessage
+    assert(e.contains("next on empty iterator"))
+  }
+
+  test("read by columnIds disable returningBatch") {
+    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration, context)
+    val requiredIds = Array(0)
+    val iterator = reader.iterator(configuration, requiredIds)
+    val result = ArrayBuffer[ Int ]()
+    while (iterator.hasNext) {
+      val row = iterator.next
+      result += row.getInt(0)
+    }
+    val length = data.length
+    assert(length == result.length)
+    for (i <- 0 until length) {
+      assert(i == result(i))
+    }
+  }
+
+  test("read by columnIds enable returningBatch") {
+    val context = Some(VectorizedContext(null, null, returningBatch = true))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration, context)
+    val requiredIds = Array(0)
+    val iterator = reader.iterator(configuration, requiredIds)
+    val result = ArrayBuffer[ Int ]()
+    while (iterator.hasNext) {
+      val batch = iterator.next.asInstanceOf[ColumnarBatch]
+      val batchIter = batch.rowIterator()
+      while (batchIter.hasNext) {
+        val row = batchIter.next
+        result += row.getInt(0)
+      }
+    }
+    val length = data.length
+    assert(length == result.length)
+    for (i <- 0 until length) {
+      assert(i == result(i))
     }
   }
 }

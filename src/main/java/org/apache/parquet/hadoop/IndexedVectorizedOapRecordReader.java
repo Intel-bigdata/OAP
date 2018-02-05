@@ -90,12 +90,6 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         super.initializeInternal();
     }
 
-
-    /**
-     * @return
-     * @throws IOException
-     * @throws InterruptedException
-     */
     @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
         resultBatch();
@@ -109,11 +103,6 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         return batchIdsIter != null && batchIdsIter.hasNext() || nextBatch();
     }
 
-    /**
-     * @return
-     * @throws IOException
-     * @throws InterruptedException
-     */
     @Override
     public Object getCurrentValue() throws IOException, InterruptedException {
         if (returnColumnarBatch) return columnarBatch;
