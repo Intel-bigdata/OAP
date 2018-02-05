@@ -23,7 +23,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
@@ -155,18 +154,5 @@ class MemoryManagerSuite extends SharedOapContext {
         assert(fiberCache.getBytes(offset, length) === bytes)
         offset += length
     }
-  }
-
-  test("check invalidate FiberCache") {
-    // 1. disposed FiberCache
-    val bytes = new Array[Byte](1024)
-    val fiberCache = MemoryManager.putToDataFiberCache(bytes)
-    fiberCache.realDispose()
-    val exception = intercept[OapException]{
-      fiberCache.getByte(0)
-    }
-    assert(exception.getMessage == "Try to access a freed memory")
-
-    // 2. TODO: test Invalidate MemoryBlock
   }
 }

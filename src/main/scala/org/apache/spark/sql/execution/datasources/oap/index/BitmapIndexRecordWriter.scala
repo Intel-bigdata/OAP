@@ -41,8 +41,8 @@ private[oap] object BitmapIndexSectionId {
   val entryListSection    : Int = 3 // bitmap entry list
   val entryNullSection    : Int = 4 // bitmap entry for null value rows
   val entryOffsetsSection : Int = 5 // bitmap entry offset list
-  val statisticsSection   : Int = 6 // keep the original statistics, not changed than before.
-  val footerSection       : Int = 7 // footer to save total key list size and length, total entry
+  val statsContentSection : Int = 6 // keep the original statistics, not changed than before.
+  val footerSection       : Int = 7 // footer to save the meta data for the above segments.
 }
 
 /* Below is the bitmap index general layout and sections.
@@ -52,18 +52,21 @@ private[oap] object BitmapIndexSectionId {
  * entryListSection        varied        bitmap entry list --
  *                                       Null key's entries are appended to the end
  * entryOffsetSection      varied        bitmap entry offset list
- * statisticsSection       varied        keep the original statistics, not changed than before.
- * footerSection           44(4 + 5*8)   footer to save total key list size and length, total entry
- * Index version number    4             list size, total offset list size, and also the original
- * Non-null key List Size  4             index end.
+ * statsContentSection     varied        keep the original statistics, not changed than before.
+ * footerSection           44(4 + 5*8)   save total key list size and length, total entry list
+ *                                       size, total offset list size, and stats meta data.
+ * Below is each entry description within footerSection.
+ * Index version number    4
+ * Non-null key List Size  4
  * Non-Null key count      4
  * Non-null key Entry Size 4
  * Offset Section Size     4
  * Null key entries offset 4
  * Null key entry size     4
- * Footer's start position 8
+ * stats offset position   8
+ * stats size              8
  *
- * TODO: 1. Bitmap index is suitable for the enumeration columns which actually has not many
+ * TODO: 1. Bitmap index is suitable for those columns which actually has not many
  *          unique values, thus we will load the key list and offset list respectively as a
  *          whole, rather than splitting into more smaller partial loading units.
  *       2. Bitmap index query will be limited for equal queries, thus each equal query will
@@ -81,6 +84,9 @@ private[oap] class BitmapIndexRecordWriter(
 
   private val rowMapBitmap = new mutable.HashMap[InternalRow, RoaringBitmap]()
   private var recordCount: Int = 0
+  private lazy val statisticsWriteManager = new StatisticsWriteManager {
+    this.initialize(BitMapIndexType, keySchema, configuration)
+  }
 
   private var bmEntryListOffset: Int = _
 
@@ -102,6 +108,7 @@ private[oap] class BitmapIndexRecordWriter(
       val bm = new RoaringBitmap()
       bm.add(recordCount)
       rowMapBitmap.put(v, bm)
+      statisticsWriteManager.addOapKey(v)
     } else {
       rowMapBitmap.get(v).get.add(recordCount)
     }
@@ -181,6 +188,8 @@ private[oap] class BitmapIndexRecordWriter(
     // The beginning of the footer are bitmap total size, key list size and offset total size.
     // Others keep back compatible and not changed than before.
     bmIndexEnd = bmEntryListOffset + bmEntryListTotalSize + bmNullEntrySize + bmOffsetListTotalSize
+    // The index end is also the starting position of statistics part.
+    val statSize = statisticsWriteManager.write(writer)
     IndexUtils.writeInt(writer, IndexFile.VERSION_NUM)
     IndexUtils.writeInt(writer, bmUniqueKeyListTotalSize)
     IndexUtils.writeInt(writer, bmUniqueKeyListCount)
@@ -189,18 +198,14 @@ private[oap] class BitmapIndexRecordWriter(
     IndexUtils.writeInt(writer, bmNullEntryOffset)
     IndexUtils.writeInt(writer, bmNullEntrySize)
     IndexUtils.writeLong(writer, bmIndexEnd)
-    IndexUtils.writeLong(writer, bmIndexEnd)
+    IndexUtils.writeLong(writer, statSize.toLong)
   }
 
   private def flushToFile(): Unit = {
-    val statisticsWriteManager = new StatisticsWriteManager
-    statisticsWriteManager.initialize(BitMapIndexType, keySchema, configuration)
     IndexUtils.writeHead(writer, IndexFile.VERSION_NUM)
     writeUniqueKeyList()
     writeBmEntryList()
     writeBmOffsetList()
-    // The index end is also the starting position of stats file.
-    // statisticsManager.write(writer)
     writeBmFooter()
   }
 }

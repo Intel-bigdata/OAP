@@ -26,23 +26,29 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManage
 import org.apache.spark.util.Utils
 
 private[spark] object OapMessageUtils {
+
+  private lazy val executorDataMapField =
+    classOf[CoarseGrainedSchedulerBackend].getDeclaredFields.find(
+      filed => filed.getName.endsWith("executorDataMap"))
+
   def sendMessageToExecutors(
       scheduler: CoarseGrainedSchedulerBackend, message: OapMessage): Unit = {
-      // TODO: why we can't just use executorDataMap?
-      val executorDataMapField =
-        classOf[CoarseGrainedSchedulerBackend].getDeclaredField(
-          "org$apache$spark$scheduler$cluster$CoarseGrainedSchedulerBackend$$executorDataMap")
-      executorDataMapField.setAccessible(true)
-      val executorDataMap =
-        executorDataMapField.get(scheduler).asInstanceOf[mutable.HashMap[String, AnyRef]]
-      for ((_, executorData) <- executorDataMap) {
-        val c = Utils.classForName("org.apache.spark.scheduler.cluster.ExecutorData")
-        val executorEndpointField = c.getDeclaredField("executorEndpoint")
-        executorEndpointField.setAccessible(true)
-        val executorEndpoint =
-          executorEndpointField.get(executorData).asInstanceOf[RpcEndpointRef]
-        executorEndpoint.send(message)
-      }
+    // TODO: why we can't just use executorDataMap?
+    executorDataMapField match {
+      case Some(field) =>
+        field.setAccessible(true)
+        val executorDataMap =
+          field.get(scheduler).asInstanceOf[mutable.HashMap[String, AnyRef]]
+        for ((_, executorData) <- executorDataMap) {
+          val c = Utils.classForName("org.apache.spark.scheduler.cluster.ExecutorData")
+          val executorEndpointField = c.getDeclaredField("executorEndpoint")
+          executorEndpointField.setAccessible(true)
+          val executorEndpoint =
+            executorEndpointField.get(executorData).asInstanceOf[RpcEndpointRef]
+          executorEndpoint.send(message)
+        }
+      case _ => throw new NoSuchFieldException("CoarseGrainedSchedulerBackend.executorDataMap")
+    }
   }
 
   def handleOapMessage(message: OapMessage): Unit = message match {

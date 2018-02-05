@@ -26,6 +26,7 @@ import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.util.Utils
 
 trait OapCache {
   def get(fiber: Fiber, conf: Configuration): FiberCache
@@ -35,7 +36,6 @@ trait OapCache {
   def invalidateAll(fibers: Iterable[Fiber]): Unit
   def cacheSize: Long
   def cacheCount: Long
-  // TODO: To be compatible with some test cases. But we shouldn't rely on Guava in trait.
   def cacheStats: CacheStats
   def pendingSize: Int
 }
@@ -50,7 +50,7 @@ class SimpleOapCache extends OapCache with Logging {
     val fiberCache = fiber.fiber2Data(conf)
     fiberCache.occupy()
     // We only use fiber for once, and CacheGuardian will dispose it after release.
-    cacheGuardian.addRemovalFiber(fiberCache)
+    cacheGuardian.addRemovalFiber(fiber, fiberCache)
     fiberCache
   }
 
@@ -67,7 +67,7 @@ class SimpleOapCache extends OapCache with Logging {
   override def cacheSize: Long = 0
 
   override def cacheStats: CacheStats = {
-    new CacheStats(0, 0, 0, 0, 0, 0)
+    CacheStats(0, 0, 0, 0, 0)
   }
 
   override def cacheCount: Long = 0
@@ -81,23 +81,24 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
   private val cacheGuardian = new CacheGuardian(cacheGuardianMemory)
   cacheGuardian.start()
 
-  private val MB: Double = 1024 * 1024
-  private val MAX_WEIGHT = (cacheMemory / MB).toInt
+  private val KB: Double = 1024
+  private val MAX_WEIGHT = (cacheMemory / KB).toInt
+  private val CONCURRENCY_LEVEL = 4
 
   // Total cached size for debug purpose
   private val _cacheSize: AtomicLong = new AtomicLong(0)
 
   private val removalListener = new RemovalListener[Fiber, FiberCache] {
     override def onRemoval(notification: RemovalNotification[Fiber, FiberCache]): Unit = {
-      logDebug(s"Add Cache into removal list: ${notification.getKey}")
-      cacheGuardian.addRemovalFiber(notification.getValue)
+      logDebug(s"Put fiber into removal list. Fiber: ${notification.getKey}")
+      cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
       _cacheSize.addAndGet(-notification.getValue.size())
     }
   }
 
   private val weigher = new Weigher[Fiber, FiberCache] {
     override def weigh(key: Fiber, value: FiberCache): Int =
-      math.ceil(value.size() / MB).toInt
+      math.ceil(value.size() / KB).toInt
   }
 
   /**
@@ -107,8 +108,10 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
   private def cacheLoader(fiber: Fiber, configuration: Configuration) =
     new Callable[FiberCache] {
       override def call(): FiberCache = {
-        logDebug(s"Loading Cache: $fiber")
+        val startLoadingTime = System.currentTimeMillis()
         val fiberCache = fiber.fiber2Data(configuration)
+        logDebug("Load missed fiber took %s. Fiber: %s"
+          .format(Utils.getUsedTimeMs(startLoadingTime), fiber))
         _cacheSize.addAndGet(fiberCache.size())
         fiberCache
       }
@@ -119,14 +122,24 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
     .removalListener(removalListener)
     .maximumWeight(MAX_WEIGHT)
     .weigher(weigher)
+    .concurrencyLevel(CONCURRENCY_LEVEL)
     .build[Fiber, FiberCache]()
 
   override def get(fiber: Fiber, conf: Configuration): FiberCache = {
-    val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
-    // Avoid loading a fiber larger than MAX_WEIGHT / 4, 4 is concurrency number
-    assert(fiberCache.size() <= MAX_WEIGHT * MB / 4, "Can't cache fiber larger than MAX_WEIGHT / 4")
-    fiberCache.occupy()
-    fiberCache
+    val readLock = FiberLockManager.getFiberLock(fiber).readLock()
+    readLock.lock()
+    try {
+      val fiberCache = cache.get(fiber, cacheLoader(fiber, conf))
+      // Avoid loading a fiber larger than MAX_WEIGHT / CONCURRENCY_LEVEL
+      assert(fiberCache.size() <= MAX_WEIGHT * KB / CONCURRENCY_LEVEL,
+        s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
+          s"with cache's MAX_WEIGHT" +
+          s"(${Utils.bytesToString(MAX_WEIGHT.toLong * KB.toLong)}) / $CONCURRENCY_LEVEL")
+      fiberCache.occupy()
+      fiberCache
+    } finally {
+      readLock.unlock()
+    }
   }
 
   override def getIfPresent(fiber: Fiber): FiberCache = cache.getIfPresent(fiber)
@@ -145,7 +158,16 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
 
   override def cacheSize: Long = _cacheSize.get()
 
-  override def cacheStats: CacheStats = cache.stats()
+  override def cacheStats: CacheStats = {
+    val stats = cache.stats()
+    CacheStats(
+      stats.hitCount(),
+      stats.missCount(),
+      stats.loadCount(),
+      stats.totalLoadTime(),
+      stats.evictionCount()
+    )
+  }
 
   override def cacheCount: Long = cache.size()
 
