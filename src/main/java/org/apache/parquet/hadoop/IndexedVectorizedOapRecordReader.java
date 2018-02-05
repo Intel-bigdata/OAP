@@ -48,6 +48,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     private int currentPageNumber;
     private int[] globalRowIds;
     private Iterator<IntList> rowIdsIter;
+    // for returnColumnarBatch is false.
     private IntListIterator batchIdsIter;
     private static final String IDS_MAP_STATE_ERROR_MSG =
             "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
@@ -102,7 +103,9 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         if (returnColumnarBatch) {
             return nextBatch();
         }
-
+        // if returnColumnarBatch
+        // batchIdsIter is null when init status && do nextBatch
+        // batchIdsIter is not null && batchIdsIter.hasNext is false do nextBatch
         return batchIdsIter != null && batchIdsIter.hasNext() || nextBatch();
     }
 
@@ -114,6 +117,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     @Override
     public Object getCurrentValue() throws IOException, InterruptedException {
         if (returnColumnarBatch) return columnarBatch;
+        // if returnColumnarBatch, use batchIdsIter && batchIdsIter.hasNext must true
         Preconditions.checkState(batchIdsIter.hasNext(), BATCH_IDS_ITER_STATE_ERROR_MSG);
         return columnarBatch.getRow(batchIdsIter.next());
     }
@@ -146,6 +150,8 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
             currentPageNumber++;
             return this.nextBatch();
         } else {
+            // if returnColumnarBatch, mark columnarBatch filtered status.
+            // else assignment batchIdsIter.
             if(returnColumnarBatch) {
                 columnarBatch.markAllFiltered();
                 for (Integer rowid : ids) {
