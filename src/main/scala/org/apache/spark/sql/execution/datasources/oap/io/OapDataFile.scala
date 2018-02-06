@@ -151,7 +151,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
 
   // full file scan
   def iterator(conf: Configuration, requiredIds: Array[Int]): OapIterator[InternalRow] = {
-    buildIterator(conf, requiredIds, None)
+    buildIterator(conf, requiredIds, rowIds = None)
   }
 
   // scan by given row ids, and we assume the rowIds are sorted
