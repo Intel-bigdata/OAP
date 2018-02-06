@@ -33,7 +33,7 @@ import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
-import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
+import org.apache.spark.sql.execution.datasources.oap.statistics.{StaticsAnalysisResult, StatisticsManager}
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
 
 private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
@@ -64,12 +64,6 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   private var bmFooterFiber: BitmapFiber = _
   private var bmFooterCache: FiberCache = _
 
-  private var bmStatsMetaFiber: BitmapFiber = _
-  private var bmStatsMetaCache: FiberCache = _
-
-  private var bmStatsContentFiber: BitmapFiber = _
-  private var bmStatsContentCache: FiberCache = _
-
   private var bmUniqueKeyListFiber: BitmapFiber = _
   private var bmUniqueKeyListCache: FiberCache = _
 
@@ -92,33 +86,6 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     if (!empty && bmRowIdIterator.hasNext) {
       true
     } else {
-      if (bmFooterFiber != null) {
-        bmFooterCache.release()
-      }
-
-      if (bmStatsMetaFiber != null) {
-        bmStatsMetaCache.release()
-      }
-
-      if (bmStatsContentFiber != null) {
-        bmStatsContentCache.release()
-      }
-
-      if (bmUniqueKeyListFiber != null) {
-        bmUniqueKeyListCache.release()
-      }
-
-      if (bmOffsetListFiber != null) {
-        bmOffsetListCache.release()
-      }
-
-      if (bmEntryListFiber != null) {
-        bmEntryListCache.release()
-      }
-
-      if (bmNullListFiber != null) {
-        bmNullListCache.release()
-      }
       false
     }
   }
@@ -152,20 +119,40 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   override protected def analyzeStatistics(indexPath: Path, conf: Configuration): Double = {
-    cacheBitmapFooterSegment(indexPath, conf)
-    // The stats offset and size are located in the end of bitmap footer segment.
-    // See the comments in BitmapIndexRecordWriter.scala.
-    val statsOffset = bmFooterCache.getLong(BITMAP_FOOTER_SIZE - IndexUtils.LONG_SIZE * 2)
-    val statsSize = bmFooterCache.getLong(BITMAP_FOOTER_SIZE - IndexUtils.LONG_SIZE)
-    // We expect stats fiber and cache to reside in memory for the whole lifecycle of BitmapScanner.
-    // Thus we will release them lazily together with other bitmap fiber and cache.
-    bmStatsContentFiber = BitmapFiber(
-      () => loadBmStatsContent(fin, statsOffset, statsSize),
-      indexPath.toString, BitmapIndexSectionId.statsContentSection, 0)
-    bmStatsContentCache = FiberCacheManager.get(bmStatsContentFiber, conf)
+    var result: Double = StaticsAnalysisResult.FULL_SCAN
+    var bmStatsContentCache: FiberCache = null
+    try {
+      cacheBitmapFooterSegment(indexPath, conf)
+      // The stats offset and size are located in the end of bitmap footer segment.
+      // See the comments in BitmapIndexRecordWriter.scala.
+      val statsOffset = bmFooterCache.getLong(BITMAP_FOOTER_SIZE - IndexUtils.LONG_SIZE * 2)
+      val statsSize = bmFooterCache.getLong(BITMAP_FOOTER_SIZE - IndexUtils.LONG_SIZE)
+      val bmStatsContentFiber = BitmapFiber(
+        () => loadBmStatsContent(fin, statsOffset, statsSize),
+        indexPath.toString, BitmapIndexSectionId.statsContentSection, 0)
+      bmStatsContentCache = FiberCacheManager.get(bmStatsContentFiber, conf)
 
-    val stats = StatisticsManager.read(bmStatsContentCache, 0, keySchema)
-    StatisticsManager.analyse(stats, intervalArray, conf)
+      val stats = StatisticsManager.read(bmStatsContentCache, 0, keySchema)
+      result = StatisticsManager.analyse(stats, intervalArray, conf)
+      result
+    } finally {
+      // The meaning of 'release' is to decrease the reference count of cache，
+      // instead of really free cache memory.
+      if (result != StaticsAnalysisResult.USE_INDEX) {
+        // We need to close FSDataInputStream and release bmFooterCache
+        // when the result is not equal USE_INDEX.
+        if (fin != null) {
+          fin.close()
+        }
+        if (bmFooterCache != null) {
+          bmFooterCache.release()
+        }
+      }
+      // bmStatsContentCache should be released every time.
+      if (bmStatsContentCache != null) {
+        bmStatsContentCache.release()
+      }
+    }
   }
 
   private def readBmFooterFromCache(data: FiberCache): Unit = {
@@ -341,16 +328,45 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   // TODO: If the index file is not changed, bypass the repetitive initialization for queries.
   override def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
-    assert(keySchema ne null)
-    // Currently OAP index type supports the column with one single field.
-    assert(keySchema.fields.length == 1)
-    this.ordering = GenerateOrdering.create(keySchema)
-    val idxPath = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
+    try {
+      assert(keySchema ne null)
+      // Currently OAP index type supports the column with one single field.
+      assert(keySchema.fields.length == 1)
+      this.ordering = GenerateOrdering.create(keySchema)
+      val idxPath = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
 
-    cacheBitmapAllSegments(idxPath, conf)
-    initDesiredRowIdIterator()
+      cacheBitmapAllSegments(idxPath, conf)
+      initDesiredRowIdIterator()
 
-    this
+      this
+    } finally {
+      // To ensure close FSDataInputStream and release FiberCache
+      // even though an exception is thrown.
+      if (fin != null) {
+        fin.close()
+      }
+      // These FiberCaches can be released because they have no practical use for this scanner when
+      // reach here.
+      if (bmFooterCache != null) {
+        bmFooterCache.release()
+      }
+
+      if (bmUniqueKeyListCache != null) {
+        bmUniqueKeyListCache.release()
+      }
+
+      if (bmOffsetListCache != null) {
+        bmOffsetListCache.release()
+      }
+
+      if (bmEntryListCache != null) {
+        bmEntryListCache.release()
+      }
+
+      if (bmNullListCache != null) {
+        bmNullListCache.release()
+      }
+    }
   }
 
   override def toString: String = "BitMapScanner"

@@ -516,17 +516,24 @@ private[oap] object DataSourceMeta {
   }
 
   def initialize(path: Path, jobConf: Configuration): DataSourceMeta = {
-    val fs = path.getFileSystem(jobConf)
-    val file = fs.getFileStatus(path)
-    val in = fs.open(path)
+    var in: FSDataInputStream = null
+    try {
+      val fs = path.getFileSystem(jobConf)
+      val file = fs.getFileStatus(path)
+      in = fs.open(path)
 
-    val fileHeader = readFileHeader(file, in)
-    val fileMetas = readFileMetas(fileHeader, in)
-    val indexMetas = readIndexMetas(fileHeader, in)
-    val schema = readSchema(fileHeader, in)
-    val dataReaderClassName = in.readUTF()
-    in.close()
-    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
+      val fileHeader = readFileHeader(file, in)
+      val fileMetas = readFileMetas(fileHeader, in)
+      val indexMetas = readIndexMetas(fileHeader, in)
+      val schema = readSchema(fileHeader, in)
+      val dataReaderClassName = in.readUTF()
+      DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
+    } finally {
+      // To ensure close FSDataInputStream even though an exception is thrown.
+      if (in != null) {
+        in.close()
+      }
+    }
   }
 
   def write(
