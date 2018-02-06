@@ -475,6 +475,7 @@ public final class ColumnarBatch {
   public void markValid(int rowId) {
     assert(filteredRows[rowId]);
     filteredRows[rowId] = false;
+    --numRowsFiltered;
   }
 
   /**
@@ -482,6 +483,7 @@ public final class ColumnarBatch {
    */
   public void markAllFiltered() {
       Arrays.fill(filteredRows, true);
+      numRowsFiltered = numRows;
   }
 
   /**
