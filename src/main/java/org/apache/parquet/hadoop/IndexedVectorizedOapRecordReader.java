@@ -91,19 +91,6 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     }
 
     @Override
-    public boolean nextKeyValue() throws IOException, InterruptedException {
-        resultBatch();
-
-        if (returnColumnarBatch) {
-            return nextBatch();
-        }
-        // if returnColumnarBatch
-        // batchIdsIter is null when init status && do nextBatch
-        // batchIdsIter is not null && batchIdsIter.hasNext is false do nextBatch
-        return batchIdsIter != null && batchIdsIter.hasNext() || nextBatch();
-    }
-
-    @Override
     public Object getCurrentValue() throws IOException, InterruptedException {
         if (returnColumnarBatch) return columnarBatch;
         // if returnColumnarBatch, use batchIdsIter && batchIdsIter.hasNext must true
@@ -148,6 +135,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
                 }
             } else {
                 batchIdsIter = ids.iterator();
+                numBatched = ids.size();
             }
             currentPageNumber++;
             return true;
