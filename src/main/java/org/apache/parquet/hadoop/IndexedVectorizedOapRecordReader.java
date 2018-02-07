@@ -20,7 +20,6 @@ import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FI
 import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -34,7 +33,6 @@ import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntListIterator;
 import org.apache.spark.sql.execution.datasources.oap.io.OapReadSupportImpl;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper;
 import org.apache.spark.sql.types.StructType$;
@@ -49,13 +47,13 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     private int[] globalRowIds;
     private Iterator<IntList> rowIdsIter;
     // for returnColumnarBatch is false.
-    private IntListIterator batchIdsIter;
+    private IntList batchIds;
     private static final String IDS_MAP_STATE_ERROR_MSG =
             "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
     private static final String IDS_ITER_STATE_ERROR_MSG =
             "The divideRowIdsIntoPages method should not be called when rowIdsIter hasNext if false.";
-    private static final String BATCH_IDS_ITER_STATE_ERROR_MSG =
-            "batchIdsIter.hasNext must true when call getCurrentValue && returnColumnarBatch is false.";
+    private static final String BATCH_IDS_NOT_NULL_ERROR_MSG =
+            "returnColumnarBatch is false, batchIds must not null.";
 
     public IndexedVectorizedOapRecordReader(
             Path file,
@@ -93,9 +91,11 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     @Override
     public Object getCurrentValue() throws IOException, InterruptedException {
         if (returnColumnarBatch) return columnarBatch;
-        // if returnColumnarBatch, use batchIdsIter && batchIdsIter.hasNext must true
-        Preconditions.checkState(batchIdsIter.hasNext(), BATCH_IDS_ITER_STATE_ERROR_MSG);
-        return columnarBatch.getRow(batchIdsIter.next());
+        Preconditions.checkNotNull(batchIds, "returnColumnarBatch = false, batchIds must not null.");
+        Preconditions.checkArgument(batchIdx <= numBatched, "batchIdx can not be more than numBatched");
+        Preconditions.checkArgument(batchIdx >= 1, "call nextKeyValue before getCurrentValue");
+        // batchIds (IntArrayList) is random access.
+        return columnarBatch.getRow(batchIds.get(batchIdx - 1));
     }
 
     /**
@@ -134,7 +134,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
                     columnarBatch.markValid(rowid);
                 }
             } else {
-                batchIdsIter = ids.iterator();
+                batchIds = ids;
                 numBatched = ids.size();
             }
             currentPageNumber++;
