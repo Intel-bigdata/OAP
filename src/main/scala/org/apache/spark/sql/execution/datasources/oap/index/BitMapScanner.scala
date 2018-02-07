@@ -231,8 +231,6 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     bmNullListFiber = BitmapFiber(
       () => loadBmNullList(fin), idxPath.toString, BitmapIndexSectionId.entryNullSection, 0)
     bmNullListCache = FiberCacheManager.get(bmNullListFiber, conf)
-
-    fin.close()
   }
 
   private def getStartIdxOffset(fiberCache: FiberCache, baseOffset: Long, startIdx: Int): Int = {

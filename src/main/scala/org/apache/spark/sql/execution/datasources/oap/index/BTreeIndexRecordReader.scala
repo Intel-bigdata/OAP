@@ -27,7 +27,6 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.filecache.{BTreeFiber, FiberCache, FiberCacheManager}
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
 import org.apache.spark.sql.types._
-import org.apache.spark.util.CompletionIterator
 
 
 private[index] case class BTreeIndexRecordReader(
@@ -59,10 +58,10 @@ private[index] case class BTreeIndexRecordReader(
 
       reader.checkVersionNum(footer.getVersionNum)
 
-      internalIterator = intervalArray.toIterator.flatMap { interval =>
+      internalIterator = intervalArray.flatMap { interval =>
         val (start, end) = findRowIdRange(interval)
         val groupedPos = (start until end).groupBy(i => i / reader.rowIdListSizePerSection)
-        groupedPos.toIterator.flatMap {
+        groupedPos.flatMap {
           case (partIdx, subPosList) =>
             val rowIdListFiber = BTreeFiber(
               () => reader.readRowIdList(partIdx),
@@ -72,9 +71,9 @@ private[index] case class BTreeIndexRecordReader(
             fiberCaches += FiberCacheManager.get(rowIdListFiber, configuration)
             val rowIdListCache = fiberCaches.last
             val rowIdList = BTreeRowIdList(rowIdListCache)
-            subPosList.toIterator.map(i => rowIdList.getRowId(i % reader.rowIdListSizePerSection))
+            subPosList.map(i => rowIdList.getRowId(i % reader.rowIdListSizePerSection))
         }
-      } // get the row ids
+      }.toIterator // get the row ids
     } finally {
       // To ensure close FSDataInputStream and release FiberCache
       // even though an exception is thrown. And these FiberCaches
