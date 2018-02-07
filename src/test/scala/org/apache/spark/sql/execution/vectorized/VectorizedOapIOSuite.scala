@@ -17,8 +17,10 @@
 package org.apache.spark.sql.execution.vectorized
 
 import scala.collection.mutable
+
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{IndexedVectorizedOapRecordReader, VectorizedOapRecordReader}
+
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
