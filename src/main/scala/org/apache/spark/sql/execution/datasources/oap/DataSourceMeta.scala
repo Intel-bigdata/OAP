@@ -385,9 +385,6 @@ private[oap] case class DataSourceMeta(
         checkInMetaSet(attrRef)
       case In(attrRef: AttributeReference, _) =>
         checkInMetaSet(attrRef)
-      // TODO: only ParquetFileFormat use this function, details in #555
-      case IsNotNull(attrRef: AttributeReference) if requirement.isDefined =>
-         checkInMetaSet(attrRef)
       case IsNull(attrRef: AttributeReference) =>
         checkInMetaSet(attrRef)
       case _ => false
