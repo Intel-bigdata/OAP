@@ -37,10 +37,16 @@ abstract class DataFile {
 
   def createDataFileHandle(): DataFileHandle
   def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache
-  def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow]
-  def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int])
-  : Iterator[InternalRow]
+  def iterator(conf: Configuration, requiredIds: Array[Int]): OapIterator[InternalRow]
+  def iterator(
+      conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int]): OapIterator[InternalRow]
   def getDictionary(fiberId: Int, conf: Configuration): Dictionary
+}
+
+private[oap] class OapIterator[T](inner: Iterator[T]) extends Iterator[T] with AutoCloseable {
+  override def hasNext: Boolean = inner.hasNext
+  override def next(): T = inner.next()
+  override def close(): Unit = {}
 }
 
 private[oap] object DataFile {

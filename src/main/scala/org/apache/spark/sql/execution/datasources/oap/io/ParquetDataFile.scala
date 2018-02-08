@@ -24,6 +24,7 @@ import org.apache.parquet.column.Dictionary
 import org.apache.parquet.hadoop.RecordReaderBuilder
 import org.apache.parquet.hadoop.api.RecordReader
 
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
@@ -38,30 +39,36 @@ private[oap] case class ParquetDataFile
     throw new UnsupportedOperationException("Not support getFiberData Operation.")
   }
 
-  def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[UnsafeRow] = {
+  def iterator(conf: Configuration, requiredIds: Array[Int]): OapIterator[InternalRow] = {
     val recordReader = recordReaderBuilder(conf, requiredIds)
       .buildDefault()
     recordReader.initialize()
-    new FileRecordReaderIterator[UnsafeRow](
-      recordReader.asInstanceOf[RecordReader[UnsafeRow]])
+    new OapIterator[InternalRow](new FileRecordReaderIterator[InternalRow](
+      recordReader.asInstanceOf[RecordReader[InternalRow]])) {
+      override def close(): Unit = recordReader.close()
+    }
   }
 
-  def iterator(conf: Configuration,
-               requiredIds: Array[Int],
-               rowIds: Array[Int]): Iterator[UnsafeRow] = {
+  def iterator(
+      conf: Configuration,
+      requiredIds: Array[Int],
+      rowIds: Array[Int]): OapIterator[InternalRow] = {
     if (rowIds == null || rowIds.length == 0) {
-      Iterator.empty
+      new OapIterator(Iterator.empty)
     } else {
       val recordReader = recordReaderBuilder(conf, requiredIds)
         .withGlobalRowIds(rowIds).buildIndexed()
       recordReader.initialize()
-      new FileRecordReaderIterator[UnsafeRow](
-        recordReader.asInstanceOf[RecordReader[UnsafeRow]])
+      new OapIterator[InternalRow](new FileRecordReaderIterator[InternalRow](
+        recordReader.asInstanceOf[RecordReader[InternalRow]])) {
+        override def close(): Unit = recordReader.close()
+      }
     }
   }
 
-  private def recordReaderBuilder(conf: Configuration,
-                                  requiredIds: Array[Int]): RecordReaderBuilder[UnsafeRow] = {
+  private def recordReaderBuilder(
+      conf: Configuration,
+      requiredIds: Array[Int]): RecordReaderBuilder[UnsafeRow] = {
     val requestSchemaString = {
       var requestSchema = new StructType
       for (index <- requiredIds) {

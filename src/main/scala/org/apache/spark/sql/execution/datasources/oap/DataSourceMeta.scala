@@ -25,9 +25,11 @@ import scala.collection.mutable.{ArrayBuffer, BitSet}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFile
 import org.apache.spark.sql.types._
+import org.apache.spark.util.ShutdownHookManager
 
 /**
  * The Oap meta file is organized in the following format.
@@ -438,7 +440,7 @@ private[oap] class DataSourceMetaBuilder {
   }
 }
 
-private[oap] object DataSourceMeta {
+private[oap] object DataSourceMeta extends Logging {
   final val MAGIC_NUMBER = "FIBER"
   final val VERSION = Version(1, 0, 0)
   final val FILE_HEAD_LEN = 32
@@ -514,17 +516,31 @@ private[oap] object DataSourceMeta {
   }
 
   def initialize(path: Path, jobConf: Configuration): DataSourceMeta = {
-    val fs = path.getFileSystem(jobConf)
-    val file = fs.getFileStatus(path)
-    val in = fs.open(path)
+    var in: FSDataInputStream = null
+    try {
+      val fs = path.getFileSystem(jobConf)
+      val file = fs.getFileStatus(path)
+      in = fs.open(path)
 
-    val fileHeader = readFileHeader(file, in)
-    val fileMetas = readFileMetas(fileHeader, in)
-    val indexMetas = readIndexMetas(fileHeader, in)
-    val schema = readSchema(fileHeader, in)
-    val dataReaderClassName = in.readUTF()
-    in.close()
-    DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
+      val fileHeader = readFileHeader(file, in)
+      val fileMetas = readFileMetas(fileHeader, in)
+      val indexMetas = readIndexMetas(fileHeader, in)
+      val schema = readSchema(fileHeader, in)
+      val dataReaderClassName = in.readUTF()
+      DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
+    } finally {
+      try {
+        if (in != null) in.close()
+      } catch {
+        case e: Exception =>
+          if (!ShutdownHookManager.inShutdown()) {
+            logWarning("Exception in RecordReader.close()", e)
+          }
+      } finally {
+        in = null
+      }
+
+    }
   }
 
   def write(

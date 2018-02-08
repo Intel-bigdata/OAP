@@ -29,7 +29,6 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.types._
-import org.apache.spark.util.CompletionIterator
 
 
 private[oap] case class OapDataFile(path: String, schema: StructType,
@@ -113,7 +112,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
 
   // full file scan
   // TODO: [linhong] two iterator functions are similar. Can we merge them?
-  def iterator(conf: Configuration, requiredIds: Array[Int]): Iterator[InternalRow] = {
+  def iterator(conf: Configuration, requiredIds: Array[Int]): OapIterator[InternalRow] = {
     val row = new BatchColumn()
     val iterator =
       (0 until meta.groupCount).iterator.flatMap { groupId =>
@@ -130,18 +129,23 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
         } else {
           row.reset(meta.rowCountInLastGroup, columns).toIterator
         }
-        CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
-          fiberCacheGroup.zip(requiredIds).foreach {
-            case (fiberCache, id) => closeRowGroup(DataFiber(this, id, groupId), fiberCache)
+        new OapIterator[InternalRow](iterator) {
+          override def close(): Unit = fiberCacheGroup.zip(requiredIds).foreach {
+            case (fiberCache, id) =>
+              closeRowGroup(DataFiber(OapDataFile.this, id, groupId), fiberCache)
           }
-        )
+        }
       }
-    CompletionIterator[InternalRow, Iterator[InternalRow]](iterator, close())
+    new OapIterator[InternalRow](iterator) {
+      override def close(): Unit = OapDataFile.this.close()
+    }
   }
 
   // scan by given row ids, and we assume the rowIds are sorted
-  def iterator(conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int])
-  : Iterator[InternalRow] = {
+  def iterator(
+      conf: Configuration,
+      requiredIds: Array[Int],
+      rowIds: Array[Int]): OapIterator[InternalRow] = {
     val row = new BatchColumn()
     val groupIds = rowIds.groupBy(rowId => rowId / meta.rowCountInEachGroup)
     val iterator =
@@ -164,13 +168,16 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
           val iterator =
             subRowIds.iterator.map(rowId => row.moveToRow(rowId % meta.rowCountInEachGroup))
 
-          CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
-            fiberCacheGroup.zip(requiredIds).foreach {
-              case (fiberCache, id) => closeRowGroup(DataFiber(this, id, groupId), fiberCache)
+          new OapIterator[InternalRow](iterator) {
+            override def close(): Unit = fiberCacheGroup.zip(requiredIds).foreach {
+              case (fiberCache, id) =>
+                closeRowGroup(DataFiber(OapDataFile.this, id, groupId), fiberCache)
             }
-          )
+          }
       }
-    CompletionIterator[InternalRow, Iterator[InternalRow]](iterator, close())
+    new OapIterator[InternalRow](iterator) {
+      override def close(): Unit = OapDataFile.this.close()
+    }
   }
 
   def close(): Unit = {

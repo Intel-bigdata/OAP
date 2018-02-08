@@ -20,15 +20,17 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.unsafe.Platform
+import org.apache.spark.util.ShutdownHookManager
 
 private[oap] case class BTreeIndexFileReader(
     configuration: Configuration,
-    file: Path) {
+    file: Path) extends Logging {
 
   private val VERSION_SIZE = IndexFile.VERSION_LENGTH
   private val FOOTER_LENGTH_SIZE = IndexUtils.INT_SIZE
@@ -42,7 +44,7 @@ private[oap] case class BTreeIndexFileReader(
   val rowIdListSizePerSection: Int =
     configuration.getInt(SQLConf.OAP_BTREE_ROW_LIST_PART_SIZE.key, 1024 * 1024)
 
-  private val (reader, fileLength) = {
+  private lazy val (reader, fileLength) = {
     val fs = file.getFileSystem(configuration)
     (fs.open(file), fs.getFileStatus(file).getLen)
   }
@@ -68,7 +70,6 @@ private[oap] case class BTreeIndexFileReader(
 
   def checkVersionNum(versionNum: Int): Unit = {
     if (IndexFile.VERSION_NUM != versionNum) {
-      reader.close()
       throw new OapException("Btree Index File version is not compatible!")
     }
   }
@@ -95,5 +96,12 @@ private[oap] case class BTreeIndexFileReader(
   def readNode(offset: Int, size: Int): FiberCache =
     MemoryManager.putToIndexFiberCache(reader, nodesIndex + offset, size)
 
-  def close(): Unit = reader.close()
+  def close(): Unit = try {
+    reader.close()
+  } catch {
+    case e: Exception =>
+      if (!ShutdownHookManager.inShutdown()) {
+        logWarning("Exception in RecordReader.close()", e)
+      }
+  }
 }

@@ -148,6 +148,18 @@ trait FiberCache extends Logging {
   def size(): Long = fiberData.size()
 }
 
+case class WrappedFiberCache(fc: FiberCache) {
+  private var released = false
+
+  def release(): Unit = synchronized {
+    try {
+      if (!released) fc.release()
+    } finally {
+      released = true
+    }
+  }
+}
+
 object FiberCache {
   // Give test suite a way to convert Array[Byte] to FiberCache. For test purpose.
   private[oap] def apply(data: Array[Byte]): FiberCache = {

@@ -28,6 +28,7 @@ import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.parquet.hadoop.util.SerializationUtil
 
+import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
@@ -307,6 +308,7 @@ private[sql] class OapFileFormat extends FileFormat
             val reader = new OapDataReader(
               new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
             val iter = reader.initialize(conf, options)
+            Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
             selectedRows.add(reader.selectedRows.getOrElse(totalRows))
             skippedRows.add(totalRows - reader.selectedRows.getOrElse(totalRows))
 

@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.index.BTreeIndexRecordReader.BTreeFooter
-import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
+import org.apache.spark.sql.execution.datasources.oap.statistics.{StaticsAnalysisResult, StatisticsManager}
 
 // we scan the index from the smallest to the largest,
 // this will scan the B+ Tree (index) leaf node.
@@ -48,19 +48,25 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
   }
 
   override protected def analyzeStatistics(indexPath: Path, conf: Configuration): Double = {
-    // TODO decouple with btreeindexrecordreader
-    // This is called before the scanner call `initialize`
-    val reader = BTreeIndexFileReader(conf, indexPath)
-    val footerFiber = BTreeFiber(
-      () => reader.readFooter(), reader.file.toString, reader.footerSectionId, 0)
-    val footerCache = FiberCacheManager.get(footerFiber, conf)
-    val footer = BTreeFooter(footerCache, keySchema)
-    val offset = footer.getStatsOffset
+    var reader: BTreeIndexFileReader = null
+    var footerCache: FiberCache = null
+    try {
+      // TODO decouple with btreeindexrecordreader
+      // This is called before the scanner call `initialize`
+      reader = BTreeIndexFileReader(conf, indexPath)
+      val footerFiber = BTreeFiber(
+        () => reader.readFooter(), reader.file.toString, reader.footerSectionId, 0)
+      footerCache = FiberCacheManager.get(footerFiber, conf)
+      val footer = BTreeFooter(footerCache, keySchema)
+      val offset = footer.getStatsOffset
 
-    val stats = StatisticsManager.read(footerCache, offset, keySchema)
-    val result = StatisticsManager.analyse(stats, intervalArray, conf)
-    footerCache.release()
-    result
+      val stats = StatisticsManager.read(footerCache, offset, keySchema)
+      val result = StatisticsManager.analyse(stats, intervalArray, conf)
+      result
+    } finally {
+      if (footerCache != null) footerCache.release()
+      if (reader != null) reader.close()
+    }
   }
 
   override def hasNext: Boolean = recordReader.hasNext
