@@ -530,11 +530,13 @@ private[oap] object DataSourceMeta extends Logging {
       DataSourceMeta(fileMetas, indexMetas, schema, dataReaderClassName, fileHeader)
     } finally {
       try {
-        if (in != null) in.close()
+        if (in != null) {
+          in.close()
+        }
       } catch {
         case e: Exception =>
           if (!ShutdownHookManager.inShutdown()) {
-            logWarning("Exception in RecordReader.close()", e)
+            logWarning("Exception in FSDataInputStream.close()", e)
           }
       } finally {
         in = null

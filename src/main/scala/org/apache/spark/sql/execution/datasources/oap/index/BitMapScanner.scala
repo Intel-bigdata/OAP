@@ -134,11 +134,13 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     } finally {
       if (bmStatsContentCache != null) bmStatsContentCache.release()
       try {
-        if (fin != null) fin.close()
+        if (fin != null) {
+          fin.close()
+        }
       } catch {
         case e: Exception =>
           if (!ShutdownHookManager.inShutdown()) {
-            logWarning("Exception in RecordReader.close()", e)
+            logWarning("Exception in FSDataInputStream.close()", e)
           }
       } finally {
         fin = null
@@ -230,7 +232,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       } catch {
         case e: Exception =>
           if (!ShutdownHookManager.inShutdown()) {
-            logWarning("Exception in RecordReader.close()", e)
+            logWarning("Exception in FSDataInputStream.close()", e)
           }
       } finally {
         fin = null

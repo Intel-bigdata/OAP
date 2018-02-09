@@ -43,9 +43,10 @@ private[oap] case class ParquetDataFile
     val recordReader = recordReaderBuilder(conf, requiredIds)
       .buildDefault()
     recordReader.initialize()
-    new OapIterator[InternalRow](new FileRecordReaderIterator[InternalRow](
-      recordReader.asInstanceOf[RecordReader[InternalRow]])) {
-      override def close(): Unit = recordReader.close()
+    val iterator = new FileRecordReaderIterator[InternalRow](
+      recordReader.asInstanceOf[RecordReader[InternalRow]])
+    new OapIterator[InternalRow](iterator) {
+      override def close(): Unit = iterator.close()
     }
   }
 
@@ -59,9 +60,10 @@ private[oap] case class ParquetDataFile
       val recordReader = recordReaderBuilder(conf, requiredIds)
         .withGlobalRowIds(rowIds).buildIndexed()
       recordReader.initialize()
-      new OapIterator[InternalRow](new FileRecordReaderIterator[InternalRow](
-        recordReader.asInstanceOf[RecordReader[InternalRow]])) {
-        override def close(): Unit = recordReader.close()
+      val iterator = new FileRecordReaderIterator[InternalRow](
+        recordReader.asInstanceOf[RecordReader[InternalRow]])
+      new OapIterator[InternalRow](iterator) {
+        override def close(): Unit = iterator.close()
       }
     }
   }
@@ -93,7 +95,10 @@ private[oap] case class ParquetDataFile
 
     override def hasNext: Boolean = {
       if (!finished && !havePair) {
-        finished = !rowReader.nextKeyValue
+        if (!rowReader.nextKeyValue) {
+          rowReader.close()
+          finished = true
+        }
         havePair = !finished
       }
       !finished
@@ -105,6 +110,10 @@ private[oap] case class ParquetDataFile
       }
       havePair = false
       rowReader.getCurrentValue
+    }
+
+    def close(): Unit = {
+      if (!finished) rowReader.close()
     }
   }
 

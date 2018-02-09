@@ -101,7 +101,7 @@ private[oap] case class BTreeIndexFileReader(
   } catch {
     case e: Exception =>
       if (!ShutdownHookManager.inShutdown()) {
-        logWarning("Exception in RecordReader.close()", e)
+        logWarning("Exception in FSDataInputStream.close()", e)
       }
   }
 }

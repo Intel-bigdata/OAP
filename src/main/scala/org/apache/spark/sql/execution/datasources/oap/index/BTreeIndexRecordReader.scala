@@ -54,8 +54,8 @@ private[index] case class BTreeIndexRecordReader(
 
     footerFiber = BTreeFiber(
       () => reader.readFooter(), reader.file.toString, reader.footerSectionId, 0)
-    indexCaches += WrappedFiberCache(FiberCacheManager.get(footerFiber, configuration))
-    footerCache = indexCaches.last
+    footerCache = WrappedFiberCache(FiberCacheManager.get(footerFiber, configuration))
+    indexCaches += footerCache
     footer = BTreeFooter(footerCache.fc, schema)
 
     reader.checkVersionNum(footer.getVersionNum)
@@ -70,8 +70,9 @@ private[index] case class BTreeIndexRecordReader(
             reader.file.toString,
             reader.rowIdListSectionId, partIdx)
 
-          indexCaches += WrappedFiberCache(FiberCacheManager.get(rowIdListFiber, configuration))
-          val rowIdListCache = indexCaches.last
+          val rowIdListCache =
+            WrappedFiberCache(FiberCacheManager.get(rowIdListFiber, configuration))
+          indexCaches += rowIdListCache
           val rowIdList = BTreeRowIdList(rowIdListCache.fc)
           val iterator =
             subPosList.toIterator.map(i => rowIdList.getRowId(i % reader.rowIdListSizePerSection))
@@ -119,8 +120,8 @@ private[index] case class BTreeIndexRecordReader(
       reader.nodeSectionId,
       nodeIdx
     )
-    indexCaches += WrappedFiberCache(FiberCacheManager.get(nodeFiber, configuration))
-    val nodeCache = indexCaches.last
+    val nodeCache = WrappedFiberCache(FiberCacheManager.get(nodeFiber, configuration))
+    indexCaches += nodeCache
     val node = BTreeNodeData(nodeCache.fc, schema)
 
     val keyCount = node.getKeyCount
@@ -142,17 +143,15 @@ private[index] case class BTreeIndexRecordReader(
             reader.file.toString,
             reader.nodeSectionId,
             nodeIdx + 1)
-          indexCaches += WrappedFiberCache(FiberCacheManager.get(nextNodeFiber, configuration))
-          val nextNodeCache = indexCaches.last
+          val nextNodeCache = WrappedFiberCache(FiberCacheManager.get(nextNodeFiber, configuration))
+          indexCaches += nextNodeCache
           val nextNode = BTreeNodeData(nextNodeCache.fc, schema)
           val rowPos = nextNode.getRowIdPos(0)
           nextNodeCache.release()
-          indexCaches.remove(indexCaches.length - 1)
           rowPos
         }
       } else node.getRowIdPos(keyPos)
     nodeCache.release()
-    indexCaches.remove(indexCaches.length - 1)
     rowPos
   }
 
@@ -194,18 +193,20 @@ private[index] case class BTreeIndexRecordReader(
   }
 
   def close(): Unit = {
-    if (reader != null) reader.close()
-    reader = null
+    if (reader != null) {
+      reader.close()
+      reader = null
+    }
     indexCaches.foreach(_.release())
     indexCaches.clear()
   }
 
-  /**
-   * TODO: if this hasNext doesn't reach false, the resource can't be released
-   * For example:
-   *   Assume recordReader.size = 100, Someone called `recordReader.take(10)`.
-   */
-  override def hasNext: Boolean = internalIterator.hasNext
+  override def hasNext: Boolean = if (internalIterator.hasNext) {
+    true
+  } else {
+    close()
+    false
+  }
 
   override def next(): Int = internalIterator.next()
 }

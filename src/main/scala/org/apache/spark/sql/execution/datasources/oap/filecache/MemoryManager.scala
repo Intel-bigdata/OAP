@@ -152,10 +152,12 @@ case class WrappedFiberCache(fc: FiberCache) {
   private var released = false
 
   def release(): Unit = synchronized {
-    try {
-      if (!released) fc.release()
-    } finally {
-      released = true
+    if (!released) {
+      try {
+        fc.release()
+      } finally {
+        released = true
+      }
     }
   }
 }
