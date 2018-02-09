@@ -189,7 +189,8 @@ private[oap] class OapDataReader(
   path: Path,
   meta: DataSourceMeta,
   filterScanners: Option[IndexScanners],
-  requiredIds: Array[Int]) extends Logging {
+  requiredIds: Array[Int],
+  context: Option[VectorizedContext] = None) extends Logging {
 
   var selectedRows: Option[Long] = None
 
@@ -198,7 +199,7 @@ private[oap] class OapDataReader(
       options: Map[String, String] = Map.empty): Iterator[InternalRow] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
-    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
+    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf, context)
 
     filterScanners match {
       case Some(indexScanners) if indexScanners.indexIsAvailable(path, conf) =>

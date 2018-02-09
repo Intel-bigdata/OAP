@@ -40,7 +40,7 @@ import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.{StructField, StructType}
+import org.apache.spark.sql.types.{AtomicType, StructField, StructType}
 import org.apache.spark.util.{LongAccumulator, SerializableConfiguration}
 
 private[sql] class OapFileFormat extends FileFormat
@@ -125,8 +125,18 @@ private[sql] class OapFileFormat extends FileFormat
    * Returns whether the reader will return the rows as batch or not.
    */
   override def supportBatch(sparkSession: SparkSession, schema: StructType): Boolean = {
-    // TODO we should naturelly support batch
-    false
+    // TODO remove readerClassName after oap support batch return
+    val readerClassName = meta match {
+      case Some(meta) =>
+        meta.dataReaderClassName
+      case _ => ""
+    }
+    val conf = sparkSession.sessionState.conf
+    // TODO modify conditions after oap support batch return
+    readerClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
+    conf.parquetVectorizedReaderEnabled && conf.wholeStageEnabled &&
+      schema.length <= conf.wholeStageMaxNumFields &&
+      schema.forall(_.dataType.isInstanceOf[AtomicType])
   }
 
   override def isSplitable(
@@ -279,6 +289,19 @@ private[sql] class OapFileFormat extends FileFormat
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
+
+        // TODO: if you move this into the closure it reverts to the default values.
+        // If true, enable using the custom RecordReader for parquet. This only works for
+        // a subset of the types (no complex types).
+        val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
+        val enableVectorizedReader: Boolean =
+          m.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
+          sparkSession.sessionState.conf.parquetVectorizedReaderEnabled &&
+            resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
+        // Whole stage codegen (PhysicalRDD) is able to deal with batches directly
+        val returningBatch = supportBatch(sparkSession, resultSchema)
+        val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
+
         (file: PartitionedFile) => {
           assert(file.partitionValues.numFields == partitionSchema.size)
           val conf = broadcastedHadoopConf.value.value
@@ -296,25 +319,38 @@ private[sql] class OapFileFormat extends FileFormat
             case _ => 0L
           }
 
-          if (dataFileHandle.isInstanceOf[OapDataFileHandle] && filters.exists(filter =>
-            canSkipFile(dataFileHandle.asInstanceOf[OapDataFileHandle].columnsMeta.map(
-              _.statistics), filter, m.schema))) {
-            selectedRows.add(0)
-            skippedRows.add(totalRows)
-            Iterator.empty
-          } else {
-            OapIndexInfo.partitionOapIndex.put(file.filePath, false)
-            val reader = new OapDataReader(
-              new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
-            val iter = reader.initialize(conf, options)
-            selectedRows.add(reader.selectedRows.getOrElse(totalRows))
-            skippedRows.add(totalRows - reader.selectedRows.getOrElse(totalRows))
+          dataFileHandle match {
+            case dataFileHandle: OapDataFileHandle if filters.exists(filter =>
+              canSkipFile(dataFileHandle.columnsMeta.map(
+                _.statistics), filter, m.schema)) =>
+              selectedRows.add(0)
+              skippedRows.add(totalRows)
+              Iterator.empty
+            case _ =>
+              OapIndexInfo.partitionOapIndex.put(file.filePath, false)
+              FilterHelper.setFilterIfExist(conf, pushed)
 
-            val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
-            val joinedRow = new JoinedRow()
-            val appendPartitionColumns = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
+              val context = if (enableVectorizedReader) {
+                Some(VectorizedContext(partitionSchema,
+                  file.partitionValues, returningBatch))
+              } else None
 
-            iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+              val reader = new OapDataReader(
+                new Path(new URI(file.filePath)), m, filterScanners, requiredIds, context)
+              val iter = reader.initialize(conf, options)
+              selectedRows.add(reader.selectedRows.getOrElse(totalRows))
+              skippedRows.add(totalRows - reader.selectedRows.getOrElse(totalRows))
+
+              if (enableVectorizedReader) {
+                iter
+              } else {
+                val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
+                val joinedRow = new JoinedRow()
+                val appendPartitionColumns
+                = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
+
+                iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+              }
           }
         }
       case None => (_: PartitionedFile) => {

@@ -390,6 +390,7 @@ case class FileSourceScanExec(
        |  int numRows = $batch.numRows();
        |  while ($idx < numRows) {
        |    int $rowidx = $idx++;
+       |    if($batch.isFiltered($rowidx)) continue;
        |    ${consume(ctx, columnsBatchInput).trim}
        |    if (shouldStop()) return;
        |  }
