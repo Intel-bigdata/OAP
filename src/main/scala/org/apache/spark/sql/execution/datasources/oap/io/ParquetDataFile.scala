@@ -94,9 +94,6 @@ private[oap] case class ParquetDataFile
     override def hasNext: Boolean = {
       if (!finished && !havePair) {
         finished = !rowReader.nextKeyValue
-        if (finished) {
-          rowReader.close()
-        }
         havePair = !finished
       }
       !finished

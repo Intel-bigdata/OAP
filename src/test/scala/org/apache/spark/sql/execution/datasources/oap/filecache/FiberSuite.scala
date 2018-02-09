@@ -112,6 +112,7 @@ class FiberSuite extends SharedOapContext with Logging {
       assert(meta.totalRowCount() === rowCounts(i))
       assert(meta.rowCountInLastGroup === rowCountInLastGroups(i))
       assert(meta.rowGroupsMeta.length === rowGroupCounts(i))
+      meta.close()
     }
     if (previousRowGroupSize == null) configuration.unset(OapFileFormat.ROW_GROUP_SIZE)
     else configuration.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
@@ -134,6 +135,7 @@ class FiberSuite extends SharedOapContext with Logging {
     assert(meta.rowCountInEachGroup === 12345)
     assert(meta.rowCountInLastGroup === 10)
     assert(meta.rowGroupsMeta.length === 1)
+    meta.close()
     // set back to default value
     if (previousRowGroupSize == null) configuration.unset(OapFileFormat.ROW_GROUP_SIZE)
     else configuration.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)

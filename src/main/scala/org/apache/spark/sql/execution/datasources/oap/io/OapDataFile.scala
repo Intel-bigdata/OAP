@@ -29,6 +29,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.types._
+import org.apache.spark.util.CompletionIterator
 
 
 private[oap] case class OapDataFile(path: String, schema: StructType,
@@ -106,21 +107,18 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     MemoryManager.putToDataFiberCache(data)
   }
 
-  def closeRowGroup(fiber: Fiber, fiberCache: FiberCache): Unit = {
-    fiberCache.release()
-  }
-
   // full file scan
   // TODO: [linhong] two iterator functions are similar. Can we merge them?
   def iterator(conf: Configuration, requiredIds: Array[Int]): OapIterator[InternalRow] = {
     val row = new BatchColumn()
+    var fiberCacheGroup: Array[WrappedFiberCache] = null
     val iterator =
       (0 until meta.groupCount).iterator.flatMap { groupId =>
-        val fiberCacheGroup = requiredIds.map(id =>
-          FiberCacheManager.get(DataFiber(this, id, groupId), conf))
+        fiberCacheGroup = requiredIds.map(id =>
+          WrappedFiberCache(FiberCacheManager.get(DataFiber(this, id, groupId), conf)))
 
         val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
-          new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache)
+          new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache.fc)
         }
 
         val iterator = if (groupId < meta.groupCount - 1) {
@@ -129,15 +127,18 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
         } else {
           row.reset(meta.rowCountInLastGroup, columns).toIterator
         }
-        new OapIterator[InternalRow](iterator) {
-          override def close(): Unit = fiberCacheGroup.zip(requiredIds).foreach {
-            case (fiberCache, id) =>
-              closeRowGroup(DataFiber(OapDataFile.this, id, groupId), fiberCache)
+        CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
+          fiberCacheGroup.zip(requiredIds).foreach {
+            case (fiberCache, id) => fiberCache.release()
           }
-        }
+        )
       }
     new OapIterator[InternalRow](iterator) {
-      override def close(): Unit = OapDataFile.this.close()
+      override def close(): Unit = {
+        // To ensure if any exception happens, caches are still released after calling close()
+        if (fiberCacheGroup != null) fiberCacheGroup.foreach(_.release())
+        OapDataFile.this.close()
+      }
     }
   }
 
@@ -148,14 +149,15 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
       rowIds: Array[Int]): OapIterator[InternalRow] = {
     val row = new BatchColumn()
     val groupIds = rowIds.groupBy(rowId => rowId / meta.rowCountInEachGroup)
+    var fiberCacheGroup: Array[WrappedFiberCache] = null
     val iterator =
       groupIds.iterator.flatMap {
         case (groupId, subRowIds) =>
-          val fiberCacheGroup = requiredIds.map(id =>
-            FiberCacheManager.get(DataFiber(this, id, groupId), conf))
+          fiberCacheGroup = requiredIds.map(id =>
+            WrappedFiberCache(FiberCacheManager.get(DataFiber(this, id, groupId), conf)))
 
           val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
-            new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache)
+            new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache.fc)
           }
 
           if (groupId < meta.groupCount - 1) {
@@ -168,15 +170,18 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
           val iterator =
             subRowIds.iterator.map(rowId => row.moveToRow(rowId % meta.rowCountInEachGroup))
 
-          new OapIterator[InternalRow](iterator) {
-            override def close(): Unit = fiberCacheGroup.zip(requiredIds).foreach {
-              case (fiberCache, id) =>
-                closeRowGroup(DataFiber(OapDataFile.this, id, groupId), fiberCache)
+          CompletionIterator[InternalRow, Iterator[InternalRow]](iterator,
+            fiberCacheGroup.zip(requiredIds).foreach {
+              case (fiberCache, id) => fiberCache.release()
             }
-          }
+          )
       }
     new OapIterator[InternalRow](iterator) {
-      override def close(): Unit = OapDataFile.this.close()
+      override def close(): Unit = {
+        // To ensure if any exception happens, caches are still released after calling close()
+        if (fiberCacheGroup != null) fiberCacheGroup.foreach(_.release())
+        OapDataFile.this.close()
+      }
     }
   }
 

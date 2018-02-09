@@ -133,6 +133,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
       assert(row.numFields == 2)
       result += row.getInt(0)
     }
+    iterator.close()
     assert(rowIds.length == result.length)
     for (i <- rowIds.indices) {
       assert(rowIds(i) == result(i))
@@ -148,6 +149,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
     val e = intercept[java.util.NoSuchElementException] {
       iterator.next()
     }.getMessage
+    iterator.close()
     assert(e.contains("next on empty iterator"))
   }
 
@@ -160,6 +162,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
       val row = iterator.next
       result += row.getInt(0)
     }
+    iterator.close()
     val length = data.length
     assert(length == result.length)
     for (i <- 0 until length) {
@@ -240,6 +243,7 @@ class NestedDataSuite extends ParquetDataFileSuite {
     assert(row.numFields == 3)
     val docId = row.getLong(0)
     assert(docId == 20L)
+    iterator.close()
   }
 
   test("read all ") {
@@ -256,6 +260,7 @@ class NestedDataSuite extends ParquetDataFileSuite {
     assert(rowTwo.numFields == 2)
     val docIdTwo = rowTwo.getLong(0)
     assert(docIdTwo == 20L)
+    iterator.close()
   }
 }
 
