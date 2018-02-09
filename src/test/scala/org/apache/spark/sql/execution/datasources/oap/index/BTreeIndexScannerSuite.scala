@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.apache.spark.util.Utils
@@ -244,5 +245,31 @@ class BTreeIndexScannerSuite extends SharedOapContext {
           includeStart = true,
           includeEnd = true)) === (0, 150))
     reader.close()
+  }
+
+  test("read value after remove fiberCache") {
+    val schema = StructType(StructField("col", IntegerType) :: Nil)
+    val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
+    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
+
+    (1 to 5).map(InternalRow(_)).foreach(writer.write(null, _))
+    writer.close(null)
+
+    val reader = BTreeIndexRecordReader(configuration, schema)
+    val intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()
+    intervalArray += RangeInterval(
+      IndexScanner.DUMMY_KEY_START,
+      IndexScanner.DUMMY_KEY_END,
+      includeStart = true,
+      includeEnd = true)
+    reader.initialize(path, intervalArray)
+    FiberCacheManager.removeIndexCache("IndexFile")
+    var result: ArrayBuffer[Int] = new ArrayBuffer[Int]()
+    while (reader.hasNext) {
+      result += reader.next()
+    }
+    val expected = (0 to 4).toArray
+    assert(result.toArray sameElements expected)
   }
 }

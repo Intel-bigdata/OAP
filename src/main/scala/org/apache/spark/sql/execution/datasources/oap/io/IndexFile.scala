@@ -17,39 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
-
-import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
-
-private[oap] trait CommonIndexFile {
-  def file: Path
-  def version(conf: Configuration): Int = {
-    val fs = file.getFileSystem(conf)
-    val fin = fs.open(file)
-    val bytes = new Array[Byte](8)
-    fin.readFully(bytes, 0, 8)
-    fin.close()
-    (bytes(6) << 8) + bytes(7)
-  }
-}
-/**
- * Read the index file into memory, and can be accessed as [[FiberCache]].
- */
-private[oap] case class IndexFile(file: Path) extends CommonIndexFile {
-  def getIndexFiberData(conf: Configuration): FiberCache = {
-    val fs = file.getFileSystem(conf)
-    val fin = fs.open(file)
-    // wind to end of file to get tree root
-    // TODO check if enough to fit in Int
-    val fileLength = fs.getContentSummary(file).getLength
-
-    val fiberCache = MemoryManager.putToIndexFiberCache(fin, 0, fileLength.toInt)
-    fin.close()
-    fiberCache
-  }
-}
-
 private[oap] object IndexFile {
   val VERSION_LENGTH = 8
   val VERSION_PREFIX = "OAPIDX"
