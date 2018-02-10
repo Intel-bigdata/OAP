@@ -225,7 +225,7 @@ private[oap] class OapDataReader(
 
         val start = System.currentTimeMillis()
         val rows = getRowIds(options)
-        val iter = fileScanner.iterator(conf, requiredIds, rows)
+        val iter = fileScanner.iterator(requiredIds, rows)
         val end = System.currentTimeMillis()
 
         selectedRows = Some(rows.length)
@@ -233,7 +233,7 @@ private[oap] class OapDataReader(
         iter
       case _ =>
         val start = System.currentTimeMillis()
-        val iter = fileScanner.iterator(conf, requiredIds)
+        val iter = fileScanner.iterator(requiredIds)
         val end = System.currentTimeMillis()
         logDebug("Construct File Iterator: " + (end - start) + "ms")
 

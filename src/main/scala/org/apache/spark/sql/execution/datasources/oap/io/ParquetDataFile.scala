@@ -20,7 +20,6 @@ package org.apache.spark.sql.execution.datasources.oap.io
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
-import org.apache.parquet.column.Dictionary
 import org.apache.parquet.hadoop.RecordReaderBuilder
 import org.apache.parquet.hadoop.api.RecordReader
 
@@ -31,16 +30,16 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelp
 import org.apache.spark.sql.types.StructType
 
 
-private[oap] case class ParquetDataFile
-(path: String, schema: StructType, configuration: Configuration) extends DataFile {
+private[oap] case class ParquetDataFile(path: String, schema: StructType,
+                                        configuration: Configuration) extends DataFile {
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache = {
+  def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
     // TODO data cache
     throw new UnsupportedOperationException("Not support getFiberData Operation.")
   }
 
-  def iterator(conf: Configuration, requiredIds: Array[Int]): OapIterator[InternalRow] = {
-    val recordReader = recordReaderBuilder(conf, requiredIds)
+  def iterator(requiredIds: Array[Int]): OapIterator[InternalRow] = {
+    val recordReader = recordReaderBuilder(configuration, requiredIds)
       .buildDefault()
     recordReader.initialize()
     val iterator = new FileRecordReaderIterator[InternalRow](
@@ -50,14 +49,11 @@ private[oap] case class ParquetDataFile
     }
   }
 
-  def iterator(
-      conf: Configuration,
-      requiredIds: Array[Int],
-      rowIds: Array[Int]): OapIterator[InternalRow] = {
+  def iterator(requiredIds: Array[Int], rowIds: Array[Int]): OapIterator[InternalRow] = {
     if (rowIds == null || rowIds.length == 0) {
       new OapIterator(Iterator.empty)
     } else {
-      val recordReader = recordReaderBuilder(conf, requiredIds)
+      val recordReader = recordReaderBuilder(configuration, requiredIds)
         .withGlobalRowIds(rowIds).buildIndexed()
       recordReader.initialize()
       val iterator = new FileRecordReaderIterator[InternalRow](
@@ -120,6 +116,4 @@ private[oap] case class ParquetDataFile
   override def createDataFileHandle(): ParquetDataFileHandle = {
     new ParquetDataFileHandle().read(configuration, new Path(StringUtils.unEscapeString(path)))
   }
-
-  override def getDictionary(fiberId: Int, conf: Configuration): Dictionary = null
 }

@@ -39,7 +39,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
   private val codecFactory = new CodecFactory(configuration)
   private val meta: OapDataFileHandle = DataFileHandleCacheManager(this)
 
-  def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
+  def getDictionary(fiberId: Int): Dictionary = {
     val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)
     val dictDataLens = meta.columnsMeta.map(_.dictionaryDataLength)
 
@@ -63,7 +63,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     } else dictionaries(fiberId)
   }
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache = {
+  def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
     val groupMeta = meta.rowGroupsMeta(groupId)
     val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
 
@@ -89,7 +89,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     }
 
     val dataType = schema(fiberId).dataType
-    val dictionary = getDictionary(fiberId, conf)
+    val dictionary = getDictionary(fiberId)
     val fiberParser =
       if (dictionary != null) {
         DictionaryBasedDataFiberParser(encoding, meta, dictionary, dataType)
@@ -109,13 +109,13 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
 
   // full file scan
   // TODO: [linhong] two iterator functions are similar. Can we merge them?
-  def iterator(conf: Configuration, requiredIds: Array[Int]): OapIterator[InternalRow] = {
+  def iterator(requiredIds: Array[Int]): OapIterator[InternalRow] = {
     val row = new BatchColumn()
     var fiberCacheGroup: Array[WrappedFiberCache] = null
     val iterator =
       (0 until meta.groupCount).iterator.flatMap { groupId =>
         fiberCacheGroup = requiredIds.map(id =>
-          WrappedFiberCache(FiberCacheManager.get(DataFiber(this, id, groupId), conf)))
+          WrappedFiberCache(FiberCacheManager.get(DataFiber(this, id, groupId), configuration)))
 
         val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
           new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache.fc)
@@ -143,10 +143,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
   }
 
   // scan by given row ids, and we assume the rowIds are sorted
-  def iterator(
-      conf: Configuration,
-      requiredIds: Array[Int],
-      rowIds: Array[Int]): OapIterator[InternalRow] = {
+  def iterator(requiredIds: Array[Int], rowIds: Array[Int]): OapIterator[InternalRow] = {
     val row = new BatchColumn()
     val groupIds = rowIds.groupBy(rowId => rowId / meta.rowCountInEachGroup)
     var fiberCacheGroup: Array[WrappedFiberCache] = null
@@ -154,7 +151,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
       groupIds.iterator.flatMap {
         case (groupId, subRowIds) =>
           fiberCacheGroup = requiredIds.map(id =>
-            WrappedFiberCache(FiberCacheManager.get(DataFiber(this, id, groupId), conf)))
+            WrappedFiberCache(FiberCacheManager.get(DataFiber(this, id, groupId), configuration)))
 
           val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
             new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache.fc)
