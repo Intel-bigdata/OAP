@@ -38,7 +38,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io._
-import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
+import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, OapUtils}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}
@@ -272,6 +272,7 @@ private[sql] class OapFileFormat extends FileFormat
         }
 
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
+        val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
 
         hadoopConf.setDouble(SQLConf.OAP_FULL_SCAN_THRESHOLD.key,
           sparkSession.conf.get(SQLConf.OAP_FULL_SCAN_THRESHOLD))
@@ -297,26 +298,28 @@ private[sql] class OapFileFormat extends FileFormat
             case _ => 0L
           }
 
-          if (dataFileHandle.isInstanceOf[OapDataFileHandle] && filters.exists(filter =>
-            canSkipFile(dataFileHandle.asInstanceOf[OapDataFileHandle].columnsMeta.map(
-              _.statistics), filter, m.schema))) {
-            selectedRows.add(0)
-            skippedRows.add(totalRows)
-            Iterator.empty
-          } else {
-            OapIndexInfo.partitionOapIndex.put(file.filePath, false)
-            val reader = new OapDataReader(
-              new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
-            val iter = reader.initialize(conf, options)
-            Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
-            selectedRows.add(reader.selectedRows.getOrElse(totalRows))
-            skippedRows.add(totalRows - reader.selectedRows.getOrElse(totalRows))
+          dataFileHandle match {
+            case fileHandle: OapDataFileHandle if filters.exists(filter =>
+              canSkipFile(fileHandle.columnsMeta.map(
+                _.statistics), filter, m.schema)) =>
+              selectedRows.add(0)
+              skippedRows.add(totalRows)
+              Iterator.empty
+            case _ =>
+              OapIndexInfo.partitionOapIndex.put(file.filePath, false)
+              FilterHelper.setFilterIfExist(conf, pushed)
+              val reader = new OapDataReader(
+                new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
+              val iter = reader.initialize(conf, options)
+              Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
+              selectedRows.add(reader.selectedRows.getOrElse(totalRows))
+              skippedRows.add(totalRows - reader.selectedRows.getOrElse(totalRows))
 
-            val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
-            val joinedRow = new JoinedRow()
-            val appendPartitionColumns = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
+              val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
+              val joinedRow = new JoinedRow()
+              val appendPartitionColumns = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
 
-            iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+              iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
           }
         }
       case None => (_: PartitionedFile) => {
