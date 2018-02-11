@@ -54,7 +54,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
         is.readFully(bytes)
       }
       val dictionaryPage = new DictionaryPage(BytesInput.from(bytes), dictSize,
-        org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
+        org.apache.parquet.column.Encoding.PLAIN)
       schema(fiberId).dataType match {
         case StringType | BinaryType => new PlainBinaryDictionary(dictionaryPage)
         case IntegerType => new PlainIntegerDictionary(dictionaryPage)
