@@ -17,8 +17,11 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import java.lang.reflect.Constructor
+
 import scala.util.{Failure, Success, Try}
 
+import com.google.common.cache.{CacheBuilder, CacheLoader}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FSDataInputStream
 import org.apache.parquet.column.Dictionary
@@ -50,10 +53,16 @@ private[oap] class OapIterator[T](inner: Iterator[T]) extends Iterator[T] with A
 }
 
 private[oap] object DataFile {
+
+  private val cache = CacheBuilder.newBuilder().build(new CacheLoader[String, Constructor[_]] {
+    override def load(name: String): Constructor[_] =
+      Utils.classForName(name).getDeclaredConstructor(
+        classOf[String], classOf[StructType], classOf[Configuration])
+  })
+
   def apply(path: String, schema: StructType, dataFileClassName: String,
             configuration: Configuration): DataFile = {
-    Try(Utils.classForName(dataFileClassName).getDeclaredConstructor(
-      classOf[String], classOf[StructType], classOf[Configuration])).toOption match {
+    Try(cache.get(dataFileClassName)).toOption match {
       case Some(ctor) =>
         Try (ctor.newInstance(path, schema, configuration).asInstanceOf[DataFile]) match {
           case Success(e) => e
@@ -65,6 +74,8 @@ private[oap] object DataFile {
           s" (String, StructType) for class $dataFileClassName")
     }
   }
+
+  private[oap] def cacheSize: Long = cache.size()
 }
 
 /**
