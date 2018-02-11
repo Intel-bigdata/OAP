@@ -41,7 +41,7 @@ private[oap] object OapIndexInfoStatusSerDe extends SerDe[String, Seq[OapIndexIn
 
   override def deserialize(json: String): Seq[OapIndexInfoStatus] = {
     (parse(json) \ "oapIndexInfoStatusRawDataArray").extract[List[JValue]].map(
-      indexStatusRawDataFromJson)
+      indexStatusRawDataFromJson _)
   }
 
   private implicit val format = DefaultFormats
