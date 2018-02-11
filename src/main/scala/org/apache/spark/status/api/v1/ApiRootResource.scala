@@ -198,4 +198,16 @@ private[v1] class ApiRootResource extends UIRootFromServletContext {
   def getVersion(): VersionResource = {
     new VersionResource(uiRoot)
   }
+
+  /**
+   * Added for OAP FiberCacheManager Metrics
+   * @param appId
+   * @return impl instance
+   */
+  @Path("applications/{appId}/fibercachemanagers")
+  def getCacheManagers(@PathParam("appId") appId: String): AllFiberCacheManagerListResource = {
+    uiRoot.withSparkUI(appId, None) { ui =>
+      new AllFiberCacheManagerListResource(ui)
+    }
+  }
 }

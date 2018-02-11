@@ -71,6 +71,14 @@ case class CacheStats(
     if (rc == 0) 0.0 else missCount.toDouble / rc
   }
 
+  def backendCacheSize: Long = indexFiberSize + dataFiberSize
+
+  def totalCacheSize: Long = backendCacheSize + pendingFiberSize
+
+  def backendCacheCount: Long = indexFiberCount + dataFiberCount
+
+  def totalCacheCount: Long = backendCacheCount + pendingFiberCount
+
   def averageLoadPenalty: Double = if (loadCount == 0) 0.0 else totalLoadTime.toDouble / loadCount
 
   def plus(other: CacheStats): CacheStats = this + other
