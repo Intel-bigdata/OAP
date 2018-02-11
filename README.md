@@ -90,25 +90,22 @@ Compression Codec - Choose compression type for OAP data files.
 Refer to [OAP User guide](https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide) for more details.
 
 ## Query Example and Performance Data
-
 Take 2 simple ad-hoc queries as instances, the store_sales table comes from TPCDS with data scale 200G. Generally we can see 5x boost in performance.
 1. "SELECT * FROM store_sales WHERE ss_ticket_number BETWEEN 100 AND 200"
-+---------------------+-----+-----+-----+---------+
-|                 Q6: |T1/ms|T2/ms|T3/ms|Median/ms|
-+---------------------+-----+-----+-----+---------+
-|       oap-with-index|  542|  295|  370|      370|
-|   parquet-with-index| 1161|  682|  680|      682|
-|parquet-without-index| 2010| 1922| 1915|     1922|
-+---------------------+-----+-----+-----+---------+
+
+Q6:                   | T1/ms | T2/ms | T3/ms | Median/ms 
+--------------------- | ----- | ----- | ----- | ---------
+oap-with-index        |   542 |   295 |   370 |      370  
+parquet-with-index    |  1161 |   682 |   680 |      682  
+parquet-without-index |  2010 |  1922 |  1915 |     1922  
 
 2. "SELECT * FROM store_sales WHERE ss_ticket_number < 10000 AND ss_net_paid BETWEEN 100.0 AND 110.0")
-+---------------------+-----+-----+-----+---------+
-|                Q12: |T1/ms|T2/ms|T3/ms|Median/ms|
-+---------------------+-----+-----+-----+---------+
-|       oap-with-index|  509|  431|  437|      437|
-|   parquet-with-index|  944|  930| 1318|      944|
-|parquet-without-index| 2084| 1895| 2007|     2007|
-+---------------------+-----+-----+-----+---------+
+
+Q12:                  | T1/ms | T2/ms | T3/ms | Median/ms 
+--------------------- | ----- | ----- | ----- | ---------
+oap-with-index        |    509|   431 |   437 |      437
+parquet-with-index    |    944|   930 |  1318 |      944
+parquet-without-index |   2084|  1895 |  2007 |     2007
 
 ## How to Contribute
 If you are looking for some ideas on what to contribute, check out GitHub issues for this project labeled ["Pick me up!"](https://github.com/Intel-bigdata/OAP/issues?labels=pick+me+up%21&state=open).
