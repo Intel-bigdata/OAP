@@ -143,16 +143,16 @@ class FiberCacheManagerSuite extends SharedOapContext {
     // release fibers so it has chance to be disposed immediately
     fibers.foreach(FiberCacheManager.get(_, configuration).release())
     Thread.sleep(1000)
-    assert(FiberCacheManager.pendingSize == 0)
+    assert(FiberCacheManager.pendingCount == 0)
     // Hold the fiber, so it can't be disposed until release
     val fiberCaches = fibers.map(FiberCacheManager.get(_, configuration))
     Thread.sleep(1000)
-    assert(FiberCacheManager.pendingSize > 0)
+    assert(FiberCacheManager.pendingCount > 0)
     // After release, CacheGuardian should be back to work
     fiberCaches.foreach(_.release())
     // Wait some time for CacheGuardian being waken-up
     Thread.sleep(1000)
-    assert(FiberCacheManager.pendingSize == 0)
+    assert(FiberCacheManager.pendingCount == 0)
   }
 
   class TestRunner(work: () => Unit) extends Runnable {
@@ -205,7 +205,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
     pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
     Thread.sleep(100)
     results.foreach(r => r.get())
-    assert(FiberCacheManager.pendingSize == 0)
+    assert(FiberCacheManager.pendingCount == 0)
   }
 
   // refCount should be correct
@@ -287,7 +287,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
 
     // Put into cache and make it use
     val fiberCacheInUse = FiberCacheManager.get(fiberInUse, configuration)
-    assert(FiberCacheManager.pendingSize == 0)
+    assert(FiberCacheManager.pendingCount == 0)
 
     // make fiber in use the 1st element in release queue.
     FiberCacheManager.removeFiber(fiberInUse)
@@ -304,9 +304,9 @@ class FiberCacheManagerSuite extends SharedOapContext {
     // Wait for clean.
     Thread.sleep(6000)
     // There should be only one in-use fiber.
-    assert(FiberCacheManager.pendingSize == 1)
+    assert(FiberCacheManager.pendingCount == 1)
     fiberCacheInUse.release()
     Thread.sleep(6000)
-    assert(FiberCacheManager.pendingSize == 0)
+    assert(FiberCacheManager.pendingCount == 0)
   }
 }

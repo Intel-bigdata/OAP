@@ -18,11 +18,15 @@
 package org.apache.spark.sql.execution.datasources.oap.listener
 
 import org.apache.spark.scheduler.{SparkListener, SparkListenerCustomInfoUpdate}
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberSensor
+import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCacheManagerSensor, FiberSensor}
 
 class FiberInfoListener extends SparkListener {
   override def onCustomInfoUpdate(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
-    FiberSensor.update(fiberInfo)
+    if (fiberInfo.clazzName.contains("OapFiberCacheHeartBeatMessager")) {
+      FiberSensor.update(fiberInfo)
+    } else if (fiberInfo.clazzName.contains("FiberCacheManagerMessager")) {
+      FiberCacheManagerSensor.update(fiberInfo)
+    }
   }
 
   // TODO: implements other events like `onExecutorAdded`, `onExecutorRemoved`, etc. to maintain
