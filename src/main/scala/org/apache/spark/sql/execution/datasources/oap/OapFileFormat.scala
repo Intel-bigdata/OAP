@@ -50,7 +50,7 @@ private[sql] class OapFileFormat extends FileFormat
   with Logging
   with Serializable {
 
-  class OapMetrics() {
+  class OapMetrics extends Serializable {
     /**
      * 4 kinds of Tasks and 5 kinds of Rows:
      *   1.skipForStatisticTasks
@@ -63,63 +63,76 @@ private[sql] class OapFileFormat extends FileFormat
      *   4.missIndexTasks
      *     a.rowsReadWhenMissIndex
      */
-    private var totalTasks: Option[SQLMetric] = None
-    private var skipForStatisticTasks: Option[SQLMetric] = None
-    private var hitIndexTasks: Option[SQLMetric] = None
-    private var ignoreIndexTasks: Option[SQLMetric] = None
-    private var missIndexTasks: Option[SQLMetric] = None
+    private var _totalTasks: Option[SQLMetric] = None
+    private var _skipForStatisticTasks: Option[SQLMetric] = None
+    private var _hitIndexTasks: Option[SQLMetric] = None
+    private var _ignoreIndexTasks: Option[SQLMetric] = None
+    private var _missIndexTasks: Option[SQLMetric] = None
 
-    private var totalRows: Option[SQLMetric] = None
-    private var rowsSkippedForStatistic: Option[SQLMetric] = None
-    private var rowsReadWhenHitIndex: Option[SQLMetric] = None
-    private var rowsSkippedWhenHitIndex: Option[SQLMetric] = None
-    private var rowsReadWhenIgnoreIndex: Option[SQLMetric] = None
-    private var rowsReadWhenMissIndex: Option[SQLMetric] = None
+    private var _totalRows: Option[SQLMetric] = None
+    private var _rowsSkippedForStatistic: Option[SQLMetric] = None
+    private var _rowsReadWhenHitIndex: Option[SQLMetric] = None
+    private var _rowsSkippedWhenHitIndex: Option[SQLMetric] = None
+    private var _rowsReadWhenIgnoreIndex: Option[SQLMetric] = None
+    private var _rowsReadWhenMissIndex: Option[SQLMetric] = None
+
+    def totalTasks: Option[SQLMetric] = _totalTasks
+    def skipForStatisticTasks: Option[SQLMetric] = _skipForStatisticTasks
+    def hitIndexTasks: Option[SQLMetric] = _hitIndexTasks
+    def ignoreIndexTasks: Option[SQLMetric] = _ignoreIndexTasks
+    def missIndexTasks: Option[SQLMetric] = _missIndexTasks
+
+    def totalRows: Option[SQLMetric] = _totalRows
+    def rowsSkippedForStatistic: Option[SQLMetric] = _rowsSkippedForStatistic
+    def rowsReadWhenHitIndex: Option[SQLMetric] = _rowsReadWhenHitIndex
+    def rowsSkippedWhenHitIndex: Option[SQLMetric] = _rowsSkippedWhenHitIndex
+    def rowsReadWhenIgnoreIndex: Option[SQLMetric] = _rowsReadWhenIgnoreIndex
+    def rowsReadWhenMissIndex: Option[SQLMetric] = _rowsReadWhenMissIndex
 
     def initMetrics(metrics: Map[String, SQLMetric]): Unit = {
-      totalTasks = Some(metrics("totalTasks"))
-      skipForStatisticTasks = Some(metrics("skipForStatisticTasks"))
-      hitIndexTasks = Some(metrics("hitIndexTasks"))
-      ignoreIndexTasks = Some(metrics("ignoreIndexTasks"))
-      missIndexTasks = Some(metrics("missIndexTasks"))
+      _totalTasks = Some(metrics("totalTasks"))
+      _skipForStatisticTasks = Some(metrics("skipForStatisticTasks"))
+      _hitIndexTasks = Some(metrics("hitIndexTasks"))
+      _ignoreIndexTasks = Some(metrics("ignoreIndexTasks"))
+      _missIndexTasks = Some(metrics("missIndexTasks"))
 
       // set row-level Accumulator
-      totalRows = Some(metrics("totalRows"))
-      rowsSkippedForStatistic = Some(metrics("rowsSkippedForStatistic"))
-      rowsReadWhenHitIndex = Some(metrics("rowsReadWhenHitIndex"))
-      rowsSkippedWhenHitIndex = Some(metrics("rowsSkippedWhenHitIndex"))
-      rowsReadWhenIgnoreIndex = Some(metrics("rowsReadWhenIgnoreIndex"))
-      rowsReadWhenMissIndex = Some(metrics("rowsReadWhenMissIndex"))
+      _totalRows = Some(metrics("totalRows"))
+      _rowsSkippedForStatistic = Some(metrics("rowsSkippedForStatistic"))
+      _rowsReadWhenHitIndex = Some(metrics("rowsReadWhenHitIndex"))
+      _rowsSkippedWhenHitIndex = Some(metrics("rowsSkippedWhenHitIndex"))
+      _rowsReadWhenIgnoreIndex = Some(metrics("rowsReadWhenIgnoreIndex"))
+      _rowsReadWhenMissIndex = Some(metrics("rowsReadWhenMissIndex"))
     }
 
     def totalRows(rows: Long): Unit = {
-      totalRows.foreach(_.add(rows))
-      totalTasks.foreach(_.add(1L))
+      _totalRows.foreach(_.add(rows))
+      _totalTasks.foreach(_.add(1L))
     }
 
     def hitIndex(readRows: Long, skippedRows: Long): Unit = {
-      hitIndexTasks.foreach(_.add(1L))
-      rowsReadWhenHitIndex.foreach(_.add(readRows))
-      rowsSkippedWhenHitIndex.foreach(_.add(skippedRows))
+      _hitIndexTasks.foreach(_.add(1L))
+      _rowsReadWhenHitIndex.foreach(_.add(readRows))
+      _rowsSkippedWhenHitIndex.foreach(_.add(skippedRows))
     }
 
     def missIndex(rows: Long): Unit = {
-      missIndexTasks.foreach(_.add(1L))
-      rowsReadWhenMissIndex.foreach(_.add(rows))
+      _missIndexTasks.foreach(_.add(1L))
+      _rowsReadWhenMissIndex.foreach(_.add(rows))
     }
 
     def ignoreIndex(rows: Long): Unit = {
-      ignoreIndexTasks.foreach(_.add(1L))
-      rowsReadWhenIgnoreIndex.foreach(_.add(rows))
+      _ignoreIndexTasks.foreach(_.add(1L))
+      _rowsReadWhenIgnoreIndex.foreach(_.add(rows))
     }
 
     def skipForStatistic(rows: Long): Unit = {
-      skipForStatisticTasks.foreach(_.add(1L))
-      rowsSkippedForStatistic.foreach(_.add(rows))
+      _skipForStatisticTasks.foreach(_.add(1L))
+      _rowsSkippedForStatistic.foreach(_.add(rows))
     }
   }
 
-  val oapMetrics: OapMetrics = new OapMetrics
+  val oapMetrics = new OapMetrics
 
   override def initialize(
       sparkSession: SparkSession,
@@ -611,7 +624,7 @@ private[sql] object OapFileFormat {
       OAP_INDEX_GROUP_BY_OPTION_KEY :: Nil
   }
 
-  def oapMetrics(sparkContext: SparkContext): Map[String, SQLMetric] = {
+  def oapMetrics(sparkContext: SparkContext): Map[String, SQLMetric] =
     Map("totalTasks" ->
       SQLMetrics.createMetric(sparkContext, "OAP:tasks in total"),
       "skipForStatisticTasks" ->
@@ -636,5 +649,4 @@ private[sql] object OapFileFormat {
       "rowsReadWhenMissIndex" ->
         SQLMetrics.createMetric(sparkContext, "OAP:rows read when miss index")
     )
-  }
 }

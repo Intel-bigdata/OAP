@@ -952,31 +952,31 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
                          rowMetrics: Option[RowMetrics] = None,
                          taskMetrics: Option[TaskMetrics] = None): Unit = {
     rowMetrics.foreach(rowMetrics => {
-      assert(rowMetrics.totalRows ==
-        accumulate(fileFormats, f => getValue(f.totalRows)))
-      assert(rowMetrics.rowsSkippedForStatistic ==
-        accumulate(fileFormats, f => getValue(f.rowsSkippedForStatistic)))
-      assert(rowMetrics.rowsReadWhenHitIndex ==
-        accumulate(fileFormats, f => getValue(f.rowsReadWhenHitIndex)))
-      assert(rowMetrics.rowsSkippedWhenHitIndex ==
-        accumulate(fileFormats, f => getValue(f.rowsSkippedWhenHitIndex)))
-      assert(rowMetrics.rowsReadWhenIgnoreIndex ==
-        accumulate(fileFormats, f => getValue(f.rowsReadWhenIgnoreIndex)))
-      assert(rowMetrics.rowsReadWhenMissIndex ==
-        accumulate(fileFormats, f => getValue(f.rowsReadWhenMissIndex)))
+      assert(rowMetrics.totalRows == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.totalRows)))
+      assert(rowMetrics.rowsSkippedForStatistic == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.rowsSkippedForStatistic)))
+      assert(rowMetrics.rowsReadWhenHitIndex == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.rowsReadWhenHitIndex)))
+      assert(rowMetrics.rowsSkippedWhenHitIndex == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.rowsSkippedWhenHitIndex)))
+      assert(rowMetrics.rowsReadWhenIgnoreIndex == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.rowsReadWhenIgnoreIndex)))
+      assert(rowMetrics.rowsReadWhenMissIndex == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.rowsReadWhenMissIndex)))
     })
 
     taskMetrics.foreach(taskMetrics => {
-      assert(taskMetrics.totalTasks ==
-        accumulate(fileFormats, f => getValue(f.totalTasks)))
-      assert(taskMetrics.tasksSkippedForStatistic ==
-        accumulate(fileFormats, f => getValue(f.skipForStatisticTasks)))
-      assert(taskMetrics.tasksHitIndex ==
-        accumulate(fileFormats, f => getValue(f.hitIndexTasks)))
-      assert(taskMetrics.tasksIgnoreIndex ==
-        accumulate(fileFormats, f => getValue(f.ignoreIndexTasks)))
-      assert(taskMetrics.tasksMissIndex ==
-        accumulate(fileFormats, f => getValue(f.missIndexTasks)))
+      assert(taskMetrics.totalTasks == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.totalTasks)))
+      assert(taskMetrics.tasksSkippedForStatistic == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.skipForStatisticTasks)))
+      assert(taskMetrics.tasksHitIndex == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.hitIndexTasks)))
+      assert(taskMetrics.tasksIgnoreIndex == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.ignoreIndexTasks)))
+      assert(taskMetrics.tasksMissIndex == accumulate(fileFormats,
+        f => getValue(f.oapMetrics.missIndexTasks)))
     })
   }
 
