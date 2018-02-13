@@ -191,8 +191,11 @@ private[oap] class OapDataReader(
   filterScanners: Option[IndexScanners],
   requiredIds: Array[Int]) extends Logging {
 
-  var rowsReadWhenHitIndex: Option[Long] = None
-  var ignoreIndex: Boolean = false
+  private var _rowsReadWhenHitIndex: Option[Long] = None
+  private var _ignoreIndex: Boolean = false
+
+  def rowsReadByIndex: Option[Long] = _rowsReadWhenHitIndex
+  def ignoreIndex: Boolean = _ignoreIndex
 
   def initialize(
       conf: Configuration,
@@ -238,11 +241,11 @@ private[oap] class OapDataReader(
         val iter = fileScanner.iterator(conf, requiredIds, rows)
         val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
 
-        rowsReadWhenHitIndex = Some(rows.length)
+        _rowsReadWhenHitIndex = Some(rows.length)
         logDebug("Construct File Iterator: " + (end - start) + "ms")
         iter
       case Some(_) =>
-        ignoreIndex = true
+        _ignoreIndex = true
         fullScan
       case _ =>
         fullScan
