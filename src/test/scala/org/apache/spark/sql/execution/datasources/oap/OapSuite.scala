@@ -74,11 +74,13 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     val df = sqlContext.read.format("parquet").load(parquetPath.getAbsolutePath)
     df.createOrReplaceTempView("parquet_table")
     val defaultMaxBytes = sqlConf.getConf(SQLConf.FILES_MAX_PARTITION_BYTES)
-    sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, 100L)
+    val maxPartitionBytes = 100L
+    sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, maxPartitionBytes)
     val numTasks = sql("select * from parquet_table").queryExecution.toRdd.partitions.length
     try {
       sql("create oindex parquet_idx on parquet_table (a)")
-      assert(numTasks == parquetPath.listFiles().count(_.getName.endsWith(".index")))
+      assert(numTasks == parquetPath.listFiles().filter(_.getName.endsWith(".parquet"))
+        .map(f => Math.ceil(f.length().toDouble / maxPartitionBytes).toInt).sum)
       sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, defaultMaxBytes)
     } finally {
       sql("drop oindex parquet_idx on parquet_table")
