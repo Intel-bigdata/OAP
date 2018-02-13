@@ -63,11 +63,12 @@ case class CreateIndexCommand(
       _fsRelation @ HadoopFsRelation(f, _, s, _, _: OapFileFormat, _), _, id) =>
         (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, id, _fsRelation)
       case LogicalRelation(
-      _fsRelation @ HadoopFsRelation(f, _, s, _, _: ParquetFileFormat, _), _, id) =>
+      _fsRelation @ HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), _, id) =>
         if (!sparkSession.conf.get(SQLConf.OAP_PARQUET_ENABLED)) {
           throw new OapException(s"turn on ${
             SQLConf.OAP_PARQUET_ENABLED.key} to allow index building on parquet files")
         }
+        format.forbidSplit
         (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, id, _fsRelation)
       case other =>
         throw new OapException(s"We don't support index building for ${other.simpleString}")
@@ -285,7 +286,8 @@ case class RefreshIndexCommand(
           HadoopFsRelation(f, _, s, _, _: OapFileFormat, _), _, _) =>
         (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME)
       case LogicalRelation(
-          HadoopFsRelation(f, _, s, _, _: ParquetFileFormat, _), _, _) =>
+          HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), _, _) =>
+        format.forbidSplit
         (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME)
       case other =>
         throw new OapException(s"We don't support index refreshing for ${other.simpleString}")

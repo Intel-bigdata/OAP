@@ -67,6 +67,10 @@ class ParquetFileFormat
 
   override def equals(other: Any): Boolean = other.isInstanceOf[ParquetFileFormat]
 
+  @transient protected var splitable = true
+
+  def forbidSplit: Unit = splitable = false
+
   override def prepareWrite(
       sparkSession: SparkSession,
       job: Job,
@@ -271,9 +275,7 @@ class ParquetFileFormat
   override def isSplitable(
       sparkSession: SparkSession,
       options: Map[String, String],
-      path: Path): Boolean = {
-      !sparkSession.conf.get(SQLConf.OAP_PARQUET_ENABLED)
-  }
+      path: Path): Boolean = splitable
 
   override def buildReaderWithPartitionValues(
       sparkSession: SparkSession,
