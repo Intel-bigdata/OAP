@@ -191,11 +191,13 @@ private[oap] class OapDataReader(
   filterScanners: Option[IndexScanners],
   requiredIds: Array[Int]) extends Logging {
 
+  import org.apache.spark.sql.execution.datasources.oap.INDEX_STAT._
+
   private var _rowsReadWhenHitIndex: Option[Long] = None
-  private var _ignoreIndex: Boolean = false
+  private var _indexStat = MISS_INDEX
 
   def rowsReadByIndex: Option[Long] = _rowsReadWhenHitIndex
-  def ignoreIndex: Boolean = _ignoreIndex
+  def indexStat: INDEX_STAT = _indexStat
 
   def initialize(
       conf: Configuration,
@@ -241,11 +243,12 @@ private[oap] class OapDataReader(
         val iter = fileScanner.iterator(conf, requiredIds, rows)
         val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
 
+        _indexStat = HIT_INDEX
         _rowsReadWhenHitIndex = Some(rows.length)
         logDebug("Construct File Iterator: " + (end - start) + "ms")
         iter
       case Some(_) =>
-        _ignoreIndex = true
+        _indexStat = IGNORE_INDEX
         fullScan
       case _ =>
         fullScan
