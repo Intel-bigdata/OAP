@@ -26,7 +26,7 @@ import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.util.Utils
 
-class OapMetricsSuite  extends QueryTest with SharedOapContext with BeforeAndAfterEach {
+class OapMetricsSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   private var currentPath: String = _
 
   override def beforeEach(): Unit = {
@@ -35,34 +35,14 @@ class OapMetricsSuite  extends QueryTest with SharedOapContext with BeforeAndAft
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b STRING)
            | USING oap
            | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY VIEW oap_test_rowgroup (a INT, b STRING)
-           | USING oap
-           | OPTIONS (path '$path', "rowgroup" '1025', 'compression' 'GZIP')""".stripMargin)
-    sql(s"""CREATE TEMPORARY VIEW oap_test_date (a INT, b DATE)
-           | USING oap
-           | OPTIONS (path '$path')""".stripMargin)
     sql(s"""CREATE TEMPORARY VIEW parquet_test (a INT, b STRING)
            | USING parquet
            | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TEMPORARY VIEW parquet_test_date (a INT, b DATE)
-           | USING parquet
-           | OPTIONS (path '$path')""".stripMargin)
-    sql(s"""CREATE TABLE t_refresh (a int, b int)
-           | USING oap
-           | PARTITIONED by (b)""".stripMargin)
-    sql(s"""CREATE TABLE t_refresh_parquet (a int, b int)
-           | USING parquet
-           | PARTITIONED by (b)""".stripMargin)
   }
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("oap_test")
-    sqlContext.dropTempTable("oap_test_rowgroup")
-    sqlContext.dropTempTable("oap_test_date")
     sqlContext.dropTempTable("parquet_test")
-    sqlContext.dropTempTable("parquet_test_date")
-    sql("DROP TABLE IF EXISTS t_refresh")
-    sql("DROP TABLE IF EXISTS t_refresh_parquet")
   }
 
   def getValue(metrics: Option[SQLMetric]): Long = metrics.map(_.value).getOrElse(0L)
