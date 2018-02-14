@@ -117,7 +117,7 @@ private[sql] class OapMetrics extends Serializable {
     _rowsReadWhenIgnoreIndex.foreach(_.add(rows))
   }
 
-  private def skipForStatistic(rows: Long): Unit = {
+  def skipForStatistic(rows: Long): Unit = {
     _skipForStatisticTasks.foreach(_.add(1L))
     _rowsSkippedForStatistic.foreach(_.add(rows))
   }
@@ -127,21 +127,16 @@ private[sql] class OapMetrics extends Serializable {
     _totalTasks.foreach(_.add(1L))
   }
 
-  def updateIndexAndRowRead(r: Option[OapDataReader], rowsInTotal: Long): Unit = {
+  def updateIndexAndRowRead(r: OapDataReader, totalRows: Long): Unit = {
     import org.apache.spark.sql.execution.datasources.oap.INDEX_STAT._
-    r match {
-      case Some(reader) =>
-        reader.indexStat match {
-          case HIT_INDEX =>
-            val rows = reader.rowsReadByIndex.getOrElse(0L)
-            hitIndex(rows, rowsInTotal - rows)
-          case IGNORE_INDEX =>
-            ignoreIndex(rowsInTotal)
-          case MISS_INDEX =>
-            missIndex(rowsInTotal)
-        }
-      case None =>
-        skipForStatistic(rowsInTotal)
+    r.indexStat match {
+      case HIT_INDEX =>
+        val rows = r.rowsReadByIndex.getOrElse(0L)
+        hitIndex(rows, totalRows - rows)
+      case IGNORE_INDEX =>
+        ignoreIndex(totalRows)
+      case MISS_INDEX =>
+        missIndex(totalRows)
     }
   }
 }
@@ -428,26 +423,26 @@ private[sql] class OapFileFormat extends FileFormat
           val dataFileHandle: DataFileHandle = DataFileHandleCacheManager(dataFile)
 
           // read total records from metaFile
-          val rowsInTotal = dataFileHandle match {
+          val totalRows = dataFileHandle match {
             case oap: OapDataFileHandle =>
               oap.totalRowCount()
             case parquet: ParquetDataFileHandle =>
               parquet.footer.getBlocks.asScala.foldLeft(0L)((s, b) => s + b.getRowCount)
             case _ => 0L
           }
-          oapMetrics.updateTotalRows(rowsInTotal)
+          oapMetrics.updateTotalRows(totalRows)
 
           dataFileHandle match {
             case handle: OapDataFileHandle if filters.exists(filter => canSkipFile(
                 handle.columnsMeta.map(_.statistics), filter, m.schema)) =>
-              oapMetrics.updateIndexAndRowRead(None, rowsInTotal)
+              oapMetrics.updateTotalRows(totalRows)
               Iterator.empty
             case _ =>
               OapIndexInfo.partitionOapIndex.put(file.filePath, false)
               val reader = new OapDataReader(
                 new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
               val iter = reader.initialize(conf, options)
-              oapMetrics.updateIndexAndRowRead(Some(reader), rowsInTotal)
+              oapMetrics.updateIndexAndRowRead(reader, totalRows)
 
               val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
               val joinedRow = new JoinedRow()
