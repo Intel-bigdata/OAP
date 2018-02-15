@@ -21,7 +21,6 @@ import java.util.Collections
 import com.google.common.collect.Lists
 import org.apache.parquet.hadoop.metadata._
 import org.apache.parquet.schema.Types
-import org.mockito.Mockito
 
 import org.apache.spark.SparkFunSuite
 
@@ -30,12 +29,12 @@ class IndexedParquetMetadataSuite extends SparkFunSuite {
   test("IndexedParquetMetadata from footer and globalRowIds") {
 
     // prepare data
-    val rowGroup0 = Mockito.mock(classOf[BlockMetaData])
-    Mockito.when(rowGroup0.getRowCount).thenReturn(33L)
-    val rowGroup1 = Mockito.mock(classOf[BlockMetaData])
-    Mockito.when(rowGroup1.getRowCount).thenReturn(35L)
-    val rowGroup2 = Mockito.mock(classOf[BlockMetaData])
-    Mockito.when(rowGroup2.getRowCount).thenReturn(34L)
+    val rowGroup0 = new BlockMetaData()
+    rowGroup0.setRowCount(33L)
+    val rowGroup1 = new BlockMetaData()
+    rowGroup1.setRowCount(35L)
+    val rowGroup2 = new BlockMetaData()
+    rowGroup2.setRowCount(34L)
 
     val blocks = Lists.newArrayList(rowGroup0, rowGroup1, rowGroup2)
 
