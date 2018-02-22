@@ -28,16 +28,14 @@ import org.apache.spark.sql.types.StructType
 
 object FilterHelper {
 
-  def tryToPushFilters(
-          sparkSession: SparkSession,
-          requiredSchema: StructType,
-          filters: Seq[Filter]): Option[FilterPredicate] =
+  def tryToPushFilters(sparkSession: SparkSession,
+      requiredSchema: StructType,
+      filters: Seq[Filter]): Option[FilterPredicate] =
     tryToPushFilters(sparkSession.sessionState.conf.parquetFilterPushDown, requiredSchema, filters)
 
-  def tryToPushFilters(
-          filterPushDown: Boolean,
-          requiredSchema: StructType,
-          filters: Seq[Filter]): Option[FilterPredicate] = {
+  def tryToPushFilters(filterPushDown: Boolean,
+      requiredSchema: StructType,
+      filters: Seq[Filter]): Option[FilterPredicate] = {
     if (filterPushDown) {
       filters
         // Collects all converted Parquet filter predicates. Notice that not all predicates can be
