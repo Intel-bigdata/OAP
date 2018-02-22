@@ -28,7 +28,6 @@ import java.io.IOException;
 
 import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
 import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
-import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
 
 public class DefaultRecordReader<T> implements RecordReader<T> {
 
@@ -71,7 +70,6 @@ public class DefaultRecordReader<T> implements RecordReader<T> {
             footer = readFooter(configuration, file, NO_FILTER);
         }
         ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file, footer);
-        parquetFileReader.filterRowGroups(getFilter(configuration));
         this.internalReader = new InternalParquetRecordReader<>(readSupport);
         this.internalReader.initialize(parquetFileReader, configuration);
     }
