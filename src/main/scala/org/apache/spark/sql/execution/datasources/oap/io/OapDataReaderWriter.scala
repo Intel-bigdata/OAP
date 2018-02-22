@@ -191,7 +191,13 @@ private[oap] class OapDataReader(
   filterScanners: Option[IndexScanners],
   requiredIds: Array[Int]) extends Logging {
 
-  var selectedRows: Option[Long] = None
+  import org.apache.spark.sql.execution.datasources.oap.INDEX_STAT._
+
+  private var _rowsReadWhenHitIndex: Option[Long] = None
+  private var _indexStat = MISS_INDEX
+
+  def rowsReadByIndex: Option[Long] = _rowsReadWhenHitIndex
+  def indexStat: INDEX_STAT = _indexStat
 
   def initialize(
       conf: Configuration,
@@ -199,6 +205,14 @@ private[oap] class OapDataReader(
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
+
+    def fullScan: OapIterator[InternalRow] = {
+      val start = if (log.isDebugEnabled) System.currentTimeMillis else 0
+      val iter = fileScanner.iterator(conf, requiredIds)
+      val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
+      logDebug("Construct File Iterator: " + (end - start) + " ms")
+      iter
+    }
 
     filterScanners match {
       case Some(indexScanners) if indexScanners.indexIsAvailable(path, conf) =>
@@ -223,21 +237,21 @@ private[oap] class OapDataReader(
           else rowIds
         }
 
-        val start = System.currentTimeMillis()
+
+        val start = if (log.isDebugEnabled) System.currentTimeMillis else 0
         val rows = getRowIds(options)
         val iter = fileScanner.iterator(conf, requiredIds, rows)
-        val end = System.currentTimeMillis()
+        val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
 
-        selectedRows = Some(rows.length)
+        _indexStat = HIT_INDEX
+        _rowsReadWhenHitIndex = Some(rows.length)
         logDebug("Construct File Iterator: " + (end - start) + "ms")
         iter
+      case Some(_) =>
+        _indexStat = IGNORE_INDEX
+        fullScan
       case _ =>
-        val start = System.currentTimeMillis()
-        val iter = fileScanner.iterator(conf, requiredIds)
-        val end = System.currentTimeMillis()
-        logDebug("Construct File Iterator: " + (end - start) + "ms")
-
-        iter
+        fullScan
     }
   }
 }

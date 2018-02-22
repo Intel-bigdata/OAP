@@ -132,7 +132,13 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       val stats = StatisticsManager.read(bmStatsContentCache.fc, 0, keySchema)
       StatisticsManager.analyse(stats, intervalArray, conf)
     } finally {
-      if (bmStatsContentCache != null) bmStatsContentCache.release()
+      if (bmFooterCache != null) {
+        bmFooterCache.release()
+        bmFooterCache = null
+      }
+      if (bmStatsContentCache != null) {
+        bmStatsContentCache.release()
+      }
       try {
         if (fin != null) {
           fin.close()
