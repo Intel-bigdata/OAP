@@ -27,7 +27,6 @@ import org.apache.spark.sql.types._
 class FilterHelperSuite extends SparkFunSuite {
 
   test("Pushed And Set") {
-
     val requiredSchema = new StructType()
       .add(StructField("a", IntegerType))
       .add(StructField("b", StringType))
@@ -41,7 +40,6 @@ class FilterHelperSuite extends SparkFunSuite {
     val humanReadable = config.get(ParquetInputFormat.FILTER_PREDICATE + ".human.readable")
     assert(humanReadable.nonEmpty)
     assert(humanReadable.equals(expected))
-
   }
 
   test("Not Pushed") {
@@ -55,6 +53,5 @@ class FilterHelperSuite extends SparkFunSuite {
     FilterHelper.setFilterIfExist(config, pushed)
     assert(config.get(ParquetInputFormat.FILTER_PREDICATE) == null)
     assert(config.get(ParquetInputFormat.FILTER_PREDICATE + ".human.readable") == null)
-
   }
 }
