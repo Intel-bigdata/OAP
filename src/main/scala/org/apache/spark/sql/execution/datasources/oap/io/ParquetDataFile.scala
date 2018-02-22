@@ -72,8 +72,7 @@ private[oap] case class ParquetDataFile(
 
   private def initRecordReader(reader: RecordReader[UnsafeRow]) = {
     reader.initialize()
-    val iterator = new FileRecordReaderIterator[UnsafeRow](
-      reader.asInstanceOf[RecordReader[UnsafeRow]])
+    val iterator = new FileRecordReaderIterator[UnsafeRow](reader)
     new OapIterator[InternalRow](iterator) {
       override def close(): Unit = iterator.close()
     }
