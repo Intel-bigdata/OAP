@@ -26,7 +26,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
 
 
@@ -63,7 +63,7 @@ class PartByValueStatisticsSuite extends StatisticsTest {
     assert(fiber.getInt(offset) == StatisticsType.TYPE_PART_BY_VALUE)
     offset += 4
 
-    val part = SQLConf.OAP_STATISTICS_PART_NUM.defaultValue.get + 1
+    val part = OapConf.OAP_STATISTICS_PART_NUM.defaultValue.get + 1
     val cntPerPart = keys.length / (part - 1)
     assert(fiber.getInt(offset) == part)
     offset += 4

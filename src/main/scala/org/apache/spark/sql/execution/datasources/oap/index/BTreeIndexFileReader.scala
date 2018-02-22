@@ -24,7 +24,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.ShutdownHookManager
 
@@ -42,7 +42,7 @@ private[oap] case class BTreeIndexFileReader(
   val nodeSectionId: Int = 2
 
   val rowIdListSizePerSection: Int =
-    configuration.getInt(SQLConf.OAP_BTREE_ROW_LIST_PART_SIZE.key, 1024 * 1024)
+    configuration.getInt(OapConf.OAP_BTREE_ROW_LIST_PART_SIZE.key, 1024 * 1024)
 
   private lazy val (reader, fileLength) = {
     val fs = file.getFileSystem(configuration)

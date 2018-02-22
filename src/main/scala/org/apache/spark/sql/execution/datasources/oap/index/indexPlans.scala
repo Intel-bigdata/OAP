@@ -38,7 +38,7 @@ import org.apache.spark.sql.execution.datasources.oap.OapMessages.CacheDrop
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
 
@@ -64,9 +64,9 @@ case class CreateIndexCommand(
         (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, id, _fsRelation)
       case LogicalRelation(
       _fsRelation @ HadoopFsRelation(f, _, s, _, _: ParquetFileFormat, _), _, id) =>
-        if (!sparkSession.conf.get(SQLConf.OAP_PARQUET_ENABLED)) {
+        if (!sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED)) {
           throw new OapException(s"turn on ${
-            SQLConf.OAP_PARQUET_ENABLED.key} to allow index building on parquet files")
+            OapConf.OAP_PARQUET_ENABLED.key} to allow index building on parquet files")
         }
         (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, id, _fsRelation)
       case other =>

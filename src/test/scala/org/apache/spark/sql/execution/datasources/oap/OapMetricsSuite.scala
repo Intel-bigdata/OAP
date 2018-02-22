@@ -21,7 +21,7 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.execution.metric.SQLMetric
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.util.Utils
@@ -169,7 +169,7 @@ class OapMetricsSuite extends QueryTest with SharedOapContext with BeforeAndAfte
     sql("create oindex idx1 on parquet_test (a)")
 
     // satisfy indexFile / dataFile > 0.7
-    sqlConf.setConfString(SQLConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "true")
+    sqlConf.setConfString(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "true")
 
     // SQL 4: ignore index => readBehavior return FULL_SCAN
     val df = sql("SELECT * FROM parquet_test WHERE a = 1")
@@ -182,7 +182,7 @@ class OapMetricsSuite extends QueryTest with SharedOapContext with BeforeAndAfte
       Some(TaskMetrics(3, 0, 0, 3, 0)))
 
     sql("drop oindex idx1 on parquet_test")
-    sqlConf.setConfString(SQLConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "false")
+    sqlConf.setConfString(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "false")
   }
 
   test("test OAP accumulators on Oap when miss index") {

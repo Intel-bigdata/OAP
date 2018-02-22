@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
 
 // PartedByValueStatistics gives statistics with the value interval.
@@ -145,7 +145,7 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
   override val id: Int = StatisticsType.TYPE_PART_BY_VALUE
 
   private lazy val maxPartNum: Int = conf.getInt(
-    SQLConf.OAP_STATISTICS_PART_NUM.key, SQLConf.OAP_STATISTICS_PART_NUM.defaultValue.get)
+    OapConf.OAP_STATISTICS_PART_NUM.key, OapConf.OAP_STATISTICS_PART_NUM.defaultValue.get)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
   protected case class PartedByValueMeta(

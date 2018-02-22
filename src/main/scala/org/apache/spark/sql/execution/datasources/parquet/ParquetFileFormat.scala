@@ -44,6 +44,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjectio
 import org.apache.spark.sql.catalyst.parser.LegacyTypeStringParser
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
@@ -272,7 +273,7 @@ class ParquetFileFormat
       sparkSession: SparkSession,
       options: Map[String, String],
       path: Path): Boolean = {
-      !sparkSession.conf.get(SQLConf.OAP_PARQUET_ENABLED)
+      !sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED)
   }
 
   override def buildReaderWithPartitionValues(

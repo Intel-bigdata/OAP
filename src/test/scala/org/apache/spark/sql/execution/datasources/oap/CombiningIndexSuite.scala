@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
@@ -28,9 +28,9 @@ class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAnd
   private var currentPath: String = _
 
   override def beforeEach(): Unit = {
-    spark.conf.set(SQLConf.OAP_INDEXER_CHOICE_MAX_SIZE.key, "2")
-    spark.conf.set(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")
-    spark.conf.set(SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key, "1000")
+    spark.conf.set(OapConf.OAP_INDEXER_CHOICE_MAX_SIZE.key, "2")
+    spark.conf.set(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")
+    spark.conf.set(OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key, "1000")
     val path = Utils.createTempDir().getAbsolutePath
     currentPath = path
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b INT, c INT)
@@ -45,9 +45,9 @@ class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAnd
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("oap_test")
     sqlContext.dropTempTable("parquet_test")
-    spark.conf.unset(SQLConf.OAP_INDEXER_CHOICE_MAX_SIZE.key)
-    spark.conf.unset(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key)
-    spark.conf.unset(SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key)
+    spark.conf.unset(OapConf.OAP_INDEXER_CHOICE_MAX_SIZE.key)
+    spark.conf.unset(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key)
+    spark.conf.unset(OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key)
   }
 
   test("filtering parquet") {
