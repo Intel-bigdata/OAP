@@ -60,11 +60,18 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
 
     /**
      * SpecificOapRecordReaderBase need
+     * configuration & footer use by initialize method,
+     * not belong to SpecificParquetRecordReaderBase
      */
     protected Configuration configuration;
     protected ParquetMetadata footer;
 
-
+    /**
+     * SpecificOapRecordReaderBase init method,
+     * needn't taskAttemptContext & inputSplit
+     * @throws IOException
+     * @throws InterruptedException
+     */
     @Override
     public void initialize() throws IOException, InterruptedException {
         if(this.footer == null){

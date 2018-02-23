@@ -102,7 +102,13 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      */
     protected static final MemoryMode DEFAULT_MEMORY_MODE = MemoryMode.ON_HEAP;
 
-
+    /**
+     * VectorizedOapRecordReader Contructor
+     * new method
+     * @param file
+     * @param configuration
+     * @param footer
+     */
     public VectorizedOapRecordReader(
                         Path file,
                         Configuration configuration,
@@ -112,6 +118,11 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         this.footer = footer;
     }
 
+    /**
+     * Override SpecificOapRecordReaderBase.initialize
+     * @throws IOException
+     * @throws InterruptedException
+     */
     @Override
     public void initialize() throws IOException, InterruptedException {
         super.initialize();
