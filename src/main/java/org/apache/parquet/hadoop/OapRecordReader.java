@@ -22,20 +22,14 @@ import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FI
 import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 
 import java.io.IOException;
-import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.Preconditions;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
-import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-
-import com.google.common.collect.Lists;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 public class OapRecordReader<T> implements RecordReader<T> {
 
@@ -48,11 +42,11 @@ public class OapRecordReader<T> implements RecordReader<T> {
 
     private ReadSupport<T> readSupport;
 
-    OapRecordReader(ReadSupport<T> readSupport,
-                        Path file,
-                        Configuration configuration,
-                        int[] globalRowIds,
-                        ParquetMetadata footer) {
+    public OapRecordReader(ReadSupport<T> readSupport,
+                           Path file,
+                           Configuration configuration,
+                           int[] globalRowIds,
+                           ParquetMetadata footer) {
         Preconditions.checkNotNull(globalRowIds,"index collection can not be null!");
         this.readSupport = readSupport;
         this.file = file;
@@ -82,37 +76,7 @@ public class OapRecordReader<T> implements RecordReader<T> {
             this.footer = readFooter(configuration, file, NO_FILTER);
         }
 
-        List<BlockMetaData> blocks = footer.getBlocks();
-
-        List<BlockMetaData> inputBlockList = Lists.newArrayList();
-
-        List<IntList> rowIdsList = Lists.newArrayList();
-
-        int nextRowGroupStartRowId = 0;
-        int totalCount = globalRowIds.length;
-        int index = 0;
-
-        for (BlockMetaData block : blocks) {
-            int currentRowGroupStartRowId = nextRowGroupStartRowId;
-            nextRowGroupStartRowId += block.getRowCount();
-            IntList rowIdList = new IntArrayList();
-            while (index < totalCount) {
-                int globalRowGroupId = globalRowIds[index];
-                if (globalRowGroupId < nextRowGroupStartRowId) {
-                    rowIdList.add(globalRowGroupId - currentRowGroupStartRowId);
-                    index++;
-                } else {
-                    break;
-                }
-
-            }
-            if (!rowIdList.isEmpty()) {
-                inputBlockList.add(block);
-                rowIdsList.add(rowIdList);
-            }
-        }
-        IndexedParquetMetadata indexedFooter =
-                new IndexedParquetMetadata(footer.getFileMetaData(), inputBlockList,rowIdsList);
+        IndexedParquetMetadata indexedFooter = IndexedParquetMetadata.from(footer, globalRowIds);
         ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file,
                 indexedFooter);
         this.internalReader = new InternalOapRecordReader<>(readSupport);

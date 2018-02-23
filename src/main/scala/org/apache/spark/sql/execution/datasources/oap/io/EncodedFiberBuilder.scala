@@ -80,8 +80,8 @@ private[oap] case class PlainBinaryDictionaryFiberBuilder(
   dataType: DataType) extends DataFiberBuilder {
 
   private val valuesWriter = new PlainBinaryDictionaryValuesWriter(1048576,
-    org.apache.parquet.column.Encoding.PLAIN_DICTIONARY,
-    org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
+    org.apache.parquet.column.Encoding.RLE_DICTIONARY,
+    org.apache.parquet.column.Encoding.PLAIN)
 
   private var dataLengthInBytes: Int = _
 
@@ -134,8 +134,8 @@ private[oap] case class PlainIntegerDictionaryFiberBuilder(
   dataType: DataType) extends DataFiberBuilder {
 
   private val valuesWriter = new PlainIntegerDictionaryValuesWriter(1048576,
-    org.apache.parquet.column.Encoding.PLAIN_DICTIONARY,
-    org.apache.parquet.column.Encoding.PLAIN_DICTIONARY)
+    org.apache.parquet.column.Encoding.RLE_DICTIONARY,
+    org.apache.parquet.column.Encoding.PLAIN)
 
   private var dataLengthInBytes: Int = _
 
