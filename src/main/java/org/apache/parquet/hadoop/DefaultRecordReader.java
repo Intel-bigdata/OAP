@@ -41,10 +41,10 @@ public class DefaultRecordReader<T> implements RecordReader<T> {
 
     private ParquetMetadata footer;
 
-    DefaultRecordReader(ReadSupport<T> readSupport,
-                        Path file,
-                        Configuration configuration,
-                        ParquetMetadata footer) {
+    public DefaultRecordReader(ReadSupport<T> readSupport,
+                               Path file,
+                               Configuration configuration,
+                               ParquetMetadata footer) {
         this.readSupport = readSupport;
         this.file = file;
         this.configuration = configuration;
@@ -72,7 +72,7 @@ public class DefaultRecordReader<T> implements RecordReader<T> {
         }
         ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file, footer);
         parquetFileReader.filterRowGroups(getFilter(configuration));
-        this.internalReader = new InternalParquetRecordReader<T>(readSupport);
+        this.internalReader = new InternalParquetRecordReader<>(readSupport);
         this.internalReader.initialize(parquetFileReader, configuration);
     }
 

@@ -28,7 +28,7 @@ public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<
 
     private int recordsRead = 0;
 
-    private IntList rowIdList = null;
+    private IntList rowIdList;
 
     private int currentIndex = 0;
 
