@@ -17,10 +17,12 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import java.io.Closeable
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
-import org.apache.parquet.hadoop.RecordReaderBuilder
+import org.apache.parquet.hadoop.{DefaultRecordReader, OapRecordReader}
 import org.apache.parquet.hadoop.api.RecordReader
 
 import org.apache.spark.sql.catalyst.InternalRow
@@ -41,34 +43,40 @@ private[oap] case class ParquetDataFile(
   }
 
   def iterator(requiredIds: Array[Int]): OapIterator[InternalRow] = {
-    val recordReader = recordReaderBuilder(configuration, requiredIds)
-      .buildDefault()
-    recordReader.initialize()
-    val iterator = new FileRecordReaderIterator[InternalRow](
-      recordReader.asInstanceOf[RecordReader[InternalRow]])
+    addRequestSchemaToConf(configuration, requiredIds)
+    val file = new Path(StringUtils.unEscapeString(path))
+    val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
+
+    initRecordReader(
+      new DefaultRecordReader[UnsafeRow](new OapReadSupportImpl,
+        file, configuration, meta.footer))
+  }
+
+  def iterator(
+      requiredIds: Array[Int],
+      rowIds: Array[Int]): OapIterator[InternalRow] = {
+    if (rowIds == null || rowIds.length == 0) {
+      new OapIterator(Iterator.empty)
+    } else {
+      addRequestSchemaToConf(configuration, requiredIds)
+      val file = new Path(StringUtils.unEscapeString(path))
+      val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
+
+      initRecordReader(
+        new OapRecordReader[UnsafeRow](new OapReadSupportImpl,
+          file, configuration, rowIds, meta.footer))
+    }
+  }
+
+  private def initRecordReader(reader: RecordReader[UnsafeRow]) = {
+    reader.initialize()
+    val iterator = new FileRecordReaderIterator[UnsafeRow](reader)
     new OapIterator[InternalRow](iterator) {
       override def close(): Unit = iterator.close()
     }
   }
 
-  def iterator(requiredIds: Array[Int], rowIds: Array[Int]): OapIterator[InternalRow] = {
-    if (rowIds == null || rowIds.length == 0) {
-      new OapIterator(Iterator.empty)
-    } else {
-      val recordReader = recordReaderBuilder(configuration, requiredIds)
-        .withGlobalRowIds(rowIds).buildIndexed()
-      recordReader.initialize()
-      val iterator = new FileRecordReaderIterator[InternalRow](
-        recordReader.asInstanceOf[RecordReader[InternalRow]])
-      new OapIterator[InternalRow](iterator) {
-        override def close(): Unit = iterator.close()
-      }
-    }
-  }
-
-  private def recordReaderBuilder(
-      conf: Configuration,
-      requiredIds: Array[Int]): RecordReaderBuilder[UnsafeRow] = {
+  private def addRequestSchemaToConf(conf: Configuration, requiredIds: Array[Int]): Unit = {
     val requestSchemaString = {
       var requestSchema = new StructType
       for (index <- requiredIds) {
@@ -77,25 +85,19 @@ private[oap] case class ParquetDataFile(
       requestSchema.json
     }
     conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
-
-    val readSupport = new OapReadSupportImpl
-
-    val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
-    RecordReaderBuilder
-      .builder(readSupport, new Path(StringUtils.unEscapeString(path)), conf)
-      .withFooter(meta.footer)
   }
 
-  private class FileRecordReaderIterator[V](rowReader: RecordReader[V])
-    extends Iterator[V] {
+
+  private class FileRecordReaderIterator[V](private[this] var rowReader: RecordReader[V])
+    extends Iterator[V] with Closeable {
     private[this] var havePair = false
     private[this] var finished = false
 
     override def hasNext: Boolean = {
       if (!finished && !havePair) {
-        if (!rowReader.nextKeyValue) {
-          rowReader.close()
-          finished = true
+        finished = !rowReader.nextKeyValue
+        if (finished) {
+          close()
         }
         havePair = !finished
       }
@@ -110,8 +112,14 @@ private[oap] case class ParquetDataFile(
       rowReader.getCurrentValue
     }
 
-    def close(): Unit = {
-      if (!finished) rowReader.close()
+    override def close(): Unit = {
+      if (rowReader != null) {
+        try {
+          rowReader.close()
+        } finally {
+          rowReader = null
+        }
+      }
     }
   }
 
