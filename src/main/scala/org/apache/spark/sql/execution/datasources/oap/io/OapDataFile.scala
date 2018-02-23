@@ -39,7 +39,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
   private val codecFactory = new CodecFactory(configuration)
   private val meta: OapDataFileHandle = DataFileHandleCacheManager(this)
 
-  def getDictionary(fiberId: Int, conf: Configuration): Dictionary = {
+  def getDictionary(fiberId: Int): Dictionary = {
     val lastGroupMeta = meta.rowGroupsMeta(meta.groupCount - 1)
     val dictDataLens = meta.columnsMeta.map(_.dictionaryDataLength)
 
@@ -63,7 +63,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     } else dictionaries(fiberId)
   }
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache = {
+  def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
     val groupMeta = meta.rowGroupsMeta(groupId)
     val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
 
@@ -89,7 +89,7 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
     }
 
     val dataType = schema(fiberId).dataType
-    val dictionary = getDictionary(fiberId, conf)
+    val dictionary = getDictionary(fiberId)
     val fiberParser =
       if (dictionary != null) {
         DictionaryBasedDataFiberParser(encoding, meta, dictionary, dataType)
@@ -150,16 +150,15 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
   }
 
   // full file scan
-  def iterator(conf: Configuration, requiredIds: Array[Int]): OapIterator[InternalRow] = {
-    buildIterator(conf, requiredIds, rowIds = None)
+  def iterator(requiredIds: Array[Int]): OapIterator[InternalRow] = {
+    buildIterator(configuration, requiredIds, rowIds = None)
   }
 
   // scan by given row ids, and we assume the rowIds are sorted
   def iterator(
-      conf: Configuration,
       requiredIds: Array[Int],
       rowIds: Array[Int]): OapIterator[InternalRow] = {
-    buildIterator(conf, requiredIds, Some(rowIds))
+    buildIterator(configuration, requiredIds, Some(rowIds))
   }
 
   def close(): Unit = {

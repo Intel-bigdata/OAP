@@ -22,7 +22,6 @@ import java.io.Closeable
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
-import org.apache.parquet.column.Dictionary
 import org.apache.parquet.hadoop.{DefaultRecordReader, OapRecordReader}
 import org.apache.parquet.hadoop.api.RecordReader
 
@@ -38,35 +37,34 @@ private[oap] case class ParquetDataFile(
     schema: StructType,
     configuration: Configuration) extends DataFile {
 
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache = {
+  def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
     // TODO data cache
     throw new UnsupportedOperationException("Not support getFiberData Operation.")
   }
 
-  def iterator(conf: Configuration, requiredIds: Array[Int]): OapIterator[InternalRow] = {
-    addRequestSchemaToConf(conf, requiredIds)
+  def iterator(requiredIds: Array[Int]): OapIterator[InternalRow] = {
+    addRequestSchemaToConf(configuration, requiredIds)
     val file = new Path(StringUtils.unEscapeString(path))
     val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
 
     initRecordReader(
       new DefaultRecordReader[UnsafeRow](new OapReadSupportImpl,
-        file, conf, meta.footer))
+        file, configuration, meta.footer))
   }
 
   def iterator(
-      conf: Configuration,
       requiredIds: Array[Int],
       rowIds: Array[Int]): OapIterator[InternalRow] = {
     if (rowIds == null || rowIds.length == 0) {
       new OapIterator(Iterator.empty)
     } else {
-      addRequestSchemaToConf(conf, requiredIds)
+      addRequestSchemaToConf(configuration, requiredIds)
       val file = new Path(StringUtils.unEscapeString(path))
       val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
 
       initRecordReader(
         new OapRecordReader[UnsafeRow](new OapReadSupportImpl,
-          file, conf, rowIds, meta.footer))
+          file, configuration, rowIds, meta.footer))
     }
   }
 
@@ -128,6 +126,4 @@ private[oap] case class ParquetDataFile(
   override def createDataFileHandle(): ParquetDataFileHandle = {
     new ParquetDataFileHandle().read(configuration, new Path(StringUtils.unEscapeString(path)))
   }
-
-  override def getDictionary(fiberId: Int, conf: Configuration): Dictionary = null
 }
