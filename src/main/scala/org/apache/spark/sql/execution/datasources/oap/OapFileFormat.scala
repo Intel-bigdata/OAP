@@ -28,6 +28,7 @@ import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.parquet.hadoop.util.SerializationUtil
 
+import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
@@ -37,7 +38,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io._
-import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
+import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, OapUtils}
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
@@ -271,6 +272,7 @@ private[sql] class OapFileFormat extends FileFormat
         }
 
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
+        val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
 
         hadoopConf.setDouble(OapConf.OAP_FULL_SCAN_THRESHOLD.key,
           sparkSession.conf.get(OapConf.OAP_FULL_SCAN_THRESHOLD))
@@ -302,9 +304,11 @@ private[sql] class OapFileFormat extends FileFormat
               Iterator.empty
             case _ =>
               OapIndexInfo.partitionOapIndex.put(file.filePath, false)
+              FilterHelper.setFilterIfExist(conf, pushed)
               val reader = new OapDataReader(
                 new Path(new URI(file.filePath)), m, filterScanners, requiredIds)
               val iter = reader.initialize(conf, options)
+              Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
               oapMetrics.updateIndexAndRowRead(reader, totalRows)
 
               val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes

@@ -212,7 +212,7 @@ private[oap] trait Fiber {
 private[oap]
 case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache =
-    file.getFiberData(rowGroupId, columnIndex, conf)
+    file.getFiberData(rowGroupId, columnIndex)
 
   override def hashCode(): Int = (file.path + columnIndex + rowGroupId).hashCode
 
