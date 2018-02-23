@@ -34,6 +34,7 @@ import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.schema.MessageType;
 import org.apache.spark.sql.execution.datasources.oap.io.OapReadSupportImpl;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper;
@@ -73,7 +74,7 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
 
         Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
         ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(
-                configuration, toSetMultiMap(fileMetadata), fileSchema));
+                configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
         this.requestedSchema = readContext.getRequestedSchema();
         String sparkRequestedSchemaString =
                 configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
@@ -92,16 +93,5 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
             reader.close();
             reader = null;
         }
-    }
-
-    // TODO duplicate of Collecionts3.toSetMultiMap in pr #575, replace it
-    protected static <K, V> Map<K, Set<V>> toSetMultiMap(Map<K, V> map) {
-        Map<K, Set<V>> setMultiMap = new HashMap<>();
-        for (Map.Entry<K, V> entry : map.entrySet()) {
-            Set<V> set = new HashSet<>();
-            set.add(entry.getValue());
-            setMultiMap.put(entry.getKey(), Collections.unmodifiableSet(set));
-        }
-        return Collections.unmodifiableMap(setMultiMap);
     }
 }
