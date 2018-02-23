@@ -86,6 +86,11 @@ public final class ColumnarBatch {
     }
   }
 
+  // For DataSourceScanExec
+  public boolean isFiltered(int rowId) {
+    return filteredRows[rowId];
+  }
+
   /**
    * Adapter class to interop with existing components that expect internal row. A lot of
    * performance is lost with this translation.
