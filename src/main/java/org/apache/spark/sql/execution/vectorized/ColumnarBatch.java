@@ -459,6 +459,25 @@ public final class ColumnarBatch {
   }
 
   /**
+   * Marks this row not filtered out. This means a subsequent iteration over the rows
+   * in this batch will include this row.
+   * For IndexedVectorizedOapRecordReader.
+   */
+  public void markValid(int rowId) {
+    assert(filteredRows[rowId]);
+    filteredRows[rowId] = false;
+    --numRowsFiltered;
+  }
+
+  /**
+   * For IndexedVectorizedOapRecordReader.
+   */
+  public void markAllFiltered() {
+    Arrays.fill(filteredRows, true);
+    numRowsFiltered = numRows;
+  }
+
+  /**
    * Marks a given column as non-nullable. Any row that has a NULL value for the corresponding
    * attribute is filtered out.
    */
