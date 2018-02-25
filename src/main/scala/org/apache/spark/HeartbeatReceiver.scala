@@ -33,6 +33,9 @@ import org.apache.spark.util._
  * components to convey liveness or execution information for in-progress tasks. It will also
  * expire the hosts that have not heartbeated for more than spark.network.timeout.
  * spark.executor.heartbeatInterval should be significantly less than spark.network.timeout.
+ *
+ * @param customizedInfo is added by OAP for deliver some metrics, whose (k,v) represents
+ *  (CustomClassName, CustomInfo)
  */
 private[spark] case class Heartbeat(
     executorId: String,

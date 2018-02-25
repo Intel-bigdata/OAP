@@ -24,6 +24,7 @@ import org.json4s.jackson.JsonMethods._
 
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.internal.oap.OapConf
 
 case class CacheStatsInternal(size: Long, count: Long) {
   require(size >= 0)
@@ -170,7 +171,7 @@ object CacheStats extends Logging {
     updateInterval = if (updateInterval != -1) {
       updateInterval
     } else {
-      conf.getLong("oap.update.fiber.cache.metrics.interval.sec", 60L) * 1000
+      conf.getLong(OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SCE.key, 60L) * 1000
     }
     if (System.currentTimeMillis() - lastUpdateTime > updateInterval) {
       lastUpdateTime = System.currentTimeMillis()
