@@ -21,7 +21,7 @@ import java.lang.reflect.Constructor
 
 import scala.util.{Failure, Success, Try}
 
-import com.google.common.cache.{CacheBuilder, CacheLoader}
+import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FSDataInputStream
 import org.apache.parquet.column.Dictionary
@@ -54,7 +54,8 @@ private[oap] class OapIterator[T](inner: Iterator[T]) extends Iterator[T] with A
 
 private[oap] object DataFile {
 
-  private val cache = CacheBuilder.newBuilder().build(new CacheLoader[String, Constructor[_]] {
+  private val cache: LoadingCache[String, Constructor[_]] =
+    CacheBuilder.newBuilder().build(new CacheLoader[String, Constructor[_]] {
     override def load(name: String): Constructor[_] =
       Utils.classForName(name).getDeclaredConstructor(
         classOf[String], classOf[StructType], classOf[Configuration])
