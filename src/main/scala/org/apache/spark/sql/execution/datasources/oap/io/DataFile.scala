@@ -74,7 +74,7 @@ private[oap] object DataFile {
     }
   }
 
-  private[oap] def cacheSize: Long = cache.size()
+  private[oap] def cachedConstructorCount: Long = cache.size()
 }
 
 /**

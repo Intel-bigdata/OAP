@@ -61,11 +61,11 @@ class DataFileSuite extends QueryTest with SharedOapContext {
       assert(datafile.configuration == config)
     }
 
-    assert(DataFile.cacheSize == 2)
+    assert(DataFile.cachedConstructorCount == 2)
 
     intercept[OapException] {
       DataFile("nofile", schema, "NotExistClass", config)
-      assert(DataFile.cacheSize == 2)
+      assert(DataFile.cachedConstructorCount == 2)
     }
   }
 }
