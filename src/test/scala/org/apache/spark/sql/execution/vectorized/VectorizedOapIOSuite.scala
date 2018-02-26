@@ -192,9 +192,9 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           result += v
         }
         assert(expected == result)
-        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
       } finally {
         reader.close()
+        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
       }
     }
 
@@ -211,9 +211,9 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           result += row.getString(0)
         }
         assert(expected.map(_._2) == result)
-        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
       } finally {
         reader.close()
+        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
       }
     }
 
@@ -231,9 +231,9 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           result += v
         }
         assert(expected.map { x => (x._2, x._1) } == result)
-        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
       } finally {
         reader.close()
+        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
       }
     }
       // Empty projection
@@ -248,9 +248,9 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           result += 1
         }
         assert(result == expected.length)
-        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
       } finally {
         reader.close()
+        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
       }
     }
     }
