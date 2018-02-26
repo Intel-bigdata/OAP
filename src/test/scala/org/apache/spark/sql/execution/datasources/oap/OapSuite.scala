@@ -28,6 +28,7 @@ import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, Scann
 import org.apache.spark.sql.execution.datasources.oap.io.{OapDataReader, OapIndexInfo, OapIndexInfoStatus}
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
@@ -87,11 +88,11 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
 
   test("Add the corresponding compression type for the OAP data file name if any") {
     Seq("GZIP", "SNAPPY", "LZO", "UNCOMPRESSED").foreach (codec => {
-      sqlConf.setConfString(SQLConf.OAP_COMPRESSION.key, codec)
+      sqlConf.setConfString(OapConf.OAP_COMPRESSION.key, codec)
       val df = sqlContext.read.format("oap").load(path.getAbsolutePath)
       df.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
       val compressionType =
-        sqlConf.getConfString(SQLConf.OAP_COMPRESSION.key).toLowerCase()
+        sqlConf.getConfString(OapConf.OAP_COMPRESSION.key).toLowerCase()
       val fileNameIterator = path.listFiles()
       for (fileName <- fileNameIterator) {
         if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
@@ -105,7 +106,7 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
       }
     })
     // Restore compression type back to default.
-    sqlConf.setConfString(SQLConf.OAP_COMPRESSION.key, SQLConf.OAP_COMPRESSION.defaultValueString)
+    sqlConf.setConfString(OapConf.OAP_COMPRESSION.key, OapConf.OAP_COMPRESSION.defaultValueString)
   }
 
   test("Enable/disable using OAP index after the index is created already") {
@@ -141,10 +142,10 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     val readerIndex = new OapDataReader(filePath, dataSourceMeta, filterScanners, requiredIds)
     val itIndex = readerIndex.initialize(conf)
     assert(itIndex.size == 4)
-    conf.setBoolean(SQLConf.OAP_ENABLE_OINDEX.key, false)
+    conf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key, false)
     val itSetIgnoreIndex = readerIndex.initialize(conf)
     assert(itSetIgnoreIndex.size == 100)
-    conf.setBoolean(SQLConf.OAP_ENABLE_OINDEX.key, true)
+    conf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key, true)
     val itSetUseIndex = readerIndex.initialize(conf)
     assert(itSetUseIndex.size == 4)
     dir.delete()

@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
 
@@ -106,9 +106,9 @@ private[oap] class BloomFilterStatisticsWriter(
   protected var bfIndex: BloomFilter = new BloomFilter(bfMaxBits, bfHashFuncs)()
 
   private lazy val bfMaxBits: Int = conf.getInt(
-    SQLConf.OAP_BLOOMFILTER_MAXBITS.key, SQLConf.OAP_BLOOMFILTER_MAXBITS.defaultValue.get)
+    OapConf.OAP_BLOOMFILTER_MAXBITS.key, OapConf.OAP_BLOOMFILTER_MAXBITS.defaultValue.get)
   private lazy val bfHashFuncs: Int = conf.getInt(
-    SQLConf.OAP_BLOOMFILTER_NUMHASHFUNC.key, SQLConf.OAP_BLOOMFILTER_NUMHASHFUNC.defaultValue.get)
+    OapConf.OAP_BLOOMFILTER_NUMHASHFUNC.key, OapConf.OAP_BLOOMFILTER_NUMHASHFUNC.defaultValue.get)
 
   @transient
   private lazy val projectors: Array[UnsafeProjection] = schema.zipWithIndex.map(x =>

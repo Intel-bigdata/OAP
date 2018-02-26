@@ -27,6 +27,7 @@ import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTableType
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.SQLTestUtils
 import org.apache.spark.util.Utils
 
@@ -238,12 +239,12 @@ class OapPlannerSuite
     checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
     val oapDF = sql(sqlString).collect()
 
-    spark.sqlContext.setConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")
+    spark.sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")
     checkKeywordsNotExist(sql("explain " + sqlString), "OapAggregationFileScanExec")
     val baseDF = sql(sqlString)
 
     checkAnswer(baseDF, oapDF)
-    spark.sqlContext.setConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
+    spark.sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
     sql("drop oindex index1 on oap_fix_length_schema_table")
   }
 

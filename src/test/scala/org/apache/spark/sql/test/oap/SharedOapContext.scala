@@ -24,6 +24,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.oap.{IndexType, OapFileFormat}
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.SharedSQLContext
 
 trait SharedOapContext extends SharedSQLContext {
@@ -32,11 +33,11 @@ trait SharedOapContext extends SharedSQLContext {
   sparkConf.set("spark.memory.offHeap.size", "100m")
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.sqlContext.setConf(SQLConf.OAP_BTREE_ROW_LIST_PART_SIZE, 64)
+    spark.sqlContext.setConf(OapConf.OAP_BTREE_ROW_LIST_PART_SIZE, 64)
   }
 
   // disable file based cbo for all test suite, as it always fails.
-  sparkConf.set(SQLConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "false")
+  sparkConf.set(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "false")
 
   protected lazy val configuration: Configuration = spark.sessionState.newHadoopConf()
 

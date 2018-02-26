@@ -14,31 +14,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql
+package org.apache.spark.sql.parquet.hadoop.utils
 
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.internal.oap.OapConf
+import com.google.common.collect.{Maps, Sets}
+import org.apache.parquet.hadoop.utils.Collections3
 
+import org.apache.spark.SparkFunSuite
 
-object TestOap extends TestOapContext(
-  OapSession.builder.config(
-    (new SparkConf).set("spark.master", "local[2]")
-      .set("spark.app.name", "test-oap-context")
-      .set("spark.sql.testkey", "true")
-      .set("spark.memory.offHeap.size", "100m")
-  ).enableHiveSupport().getOrCreate()) {
+class Collections3Suite extends SparkFunSuite {
+
+  test("toSetMultiMap") {
+    val map = Maps.newHashMap[Int, Int]()
+    map.put(1, 1)
+    map.put(2, 2)
+    map.put(3, 3)
+
+    val ret = Collections3.toSetMultiMap(map)
+    assert(ret.size() == 3)
+    assert(ret.get(1).equals(Sets.newHashSet(1)))
+    assert(ret.get(2).equals(Sets.newHashSet(2)))
+    assert(ret.get(3).equals(Sets.newHashSet(3)))
+  }
 }
-
-/**
- * A locally running test instance of Oap engine.
- */
-class TestOapContext(
-    @transient override val sparkSession: SparkSession)
-  extends SQLContext(sparkSession) {
-
-  protected def sqlContext: SQLContext = sparkSession.sqlContext
-
-  // OapStrategy conflicts with EXECUTOR_INDEX_SELECTION.
-  sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
-}
-

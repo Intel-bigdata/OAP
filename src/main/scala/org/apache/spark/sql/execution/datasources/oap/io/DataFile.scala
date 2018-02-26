@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import java.io.Closeable
 import java.lang.reflect.Constructor
 
 import scala.util.{Failure, Success, Try}
@@ -24,7 +25,6 @@ import scala.util.{Failure, Success, Try}
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FSDataInputStream
-import org.apache.parquet.column.Dictionary
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
@@ -39,14 +39,12 @@ abstract class DataFile {
   def configuration: Configuration
 
   def createDataFileHandle(): DataFileHandle
-  def getFiberData(groupId: Int, fiberId: Int, conf: Configuration): FiberCache
-  def iterator(conf: Configuration, requiredIds: Array[Int]): OapIterator[InternalRow]
-  def iterator(
-      conf: Configuration, requiredIds: Array[Int], rowIds: Array[Int]): OapIterator[InternalRow]
-  def getDictionary(fiberId: Int, conf: Configuration): Dictionary
+  def getFiberData(groupId: Int, fiberId: Int): FiberCache
+  def iterator(requiredIds: Array[Int]): OapIterator[InternalRow]
+  def iterator(requiredIds: Array[Int], rowIds: Array[Int]): OapIterator[InternalRow]
 }
 
-private[oap] class OapIterator[T](inner: Iterator[T]) extends Iterator[T] with AutoCloseable {
+private[oap] class OapIterator[T](inner: Iterator[T]) extends Iterator[T] with Closeable {
   override def hasNext: Boolean = inner.hasNext
   override def next(): T = inner.next()
   override def close(): Unit = {}

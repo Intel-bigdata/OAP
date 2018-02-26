@@ -14,31 +14,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql
 
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.internal.oap.OapConf
+package org.apache.spark.sql.execution.datasources.parquet;
 
+import java.io.IOException;
 
-object TestOap extends TestOapContext(
-  OapSession.builder.config(
-    (new SparkConf).set("spark.master", "local[2]")
-      .set("spark.app.name", "test-oap-context")
-      .set("spark.sql.testkey", "true")
-      .set("spark.memory.offHeap.size", "100m")
-  ).enableHiveSupport().getOrCreate()) {
-}
+import org.apache.spark.sql.execution.vectorized.ColumnVector;
 
 /**
- * A locally running test instance of Oap engine.
+ * VectorizedColumnReaderWrapper let readBatch method can be used
+ * outside "org.apache.spark.sql.execution.datasources.parquet" package
  */
-class TestOapContext(
-    @transient override val sparkSession: SparkSession)
-  extends SQLContext(sparkSession) {
+public class VectorizedColumnReaderWrapper {
 
-  protected def sqlContext: SQLContext = sparkSession.sqlContext
+    private VectorizedColumnReader reader;
 
-  // OapStrategy conflicts with EXECUTOR_INDEX_SELECTION.
-  sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
+    public VectorizedColumnReaderWrapper(VectorizedColumnReader reader) {
+        this.reader = reader;
+    }
+
+    public void readBatch(int total, ColumnVector column) throws IOException {
+        reader.readBatch(total, column);
+    }
+
 }
-

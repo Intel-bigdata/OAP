@@ -14,31 +14,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql
+package org.apache.parquet.hadoop.utils;
 
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.internal.oap.OapConf
-
-
-object TestOap extends TestOapContext(
-  OapSession.builder.config(
-    (new SparkConf).set("spark.master", "local[2]")
-      .set("spark.app.name", "test-oap-context")
-      .set("spark.sql.testkey", "true")
-      .set("spark.memory.offHeap.size", "100m")
-  ).enableHiveSupport().getOrCreate()) {
-}
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * A locally running test instance of Oap engine.
+ * Jdk has Collections, Guava has Colletions2,
+ * We use Collections3.
  */
-class TestOapContext(
-    @transient override val sparkSession: SparkSession)
-  extends SQLContext(sparkSession) {
+public final class Collections3 {
 
-  protected def sqlContext: SQLContext = sparkSession.sqlContext
-
-  // OapStrategy conflicts with EXECUTOR_INDEX_SELECTION.
-  sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
+    public static <K, V> Map<K, Set<V>> toSetMultiMap(Map<K, V> map) {
+        Map<K, Set<V>> setMultiMap = new HashMap<>();
+        for (Map.Entry<K, V> entry : map.entrySet()) {
+            Set<V> set = new HashSet<>();
+            set.add(entry.getValue());
+            setMultiMap.put(entry.getKey(), Collections.unmodifiableSet(set));
+        }
+        return Collections.unmodifiableMap(setMultiMap);
+    }
 }
 

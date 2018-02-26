@@ -27,7 +27,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
 
@@ -55,8 +55,8 @@ class StatisticsWriteManager {
   // which is created from `SparkUtils`, hence containing all spark config values.
   def initialize(indexType: AnyIndexType, s: StructType, conf: Configuration): Unit = {
     val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter { statType =>
-      val typeFromConfig = conf.get(SQLConf.OAP_STATISTICS_TYPES.key,
-        SQLConf.OAP_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
+      val typeFromConfig = conf.get(OapConf.OAP_STATISTICS_TYPES.key,
+        OapConf.OAP_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
       typeFromConfig.contains(statType)
     }
     schema = s
@@ -151,7 +151,7 @@ object StatisticsManager {
         }
       }
 
-      val fullScanConf = SQLConf.OAP_FULL_SCAN_THRESHOLD
+      val fullScanConf = OapConf.OAP_FULL_SCAN_THRESHOLD
       if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
         StaticsAnalysisResult.SKIP_INDEX
       } else if (resNum == 0 || resSum / resNum <= conf.getDouble(

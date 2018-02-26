@@ -64,7 +64,7 @@ class DictionaryBasedEncoderCheck extends Properties("DictionaryBasedEncoder") {
               new DictionaryPage(
                 BytesInput.from(fiberBuilder.buildDictionary),
                 fiberBuilder.getDictionarySize,
-                org.apache.parquet.column.Encoding.PLAIN_DICTIONARY))
+                org.apache.parquet.column.Encoding.PLAIN))
             val fiberParser = PlainDictionaryFiberParser(
               new OapDataFileHandle(rowCountInEachGroup = rowCount), dictionary, StringType)
             val parsedBytes = fiberParser.parse(bytes, count)
