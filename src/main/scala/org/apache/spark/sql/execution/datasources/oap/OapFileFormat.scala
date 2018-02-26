@@ -274,10 +274,6 @@ private[sql] class OapFileFormat extends FileFormat
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
         val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
 
-        hadoopConf.setDouble(OapConf.OAP_FULL_SCAN_THRESHOLD.key,
-          sparkSession.conf.get(OapConf.OAP_FULL_SCAN_THRESHOLD))
-        hadoopConf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key,
-          sparkSession.conf.get(OapConf.OAP_ENABLE_OINDEX))
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
