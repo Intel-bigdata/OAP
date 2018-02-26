@@ -16,14 +16,12 @@
  */
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import java.io.File
-import java.util
-
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
+import org.apache.spark.sql.execution.datasources.parquet.SpecificParquetRecordReaderBase
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
@@ -40,12 +38,11 @@ class DataFileSuite extends QueryTest with SharedOapContext {
     val data = (0 to 10).map(i => (i, (i + 'a').toChar.toString))
     val schema = new StructType()
     val config = new Configuration()
-
-
+    
     withTempPath { dir =>
       val df = spark.createDataFrame(data)
       df.repartition(1).write.format("oap").save(dir.getAbsolutePath)
-      val file = listDirectory(dir).get(0)
+      val file = SpecificParquetRecordReaderBase.listDirectory(dir).get(0)
       val datafile =
         DataFile(file, schema, OapFileFormat.OAP_DATA_FILE_CLASSNAME, config)
       assert(datafile.path == file)
@@ -56,7 +53,7 @@ class DataFileSuite extends QueryTest with SharedOapContext {
     withTempPath { dir =>
       val df = spark.createDataFrame(data)
       df.repartition(1).write.parquet(dir.getAbsolutePath)
-      val file = listDirectory(dir).get(0)
+      val file = SpecificParquetRecordReaderBase.listDirectory(dir).get(0)
       val datafile =
         DataFile(file, schema, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, config)
       assert(datafile.path == file)
@@ -71,17 +68,4 @@ class DataFileSuite extends QueryTest with SharedOapContext {
       assert(DataFile.cacheSize == 2)
     }
   }
-
-  private def listDirectory(path: File): util.List[String] = {
-    val result: util.List[String] = new util.ArrayList[String]
-    if (path.isDirectory) for (f <- path.listFiles) {
-      result.addAll(listDirectory(f))
-    }
-    else {
-      val c: Char = path.getName.charAt(0)
-      if (c != '.' && c != '_') result.add(path.getAbsolutePath)
-    }
-    result
-  }
-
 }
