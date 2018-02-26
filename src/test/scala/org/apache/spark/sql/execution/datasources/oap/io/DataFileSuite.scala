@@ -38,7 +38,7 @@ class DataFileSuite extends QueryTest with SharedOapContext {
     val data = (0 to 10).map(i => (i, (i + 'a').toChar.toString))
     val schema = new StructType()
     val config = new Configuration()
-    
+
     withTempPath { dir =>
       val df = spark.createDataFrame(data)
       df.repartition(1).write.format("oap").save(dir.getAbsolutePath)
