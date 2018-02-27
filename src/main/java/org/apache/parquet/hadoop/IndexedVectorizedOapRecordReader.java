@@ -57,9 +57,9 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     private IntList batchIds;
 
     private static final String IDS_MAP_STATE_ERROR_MSG =
-      "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
+        "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
     private static final String IDS_ITER_STATE_ERROR_MSG =
-      "The divideRowIdsIntoPages method should not be called when rowIdsIter hasNext if false.";
+        "The divideRowIdsIntoPages method should not be called when rowIdsIter hasNext if false.";
 
     public IndexedVectorizedOapRecordReader(
         Path file,
@@ -92,7 +92,9 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
 
     @Override
     public Object getCurrentValue() throws IOException, InterruptedException {
-      if (returnColumnarBatch) return columnarBatch;
+      if (returnColumnarBatch) {
+        return columnarBatch;
+      }
       Preconditions.checkNotNull(batchIds, "returnColumnarBatch = false, batchIds must not null.");
       Preconditions.checkArgument(batchIdx <= numBatched, "batchIdx can not be more than numBatched");
       Preconditions.checkArgument(batchIdx >= 1, "call nextKeyValue before getCurrentValue");
@@ -115,7 +117,9 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
 
     @Override
     protected void checkEndOfRowGroup() throws IOException {
-      if (rowsReturned != totalCountLoadedSoFar) return;
+      if (rowsReturned != totalCountLoadedSoFar) {
+        return;
+      }
       // if rowsReturned == totalCountLoadedSoFar
       // readNextRowGroup & divideRowIdsIntoPages
       super.readNextRowGroup();
