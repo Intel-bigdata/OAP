@@ -55,7 +55,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     // for returnColumnarBatch is false branch,
     // secondary indexes to call columnarBatch.getRow
     private IntList batchIds;
-    
+
     private static final String IDS_MAP_STATE_ERROR_MSG =
             "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
     private static final String IDS_ITER_STATE_ERROR_MSG =
@@ -132,8 +132,8 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
             // else assignment batchIdsIter.
             if(returnColumnarBatch) {
                 columnarBatch.markAllFiltered();
-                for (Integer rowid : ids) {
-                    columnarBatch.markValid(rowid);
+                for (Integer rowId : ids) {
+                    columnarBatch.markValid(rowId);
                 }
             } else {
                 batchIds = ids;
