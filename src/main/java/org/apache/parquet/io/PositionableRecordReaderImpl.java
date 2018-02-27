@@ -39,7 +39,7 @@ public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<
         long recordCount,
         IntList rowIdList) {
       super(root, recordMaterializer, false, columnStore);
-      Preconditions.checkNotNull(rowIdList,"rowIdList can not be null.");
+      Preconditions.checkNotNull(rowIdList, "rowIdList can not be null.");
       Preconditions.checkArgument(!rowIdList.isEmpty(), "rowIdList must has item.");
       this.recordMaxCount = recordCount;
       this.rowIdList = rowIdList;
