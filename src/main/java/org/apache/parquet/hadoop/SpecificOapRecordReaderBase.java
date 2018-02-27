@@ -61,30 +61,30 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
      * @throws InterruptedException
      */
     protected void initialize(ParquetMetadata footer, Configuration configuration, boolean isFilterRowGroups) throws
-            IOException, InterruptedException {
-        this.fileSchema = footer.getFileMetaData().getSchema();
-        Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
-        ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(
-                configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
-        this.requestedSchema = readContext.getRequestedSchema();
-        String sparkRequestedSchemaString =
-                configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
-        this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
-        this.reader = ParquetFileReader.open(configuration, file, footer);
-        if (isFilterRowGroups) {
-            this.reader.filterRowGroups(getFilter(configuration));
-        }
-        this.reader.setRequestedSchema(requestedSchema);
-        for (BlockMetaData block : this.reader.getRowGroups()) {
-            this.totalRowCount += block.getRowCount();
-        }
+        IOException, InterruptedException {
+      this.fileSchema = footer.getFileMetaData().getSchema();
+      Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
+      ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(
+              configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
+      this.requestedSchema = readContext.getRequestedSchema();
+      String sparkRequestedSchemaString =
+              configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
+      this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
+      this.reader = ParquetFileReader.open(configuration, file, footer);
+      if (isFilterRowGroups) {
+        this.reader.filterRowGroups(getFilter(configuration));
+      }
+      this.reader.setRequestedSchema(requestedSchema);
+      for (BlockMetaData block : this.reader.getRowGroups()) {
+        this.totalRowCount += block.getRowCount();
+      }
     }
 
     @Override
     public void close() throws IOException {
-        if (reader != null) {
-            reader.close();
-            reader = null;
-        }
+      if (reader != null) {
+        reader.close();
+        reader = null;
+      }
     }
 }

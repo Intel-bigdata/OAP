@@ -107,7 +107,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
 
     /**
      * SpecificOapRecordReaderBase need
-     * configuration & footer use by initialize method,
+     * configuration and footer use by initialize method,
      * not belong to SpecificParquetRecordReaderBase
      */
     protected Configuration configuration;
@@ -121,12 +121,12 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * @param footer
      */
     public VectorizedOapRecordReader(
-                        Path file,
-                        Configuration configuration,
-                        ParquetMetadata footer) {
-        this.file = file;
-        this.configuration = configuration;
-        this.footer = footer;
+        Path file,
+        Configuration configuration,
+        ParquetMetadata footer) {
+      this.file = file;
+      this.configuration = configuration;
+      this.footer = footer;
     }
 
     /**
@@ -137,12 +137,12 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      */
     @Override
     public void initialize() throws IOException, InterruptedException {
-        if(this.footer == null){
-            footer = readFooter(configuration, file, NO_FILTER);
-        }
-        // no index to use, try do filterRowGroups to skip rowgroups.
-        initialize(footer, configuration, true);
-        initializeInternal();
+      if (this.footer == null) {
+        footer = readFooter(configuration, file, NO_FILTER);
+      }
+      // no index to use, try do filterRowGroups to skip rowgroups.
+      initialize(footer, configuration, true);
+      initializeInternal();
     }
 
     /**

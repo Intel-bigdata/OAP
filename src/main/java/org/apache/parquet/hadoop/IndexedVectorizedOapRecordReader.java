@@ -57,17 +57,14 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     private IntList batchIds;
 
     private static final String IDS_MAP_STATE_ERROR_MSG =
-            "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
+      "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
     private static final String IDS_ITER_STATE_ERROR_MSG =
-            "The divideRowIdsIntoPages method should not be called when rowIdsIter hasNext if false.";
+      "The divideRowIdsIntoPages method should not be called when rowIdsIter hasNext if false.";
 
-    public IndexedVectorizedOapRecordReader(
-            Path file,
-            Configuration configuration,
-            ParquetMetadata footer,
-            int[] globalRowIds) {
-        super(file, configuration, footer);
-        this.globalRowIds = globalRowIds;
+    public IndexedVectorizedOapRecordReader(Path file, Configuration configuration,
+        ParquetMetadata footer, int[] globalRowIds) {
+      super(file, configuration, footer);
+      this.globalRowIds = globalRowIds;
     }
 
     /**
@@ -79,25 +76,25 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
      */
     @Override
     public void initialize() throws IOException, InterruptedException {
-        if (this.footer == null) {
-            footer = readFooter(configuration, file, NO_FILTER);
-        }
-        IndexedParquetMetadata indexedFooter = IndexedParquetMetadata.from(footer, globalRowIds);
-        this.rowIdsIter = indexedFooter.getRowIdsList().iterator();
+      if (this.footer == null) {
+        footer = readFooter(configuration, file, NO_FILTER);
+      }
+      IndexedParquetMetadata indexedFooter = IndexedParquetMetadata.from(footer, globalRowIds);
+      this.rowIdsIter = indexedFooter.getRowIdsList().iterator();
 
-        // use indexedFooter read data, need't do filterRowGroups.
-        initialize(footer, configuration, false);
-        super.initializeInternal();
+      // use indexedFooter read data, need't do filterRowGroups.
+      initialize(footer, configuration, false);
+      super.initializeInternal();
     }
 
     @Override
     public Object getCurrentValue() throws IOException, InterruptedException {
-        if (returnColumnarBatch) return columnarBatch;
-        Preconditions.checkNotNull(batchIds, "returnColumnarBatch = false, batchIds must not null.");
-        Preconditions.checkArgument(batchIdx <= numBatched, "batchIdx can not be more than numBatched");
-        Preconditions.checkArgument(batchIdx >= 1, "call nextKeyValue before getCurrentValue");
-        // batchIds (IntArrayList) is random access.
-        return columnarBatch.getRow(batchIds.get(batchIdx - 1));
+      if (returnColumnarBatch) return columnarBatch;
+      Preconditions.checkNotNull(batchIds, "returnColumnarBatch = false, batchIds must not null.");
+      Preconditions.checkArgument(batchIdx <= numBatched, "batchIdx can not be more than numBatched");
+      Preconditions.checkArgument(batchIdx >= 1, "call nextKeyValue before getCurrentValue");
+      // batchIds (IntArrayList) is random access.
+      return columnarBatch.getRow(batchIds.get(batchIdx - 1));
     }
 
     /**
@@ -105,72 +102,72 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
      */
     @Override
     public boolean nextBatch() throws IOException {
-        // if idsMap is Empty, needn't read remaining data in this row group
-        // rowsReturned = totalCountLoadedSoFar to skip remaining data
-        if (idsMap.isEmpty()) {
-            rowsReturned = totalCountLoadedSoFar;
-        }
-        return super.nextBatch() && filterRowsWithIndex();
+      // if idsMap is Empty, needn't read remaining data in this row group
+      // rowsReturned = totalCountLoadedSoFar to skip remaining data
+      if (idsMap.isEmpty()) {
+        rowsReturned = totalCountLoadedSoFar;
+      }
+      return super.nextBatch() && filterRowsWithIndex();
     }
 
     @Override
     protected void checkEndOfRowGroup() throws IOException {
-        if (rowsReturned != totalCountLoadedSoFar) return;
-        // if rowsReturned == totalCountLoadedSoFar
-        // readNextRowGroup & divideRowIdsIntoPages
-        super.readNextRowGroup();
-        this.divideRowIdsIntoPages();
+      if (rowsReturned != totalCountLoadedSoFar) return;
+      // if rowsReturned == totalCountLoadedSoFar
+      // readNextRowGroup & divideRowIdsIntoPages
+      super.readNextRowGroup();
+      this.divideRowIdsIntoPages();
     }
     
     private boolean filterRowsWithIndex() throws IOException {
-        IntList ids = idsMap.remove(currentPageNumber);
-        if (ids == null || ids.isEmpty()) {
-            currentPageNumber++;
-            return this.nextBatch();
-        } else {
-            // if returnColumnarBatch, mark columnarBatch filtered status.
-            // else assignment batchIdsIter.
-            if(returnColumnarBatch) {
-                // we can do same operation use markFiltered as follow code:
-                // int current = 0;
-                // for (Integer target : ids)
-                // { while (current < target){
-                // columnarBatch.markFiltered(current);
-                // current++; }
-                // current++; }
-                // current++;
-                // while (current < numBatched){
-                // columnarBatch.markFiltered(current); current++; }
-                // it a little complex and use current version,
-                // we can revert use above code if need.
-                columnarBatch.markAllFiltered();
-                for (Integer rowId : ids) {
-                    columnarBatch.markValid(rowId);
-                }
-            } else {
-                batchIds = ids;
-                numBatched = ids.size();
+      IntList ids = idsMap.remove(currentPageNumber);
+      if (ids == null || ids.isEmpty()) {
+        currentPageNumber++;
+        return this.nextBatch();
+      } else {
+        // if returnColumnarBatch, mark columnarBatch filtered status.
+        // else assignment batchIdsIter.
+        if (returnColumnarBatch) {
+          // we can do same operation use markFiltered as follow code:
+          // int current = 0;
+          // for (Integer target : ids)
+          // { while (current < target){
+          // columnarBatch.markFiltered(current);
+          // current++; }
+          // current++; }
+          // current++;
+          // while (current < numBatched){
+          // columnarBatch.markFiltered(current); current++; }
+          // it a little complex and use current version,
+          // we can revert use above code if need.
+          columnarBatch.markAllFiltered();
+            for (Integer rowId : ids) {
+              columnarBatch.markValid(rowId);
             }
-            currentPageNumber++;
-            return true;
-        }
+          } else {
+            batchIds = ids;
+            numBatched = ids.size();
+          }
+          currentPageNumber++;
+          return true;
+      }
     }
 
     private void divideRowIdsIntoPages() {
-        Preconditions.checkState(idsMap.isEmpty(), IDS_MAP_STATE_ERROR_MSG);
-        Preconditions.checkState(rowIdsIter.hasNext(), IDS_ITER_STATE_ERROR_MSG);
-        this.currentPageNumber = 0;
-        int pageSize = columnarBatch.capacity();
-        IntList currentIndexList = rowIdsIter.next();
-        for (int rowId : currentIndexList) {
-            int pageNumber = rowId / pageSize;
-            if (idsMap.containsKey(pageNumber)) {
-                idsMap.get(pageNumber).add(rowId - pageNumber * pageSize);
-            } else {
-                IntArrayList ids = new IntArrayList(pageSize / 2);
-                ids.add(rowId - pageNumber * pageSize);
-                idsMap.put(pageNumber, ids);
-            }
+      Preconditions.checkState(idsMap.isEmpty(), IDS_MAP_STATE_ERROR_MSG);
+      Preconditions.checkState(rowIdsIter.hasNext(), IDS_ITER_STATE_ERROR_MSG);
+      this.currentPageNumber = 0;
+      int pageSize = columnarBatch.capacity();
+      IntList currentIndexList = rowIdsIter.next();
+      for (int rowId : currentIndexList) {
+        int pageNumber = rowId / pageSize;
+        if (idsMap.containsKey(pageNumber)) {
+          idsMap.get(pageNumber).add(rowId - pageNumber * pageSize);
+        } else {
+          IntArrayList ids = new IntArrayList(pageSize / 2);
+          ids.add(rowId - pageNumber * pageSize);
+          idsMap.put(pageNumber, ids);
         }
+      }
     }
 }
