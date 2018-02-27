@@ -126,12 +126,13 @@ object Statistics {
     if (intervalArray == null || intervalArray.isEmpty) {
       false
     } else {
-      intervalArray.exists{interval =>
+      intervalArray.exists { interval =>
         val startOrder =
           if (interval.start.numFields == row.numFields) fullOrder else partialOrder
         val endOrder =
           if (interval.end.numFields == row.numFields) fullOrder else partialOrder
-        rowInSingleInterval(row, interval, startOrder, endOrder)}
+        rowInSingleInterval(row, interval, startOrder, endOrder)
+      }
     }
   }
 }
