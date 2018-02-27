@@ -54,7 +54,7 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
 
     /**
      *
-     * @param footer parquet file footer∂
+     * @param footer parquet file footer
      * @param configuration haddoop configuration
      * @param isFilterRowGroups is do filterRowGroups
      * @throws IOException
@@ -65,10 +65,10 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
       this.fileSchema = footer.getFileMetaData().getSchema();
       Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
       ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(
-          configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
+        configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
       this.requestedSchema = readContext.getRequestedSchema();
       String sparkRequestedSchemaString =
-          configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
+        configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
       this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
       this.reader = ParquetFileReader.open(configuration, file, footer);
       if (isFilterRowGroups) {
