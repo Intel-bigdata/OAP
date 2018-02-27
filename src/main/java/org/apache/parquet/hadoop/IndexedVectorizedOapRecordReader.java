@@ -42,18 +42,24 @@ import com.google.common.collect.Maps;
 
 public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader {
 
+    // pageNumber -> rowIdsList, use to decide：
+    // 1. Is this pageNumber has data to read ?
+    // 2. Use rowIdsList to mark which row need read.
     private Map<Integer, IntList> idsMap = Maps.newHashMap();
+    // Record current PageNumber
     private int currentPageNumber;
+    // Rowid list of file granularity
     private int[] globalRowIds;
+    // Rowid Iter of RowGroup granularity
     private Iterator<IntList> rowIdsIter;
-    // for returnColumnarBatch is false.
+    // for returnColumnarBatch is false branch,
+    // secondary indexes to call columnarBatch.getRow
     private IntList batchIds;
+    
     private static final String IDS_MAP_STATE_ERROR_MSG =
             "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
     private static final String IDS_ITER_STATE_ERROR_MSG =
             "The divideRowIdsIntoPages method should not be called when rowIdsIter hasNext if false.";
-    private static final String BATCH_IDS_NOT_NULL_ERROR_MSG =
-            "returnColumnarBatch is false, batchIds must not null.";
 
     public IndexedVectorizedOapRecordReader(
             Path file,
