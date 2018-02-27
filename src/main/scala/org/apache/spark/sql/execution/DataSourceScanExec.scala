@@ -415,7 +415,7 @@ case class FileSourceScanExec(
     dataType: DataType, nullable: Boolean): ExprCode = {
     val javaType = ctx.javaType(dataType)
     val value = ctx.getValue(columnVar, dataType, ordinal)
-    val isNullVar = if (nullable) ctx.freshName("isNull") else "false"
+    val isNullVar = if (nullable) { ctx.freshName("isNull") } else { "false" }
     val valueVar = ctx.freshName("value")
     val str = s"columnVector[$columnVar, $ordinal, ${dataType.simpleString}]"
     val code = s"${ctx.registerComment(str)}\n" + (if (nullable) {

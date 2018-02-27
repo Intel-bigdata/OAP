@@ -436,7 +436,7 @@ object DataSourceStrategy extends Strategy with Logging {
       // Mark filters which are handled by the underlying DataSource with an Astrisk
       if (pushedFilters.nonEmpty) {
         val markedFilters = for (filter <- pushedFilters) yield {
-          if (handledFilters.contains(filter)) s"*$filter" else s"$filter"
+            if (handledFilters.contains(filter)) s"*$filter" else s"$filter"
         }
         pairs += ("PushedFilters" -> markedFilters.mkString("[", ", ", "]"))
       }
