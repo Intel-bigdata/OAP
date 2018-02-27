@@ -25,17 +25,10 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.hadoop.api.InitContext;
-import org.apache.parquet.hadoop.api.ReadSupport;
-import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
-import org.apache.spark.sql.execution.datasources.oap.io.OapReadSupportImpl;
-import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper;
-import org.apache.spark.sql.types.StructType$;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
