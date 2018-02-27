@@ -64,27 +64,23 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         this.globalRowIds = globalRowIds;
     }
 
+    /**
+     * Override initialize method, init footer if need,
+     * then init indexedFooter & rowIdsIter,
+     * then call super.initialize & initializeInternal
+     * @throws IOException
+     * @throws InterruptedException
+     */
     @Override
     public void initialize() throws IOException, InterruptedException {
         if (this.footer == null) {
             footer = readFooter(configuration, file, NO_FILTER);
         }
-
         IndexedParquetMetadata indexedFooter = IndexedParquetMetadata.from(footer, globalRowIds);
-        this.fileSchema = footer.getFileMetaData().getSchema();
-        Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
-        ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(
-                configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
-        this.requestedSchema = readContext.getRequestedSchema();
-        String sparkRequestedSchemaString =
-                configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
-        this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
-        this.reader = ParquetFileReader.open(configuration, file, indexedFooter);
-        this.reader.setRequestedSchema(requestedSchema);
         this.rowIdsIter = indexedFooter.getRowIdsList().iterator();
-        for (BlockMetaData block : indexedFooter.getBlocks()) {
-            this.totalRowCount += block.getRowCount();
-        }
+
+        // use indexedFooter read data, need't do filterRowGroups.
+        initialize(footer, configuration, false);
         super.initializeInternal();
     }
 
