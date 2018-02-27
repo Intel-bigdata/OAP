@@ -72,8 +72,8 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
 
     /**
      * Override initialize method, init footer if need,
-     * then init indexedFooter & rowIdsIter,
-     * then call super.initialize & initializeInternal
+     * then init indexedFooter and rowIdsIter,
+     * then call super.initialize and initializeInternal
      * @throws IOException
      * @throws InterruptedException
      */

@@ -131,7 +131,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
 
     /**
      * Override initialize method, init footer if need,
-     * then call super.initialize & initializeInternal
+     * then call super.initialize and initializeInternal
      * @throws IOException
      * @throws InterruptedException
      */
