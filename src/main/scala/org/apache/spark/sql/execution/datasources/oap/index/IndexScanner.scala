@@ -349,7 +349,6 @@ private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
       case 0 => Iterator.empty
       case 1 =>
         actualUsedScanners.head.initialize(dataPath, conf)
-        actualUsedScanners.head.toArray.iterator
       case _ =>
         actualUsedScanners.par.foreach(_.initialize(dataPath, conf))
         actualUsedScanners.map(_.toSet)
