@@ -18,17 +18,17 @@
  */
 package org.apache.parquet.hadoop;
 
+import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
+import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
+import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
+
+import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-
-import java.io.IOException;
-
-import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
-import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
-import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
 
 public class DefaultRecordReader<T> implements RecordReader<T> {
 
@@ -41,43 +41,44 @@ public class DefaultRecordReader<T> implements RecordReader<T> {
 
     private ParquetMetadata footer;
 
-    public DefaultRecordReader(ReadSupport<T> readSupport,
-                               Path file,
-                               Configuration configuration,
-                               ParquetMetadata footer) {
-        this.readSupport = readSupport;
-        this.file = file;
-        this.configuration = configuration;
-        this.footer = footer;
+    public DefaultRecordReader(
+        ReadSupport<T> readSupport,
+        Path file,
+        Configuration configuration,
+        ParquetMetadata footer) {
+      this.readSupport = readSupport;
+      this.file = file;
+      this.configuration = configuration;
+      this.footer = footer;
     }
 
     @Override
     public void close() throws IOException {
-        internalReader.close();
+      internalReader.close();
     }
 
     @Override
     public T getCurrentValue() throws IOException, InterruptedException {
-        return internalReader.getCurrentValue();
+      return internalReader.getCurrentValue();
     }
 
     @Override
     public float getProgress() throws IOException, InterruptedException {
-        return internalReader.getProgress();
+      return internalReader.getProgress();
     }
 
     public void initialize() throws IOException, InterruptedException {
-        if(this.footer == null){
-            footer = readFooter(configuration, file, NO_FILTER);
-        }
-        ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file, footer);
-        parquetFileReader.filterRowGroups(getFilter(configuration));
-        this.internalReader = new InternalParquetRecordReader<>(readSupport);
-        this.internalReader.initialize(parquetFileReader, configuration);
+      if (this.footer == null) {
+        footer = readFooter(configuration, file, NO_FILTER);
+      }
+      ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file, footer);
+      parquetFileReader.filterRowGroups(getFilter(configuration));
+      this.internalReader = new InternalParquetRecordReader<>(readSupport);
+      this.internalReader.initialize(parquetFileReader, configuration);
     }
 
     @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
-        return internalReader.nextKeyValue();
+      return internalReader.nextKeyValue();
     }
 }

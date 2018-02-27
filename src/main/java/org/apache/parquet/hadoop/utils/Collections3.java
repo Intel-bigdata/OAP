@@ -29,13 +29,13 @@ import java.util.Set;
 public final class Collections3 {
 
     public static <K, V> Map<K, Set<V>> toSetMultiMap(Map<K, V> map) {
-        Map<K, Set<V>> setMultiMap = new HashMap<>();
-        for (Map.Entry<K, V> entry : map.entrySet()) {
-            Set<V> set = new HashSet<>();
-            set.add(entry.getValue());
-            setMultiMap.put(entry.getKey(), Collections.unmodifiableSet(set));
-        }
-        return Collections.unmodifiableMap(setMultiMap);
+      Map<K, Set<V>> setMultiMap = new HashMap<>();
+      for (Map.Entry<K, V> entry : map.entrySet()) {
+        Set<V> set = new HashSet<>();
+        set.add(entry.getValue());
+        setMultiMap.put(entry.getKey(), Collections.unmodifiableSet(set));
+      }
+      return Collections.unmodifiableMap(setMultiMap);
     }
 }
 

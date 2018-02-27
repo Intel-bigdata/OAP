@@ -30,11 +30,11 @@ public class VectorizedColumnReaderWrapper {
     private VectorizedColumnReader reader;
 
     public VectorizedColumnReaderWrapper(VectorizedColumnReader reader) {
-        this.reader = reader;
+      this.reader = reader;
     }
 
     public void readBatch(int total, ColumnVector column) throws IOException {
-        reader.readBatch(total, column);
+      reader.readBatch(total, column);
     }
 
 }
