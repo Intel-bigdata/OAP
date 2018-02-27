@@ -60,8 +60,8 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
      * @throws IOException
      * @throws InterruptedException
      */
-    protected void initialize(ParquetMetadata footer, Configuration configuration, boolean isFilterRowGroups) throws
-        IOException, InterruptedException {
+    protected void initialize(ParquetMetadata footer, Configuration configuration, boolean isFilterRowGroups)
+        throws IOException, InterruptedException {
       this.fileSchema = footer.getFileMetaData().getSchema();
       Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
       ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(

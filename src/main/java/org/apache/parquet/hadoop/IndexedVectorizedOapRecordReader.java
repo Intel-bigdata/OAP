@@ -61,8 +61,11 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     private static final String IDS_ITER_STATE_ERROR_MSG =
       "The divideRowIdsIntoPages method should not be called when rowIdsIter hasNext if false.";
 
-    public IndexedVectorizedOapRecordReader(Path file, Configuration configuration,
-        ParquetMetadata footer, int[] globalRowIds) {
+    public IndexedVectorizedOapRecordReader(
+        Path file,
+        Configuration configuration,
+        ParquetMetadata footer,
+        int[] globalRowIds) {
       super(file, configuration, footer);
       this.globalRowIds = globalRowIds;
     }
