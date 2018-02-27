@@ -112,8 +112,9 @@ trait OapStrategies extends Logging {
             case Some(fastScan) => OapOrderLimitFileScanExec(limit, order, projectList, fastScan)
             case None => PlanLater(child)
           }
+        } else {
+          PlanLater(child)
         }
-        else PlanLater(child)
       case _ => PlanLater(child)
     }
   }
@@ -175,7 +176,9 @@ trait OapStrategies extends Logging {
             case Some(fastScan) => OapDistinctFileScanExec(scanNumber = 1, projectList, fastScan)
             case None => PlanLater(child)
           }
-        } else PlanLater(child)
+        } else {
+          PlanLater(child)
+        }
       case _ => PlanLater(child)
     }
   }

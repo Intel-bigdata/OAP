@@ -212,7 +212,9 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedOapContext with Bef
     rbFis.close()
     val rbEndTime = System.nanoTime
     val rbTime = (rbEndTime - rbStartTime) / 1000
-    if(!rbRead.equals(rb)) throw new RuntimeException("rb r/w is not equal!")
+    if(!rbRead.equals(rb)) {
+      throw new RuntimeException("rb r/w is not equal!")
+    }
 
     /* The result is below. The unit is us. The configuration is the same as the above.
      * spark r/w time is 57412.

@@ -51,9 +51,13 @@ class DeltaByteArrayEncoderCheck extends Properties("DeltaByteArrayEncoder") {
             new OapDataFileHandle(rowCountInEachGroup = rowCount), StringType)
           !(0 until groupCount).exists { group =>
             // If lastCount > rowCount, assume lastCount = rowCount
-            val count = if (group < groupCount - 1) rowCount
-                        else if (lastCount > rowCount) rowCount
-                        else lastCount
+            val count = if (group < groupCount - 1) {
+              rowCount
+            } else if (lastCount > rowCount) {
+              rowCount
+            } else {
+              lastCount
+            }
             (0 until count).foreach { row =>
               fiberBuilder.append(InternalRow(UTF8String.fromString(values(row % values.length))))
               referenceFiberBuilder

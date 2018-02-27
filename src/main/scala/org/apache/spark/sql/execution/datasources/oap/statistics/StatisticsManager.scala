@@ -68,7 +68,10 @@ class StatisticsWriteManager {
   }
 
   def addOapKey(key: Key): Unit = {
-    if (key.anyNull) return // stats info does not collect null keys
+    if (key.anyNull) {
+      // stats info does not collect null keys
+      return
+    }
     content.append(key)
     stats.foreach(_.addOapKey(key))
   }
@@ -138,8 +141,10 @@ object StatisticsManager {
     var resSum: Double = 0.0
     var resNum: Int = 0
 
-    if (stats.isEmpty) StaticsAnalysisResult.USE_INDEX // use index if no statistics
-    else {
+    if (stats.isEmpty) {
+      // use index if no statistics
+      StaticsAnalysisResult.USE_INDEX
+    } else {
       stats.foreach { stat =>
         val res = stat.analyse(intervalArray)
 

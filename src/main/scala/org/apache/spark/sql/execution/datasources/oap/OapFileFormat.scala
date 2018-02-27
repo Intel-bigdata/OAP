@@ -347,7 +347,9 @@ private[sql] class OapFileFormat extends FileFormat
           }
         case _ => false
       }
-    } else false
+    } else {
+      false
+    }
   }
 }
 
@@ -401,7 +403,9 @@ private[oap] class OapOutputWriterFactory(
       val oldMeta = m.get
       val existsIndexes = oldMeta.indexMetas
       val existsData = oldMeta.fileMetas
-      if (existsData != null) existsData.foreach(builder.addFileMeta(_))
+      if (existsData != null) {
+        existsData.foreach(builder.addFileMeta(_))
+      }
       if (existsIndexes != null) {
         existsIndexes.foreach(builder.addIndexMeta(_))
       }
