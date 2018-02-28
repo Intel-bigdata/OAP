@@ -135,7 +135,8 @@ private[sql] class OapFileFormat extends FileFormat
     val conf = sparkSession.sessionState.conf
     // TODO modify conditions after oap support batch return
     readerClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
-      conf.parquetVectorizedReaderEnabled && conf.wholeStageEnabled &&
+      conf.parquetVectorizedReaderEnabled &&
+      conf.wholeStageEnabled &&
       schema.length <= conf.wholeStageMaxNumFields &&
       schema.forall(_.dataType.isInstanceOf[AtomicType])
   }
@@ -284,9 +285,8 @@ private[sql] class OapFileFormat extends FileFormat
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
         val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
 
-        // refer to ParquetFileFormat
-        // use resultSchema to decide if
-        // this query support Vectorized Read and returningBatch
+        // refer to ParquetFileFormat, use resultSchema to decide if this query support
+        // Vectorized Read and returningBatch.
         val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
         val enableVectorizedReader: Boolean =
           m.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
@@ -325,8 +325,8 @@ private[sql] class OapFileFormat extends FileFormat
             case _ =>
               OapIndexInfo.partitionOapIndex.put(file.filePath, false)
               FilterHelper.setFilterIfExist(conf, pushed)
-              // if enableVectorizedReader == true, init VectorizedContext
-              // else context is None
+              // if enableVectorizedReader == true, init VectorizedContext,
+              // else context is None.
               val context = if (enableVectorizedReader) {
                 Some(VectorizedContext(partitionSchema,
                   file.partitionValues, returningBatch))
@@ -338,9 +338,8 @@ private[sql] class OapFileFormat extends FileFormat
               val iter = reader.initialize(conf, options)
               Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
               oapMetrics.updateIndexAndRowRead(reader, totalRows)
-              // if enableVectorizedReader == true, return iter directly
-              // else use original branch
-              // partitionValues already filled by VectorizedReader
+              // if enableVectorizedReader == true, return iter directly because of partitionValues
+              // already filled by VectorizedReader, else use original branch.
               if (enableVectorizedReader) {
                 iter
               } else {
