@@ -386,8 +386,7 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
       }
       // union two intervals
       union
-    }
-    else {// base.start is not DUMMY
+    } else { // base.start is not DUMMY
       if (order.compare(extra.start, base.start)==0) {
         base.startInclude = base.startInclude || extra.startInclude
       }
@@ -442,8 +441,7 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
     else {
       if (key2 == IndexScanner.DUMMY_KEY_START) {
         (key1, include1)
-      }
-      else { // both key1 and key2 are not Dummy
+      } else { // both key1 and key2 are not Dummy
         if (order.compare(key1, key2) == 0) {
           return (key1, include1 && include2)
         }
