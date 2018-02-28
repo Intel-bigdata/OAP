@@ -404,3 +404,4 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
     }
   }
 }
+
