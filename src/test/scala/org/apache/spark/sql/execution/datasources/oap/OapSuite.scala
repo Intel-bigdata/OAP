@@ -34,7 +34,6 @@ import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
 
-
 class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
   import testImplicits._
   private var path: File = _

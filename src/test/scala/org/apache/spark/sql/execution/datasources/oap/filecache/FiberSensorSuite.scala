@@ -24,7 +24,6 @@ import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
 
-
 class FiberSensorSuite extends SparkFunSuite with AbstractFiberSensor with Logging {
 
   test("test get hosts from FiberSensor") {

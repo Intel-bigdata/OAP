@@ -30,7 +30,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.StringFiberBuild
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.unsafe.types.UTF8String
 
-
 class DictionaryBasedEncoderCheck extends Properties("DictionaryBasedEncoder") {
   private val rowCountInEachGroup = Gen.choose(1, 1024)
   private val rowCountInLastGroup = Gen.choose(1, 1024)

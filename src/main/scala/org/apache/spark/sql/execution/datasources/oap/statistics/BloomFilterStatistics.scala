@@ -31,7 +31,6 @@ import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
-
 private[oap] class BloomFilterStatisticsReader(
     schema: StructType) extends StatisticsReader(schema) {
   override val id: Int = StatisticsType.TYPE_BLOOM_FILTER
@@ -107,7 +106,8 @@ private[oap] class BloomFilterStatisticsReader(
 }
 
 private[oap] class BloomFilterStatisticsWriter(
-    schema: StructType, conf: Configuration) extends StatisticsWriter(schema, conf) {
+    schema: StructType,
+    conf: Configuration) extends StatisticsWriter(schema, conf) {
   override val id: Int = StatisticsType.TYPE_BLOOM_FILTER
 
   protected var bfIndex: BloomFilter = new BloomFilter(bfMaxBits, bfHashFuncs)()

@@ -23,7 +23,6 @@ import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
-
 /**
  * Index suite for BitMap Index
  */
@@ -121,8 +120,8 @@ class BitMapIndexSuite extends QueryTest with SharedOapContext with BeforeAndAft
     val emptyResult : Seq[(Int, String)] = Seq.empty
 
     checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 180 and a < 200 " +
-          "AND (b like '%22%' or b like '%21%')"),
-          emptyResult.toDF("key", "value"))
+      "AND (b like '%22%' or b like '%21%')"),
+      emptyResult.toDF("key", "value"))
 
     checkAnswer(sql("SELECT * FROM oap_test WHERE a >= 180 and a < 200 " +
       "AND (b like '%18%' or b like '%19%')"),

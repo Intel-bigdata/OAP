@@ -26,7 +26,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheStatus
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
 import org.apache.spark.util.collection.BitSet
 
-
 class CacheStatusSerDeSuite extends SparkFunSuite {
   private def assertStringEquals(json1: String, json2: String) {
     val formatJsonString = (json: String) => json.replaceAll("[\\s|]", "")

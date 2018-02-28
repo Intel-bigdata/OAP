@@ -27,8 +27,11 @@ import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
 
 
-private[oap] case class FiberCacheStatus(file: String, bitmask: BitSet,
-                                             meta: OapDataFileHandle) {
+private[oap] case class FiberCacheStatus(
+    file: String,
+    bitmask: BitSet,
+    meta: OapDataFileHandle) {
+
   val cachedFiberCount = bitmask.cardinality()
 
   def moreCacheThan(other: FiberCacheStatus): Boolean = {

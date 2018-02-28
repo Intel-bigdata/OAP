@@ -28,7 +28,6 @@ import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.apache.spark.util.Utils
 
-
 class BTreeIndexScannerSuite extends SharedOapContext {
 
   // Override afterEach because we do not want to check open streams

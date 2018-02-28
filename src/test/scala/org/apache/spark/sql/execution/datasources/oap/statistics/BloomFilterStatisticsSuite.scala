@@ -26,7 +26,6 @@ import org.apache.spark.sql.execution.datasources.oap.index.{BloomFilter, IndexU
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
 
-
 class BloomFilterStatisticsSuite extends StatisticsTest {
 
   class TestBloomFilterWriter(schema: StructType)

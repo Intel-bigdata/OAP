@@ -31,9 +31,10 @@ private[oap] trait DataFiberParser {
 }
 
 object DataFiberParser {
-  def apply(encoding: Encoding,
-            meta: OapDataFileHandle,
-            dataType: DataType): DataFiberParser = {
+  def apply(
+      encoding: Encoding,
+      meta: OapDataFileHandle,
+      dataType: DataType): DataFiberParser = {
 
     encoding match {
       case Encoding.PLAIN => PlainDataFiberParser(meta)
@@ -45,10 +46,11 @@ object DataFiberParser {
 
 object DictionaryBasedDataFiberParser {
 
-  def apply(encoding: Encoding,
-            meta: OapDataFileHandle,
-            dictionary: Dictionary,
-            dataType: DataType): DataFiberParser = {
+  def apply(
+      encoding: Encoding,
+      meta: OapDataFileHandle,
+      dictionary: Dictionary,
+      dataType: DataType): DataFiberParser = {
     encoding match {
       case Encoding.PLAIN_DICTIONARY => PlainDictionaryFiberParser(meta, dictionary, dataType)
       case _ => sys.error(s"Not support encoding type: $encoding")
@@ -63,8 +65,8 @@ private[oap] case class PlainDataFiberParser(
 }
 
 private[oap] case class DeltaByteArrayDataFiberParser(
-  meta: OapDataFileHandle, dataType: DataType) extends DataFiberParser{
-
+    meta: OapDataFileHandle,
+    dataType: DataType) extends DataFiberParser{
 
   override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = {
 
@@ -112,9 +114,9 @@ private[oap] case class DeltaByteArrayDataFiberParser(
 }
 
 private[oap] case class PlainDictionaryFiberParser(
-  meta: OapDataFileHandle,
-  dictionary: Dictionary,
-  dataType: DataType) extends DataFiberParser {
+    meta: OapDataFileHandle,
+    dictionary: Dictionary,
+    dataType: DataType) extends DataFiberParser {
 
   override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = {
     val valuesReader = new DictionaryValuesReader(dictionary)

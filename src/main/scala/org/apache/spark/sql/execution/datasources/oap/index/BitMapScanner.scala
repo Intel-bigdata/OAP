@@ -296,8 +296,11 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     (startIdx, endIdx)
   }
 
-  private def getDesiredBitmaps(byteCache: FiberCache, position: Int,
-      startIdx: Int, endIdx: Int): IndexedSeq[RoaringBitmap] = {
+  private def getDesiredBitmaps(
+      byteCache: FiberCache,
+      position: Int,
+      startIdx: Int,
+      endIdx: Int): IndexedSeq[RoaringBitmap] = {
     if (byteCache.size() != 0) {
       val bmStream = new BitmapDataInputStream(byteCache)
       bmStream.skipBytes(position)

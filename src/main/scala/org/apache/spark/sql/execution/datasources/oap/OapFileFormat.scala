@@ -107,12 +107,10 @@ private[sql] class OapFileFormat extends FileFormat
     // TODO: Should we have our own config util instead of SqlConf?
     // First use table option, if not, use SqlConf, else, use default value.
     conf.set(OapFileFormat.COMPRESSION, options.getOrElse("compression",
-        sparkSession.conf.get(OapConf.OAP_COMPRESSION.key,
-          OapFileFormat.DEFAULT_COMPRESSION)))
+      sparkSession.conf.get(OapConf.OAP_COMPRESSION.key, OapFileFormat.DEFAULT_COMPRESSION)))
 
     conf.set(OapFileFormat.ROW_GROUP_SIZE, options.getOrElse("rowgroup",
-      sparkSession.conf.get(OapConf.OAP_ROW_GROUP_SIZE.key,
-      OapFileFormat.DEFAULT_ROW_GROUP_SIZE)))
+      sparkSession.conf.get(OapConf.OAP_ROW_GROUP_SIZE.key, OapFileFormat.DEFAULT_ROW_GROUP_SIZE)))
 
     new OapOutputWriterFactory(
       dataSchema,
@@ -142,8 +140,7 @@ private[sql] class OapFileFormat extends FileFormat
       requiredSchema: StructType,
       filters: Seq[Filter],
       options: Map[String, String],
-      hadoopConf: Configuration
-  ): PartitionedFile => Iterator[InternalRow] = {
+      hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
     meta match {
       case Some(m) =>
@@ -455,7 +452,9 @@ private[oap] class OapOutputWriterFactory(
 
 
 private[oap] case class OapWriteResult(
-    fileName: String, rowsWritten: Int, partitionString: String)
+    fileName: String,
+    rowsWritten: Int,
+    partitionString: String)
 
 private[oap] class OapOutputWriter(
     path: String,
@@ -463,9 +462,11 @@ private[oap] class OapOutputWriter(
     context: TaskAttemptContext) extends OutputWriter {
   private var rowCount = 0
   private var partitionString: String = ""
+
   override def setPartitionString(ps: String): Unit = {
     partitionString = ps
   }
+
   private val writer: OapDataWriter = {
     val isCompressed = FileOutputFormat.getCompressOutput(context)
     val conf = context.getConfiguration
@@ -477,6 +478,7 @@ private[oap] class OapOutputWriter(
   }
 
   override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
+
   override protected[sql] def writeInternal(row: InternalRow): Unit = {
     rowCount += 1
     writer.write(row)
@@ -522,9 +524,9 @@ private[sql] object OapFileFormat {
   val OAP_INDEX_GROUP_BY_OPTION_KEY = "oap.scan.index.group"
 
   val oapOptimizationKeySeq : Seq[String] = {
-      OAP_QUERY_ORDER_OPTION_KEY ::
-      OAP_QUERY_LIMIT_OPTION_KEY ::
-      OAP_INDEX_SCAN_NUM_OPTION_KEY ::
-      OAP_INDEX_GROUP_BY_OPTION_KEY :: Nil
+    OAP_QUERY_ORDER_OPTION_KEY ::
+    OAP_QUERY_LIMIT_OPTION_KEY ::
+    OAP_INDEX_SCAN_NUM_OPTION_KEY ::
+    OAP_INDEX_GROUP_BY_OPTION_KEY :: Nil
   }
 }

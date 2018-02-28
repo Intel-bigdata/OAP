@@ -31,7 +31,6 @@ import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
 
-
 class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
   import testImplicits._
   private var tmpDir: File = _

@@ -23,7 +23,6 @@ import org.apache.parquet.format.converter.ParquetMetadataConverter._
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.metadata.ParquetMetadata
 
-
 private[oap] class ParquetDataFileHandle(
   var footer: ParquetMetadata = null)
   extends DataFileHandle {
@@ -36,6 +35,4 @@ private[oap] class ParquetDataFileHandle(
     this.footer = ParquetFileReader.readFooter(conf, path, NO_FILTER)
     this
   }
-
 }
-

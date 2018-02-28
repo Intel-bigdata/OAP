@@ -29,9 +29,9 @@ import org.apache.spark.sql.types.{BinaryType, DataType, IntegerType, StringType
 import org.apache.spark.unsafe.Platform
 
 private[oap] case class DeltaByteArrayFiberBuilder (
-  defaultRowGroupRowCount: Int,
-  ordinal: Int,
-  dataType: DataType) extends DataFiberBuilder {
+    defaultRowGroupRowCount: Int,
+    ordinal: Int,
+    dataType: DataType) extends DataFiberBuilder {
 
   // TODO: [linhong] hard-coded variables need to remove
   private val valuesWriter = new DeltaByteArrayWriter(32, 1048576)
@@ -75,9 +75,9 @@ private[oap] case class DeltaByteArrayFiberBuilder (
 
 // TODO: [linhong] Code is similar to DeltaByteArrayFiberBuilder. Need abstract
 private[oap] case class PlainBinaryDictionaryFiberBuilder(
-  defaultRowGroupRowCount: Int,
-  ordinal: Int,
-  dataType: DataType) extends DataFiberBuilder {
+    defaultRowGroupRowCount: Int,
+    ordinal: Int,
+    dataType: DataType) extends DataFiberBuilder {
 
   private val valuesWriter = new PlainBinaryDictionaryValuesWriter(1048576,
     org.apache.parquet.column.Encoding.RLE_DICTIONARY,
@@ -132,9 +132,9 @@ private[oap] case class PlainBinaryDictionaryFiberBuilder(
 }
 
 private[oap] case class PlainIntegerDictionaryFiberBuilder(
-  defaultRowGroupRowCount: Int,
-  ordinal: Int,
-  dataType: DataType) extends DataFiberBuilder {
+    defaultRowGroupRowCount: Int,
+    ordinal: Int,
+    dataType: DataType) extends DataFiberBuilder {
 
   private val valuesWriter = new PlainIntegerDictionaryValuesWriter(1048576,
     org.apache.parquet.column.Encoding.RLE_DICTIONARY,

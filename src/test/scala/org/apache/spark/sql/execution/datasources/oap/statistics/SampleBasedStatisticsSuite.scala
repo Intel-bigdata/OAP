@@ -30,7 +30,6 @@ import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
 import org.apache.spark.sql.types.StructType
 
-
 class SampleBasedStatisticsSuite extends StatisticsTest {
 
   class TestSampleWriter(schema: StructType)
@@ -158,4 +157,3 @@ class SampleBasedStatisticsSuite extends StatisticsTest {
     assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
   }
 }
-

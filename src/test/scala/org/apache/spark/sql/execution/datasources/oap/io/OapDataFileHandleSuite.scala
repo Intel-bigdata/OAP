@@ -30,7 +30,6 @@ import org.scalatest.prop.Checkers
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.util.Utils
 
-
 class OapDataFileHandleCheck extends Properties("OapDataFileHandle") {
   private val tmpDir = Utils.createTempDir()
   private val conf = new Configuration()
@@ -62,14 +61,15 @@ class OapDataFileHandleCheck extends Properties("OapDataFileHandle") {
     Arbitrary(genOapDataFileHandle)
   }
 
-  private def generateOapDataFileHandle(rowGroupCount: Int,
-                                            defaultRowCount: Int,
-                                            fieldCount: Int,
-                                            lastRowCount: Int,
-                                            fiberLens: Array[Int],
-                                            uncompressedFiberLens: Array[Int],
-                                            columnsMeta: Seq[ColumnMeta],
-                                            codec: CompressionCodec): OapDataFileHandle = {
+  private def generateOapDataFileHandle(
+      rowGroupCount: Int,
+      defaultRowCount: Int,
+      fieldCount: Int,
+      lastRowCount: Int,
+      fiberLens: Array[Int],
+      uncompressedFiberLens: Array[Int],
+      columnsMeta: Seq[ColumnMeta],
+      codec: CompressionCodec): OapDataFileHandle = {
 
     val rowGroupMetaArray = new Array[RowGroupMeta](rowGroupCount)
     rowGroupMetaArray.indices.foreach(

@@ -36,7 +36,6 @@ import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, Key, OapF
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
-
 /**
  * Utils for Oap
  */

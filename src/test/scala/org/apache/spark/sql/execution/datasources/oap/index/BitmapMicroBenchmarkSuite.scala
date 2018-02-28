@@ -30,7 +30,6 @@ import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.{collection, Utils}
 
-
 /**
  * Microbenchmark for Bitmap index with different bitmap implementations.
  */

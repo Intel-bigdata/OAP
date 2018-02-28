@@ -29,7 +29,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
 
-
 private[oap] class MinMaxStatisticsReader(schema: StructType) extends StatisticsReader(schema) {
   override val id: Int = StatisticsType.TYPE_MIN_MAX
 
@@ -86,7 +85,8 @@ private[oap] class MinMaxStatisticsReader(schema: StructType) extends Statistics
 }
 
 private[oap] class MinMaxStatisticsWriter(
-    schema: StructType, conf: Configuration) extends StatisticsWriter(schema, conf) {
+    schema: StructType,
+    conf: Configuration) extends StatisticsWriter(schema, conf) {
   override val id: Int = StatisticsType.TYPE_MIN_MAX
   @transient
   private lazy val ordering = GenerateOrdering.create(schema)

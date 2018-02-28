@@ -25,7 +25,6 @@ import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 import org.apache.spark.util.collection.BitSet
 
-
 class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache) {
   require(dataType.isInstanceOf[AtomicType], "Only atomic type accepted for now.")
 

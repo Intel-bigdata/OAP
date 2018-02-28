@@ -29,7 +29,6 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 
-
 /**
  * A Parquet [[ReadSupport]] implementation for reading Parquet records as Catalyst
  * [[UnsafeRow]]s.
@@ -68,10 +67,10 @@ class OapReadSupportImpl extends ReadSupport[UnsafeRow] with Logging {
    * records to Catalyst [[UnsafeRow]]s.
    */
   override def prepareForRead(
-                               conf: Configuration,
-                               keyValueMetaData: JMap[String, String],
-                               fileSchema: MessageType,
-                               readContext: ReadContext): RecordMaterializer[UnsafeRow] = {
+      conf: Configuration,
+      keyValueMetaData: JMap[String, String],
+      fileSchema: MessageType,
+      readContext: ReadContext): RecordMaterializer[UnsafeRow] = {
     readSupportHelper.prepareForRead(conf, keyValueMetaData, fileSchema, readContext)
   }
 }

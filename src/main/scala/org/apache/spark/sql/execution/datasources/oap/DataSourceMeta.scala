@@ -199,7 +199,9 @@ private[oap] class IndexMeta(
   }
 
   private def writeBTreeIndexEntries(
-      entries: Seq[BTreeIndexEntry], totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {
+      entries: Seq[BTreeIndexEntry],
+      totalSizeToWrite: Int,
+      out: FSDataOutputStream): Unit = {
     val sizeBefore = out.size
     out.writeInt(entries.size)
     entries.foreach(e => {

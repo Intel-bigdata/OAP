@@ -30,7 +30,6 @@ import org.apache.spark.sql.sources._
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
-
 class IndexSelectionSuite extends SharedOapContext with BeforeAndAfterEach{
 
   import testImplicits._

@@ -49,17 +49,25 @@ class OapMetricsSuite extends QueryTest with SharedOapContext with BeforeAndAfte
   def accumulate(fileFormats: Set[Option[OapFileFormat]], func: OapFileFormat => Long): Long =
     fileFormats.foldLeft(0L)((sum, of) => sum + of.map(func).getOrElse(0L))
 
-  case class RowMetrics(totalRows: Long, rowsSkippedForStatistic: Long,
-                        rowsReadWhenHitIndex: Long, rowsSkippedWhenHitIndex: Long,
-                        rowsReadWhenIgnoreIndex: Long, rowsReadWhenMissIndex: Long)
+  case class RowMetrics(
+      totalRows: Long,
+      rowsSkippedForStatistic: Long,
+      rowsReadWhenHitIndex: Long,
+      rowsSkippedWhenHitIndex: Long,
+      rowsReadWhenIgnoreIndex: Long,
+      rowsReadWhenMissIndex: Long)
 
-  case class TaskMetrics(totalTasks: Long, tasksSkippedForStatistic: Long,
-                         tasksHitIndex: Long, tasksIgnoreIndex: Long,
-                         tasksMissIndex: Long)
+  case class TaskMetrics(
+      totalTasks: Long,
+      tasksSkippedForStatistic: Long,
+      tasksHitIndex: Long,
+      tasksIgnoreIndex: Long,
+      tasksMissIndex: Long)
 
-  def assertAccumulators(fileFormats: Set[Option[OapFileFormat]],
-                         rowMetrics: Option[RowMetrics] = None,
-                         taskMetrics: Option[TaskMetrics] = None): Unit = {
+  def assertAccumulators(
+      fileFormats: Set[Option[OapFileFormat]],
+      rowMetrics: Option[RowMetrics] = None,
+      taskMetrics: Option[TaskMetrics] = None): Unit = {
     rowMetrics.foreach(rowMetrics => {
       assert(rowMetrics.totalRows == accumulate(fileFormats,
         f => getValue(f.oapMetrics.totalRows)))

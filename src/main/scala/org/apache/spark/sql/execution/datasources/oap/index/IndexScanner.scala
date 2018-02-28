@@ -181,11 +181,11 @@ private[oap] object ScannerBuilder extends Logging {
 
   type IntervalArrayMap = mutable.HashMap[String, ArrayBuffer[RangeInterval]]
 
-  def combineIntervalMaps(leftMap: IntervalArrayMap,
-                          rightMap: IntervalArrayMap,
-                          ic: IndexContext,
-                          needMerge: Boolean): IntervalArrayMap = {
-
+  def combineIntervalMaps(
+      leftMap: IntervalArrayMap,
+      rightMap: IntervalArrayMap,
+      ic: IndexContext,
+      needMerge: Boolean): IntervalArrayMap = {
     for ((attribute, intervals) <- rightMap) {
       if (leftMap.contains(attribute)) {
         attribute match {

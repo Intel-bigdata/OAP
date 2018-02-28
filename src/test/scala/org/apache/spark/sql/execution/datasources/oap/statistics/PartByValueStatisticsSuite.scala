@@ -29,7 +29,6 @@ import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, Index
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
 
-
 class PartByValueStatisticsSuite extends StatisticsTest {
 
   class TestPartByValueWriter(schema: StructType)
@@ -111,7 +110,6 @@ class PartByValueStatisticsSuite extends StatisticsTest {
       assert(metas(i).curMaxId == curMaxId(i))
       assert(metas(i).accumulatorCnt == curAccumuCount(i))
     }
-
   }
 
   test("read and write") {

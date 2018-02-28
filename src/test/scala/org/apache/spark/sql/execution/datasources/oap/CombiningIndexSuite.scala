@@ -114,4 +114,3 @@ class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAnd
     sql("drop oindex index2 on oap_test")
   }
 }
-

@@ -29,7 +29,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
-
 class BTreeRecordReaderWriterSuite extends SparkFunSuite {
 
   private lazy val random = new Random(0)
@@ -37,7 +36,7 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
    * This class is used to inject into BTreeRecordWriter and get the data it write.
    */
   private class TestBTreeIndexFileWriter(conf: Configuration)
-      extends BTreeIndexFileWriter(conf, new Path(Utils.createTempDir().getAbsolutePath, "temp")) {
+    extends BTreeIndexFileWriter(conf, new Path(Utils.createTempDir().getAbsolutePath, "temp")) {
     val nodes = new ArrayBuffer[Array[Byte]]()
     var footer: Array[Byte] = _
     var rowIdList: Array[Byte] = Array()

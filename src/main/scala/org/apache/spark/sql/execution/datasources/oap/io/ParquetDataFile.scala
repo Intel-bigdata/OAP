@@ -31,7 +31,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper
 import org.apache.spark.sql.types.StructType
 
-
 private[oap] case class ParquetDataFile(
     path: String,
     schema: StructType,
@@ -86,7 +85,6 @@ private[oap] case class ParquetDataFile(
     }
     conf.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
   }
-
 
   private class FileRecordReaderIterator[V](private[this] var rowReader: RecordReader[V])
     extends Iterator[V] with Closeable {

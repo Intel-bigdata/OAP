@@ -28,12 +28,15 @@ import org.apache.spark.sql.types.StructType
 
 object FilterHelper {
 
-  def tryToPushFilters(sparkSession: SparkSession,
+  def tryToPushFilters(
+      sparkSession: SparkSession,
       requiredSchema: StructType,
-      filters: Seq[Filter]): Option[FilterPredicate] =
+      filters: Seq[Filter]): Option[FilterPredicate] = {
     tryToPushFilters(sparkSession.sessionState.conf.parquetFilterPushDown, requiredSchema, filters)
+  }
 
-  def tryToPushFilters(filterPushDown: Boolean,
+  def tryToPushFilters(
+      filterPushDown: Boolean,
       requiredSchema: StructType,
       filters: Seq[Filter]): Option[FilterPredicate] = {
     if (filterPushDown) {

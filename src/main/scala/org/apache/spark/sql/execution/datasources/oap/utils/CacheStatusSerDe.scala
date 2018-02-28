@@ -25,7 +25,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheStatus
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
 import org.apache.spark.util.collection.BitSet
 
-
 /**
  * This is user defined Json protocol for SerDe, here the format of Json output should like
  * following:

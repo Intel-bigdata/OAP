@@ -27,7 +27,6 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.unsafe.Platform
 
-
 class IndexUtilsSuite extends SparkFunSuite with Logging {
   test("write int to unsafe") {
     val buf = new ByteArrayOutputStream(8)

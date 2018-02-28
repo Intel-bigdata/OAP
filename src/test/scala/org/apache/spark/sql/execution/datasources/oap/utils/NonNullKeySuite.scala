@@ -27,7 +27,6 @@ import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.ByteBufferOutputStream
 
-
 class NonNullKeySuite extends SparkFunSuite with Logging {
 
   private lazy val random = new Random(0)

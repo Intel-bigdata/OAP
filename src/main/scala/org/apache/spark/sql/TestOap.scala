@@ -19,7 +19,6 @@ package org.apache.spark.sql
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.internal.oap.OapConf
 
-
 object TestOap extends TestOapContext(
   OapSession.builder.config(
     (new SparkConf).set("spark.master", "local[2]")
@@ -41,4 +40,3 @@ class TestOapContext(
   // OapStrategy conflicts with EXECUTOR_INDEX_SELECTION.
   sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
 }
-

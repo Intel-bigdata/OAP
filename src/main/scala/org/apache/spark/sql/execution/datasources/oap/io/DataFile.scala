@@ -49,8 +49,11 @@ private[oap] class OapIterator[T](inner: Iterator[T]) extends Iterator[T] with C
 }
 
 private[oap] object DataFile {
-  def apply(path: String, schema: StructType, dataFileClassName: String,
-            configuration: Configuration): DataFile = {
+  def apply(
+      path: String,
+      schema: StructType,
+      dataFileClassName: String,
+      configuration: Configuration): DataFile = {
     Try(Utils.classForName(dataFileClassName).getDeclaredConstructor(
       classOf[String], classOf[StructType], classOf[Configuration])).toOption match {
       case Some(ctor) =>

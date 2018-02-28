@@ -27,7 +27,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.StringFiberBuild
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.unsafe.types.UTF8String
 
-
 class DeltaByteArrayEncoderCheck extends Properties("DeltaByteArrayEncoder") {
 
   private val rowCountInEachGroup = Gen.choose(1, 1024)

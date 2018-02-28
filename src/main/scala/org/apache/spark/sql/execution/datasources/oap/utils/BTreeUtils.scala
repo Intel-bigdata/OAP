@@ -19,7 +19,6 @@ package org.apache.spark.sql.execution.datasources.oap.utils
 
 import org.apache.spark.internal.Logging
 
-
 /**
  * Util functions for building BTree from sorted iterator
  */

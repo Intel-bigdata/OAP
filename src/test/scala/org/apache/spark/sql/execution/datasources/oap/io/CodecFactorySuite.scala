@@ -25,7 +25,6 @@ import org.scalatest.prop.Checkers
 
 import org.apache.spark.SparkFunSuite
 
-
 class CodecFactoryCheck extends Properties("CodecFactory") {
 
   private val codecFactory = new CodecFactory(new Configuration())
@@ -55,6 +54,7 @@ class CodecFactoryCheck extends Properties("CodecFactory") {
     CompressionCodec.UNCOMPRESSED, CompressionCodec.GZIP,
     CompressionCodec.SNAPPY, CompressionCodec.LZO)
 }
+
 class CodecFactorySuite extends SparkFunSuite with Checkers {
 
   test("Check CodecFactory Compress/Decompress") {

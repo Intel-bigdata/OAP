@@ -138,8 +138,11 @@ private[oap] object UnsafeIndexNode {
     }
   }
 
-  def getUnsafeRow(schemaLen: Int, baseObj : Object, baseOffset: Long, sizeInBytes : Int)
-    : UnsafeRow = {
+  def getUnsafeRow(
+      schemaLen: Int,
+      baseObj : Object,
+      baseOffset: Long,
+      sizeInBytes : Int) : UnsafeRow = {
     val curRow = getCorrectUnsafeRow(schemaLen)
     curRow.pointTo(baseObj, baseOffset, sizeInBytes)
     curRow
@@ -229,6 +232,7 @@ private [oap] object RangeInterval{
       e: Key,
       includeStart: Boolean,
       includeEnd: Boolean,
-      isNull: Boolean = false): RangeInterval =
+      isNull: Boolean = false): RangeInterval = {
     new RangeInterval(s, e, includeStart, includeEnd, isNull)
+  }
 }

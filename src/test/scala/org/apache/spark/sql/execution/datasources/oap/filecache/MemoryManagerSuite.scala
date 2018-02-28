@@ -55,7 +55,7 @@ class MemoryManagerSuite extends SharedOapContext {
         buf
       }
       booleans ++ bytes ++ shorts ++ ints ++ longs ++
-          floats ++ doubles ++ strings ++ binaries ++ Nil
+        floats ++ doubles ++ strings ++ binaries ++ Nil
     }
     random.shuffle(values)
 

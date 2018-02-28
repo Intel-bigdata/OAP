@@ -436,7 +436,7 @@ case class RefreshIndexCommand(
  * List indices for table
  */
 case class OapShowIndexCommand(table: TableIdentifier, relationName: String)
-    extends RunnableCommand with Logging {
+  extends RunnableCommand with Logging {
 
   override val output: Seq[Attribute] = {
     AttributeReference("table", StringType, nullable = true)() ::

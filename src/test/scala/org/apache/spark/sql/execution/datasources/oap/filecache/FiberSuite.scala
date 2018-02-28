@@ -32,7 +32,6 @@ import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
 
-
 class FiberSuite extends SharedOapContext with Logging {
   private var file: File = _
 

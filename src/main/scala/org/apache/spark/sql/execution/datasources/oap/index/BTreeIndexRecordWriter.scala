@@ -170,7 +170,8 @@ private[index] case class BTreeIndexRecordWriter(
    * Key Data For Key #N
    */
   private[index] def serializeNode(
-      uniqueKeys: Seq[InternalRow], startPosInRowList: Int): Array[Byte] = {
+      uniqueKeys: Seq[InternalRow],
+      startPosInRowList: Int): Array[Byte] = {
     val buffer = new ByteArrayOutputStream()
     val keyBuffer = new ByteArrayOutputStream()
 
@@ -270,4 +271,7 @@ private[index] case class BTreeIndexRecordWriter(
 }
 
 private case class BTreeNodeMetaData(
-    rowCount: Int, byteSize: Int, min: InternalRow, max: InternalRow)
+    rowCount: Int,
+    byteSize: Int,
+    min: InternalRow,
+    max: InternalRow)

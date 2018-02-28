@@ -20,7 +20,6 @@ package org.apache.spark.sql.execution.datasources.oap.utils
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 
-
 class BTreeUtilsSuite extends SparkFunSuite with Logging {
   test("height") {
     assert(BTreeUtils.height(25) == 2)

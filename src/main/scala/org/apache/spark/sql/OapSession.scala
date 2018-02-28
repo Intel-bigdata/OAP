@@ -29,7 +29,6 @@ import org.apache.spark.sql.internal.SessionState
 import org.apache.spark.sql.internal.StaticSQLConf.CATALOG_IMPLEMENTATION
 import org.apache.spark.util.Utils
 
-
 class OapSession(sparkContext: SparkContext) extends SparkSession(sparkContext) { self =>
   @transient
   override private[sql] lazy val sessionState: SessionState = {

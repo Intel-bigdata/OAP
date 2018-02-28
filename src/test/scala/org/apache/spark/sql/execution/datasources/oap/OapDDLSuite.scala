@@ -24,7 +24,6 @@ import org.apache.spark.sql.{QueryTest, Row, SaveMode}
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
-
 class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
 
@@ -157,4 +156,3 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     assert(indexFiles1 === indexFiles2)
   }
 }
-
