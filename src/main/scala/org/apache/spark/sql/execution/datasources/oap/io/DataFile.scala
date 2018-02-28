@@ -35,6 +35,7 @@ abstract class DataFile {
   def path: String
   def schema: StructType
   def configuration: Configuration
+  def context: Option[VectorizedContext]
 
   def createDataFileHandle(): DataFileHandle
   def getFiberData(groupId: Int, fiberId: Int): FiberCache
@@ -50,11 +51,13 @@ private[oap] class OapIterator[T](inner: Iterator[T]) extends Iterator[T] with C
 
 private[oap] object DataFile {
   def apply(path: String, schema: StructType, dataFileClassName: String,
-            configuration: Configuration): DataFile = {
+      configuration: Configuration,
+      context: Option[VectorizedContext] = None): DataFile = {
     Try(Utils.classForName(dataFileClassName).getDeclaredConstructor(
-      classOf[String], classOf[StructType], classOf[Configuration])).toOption match {
+      classOf[String], classOf[StructType], classOf[Configuration],
+      classOf[Option[VectorizedContext]])).toOption match {
       case Some(ctor) =>
-        Try (ctor.newInstance(path, schema, configuration).asInstanceOf[DataFile]) match {
+        Try (ctor.newInstance(path, schema, configuration, context).asInstanceOf[DataFile]) match {
           case Success(e) => e
           case Failure(e) =>
             throw new OapException(s"Cannot instantiate class $dataFileClassName", e)
@@ -65,6 +68,16 @@ private[oap] object DataFile {
     }
   }
 }
+
+/**
+ * VectorizedContext encapsulation infomation for Vectorized Read,
+ * partitionColumns and partitionValues use by VectorizedOapRecordReader#initBatch
+ * returningBatch use by VectorizedOapRecordReader#enableReturningBatches
+ */
+private[oap] case class VectorizedContext(
+    partitionColumns: StructType,
+    partitionValues: InternalRow,
+    returningBatch: Boolean)
 
 /**
  * The data file handle, will be cached for performance purpose, as we don't want to open the
