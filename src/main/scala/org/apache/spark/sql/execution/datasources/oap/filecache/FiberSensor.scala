@@ -26,7 +26,6 @@ import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.util.collection.BitSet
 
-
 private[oap] case class FiberCacheStatus(
     file: String,
     bitmask: BitSet,

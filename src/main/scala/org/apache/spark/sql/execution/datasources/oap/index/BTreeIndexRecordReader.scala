@@ -30,7 +30,6 @@ import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
 import org.apache.spark.sql.types._
 import org.apache.spark.util.CompletionIterator
 
-
 private[index] case class BTreeIndexRecordReader(
     configuration: Configuration,
     schema: StructType) extends Iterator[Int] {
@@ -80,6 +79,7 @@ private[index] case class BTreeIndexRecordReader(
       }
     } // get the row ids
   }
+
   // find the row id list start pos, end pos of the range interval
   private[index] def findRowIdRange(interval: RangeInterval): (Int, Int) = {
     val recordCount = footer.getNonNullKeyRecordCount
