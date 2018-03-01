@@ -27,6 +27,8 @@ import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
+
 
 /**
  * A strategy for planning scans over collections of files that might be partitioned or bucketed
@@ -90,7 +92,7 @@ object FileSourceStrategy extends Strategy with Logging {
         // if config true turn to OapFileFormat
         // else turn to ParquetFileFormat
         case a: ParquetFileFormat
-          if _fsRelation.sparkSession.conf.get(SQLConf.OAP_PARQUET_ENABLED) =>
+          if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
           val oapFileFormat = new OapFileFormat
           oapFileFormat
             .initialize(_fsRelation.sparkSession,

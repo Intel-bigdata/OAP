@@ -33,7 +33,7 @@ import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.aggregate.OapAggUtils
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.joins.BuildRight
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.util.Utils
 
 trait OapStrategies extends Logging {
@@ -112,8 +112,9 @@ trait OapStrategies extends Logging {
             case Some(fastScan) => OapOrderLimitFileScanExec(limit, order, projectList, fastScan)
             case None => PlanLater(child)
           }
+        } else {
+          PlanLater(child)
         }
-        else PlanLater(child)
       case _ => PlanLater(child)
     }
   }
@@ -175,7 +176,9 @@ trait OapStrategies extends Logging {
             case Some(fastScan) => OapDistinctFileScanExec(scanNumber = 1, projectList, fastScan)
             case None => PlanLater(child)
           }
-        } else PlanLater(child)
+        } else {
+          PlanLater(child)
+        }
       case _ => PlanLater(child)
     }
   }
@@ -272,7 +275,7 @@ trait OapStrategies extends Logging {
       indexRequirements: Seq[IndexType]): Option[SparkPlan] = {
     // If executor index selection (EIS) is enabled, oapStrategies are disabled.
     val conf = SparkSession.getActiveSession.get.sessionState.conf
-    if (conf.getConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION)) {
+    if (conf.getConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION)) {
       return None
     }
 

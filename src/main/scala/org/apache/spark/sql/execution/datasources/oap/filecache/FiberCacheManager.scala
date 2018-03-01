@@ -134,7 +134,9 @@ object FiberCacheManager extends Logging {
 
   // Used by test suite
   private[filecache] def removeFiber(fiber: TestFiber): Unit = {
-    if (cacheBackend.getIfPresent(fiber) != null) cacheBackend.invalidate(fiber)
+    if (cacheBackend.getIfPresent(fiber) != null) {
+      cacheBackend.invalidate(fiber)
+    }
   }
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly
@@ -212,7 +214,7 @@ private[oap] trait Fiber {
 private[oap]
 case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
   override def fiber2Data(conf: Configuration): FiberCache =
-    file.getFiberData(rowGroupId, columnIndex, conf)
+    file.getFiberData(rowGroupId, columnIndex)
 
   override def hashCode(): Int = (file.path + columnIndex + rowGroupId).hashCode
 

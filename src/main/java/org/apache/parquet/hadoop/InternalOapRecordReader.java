@@ -29,6 +29,7 @@ import org.apache.parquet.hadoop.api.InitContext;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
+import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.io.*;
 import org.apache.parquet.io.api.RecordMaterializer;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
@@ -116,7 +117,7 @@ public class InternalOapRecordReader<T> {
         this.fileSchema = parquetFileMetadata.getSchema();
         Map<String, String> fileMetadata = parquetFileMetadata.getKeyValueMetaData();
         ReadSupport.ReadContext readContext = readSupport.init(new InitContext(
-                configuration, toSetMultiMap(fileMetadata), fileSchema));
+                configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
         this.createdBy = parquetFileMetadata.getCreatedBy();
         this.columnIOFactory = new ColumnIOFactory(createdBy);
         this.requestedSchema = readContext.getRequestedSchema();
@@ -178,16 +179,6 @@ public class InternalOapRecordReader<T> {
             return 1F;
         }
         return (float) current / total;
-    }
-
-    private static <K, V> Map<K, Set<V>> toSetMultiMap(Map<K, V> map) {
-        Map<K, Set<V>> setMultiMap = new HashMap<>();
-        for (Map.Entry<K, V> entry : map.entrySet()) {
-            Set<V> set = new HashSet<>();
-            set.add(entry.getValue());
-            setMultiMap.put(entry.getKey(), Collections.unmodifiableSet(set));
-        }
-        return Collections.unmodifiableMap(setMultiMap);
     }
 
     private void checkIOState(PageReadStore pages) throws IOException {

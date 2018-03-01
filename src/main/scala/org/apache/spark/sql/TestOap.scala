@@ -17,7 +17,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.SparkConf
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 
 
 object TestOap extends TestOapContext(
@@ -39,6 +39,6 @@ class TestOapContext(
   protected def sqlContext: SQLContext = sparkSession.sqlContext
 
   // OapStrategy conflicts with EXECUTOR_INDEX_SELECTION.
-  sqlContext.setConf(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
+  sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
 }
 

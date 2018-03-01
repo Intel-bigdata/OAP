@@ -25,7 +25,7 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.util.Utils
@@ -35,6 +35,19 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   import testImplicits._
 
   private var currentPath: String = _
+  private var defaultEis: Boolean = true
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    // In this suite we don't want to skip index even if the cost is higher.
+    defaultEis = sqlConf.getConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION)
+    sqlConf.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION, false)
+  }
+
+  override def afterAll(): Unit = {
+    sqlConf.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION, defaultEis)
+    super.afterAll()
+  }
 
   override def beforeEach(): Unit = {
     val path = Utils.createTempDir().getAbsolutePath
@@ -85,9 +98,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test oap row group size change") {
-    val previousRowGroupSize = sqlConf.getConfString(SQLConf.OAP_ROW_GROUP_SIZE.key)
+    val previousRowGroupSize = sqlConf.getConfString(OapConf.OAP_ROW_GROUP_SIZE.key)
     // change default row group size
-    sqlConf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key, "1025")
+    sqlConf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key, "1025")
     val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     checkAnswer(sql("SELECT * FROM oap_test"), Seq.empty[Row])
@@ -95,10 +108,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM oap_test"), data.map { row => Row(row._1, row._2) })
     // set back to default value
     if (previousRowGroupSize == null) {
-      sqlConf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key,
-        SQLConf.OAP_ROW_GROUP_SIZE.defaultValueString)
+      sqlConf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key,
+        OapConf.OAP_ROW_GROUP_SIZE.defaultValueString)
     } else {
-      sqlConf.setConfString(SQLConf.OAP_ROW_GROUP_SIZE.key,
+      sqlConf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key,
         previousRowGroupSize)
     }
   }
@@ -741,9 +754,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering null key") {
-    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
-      if (i <= 5) Seq(null, s"this is row $i")
-      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
+      if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+     }.map(Row.fromSeq)
     val schema =
       StructType(
         StructField("a", IntegerType) ::
@@ -774,9 +787,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering null key in Parquet format") {
-    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
-      if (i <= 5) Seq(null, s"this is row $i")
-      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
+      if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
     val schema =
       StructType(
         StructField("a", IntegerType) ::
@@ -807,9 +820,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering non-null key") {
-    val rowRDD = spark.sparkContext.parallelize(1 to 10).map(i =>
-      if (i <= 3) Seq(null, s"this is row $i")
-      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val rowRDD = spark.sparkContext.parallelize(1 to 10).map { i =>
+      if (i <= 3) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
     val schema =
       StructType(
         StructField("a", IntegerType) ::
@@ -833,9 +846,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering non-null key in Parquet format") {
-    val rowRDD = spark.sparkContext.parallelize(1 to 10).map(i =>
-      if (i <= 3) Seq(null, s"this is row $i")
-      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val rowRDD = spark.sparkContext.parallelize(1 to 10).map { i =>
+      if (i <= 3) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
     val schema =
       StructType(
         StructField("a", IntegerType) ::
@@ -859,9 +872,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering null key and normal key mixed") {
-    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
-      if (i <= 5) Seq(null, s"this is row $i")
-      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
+      if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
     val schema =
       StructType(
         StructField("a", IntegerType) ::
@@ -882,9 +895,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering null key and normal key mixed in Parquet format") {
-    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
-      if (i <= 5) Seq(null, s"this is row $i")
-      else Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
+      if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
     val schema =
       StructType(
         StructField("a", IntegerType) ::
@@ -932,56 +945,5 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       == BTreeIndex(BTreeIndexEntry(0)::BTreeIndexEntry(1)::Nil).toString)
     sql("drop oindex idx1 on parquet_test")
     sql("drop oindex idx2 on parquet_test")
-  }
-
-  test("skipped rows and selected rows") {
-    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
-      Seq(i, s"this is row $i")).map(Row.fromSeq)
-    val schema =
-      StructType(
-        StructField("a", IntegerType) ::
-          StructField("b", StringType) :: Nil)
-    val df = spark.createDataFrame(rowRDD, schema)
-    df.createOrReplaceTempView("t")
-
-    val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").createOrReplaceTempView("t1")
-
-    sql("insert overwrite table parquet_test select * from t")
-    sql("create oindex idx1 on parquet_test (a)")
-
-    val df1 = sql("SELECT * FROM parquet_test WHERE a = 1")
-    checkAnswer(df1, Row(1, "this is row 1") :: Nil)
-    val ret1 = getColumnsHitIndex(df1.queryExecution.sparkPlan)
-    assert(ret1.keySet.size == 1 && ret1.keySet.head == "a")
-    assert(ret1.values.head.toString == BTreeIndex(BTreeIndexEntry(0)::Nil).toString)
-
-    // check accumulator
-    var fileFormats = getOapFileFormat(df1.queryExecution.sparkPlan)
-    fileFormats.foreach(f => assert(f.orNull != null))
-    assert(1L == fileFormats.foldLeft(0L)((sum, of) =>
-      sum + of.map(f => f.selectedRows.sum).getOrElse(0L)
-    ))
-    assert(99L == fileFormats.foldLeft(0L)(
-      (sum, of) => sum + of.map(f => f.skippedRows.sum).getOrElse(0L)
-    ))
-
-    // check 2 format
-    val df2 = sql("select t2.a, t2.b " +
-      "from (select a from parquet_test where a = 1 ) t1 " +
-      "inner join parquet_test t2 on t1.a = t2.a")
-    checkAnswer(df2, Row(1, "this is row 1") :: Nil)
-
-    // check accumulator
-    fileFormats = getOapFileFormat(df2.queryExecution.sparkPlan)
-    fileFormats.foreach(f => assert(f.orNull != null))
-    assert(2 * 1L == fileFormats.foldLeft(0L)(
-      (sum, of) => sum + of.map(f => f.selectedRows.sum).getOrElse(0L)
-    ))
-    assert(2 * 99L == fileFormats.foldLeft(0L)(
-      (sum, of) => sum + of.map(f => f.skippedRows.sum).getOrElse(0L)
-    ))
-
-    sql("drop oindex idx1 on parquet_test")
   }
 }

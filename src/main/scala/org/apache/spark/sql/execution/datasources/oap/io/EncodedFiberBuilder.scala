@@ -115,8 +115,11 @@ private[oap] case class PlainBinaryDictionaryFiberBuilder(
 
   override def buildDictionary: Array[Byte] = {
     val dictionary = valuesWriter.createDictionaryPage()
-    if (dictionary != null) dictionary.getBytes.toByteArray
-    else Array.empty[Byte]
+    if (dictionary != null) {
+      dictionary.getBytes.toByteArray
+    } else {
+      Array.empty[Byte]
+    }
   }
 
   override def getDictionarySize: Int = valuesWriter.getDictionarySize
@@ -166,8 +169,11 @@ private[oap] case class PlainIntegerDictionaryFiberBuilder(
 
   override def buildDictionary: Array[Byte] = {
     val dictionary = valuesWriter.createDictionaryPage()
-    if (dictionary != null) dictionary.getBytes.toByteArray
-    else Array.empty[Byte]
+    if (dictionary != null) {
+      dictionary.getBytes.toByteArray
+    } else {
+      Array.empty[Byte]
+    }
   }
 
   override def getDictionarySize: Int = valuesWriter.getDictionarySize

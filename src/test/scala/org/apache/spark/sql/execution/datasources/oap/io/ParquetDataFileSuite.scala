@@ -126,7 +126,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     val requiredIds = Array(0, 1)
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
-    val iterator = reader.iterator(configuration, requiredIds, rowIds)
+    val iterator = reader.iterator(requiredIds, rowIds)
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val row = iterator.next
@@ -144,7 +144,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     val requiredIds = Array(0, 1)
     val rowIds = Array.emptyIntArray
-    val iterator = reader.iterator(configuration, requiredIds, rowIds)
+    val iterator = reader.iterator(requiredIds, rowIds)
     assert(!iterator.hasNext)
     val e = intercept[java.util.NoSuchElementException] {
       iterator.next()
@@ -156,7 +156,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
   test("read by columnIds ") {
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     val requiredIds = Array(0)
-    val iterator = reader.iterator(configuration, requiredIds)
+    val iterator = reader.iterator(requiredIds)
     val result = ArrayBuffer[ Int ]()
     while (iterator.hasNext) {
       val row = iterator.next
@@ -237,7 +237,7 @@ class NestedDataSuite extends ParquetDataFileSuite {
     val reader = ParquetDataFile(fileName, requestStructType, configuration)
     val requiredIds = Array(0, 1, 2)
     val rowIds = Array(1)
-    val iterator = reader.iterator(configuration, requiredIds, rowIds)
+    val iterator = reader.iterator(requiredIds, rowIds)
     assert(iterator.hasNext)
     val row = iterator.next
     assert(row.numFields == 3)
@@ -249,7 +249,7 @@ class NestedDataSuite extends ParquetDataFileSuite {
   test("read all ") {
     val reader = ParquetDataFile(fileName, requestStructType, configuration)
     val requiredIds = Array(0, 2)
-    val iterator = reader.iterator(configuration, requiredIds)
+    val iterator = reader.iterator(requiredIds)
     assert(iterator.hasNext)
     val rowOne = iterator.next
     assert(rowOne.numFields == 2)

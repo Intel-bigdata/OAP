@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.expressions.{SortDirection, UnsafeRow}
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
 import org.apache.spark.sql.execution.datasources.oap.statistics.StaticsAnalysisResult
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
 
@@ -75,8 +75,8 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       StaticsAnalysisResult.FULL_SCAN
     } else {
       val start = System.currentTimeMillis()
-      val enableOIndex = conf.getBoolean(SQLConf.OAP_ENABLE_OINDEX.key,
-        SQLConf.OAP_ENABLE_OINDEX.defaultValue.get)
+      val enableOIndex = conf.getBoolean(OapConf.OAP_ENABLE_OINDEX.key,
+        OapConf.OAP_ENABLE_OINDEX.defaultValue.get)
       var behavior: Double = StaticsAnalysisResult.FULL_SCAN
       val useIndex = enableOIndex && {
         behavior = readBehavior(indexPath, dataPath, conf)
@@ -108,26 +108,26 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
     *         like FULL_SCAN, USE_INDEX or SKIP_INDEX
    */
   private def readBehavior(indexPath: Path, dataPath: Path, conf: Configuration): Double = {
-    if (conf.getBoolean(SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key,
-      SQLConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.defaultValue.get)) {
+    if (conf.getBoolean(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key,
+      OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.defaultValue.get)) {
       // Index selection is enabled, executor chooses index according to policy.
 
       // Policy 1: index file size < data file size.
       val indexFileSize = indexPath.getFileSystem(conf).getContentSummary(indexPath).getLength
       val dataFileSize = dataPath.getFileSystem(conf).getContentSummary(dataPath).getLength
-      val ratio = conf.getDouble(SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
-        SQLConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
+      val ratio = conf.getDouble(OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
+        OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
 
       val filePolicyEnable =
-        conf.getBoolean(SQLConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key,
-        SQLConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.defaultValue.get)
+        conf.getBoolean(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key,
+        OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.defaultValue.get)
       if (filePolicyEnable && indexFileSize > dataFileSize * ratio) {
         return StaticsAnalysisResult.FULL_SCAN
       }
 
       val statsPolicyEnable =
-        conf.getBoolean(SQLConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY.key,
-          SQLConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY.defaultValue.get)
+        conf.getBoolean(OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY.key,
+          OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY.defaultValue.get)
 
       // Policy 2: statistics tells the scan cost
       if (statsPolicyEnable) {
@@ -191,15 +191,17 @@ private[oap] object ScannerBuilder extends Logging {
         attribute match {
           case ic (filterOptimizer) => // extract the corresponding scannerBuilder
             // combine all intervals of the same attribute of leftMap and rightMap
-            if (needMerge) leftMap.put(attribute,
-              filterOptimizer.mergeBound(leftMap.getOrElseUpdate (attribute, null), intervals) )
-            // add bound of the same attribute to the left map
-            else leftMap.put(attribute,
-              filterOptimizer.addBound(leftMap.getOrElse (attribute, null), intervals) )
+            if (needMerge) {
+              leftMap.put(attribute,
+                filterOptimizer.mergeBound(leftMap.getOrElseUpdate (attribute, null), intervals))
+            } else {
+              // add bound of the same attribute to the left map
+              leftMap.put(attribute,
+                filterOptimizer.addBound(leftMap.getOrElse (attribute, null), intervals))
+            }
           case _ => // this attribute does not exist, do nothing
         }
-      }
-      else {
+      } else {
         leftMap.put(attribute, intervals)
       }
     }
@@ -297,15 +299,21 @@ private[oap] object ScannerBuilder extends Logging {
       ic: IndexContext,
       scannerOptions: Map[String, String] = Map.empty,
       maxChooseSize: Int = 1): Array[Filter] = {
-    if (filters == null || filters.isEmpty) return filters
+    if (filters == null || filters.isEmpty) {
+      return filters
+    }
     logDebug("Transform filters into Intervals:")
     val intervalMapArray = filters.map(optimizeFilterBound(_, ic))
     // reduce multiple hashMap to one hashMap("AND" operation)
     val intervalMap = intervalMapArray.reduce(
       (leftMap, rightMap) =>
-        if (leftMap == null || leftMap.isEmpty) rightMap
-        else if (rightMap == null || rightMap.isEmpty) leftMap
-        else combineIntervalMaps(leftMap, rightMap, ic, needMerge = true)
+        if (leftMap == null || leftMap.isEmpty) {
+          rightMap
+        } else if (rightMap == null || rightMap.isEmpty) {
+          leftMap
+        } else {
+          combineIntervalMaps(leftMap, rightMap, ic, needMerge = true)
+        }
     )
 
     if (intervalMap.nonEmpty) {
@@ -349,13 +357,15 @@ private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
       case 0 => Iterator.empty
       case 1 =>
         actualUsedScanners.head.initialize(dataPath, conf)
-        actualUsedScanners.head.toArray.iterator
       case _ =>
         actualUsedScanners.par.foreach(_.initialize(dataPath, conf))
         actualUsedScanners.map(_.toSet)
           .reduce((left, right) => {
-            if (left.isEmpty || right.isEmpty) Set.empty
-            else left.intersect(right)
+            if (left.isEmpty || right.isEmpty) {
+              Set.empty
+            } else {
+              left.intersect(right)
+            }
           }).iterator
     }
     this

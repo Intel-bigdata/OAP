@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
 
 
@@ -66,7 +66,9 @@ private[oap] class SampleBasedStatisticsReader(
       var hitCnt = 0
       val partialOrder = GenerateOrdering.create(StructType(schema.dropRight(1)))
       for (row <- sampleArray) {
-        if (Statistics.rowInIntervalArray(row, intervalArray, ordering, partialOrder)) hitCnt += 1
+        if (Statistics.rowInIntervalArray(row, intervalArray, ordering, partialOrder)) {
+          hitCnt += 1
+        }
       }
       hitCnt * 1.0 / sampleArray.length
     }
@@ -78,7 +80,7 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
   override val id: Int = StatisticsType.TYPE_SAMPLE_BASE
 
   lazy val sampleRate: Double = conf.getDouble(
-    SQLConf.OAP_STATISTICS_SAMPLE_RATE.key, SQLConf.OAP_STATISTICS_SAMPLE_RATE.defaultValue.get)
+    OapConf.OAP_STATISTICS_SAMPLE_RATE.key, OapConf.OAP_STATISTICS_SAMPLE_RATE.defaultValue.get)
 
   protected var sampleArray: Array[Key] = _
 

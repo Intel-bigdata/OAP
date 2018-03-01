@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
 
 // PartedByValueStatistics gives statistics with the value interval.
@@ -87,11 +87,17 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
     metas.zipWithIndex.indexWhere {
       case (meta, index) =>
         if (row.numFields == schema.length) {
-          if (include && index < metas.length - 1) ordering.compare(row, meta.row) < 0
-          else ordering.compare(row, meta.row) <= 0
+          if (include && index < metas.length - 1) {
+            ordering.compare(row, meta.row) < 0
+          } else {
+            ordering.compare(row, meta.row) <= 0
+          }
         } else {
-          if (isStart) partialOrdering.compare(row, meta.row) <= 0
-          else partialOrdering.compare(row, meta.row) < 0
+          if (isStart) {
+            partialOrdering.compare(row, meta.row) <= 0
+          } else {
+            partialOrdering.compare(row, meta.row) < 0
+          }
         }
     }
   }
@@ -130,9 +136,13 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
           cover -= 0.5 * (metas(right).accumulatorCnt - metas(right - 1).accumulatorCnt)
         }
 
-        if (cover > wholeCount) StaticsAnalysisResult.FULL_SCAN
-        else if (cover < 0) StaticsAnalysisResult.USE_INDEX
-        else cover / wholeCount
+        if (cover > wholeCount) {
+          StaticsAnalysisResult.FULL_SCAN
+        } else if (cover < 0) {
+          StaticsAnalysisResult.USE_INDEX
+        } else {
+          cover / wholeCount
+        }
       }
     } else {
       StaticsAnalysisResult.USE_INDEX
@@ -145,7 +155,7 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
   override val id: Int = StatisticsType.TYPE_PART_BY_VALUE
 
   private lazy val maxPartNum: Int = conf.getInt(
-    SQLConf.OAP_STATISTICS_PART_NUM.key, SQLConf.OAP_STATISTICS_PART_NUM.defaultValue.get)
+    OapConf.OAP_STATISTICS_PART_NUM.key, OapConf.OAP_STATISTICS_PART_NUM.defaultValue.get)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
   protected case class PartedByValueMeta(

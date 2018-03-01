@@ -64,8 +64,12 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
       val result = StatisticsManager.analyse(stats, intervalArray, conf)
       result
     } finally {
-      if (footerCache != null) footerCache.release()
-      if (reader != null) reader.close()
+      if (footerCache != null) {
+        footerCache.release()
+      }
+      if (reader != null) {
+        reader.close()
+      }
     }
   }
 

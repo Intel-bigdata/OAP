@@ -38,7 +38,7 @@ import org.apache.spark.sql.execution.datasources.oap.OapMessages.CacheDrop
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
 
@@ -64,9 +64,9 @@ case class CreateIndexCommand(
         (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, id, _fsRelation)
       case LogicalRelation(
       _fsRelation @ HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), _, id) =>
-        if (!sparkSession.conf.get(SQLConf.OAP_PARQUET_ENABLED)) {
+        if (!sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED)) {
           throw new OapException(s"turn on ${
-            SQLConf.OAP_PARQUET_ENABLED.key} to allow index building on parquet files")
+            OapConf.OAP_PARQUET_ENABLED.key} to allow index building on parquet files")
         }
         format.forbidSplit
         (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, id, _fsRelation)
@@ -102,7 +102,9 @@ case class CreateIndexCommand(
             return Nil
           }
         }
-        if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)
+        if (existsData != null) {
+          existsData.foreach(metaBuilder.addFileMeta)
+        }
         if (existsIndexes != null) {
           existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
         }
@@ -185,8 +187,10 @@ case class CreateIndexCommand(
     val retMap = retVal.flatten.groupBy(_.parent)
     bAndP.foreach(bp =>
       retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
-        if (!bp._3) bp._1.addFileMeta(
-          FileMeta(r.fingerprint, r.rowCount, r.dataFile))
+        if (!bp._3) {
+          bp._1.addFileMeta(
+            FileMeta(r.fingerprint, r.rowCount, r.dataFile))
+        }
       ))
     // write updated metas down
     bAndP.foreach(bp => DataSourceMeta.write(
@@ -243,7 +247,9 @@ case class DropIndexCommand(
                 return Nil
               }
             }
-            if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)
+            if (existsData != null) {
+              existsData.foreach(metaBuilder.addFileMeta)
+            }
             if (existsIndexes != null) {
               existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
             }
