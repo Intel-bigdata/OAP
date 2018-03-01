@@ -49,8 +49,9 @@ object OapUtils extends Logging {
     }
   }
 
-  def getPartitions(fileIndex: FileIndex,
-                    partitionSpec: Option[TablePartitionSpec] = None): Seq[PartitionDirectory] = {
+  def getPartitions(
+      fileIndex: FileIndex,
+      partitionSpec: Option[TablePartitionSpec] = None): Seq[PartitionDirectory] = {
     val filters = if (partitionSpec.nonEmpty) {
       val partitionColumnsInfo: Map[String, DataType] =
         fileIndex.partitionSchema.map {

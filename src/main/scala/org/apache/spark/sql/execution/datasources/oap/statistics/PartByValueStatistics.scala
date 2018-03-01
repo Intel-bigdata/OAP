@@ -51,8 +51,6 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
   @transient private lazy val partialOrdering =
     GenerateOrdering.create(StructType(schema.dropRight(1)))
 
-  protected case class PartedByValueMeta(
-      idx: Int, row: InternalRow, curMaxId: Int, accumulatorCnt: Int)
   protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
 
   override def read(fiberCache: FiberCache, offset: Int): Int = {
@@ -158,8 +156,6 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
     OapConf.OAP_STATISTICS_PART_NUM.key, OapConf.OAP_STATISTICS_PART_NUM.defaultValue.get)
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
-  protected case class PartedByValueMeta(
-      idx: Int, row: InternalRow, curMaxId: Int, accumulatorCnt: Int)
   protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
 
   override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
@@ -237,3 +233,9 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
     }
   }
 }
+
+private[oap] case class PartedByValueMeta(
+    idx: Int,
+    row: InternalRow,
+    curMaxId: Int,
+    accumulatorCnt: Int)

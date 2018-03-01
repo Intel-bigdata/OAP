@@ -125,9 +125,10 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
       maxChooseSize: Int = 1): Seq[(Int, IndexMeta)] = {
     logDebug("Get Available Indexers: maxChooseSize = " + maxChooseSize)
 
-    def takeRatioAndUsedFields(attrNum: Int,
-                               idx: Int,
-                               entryNames: Seq[String]): (Double, Seq[String]) = {
+    def takeRatioAndUsedFields(
+        attrNum: Int,
+        idx: Int,
+        entryNames: Seq[String]): (Double, Seq[String]) = {
       val matchedAttr: Double = idx + 1
       // (ratio, usedFields)
       (attrNum / matchedAttr + entryNames.length / matchedAttr, entryNames.take(idx + 1))

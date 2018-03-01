@@ -33,6 +33,7 @@ import org.apache.spark.unsafe.types.UTF8String
 private[oap] class NonNullKeyWriter(schema: StructType) {
   private lazy val internalWriters: Seq[(OutputStream, Any) => Unit] =
     schema.toSeq.map(_.dataType).map(getWriterFunctionBasedOnType)
+
   private def getWriterFunctionBasedOnType(
       dt: DataType): (OutputStream, Any) => Unit = dt match {
     case BooleanType =>

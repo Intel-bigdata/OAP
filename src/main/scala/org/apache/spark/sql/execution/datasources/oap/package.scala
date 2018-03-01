@@ -19,7 +19,6 @@ package org.apache.spark.sql.execution.datasources
 
 import org.apache.spark.sql.catalyst.InternalRow
 
-
 package object oap {
   type Key = InternalRow
 }

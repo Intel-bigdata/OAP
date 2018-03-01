@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-
 sealed abstract class AnyIndexType {
   def toString: String
 }

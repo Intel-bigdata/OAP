@@ -74,4 +74,3 @@ class OapReadSupportImpl extends ReadSupport[UnsafeRow] with Logging {
     readSupportHelper.prepareForRead(conf, keyValueMetaData, fileSchema, readContext)
   }
 }
-

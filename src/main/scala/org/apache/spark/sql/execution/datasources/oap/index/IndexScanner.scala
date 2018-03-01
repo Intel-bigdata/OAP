@@ -32,7 +32,6 @@ import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
 
-
 private[oap] object IndexScanner {
   val DUMMY_KEY_START: Key = new UnsafeRow() // we compare the ref not the value
   val DUMMY_KEY_END: Key = new UnsafeRow() // we compare the ref not the value

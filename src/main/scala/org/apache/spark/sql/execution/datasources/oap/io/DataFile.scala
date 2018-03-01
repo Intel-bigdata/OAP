@@ -30,7 +30,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
 
-
 abstract class DataFile {
   def path: String
   def schema: StructType

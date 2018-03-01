@@ -250,7 +250,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     startIdxOffset
   }
 
-  private def getBitmapIdx(keySeq: IndexedSeq[InternalRow],
+  private def getBitmapIdx(
+      keySeq: IndexedSeq[InternalRow],
       range: RangeInterval): (Int, Int) = {
     val keyLength = keySeq.length
     val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {

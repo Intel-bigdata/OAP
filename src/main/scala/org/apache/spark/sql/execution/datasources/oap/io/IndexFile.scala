@@ -33,6 +33,7 @@ private[oap] trait CommonIndexFile {
     (bytes(6) << 8) + bytes(7)
   }
 }
+
 /**
  * Read the index file into memory, and can be accessed as [[FiberCache]].
  */

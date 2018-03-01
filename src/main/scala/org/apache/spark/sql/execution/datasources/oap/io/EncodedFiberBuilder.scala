@@ -66,7 +66,6 @@ private[oap] case class DeltaByteArrayFiberBuilder (
   }
 
   override def clear(): Unit = {
-
     super.clear()
     valuesWriter.reset()
     dataLengthInBytes = 0

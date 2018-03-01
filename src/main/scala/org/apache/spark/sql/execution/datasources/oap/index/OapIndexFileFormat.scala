@@ -26,7 +26,6 @@ import org.apache.spark.sql.execution.datasources.{FileFormat, OutputWriterFacto
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.types.StructType
 
-
 private[index] class OapIndexFileFormat
   extends FileFormat
   with Logging
@@ -44,7 +43,6 @@ private[index] class OapIndexFileFormat
       job: Job,
       options: Map[String, String],
       dataSchema: StructType): OutputWriterFactory = {
-
 
     val configuration = ContextUtil.getConfiguration(job)
 

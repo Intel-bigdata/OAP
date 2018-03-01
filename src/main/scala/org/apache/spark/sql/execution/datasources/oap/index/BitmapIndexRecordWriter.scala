@@ -36,13 +36,13 @@ import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
 import org.apache.spark.sql.types._
 
 private[oap] object BitmapIndexSectionId {
-  val headerSection       : Int = 1 // header
-  val keyListSection      : Int = 2 // sorted unique key list (index column unique values)
-  val entryListSection    : Int = 3 // bitmap entry list
-  val entryNullSection    : Int = 4 // bitmap entry for null value rows
+  val headerSection : Int = 1 // header
+  val keyListSection : Int = 2 // sorted unique key list (index column unique values)
+  val entryListSection : Int = 3 // bitmap entry list
+  val entryNullSection : Int = 4 // bitmap entry for null value rows
   val entryOffsetsSection : Int = 5 // bitmap entry offset list
   val statsContentSection : Int = 6 // keep the original statistics, not changed than before.
-  val footerSection       : Int = 7 // footer to save the meta data for the above segments.
+  val footerSection : Int = 7 // footer to save the meta data for the above segments.
 }
 
 /* Below is the bitmap index general layout and sections.

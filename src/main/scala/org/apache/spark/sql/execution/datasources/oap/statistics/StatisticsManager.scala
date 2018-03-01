@@ -30,7 +30,6 @@ import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
-
 /**
  * Statistics write:
  * {{{

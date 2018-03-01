@@ -170,6 +170,7 @@ private[oap] case class OapIndexInfoStatus(path: String, useIndex: Boolean)
 
 private[oap] object OapIndexInfo extends Logging {
   val partitionOapIndex = new TimeStampedHashMap[String, Boolean](updateTimeStampOnGet = true)
+
   def status: String = {
     val indexInfoStatusSeq = partitionOapIndex.map(kv => OapIndexInfoStatus(kv._1, kv._2)).toSeq
     val threshTime = System.currentTimeMillis()
@@ -181,6 +182,7 @@ private[oap] object OapIndexInfo extends Logging {
     val indexStatusRawData = OapIndexInfoStatusSerDe.serialize(indexInfoStatusSeq)
     indexStatusRawData
   }
+
   def update(indexInfo: SparkListenerOapIndexInfoUpdate): Unit = {
     val indexStatusRawData = OapIndexInfoStatusSerDe.deserialize(indexInfo.oapIndexInfo)
     indexStatusRawData.foreach {oapIndexInfo =>
@@ -190,10 +192,10 @@ private[oap] object OapIndexInfo extends Logging {
 }
 
 private[oap] class OapDataReader(
-  path: Path,
-  meta: DataSourceMeta,
-  filterScanners: Option[IndexScanners],
-  requiredIds: Array[Int]) extends Logging {
+    path: Path,
+    meta: DataSourceMeta,
+    filterScanners: Option[IndexScanners],
+    requiredIds: Array[Int]) extends Logging {
 
   import org.apache.spark.sql.execution.datasources.oap.INDEX_STAT._
 

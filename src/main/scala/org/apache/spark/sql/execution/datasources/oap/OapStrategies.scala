@@ -406,8 +406,7 @@ abstract class OapFileScanExec extends UnaryExecNode with CodegenSupport {
     child.asInstanceOf[CodegenSupport].produce(ctx, this)
   }
 
-  override def doConsume(
-      ctx: CodegenContext, input: Seq[ExprCode], row: ExprCode): String = {
+  override def doConsume(ctx: CodegenContext, input: Seq[ExprCode], row: ExprCode): String = {
     s"""
        ${consume(ctx, input)}
      """.stripMargin

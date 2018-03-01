@@ -59,7 +59,7 @@ object DictionaryBasedDataFiberParser {
 }
 
 private[oap] case class PlainDataFiberParser(
-  meta: OapDataFileHandle) extends DataFiberParser{
+    meta: OapDataFileHandle) extends DataFiberParser{
 
   override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = bytes
 }

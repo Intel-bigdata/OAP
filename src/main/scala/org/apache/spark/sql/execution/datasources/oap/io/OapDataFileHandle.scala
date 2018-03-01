@@ -226,13 +226,13 @@ private[oap] object ColumnMeta {
 }
 
 private[oap] class OapDataFileHandle(
-   var rowGroupsMeta: ArrayBuffer[RowGroupMeta] = new ArrayBuffer[RowGroupMeta](),
-   var columnsMeta: ArrayBuffer[ColumnMeta] = new ArrayBuffer[ColumnMeta](),
-   var rowCountInEachGroup: Int = 0,
-   var rowCountInLastGroup: Int = 0,
-   var groupCount: Int = 0,
-   var fieldCount: Int = 0,
-   var codec: CompressionCodec = CompressionCodec.UNCOMPRESSED) extends DataFileHandle {
+    var rowGroupsMeta: ArrayBuffer[RowGroupMeta] = new ArrayBuffer[RowGroupMeta](),
+    var columnsMeta: ArrayBuffer[ColumnMeta] = new ArrayBuffer[ColumnMeta](),
+    var rowCountInEachGroup: Int = 0,
+    var rowCountInLastGroup: Int = 0,
+    var groupCount: Int = 0,
+    var fieldCount: Int = 0,
+    var codec: CompressionCodec = CompressionCodec.UNCOMPRESSED) extends DataFileHandle {
   private var _fin: FSDataInputStream = _
   private var _len: Long = 0
 
