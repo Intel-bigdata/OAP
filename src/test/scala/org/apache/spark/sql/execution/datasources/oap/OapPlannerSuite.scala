@@ -23,9 +23,13 @@ import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTableType
+import org.apache.spark.sql.catalyst.encoders._
+import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
+import org.apache.spark.sql.catalyst.plans.logical.CatalystSerde
+import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
+import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.SQLTestUtils
@@ -115,7 +119,6 @@ class OapPlannerSuite
   }
 
   test("SortPushDown Test with Different Project") {
-    spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
     val data = (1 to 300).map{ i => (i, s"this is test $i")}
     val dataRDD = spark.sparkContext.parallelize(data, 10)
 
@@ -133,6 +136,27 @@ class OapPlannerSuite
 
     sql("drop oindex index1 on oap_sort_opt_table")
     sql("drop oindex index2 on oap_sort_opt_table")
+  }
+
+  test("SortPushDown should consider deserialized plan") {
+    val data = (1 to 300).map{ i => (i, s"this is test $i")}
+    val dataRDD = spark.sparkContext.parallelize(data, 10)
+
+    dataRDD.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_sort_opt_table select * from t")
+    sql("create oindex index1 on oap_sort_opt_table (a)")
+
+    val sqlText = "SELECT b FROM oap_sort_opt_table WHERE a >= 1 AND a <= 10 ORDER BY a LIMIT 4"
+    val logicPlan = spark.sessionState.sqlParser.parsePlan(sqlText)
+    val qe = new QueryExecution(spark, logicPlan)
+    assert(qe.sparkPlan.toString().contains("OapOrderLimitFileScanExec"))
+
+    implicit val exprEnc: ExpressionEncoder[Row] = encoderFor(RowEncoder(qe.analyzed.schema))
+    val deserializedPlan = CatalystSerde.deserialize[Row](logicPlan)
+    val qe1 = new QueryExecution(spark, deserializedPlan)
+    assert(qe1.sparkPlan.toString().contains("OapOrderLimitFileScanExec"))
+
+    sql("drop oindex index1 on oap_sort_opt_table")
   }
 
   test("Distinct index scan if SemiJoin Test") {
