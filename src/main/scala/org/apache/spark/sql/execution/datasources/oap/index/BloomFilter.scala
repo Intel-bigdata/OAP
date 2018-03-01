@@ -48,12 +48,7 @@ class BloomFilter(
   }
 
   def checkExist(value: String): Boolean = {
-    val indices = getIndices(value)
-    for (i <- indices)
-      if (!bloomBitSet.contains(i)) {
-        return false
-      }
-    true
+    getIndices(value).forall(bloomBitSet.contains)
   }
 
   def addValue(data: Array[Byte]): Unit = {
