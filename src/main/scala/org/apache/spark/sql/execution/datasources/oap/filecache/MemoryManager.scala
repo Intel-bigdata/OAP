@@ -104,7 +104,9 @@ trait FiberCache extends Logging {
   protected def getBaseObj: AnyRef = {
     // NOTE: A trick here. Since every function need to get memory data has to get here first.
     // So, here check the if the memory has been freed.
-    if (disposed) throw new OapException("Try to access a freed memory")
+    if (disposed) {
+      throw new OapException("Try to access a freed memory")
+    }
     fiberData.getBaseObject
   }
   protected def getBaseOffset: Long = fiberData.getBaseOffset

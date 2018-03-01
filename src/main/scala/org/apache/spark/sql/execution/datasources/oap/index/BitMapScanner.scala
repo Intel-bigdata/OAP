@@ -98,9 +98,15 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   private def cacheBitmapFooterSegment(idxPath: Path, conf: Configuration): Unit = {
     val fs = idxPath.getFileSystem(conf)
     // Cache the file inputstream rather than opening it each query.
-    if (fin == null) fin = fs.open(idxPath)
-    if (idxFileSize == 0L) idxFileSize = fs.getFileStatus(idxPath).getLen
-    if (bmFooterOffset == 0) bmFooterOffset = idxFileSize.toInt - BITMAP_FOOTER_SIZE
+    if (fin == null) {
+      fin = fs.open(idxPath)
+    }
+    if (idxFileSize == 0L) {
+      idxFileSize = fs.getFileStatus(idxPath).getLen
+    }
+    if (bmFooterOffset == 0) {
+      bmFooterOffset = idxFileSize.toInt - BITMAP_FOOTER_SIZE
+    }
 
     if (bmFooterFiber == null) {
       bmFooterFiber = BitmapFiber(
@@ -234,7 +240,9 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       bmNullListCache = WrappedFiberCache(FiberCacheManager.get(bmNullListFiber, conf))
     } finally {
       try {
-        if (fin != null) fin.close()
+        if (fin != null) {
+          fin.close()
+        }
       } catch {
         case e: Exception =>
           if (!ShutdownHookManager.inShutdown()) {
@@ -264,10 +272,16 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
          IndexUtils.binarySearch(0, keyLength, keySeq(_), range.start, ordering.compare(_, _))
       if (found) {
         if (range.startInclude) idx else idx + 1
-      } else if (ordering.compare(keySeq.head, range.start) > 0) 0 else -1
+      } else if (ordering.compare(keySeq.head, range.start) > 0) {
+        0
+      } else {
+        -1
+      }
     }
     // If invalid starting index, just return.
-    if (startIdx == -1 || startIdx == keyLength) return (-1, -1)
+    if (startIdx == -1 || startIdx == keyLength) {
+      return (-1, -1)
+    }
     // If equal query, no need to find endIdx.
     if (range.start == range.end && range.start != IndexScanner.DUMMY_KEY_START) {
       return (startIdx, startIdx)
@@ -283,7 +297,11 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
          IndexUtils.binarySearch(0, keyLength, keySeq(_), range.end, ordering.compare(_, _))
       if (found) {
         if (range.endInclude) idx else idx - 1
-      } else if (ordering.compare(keySeq.last, range.end) < 0) keyLength - 1 else -1
+      } else if (ordering.compare(keySeq.last, range.end) < 0) {
+        keyLength - 1
+      } else {
+        -1
+      }
     }
     (startIdx, endIdx)
   }
@@ -299,7 +317,9 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
         bmEntry.deserialize(bmStream)
         bmEntry
       })
-    } else IndexedSeq.empty
+    } else {
+      IndexedSeq.empty
+    }
   }
 
   private def getDesiredBitmapArray: mutable.ArrayBuffer[RoaringBitmap] = {
@@ -356,11 +376,21 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   def closeCache(): Unit = {
-    if (bmFooterCache != null) bmFooterCache.release()
-    if (bmUniqueKeyListCache != null) bmUniqueKeyListCache.release()
-    if (bmOffsetListCache != null) bmOffsetListCache.release()
-    if (bmEntryListCache != null) bmEntryListCache.release()
-    if (bmNullListCache != null) bmNullListCache.release()
+    if (bmFooterCache != null) {
+      bmFooterCache.release()
+    }
+    if (bmUniqueKeyListCache != null) {
+      bmUniqueKeyListCache.release()
+    }
+    if (bmOffsetListCache != null) {
+      bmOffsetListCache.release()
+    }
+    if (bmEntryListCache != null) {
+      bmEntryListCache.release()
+    }
+    if (bmNullListCache != null) {
+      bmNullListCache.release()
+    }
   }
 
   override def toString: String = "BitMapScanner"
@@ -404,10 +434,14 @@ private[oap] class BitmapDataInputStream(bitsStream: FiberCache) extends DataInp
  }
 
  override def readFully(readBuffer: Array[Byte], offset: Int, length: Int): Unit = {
-   if (length < 0) throw new IndexOutOfBoundsException("read length is inlegal for bitmap index.\n")
+   if (length < 0) {
+     throw new IndexOutOfBoundsException("read length is inlegal for bitmap index.\n")
+   }
    var curPos = pos
    pos += length
-   if (pos > bitsSize - 1) throw new EOFException("read is ending of file for bitmap index.\n")
+   if (pos > bitsSize - 1) {
+     throw new EOFException("read is ending of file for bitmap index.\n")
+   }
    (offset until (offset + length)).foreach(idx => {
      readBuffer(idx) = bitsStream.getByte(curPos)
      curPos += 1

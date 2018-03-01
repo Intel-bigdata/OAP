@@ -126,11 +126,17 @@ private[oap] object IndexUtils {
       assert(s + e >= 0, "too large array size caused overflow")
       m = (s + e) / 2
       val cmp = compare(keys(m), candidate)
-      if (cmp == 0) found = true
-      else if (cmp < 0) s = m + 1
-      else e = m - 1
+      if (cmp == 0) {
+        found = true
+      } else if (cmp < 0) {
+        s = m + 1
+      } else {
+        e = m - 1
+      }
     }
-    if (!found) m = s
+    if (!found) {
+      m = s
+    }
     (m, found)
   }
 }

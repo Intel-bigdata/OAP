@@ -187,8 +187,7 @@ private[index] case class BTreeIndexRecordWriter(
 
   // TODO: BTreeNode can be re-write. It doesn't carry any values.
   private def sumKeyCount(node: BTreeNode): Int = {
-    if (node.children.nonEmpty) node.children.map(sumKeyCount).sum
-    else node.root
+    if (node.children.nonEmpty) node.children.map(sumKeyCount).sum else node.root
   }
 
   /**
