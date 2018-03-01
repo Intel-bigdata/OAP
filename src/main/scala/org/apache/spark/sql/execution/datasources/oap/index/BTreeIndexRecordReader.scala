@@ -92,18 +92,22 @@ private[index] case class BTreeIndexRecordReader(
     if (nodeIdxForStart == nodeIdxForEnd && !isStartFound && !isEndFound) {
       (0, 0) // not found in B+ tree
     } else {
-      val start = if (interval.start == IndexScanner.DUMMY_KEY_START) 0
-      else {
-        nodeIdxForStart.map { idx =>
-          findRowIdPos(idx, interval.start, isStart = true, !interval.startInclude)
-        }.getOrElse(recordCount)
-      }
-      val end = if (interval.end == IndexScanner.DUMMY_KEY_END) recordCount
-      else {
-        nodeIdxForEnd.map { idx =>
-          findRowIdPos(idx, interval.end, isStart = false, interval.endInclude)
-        }.getOrElse(recordCount)
-      }
+      val start =
+        if (interval.start == IndexScanner.DUMMY_KEY_START) {
+          0
+        } else {
+          nodeIdxForStart.map { idx =>
+            findRowIdPos(idx, interval.start, isStart = true, !interval.startInclude)
+          }.getOrElse(recordCount)
+        }
+      val end =
+        if (interval.end == IndexScanner.DUMMY_KEY_END) {
+          recordCount
+        } else {
+          nodeIdxForEnd.map { idx =>
+            findRowIdPos(idx, interval.end, isStart = false, interval.endInclude)
+          }.getOrElse(recordCount)
+        }
       (start, end)
     }
   }
@@ -134,8 +138,9 @@ private[index] case class BTreeIndexRecordReader(
 
     val rowPos =
       if (keyPos == keyCount) {
-        if (nodeIdx + 1 == footer.getNodesCount) footer.getNonNullKeyRecordCount
-        else {
+        if (nodeIdx + 1 == footer.getNodesCount) {
+          footer.getNonNullKeyRecordCount
+        } else {
           val offset = footer.getNodeOffset(nodeIdx + 1)
           val size = footer.getNodeSize(nodeIdx + 1)
           val nextNodeFiber = BTreeFiber(
@@ -150,7 +155,9 @@ private[index] case class BTreeIndexRecordReader(
           nextNodeCache.release()
           rowPos
         }
-      } else node.getRowIdPos(keyPos)
+      } else {
+        node.getRowIdPos(keyPos)
+      }
     nodeCache.release()
     rowPos
   }
@@ -186,7 +193,9 @@ private[index] case class BTreeIndexRecordReader(
       val cmp = partialOrdering.compare(x, y)
       if (cmp == 0) {
         if (isStart) -1 else 1
-      } else cmp
+      } else {
+        cmp
+      }
     } else {
       -rowOrdering(y, x, isStart) // Keep x.numFields <= y.numFields to simplify
     }

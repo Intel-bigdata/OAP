@@ -114,8 +114,11 @@ class FiberSuite extends SharedOapContext with Logging {
       assert(meta.rowGroupsMeta.length === rowGroupCounts(i))
       meta.close()
     }
-    if (previousRowGroupSize == null) configuration.unset(OapFileFormat.ROW_GROUP_SIZE)
-    else configuration.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
+    if (previousRowGroupSize == null) {
+      configuration.unset(OapFileFormat.ROW_GROUP_SIZE)
+    } else {
+      configuration.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
+    }
   }
 
   test("test oap row group configuration") {
@@ -137,8 +140,11 @@ class FiberSuite extends SharedOapContext with Logging {
     assert(meta.rowGroupsMeta.length === 1)
     meta.close()
     // set back to default value
-    if (previousRowGroupSize == null) configuration.unset(OapFileFormat.ROW_GROUP_SIZE)
-    else configuration.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
+    if (previousRowGroupSize == null) {
+      configuration.unset(OapFileFormat.ROW_GROUP_SIZE)
+    } else {
+      configuration.set(OapFileFormat.ROW_GROUP_SIZE, previousRowGroupSize)
+    }
   }
 
   // a simple algorithm to check if it's should be null

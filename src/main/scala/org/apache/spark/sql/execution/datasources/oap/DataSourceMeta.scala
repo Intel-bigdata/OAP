@@ -357,7 +357,9 @@ private[oap] case class DataSourceMeta(
             case _ => false
           }
         }
-      } else false
+      } else {
+        false
+      }
     }
 
     def checkAttribute(filter: Expression): Boolean = filter match {

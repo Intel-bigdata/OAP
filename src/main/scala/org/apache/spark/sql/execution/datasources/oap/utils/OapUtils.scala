@@ -77,7 +77,9 @@ object OapUtils extends Logging {
         }
         EqualTo(AttributeReference(key, partitionColumnsInfo.get(key).get)(), Literal(v))
       }.toSeq
-    } else Nil
+    } else {
+      Nil
+    }
     fileIndex.listFiles(filters)
   }
 
@@ -125,7 +127,9 @@ object OapUtils extends Logging {
         }
         val pathFragment = PartitioningUtils.getPathFragment(partitionSpec.get, partitionSchema)
         rootPaths.map(rootPath => new Path(rootPath, pathFragment)).filter(fs.exists)
-      } else rootPaths
+      } else {
+        rootPaths
+      }
 
     getPartitionPaths(directoryPaths, fs)
   }

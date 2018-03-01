@@ -294,10 +294,6 @@ private[sql] class OapFileFormat extends FileFormat
           resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
         val returningBatch = supportBatch(sparkSession, resultSchema)
 
-        hadoopConf.setDouble(OapConf.OAP_FULL_SCAN_THRESHOLD.key,
-          sparkSession.conf.get(OapConf.OAP_FULL_SCAN_THRESHOLD))
-        hadoopConf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key,
-          sparkSession.conf.get(OapConf.OAP_ENABLE_OINDEX))
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
@@ -381,7 +377,9 @@ private[sql] class OapFileFormat extends FileFormat
           }
         case _ => false
       }
-    } else false
+    } else {
+      false
+    }
   }
 }
 
@@ -435,7 +433,9 @@ private[oap] class OapOutputWriterFactory(
       val oldMeta = m.get
       val existsIndexes = oldMeta.indexMetas
       val existsData = oldMeta.fileMetas
-      if (existsData != null) existsData.foreach(builder.addFileMeta(_))
+      if (existsData != null) {
+        existsData.foreach(builder.addFileMeta(_))
+      }
       if (existsIndexes != null) {
         existsIndexes.foreach(builder.addIndexMeta(_))
       }

@@ -119,8 +119,12 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     var oapDataFile: File = null
     var oapMetaFile: File = null
     files.foreach { fileName =>
-      if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) oapDataFile = fileName
-      if (fileName.toString.endsWith(OapFileFormat.OAP_META_FILE)) oapMetaFile = fileName
+      if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
+        oapDataFile = fileName
+      }
+      if (fileName.toString.endsWith(OapFileFormat.OAP_META_FILE)) {
+        oapMetaFile = fileName
+      }
     }
     val df = sqlContext.read.format("oap").load(dir.getAbsolutePath)
     df.createOrReplaceTempView("oap_table")

@@ -66,7 +66,9 @@ private[oap] class SampleBasedStatisticsReader(
       var hitCnt = 0
       val partialOrder = GenerateOrdering.create(StructType(schema.dropRight(1)))
       for (row <- sampleArray) {
-        if (Statistics.rowInIntervalArray(row, intervalArray, ordering, partialOrder)) hitCnt += 1
+        if (Statistics.rowInIntervalArray(row, intervalArray, ordering, partialOrder)) {
+          hitCnt += 1
+        }
       }
       hitCnt * 1.0 / sampleArray.length
     }

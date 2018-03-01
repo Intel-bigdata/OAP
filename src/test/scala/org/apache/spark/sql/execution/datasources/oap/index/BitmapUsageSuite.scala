@@ -71,7 +71,9 @@ class BitmapUsageSuite extends QueryTest with SharedOapContext with BeforeAndAft
     int.skip(rb1.serializedSizeInBytes + rb2.serializedSizeInBytes)
     val rbtest3 = new RoaringBitmap()
     rbtest3.deserialize(int)
-    if (!rbtest3.equals(rb3)) throw new RuntimeException("bug!")
+    if (!rbtest3.equals(rb3)) {
+      throw new RuntimeException("bug!")
+    }
   }
 
   test("test to use MutableRoaringBitmap and ImmutableRoarigBitmap " +

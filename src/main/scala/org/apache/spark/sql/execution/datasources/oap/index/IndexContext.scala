@@ -73,17 +73,22 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
               val start = intervalMap(attribute).head.start
               val end = intervalMap(attribute).head.end
               val ordering = unapply(attribute).get.order
-              if(start != IndexScanner.DUMMY_KEY_START &&
+              if (start != IndexScanner.DUMMY_KEY_START &&
                 end != IndexScanner.DUMMY_KEY_END &&
-                ordering.compare(start, end) == 0) {num += 1} else flag = 1
-            }
-            else {
+                ordering.compare(start, end) == 0) {
+                num += 1
+              } else {
+                flag = 1
+              }
+            } else {
               if (!intervalMap.contains(attribute)) flag = 2 else flag = 1
             }
           } // end for
-          if (flag == 1) num += 1
-          if (num>0) {
-            availableIndexes.append( (num-1, meta.indexMetas(idx)) )
+          if (flag == 1) {
+            num += 1
+          }
+          if (num > 0) {
+            availableIndexes.append((num - 1, meta.indexMetas(idx)) )
           }
         case BitMapIndex(entries) =>
           for (entry <- entries) {
@@ -145,7 +150,9 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
       if (hasUsedAttrs.intersect(attrs).isEmpty) {
         attrs.foreach(hasUsedAttrs.add)
         true
-      } else false
+      } else {
+        false
+      }
     }
 
     def takeCandidateSet = {
@@ -190,13 +197,15 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
     //    intervalArray.sortWith(compare)
     logDebug("Building Index Scanners with IndexMeta and IntervalMap ...")
 
-    if (availableIndexers == null || availableIndexers.isEmpty) return
+    if (availableIndexers == null || availableIndexers.isEmpty) {
+      return
+    }
 
     val availableScanners = availableIndexers.map(availableIndexer =>
       buildScanner(availableIndexer._1, availableIndexer._2, intervalMap, options))
       .filter(_ != null)
 
-    if(availableScanners.nonEmpty) {
+    if (availableScanners.nonEmpty) {
       logDebug("Index Scanner Intervals: "
         + availableScanners.map(_.intervalArray.mkString(", ")).mkString(" | "))
 
@@ -211,7 +220,9 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
     mutable.HashMap[String, ArrayBuffer[RangeInterval]],
     options: Map[String, String] = Map.empty): IndexScanner = {
 
-    if (lastIdx == -1 && bestIndexer == null) return null
+    if (lastIdx == -1 && bestIndexer == null) {
+      return null
+    }
     var keySchema: StructType = null
     var scanner: IndexScanner = null
     bestIndexer.indexType match {
@@ -231,14 +242,22 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
         scanner.intervalArray = new ArrayBuffer[RangeInterval](intervalMap(attributes.last).length)
 
         for (i <- intervalMap(attributes.last).indices) {
-          val startKeys = attributes.indices.map(attrIdx =>
-            if (attrIdx == attributes.length-1) intervalMap(attributes(attrIdx))(i).start
-            else intervalMap(attributes(attrIdx)).head.start )
+          val startKeys = attributes.indices.map { attrIdx =>
+            if (attrIdx == attributes.length - 1) {
+              intervalMap(attributes(attrIdx))(i).start
+            } else {
+              intervalMap(attributes(attrIdx)).head.start
+            }
+          }
           val compositeStartKey = startKeys.reduce((key1, key2) => new JoinedRow(key1, key2))
 
-          val endKeys = attributes.indices.map(attrIdx =>
-            if (attrIdx == attributes.length-1) intervalMap(attributes(attrIdx))(i).end
-            else intervalMap(attributes(attrIdx)).head.end )
+          val endKeys = attributes.indices.map { attrIdx =>
+            if (attrIdx == attributes.length - 1) {
+              intervalMap(attributes(attrIdx))(i).end
+            } else {
+              intervalMap(attributes(attrIdx)).head.end
+            }
+          }
           val compositeEndKey = endKeys.reduce((key1, key2) => new JoinedRow(key1, key2))
 
           scanner.intervalArray.append(
@@ -309,8 +328,11 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
   // isNullPredicate is assumed to be "smallest"
   def compareRangeInterval(interval1: RangeInterval, interval2: RangeInterval): Boolean = {
     if (interval1.isNullPredicate || interval2.isNullPredicate) {
-      if (interval1.isNullPredicate) return true
-      else return false
+      if (interval1.isNullPredicate) {
+        return true
+      } else {
+        return false
+      }
     }
     if ((interval1.start eq IndexScanner.DUMMY_KEY_START) &&
       (interval2.start ne IndexScanner.DUMMY_KEY_START)) {
@@ -338,16 +360,23 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
     }// end def union
 
     // isNull U isNull => isNull
-    if (base.isNullPredicate && extra.isNullPredicate) return true
+    if (base.isNullPredicate && extra.isNullPredicate) {
+      return true
+    }
     // isNull U otherFilterPredicate => isNull U otherFilterPredicate
-    if (base.isNullPredicate ^ extra.isNullPredicate) return false
+    if (base.isNullPredicate ^ extra.isNullPredicate) {
+      return false
+    }
 
     if (base.start eq IndexScanner.DUMMY_KEY_START) {
       if (base.end eq IndexScanner.DUMMY_KEY_END) {
         // base is isNotNullPredicate
         // isNotNull U isNull => isNotNull U isNull
-        if (extra.isNullPredicate) return false
-        else return true // isNotNull U otherFilterPredicate => isNotNull
+        if (extra.isNullPredicate) {
+          return false
+        } else {
+          return true
+        } // isNotNull U otherFilterPredicate => isNotNull
       }
       if (extra.start ne IndexScanner.DUMMY_KEY_START) {
         val cmp = order.compare(extra.start, base.end)
@@ -357,8 +386,7 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
       }
       // union two intervals
       union
-    }
-    else {// base.start is not DUMMY
+    } else { // base.start is not DUMMY
       if (order.compare(extra.start, base.start)==0) {
         base.startInclude = base.startInclude || extra.startInclude
       }
@@ -413,15 +441,13 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
     else {
       if (key2 == IndexScanner.DUMMY_KEY_START) {
         (key1, include1)
-      }
-      else { // both key1 and key2 are not Dummy
+      } else { // both key1 and key2 are not Dummy
         if (order.compare(key1, key2) == 0) {
           return (key1, include1 && include2)
         }
         if (order.compare(key1, key2) > 0 ^ isEndKey) {
           (key1, include1)
-        }
-        else {
+        } else {
           (key2, include2)
         }
       }
@@ -432,7 +458,7 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
   def validate(interval: RangeInterval): Boolean = {
     if ((interval.start ne IndexScanner.DUMMY_KEY_START)
       && (interval.end ne IndexScanner.DUMMY_KEY_END)) {
-      if (order.compare(interval.start, interval.end)>0) {
+      if (order.compare(interval.start, interval.end) > 0) {
         return false
       }
       if (order.compare(interval.start, interval.end) == 0
@@ -453,8 +479,9 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
       if !(interval1.isNullPredicate ^ interval2.isNullPredicate)
     } yield {
       // isNull & isNull => isNull
-      if (interval1.isNullPredicate && interval2.isNullPredicate) interval1
-      else {
+      if (interval1.isNullPredicate && interval2.isNullPredicate) {
+        interval1
+      } else {
         // this condition contains isNotNull & normalInterval => normalInterval
         val interval = RangeInterval(
           IndexScanner.DUMMY_KEY_START,

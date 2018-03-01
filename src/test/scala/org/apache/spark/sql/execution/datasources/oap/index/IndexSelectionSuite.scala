@@ -77,7 +77,9 @@ class IndexSelectionSuite extends SharedOapContext with BeforeAndAfterEach{
       case _ => null
     }
     assert(lastIdx == targetLastIdx)
-    if (idxMeta != null) assert(idxMeta.name equals targetIdxName)
+    if (idxMeta != null) {
+      assert(idxMeta.name equals targetIdxName)
+    }
   }
 
   test("Non-Index Test") {

@@ -78,8 +78,7 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
 
   test("check sequence reading if parquet format") {
     val data: Seq[(Int, String)] = (1 to 300).map { i =>
-      if (i == 10) (1, s"this is test $i")
-      else (i, s"this is test $i")
+      if (i == 10) (1, s"this is test $i") else (i, s"this is test $i")
     }
     data.toDF("key", "value").createOrReplaceTempView("t")
 
