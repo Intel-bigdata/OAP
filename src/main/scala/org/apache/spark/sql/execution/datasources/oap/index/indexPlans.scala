@@ -101,7 +101,9 @@ case class CreateIndexCommand(
             return Nil
           }
         }
-        if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)
+        if (existsData != null) {
+          existsData.foreach(metaBuilder.addFileMeta)
+        }
         if (existsIndexes != null) {
           existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
         }
@@ -184,8 +186,10 @@ case class CreateIndexCommand(
     val retMap = retVal.flatten.groupBy(_.parent)
     bAndP.foreach(bp =>
       retMap.getOrElse(bp._2.toString, Nil).foreach(r =>
-        if (!bp._3) bp._1.addFileMeta(
-          FileMeta(r.fingerprint, r.rowCount, r.dataFile))
+        if (!bp._3) {
+          bp._1.addFileMeta(
+            FileMeta(r.fingerprint, r.rowCount, r.dataFile))
+        }
       ))
     // write updated metas down
     bAndP.foreach(bp => DataSourceMeta.write(
@@ -242,7 +246,9 @@ case class DropIndexCommand(
                 return Nil
               }
             }
-            if (existsData != null) existsData.foreach(metaBuilder.addFileMeta)
+            if (existsData != null) {
+              existsData.foreach(metaBuilder.addFileMeta)
+            }
             if (existsIndexes != null) {
               existsIndexes.filter(_.name != indexName).foreach(metaBuilder.addIndexMeta)
             }

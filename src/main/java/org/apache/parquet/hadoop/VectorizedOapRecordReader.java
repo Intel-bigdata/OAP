@@ -16,6 +16,9 @@
  */
 package org.apache.parquet.hadoop;
 
+import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
+import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -103,6 +106,14 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
     protected static final MemoryMode DEFAULT_MEMORY_MODE = MemoryMode.ON_HEAP;
 
     /**
+     * SpecificOapRecordReaderBase need
+     * configuration and footer use by initialize method,
+     * not belong to SpecificParquetRecordReaderBase
+     */
+    protected Configuration configuration;
+    protected ParquetMetadata footer;
+
+    /**
      * VectorizedOapRecordReader Contructor
      * new method
      * @param file
@@ -110,23 +121,28 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * @param footer
      */
     public VectorizedOapRecordReader(
-                        Path file,
-                        Configuration configuration,
-                        ParquetMetadata footer) {
-        this.file = file;
-        this.configuration = configuration;
-        this.footer = footer;
+        Path file,
+        Configuration configuration,
+        ParquetMetadata footer) {
+      this.file = file;
+      this.configuration = configuration;
+      this.footer = footer;
     }
 
     /**
-     * Override SpecificOapRecordReaderBase.initialize
+     * Override initialize method, init footer if need,
+     * then call super.initialize and initializeInternal
      * @throws IOException
      * @throws InterruptedException
      */
     @Override
     public void initialize() throws IOException, InterruptedException {
-        super.initialize();
-        initializeInternal();
+      if (this.footer == null) {
+        footer = readFooter(configuration, file, NO_FILTER);
+      }
+      // no index to use, try do filterRowGroups to skip rowgroups.
+      initialize(footer, configuration, true);
+      initializeInternal();
     }
 
     /**

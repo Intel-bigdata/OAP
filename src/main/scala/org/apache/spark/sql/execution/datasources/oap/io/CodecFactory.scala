@@ -41,8 +41,9 @@ private[oap] class CodecFactory(conf: Configuration) {
       case None =>
         val codecName = CompressionCodecName.valueOf(codecString)
         val codecClass = codecName.getHadoopCompressionCodecClass
-        if (codecClass == null) None
-        else {
+        if (codecClass == null) {
+          None
+        } else {
           val codec = ReflectionUtils.newInstance(codecClass, conf).asInstanceOf[CompressionCodec]
           codecByName.put(codecString, codec)
           Some(codec)
@@ -79,7 +80,9 @@ private[oap] class BytesCompressor(compressionCodec: Option[CompressionCodec]) {
       case Some(codec) =>
         compressedOutBuffer.reset()
         // null compressor for non-native gzip
-        if (compressor != null) compressor.reset()
+        if (compressor != null) {
+          compressor.reset()
+        }
         val cos = codec.createOutputStream(compressedOutBuffer, compressor)
         cos.write(bytes)
         cos.finish()

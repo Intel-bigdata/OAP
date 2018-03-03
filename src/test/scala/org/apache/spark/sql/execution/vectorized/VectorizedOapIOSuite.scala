@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.vectorized
 import scala.collection.mutable
 
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.hadoop.VectorizedOapRecordReader
+import org.apache.parquet.hadoop.{IndexedVectorizedOapRecordReader, VectorizedOapRecordReader}
 
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.catalyst.InternalRow
@@ -164,6 +164,93 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
         } finally {
           vectorizedReader.close()
+        }
+      }
+    }
+  }
+
+  test("IndexedVectorizedOapRecordReader - direct path read") {
+    val data = (0 to 6000).map(i => (i, (i + 'a').toChar.toString))
+    val rowIds = Array(1, 1001, 2001, 3001, 4001, 5001)
+    val expected = data.filter( item => rowIds.contains(item._1))
+    withTempPath { dir =>
+      val df = spark.createDataFrame(data)
+      val schema = df.schema.json
+      df.repartition(1).write.parquet(dir.getCanonicalPath)
+      val file = SpecificParquetRecordReaderBase.listDirectory(dir).get(0)
+      val path = new Path(file.asInstanceOf[String])
+
+      {
+        configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, schema)
+        val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
+        try {
+          reader.initialize()
+          val result = mutable.ArrayBuffer.empty[(Int, String)]
+          while (reader.nextKeyValue()) {
+            val row = reader.getCurrentValue.asInstanceOf[InternalRow]
+            val v = (row.getInt(0), row.getString(1))
+            result += v
+          }
+          assert(expected == result)
+        } finally {
+          reader.close()
+          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+        }
+      }
+
+        // Project just one column
+      {
+        val requestSchema = requestSchemaString(df.schema, Array(1))
+        configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
+        val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
+        try {
+          reader.initialize()
+          val result = mutable.ArrayBuffer.empty[(String)]
+          while (reader.nextKeyValue()) {
+            val row = reader.getCurrentValue.asInstanceOf[InternalRow]
+            result += row.getString(0)
+          }
+          assert(expected.map(_._2) == result)
+        } finally {
+          reader.close()
+          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+        }
+      }
+
+        // Project columns in opposite order
+      {
+        val requestSchema = requestSchemaString(df.schema, Array(1, 0))
+        configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
+        val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
+        try {
+          reader.initialize()
+          val result = mutable.ArrayBuffer.empty[(String, Int)]
+          while (reader.nextKeyValue()) {
+            val row = reader.getCurrentValue.asInstanceOf[InternalRow]
+            val v = (row.getString(0), row.getInt(1))
+            result += v
+          }
+          assert(expected.map { x => (x._2, x._1) } == result)
+        } finally {
+          reader.close()
+          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+        }
+      }
+        // Empty projection
+      {
+        val requestSchema = requestSchemaString(df.schema, Array())
+        configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
+        val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
+        try {
+          reader.initialize()
+          var result = 0
+          while (reader.nextKeyValue()) {
+            result += 1
+          }
+          assert(result == expected.length)
+        } finally {
+          reader.close()
+          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
         }
       }
     }

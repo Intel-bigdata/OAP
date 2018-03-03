@@ -580,6 +580,25 @@ class ColumnarBatchSuite extends SparkFunSuite {
       assert(batch.numValidRows() == 1)
       val it4 = batch.rowIterator()
       rowEquals(it4.next(), Row(null, 2.2, 2, "abc"))
+
+      // mark all filtered and verify
+      batch.markAllFiltered()
+      assert(batch.numValidRows() == 0)
+
+      // mark row0 valid and verify
+      batch.markValid(0)
+      assert(batch.numValidRows() == 1)
+      val it5 = batch.rowIterator()
+      rowEquals(it5.next(), Row(null, 2.2, 2, "abc"))
+
+
+      // mark row0 valid and verify
+      batch.markValid(2)
+      assert(batch.numValidRows() == 2)
+      val it6 = batch.rowIterator()
+      rowEquals(it6.next(), Row(null, 2.2, 2, "abc"))
+      rowEquals(it6.next(), Row(4, 4.4, 4, "world"))
+      assert(!it6.hasNext)
       batch.close()
     }}
   }

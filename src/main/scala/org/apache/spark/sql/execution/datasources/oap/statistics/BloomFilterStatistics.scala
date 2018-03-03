@@ -86,16 +86,23 @@ private[oap] class BloomFilterStatisticsReader(
       if (schema.length > 1) {
         if (numFields == schema.length && ordering.compare(interval.start, interval.end) == 0) {
           !bfIndex.checkExist(converter(interval.start).getBytes)
-        } else !bfIndex.checkExist(partialConverter(interval.start).getBytes)
+        } else {
+          !bfIndex.checkExist(partialConverter(interval.start).getBytes)
+        }
       } else {
         if (numFields == 1 && ordering.compare(interval.start, interval.end) == 0) {
           !bfIndex.checkExist(converter(interval.start).getBytes)
-        } else false
+        } else {
+          false
+        }
       }
     }
 
-    if (skipIndex) StaticsAnalysisResult.SKIP_INDEX
-    else StaticsAnalysisResult.USE_INDEX
+    if (skipIndex) {
+      StaticsAnalysisResult.SKIP_INDEX
+    } else {
+      StaticsAnalysisResult.USE_INDEX
+    }
   }
 }
 

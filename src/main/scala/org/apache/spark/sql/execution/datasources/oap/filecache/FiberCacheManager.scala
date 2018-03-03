@@ -134,7 +134,9 @@ object FiberCacheManager extends Logging {
 
   // Used by test suite
   private[filecache] def removeFiber(fiber: TestFiber): Unit = {
-    if (cacheBackend.getIfPresent(fiber) != null) cacheBackend.invalidate(fiber)
+    if (cacheBackend.getIfPresent(fiber) != null) {
+      cacheBackend.invalidate(fiber)
+    }
   }
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly

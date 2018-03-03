@@ -21,6 +21,7 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.test.oap.SharedOapContext
+import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
 class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
@@ -46,18 +47,18 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
   }
 
   test("index integrity") {
-      val data: Seq[(Int, String)] =
-        scala.util.Random.shuffle(1 to 300).map{ i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table oap_test_1 select * from t")
-      sql("create oindex index1 on oap_test_1 (a) using bitmap")
+    val data: Seq[(Int, String)] =
+      scala.util.Random.shuffle(1 to 300).map{ i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test_1 select * from t")
+    sql("create oindex index1 on oap_test_1 (a) using bitmap")
 
-      val dfwithIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
-      sql("drop oindex index1 on oap_test_1")
-      val dfWithoutIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
-      val dfOriginal = sql("SELECT * FROM t WHERE key > 8 and key <= 200")
-      assert(dfWithoutIdx.count == dfwithIdx.count)
-      assert(dfWithoutIdx.count == dfOriginal.count)
+    val dfwithIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
+    sql("drop oindex index1 on oap_test_1")
+    val dfWithoutIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
+    val dfOriginal = sql("SELECT * FROM t WHERE key > 8 and key <= 200")
+    assert(dfWithoutIdx.count == dfwithIdx.count)
+    assert(dfWithoutIdx.count == dfOriginal.count)
   }
 
   test("index row boundary") {
@@ -78,8 +79,7 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
 
   test("check sequence reading if parquet format") {
     val data: Seq[(Int, String)] = (1 to 300).map { i =>
-      if (i == 10) (1, s"this is test $i")
-      else (i, s"this is test $i")
+      if (i == 10) (1, s"this is test $i") else (i, s"this is test $i")
     }
     data.toDF("key", "value").createOrReplaceTempView("t")
 
@@ -106,6 +106,24 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
 
     sql("drop oindex index1 on oap_parquet_test_1")
     sql("drop oindex index1 on oap_test_1")
+  }
 
+  test("#604 bitmap index core dump error") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 31, 3).map(i =>
+      Seq(i % 20, s"this is row $i")).map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("b", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+
+    sql("insert overwrite table oap_test_1 select * from t")
+    sql("create oindex bmidx1 on oap_test_1 (a) using bitmap")
+
+    val df1 = sql("SELECT * FROM oap_test_1 WHERE a = 1")
+    checkAnswer(df1, Row(1, "this is row 1") :: Row(1, "this is row 21") :: Nil)
+
+    sql("drop oindex bmidx1 on oap_test_1")
   }
 }

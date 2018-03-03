@@ -40,8 +40,9 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
 
   private def checkBloomFilter(bf1: BloomFilter, bf2: BloomFilter) = {
     val res =
-      if (bf1.getNumOfHashFunc != bf2.getNumOfHashFunc) false
-      else {
+      if (bf1.getNumOfHashFunc != bf2.getNumOfHashFunc) {
+        false
+      } else {
         val bitLongArray1 = bf1.getBitMapLongArray
         val bitLongArray2 = bf2.getBitMapLongArray
 

@@ -97,7 +97,9 @@ private[oap] class OapDataWriter(
     var idx = 0
     while (idx < rowGroup.length) {
       rowGroup(idx).append(row)
-      if (!row.isNullAt(idx)) updateStats(statisticsArray(idx), row, idx, schema(idx).dataType)
+      if (!row.isNullAt(idx)) {
+        updateStats(statisticsArray(idx), row, idx, schema(idx).dataType)
+      }
       idx += 1
     }
     rowCount += 1
@@ -145,7 +147,9 @@ private[oap] class OapDataWriter(
       val encoding = rowGroup(i).getEncoding
       val dictionaryDataLength = dictByteData.length
       val dictionaryIdSize = rowGroup(i).getDictionarySize
-      if (dictionaryDataLength > 0) out.write(dictByteData)
+      if (dictionaryDataLength > 0) {
+        out.write(dictByteData)
+      }
       fiberMeta.appendColumnMeta(new ColumnMeta(encoding, dictionaryDataLength, dictionaryIdSize,
         ColumnStatistics(statisticsArray(i))))
     }
@@ -228,13 +232,21 @@ private[oap] class OapDataReader(
             val sameOrder =
               !((indexScanners.order == Ascending) ^ isAscending)
 
-            if (sameOrder) indexScanners.take(limit).toArray
-            else indexScanners.toArray.reverse.take(limit)
-          } else indexScanners.toArray
+            if (sameOrder) {
+              indexScanners.take(limit).toArray
+            } else {
+              indexScanners.toArray.reverse.take(limit)
+            }
+          } else {
+            indexScanners.toArray
+          }
 
           // Parquet reader does not support backward scan, so rowIds must be sorted.
-          if (meta.dataReaderClassName.contains("ParquetDataFile")) rowIds.sorted
-          else rowIds
+          if (meta.dataReaderClassName.contains("ParquetDataFile")) {
+            rowIds.sorted
+          } else {
+            rowIds
+          }
         }
 
 

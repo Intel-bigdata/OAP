@@ -143,8 +143,11 @@ private[oap] object ColumnStatistics {
   }
 
   def apply(stat: ParquetStatistics): ColumnStatistics = {
-    if (!stat.hasNonNullValue) new ColumnStatistics(null, null)
-    else new ColumnStatistics(stat.getMinBytes, stat.getMaxBytes)
+    if (!stat.hasNonNullValue) {
+      new ColumnStatistics(null, null)
+    } else {
+      new ColumnStatistics(stat.getMinBytes, stat.getMaxBytes)
+    }
   }
 
   def apply(in: DataInputStream): ColumnStatistics = {
@@ -154,14 +157,18 @@ private[oap] object ColumnStatistics {
       val bytes = new Array[Byte](minLength)
       in.readFully(bytes)
       bytes
-    } else null
+    } else {
+      null
+    }
 
     val maxLength = in.readInt()
     val max = if (maxLength != 0) {
       val bytes = new Array[Byte](maxLength)
       in.readFully(bytes)
       bytes
-    } else null
+    } else {
+      null
+    }
 
     new ColumnStatistics(min, max)
   }

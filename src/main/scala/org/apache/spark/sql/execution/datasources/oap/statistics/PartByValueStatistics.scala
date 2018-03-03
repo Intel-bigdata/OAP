@@ -87,11 +87,17 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
     metas.zipWithIndex.indexWhere {
       case (meta, index) =>
         if (row.numFields == schema.length) {
-          if (include && index < metas.length - 1) ordering.compare(row, meta.row) < 0
-          else ordering.compare(row, meta.row) <= 0
+          if (include && index < metas.length - 1) {
+            ordering.compare(row, meta.row) < 0
+          } else {
+            ordering.compare(row, meta.row) <= 0
+          }
         } else {
-          if (isStart) partialOrdering.compare(row, meta.row) <= 0
-          else partialOrdering.compare(row, meta.row) < 0
+          if (isStart) {
+            partialOrdering.compare(row, meta.row) <= 0
+          } else {
+            partialOrdering.compare(row, meta.row) < 0
+          }
         }
     }
   }
@@ -130,9 +136,13 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
           cover -= 0.5 * (metas(right).accumulatorCnt - metas(right - 1).accumulatorCnt)
         }
 
-        if (cover > wholeCount) StaticsAnalysisResult.FULL_SCAN
-        else if (cover < 0) StaticsAnalysisResult.USE_INDEX
-        else cover / wholeCount
+        if (cover > wholeCount) {
+          StaticsAnalysisResult.FULL_SCAN
+        } else if (cover < 0) {
+          StaticsAnalysisResult.USE_INDEX
+        } else {
+          cover / wholeCount
+        }
       }
     } else {
       StaticsAnalysisResult.USE_INDEX
