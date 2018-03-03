@@ -25,7 +25,7 @@ import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
-import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportHelper, ParquetTest, SpecificParquetRecordReaderBase}
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportWrapper, ParquetTest, SpecificParquetRecordReaderBase}
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{StructType, _}
 import org.apache.spark.unsafe.types.UTF8String
@@ -43,7 +43,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
       val path = new Path(file.asInstanceOf[String])
 
       {
-        configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, schema)
+        configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
         val reader = new VectorizedOapRecordReader(path, configuration, null)
         try {
           reader.initialize()
@@ -54,7 +54,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
             result += v
           }
           assert(data == result)
-          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
         } finally {
           reader.close()
         }
@@ -64,7 +64,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
       // Project just one column
     {
       val requestSchema = requestSchemaString(df.schema, Array(1))
-      configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
+      configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
       val reader = new VectorizedOapRecordReader(path, configuration, null)
       try {
         reader.initialize()
@@ -74,7 +74,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           result += row.getString(0)
         }
         assert(data.map(_._2) == result)
-        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+        configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
       } finally {
         reader.close()
       }
@@ -83,7 +83,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
       // Project columns in opposite order
     {
       val requestSchema = requestSchemaString(df.schema, Array(1, 0))
-      configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
+      configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
       val reader = new VectorizedOapRecordReader(path, configuration, null)
       try {
         reader.initialize()
@@ -94,7 +94,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           result += v
         }
         assert(data.map { x => (x._2, x._1) } == result)
-        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+        configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
       } finally {
         reader.close()
       }
@@ -102,7 +102,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
       // Empty projection
     {
       val requestSchema = requestSchemaString(df.schema, Array())
-      configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
+      configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
       val reader = new VectorizedOapRecordReader(path, configuration, null)
       try {
         reader.initialize()
@@ -111,7 +111,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           result += 1
         }
         assert(result == data.length)
-        configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+        configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
       } finally {
         reader.close()
       }
@@ -143,7 +143,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
 
       dataTypes.zip(constantValues).foreach { case (dt, v) =>
         val schema = StructType(StructField("pcol", dt) :: Nil)
-        configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, schema.json)
+        configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema.json)
         val file = SpecificParquetRecordReaderBase.listDirectory(dir).get(0)
         val path = new Path(file)
         val vectorizedReader = new VectorizedOapRecordReader(path, configuration, null)
@@ -161,7 +161,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           val actual = row.copy().get(1, dt)
           val expected = v
           assert(actual == expected)
-          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
         } finally {
           vectorizedReader.close()
         }
@@ -181,7 +181,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
       val path = new Path(file.asInstanceOf[String])
 
       {
-        configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, schema)
+        configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
         val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
         try {
           reader.initialize()
@@ -194,14 +194,14 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           assert(expected == result)
         } finally {
           reader.close()
-          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
         }
       }
 
         // Project just one column
       {
         val requestSchema = requestSchemaString(df.schema, Array(1))
-        configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
+        configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
         val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
         try {
           reader.initialize()
@@ -213,14 +213,14 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           assert(expected.map(_._2) == result)
         } finally {
           reader.close()
-          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
         }
       }
 
         // Project columns in opposite order
       {
         val requestSchema = requestSchemaString(df.schema, Array(1, 0))
-        configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
+        configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
         val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
         try {
           reader.initialize()
@@ -233,13 +233,13 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           assert(expected.map { x => (x._2, x._1) } == result)
         } finally {
           reader.close()
-          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
         }
       }
         // Empty projection
       {
         val requestSchema = requestSchemaString(df.schema, Array())
-        configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
+        configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, requestSchema)
         val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
         try {
           reader.initialize()
@@ -250,7 +250,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
           assert(result == expected.length)
         } finally {
           reader.close()
-          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
         }
       }
     }
