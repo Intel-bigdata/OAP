@@ -59,3 +59,4 @@ object ParquetReadSupportWrapper {
   // Proxy ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA value.
   val SPARK_ROW_REQUESTED_SCHEMA: String = ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA
 }
+
