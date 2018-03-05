@@ -32,7 +32,6 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
   override def toString(): String = "BPlusTreeScanner"
   @transient protected var currentKeyArray: Array[CurrentKey] = _
 
-  var currentKeyIdx = 0
   var recordReader: BTreeIndexRecordReader = _
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
@@ -64,8 +63,12 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
       val result = StatisticsManager.analyse(stats, intervalArray, conf)
       result
     } finally {
-      if (footerCache != null) footerCache.release()
-      if (reader != null) reader.close()
+      if (footerCache != null) {
+        footerCache.release()
+      }
+      if (reader != null) {
+        reader.close()
+      }
     }
   }
 

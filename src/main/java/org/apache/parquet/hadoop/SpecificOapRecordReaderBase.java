@@ -16,16 +16,10 @@
  */
 package org.apache.parquet.hadoop;
 
-import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
-import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -36,6 +30,7 @@ import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.schema.MessageType;
+
 import org.apache.spark.sql.execution.datasources.oap.io.OapReadSupportImpl;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper;
 import org.apache.spark.sql.types.StructType;
@@ -59,46 +54,38 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
     protected ParquetFileReader reader;
 
     /**
-     * SpecificOapRecordReaderBase need
-     * configuration & footer use by initialize method,
-     * not belong to SpecificParquetRecordReaderBase
-     */
-    protected Configuration configuration;
-    protected ParquetMetadata footer;
-
-    /**
-     * SpecificOapRecordReaderBase init method,
-     * needn't taskAttemptContext & inputSplit
+     *
+     * @param footer parquet file footer
+     * @param configuration haddoop configuration
+     * @param isFilterRowGroups is do filterRowGroups
      * @throws IOException
      * @throws InterruptedException
      */
-    @Override
-    public void initialize() throws IOException, InterruptedException {
-        if(this.footer == null){
-            footer = readFooter(configuration, file, NO_FILTER);
-        }
-        this.fileSchema = footer.getFileMetaData().getSchema();
-
-        Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
-        ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(
-                configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
-        this.requestedSchema = readContext.getRequestedSchema();
-        String sparkRequestedSchemaString =
-                configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
-        this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
-        this.reader = ParquetFileReader.open(configuration, file,footer);
+    protected void initialize(ParquetMetadata footer, Configuration configuration, boolean isFilterRowGroups)
+        throws IOException, InterruptedException {
+      this.fileSchema = footer.getFileMetaData().getSchema();
+      Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
+      ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(
+        configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
+      this.requestedSchema = readContext.getRequestedSchema();
+      String sparkRequestedSchemaString =
+        configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
+      this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
+      this.reader = ParquetFileReader.open(configuration, file, footer);
+      if (isFilterRowGroups) {
         this.reader.filterRowGroups(getFilter(configuration));
-        this.reader.setRequestedSchema(requestedSchema);
-        for (BlockMetaData block : this.reader.getRowGroups()) {
-            this.totalRowCount += block.getRowCount();
-        }
+      }
+      this.reader.setRequestedSchema(requestedSchema);
+      for (BlockMetaData block : this.reader.getRowGroups()) {
+        this.totalRowCount += block.getRowCount();
+      }
     }
 
     @Override
     public void close() throws IOException {
-        if (reader != null) {
-            reader.close();
-            reader = null;
-        }
+      if (reader != null) {
+        reader.close();
+        reader = null;
+      }
     }
 }

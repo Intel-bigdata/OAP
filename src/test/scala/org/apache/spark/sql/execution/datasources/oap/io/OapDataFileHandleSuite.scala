@@ -114,8 +114,11 @@ class OapDataFileHandleCheck extends Properties("OapDataFileHandle") {
     for { min <- arbitrary[Array[Byte]]
           max <- arbitrary[Array[Byte]]
     } yield {
-        if (min.isEmpty || max.isEmpty) new ColumnStatistics(null, null)
-        else new ColumnStatistics(min, max)
+        if (min.isEmpty || max.isEmpty) {
+          new ColumnStatistics(null, null)
+        } else {
+          new ColumnStatistics(min, max)
+        }
       }
   }
 

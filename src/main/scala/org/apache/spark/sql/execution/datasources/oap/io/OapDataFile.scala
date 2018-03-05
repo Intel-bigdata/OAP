@@ -60,7 +60,9 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
         case IntegerType => new PlainIntegerDictionary(dictionaryPage)
         case other => sys.error(s"not support data type: $other")
       }
-    } else dictionaries(fiberId)
+    } else {
+      dictionaries(fiberId)
+    }
   }
 
   def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
@@ -98,8 +100,11 @@ private[oap] case class OapDataFile(path: String, schema: StructType,
       }
 
     val rowCount =
-      if (groupId == meta.groupCount - 1) meta.rowCountInLastGroup
-      else meta.rowCountInEachGroup
+      if (groupId == meta.groupCount - 1) {
+        meta.rowCountInLastGroup
+      } else {
+        meta.rowCountInEachGroup
+      }
 
     // We have to read Array[Byte] from file and decode/decompress it before putToFiberCache
     // TODO: Try to finish this in off-heap memory

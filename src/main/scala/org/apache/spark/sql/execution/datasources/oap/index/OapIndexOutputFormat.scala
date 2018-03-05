@@ -38,7 +38,9 @@ private[index] class OapIndexOutputFormat extends FileOutputFormat[Void, Interna
       if (isAppend) {
         val target = new Path(FileOutputFormat.getOutputPath(taskAttemptContext), file.getName)
         target.getFileSystem(configuration).exists(target)
-      } else false
+      } else {
+        false
+      }
     }
 
     val extension = "." + configuration.get(OapIndexFileFormat.INDEX_TIME) +
