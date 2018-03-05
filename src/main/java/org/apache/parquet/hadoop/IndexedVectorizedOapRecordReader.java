@@ -89,7 +89,9 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         return columnarBatch;
       }
       Preconditions.checkNotNull(batchIds, "returnColumnarBatch = false, batchIds must not null.");
-      Preconditions.checkArgument(batchIdx <= numBatched, "batchIdx can not be more than numBatched");
+      Preconditions.checkArgument(
+        batchIdx <= numBatched,
+        "batchIdx can not be more than numBatched");
       Preconditions.checkArgument(batchIdx >= 1, "call nextKeyValue before getCurrentValue");
       // batchIds (IntArrayList) is random access.
       return columnarBatch.getRow(batchIds.get(batchIdx - 1));
@@ -118,7 +120,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       super.readNextRowGroup();
       this.divideRowIdsIntoPages();
     }
-    
+
     private boolean filterRowsWithIndex() throws IOException {
       IntList ids = idsMap.remove(currentPageNumber);
       if (ids == null || ids.isEmpty()) {

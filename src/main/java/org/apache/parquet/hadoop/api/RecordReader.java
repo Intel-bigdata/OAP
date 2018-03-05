@@ -31,7 +31,7 @@ public interface RecordReader<T> extends Closeable {
 
     /**
      * Read the next key, value pair.
-     * 
+     *
      * @return true if a key/value pair was read
      * @throws IOException
      * @throws InterruptedException
@@ -40,7 +40,7 @@ public interface RecordReader<T> extends Closeable {
 
     /**
      * Get the current value.
-     * 
+     *
      * @return the object that was read
      * @throws IOException
      * @throws InterruptedException
@@ -49,7 +49,7 @@ public interface RecordReader<T> extends Closeable {
 
     /**
      * The current progress of the record reader through its data.
-     * 
+     *
      * @return a number between 0.0 and 1.0 that is the fraction of the data read
      * @throws IOException
      * @throws InterruptedException

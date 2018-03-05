@@ -54,7 +54,8 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
     /**
      * For each request column, the reader to read this column. This is NULL if this column
      * is missing from the file, in which case we populate the attribute with NULL.
-     * From VectorizedParquetRecordReader, change private to protected, wrapper VectorizedColumnReader.
+     * From VectorizedParquetRecordReader, change private to protected,
+     * wrapper VectorizedColumnReader.
      */
     protected VectorizedColumnReaderWrapper[] columnReaders;
 
@@ -229,7 +230,8 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         if (partitionColumns != null) {
             int partitionIdx = sparkSchema.fields().length;
             for (int i = 0; i < partitionColumns.fields().length; i++) {
-                ColumnVectorUtils.populate(columnarBatch.column(i + partitionIdx), partitionValues, i);
+                ColumnVectorUtils.populate(columnarBatch.column(i + partitionIdx),
+                  partitionValues, i);
                 columnarBatch.column(i + partitionIdx).setIsConstant();
             }
         }
@@ -284,7 +286,8 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         if (rowsReturned >= totalRowCount) return false;
         checkEndOfRowGroup();
 
-        int num = (int) Math.min((long) columnarBatch.capacity(), totalCountLoadedSoFar - rowsReturned);
+        int num = (int) Math.min((long) columnarBatch.capacity(),
+          totalCountLoadedSoFar - rowsReturned);
         for (int i = 0; i < columnReaders.length; ++i) {
             if (columnReaders[i] == null) continue;
             columnReaders[i].readBatch(num, columnarBatch.column(i));
@@ -318,7 +321,8 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
                 missingColumns[i] = false;
             } else {
                 if (requestedSchema.getColumns().get(i).getMaxDefinitionLevel() == 0) {
-                    // Column is missing in data but the required data is non-nullable. This file is invalid.
+                    // Column is missing in data but the required data is non-nullable.
+                    // This file is invalid.
                     throw new IOException("Required column is missing in data file. Col: " +
                             Arrays.toString(colPath));
                 }

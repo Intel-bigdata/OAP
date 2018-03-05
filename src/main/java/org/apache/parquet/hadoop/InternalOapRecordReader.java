@@ -110,7 +110,8 @@ public class InternalOapRecordReader<T> {
         MessageColumnIO columnIO,
         PageReadStore pages,
         IntList rowIdList) {
-      return RecordReaderFactory.getRecordReader(columnIO, pages, recordConverter, createdBy, rowIdList);
+      return RecordReaderFactory
+        .getRecordReader(columnIO, pages, recordConverter, createdBy, rowIdList);
     }
 
     public void close() throws IOException {
@@ -134,7 +135,8 @@ public class InternalOapRecordReader<T> {
       this.recordConverter = readSupport.prepareForRead(
         configuration, fileMetadata, fileSchema, readContext);
       this.strictTypeChecking = configuration.getBoolean(STRICT_TYPE_CHECKING, true);
-      List<IntList> rowIdsList = ((IndexedParquetMetadata)parquetFileReader.getFooter()).getRowIdsList();
+      List<IntList> rowIdsList =
+        ((IndexedParquetMetadata)parquetFileReader.getFooter()).getRowIdsList();
       this.rowIdsIter = rowIdsList.iterator();
       for (IntList rowIdList : rowIdsList) {
         total += rowIdList.size();
@@ -169,8 +171,12 @@ public class InternalOapRecordReader<T> {
             LOG.debug("read value: " + currentValue);
           }
         } catch (RuntimeException e) {
-          throw new ParquetDecodingException(format("Can not read value at %d in block %d in file %s",
-            current, currentBlock, reader.getPath()), e);
+          throw new ParquetDecodingException(
+            format("Can not read value at %d in block %d in file %s",
+              current,
+              currentBlock,
+              reader.getPath()),
+            e);
         }
       }
       return true;

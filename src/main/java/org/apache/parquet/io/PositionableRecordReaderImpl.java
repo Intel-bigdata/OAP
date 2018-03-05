@@ -57,9 +57,14 @@ public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<
     }
 
     private void seek(int position) {
-      Preconditions.checkArgument(position >= recordsRead,
-        "Not support seek to backward position, recordsRead: %s want to read: %s", recordsRead, position);
-      Preconditions.checkArgument(position < recordMaxCount, "Seek position must less than recordCount");
+      Preconditions.checkArgument(
+        position >= recordsRead,
+        "Not support seek to backward position, recordsRead: %s want to read: %s",
+        recordsRead,
+        position);
+      Preconditions.checkArgument(
+        position < recordMaxCount,
+        "Seek position must less than recordCount");
       while (recordsRead < position) {
         State currentState = getState(0);
         do {
@@ -70,7 +75,8 @@ public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<
           }
           // change r,d state
           columnReader.consume();
-          int nextR = currentState.maxRepetitionLevel == 0 ? 0 : columnReader.getCurrentRepetitionLevel();
+          int nextR =
+            currentState.maxRepetitionLevel == 0 ? 0 : columnReader.getCurrentRepetitionLevel();
           currentState = currentState.getNextState(nextR);
         } while (currentState != null);
           recordsRead++;
