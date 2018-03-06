@@ -25,7 +25,7 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTableType
-import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
+import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.catalyst.plans.logical.CatalystSerde
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
