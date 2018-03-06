@@ -23,13 +23,12 @@ import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTableType
-import org.apache.spark.sql.catalyst.encoders._
 import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.catalyst.plans.logical.CatalystSerde
-import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.execution.QueryExecution
+import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.SQLTestUtils
@@ -90,7 +89,7 @@ class OapPlannerSuite
 
   test("SortPushDown Test") {
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
-    val data = (1 to 300).map{ i => (i%102, s"this is test $i")}
+    val data = (1 to 300).map { i => (i%102, s"this is test $i") }
     val dataRDD = spark.sparkContext.parallelize(data, 10)
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
@@ -119,7 +118,7 @@ class OapPlannerSuite
   }
 
   test("SortPushDown Test with Different Project") {
-    val data = (1 to 300).map{ i => (i, s"this is test $i")}
+    val data = (1 to 300).map { i => (i, s"this is test $i") }
     val dataRDD = spark.sparkContext.parallelize(data, 10)
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
@@ -139,7 +138,7 @@ class OapPlannerSuite
   }
 
   test("SortPushDown should consider deserialized plan") {
-    val data = (1 to 300).map{ i => (i, s"this is test $i")}
+    val data = (1 to 300).map { i => (i, s"this is test $i") }
     val dataRDD = spark.sparkContext.parallelize(data, 10)
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
@@ -162,14 +161,14 @@ class OapPlannerSuite
   test("Distinct index scan if SemiJoin Test") {
     spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
-    val data = (1 to 300).map{ i => (i, s"this is test $i")}
+    val data = (1 to 300).map { i => (i, s"this is test $i") }
     val dataRDD = spark.sparkContext.parallelize(data, 10)
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_sort_opt_table select * from t")
     sql("create oindex index1 on oap_sort_opt_table (a)")
 
-    val data1 = (1 to 300).map{ i => (i % 10, s"this is test $i")}
+    val data1 = (1 to 300).map { i => (i % 10, s"this is test $i") }
     val dataRDD1 = spark.sparkContext.parallelize(data1, 5)
 
     dataRDD1.toDF("key", "value").createOrReplaceTempView("t1")
@@ -219,7 +218,7 @@ class OapPlannerSuite
 
   test("OapFileScan WholeStageCodeGen Check") {
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
-    val data = (1 to 300).map{ i => (i, s"this is test $i")}
+    val data = (1 to 300).map { i => (i, s"this is test $i") }
     val dataRDD = spark.sparkContext.parallelize(data, 10)
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
@@ -245,9 +244,7 @@ class OapPlannerSuite
 
   test("aggregations with group by test") {
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
-    val data = (1 to 300).map{ i =>
-      (i % 101, i % 37)
-    }
+    val data = (1 to 300).map { i => (i % 101, i % 37) }
     val dataRDD = spark.sparkContext.parallelize(data, 2)
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
@@ -274,9 +271,7 @@ class OapPlannerSuite
 
   test("oapStrategies does not support empty filter") {
     spark.conf.set(OapFileFormat.ROW_GROUP_SIZE, 50)
-    val data = (1 to 300).map{ i =>
-      (i % 101, i % 37)
-    }
+    val data = (1 to 300).map { i => (i % 101, i % 37) }
     val dataRDD = spark.sparkContext.parallelize(data, 2)
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
