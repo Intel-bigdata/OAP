@@ -23,6 +23,7 @@ import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
 import org.apache.spark.sql.execution.datasources.oap.listener.FiberInfoListener
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.util.collection.BitSet
 
 class FiberSensorSuite extends SparkFunSuite with AbstractFiberSensor with Logging {
@@ -44,7 +45,7 @@ class FiberSensorSuite extends SparkFunSuite with AbstractFiberSensor with Loggi
 
     // Test normal msg
     val conf: SparkConf = new SparkConf()
-    conf.set("oap.update.fiber.cache.metrics.interval.sec", 0L.toString)
+    conf.set(OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SCE.key, 0L.toString)
     val cacheStats = CacheStats(CacheStatsInternal(12, 21),
       CacheStatsInternal(12, 21), CacheStatsInternal(2, 19),
       CacheStatsInternal(10, 2), CacheStatsInternal(0, 0),
