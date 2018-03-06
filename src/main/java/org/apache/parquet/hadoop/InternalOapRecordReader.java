@@ -121,7 +121,7 @@ public class InternalOapRecordReader<T> {
     }
 
     public void initialize(ParquetFileReader parquetFileReader, Configuration configuration)
-        throws IOException {
+      throws IOException {
       this.reader = parquetFileReader;
       FileMetaData parquetFileMetadata = parquetFileReader.getFooter().getFileMetaData();
       this.fileSchema = parquetFileMetadata.getSchema();
