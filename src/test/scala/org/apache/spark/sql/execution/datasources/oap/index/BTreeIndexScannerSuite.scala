@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.apache.spark.util.Utils
@@ -34,6 +35,16 @@ class BTreeIndexScannerSuite extends SharedOapContext {
   // Override afterEach because we do not want to check open streams
   override def beforeEach(): Unit = {}
   override def afterEach(): Unit = {}
+
+  private def assertRowIdList(reader: BTreeIndexRecordReader, start: Int, end: Int): Unit = {
+    var result: ArrayBuffer[Int] = new ArrayBuffer[Int]()
+    while (reader.hasNext) {
+      result += reader.next()
+    }
+    logWarning(s"songzhan: ${result.toString()}")
+    val expected = (start until end).toArray
+    assert(result.sorted.toArray sameElements expected)
+  }
 
   test("test rowOrdering") {
     // Only check Integer is enough. We use [[GenerateOrdering]] to handle different data types.
@@ -117,41 +128,75 @@ class BTreeIndexScannerSuite extends SharedOapContext {
     writer.close(null)
 
     val reader = BTreeIndexRecordReader(configuration, schema)
-    reader.initialize(path, new ArrayBuffer[RangeInterval]())
-
     // DUMMY_START <= x <= DUMMY_END
-    assert(reader.findRowIdRange(RangeInterval(
+    val intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()
+    var rangeInterval = RangeInterval(
       IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END,
-      includeStart = true, includeEnd = true)) === (0, 150))
+      includeStart = true, includeEnd = true)
+    intervalArray +=  rangeInterval
+    reader.initialize(path, intervalArray)
+    intervalArray -=  rangeInterval
+    assertRowIdList(reader, 0, 150)
     // DUMMY_START < x <= Max
-    assert(reader.findRowIdRange(RangeInterval(
+    rangeInterval = RangeInterval(
       IndexScanner.DUMMY_KEY_START, InternalRow(299),
-      includeStart = true, includeEnd = true)) === (0, 150))
+      includeStart = true, includeEnd = true)
+    intervalArray +=  rangeInterval
+    reader.initialize(path, intervalArray)
+    intervalArray -=  rangeInterval
+    assertRowIdList(reader, 0, 150)
     // DUMMY_START < x < Max
-    assert(reader.findRowIdRange(RangeInterval(
+    rangeInterval = RangeInterval(
       IndexScanner.DUMMY_KEY_START, InternalRow(299),
-      includeStart = true, includeEnd = false)) === (0, 149))
+      includeStart = true, includeEnd = false)
+    intervalArray +=  rangeInterval
+    reader.initialize(path, intervalArray)
+    intervalArray -=  rangeInterval
+    assertRowIdList(reader, 0, 149)
     // Min <= x < DUMMY_END
-    assert(reader.findRowIdRange(RangeInterval(
+    rangeInterval = RangeInterval(
       InternalRow(1), IndexScanner.DUMMY_KEY_END,
-      includeStart = true, includeEnd = false)) === (0, 150))
+      includeStart = true, includeEnd = false)
+    intervalArray +=  rangeInterval
+    reader.initialize(path, intervalArray)
+    intervalArray -=  rangeInterval
+    assertRowIdList(reader, 0, 150)
     // Min < x < DUMMY_END
-    assert(reader.findRowIdRange(RangeInterval(
+    rangeInterval = RangeInterval(
       InternalRow(1), IndexScanner.DUMMY_KEY_END,
-      includeStart = false, includeEnd = false)) === (1, 150))
+      includeStart = false, includeEnd = false)
+    intervalArray +=  rangeInterval
+    reader.initialize(path, intervalArray)
+    intervalArray -=  rangeInterval
+    assertRowIdList(reader, 1, 150)
     // 2 < x <= 4 (Target not exist in values)
-    assert(reader.findRowIdRange(RangeInterval(
-      InternalRow(2), InternalRow(4), includeStart = false, includeEnd = true)) === (1, 2))
+    rangeInterval = RangeInterval(
+      InternalRow(2), InternalRow(4), includeStart = false, includeEnd = true)
+    intervalArray +=  rangeInterval
+    reader.initialize(path, intervalArray)
+    intervalArray -=  rangeInterval
+    assertRowIdList(reader, 1, 2)
     // 59 < x <= 119 (get the next position of target value)
-    assert(reader.findRowIdRange(RangeInterval(
-      InternalRow(59), InternalRow(119), includeStart = false, includeEnd = true)) === (30, 60))
+    rangeInterval = RangeInterval(
+      InternalRow(59), InternalRow(119), includeStart = false, includeEnd = true)
+    intervalArray +=  rangeInterval
+    reader.initialize(path, intervalArray)
+    intervalArray -=  rangeInterval
+    assertRowIdList(reader, 30, 60)
     // 1 < x < 1
-    assert(reader.findRowIdRange(RangeInterval(
-      InternalRow(1), InternalRow(1), includeStart = false, includeEnd = false)) === (1, 0))
+    rangeInterval = RangeInterval(
+      InternalRow(1), InternalRow(1), includeStart = false, includeEnd = false)
+    intervalArray +=  rangeInterval
+    reader.initialize(path, intervalArray)
+    intervalArray -=  rangeInterval
+    assertRowIdList(reader, 1, 0)
     // 1 <= x <= 1
-    assert(reader.findRowIdRange(RangeInterval(
-      InternalRow(1), InternalRow(1), includeStart = true, includeEnd = true)) === (0, 1))
-    reader.close()
+    rangeInterval = RangeInterval(
+      InternalRow(1), InternalRow(1), includeStart = true, includeEnd = true)
+    intervalArray +=  rangeInterval
+    reader.initialize(path, intervalArray)
+    intervalArray -=  rangeInterval
+    assertRowIdList(reader, 0, 1)
   }
 
   test("findRowIdRange for isNull filter predicate: empty result") {
@@ -164,17 +209,16 @@ class BTreeIndexScannerSuite extends SharedOapContext {
     writer.close(null)
 
     val reader = BTreeIndexRecordReader(configuration, schema)
-    reader.initialize(path, new ArrayBuffer[RangeInterval]())
+    val intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()
+    intervalArray += RangeInterval(
+      IndexScanner.DUMMY_KEY_START,
+      IndexScanner.DUMMY_KEY_END,
+      includeStart = true,
+      includeEnd = true,
+      isNull = true)
+    reader.initialize(path, intervalArray)
 
-    assert(
-      reader.findRowIdRange(
-        RangeInterval(
-          IndexScanner.DUMMY_KEY_START,
-          IndexScanner.DUMMY_KEY_END,
-          includeStart = true,
-          includeEnd = true,
-          isNull = true)) === (150, 150))
-    reader.close()
+    assertRowIdList(reader, 150, 150)
   }
 
   test("findRowIdRange for isNull filter predicate") {
@@ -188,17 +232,16 @@ class BTreeIndexScannerSuite extends SharedOapContext {
     writer.close(null)
 
     val reader = BTreeIndexRecordReader(configuration, schema)
-    reader.initialize(path, new ArrayBuffer[RangeInterval]())
+    val intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()
+    intervalArray += RangeInterval(
+      IndexScanner.DUMMY_KEY_START,
+      IndexScanner.DUMMY_KEY_END,
+      includeStart = true,
+      includeEnd = true,
+      isNull = true)
+    reader.initialize(path, intervalArray)
 
-    assert(
-      reader.findRowIdRange(
-        RangeInterval(
-          IndexScanner.DUMMY_KEY_START,
-          IndexScanner.DUMMY_KEY_END,
-          includeStart = true,
-          includeEnd = true,
-          isNull = true)) === (150, 155))
-    reader.close()
+    assertRowIdList(reader, 150, 155)
   }
 
   test("findRowIdRange for isNotNull filter predicate: empty result") {
@@ -211,16 +254,15 @@ class BTreeIndexScannerSuite extends SharedOapContext {
     writer.close(null)
 
     val reader = BTreeIndexRecordReader(configuration, schema)
-    reader.initialize(path, new ArrayBuffer[RangeInterval]())
+    val intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()
+    intervalArray += RangeInterval(
+      IndexScanner.DUMMY_KEY_START,
+      IndexScanner.DUMMY_KEY_END,
+      includeStart = true,
+      includeEnd = true)
+    reader.initialize(path, intervalArray)
 
-    assert(
-      reader.findRowIdRange(
-        RangeInterval(
-          IndexScanner.DUMMY_KEY_START,
-          IndexScanner.DUMMY_KEY_END,
-          includeStart = true,
-          includeEnd = true)) === (0, 0))
-    reader.close()
+    assertRowIdList(reader, 0, 0)
   }
 
   test("findRowIdRange for isNotNull filter predicate") {
@@ -234,15 +276,37 @@ class BTreeIndexScannerSuite extends SharedOapContext {
     writer.close(null)
 
     val reader = BTreeIndexRecordReader(configuration, schema)
-    reader.initialize(path, new ArrayBuffer[RangeInterval]())
+    val intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()
+    intervalArray += RangeInterval(
+      IndexScanner.DUMMY_KEY_START,
+      IndexScanner.DUMMY_KEY_END,
+      includeStart = true,
+      includeEnd = true)
 
-    assert(
-      reader.findRowIdRange(
-        RangeInterval(
-          IndexScanner.DUMMY_KEY_START,
-          IndexScanner.DUMMY_KEY_END,
-          includeStart = true,
-          includeEnd = true)) === (0, 150))
-    reader.close()
+    reader.initialize(path, intervalArray)
+
+    assertRowIdList(reader, 0, 150)
+  }
+
+  test("read rowId after remove fiberCache") {
+    val schema = StructType(StructField("col", IntegerType) :: Nil)
+    val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
+    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
+
+    (1 to 5).map(InternalRow(_)).foreach(writer.write(null, _))
+    writer.close(null)
+
+    val reader = BTreeIndexRecordReader(configuration, schema)
+    val intervalArray: ArrayBuffer[RangeInterval] = new ArrayBuffer[RangeInterval]()
+    intervalArray += RangeInterval(
+      IndexScanner.DUMMY_KEY_START,
+      IndexScanner.DUMMY_KEY_END,
+      includeStart = true,
+      includeEnd = true)
+    reader.initialize(path, intervalArray)
+    FiberCacheManager.removeIndexCache("IndexFile")
+
+    assertRowIdList(reader, 0, 5)
   }
 }

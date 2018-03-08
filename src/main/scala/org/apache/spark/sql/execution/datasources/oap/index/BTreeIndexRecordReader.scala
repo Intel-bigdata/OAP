@@ -28,7 +28,6 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.filecache.{BTreeFiber, FiberCache, FiberCacheManager, WrappedFiberCache}
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
 import org.apache.spark.sql.types._
-import org.apache.spark.util.CompletionIterator
 
 
 private[index] case class BTreeIndexRecordReader(
@@ -60,25 +59,30 @@ private[index] case class BTreeIndexRecordReader(
 
     reader.checkVersionNum(footer.getVersionNum)
 
-    internalIterator = intervalArray.toIterator.flatMap { interval =>
-      val (start, end) = findRowIdRange(interval)
-      val groupedPos = (start until end).groupBy(i => i / reader.rowIdListSizePerSection)
-      groupedPos.toIterator.flatMap {
-        case (partIdx, subPosList) =>
-          val rowIdListFiber = BTreeFiber(
-            () => reader.readRowIdList(partIdx),
-            reader.file.toString,
-            reader.rowIdListSectionId, partIdx)
+    try {
+      internalIterator = intervalArray.flatMap { interval =>
+        val (start, end) = findRowIdRange(interval)
+        val groupedPos = (start until end).groupBy(i => i / reader.rowIdListSizePerSection)
+        groupedPos.flatMap {
+          case (partIdx, subPosList) =>
+            val rowIdListFiber = BTreeFiber(
+              () => reader.readRowIdList(partIdx),
+              reader.file.toString,
+              reader.rowIdListSectionId, partIdx)
 
-          val rowIdListCache =
-            WrappedFiberCache(FiberCacheManager.get(rowIdListFiber, configuration))
-          indexCaches += rowIdListCache
-          val rowIdList = BTreeRowIdList(rowIdListCache.fc)
-          val iterator =
-            subPosList.toIterator.map(i => rowIdList.getRowId(i % reader.rowIdListSizePerSection))
-          CompletionIterator[Int, Iterator[Int]](iterator, rowIdListCache.release())
-      }
-    } // get the row ids
+            val rowIdListCache =
+              WrappedFiberCache(FiberCacheManager.get(rowIdListFiber, configuration))
+            indexCaches += rowIdListCache
+            val rowIdList = BTreeRowIdList(rowIdListCache.fc)
+            val iterator =
+              subPosList.map(i => rowIdList.getRowId(i % reader.rowIdListSizePerSection))
+            rowIdListCache.release()
+            iterator
+        }
+      }.toIterator // get the row ids
+    } finally {
+      close()
+    }
   }
   // find the row id list start pos, end pos of the range interval
   private[index] def findRowIdRange(interval: RangeInterval): (Int, Int) = {
@@ -213,7 +217,6 @@ private[index] case class BTreeIndexRecordReader(
   override def hasNext: Boolean = if (internalIterator.hasNext) {
     true
   } else {
-    close()
     false
   }
 
