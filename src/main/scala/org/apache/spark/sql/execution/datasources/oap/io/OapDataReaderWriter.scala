@@ -193,7 +193,8 @@ private[oap] class OapDataReader(
   path: Path,
   meta: DataSourceMeta,
   filterScanners: Option[IndexScanners],
-  requiredIds: Array[Int]) extends Logging {
+  requiredIds: Array[Int],
+  context: Option[VectorizedContext] = None) extends Logging {
 
   import org.apache.spark.sql.execution.datasources.oap.INDEX_STAT._
 
@@ -209,6 +210,9 @@ private[oap] class OapDataReader(
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
+    if (meta.dataReaderClassName.contains("ParquetDataFile")) {
+      fileScanner.asInstanceOf[ParquetDataFile].setVectorizedContext(context)
+    }
 
     def fullScan: OapIterator[InternalRow] = {
       val start = if (log.isDebugEnabled) System.currentTimeMillis else 0

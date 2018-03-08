@@ -54,7 +54,8 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
     /**
      * For each request column, the reader to read this column. This is NULL if this column
      * is missing from the file, in which case we populate the attribute with NULL.
-     * From VectorizedParquetRecordReader, change private to protected, wrapper VectorizedColumnReader.
+     * From VectorizedParquetRecordReader, change private to protected,
+     * wrapper VectorizedColumnReader.
      */
     protected VectorizedColumnReaderWrapper[] columnReaders;
 
@@ -151,11 +152,11 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      */
     @Override
     public void close() throws IOException {
-        if (columnarBatch != null) {
-            columnarBatch.close();
-            columnarBatch = null;
-        }
-        super.close();
+      if (columnarBatch != null) {
+        columnarBatch.close();
+        columnarBatch = null;
+      }
+      super.close();
     }
 
     /**
@@ -166,15 +167,15 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      */
     @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
-        resultBatch();
+      resultBatch();
 
-        if (returnColumnarBatch) return nextBatch();
+      if (returnColumnarBatch) return nextBatch();
 
-        if (batchIdx >= numBatched) {
-            if (!nextBatch()) return false;
-        }
-        ++batchIdx;
-        return true;
+      if (batchIdx >= numBatched) {
+        if (!nextBatch()) return false;
+      }
+      ++batchIdx;
+      return true;
     }
 
     /**
@@ -185,8 +186,8 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      */
     @Override
     public Object getCurrentValue() throws IOException, InterruptedException {
-        if (returnColumnarBatch) return columnarBatch;
-        return columnarBatch.getRow(batchIdx - 1);
+      if (returnColumnarBatch) return columnarBatch;
+      return columnarBatch.getRow(batchIdx - 1);
     }
 
     /**
@@ -197,7 +198,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      */
     @Override
     public float getProgress() throws IOException, InterruptedException {
-        return (float) rowsReturned / totalRowCount;
+      return (float) rowsReturned / totalRowCount;
     }
 
     /**
@@ -213,41 +214,44 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
     // Columns 0,1: data columns
     // Column 2: partitionValues[0]
     // Column 3: partitionValues[1]
-    public void initBatch(MemoryMode memMode, StructType partitionColumns,
-                          InternalRow partitionValues) {
-        StructType batchSchema = new StructType();
-        for (StructField f: sparkSchema.fields()) {
-            batchSchema = batchSchema.add(f);
+    public void initBatch(
+        MemoryMode memMode,
+        StructType partitionColumns,
+        InternalRow partitionValues) {
+      StructType batchSchema = new StructType();
+      for (StructField f: sparkSchema.fields()) {
+        batchSchema = batchSchema.add(f);
+      }
+      if (partitionColumns != null) {
+        for (StructField f : partitionColumns.fields()) {
+          batchSchema = batchSchema.add(f);
         }
-        if (partitionColumns != null) {
-            for (StructField f : partitionColumns.fields()) {
-                batchSchema = batchSchema.add(f);
-            }
-        }
+      }
 
-        columnarBatch = ColumnarBatch.allocate(batchSchema, memMode);
-        if (partitionColumns != null) {
-            int partitionIdx = sparkSchema.fields().length;
-            for (int i = 0; i < partitionColumns.fields().length; i++) {
-                ColumnVectorUtils.populate(columnarBatch.column(i + partitionIdx), partitionValues, i);
-                columnarBatch.column(i + partitionIdx).setIsConstant();
-            }
+      columnarBatch = ColumnarBatch.allocate(batchSchema, memMode);
+      if (partitionColumns != null) {
+        int partitionIdx = sparkSchema.fields().length;
+        for (int i = 0; i < partitionColumns.fields().length; i++) {
+           ColumnVectorUtils.populate(columnarBatch.column(i + partitionIdx),
+             partitionValues, i);
+           columnarBatch.column(i + partitionIdx).setIsConstant();
         }
+      }
 
-        // Initialize missing columns with nulls.
-        for (int i = 0; i < missingColumns.length; i++) {
-            if (missingColumns[i]) {
-                columnarBatch.column(i).putNulls(0, columnarBatch.capacity());
-                columnarBatch.column(i).setIsConstant();
-            }
+      // Initialize missing columns with nulls.
+      for (int i = 0; i < missingColumns.length; i++) {
+        if (missingColumns[i]) {
+          columnarBatch.column(i).putNulls(0, columnarBatch.capacity());
+          columnarBatch.column(i).setIsConstant();
         }
+      }
     }
 
     /**
      * From VectorizedParquetRecordReader,no change.
      */
     public void initBatch() {
-        initBatch(DEFAULT_MEMORY_MODE, null, null);
+      initBatch(DEFAULT_MEMORY_MODE, null, null);
     }
 
     /**
@@ -256,7 +260,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * @param partitionValues
      */
     public void initBatch(StructType partitionColumns, InternalRow partitionValues) {
-        initBatch(DEFAULT_MEMORY_MODE, partitionColumns, partitionValues);
+      initBatch(DEFAULT_MEMORY_MODE, partitionColumns, partitionValues);
     }
 
     /**
@@ -264,15 +268,15 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * @return
      */
     public ColumnarBatch resultBatch() {
-        if (columnarBatch == null) initBatch();
-        return columnarBatch;
+      if (columnarBatch == null) initBatch();
+      return columnarBatch;
     }
 
     /*
      * Can be called before any rows are returned to enable returning columnar batches directly.
      */
     public void enableReturningBatches() {
-        returnColumnarBatch = true;
+      returnColumnarBatch = true;
     }
 
     /**
@@ -280,20 +284,21 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * From VectorizedParquetRecordReader, no change.
      */
     public boolean nextBatch() throws IOException {
-        columnarBatch.reset();
-        if (rowsReturned >= totalRowCount) return false;
-        checkEndOfRowGroup();
+      columnarBatch.reset();
+      if (rowsReturned >= totalRowCount) return false;
+      checkEndOfRowGroup();
 
-        int num = (int) Math.min((long) columnarBatch.capacity(), totalCountLoadedSoFar - rowsReturned);
-        for (int i = 0; i < columnReaders.length; ++i) {
-            if (columnReaders[i] == null) continue;
-            columnReaders[i].readBatch(num, columnarBatch.column(i));
-        }
-        rowsReturned += num;
-        columnarBatch.setNumRows(num);
-        numBatched = num;
-        batchIdx = 0;
-        return true;
+      int num = (int) Math.min((long) columnarBatch.capacity(),
+        totalCountLoadedSoFar - rowsReturned);
+      for (int i = 0; i < columnReaders.length; ++i) {
+        if (columnReaders[i] == null) continue;
+        columnReaders[i].readBatch(num, columnarBatch.column(i));
+      }
+      rowsReturned += num;
+      columnarBatch.setNumRows(num);
+      numBatched = num;
+      batchIdx = 0;
+      return true;
     }
 
     /**
@@ -302,29 +307,30 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * @throws UnsupportedOperationException
      */
     protected void initializeInternal() throws IOException, UnsupportedOperationException {
-        missingColumns = new boolean[requestedSchema.getFieldCount()];
-        for (int i = 0; i < requestedSchema.getFieldCount(); ++i) {
-            Type t = requestedSchema.getFields().get(i);
-            if (!t.isPrimitive() || t.isRepetition(Type.Repetition.REPEATED)) {
-                throw new UnsupportedOperationException("Complex types not supported.");
-            }
-
-            String[] colPath = requestedSchema.getPaths().get(i);
-            if (fileSchema.containsPath(colPath)) {
-                ColumnDescriptor fd = fileSchema.getColumnDescription(colPath);
-                if (!fd.equals(requestedSchema.getColumns().get(i))) {
-                    throw new UnsupportedOperationException("Schema evolution not supported.");
-                }
-                missingColumns[i] = false;
-            } else {
-                if (requestedSchema.getColumns().get(i).getMaxDefinitionLevel() == 0) {
-                    // Column is missing in data but the required data is non-nullable. This file is invalid.
-                    throw new IOException("Required column is missing in data file. Col: " +
-                            Arrays.toString(colPath));
-                }
-                missingColumns[i] = true;
-            }
+      missingColumns = new boolean[requestedSchema.getFieldCount()];
+      for (int i = 0; i < requestedSchema.getFieldCount(); ++i) {
+        Type t = requestedSchema.getFields().get(i);
+        if (!t.isPrimitive() || t.isRepetition(Type.Repetition.REPEATED)) {
+          throw new UnsupportedOperationException("Complex types not supported.");
         }
+
+        String[] colPath = requestedSchema.getPaths().get(i);
+        if (fileSchema.containsPath(colPath)) {
+          ColumnDescriptor fd = fileSchema.getColumnDescription(colPath);
+          if (!fd.equals(requestedSchema.getColumns().get(i))) {
+            throw new UnsupportedOperationException("Schema evolution not supported.");
+          }
+          missingColumns[i] = false;
+        } else {
+          if (requestedSchema.getColumns().get(i).getMaxDefinitionLevel() == 0) {
+            // Column is missing in data but the required data is non-nullable.
+            // This file is invalid.
+            throw new IOException("Required column is missing in data file. Col: " +
+              Arrays.toString(colPath));
+          }
+          missingColumns[i] = true;
+        }
+      }
     }
 
     /**
@@ -332,24 +338,24 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * @throws IOException
      */
     protected void checkEndOfRowGroup() throws IOException {
-        if (rowsReturned != totalCountLoadedSoFar) return;
-        readNextRowGroup();
+      if (rowsReturned != totalCountLoadedSoFar) return;
+      readNextRowGroup();
     }
 
     protected void readNextRowGroup() throws IOException {
-        PageReadStore pages = reader.readNextRowGroup();
-        if (pages == null) {
-            throw new IOException("expecting more rows but reached last block. Read "
-                    + rowsReturned + " out of " + totalRowCount);
-        }
-        List<ColumnDescriptor> columns = requestedSchema.getColumns();
-        columnReaders = new VectorizedColumnReaderWrapper[columns.size()];
-        for (int i = 0; i < columns.size(); ++i) {
-            if (missingColumns[i]) continue;
-            columnReaders[i] = new VectorizedColumnReaderWrapper(
-                    new VectorizedColumnReader(columns.get(i),
-                    pages.getPageReader(columns.get(i))));
-        }
-        totalCountLoadedSoFar += pages.getRowCount();
+      PageReadStore pages = reader.readNextRowGroup();
+      if (pages == null) {
+        throw new IOException("expecting more rows but reached last block. Read "
+          + rowsReturned + " out of " + totalRowCount);
+      }
+      List<ColumnDescriptor> columns = requestedSchema.getColumns();
+      columnReaders = new VectorizedColumnReaderWrapper[columns.size()];
+      for (int i = 0; i < columns.size(); ++i) {
+        if (missingColumns[i]) continue;
+        columnReaders[i] = new VectorizedColumnReaderWrapper(
+          new VectorizedColumnReader(columns.get(i),
+          pages.getPageReader(columns.get(i))));
+      }
+      totalCountLoadedSoFar += pages.getRowCount();
     }
 }

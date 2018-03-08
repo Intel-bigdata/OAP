@@ -50,7 +50,7 @@ private[oap] class OapIterator[T](inner: Iterator[T]) extends Iterator[T] with C
 
 private[oap] object DataFile {
   def apply(path: String, schema: StructType, dataFileClassName: String,
-            configuration: Configuration): DataFile = {
+      configuration: Configuration): DataFile = {
     Try(Utils.classForName(dataFileClassName).getDeclaredConstructor(
       classOf[String], classOf[StructType], classOf[Configuration])).toOption match {
       case Some(ctor) =>
@@ -65,6 +65,16 @@ private[oap] object DataFile {
     }
   }
 }
+
+/**
+ * VectorizedContext encapsulation infomation for Vectorized Read,
+ * partitionColumns and partitionValues use by VectorizedOapRecordReader#initBatch
+ * returningBatch use by VectorizedOapRecordReader#enableReturningBatches
+ */
+private[oap] case class VectorizedContext(
+    partitionColumns: StructType,
+    partitionValues: InternalRow,
+    returningBatch: Boolean)
 
 /**
  * The data file handle, will be cached for performance purpose, as we don't want to open the

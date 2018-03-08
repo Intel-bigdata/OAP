@@ -23,10 +23,11 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_2_0
+import org.apache.parquet.column.ParquetProperties.WriterVersion
+import org.apache.parquet.column.ParquetProperties.WriterVersion.{PARQUET_1_0, PARQUET_2_0}
+import org.apache.parquet.example.Paper
 import org.apache.parquet.example.data.Group
 import org.apache.parquet.example.data.simple.{SimpleGroup, SimpleGroupFactory}
-import org.apache.parquet.example.Paper
 import org.apache.parquet.hadoop.example.{ExampleParquetWriter, GroupWriteSupport}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName.UNCOMPRESSED
 import org.apache.parquet.schema.{MessageType, PrimitiveType}
@@ -36,6 +37,7 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.vectorized.ColumnarBatch
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
@@ -63,6 +65,8 @@ abstract class ParquetDataFileSuite extends SparkFunSuite
 
   protected def parquetSchema: MessageType
 
+  protected def dataVersion: WriterVersion
+
   override def beforeEach(): Unit = prepareData()
 
   override def afterEach(): Unit = cleanDir()
@@ -79,7 +83,7 @@ abstract class ParquetDataFileSuite extends SparkFunSuite
       .withDictionaryPageSize(dictPageSize)
       .withDictionaryEncoding(true)
       .withValidation(false)
-      .withWriterVersion(PARQUET_2_0)
+      .withWriterVersion(dataVersion)
       .withConf(configuration)
       .build()
 
@@ -111,6 +115,8 @@ class SimpleDataSuite extends ParquetDataFileSuite {
     new PrimitiveType(REQUIRED, FLOAT, "float_field"),
     new PrimitiveType(REQUIRED, DOUBLE, "double_field")
   )
+
+  override def dataVersion: WriterVersion = PARQUET_2_0
 
   override def data: Seq[Group] = {
     val factory = new SimpleGroupFactory(parquetSchema)
@@ -199,6 +205,8 @@ class NestedDataSuite extends ParquetDataFileSuite {
 
   override def parquetSchema: MessageType = Paper.schema
 
+  override def dataVersion: WriterVersion = PARQUET_2_0
+
   override def data: Seq[Group] = {
     val r1 = new SimpleGroup(parquetSchema)
       r1.add("DocId", 10L)
@@ -261,6 +269,145 @@ class NestedDataSuite extends ParquetDataFileSuite {
     val docIdTwo = rowTwo.getLong(0)
     assert(docIdTwo == 20L)
     iterator.close()
+  }
+}
+
+class VectorizedDataSuite extends ParquetDataFileSuite {
+
+  private val requestSchema: StructType = new StructType()
+    .add(StructField("int32_field", IntegerType))
+    .add(StructField("int64_field", LongType))
+    .add(StructField("boolean_field", BooleanType))
+    .add(StructField("float_field", FloatType))
+
+  override def parquetSchema: MessageType = new MessageType("test",
+    new PrimitiveType(REQUIRED, INT32, "int32_field"),
+    new PrimitiveType(REQUIRED, INT64, "int64_field"),
+    new PrimitiveType(REQUIRED, BOOLEAN, "boolean_field"),
+    new PrimitiveType(REQUIRED, FLOAT, "float_field"),
+    new PrimitiveType(REQUIRED, DOUBLE, "double_field")
+  )
+
+  override def dataVersion: WriterVersion = PARQUET_1_0
+
+  override def data: Seq[Group] = {
+    val factory = new SimpleGroupFactory(parquetSchema)
+    (0 until 5000).map(i => factory.newGroup()
+      .append("int32_field", i)
+      .append("int64_field", 64L)
+      .append("boolean_field", true)
+      .append("float_field", 1.0f)
+      .append("double_field", 2.0d))
+  }
+
+  test("read by columnIds and rowIds disable returningBatch") {
+    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
+    val requiredIds = Array(0, 1)
+    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 1134, 1753, 2222, 3928, 4200, 4734)
+    val iterator = reader.iterator(requiredIds, rowIds)
+    val result = ArrayBuffer[Int]()
+    while (iterator.hasNext) {
+      val row = iterator.next()
+      assert(row.numFields == 2)
+      result += row.getInt(0)
+    }
+    assert(rowIds.length == result.length)
+    for (i <- rowIds.indices) {
+      assert(rowIds(i) == result(i))
+    }
+  }
+
+  test("read by columnIds and rowIds enable returningBatch") {
+    val context = Some(VectorizedContext(null, null, returningBatch = true))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
+    val requiredIds = Array(0, 1)
+    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
+    val iterator = reader.iterator(requiredIds, rowIds)
+    val result = ArrayBuffer[Int]()
+    while (iterator.hasNext) {
+      val batch = iterator.next().asInstanceOf[ColumnarBatch]
+      val rowIterator = batch.rowIterator()
+      while (rowIterator.hasNext) {
+        val row = rowIterator.next()
+        assert(row.numFields == 2)
+        result += row.getInt(0)
+      }
+    }
+    assert(rowIds.length == result.length)
+    for (i <- rowIds.indices) {
+      assert(rowIds(i) == result(i))
+    }
+  }
+
+  test("read by columnIds and empty rowIds array disable returningBatch") {
+    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
+    val requiredIds = Array(0, 1)
+    val rowIds = Array.emptyIntArray
+    val iterator = reader.iterator(requiredIds, rowIds)
+    assert(!iterator.hasNext)
+    val e = intercept[java.util.NoSuchElementException] {
+      iterator.next()
+    }.getMessage
+    assert(e.contains("next on empty iterator"))
+  }
+
+  test("read by columnIds and empty rowIds array enable returningBatch") {
+    val context = Some(VectorizedContext(null, null, returningBatch = true))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
+    val requiredIds = Array(0, 1)
+    val rowIds = Array.emptyIntArray
+    val iterator = reader.iterator(requiredIds, rowIds)
+    assert(!iterator.hasNext)
+    val e = intercept[java.util.NoSuchElementException] {
+      iterator.next()
+    }.getMessage
+    assert(e.contains("next on empty iterator"))
+  }
+
+  test("read by columnIds disable returningBatch") {
+    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
+    val requiredIds = Array(0)
+    val iterator = reader.iterator(requiredIds)
+    val result = ArrayBuffer[ Int ]()
+    while (iterator.hasNext) {
+      val row = iterator.next()
+      result += row.getInt(0)
+    }
+    val length = data.length
+    assert(length == result.length)
+    for (i <- 0 until length) {
+      assert(i == result(i))
+    }
+  }
+
+  test("read by columnIds enable returningBatch") {
+    val context = Some(VectorizedContext(null, null, returningBatch = true))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
+    val requiredIds = Array(0)
+    val iterator = reader.iterator(requiredIds)
+    val result = ArrayBuffer[ Int ]()
+    while (iterator.hasNext) {
+      val batch = iterator.next().asInstanceOf[ColumnarBatch]
+      val batchIter = batch.rowIterator()
+      while (batchIter.hasNext) {
+        val row = batchIter.next
+        result += row.getInt(0)
+      }
+    }
+    val length = data.length
+    assert(length == result.length)
+    for (i <- 0 until length) {
+      assert(i == result(i))
+    }
   }
 }
 
