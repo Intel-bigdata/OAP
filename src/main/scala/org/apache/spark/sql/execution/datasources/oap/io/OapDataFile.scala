@@ -35,8 +35,7 @@ import org.apache.spark.util.CompletionIterator
 private[oap] case class OapDataFile(
     path: String,
     schema: StructType,
-    configuration: Configuration,
-    context: Option[VectorizedContext] = None) extends DataFile {
+    configuration: Configuration) extends DataFile {
 
   private val dictionaries = new Array[Dictionary](schema.length)
   private val codecFactory = new CodecFactory(configuration)

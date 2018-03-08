@@ -35,8 +35,9 @@ import org.apache.spark.sql.types.StructType
 private[oap] case class ParquetDataFile(
     path: String,
     schema: StructType,
-    configuration: Configuration,
-    context: Option[VectorizedContext] = None) extends DataFile {
+    configuration: Configuration) extends DataFile {
+
+  private var context: Option[VectorizedContext] = None
 
   def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
     // TODO data cache
@@ -79,6 +80,9 @@ private[oap] case class ParquetDataFile(
       }
     }
   }
+
+  def setVectorizedContext(context: Option[VectorizedContext]): Unit =
+    this.context = context
 
   private def initRecordReader(reader: RecordReader[UnsafeRow]) = {
     reader.initialize()

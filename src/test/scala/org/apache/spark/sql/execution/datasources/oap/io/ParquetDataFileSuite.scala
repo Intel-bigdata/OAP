@@ -302,7 +302,8 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds and rowIds disable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = false))
-    val reader = ParquetDataFile(fileName, requestSchema, configuration, context)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 1134, 1753, 2222, 3928, 4200, 4734)
     val iterator = reader.iterator(requiredIds, rowIds)
@@ -320,7 +321,8 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds and rowIds enable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = true))
-    val reader = ParquetDataFile(fileName, requestSchema, configuration, context)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
     val iterator = reader.iterator(requiredIds, rowIds)
@@ -342,7 +344,8 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds and empty rowIds array disable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = false))
-    val reader = ParquetDataFile(fileName, requestSchema, configuration, context)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array.emptyIntArray
     val iterator = reader.iterator(requiredIds, rowIds)
@@ -355,7 +358,8 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds and empty rowIds array enable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = true))
-    val reader = ParquetDataFile(fileName, requestSchema, configuration, context)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array.emptyIntArray
     val iterator = reader.iterator(requiredIds, rowIds)
@@ -368,7 +372,8 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds disable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = false))
-    val reader = ParquetDataFile(fileName, requestSchema, configuration, context)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
     val requiredIds = Array(0)
     val iterator = reader.iterator(requiredIds)
     val result = ArrayBuffer[ Int ]()
@@ -385,7 +390,8 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds enable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = true))
-    val reader = ParquetDataFile(fileName, requestSchema, configuration, context)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
     val requiredIds = Array(0)
     val iterator = reader.iterator(requiredIds)
     val result = ArrayBuffer[ Int ]()
