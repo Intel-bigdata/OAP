@@ -994,6 +994,15 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       Row(1, 1.0f):: Nil)
   }
 
+  test("create index on table partitioned by byte type") {
+    val data: Seq[(Int, Byte)] = (1 to 10).map { i => (i, (i%2).toByte)}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table test_partitioned_by_byte select * from t")
+    sql("create oindex idx1 on test_partitioned_by_byte (a) partition(b=1)")
+    checkAnswer(sql("select * from test_partitioned_by_byte where a = 1"),
+      Row(1, 1.toByte):: Nil)
+  }
+
   test("create index on table partitioned by short type") {
     val data: Seq[(Int, Short)] = (1 to 10).map { i => (i, (i%2).toShort)}
     data.toDF("key", "value").createOrReplaceTempView("t")
