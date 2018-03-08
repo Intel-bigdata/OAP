@@ -73,6 +73,21 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql(s"""CREATE TABLE t_refresh_parquet (a int, b int)
             | USING parquet
             | PARTITIONED by (b)""".stripMargin)
+    sql(s"""CREATE TABLE test_partitioned_by_date (a int, b DATE)
+           | USING parquet
+           | PARTITIONED by (b)""".stripMargin)
+    sql(s"""CREATE TABLE test_partitioned_by_double (a int, b DOUBLE)
+           | USING parquet
+           | PARTITIONED by (b)""".stripMargin)
+    sql(s"""CREATE TABLE test_partitioned_by_float (a int, b FLOAT)
+           | USING parquet
+           | PARTITIONED by (b)""".stripMargin)
+    sql(s"""CREATE TABLE test_partitioned_by_byte (a int, b BYTE)
+           | USING parquet
+           | PARTITIONED by (b)""".stripMargin)
+    sql(s"""CREATE TABLE test_partitioned_by_short (a int, b SHORT)
+           | USING parquet
+           | PARTITIONED by (b)""".stripMargin)
   }
 
   override def afterEach(): Unit = {
@@ -83,6 +98,11 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sqlContext.dropTempTable("parquet_test_date")
     sql("DROP TABLE IF EXISTS t_refresh")
     sql("DROP TABLE IF EXISTS t_refresh_parquet")
+    sql("DROP TABLE IF EXISTS test_partitioned_by_date")
+    sql("DROP TABLE IF EXISTS test_partitioned_by_double")
+    sql("DROP TABLE IF EXISTS test_partitioned_by_float")
+    sql("DROP TABLE IF EXISTS test_partitioned_by_byte")
+    sql("DROP TABLE IF EXISTS test_partitioned_by_short")
   }
 
   test("empty table") {
@@ -945,5 +965,41 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       == BTreeIndex(BTreeIndexEntry(0)::BTreeIndexEntry(1)::Nil).toString)
     sql("drop oindex idx1 on parquet_test")
     sql("drop oindex idx2 on parquet_test")
+  }
+
+  test("create index on table partitioned by date type") {
+    val data: Seq[(Int, Date)] = (1 to 10).map { i => (i, DateTimeUtils.toJavaDate(i%2))}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table test_partitioned_by_date select * from t")
+    sql("create oindex idx1 on test_partitioned_by_date (a) partition(b='1970-01-01')")
+    checkAnswer(sql("select * from test_partitioned_by_date where a = 1"),
+      Row(1, DateTimeUtils.toJavaDate(1)):: Nil)
+  }
+
+  test("create index on table partitioned by double type") {
+    val data: Seq[(Int, Double)] = (1 to 10).map { i => (i, (i%2)*1.0)}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table test_partitioned_by_double select * from t")
+    sql("create oindex idx1 on test_partitioned_by_double (a) partition(b=1.0)")
+    checkAnswer(sql("select * from test_partitioned_by_double where a = 1"),
+      Row(1, 1.0):: Nil)
+  }
+
+  test("create index on table partitioned by float type") {
+    val data: Seq[(Int, Float)] = (1 to 10).map { i => (i, (i%2)*1.0f)}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table test_partitioned_by_float select * from t")
+    sql("create oindex idx1 on test_partitioned_by_float (a) partition(b=1.0)")
+    checkAnswer(sql("select * from test_partitioned_by_float where a = 1"),
+      Row(1, 1.0f):: Nil)
+  }
+
+  test("create index on table partitioned by short type") {
+    val data: Seq[(Int, Short)] = (1 to 10).map { i => (i, (i%2).toShort)}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table test_partitioned_by_short select * from t")
+    sql("create oindex idx1 on test_partitioned_by_short (a) partition(b=1)")
+    checkAnswer(sql("select * from test_partitioned_by_short where a = 1"),
+      Row(1, 1):: Nil)
   }
 }

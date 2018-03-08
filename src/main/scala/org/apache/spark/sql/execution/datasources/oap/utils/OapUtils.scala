@@ -70,6 +70,11 @@ object OapUtils extends Logging {
           case IntegerType => value.toInt
           case LongType => value.toLong
           case BooleanType => value.toBoolean
+          case DateType => java.sql.Date.valueOf(value)
+          case DoubleType => value.toDouble
+          case FloatType => value.toFloat
+          case ByteType => value.toByte
+          case ShortType => value.toShort
           case _: DataType =>
             throw new AnalysisException(
               s"Only handle partition key type in common use, check the partition key type:" +
