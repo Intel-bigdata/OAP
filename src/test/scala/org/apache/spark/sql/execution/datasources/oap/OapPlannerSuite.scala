@@ -82,7 +82,13 @@ class OapPlannerSuite
     spark.sqlContext.dropTempTable("oap_fix_length_schema_table")
   }
 
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    spark.conf.set(OapConf.OAP_ENABLE_OPTIMIZATION_STRATEGIES.key, "true")
+  }
+
   override def afterAll(): Unit = {
+    spark.conf.set(OapConf.OAP_ENABLE_OPTIMIZATION_STRATEGIES.key, "false")
     spark.stop()
     super.afterAll()
   }

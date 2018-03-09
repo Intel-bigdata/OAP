@@ -147,6 +147,13 @@ object OapConf {
       .booleanConf
       .createWithDefault(true)
 
+  val OAP_ENABLE_OPTIMIZATION_STRATEGIES =
+    SQLConfigBuilder("spark.sql.oap.strategies.enabled")
+      .internal()
+      .doc("To indicate if enable/disable oap strategies")
+      .booleanConf
+      .createWithDefault(false)
+
   val OAP_INDEX_FILE_SIZE_MAX_RATIO =
     SQLConfigBuilder("spark.sql.oap.oindex.size.ratio")
       .internal()

@@ -172,6 +172,7 @@ class OapAggregationIterator(
         result.copy()
       }
 
+      numOutputRows += 1
       // If this is the last record, update the task's peak memory usage.
       // So far it has no map/sorter/spill memory.
       if (!hasNext) {
@@ -183,7 +184,6 @@ class OapAggregationIterator(
         spillSize += 0L
         metrics.incPeakExecutionMemory(maxMemory)
       }
-      numOutputRows += 1
       res
     } else {
       // no more result
