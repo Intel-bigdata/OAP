@@ -324,7 +324,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setVectorizedContext(context)
     val requiredIds = Array(0, 1)
-    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
+    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 23000)
     val iterator = reader.iterator(requiredIds, rowIds)
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
