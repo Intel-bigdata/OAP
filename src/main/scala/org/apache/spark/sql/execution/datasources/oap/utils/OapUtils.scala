@@ -75,6 +75,7 @@ object OapUtils extends Logging {
           case FloatType => value.toFloat
           case ByteType => value.toByte
           case ShortType => value.toShort
+          // OapFileFormat only support the above partition key type.
           case _: DataType =>
             throw new AnalysisException(
               s"Only handle partition key type in common use, check the partition key type:" +
