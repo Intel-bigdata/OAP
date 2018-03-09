@@ -106,13 +106,14 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       // rowsReturned = totalCountLoadedSoFar to skip remaining data
       if (idsMap.isEmpty()) {
         rowsReturned = totalCountLoadedSoFar;
+        skipfollowingBatch = !rowIdsIter.hasNext();
       }
       return super.nextBatch() && filterRowsWithIndex();
     }
 
     @Override
     protected void checkEndOfRowGroup() throws IOException {
-      if (rowsReturned != totalCountLoadedSoFar) {
+      if (rowsReturned != totalCountLoadedSoFar || skipfollowingBatch) {
         return;
       }
       // if rowsReturned == totalCountLoadedSoFar

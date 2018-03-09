@@ -115,6 +115,12 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
     protected ParquetMetadata footer;
 
     /**
+     * Indicate if all following batches should be skipped, which happens
+     * the current batch finishes all index reading.
+     */
+    protected boolean skipfollowingBatch = false;
+
+    /**
      * VectorizedOapRecordReader Contructor
      * new method
      * @param file
@@ -298,7 +304,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
       columnarBatch.setNumRows(num);
       numBatched = num;
       batchIdx = 0;
-      return true;
+      return !skipfollowingBatch;
     }
 
     /**
