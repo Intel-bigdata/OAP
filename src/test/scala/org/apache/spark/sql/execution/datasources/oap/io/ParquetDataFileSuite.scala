@@ -73,8 +73,8 @@ abstract class ParquetDataFileSuite extends SparkFunSuite
 
   private def prepareData(): Unit = {
     val dictPageSize = 512
-    val blockSize = 128 * 1024 * 1024
-    val pageSize = 1024 * 1024
+    val blockSize = 128 * 1024
+    val pageSize = 1024
     GroupWriteSupport.setSchema(parquetSchema, configuration)
     val writer = ExampleParquetWriter.builder(new Path(fileName))
       .withCompressionCodec(UNCOMPRESSED)
@@ -292,7 +292,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   override def data: Seq[Group] = {
     val factory = new SimpleGroupFactory(parquetSchema)
-    (0 until 5000).map(i => factory.newGroup()
+    (0 until 100000).map(i => factory.newGroup()
       .append("int32_field", i)
       .append("int64_field", 64L)
       .append("boolean_field", true)
