@@ -82,6 +82,14 @@ trait OapStrategies extends Logging {
         case _ =>
           Nil
       }
+      case logical.Limit(IntegerLiteral(limit), logical.Sort(order, true, child)) =>
+        val childPlan = calcChildPlan(child, limit, order)
+        TakeOrderedAndProjectExec(limit, order, child.output, childPlan) :: Nil
+      case logical.Limit(
+          IntegerLiteral(limit),
+          logical.Project(projectList, logical.Sort(order, true, child))) =>
+        val childPlan = calcChildPlan(child, limit, order)
+        TakeOrderedAndProjectExec(limit, order, projectList, childPlan) :: Nil
       case _ => Nil
     }
 
@@ -347,9 +355,10 @@ trait OapStrategies extends Logging {
 
           val outputAttributes = readDataColumns ++ partitionColumns
 
+          val oapRelation = _fsRelation.copy(options = oapOption)(_fsRelation.sparkSession)
           val scan =
             new FileSourceScanExec(
-              _fsRelation,
+              oapRelation,
               outputAttributes,
               outputSchema,
               partitionKeyFilters.toSeq,

@@ -425,14 +425,14 @@ private[oap] class BitmapDataInputStream(bitsStream: FiberCache) extends DataInp
  override def readLong(): Long = {
    val curPos = pos
    pos += 8
-   ((bitsStream.getByte(curPos) & 0xFF) << 56) |
-     ((bitsStream.getByte(curPos + 1) & 0xFF) << 48) |
-     ((bitsStream.getByte(curPos + 2) & 0xFF) << 40) |
-     ((bitsStream.getByte(curPos + 3) & 0xFF) << 32) |
-     ((bitsStream.getByte(curPos + 4) & 0xFF) << 24) |
-     ((bitsStream.getByte(curPos + 5) & 0xFF) << 16) |
-     ((bitsStream.getByte(curPos + 6) & 0xFF) << 8) |
-     (bitsStream.getByte(curPos + 7) & 0xFF)
+   ((bitsStream.getByte(curPos) & 0xFF).toLong << 56) |
+     ((bitsStream.getByte(curPos + 1).toLong & 0xFF) << 48) |
+     ((bitsStream.getByte(curPos + 2).toLong & 0xFF) << 40) |
+     ((bitsStream.getByte(curPos + 3).toLong & 0xFF) << 32) |
+     ((bitsStream.getByte(curPos + 4).toLong & 0xFF) << 24) |
+     ((bitsStream.getByte(curPos + 5).toLong & 0xFF) << 16) |
+     ((bitsStream.getByte(curPos + 6).toLong & 0xFF) << 8) |
+     (bitsStream.getByte(curPos + 7).toLong & 0xFF)
  }
 
  override def readFully(readBuffer: Array[Byte], offset: Int, length: Int): Unit = {

@@ -32,8 +32,10 @@ import org.apache.spark.sql.types._
 import org.apache.spark.util.CompletionIterator
 
 
-private[oap] case class OapDataFile(path: String, schema: StructType,
-                                    configuration: Configuration) extends DataFile {
+private[oap] case class OapDataFile(
+    path: String,
+    schema: StructType,
+    configuration: Configuration) extends DataFile {
 
   private val dictionaries = new Array[Dictionary](schema.length)
   private val codecFactory = new CodecFactory(configuration)

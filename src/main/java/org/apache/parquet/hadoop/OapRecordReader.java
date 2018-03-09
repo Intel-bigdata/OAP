@@ -42,50 +42,49 @@ public class OapRecordReader<T> implements RecordReader<T> {
 
     private ReadSupport<T> readSupport;
 
-    public OapRecordReader(ReadSupport<T> readSupport,
-                           Path file,
-                           Configuration configuration,
-                           int[] globalRowIds,
-                           ParquetMetadata footer) {
-        Preconditions.checkNotNull(globalRowIds,"index collection can not be null!");
-        this.readSupport = readSupport;
-        this.file = file;
-        this.configuration = configuration;
-        this.globalRowIds = globalRowIds;
-        this.footer = footer;
+    public OapRecordReader(
+        ReadSupport<T> readSupport,
+        Path file,
+        Configuration configuration,
+        int[] globalRowIds,
+        ParquetMetadata footer) {
+      Preconditions.checkNotNull(globalRowIds,"index collection can not be null!");
+      this.readSupport = readSupport;
+      this.file = file;
+      this.configuration = configuration;
+      this.globalRowIds = globalRowIds;
+      this.footer = footer;
     }
 
     @Override
     public void close() throws IOException {
-        internalReader.close();
+      internalReader.close();
     }
 
     @Override
     public T getCurrentValue() throws IOException, InterruptedException {
-        return internalReader.getCurrentValue();
+      return internalReader.getCurrentValue();
     }
 
     @Override
     public float getProgress() throws IOException, InterruptedException {
-        return internalReader.getProgress();
+      return internalReader.getProgress();
     }
 
     public void initialize() throws IOException, InterruptedException {
-
-        if (this.footer == null) {
-            this.footer = readFooter(configuration, file, NO_FILTER);
-        }
-
-        IndexedParquetMetadata indexedFooter = IndexedParquetMetadata.from(footer, globalRowIds);
-        ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file,
-                indexedFooter);
-        this.internalReader = new InternalOapRecordReader<>(readSupport);
-        this.internalReader.initialize(parquetFileReader, configuration);
+      if (this.footer == null) {
+        this.footer = readFooter(configuration, file, NO_FILTER);
+      }
+      IndexedParquetMetadata indexedFooter = IndexedParquetMetadata.from(footer, globalRowIds);
+      ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file,
+        indexedFooter);
+      this.internalReader = new InternalOapRecordReader<>(readSupport);
+      this.internalReader.initialize(parquetFileReader, configuration);
 
     }
 
     @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
-        return internalReader.nextKeyValue();
+      return internalReader.nextKeyValue();
     }
 }

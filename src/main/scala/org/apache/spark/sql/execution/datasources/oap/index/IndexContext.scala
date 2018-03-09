@@ -51,16 +51,18 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
     scanners = null
   }
 
-  private def selectAvailableIndex(intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]])
-  : Unit = {
+  private def selectAvailableIndex(
+      intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]],
+      indexDisableListStr: String): Unit = {
     logDebug("Selecting Available Index:")
-    var idx = 0
-    while (idx < meta.indexMetas.length) {
-      meta.indexMetas(idx).indexType match {
+    val indexDisableList = indexDisableListStr.split(",").map(_.trim).toSeq
+
+    meta.indexMetas.filterNot(meta => indexDisableList.contains(meta.name)).foreach {
+      indexMeta => indexMeta.indexType match {
         case BTreeIndex(entries) if entries.length == 1 =>
           val attribute = meta.schema(entries(0).ordinal).name
           if (intervalMap.contains(attribute)) {
-            availableIndexes.append((0, meta.indexMetas(idx)) )
+            availableIndexes.append((0, indexMeta))
           }
         case BTreeIndex(entries) =>
           var num = 0 // the number of matched column
@@ -88,18 +90,17 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
             num += 1
           }
           if (num > 0) {
-            availableIndexes.append((num - 1, meta.indexMetas(idx)) )
+            availableIndexes.append((num - 1, indexMeta))
           }
         case BitMapIndex(entries) =>
           for (entry <- entries) {
             if (intervalMap.contains(meta.schema(entry).name)) {
-              availableIndexes.append((entries.indexOf(entry), meta.indexMetas(idx)) )
+              availableIndexes.append((entries.indexOf(entry), indexMeta))
             }
           }
         case other => // TODO support other types of index
       }
-      idx += 1
-    } // end while
+    }
     availableIndexes.foreach(indices =>
       logDebug("\t" + indices._2.toString + "; lastIdx: " + indices._1))
   }
@@ -190,8 +191,9 @@ private[oap] class IndexContext(meta: DataSourceMeta) extends Logging {
   def buildScanners(
       intervalMap: mutable.HashMap[String, ArrayBuffer[RangeInterval]],
       options: Map[String, String] = Map.empty,
-      maxChooseSize: Int = 1): Unit = {
-    selectAvailableIndex(intervalMap)
+      maxChooseSize: Int = 1,
+      indexDisableList: String = ""): Unit = {
+    selectAvailableIndex(intervalMap, indexDisableList)
     val availableIndexers = getAvailableIndexers(intervalMap.size, maxChooseSize)
 
     //    intervalArray.sortWith(compare)

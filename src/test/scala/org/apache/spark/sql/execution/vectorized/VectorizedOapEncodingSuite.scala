@@ -20,7 +20,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER
 import org.apache.parquet.hadoop.{ParquetFileReader, ParquetOutputFormat, VectorizedOapRecordReader}
 
-import org.apache.spark.sql.execution.datasources.parquet.{ParquetCompatibilityTest, ParquetReadSupportHelper, SpecificParquetRecordReaderBase}
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetCompatibilityTest, ParquetReadSupportWrapper, SpecificParquetRecordReaderBase}
 import org.apache.spark.sql.test.oap.SharedOapContext
 
 class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOapContext{
@@ -44,7 +44,7 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
         val path = new Path(file.asInstanceOf[String])
         val footer = ParquetFileReader.readFooter(configuration, path, NO_FILTER)
         (footer :: null :: Nil).foreach { f =>
-          configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, schema)
+          configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
           val reader = new VectorizedOapRecordReader(path, configuration, f)
           reader.initialize()
           val batch = reader.resultBatch()
@@ -59,7 +59,7 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
             assert(batch.column(3).getUTF8String(i).toString == "abc")
             i += 1
           }
-          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
           reader.close()
         }
       }
@@ -77,7 +77,7 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
         val path = new Path(file.asInstanceOf[String])
         val footer = ParquetFileReader.readFooter(configuration, path, NO_FILTER)
         (footer :: null :: Nil).foreach { f =>
-          configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, schema)
+          configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
           val reader = new VectorizedOapRecordReader(path, configuration, f)
           reader.initialize()
           val batch = reader.resultBatch()
@@ -92,7 +92,7 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
             assert(batch.column(3).isNullAt(i))
             i += 1
           }
-          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
           reader.close()
         }
       }
@@ -113,7 +113,7 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
         val footer = ParquetFileReader.readFooter(configuration, path, NO_FILTER)
 
         (footer :: null:: Nil).foreach { f =>
-          configuration.set(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA, schema)
+          configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
           val reader = new VectorizedOapRecordReader(path, configuration, f)
           reader.initialize()
           val batch = reader.resultBatch()
@@ -126,7 +126,7 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
             assert(column.getUTF8String(3 * i + 1).toString == i.toString)
             assert(column.getUTF8String(3 * i + 2).toString == i.toString)
           }
-          configuration.unset(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA)
+          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
           reader.close()
         }
       }

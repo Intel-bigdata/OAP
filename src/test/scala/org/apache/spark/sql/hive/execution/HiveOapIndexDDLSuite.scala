@@ -21,6 +21,7 @@ import java.io.File
 
 import org.apache.hadoop.fs.Path
 import org.scalatest.{BeforeAndAfterEach, Ignore}
+
 import org.apache.spark.sql.{QueryTest, Row, SparkSession, TestOap}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTableType
@@ -75,7 +76,8 @@ class HiveOapIndexDDLSuite
         assert(tmpDir.listFiles.nonEmpty)
         checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
 
-        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE"))
+        checkAnswer(
+          sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
         sql(s"DROP TABLE $tabName")
         assert(tmpDir.listFiles.nonEmpty)
       }
@@ -103,7 +105,8 @@ class HiveOapIndexDDLSuite
         assert(tmpDir.listFiles.nonEmpty)
         checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
 
-        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE"))
+        checkAnswer(
+          sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
 
         sql(s"drop oindex idxa on $tabName")
         checkAnswer(sql(s"show oindex from $tabName"), Nil)
@@ -134,14 +137,16 @@ class HiveOapIndexDDLSuite
         assert(tmpDir.listFiles.nonEmpty)
         checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
 
-        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE"))
+        checkAnswer(
+          sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
 
         // test refresh oap index
         (500 to 600).map { i => (i, s"this is test $i") }.toDF("a", "b")
           .createOrReplaceTempView("t2")
         sql(s"insert into table $tabName select * from t2")
         sql(s"refresh oindex on $tabName")
-        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE"))
+        checkAnswer(
+          sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
         checkAnswer(sql(s"select a from $tabName where a=555"), Row(555))
         sql(s"DROP TABLE $tabName")
         assert(tmpDir.listFiles.nonEmpty)
@@ -170,7 +175,7 @@ class HiveOapIndexDDLSuite
         assert(tmpDir.listFiles.nonEmpty)
         checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
 
-        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE"))
+        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
 
         // test check oap index
         checkAnswer(sql(s"check oindex on $tabName"), Nil)

@@ -76,17 +76,17 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql("create oindex index1 on oap_test_2 (a desc, b desc)")
 
     checkAnswer(sql("show oindex from oap_test_1"),
-      Row("oap_test_1", "index1", 0, "a", "A", "BTREE") ::
-        Row("oap_test_1", "index2", 0, "b", "D", "BTREE") ::
-        Row("oap_test_1", "index3", 0, "b", "A", "BTREE") ::
-        Row("oap_test_1", "index3", 1, "a", "D", "BTREE") :: Nil)
+      Row("oap_test_1", "index1", 0, "a", "A", "BTREE", true) ::
+        Row("oap_test_1", "index2", 0, "b", "D", "BTREE", true) ::
+        Row("oap_test_1", "index3", 0, "b", "A", "BTREE", true) ::
+        Row("oap_test_1", "index3", 1, "a", "D", "BTREE", true) :: Nil)
 
     checkAnswer(sql("show oindex in oap_test_2"),
-      Row("oap_test_2", "index4", 0, "a", "A", "BTREE") ::
-        Row("oap_test_2", "index5", 0, "b", "D", "BTREE") ::
-        Row("oap_test_2", "index6", 0, "a", "A", "BITMAP") ::
-        Row("oap_test_2", "index1", 0, "a", "D", "BTREE") ::
-        Row("oap_test_2", "index1", 1, "b", "D", "BTREE") :: Nil)
+      Row("oap_test_2", "index4", 0, "a", "A", "BTREE", true) ::
+        Row("oap_test_2", "index5", 0, "b", "D", "BTREE", true) ::
+        Row("oap_test_2", "index6", 0, "a", "A", "BITMAP", true) ::
+        Row("oap_test_2", "index1", 0, "a", "D", "BTREE", true) ::
+        Row("oap_test_2", "index1", 1, "b", "D", "BTREE", true) :: Nil)
   }
 
   test("create and drop index with partition specify") {
