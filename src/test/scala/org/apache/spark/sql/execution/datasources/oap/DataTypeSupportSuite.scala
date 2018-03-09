@@ -235,3 +235,4 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
       Row(1, 1.toShort):: Nil)
   }
 }
+
