@@ -24,9 +24,11 @@ import org.scalatest.BeforeAndAfter
 
 import org.apache.spark.scheduler.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.sql._
+import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io.{OapDataReader, OapIndexInfo, OapIndexInfoStatus}
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
@@ -74,11 +76,13 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     val df = sqlContext.read.format("parquet").load(parquetPath.getAbsolutePath)
     df.createOrReplaceTempView("parquet_table")
     val defaultMaxBytes = sqlConf.getConf(SQLConf.FILES_MAX_PARTITION_BYTES)
-    sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, 100L)
+    val maxPartitionBytes = 100L
+    sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, maxPartitionBytes)
     val numTasks = sql("select * from parquet_table").queryExecution.toRdd.partitions.length
     try {
       sql("create oindex parquet_idx on parquet_table (a)")
-      assert(numTasks == parquetPath.listFiles().count(_.getName.endsWith(".index")))
+      assert(numTasks == parquetPath.listFiles().filter(_.getName.endsWith(".parquet"))
+        .map(f => Math.ceil(f.length().toDouble / maxPartitionBytes).toInt).sum)
       sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, defaultMaxBytes)
     } finally {
       sql("drop oindex parquet_idx on parquet_table")
@@ -175,6 +179,28 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     assert(oapIndexInfo.hostName == host)
     assert(oapIndexInfo.executorId == executorId)
     assert(oapIndexInfo.oapIndexInfo == indexInfoStatusSerializeStr)
+  }
+
+  test("forbidSplit method in Parquet File Format") {
+    val df = sqlContext.read.format("parquet").load(parquetPath.getAbsolutePath)
+    df.createOrReplaceTempView("parquet_table")
+    val defaultMaxBytes = sqlConf.getConf(SQLConf.FILES_MAX_PARTITION_BYTES)
+    val maxPartitionBytes = 100L
+    sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, maxPartitionBytes)
+    val query = "select * from parquet_table"
+
+    // isSplitable is true and numTasks1 == 36
+    val numTasks1 = sql(query).queryExecution.toRdd.partitions.length
+    assert(numTasks1 == parquetPath.listFiles().filter(_.getName.endsWith(".parquet"))
+      .map(f => Math.ceil(f.length().toDouble / maxPartitionBytes).toInt).sum)
+
+    // Manual call forbidSplit method, isSplitable is false and numTasks2 = 3
+    val qe = sql(query).queryExecution
+    qe.sparkPlan.asInstanceOf[FileSourceScanExec]
+      .relation.fileFormat.asInstanceOf[ParquetFileFormat].forbidSplit
+    val numTasks2 = qe.toRdd.partitions.length
+    assert(numTasks2 == parquetPath.listFiles().count(_.getName.endsWith(".parquet")))
+    sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, defaultMaxBytes)
   }
 
   /** Verifies data and schema. */

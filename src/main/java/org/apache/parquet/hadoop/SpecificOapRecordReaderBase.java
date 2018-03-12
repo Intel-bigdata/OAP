@@ -31,8 +31,7 @@ import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.schema.MessageType;
 
-import org.apache.spark.sql.execution.datasources.oap.io.OapReadSupportImpl;
-import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportHelper;
+import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructType$;
 
@@ -67,11 +66,11 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
         boolean isFilterRowGroups) throws IOException, InterruptedException {
       this.fileSchema = footer.getFileMetaData().getSchema();
       Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
-      ReadSupport.ReadContext readContext = new OapReadSupportImpl().init(new InitContext(
+      ReadSupport.ReadContext readContext = new ParquetReadSupportWrapper().init(new InitContext(
         configuration, Collections3.toSetMultiMap(fileMetadata), fileSchema));
       this.requestedSchema = readContext.getRequestedSchema();
       String sparkRequestedSchemaString =
-        configuration.get(ParquetReadSupportHelper.SPARK_ROW_REQUESTED_SCHEMA());
+        configuration.get(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA());
       this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
       this.reader = ParquetFileReader.open(configuration, file, footer);
       if (isFilterRowGroups) {
