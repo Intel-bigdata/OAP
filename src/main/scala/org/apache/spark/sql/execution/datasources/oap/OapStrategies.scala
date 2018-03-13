@@ -290,15 +290,12 @@ trait OapStrategies extends Logging {
       oapOption: Map[String, String],
       indexHint: Seq[Expression],
       indexRequirements: Seq[IndexType]): Option[SparkPlan] = {
-    // If executor index selection (EIS) is enabled, oapStrategies are disabled.
     val conf = SparkSession.getActiveSession.get.sessionState.conf
-    if (!conf.getConf(OapConf.OAP_ENABLE_OPTIMIZATION_STRATEGIES)) {
+    if (!conf.getConf(OapConf.OAP_ENABLE_OPTIMIZATION_STRATEGIES) ||
+        conf.getConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION)) {
+      // If executor index selection (spark.sql.oap.oindex.eis.enabled) is enabled,
+      // oapStrategies does not work because exeutor may skip the index scan.
       return None
-    } else {
-      if (conf.getConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION)) {
-        logWarning("Please disable OAP_ENABLE_EXECUTOR_INDEX_SELECTION to make oapStrategies work.")
-        return None
-      }
     }
 
     // Filters on this relation fall into four categories based
