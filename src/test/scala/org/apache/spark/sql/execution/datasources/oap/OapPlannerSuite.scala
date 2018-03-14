@@ -88,7 +88,8 @@ class OapPlannerSuite
   }
 
   override def afterAll(): Unit = {
-    spark.conf.set(OapConf.OAP_ENABLE_OPTIMIZATION_STRATEGIES.key, false)
+    spark.conf.set(OapConf.OAP_ENABLE_OPTIMIZATION_STRATEGIES.key,
+      OapConf.OAP_ENABLE_OPTIMIZATION_STRATEGIES.defaultValue.get)
     spark.stop()
     super.afterAll()
   }
