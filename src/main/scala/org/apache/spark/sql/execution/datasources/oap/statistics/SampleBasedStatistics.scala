@@ -58,7 +58,7 @@ private[oap] class SampleBasedStatisticsReader(
     readOffset - offset
   }
 
-  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
+  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StaticsAnalysisResult = {
     if (sampleArray == null || sampleArray.isEmpty) {
       StaticsAnalysisResult.USE_INDEX
     } else {
@@ -69,7 +69,7 @@ private[oap] class SampleBasedStatisticsReader(
           hitCnt += 1
         }
       }
-      hitCnt * 1.0 / sampleArray.length
+      StaticsAnalysisResult(hitCnt * 1.0 / sampleArray.length)
     }
   }
 }

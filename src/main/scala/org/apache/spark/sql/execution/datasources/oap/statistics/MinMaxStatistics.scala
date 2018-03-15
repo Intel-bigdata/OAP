@@ -51,7 +51,7 @@ private[oap] class MinMaxStatisticsReader(schema: StructType) extends Statistics
     readOffset - offset
   }
 
-  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
+  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StaticsAnalysisResult = {
     if (min == null || max == null) {
       return StaticsAnalysisResult.USE_INDEX
     }

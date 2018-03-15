@@ -108,7 +108,7 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
     getIntervalIdx(end, include, isStart = false)
   }
 
-  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
+  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StaticsAnalysisResult = {
     if (metas.nonEmpty) {
       val wholeCount = metas.last.accumulatorCnt
 
@@ -139,7 +139,7 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
         } else if (cover < 0) {
           StaticsAnalysisResult.USE_INDEX
         } else {
-          cover / wholeCount
+          StaticsAnalysisResult(cover / wholeCount)
         }
       }
     } else {

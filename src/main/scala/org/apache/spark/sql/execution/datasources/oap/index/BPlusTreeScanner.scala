@@ -46,7 +46,9 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
     this
   }
 
-  override protected def analyzeStatistics(indexPath: Path, conf: Configuration): Double = {
+  override protected def analyzeStatistics(
+      indexPath: Path,
+      conf: Configuration): StaticsAnalysisResult = {
     var reader: BTreeIndexFileReader = null
     var footerCache: FiberCache = null
     try {

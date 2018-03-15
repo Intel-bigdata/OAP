@@ -66,7 +66,7 @@ private[oap] class BloomFilterStatisticsReader(
     readOffset - offset
   }
 
-  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): Double = {
+  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StaticsAnalysisResult = {
 
     val partialSchema = StructType(schema.dropRight(1))
     val partialConverter = UnsafeProjection.create(partialSchema)

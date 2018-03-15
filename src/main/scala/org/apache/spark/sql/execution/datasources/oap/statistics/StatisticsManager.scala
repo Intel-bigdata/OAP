@@ -136,34 +136,18 @@ object StatisticsManager {
   def analyse(
       stats: Array[StatisticsReader],
       intervalArray: ArrayBuffer[RangeInterval],
-      conf: Configuration): Double = {
-    var resSum: Double = 0.0
-    var resNum: Int = 0
+      conf: Configuration): StaticsAnalysisResult = {
+    val fullScanThreshold = conf.getDouble(
+      OapConf.OAP_FULL_SCAN_THRESHOLD.key, OapConf.OAP_FULL_SCAN_THRESHOLD.defaultValue.get)
+    val analysisResults = stats.map(_.analyse(intervalArray))
 
-    if (stats.isEmpty) {
-      // use index if no statistics
+    if (analysisResults.exists(_ == StaticsAnalysisResult.SKIP_INDEX)) {
+      StaticsAnalysisResult.SKIP_INDEX
+    } else if (analysisResults.isEmpty ||
+      analysisResults.map(_.coverage).sum / analysisResults.length <= fullScanThreshold) {
       StaticsAnalysisResult.USE_INDEX
     } else {
-      stats.foreach { stat =>
-        val res = stat.analyse(intervalArray)
-
-        if (res == StaticsAnalysisResult.SKIP_INDEX) {
-          resSum = StaticsAnalysisResult.SKIP_INDEX
-        } else {
-          resSum += res
-          resNum += 1
-        }
-      }
-
-      val fullScanConf = OapConf.OAP_FULL_SCAN_THRESHOLD
-      if (resSum == StaticsAnalysisResult.SKIP_INDEX) {
-        StaticsAnalysisResult.SKIP_INDEX
-      } else if (resNum == 0 || resSum / resNum <= conf.getDouble(
-        fullScanConf.key, fullScanConf.defaultValue.get)) {
-        StaticsAnalysisResult.USE_INDEX
-      } else {
-        StaticsAnalysisResult.FULL_SCAN
-      }
+      StaticsAnalysisResult.FULL_SCAN
     }
   }
 }

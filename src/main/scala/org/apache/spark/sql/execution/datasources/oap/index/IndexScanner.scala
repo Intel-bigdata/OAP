@@ -69,7 +69,7 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
 
   def getSchema: StructType = keySchema
 
-  def readBehavior(dataPath: Path, conf: Configuration): Double = {
+  def readBehavior(dataPath: Path, conf: Configuration): StaticsAnalysisResult = {
     val indexPath = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     if (!indexPath.getFileSystem(conf).exists(indexPath)) {
       logDebug("No index file exist for data file: " + dataPath)
@@ -78,7 +78,7 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       val start = System.currentTimeMillis()
       val enableOIndex = conf.getBoolean(OapConf.OAP_ENABLE_OINDEX.key,
         OapConf.OAP_ENABLE_OINDEX.defaultValue.get)
-      var behavior: Double = StaticsAnalysisResult.FULL_SCAN
+      var behavior: StaticsAnalysisResult = StaticsAnalysisResult.FULL_SCAN
       val useIndex = enableOIndex && {
         behavior = readBehavior(indexPath, dataPath, conf)
         behavior != StaticsAnalysisResult.FULL_SCAN
@@ -108,7 +108,10 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
    * @return Double to indicate if executor use index behavior,
     *         like FULL_SCAN, USE_INDEX or SKIP_INDEX
    */
-  private def readBehavior(indexPath: Path, dataPath: Path, conf: Configuration): Double = {
+  private def readBehavior(
+      indexPath: Path,
+      dataPath: Path,
+      conf: Configuration): StaticsAnalysisResult = {
     if (conf.getBoolean(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key,
       OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.defaultValue.get)) {
       // Index selection is enabled, executor chooses index according to policy.
@@ -149,7 +152,7 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
    * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
    * called before invoking [[initialize]].
    */
-  private def tryAnalyzeStatistics(indexPath: Path, conf: Configuration): Double = {
+  private def tryAnalyzeStatistics(indexPath: Path, conf: Configuration): StaticsAnalysisResult = {
     if (!canBeOptimizedByStatistics) {
       StaticsAnalysisResult.USE_INDEX
     } else if (intervalArray.isEmpty) {
@@ -159,7 +162,9 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
     }
   }
 
-  protected def analyzeStatistics(indexPath: Path, conf: Configuration): Double = 0
+  protected def analyzeStatistics(indexPath: Path, conf: Configuration): StaticsAnalysisResult = {
+    StaticsAnalysisResult.USE_INDEX
+  }
 
   def withKeySchema(schema: StructType): IndexScanner = {
     this.keySchema = schema

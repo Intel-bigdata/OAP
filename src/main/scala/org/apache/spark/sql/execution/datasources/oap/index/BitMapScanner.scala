@@ -33,7 +33,7 @@ import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
-import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
+import org.apache.spark.sql.execution.datasources.oap.statistics.{StaticsAnalysisResult, StatisticsManager}
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
 import org.apache.spark.util.ShutdownHookManager
 
@@ -102,7 +102,9 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     }
   }
 
-  override protected def analyzeStatistics(indexPath: Path, conf: Configuration): Double = {
+  override protected def analyzeStatistics(
+      indexPath: Path,
+      conf: Configuration): StaticsAnalysisResult = {
     var bmStatsContentCache: WrappedFiberCache = null
     try {
       val fs = indexPath.getFileSystem(conf)
