@@ -40,8 +40,10 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
   }
 }
 
-private[filecache] class CacheGuardian(maxMemory: Long, oapCache: OapCache)
+private[filecache] class CacheGuardian(maxMemory: Long)
   extends Thread with Logging {
+
+  private val _pendingFiberSize: AtomicLong = new AtomicLong(0)
 
   private val removalPendingQueue = new LinkedBlockingQueue[(Fiber, FiberCache)]()
 
@@ -54,12 +56,14 @@ private[filecache] class CacheGuardian(maxMemory: Long, oapCache: OapCache)
     removalPendingQueue.size()
   }
 
+  def pendingFiberSize: Long = _pendingFiberSize.get()
+
   def addRemovalFiber(fiber: Fiber, fiberCache: FiberCache): Unit = {
-    oapCache.pendingFiberSize.addAndGet(fiberCache.size())
+    _pendingFiberSize.addAndGet(fiberCache.size())
     removalPendingQueue.offer((fiber, fiberCache))
-    if (oapCache.pendingFiberSize.get() > maxMemory) {
+    if (_pendingFiberSize.get() > maxMemory) {
       logWarning("Fibers pending on removal use too much memory, " +
-          s"current: ${oapCache.pendingFiberSize.get()}, max: $maxMemory")
+          s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
     }
   }
 
@@ -74,14 +78,13 @@ private[filecache] class CacheGuardian(maxMemory: Long, oapCache: OapCache)
         // Check memory usage every 3s while we are waiting fiber release.
         logDebug(s"Waiting fiber to be released timeout. Fiber: $fiber")
         removalPendingQueue.offer((fiber, fiberCache))
-        if (oapCache.pendingFiberSize.get() > maxMemory) {
+        if (_pendingFiberSize.get() > maxMemory) {
           logWarning("Fibers pending on removal use too much memory, " +
-              s"current: ${oapCache.pendingFiberSize.get()}, max: $maxMemory")
+              s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
         }
       } else {
+        _pendingFiberSize.addAndGet(-fiberCache.size())
         // TODO: Make log more readable
-        oapCache.addFiber(fiber, -1, -fiberCache.size())
-        oapCache.pendingFiberSize.addAndGet(-fiberCache.size())
         logDebug(s"Fiber removed successfully. Fiber: $fiber")
       }
       bRemoving = false

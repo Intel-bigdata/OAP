@@ -26,55 +26,33 @@ import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.internal.oap.OapConf
 
-case class CacheStatsInternal(size: Long, count: Long) {
-  require(size >= 0)
-  require(count >= 0)
-
-  def plus(other: CacheStatsInternal): CacheStatsInternal = this + other
-
-  def minus(other: CacheStatsInternal): CacheStatsInternal = this - other
-
-  def +(other: CacheStatsInternal): CacheStatsInternal =
-    CacheStatsInternal(size + other.size, count + other.count)
-
-  def -(other: CacheStatsInternal): CacheStatsInternal =
-    CacheStatsInternal(
-      math.max(0, size - other.size),
-      math.max(0, count - other.count))
-
-  override def toString: String = s"{size:$size, count:$count}"
-
-  def toJson: JValue = ("size" -> size) ~ ("count" -> count)
-}
-object CacheStatsInternal {
-  private implicit val format = DefaultFormats
-
-  def apply(): CacheStatsInternal = CacheStatsInternal(0, 0)
-
-  def apply(json: String): CacheStatsInternal = CacheStatsInternal(parse(json))
-
-  def apply(json: JValue): CacheStatsInternal = CacheStatsInternal(
-    (json \ "size").extract[Long],
-    (json \ "count").extract[Long]
-  )
-}
-
 /**
  * Immutable class to present statistics of Cache. To record the change of cache stat in runtime,
  * please consider a counter class. [[CacheStats]] can be a snapshot of the counter class.
+ *
+ * implicit metrics:
+ *    backEndCache(e.g. GuavaCache) = dataFiberCache + indexFiberCache
+ *    allCache = backEndCache + pendingFiberCache
  */
 case class CacheStats(
-    cache: CacheStatsInternal,
-    backEndCache: CacheStatsInternal,
-    dataFiberCache: CacheStatsInternal,
-    indexFiberCache: CacheStatsInternal,
-    pendingFiberCache: CacheStatsInternal,
+    dataFiberCount: Long,
+    dataFiberSize: Long,
+    indexFiberCount: Long,
+    indexFiberSize: Long,
+    pendingFiberCount: Long,
+    pendingFiberSize: Long,
     hitCount: Long,
     missCount: Long,
     loadCount: Long,
     totalLoadTime: Long,
     evictionCount: Long) {
 
+  require(dataFiberCount >= 0)
+  require(dataFiberSize >= 0)
+  require(indexFiberCount >= 0)
+  require(indexFiberSize >= 0)
+  require(pendingFiberCount >= 0)
+  require(pendingFiberSize >= 0)
   require(hitCount >= 0)
   require(missCount >= 0)
   require(loadCount >= 0)
@@ -101,11 +79,12 @@ case class CacheStats(
 
   def +(other: CacheStats): CacheStats =
     CacheStats(
-      cache + other.cache,
-      backEndCache + other.backEndCache,
-      dataFiberCache + other.dataFiberCache,
-      indexFiberCache + other.indexFiberCache,
-      pendingFiberCache + other.pendingFiberCache,
+      dataFiberCount + other.dataFiberCount,
+      dataFiberSize + other.dataFiberSize,
+      indexFiberCount + other.indexFiberCount,
+      indexFiberSize + other.indexFiberSize,
+      pendingFiberCount + other.pendingFiberCount,
+      pendingFiberSize + other.pendingFiberSize,
       hitCount + other.hitCount,
       missCount + other.missCount,
       loadCount + other.loadCount,
@@ -114,11 +93,12 @@ case class CacheStats(
 
   def -(other: CacheStats): CacheStats =
     CacheStats(
-      cache - other.cache,
-      backEndCache - other.backEndCache,
-      dataFiberCache - other.dataFiberCache,
-      indexFiberCache - other.indexFiberCache,
-      pendingFiberCache - other.pendingFiberCache,
+      math.max(0, dataFiberCount - other.dataFiberCount),
+      math.max(0, dataFiberSize - other.dataFiberSize),
+      math.max(0, indexFiberCount - other.indexFiberCount),
+      math.max(0, indexFiberSize - other.indexFiberSize),
+      math.max(0, pendingFiberCount - other.pendingFiberCount),
+      math.max(0, pendingFiberSize - other.pendingFiberSize),
       math.max(0, hitCount - other.hitCount),
       math.max(0, missCount - other.missCount),
       math.max(0, loadCount - other.loadCount),
@@ -126,41 +106,44 @@ case class CacheStats(
       math.max(0, evictionCount - other.evictionCount))
 
   def toDebugString: String = {
-    s"CacheStats: { cache: $cache, backEndCache:$backEndCache, dataFiber:$dataFiberCache, " +
-      s"indexFiber:$indexFiberCache, pendingFiber:$pendingFiberCache hitCount=$hitCount, " +
-      s"missCount=$missCount, totalLoadTime=${totalLoadTime} ns, evictionCount=$evictionCount }"
+    s"CacheStats: { dataCacheCount/Size: $dataFiberCount/$dataFiberSize, " +
+      s"indexCacheCount/Size: $indexFiberCount/$indexFiberSize, " +
+      s"pendingCacheCount/Size: $pendingFiberCount/$pendingFiberSize, " +
+      s"hitCount=$hitCount, missCount=$missCount, " +
+      s"totalLoadTime=${totalLoadTime}ns, evictionCount=$evictionCount }"
   }
 
   def toJson: JValue = {
-    ("cache" -> cache.toJson)~
-      ("backEndCache" -> backEndCache.toJson)~
-      ("dataFiber" -> dataFiberCache.toJson)~
-      ("indexFiber" -> indexFiberCache.toJson)~
-      ("pendingFiber" -> pendingFiberCache.toJson)~
-      ("hitCount" -> hitCount)~
+    ("dataFiberCount" -> dataFiberCount) ~
+      ("dataFiberSize" -> dataFiberSize) ~
+      ("indexFiberCount" -> indexFiberCount) ~
+      ("indexFiberSize" -> indexFiberSize) ~
+      ("pendingFiberCount" -> pendingFiberCount) ~
+      ("pendingFiberSize" -> pendingFiberSize) ~
+      ("hitCount" -> hitCount) ~
       ("missCount" -> missCount) ~
       ("loadCount" -> loadCount) ~
       ("totalLoadTime" -> totalLoadTime) ~
       ("evictionCount" -> evictionCount)
   }
 }
+
 object CacheStats extends Logging {
   private implicit val format = DefaultFormats
   private var updateInterval: Long = -1
   private var lastUpdateTime: Long = 0
 
-  def apply(): CacheStats = CacheStats(
-    CacheStatsInternal(), CacheStatsInternal(), CacheStatsInternal(),
-    CacheStatsInternal(), CacheStatsInternal(), 0, 0, 0, 0, 0)
+  def apply(): CacheStats = CacheStats(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
   def apply(json: String): CacheStats = CacheStats(parse(json))
 
   def apply(json: JValue): CacheStats = CacheStats(
-    CacheStatsInternal(json \ "cache"),
-    CacheStatsInternal(json \ "backEndCache"),
-    CacheStatsInternal(json \ "dataFiber"),
-    CacheStatsInternal(json \ "indexFiber"),
-    CacheStatsInternal(json \ "pendingFiber"),
+    (json \ "dataFiberCount").extract[Long],
+      (json \ "dataFiberSize").extract[Long],
+      (json \ "indexFiberCount").extract[Long],
+      (json \ "indexFiberSize").extract[Long],
+      (json \ "pendingFiberCount").extract[Long],
+      (json \ "pendingFiberSize").extract[Long],
       (json \ "hitCount").extract[Long],
       (json \ "missCount").extract[Long],
       (json \ "loadCount").extract[Long],
@@ -171,7 +154,8 @@ object CacheStats extends Logging {
     updateInterval = if (updateInterval != -1) {
       updateInterval
     } else {
-      conf.getLong(OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SCE.key, 60L) * 1000
+      conf.getLong(OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SCE.key,
+        OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SCE.defaultValue.get) * 1000
     }
     if (System.currentTimeMillis() - lastUpdateTime > updateInterval) {
       lastUpdateTime = System.currentTimeMillis()

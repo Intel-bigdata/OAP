@@ -33,8 +33,6 @@ trait OapCache {
   val indexFiberSize: AtomicLong = new AtomicLong(0)
   val dataFiberCount: AtomicLong = new AtomicLong(0)
   val indexFiberCount: AtomicLong = new AtomicLong(0)
-  val totalFiberSize: AtomicLong = new AtomicLong(0)
-  val pendingFiberSize: AtomicLong = new AtomicLong(0)
 
   def get(fiber: Fiber, conf: Configuration): FiberCache
   def getIfPresent(fiber: Fiber): FiberCache
@@ -45,7 +43,8 @@ trait OapCache {
   def cacheCount: Long
   def cacheStats: CacheStats
   def pendingFiberCount: Int
-  def addFiber(fiber: Fiber, cnt: Long, inc: Long): Unit = {
+
+  def incFiberCountAndSize(fiber: Fiber, cnt: Long, inc: Long): Unit = {
     if (fiber.isInstanceOf[DataFiber]) {
       dataFiberCount.addAndGet(cnt)
       dataFiberSize.addAndGet(inc)
@@ -53,22 +52,26 @@ trait OapCache {
       indexFiberCount.addAndGet(cnt)
       indexFiberSize.addAndGet(inc)
     }
-    totalFiberSize.addAndGet(inc)
   }
+
+  def decFiberCountAndSize(fiber: Fiber, cnt: Long, dec: Long): Unit =
+    incFiberCountAndSize(fiber, -cnt, -dec)
+
 }
 
 class SimpleOapCache extends OapCache with Logging {
 
   // We don't bother the memory use of Simple Cache
-  private val cacheGuardian = new CacheGuardian(Int.MaxValue, this)
+  private val cacheGuardian = new CacheGuardian(Int.MaxValue)
   cacheGuardian.start()
 
   override def get(fiber: Fiber, conf: Configuration): FiberCache = {
     val fiberCache = fiber.fiber2Data(conf)
-    addFiber(fiber, 1, fiberCache.size())
+    incFiberCountAndSize(fiber, 1, fiberCache.size())
     fiberCache.occupy()
     // We only use fiber for once, and CacheGuardian will dispose it after release.
     cacheGuardian.addRemovalFiber(fiber, fiberCache)
+    decFiberCountAndSize(fiber, 1, fiberCache.size())
     fiberCache
   }
 
@@ -84,10 +87,7 @@ class SimpleOapCache extends OapCache with Logging {
 
   override def cacheSize: Long = 0
 
-  override def cacheStats: CacheStats = CacheStats(
-    CacheStatsInternal(), CacheStatsInternal(), CacheStatsInternal(),
-    CacheStatsInternal(), CacheStatsInternal(), 0, 0, 0, 0, 0)
-
+  override def cacheStats: CacheStats = CacheStats()
 
   override def cacheCount: Long = 0
 
@@ -97,7 +97,7 @@ class SimpleOapCache extends OapCache with Logging {
 class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCache with Logging {
 
   // TODO: CacheGuardian can also track cache statistics periodically
-  private val cacheGuardian = new CacheGuardian(cacheGuardianMemory, this)
+  private val cacheGuardian = new CacheGuardian(cacheGuardianMemory)
   cacheGuardian.start()
 
   private val KB: Double = 1024
@@ -112,6 +112,7 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
       logDebug(s"Put fiber into removal list. Fiber: ${notification.getKey}")
       cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
       _cacheSize.addAndGet(-notification.getValue.size())
+      decFiberCountAndSize(notification.getKey, 1, notification.getValue.size())
     }
   }
 
@@ -129,7 +130,7 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
       override def call(): FiberCache = {
         val startLoadingTime = System.currentTimeMillis()
         val fiberCache = fiber.fiber2Data(configuration)
-        addFiber(fiber, 1, fiberCache.size())
+        incFiberCountAndSize(fiber, 1, fiberCache.size())
         logDebug("Load missed fiber took %s. Fiber: %s"
           .format(Utils.getUsedTimeMs(startLoadingTime), fiber))
         _cacheSize.addAndGet(fiberCache.size())
@@ -181,11 +182,9 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
   override def cacheStats: CacheStats = {
     val stats = cache.stats()
     CacheStats(
-      CacheStatsInternal(cacheSize + pendingFiberSize.get(), cacheCount + pendingFiberCount),
-      CacheStatsInternal(cacheSize, cacheCount),
-      CacheStatsInternal(dataFiberSize.get(), dataFiberCount.get()),
-      CacheStatsInternal(indexFiberSize.get(), indexFiberCount.get()),
-      CacheStatsInternal(pendingFiberSize.get(), pendingFiberCount),
+      dataFiberCount.get(), dataFiberSize.get(),
+      indexFiberCount.get(), indexFiberSize.get(),
+      pendingFiberCount, cacheGuardian.pendingFiberSize,
       stats.hitCount(),
       stats.missCount(),
       stats.loadCount(),

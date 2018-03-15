@@ -46,10 +46,7 @@ class FiberSensorSuite extends SparkFunSuite with AbstractFiberSensor with Loggi
     // Test normal msg
     val conf: SparkConf = new SparkConf()
     conf.set(OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SCE.key, 0L.toString)
-    val cacheStats = CacheStats(CacheStatsInternal(12, 21),
-      CacheStatsInternal(12, 21), CacheStatsInternal(2, 19),
-      CacheStatsInternal(10, 2), CacheStatsInternal(0, 0),
-      213, 23, 23, 123131, 2)
+    val cacheStats = CacheStats(2, 19, 10, 2, 0, 0, 213, 23, 23, 123131, 2)
     new FiberInfoListener onCustomInfoUpdate SparkListenerCustomInfoUpdate(
       host, execID, messager, CacheStats.status(cacheStats, conf))
     assertResult(1)(FiberCacheManagerSensor.executorToCacheManager.size())
