@@ -141,9 +141,9 @@ object Statistics {
  * coverage form this content.
  */
 object StatsAnalysisResult {
-  val FULL_SCAN = new StatsAnalysisResult(1)
-  val SKIP_INDEX = new StatsAnalysisResult(-1)
-  val USE_INDEX = new StatsAnalysisResult(0)
+  val FULL_SCAN = StatsAnalysisResult(1)
+  val SKIP_INDEX = StatsAnalysisResult(-1)
+  val USE_INDEX = StatsAnalysisResult(0)
 }
 
 case class StatsAnalysisResult(coverage: Double)
