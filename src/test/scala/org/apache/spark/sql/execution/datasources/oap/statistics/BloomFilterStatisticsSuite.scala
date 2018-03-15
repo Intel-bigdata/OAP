@@ -180,10 +180,10 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
 
     for (i <- 1 until 300) {
       generateInterval(rowGen(i), rowGen(i), true, true)
-      assert(bloomFilterRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+      assert(bloomFilterRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
     }
 
     generateInterval(rowGen(10), rowGen(20), true, true)
-    assert(bloomFilterRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(bloomFilterRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
   }
 }

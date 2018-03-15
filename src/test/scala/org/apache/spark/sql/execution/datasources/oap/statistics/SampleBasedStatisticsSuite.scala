@@ -123,37 +123,37 @@ class SampleBasedStatisticsSuite extends StatisticsTest {
     sampleRead.read(fiber, 0)
 
     generateInterval(rowGen(-10), rowGen(-1), startInclude = true, endInclude = true)
-    assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(sampleRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(301), rowGen(400), startInclude = true, endInclude = true)
-    assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(sampleRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(dummyStart, dummyEnd,
       startInclude = true, endInclude = true)
-    assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
+    assert(sampleRead.analyse(intervalArray) == StatsAnalysisResult.FULL_SCAN)
 
     generateInterval(dummyStart, rowGen(0),
       startInclude = true, endInclude = false)
-    assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(sampleRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(dummyStart, rowGen(300),
       startInclude = true, endInclude = true)
-    assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
+    assert(sampleRead.analyse(intervalArray) == StatsAnalysisResult.FULL_SCAN)
 
     generateInterval(rowGen(0), dummyEnd,
       startInclude = true, endInclude = true)
-    assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
+    assert(sampleRead.analyse(intervalArray) == StatsAnalysisResult.FULL_SCAN)
 
     generateInterval(rowGen(1), dummyEnd,
       startInclude = true, endInclude = true)
-    assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
+    assert(sampleRead.analyse(intervalArray) == StatsAnalysisResult.FULL_SCAN)
 
     generateInterval(rowGen(300), dummyEnd,
       startInclude = false, endInclude = true)
-    assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(sampleRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(301), dummyEnd,
       startInclude = true, endInclude = true)
-    assert(sampleRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(sampleRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
   }
 }

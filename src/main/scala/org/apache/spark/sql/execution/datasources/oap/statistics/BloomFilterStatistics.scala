@@ -66,7 +66,7 @@ private[oap] class BloomFilterStatisticsReader(
     readOffset - offset
   }
 
-  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StaticsAnalysisResult = {
+  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StatsAnalysisResult = {
 
     val partialSchema = StructType(schema.dropRight(1))
     val partialConverter = UnsafeProjection.create(partialSchema)
@@ -98,9 +98,9 @@ private[oap] class BloomFilterStatisticsReader(
     }
 
     if (skipIndex) {
-      StaticsAnalysisResult.SKIP_INDEX
+      StatsAnalysisResult.SKIP_INDEX
     } else {
-      StaticsAnalysisResult.USE_INDEX
+      StatsAnalysisResult.USE_INDEX
     }
   }
 }

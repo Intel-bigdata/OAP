@@ -58,9 +58,9 @@ private[oap] class SampleBasedStatisticsReader(
     readOffset - offset
   }
 
-  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StaticsAnalysisResult = {
+  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StatsAnalysisResult = {
     if (sampleArray == null || sampleArray.isEmpty) {
-      StaticsAnalysisResult.USE_INDEX
+      StatsAnalysisResult.USE_INDEX
     } else {
       var hitCnt = 0
       val partialOrder = GenerateOrdering.create(StructType(schema.dropRight(1)))
@@ -69,7 +69,7 @@ private[oap] class SampleBasedStatisticsReader(
           hitCnt += 1
         }
       }
-      StaticsAnalysisResult(hitCnt * 1.0 / sampleArray.length)
+      StatsAnalysisResult(hitCnt * 1.0 / sampleArray.length)
     }
   }
 }

@@ -136,18 +136,18 @@ object StatisticsManager {
   def analyse(
       stats: Array[StatisticsReader],
       intervalArray: ArrayBuffer[RangeInterval],
-      conf: Configuration): StaticsAnalysisResult = {
+      conf: Configuration): StatsAnalysisResult = {
     val fullScanThreshold = conf.getDouble(
       OapConf.OAP_FULL_SCAN_THRESHOLD.key, OapConf.OAP_FULL_SCAN_THRESHOLD.defaultValue.get)
     val analysisResults = stats.map(_.analyse(intervalArray))
 
-    if (analysisResults.exists(_ == StaticsAnalysisResult.SKIP_INDEX)) {
-      StaticsAnalysisResult.SKIP_INDEX
+    if (analysisResults.exists(_ == StatsAnalysisResult.SKIP_INDEX)) {
+      StatsAnalysisResult.SKIP_INDEX
     } else if (analysisResults.isEmpty ||
       analysisResults.map(_.coverage).sum / analysisResults.length <= fullScanThreshold) {
-      StaticsAnalysisResult.USE_INDEX
+      StatsAnalysisResult.USE_INDEX
     } else {
-      StaticsAnalysisResult.FULL_SCAN
+      StatsAnalysisResult.FULL_SCAN
     }
   }
 }

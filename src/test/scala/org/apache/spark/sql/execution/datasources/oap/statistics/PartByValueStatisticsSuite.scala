@@ -151,27 +151,27 @@ class PartByValueStatisticsSuite extends StatisticsTest {
     partByValueRead.read(fiber, 0)
 
     generateInterval(dummyStart, dummyEnd, true, true)
-    assert(partByValueRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
+    assert(partByValueRead.analyse(intervalArray) == StatsAnalysisResult.FULL_SCAN)
 
     generateInterval(rowGen(1), rowGen(301), true, true)
-    assert(partByValueRead.analyse(intervalArray) == StaticsAnalysisResult.FULL_SCAN)
+    assert(partByValueRead.analyse(intervalArray) == StatsAnalysisResult.FULL_SCAN)
 
     generateInterval(rowGen(10), rowGen(70), true, true)
-    assert(partByValueRead.analyse(intervalArray) == StaticsAnalysisResult(0.4))
+    assert(partByValueRead.analyse(intervalArray) == StatsAnalysisResult(0.4))
 
     generateInterval(rowGen(10), rowGen(190), true, true)
-    assert(partByValueRead.analyse(intervalArray) == StaticsAnalysisResult(0.8))
+    assert(partByValueRead.analyse(intervalArray) == StatsAnalysisResult(0.8))
 
     generateInterval(rowGen(-10), rowGen(10), true, true)
-    assert(partByValueRead.analyse(intervalArray) == StaticsAnalysisResult(31.0 / 300))
+    assert(partByValueRead.analyse(intervalArray) == StatsAnalysisResult(31.0 / 300))
 
     generateInterval(rowGen(-10), rowGen(0), true, true)
-    assert(partByValueRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
+    assert(partByValueRead.analyse(intervalArray) == StatsAnalysisResult.SKIP_INDEX)
 
     generateInterval(rowGen(310), rowGen(400), true, true)
-    assert(partByValueRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
+    assert(partByValueRead.analyse(intervalArray) == StatsAnalysisResult.SKIP_INDEX)
 
     generateInterval(rowGen(-10), rowGen(0), true, true)
-    assert(partByValueRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
+    assert(partByValueRead.analyse(intervalArray) == StatsAnalysisResult.SKIP_INDEX)
   }
 }

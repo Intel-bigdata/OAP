@@ -134,54 +134,54 @@ class MinMaxStatisticsSuite extends StatisticsTest {
     minmaxRead.read(fiber, 0)
 
     generateInterval(rowGen(-10), rowGen(-1), startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.SKIP_INDEX)
 
     generateInterval(rowGen(301), rowGen(400), startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.SKIP_INDEX)
 
     generateInterval(rowGen(300), rowGen(400), startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(30), rowGen(40), startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(-10), rowGen(1), startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(IndexScanner.DUMMY_KEY_START, IndexScanner.DUMMY_KEY_END,
       startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(IndexScanner.DUMMY_KEY_START, rowGen(1),
       startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(IndexScanner.DUMMY_KEY_START, rowGen(0),
       startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.SKIP_INDEX)
 
     generateInterval(IndexScanner.DUMMY_KEY_START, rowGen(300),
       startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(0), IndexScanner.DUMMY_KEY_END,
       startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(1), IndexScanner.DUMMY_KEY_END,
       startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(150), IndexScanner.DUMMY_KEY_END,
       startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(300), IndexScanner.DUMMY_KEY_END,
       startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.USE_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.USE_INDEX)
 
     generateInterval(rowGen(301), IndexScanner.DUMMY_KEY_END,
       startInclude = true, endInclude = true)
-    assert(minmaxRead.analyse(intervalArray) == StaticsAnalysisResult.SKIP_INDEX)
+    assert(minmaxRead.analyse(intervalArray) == StatsAnalysisResult.SKIP_INDEX)
   }
 }

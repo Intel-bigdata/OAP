@@ -76,7 +76,7 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
     assert(readBytes == 4)
 
     val analyzeResult = test.analyse(new ArrayBuffer[RangeInterval]())
-    assert(analyzeResult == StaticsAnalysisResult.USE_INDEX)
+    assert(analyzeResult == StatsAnalysisResult.USE_INDEX)
   }
 
 

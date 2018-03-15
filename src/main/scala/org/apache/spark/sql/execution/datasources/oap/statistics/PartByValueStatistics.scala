@@ -108,7 +108,7 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
     getIntervalIdx(end, include, isStart = false)
   }
 
-  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StaticsAnalysisResult = {
+  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StatsAnalysisResult = {
     if (metas.nonEmpty) {
       val wholeCount = metas.last.accumulatorCnt
 
@@ -120,7 +120,7 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
 
       if (left == -1 || right == 0) {
         // interval.min > partition.max || interval.max < partition.min
-        StaticsAnalysisResult.SKIP_INDEX
+        StatsAnalysisResult.SKIP_INDEX
       } else {
         var cover: Double =
           if (right != -1) metas(right).accumulatorCnt else metas.last.accumulatorCnt
@@ -135,15 +135,15 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
         }
 
         if (cover > wholeCount) {
-          StaticsAnalysisResult.FULL_SCAN
+          StatsAnalysisResult.FULL_SCAN
         } else if (cover < 0) {
-          StaticsAnalysisResult.USE_INDEX
+          StatsAnalysisResult.USE_INDEX
         } else {
-          StaticsAnalysisResult(cover / wholeCount)
+          StatsAnalysisResult(cover / wholeCount)
         }
       }
     } else {
-      StaticsAnalysisResult.USE_INDEX
+      StatsAnalysisResult.USE_INDEX
     }
   }
 }

@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{SortDirection, UnsafeRow}
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
-import org.apache.spark.sql.execution.datasources.oap.statistics.StaticsAnalysisResult
+import org.apache.spark.sql.execution.datasources.oap.statistics.StatsAnalysisResult
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
@@ -69,19 +69,19 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
 
   def getSchema: StructType = keySchema
 
-  def readBehavior(dataPath: Path, conf: Configuration): StaticsAnalysisResult = {
+  def readBehavior(dataPath: Path, conf: Configuration): StatsAnalysisResult = {
     val indexPath = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     if (!indexPath.getFileSystem(conf).exists(indexPath)) {
       logDebug("No index file exist for data file: " + dataPath)
-      StaticsAnalysisResult.FULL_SCAN
+      StatsAnalysisResult.FULL_SCAN
     } else {
       val start = System.currentTimeMillis()
       val enableOIndex = conf.getBoolean(OapConf.OAP_ENABLE_OINDEX.key,
         OapConf.OAP_ENABLE_OINDEX.defaultValue.get)
-      var behavior: StaticsAnalysisResult = StaticsAnalysisResult.FULL_SCAN
+      var behavior: StatsAnalysisResult = StatsAnalysisResult.FULL_SCAN
       val useIndex = enableOIndex && {
         behavior = readBehavior(indexPath, dataPath, conf)
-        behavior != StaticsAnalysisResult.FULL_SCAN
+        behavior != StatsAnalysisResult.FULL_SCAN
       }
       val end = System.currentTimeMillis()
       logDebug("Index Selection Time (Executor): " + (end - start) + "ms")
@@ -111,7 +111,7 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
   private def readBehavior(
       indexPath: Path,
       dataPath: Path,
-      conf: Configuration): StaticsAnalysisResult = {
+      conf: Configuration): StatsAnalysisResult = {
     if (conf.getBoolean(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key,
       OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.defaultValue.get)) {
       // Index selection is enabled, executor chooses index according to policy.
@@ -126,7 +126,7 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
         conf.getBoolean(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key,
         OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.defaultValue.get)
       if (filePolicyEnable && indexFileSize > dataFileSize * ratio) {
-        return StaticsAnalysisResult.FULL_SCAN
+        return StatsAnalysisResult.FULL_SCAN
       }
 
       val statsPolicyEnable =
@@ -137,12 +137,12 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       if (statsPolicyEnable) {
         tryAnalyzeStatistics(indexPath, conf)
       } else {
-        StaticsAnalysisResult.USE_INDEX
+        StatsAnalysisResult.USE_INDEX
       }
       // More Policies
     } else {
       // Index selection is disabled, executor always uses index.
-      StaticsAnalysisResult.USE_INDEX
+      StatsAnalysisResult.USE_INDEX
     }
   }
 
@@ -152,18 +152,18 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
    * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
    * called before invoking [[initialize]].
    */
-  private def tryAnalyzeStatistics(indexPath: Path, conf: Configuration): StaticsAnalysisResult = {
+  private def tryAnalyzeStatistics(indexPath: Path, conf: Configuration): StatsAnalysisResult = {
     if (!canBeOptimizedByStatistics) {
-      StaticsAnalysisResult.USE_INDEX
+      StatsAnalysisResult.USE_INDEX
     } else if (intervalArray.isEmpty) {
-      StaticsAnalysisResult.SKIP_INDEX
+      StatsAnalysisResult.SKIP_INDEX
     } else {
       analyzeStatistics(indexPath, conf)
     }
   }
 
-  protected def analyzeStatistics(indexPath: Path, conf: Configuration): StaticsAnalysisResult = {
-    StaticsAnalysisResult.USE_INDEX
+  protected def analyzeStatistics(indexPath: Path, conf: Configuration): StatsAnalysisResult = {
+    StatsAnalysisResult.USE_INDEX
   }
 
   def withKeySchema(schema: StructType): IndexScanner = {
@@ -355,10 +355,10 @@ private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
     val scannersAndStatics = scanners
       .map(scanner => (scanner, scanner.readBehavior(dataPath, conf)))
       // _ is (scanner, StaticsAnalysisResult)
-      .filter(_._2 != StaticsAnalysisResult.FULL_SCAN)
+      .filter(_._2 != StatsAnalysisResult.FULL_SCAN)
     scannersAndStatics.length match {
       case 0 => false
-      case _ if scannersAndStatics.exists(_._2 == StaticsAnalysisResult.SKIP_INDEX) =>
+      case _ if scannersAndStatics.exists(_._2 == StatsAnalysisResult.SKIP_INDEX) =>
         actualUsedScanners = Seq.empty
         true
       case _ => actualUsedScanners = scannersAndStatics.map(_._1)

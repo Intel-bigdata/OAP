@@ -55,8 +55,8 @@ abstract class StatisticsReader(schema: StructType) {
    * @param intervalArray query intervals from `IndexContext`
    * @return the `StaticsAnalysisResult`
    */
-  def analyse(intervalArray: ArrayBuffer[RangeInterval]): StaticsAnalysisResult =
-    StaticsAnalysisResult.USE_INDEX
+  def analyse(intervalArray: ArrayBuffer[RangeInterval]): StatsAnalysisResult =
+    StatsAnalysisResult.USE_INDEX
 }
 
 abstract class StatisticsWriter(schema: StructType, conf: Configuration) {
@@ -136,14 +136,14 @@ object Statistics {
 }
 
 /**
- * StaticsAnalysisResult should be one of these following values,
+ * StatsAnalysisResult should be one of these following values,
  * or a double value between 0 and 1, standing for the estimated
  * coverage form this content.
  */
-object StaticsAnalysisResult {
-  val FULL_SCAN = new StaticsAnalysisResult(1)
-  val SKIP_INDEX = new StaticsAnalysisResult(-1)
-  val USE_INDEX = new StaticsAnalysisResult(0)
+object StatsAnalysisResult {
+  val FULL_SCAN = new StatsAnalysisResult(1)
+  val SKIP_INDEX = new StatsAnalysisResult(-1)
+  val USE_INDEX = new StatsAnalysisResult(0)
 }
 
-case class StaticsAnalysisResult(coverage: Double)
+case class StatsAnalysisResult(coverage: Double)

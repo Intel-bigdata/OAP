@@ -51,9 +51,9 @@ private[oap] class MinMaxStatisticsReader(schema: StructType) extends Statistics
     readOffset - offset
   }
 
-  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StaticsAnalysisResult = {
+  override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StatsAnalysisResult = {
     if (min == null || max == null) {
-      return StaticsAnalysisResult.USE_INDEX
+      return StatsAnalysisResult.USE_INDEX
     }
 
     val start = intervalArray.head
@@ -77,9 +77,9 @@ private[oap] class MinMaxStatisticsReader(schema: StructType) extends Statistics
       }
 
     if (startOutOfBound || endOutOfBound) {
-      StaticsAnalysisResult.SKIP_INDEX
+      StatsAnalysisResult.SKIP_INDEX
     } else {
-      StaticsAnalysisResult.USE_INDEX
+      StatsAnalysisResult.USE_INDEX
     }
   }
 }
