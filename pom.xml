@@ -406,6 +406,7 @@
           </executions>
           <configuration>
             <scalaVersion>${scala.version}</scalaVersion>
+            <scalaCompatVersion>${scala.binary.version}</scalaCompatVersion>
             <recompileMode>incremental</recompileMode>
             <useZincServer>true</useZincServer>
             <args>
