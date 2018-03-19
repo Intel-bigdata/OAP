@@ -347,10 +347,16 @@ private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
   private var backendIter: Iterator[Int] = _
 
   def indexIsAvailable(dataPath: Path, conf: Configuration): Boolean = {
-    val scannersAndStatics = scanners
-      .map(scanner => (scanner, scanner.readBehavior(dataPath, conf)))
-      // _ is (scanner, StaticsAnalysisResult)
-      .filter(_._2 != StaticsAnalysisResult.FULL_SCAN)
+    val scannersAndStatics = scanners.length match {
+      case 0 => mutable.Seq.empty
+      case 1 => scanners.map(scanner => (scanner, scanner.readBehavior(dataPath, conf)))
+        // _ is (scanner, StaticsAnalysisResult)
+        .filter(_._2 != StaticsAnalysisResult.FULL_SCAN)
+      case _ => scanners.par
+        .map(scanner => (scanner, scanner.readBehavior(dataPath, conf))).seq
+        // _ is (scanner, StaticsAnalysisResult)
+        .filter(_._2 != StaticsAnalysisResult.FULL_SCAN)
+    }
     scannersAndStatics.length match {
       case 0 => false
       case _ if scannersAndStatics.exists(_._2 == StaticsAnalysisResult.SKIP_INDEX) =>
