@@ -154,8 +154,8 @@ object CacheStats extends Logging {
     updateInterval = if (updateInterval != -1) {
       updateInterval
     } else {
-      conf.getLong(OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SCE.key,
-        OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SCE.defaultValue.get) * 1000
+      conf.getLong(OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SEC.key,
+        OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SEC.defaultValue.get) * 1000
     }
     if (System.currentTimeMillis() - lastUpdateTime > updateInterval) {
       lastUpdateTime = System.currentTimeMillis()

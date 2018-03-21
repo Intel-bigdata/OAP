@@ -43,19 +43,26 @@ trait OapCache {
   def cacheCount: Long
   def cacheStats: CacheStats
   def pendingFiberCount: Int
+  def cleanUp: Unit = {
+    invalidateAll(getFibers)
+    dataFiberSize.set(0L)
+    dataFiberCount.set(0L)
+    indexFiberSize.set(0L)
+    indexFiberCount.set(0L)
+  }
 
-  def incFiberCountAndSize(fiber: Fiber, cnt: Long, inc: Long): Unit = {
+  def incFiberCountAndSize(fiber: Fiber, count: Long, size: Long): Unit = {
     if (fiber.isInstanceOf[DataFiber]) {
-      dataFiberCount.addAndGet(cnt)
-      dataFiberSize.addAndGet(inc)
+      dataFiberCount.addAndGet(count)
+      dataFiberSize.addAndGet(size)
     } else if (fiber.isInstanceOf[BTreeFiber] || fiber.isInstanceOf[BitmapFiber]) {
-      indexFiberCount.addAndGet(cnt)
-      indexFiberSize.addAndGet(inc)
+      indexFiberCount.addAndGet(count)
+      indexFiberSize.addAndGet(size)
     }
   }
 
-  def decFiberCountAndSize(fiber: Fiber, cnt: Long, dec: Long): Unit =
-    incFiberCountAndSize(fiber, -cnt, -dec)
+  def decFiberCountAndSize(fiber: Fiber, count: Long, size: Long): Unit =
+    incFiberCountAndSize(fiber, -count, -size)
 
 }
 
@@ -196,4 +203,9 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
   override def cacheCount: Long = cache.size()
 
   override def pendingFiberCount: Int = cacheGuardian.pendingFiberCount
+
+  override def cleanUp: Unit = {
+    super.cleanUp
+    cache.cleanUp
+  }
 }

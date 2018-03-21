@@ -80,7 +80,7 @@ private[filecache] class CacheGuardian(maxMemory: Long)
         removalPendingQueue.offer((fiber, fiberCache))
         if (_pendingFiberSize.get() > maxMemory) {
           logWarning("Fibers pending on removal use too much memory, " +
-              s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
+            s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
         }
       } else {
         _pendingFiberSize.addAndGet(-fiberCache.size())
@@ -146,6 +146,9 @@ object FiberCacheManager extends Logging {
       cacheBackend.invalidate(fiber)
     }
   }
+
+  // Used by test suite
+  private[filecache] def clearAllFibers(): Unit = cacheBackend.cleanUp
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly
   private[filecache] def status: String = {
