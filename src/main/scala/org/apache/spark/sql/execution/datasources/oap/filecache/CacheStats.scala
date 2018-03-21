@@ -164,4 +164,10 @@ object CacheStats extends Logging {
       ""
     }
   }
+
+  // used for unit test
+  def reset: Unit = {
+    updateInterval = -1
+    lastUpdateTime = 0
+  }
 }

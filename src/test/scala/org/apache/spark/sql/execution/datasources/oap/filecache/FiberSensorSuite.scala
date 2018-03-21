@@ -98,11 +98,11 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
     assertResult(1)(FiberCacheManagerSensor.executorToCacheManager.size())
     assertResult(dataFileCount * 4)(summary.dataFiberCount)
 
-    // all data are cached when rerun the same sql.
+    // all data are cached when run another sql.
     // Expect: 1.hitCount increase; 2.missCount equal
     // wait for a heartbeat period
-    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 500 AND a < 2500"),
-      data.filter(r => r._1 > 500 && r._1 < 2500).map(r => Row(r._1, r._2)))
+    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 200 AND a < 2400"),
+      data.filter(r => r._1 > 200 && r._1 < 2400).map(r => Row(r._1, r._2)))
     Thread.sleep(15 * 1000)
     val summary2 = FiberCacheManagerSensor.summary()
     logInfo(s"Summary2: ${summary2.toDebugString}")
@@ -130,7 +130,7 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
     assertResult(0)(FiberCacheManagerSensor.executorToCacheManager.size())
 
     // Test normal msg
-    Thread.sleep(1000)
+    CacheStats.reset
     val conf: SparkConf = new SparkConf()
     conf.set(OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SEC.key, 0L.toString)
     val cacheStats = CacheStats(2, 19, 10, 2, 0, 0, 213, 23, 23, 123131, 2)
