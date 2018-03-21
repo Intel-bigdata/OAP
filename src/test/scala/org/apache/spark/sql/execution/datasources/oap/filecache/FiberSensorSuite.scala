@@ -17,9 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import org.scalatest.BeforeAndAfterEach
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkConf
 import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate

@@ -19,8 +19,9 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.ConcurrentHashMap
 
-import com.google.common.base.Throwables
 import scala.collection.JavaConverters._
+
+import com.google.common.base.Throwables
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
