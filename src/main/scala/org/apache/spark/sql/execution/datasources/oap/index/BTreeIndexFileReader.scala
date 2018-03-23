@@ -18,12 +18,13 @@
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FSDataInputStream, Path}
+import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
-import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
+import org.apache.spark.sql.execution.datasources.oap.io.{CodecFactory, IndexFile}
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.ShutdownHookManager
@@ -35,6 +36,8 @@ private[oap] case class BTreeIndexFileReader(
   private val VERSION_SIZE = IndexFile.VERSION_LENGTH
   private val FOOTER_LENGTH_SIZE = IndexUtils.INT_SIZE
   private val ROW_ID_LIST_LENGTH_SIZE = IndexUtils.LONG_SIZE
+  private val CODEC_SIZE = IndexUtils.INT_SIZE
+  private val META_SIZE = FOOTER_LENGTH_SIZE + ROW_ID_LIST_LENGTH_SIZE + CODEC_SIZE
 
   // Section ID for fiber cache reading.
   val footerSectionId: Int = 0
@@ -49,16 +52,21 @@ private[oap] case class BTreeIndexFileReader(
     (fs.open(file), fs.getFileStatus(file).getLen)
   }
 
-  private val (footerLength, rowIdListLength) = {
-    val sectionLengthIndex = fileLength - FOOTER_LENGTH_SIZE - ROW_ID_LIST_LENGTH_SIZE
-    val sectionLengthBuffer = new Array[Byte](FOOTER_LENGTH_SIZE + ROW_ID_LIST_LENGTH_SIZE)
+  private val (footerLength, rowIdListLength, codec) = {
+    val sectionLengthIndex = fileLength - META_SIZE
+    val sectionLengthBuffer = new Array[Byte](META_SIZE)
     reader.readFully(sectionLengthIndex, sectionLengthBuffer)
     val rowIdListSize = getLongFromBuffer(sectionLengthBuffer, 0)
     val footerSize = getIntFromBuffer(sectionLengthBuffer, ROW_ID_LIST_LENGTH_SIZE)
-    (footerSize, rowIdListSize)
+    val codecValue =
+      getIntFromBuffer(sectionLengthBuffer, ROW_ID_LIST_LENGTH_SIZE + FOOTER_LENGTH_SIZE)
+    val codec = CompressionCodec.findByValue(codecValue)
+    (footerSize, rowIdListSize, codec)
   }
 
-  private def footerIndex = fileLength - FOOTER_LENGTH_SIZE - ROW_ID_LIST_LENGTH_SIZE - footerLength
+  @transient private val decompressor = new CodecFactory(configuration).getDecompressor(codec)
+
+  private def footerIndex = fileLength - META_SIZE - footerLength
   private def rowIdListIndex = footerIndex - rowIdListLength
   private def nodesIndex = VERSION_SIZE
 
@@ -68,6 +76,15 @@ private[oap] case class BTreeIndexFileReader(
   private def getIntFromBuffer(buffer: Array[Byte], offset: Int) =
     Platform.getInt(buffer, Platform.BYTE_ARRAY_OFFSET + offset)
 
+  private def readData(in: FSDataInputStream, position: Long, length: Int): Array[Byte] = {
+
+    assert(length <= Int.MaxValue, "Try to read too large index data")
+
+    val bytes = new Array[Byte](length)
+    in.readFully(position, bytes)
+    IndexUtils.decompressIndexData(decompressor, bytes)
+  }
+
   def checkVersionNum(versionNum: Int): Unit = {
     if (IndexFile.VERSION_NUM != versionNum) {
       throw new OapException("Btree Index File version is not compatible!")
@@ -75,26 +92,14 @@ private[oap] case class BTreeIndexFileReader(
   }
 
   def readFooter(): FiberCache =
-    MemoryManager.putToIndexFiberCache(reader, footerIndex, footerLength)
+    MemoryManager.putToIndexFiberCache(readData(reader, footerIndex, footerLength))
 
-  def readRowIdList(partIdx: Int): FiberCache = {
-    val partSize = rowIdListSizePerSection.toLong * IndexUtils.INT_SIZE
-    val readLength = if (partIdx * partSize + partSize > rowIdListLength) {
-      rowIdListLength % partSize
-    } else {
-      partSize
-    }
-    assert(readLength <= Int.MaxValue, "Size of each row id list partition is too large!")
-    MemoryManager.putToIndexFiberCache(reader, rowIdListIndex + partIdx * partSize,
-      readLength.toInt)
+  def readRowIdList(offset: Int, size: Int): FiberCache = {
+    MemoryManager.putToIndexFiberCache(readData(reader, rowIdListIndex + offset, size))
   }
 
-  @deprecated("no need to read the whole row id list", "v0.3")
-  def readRowIdList(): FiberCache =
-    MemoryManager.putToIndexFiberCache(reader, rowIdListIndex, rowIdListLength.toInt)
-
   def readNode(offset: Int, size: Int): FiberCache =
-    MemoryManager.putToIndexFiberCache(reader, nodesIndex + offset, size)
+    MemoryManager.putToIndexFiberCache(readData(reader, nodesIndex + offset, size))
 
   def close(): Unit = try {
     reader.close()

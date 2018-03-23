@@ -17,16 +17,25 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
+import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.hadoop.util.ContextUtil
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.types.StructType
 
 private[index] class OapIndexOutputFormat extends FileOutputFormat[Void, InternalRow] {
+
+  private def getCodec(taskAttemptContext: TaskAttemptContext): CompressionCodec = {
+    val configuration = ContextUtil.getConfiguration(taskAttemptContext)
+    CompressionCodec.valueOf(
+      configuration.get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION))
+  }
 
   override def getRecordWriter(
       taskAttemptContext: TaskAttemptContext): RecordWriter[Void, InternalRow] = {
@@ -34,6 +43,7 @@ private[index] class OapIndexOutputFormat extends FileOutputFormat[Void, Interna
     val configuration = ContextUtil.getConfiguration(taskAttemptContext)
 
     def canBeSkipped(file: Path): Boolean = {
+      val configuration = ContextUtil.getConfiguration(taskAttemptContext)
       val isAppend = configuration.get(OapIndexFileFormat.IS_APPEND).toBoolean
       if (isAppend) {
         val target = new Path(FileOutputFormat.getOutputPath(taskAttemptContext), file.getName)
@@ -43,24 +53,36 @@ private[index] class OapIndexOutputFormat extends FileOutputFormat[Void, Interna
       }
     }
 
+    val codec = getCodec(taskAttemptContext)
+
     val extension = "." + configuration.get(OapIndexFileFormat.INDEX_TIME) +
         "." + configuration.get(OapIndexFileFormat.INDEX_NAME) +
         ".index"
 
     val file = getDefaultWorkFile(taskAttemptContext, extension)
 
+    if (canBeSkipped(file)) {
+      new DummyIndexRecordWriter()
+    } else {
+      getRecordWriter(configuration, file, codec)
+    }
+  }
+
+  def getRecordWriter(
+      configuration: Configuration,
+      file: Path,
+      codec: CompressionCodec): RecordWriter[Void, InternalRow] = {
+
     val schema = StructType.fromString(configuration.get(OapIndexFileFormat.ROW_SCHEMA))
 
     val indexType = configuration.get(OapIndexFileFormat.INDEX_TYPE, "")
 
-    if (canBeSkipped(file)) {
-      new DummyIndexRecordWriter()
-    } else if (indexType == "BTREE") {
-      val writer = BTreeIndexFileWriter(configuration, file)
-      new BTreeIndexRecordWriter(configuration, writer, schema)
+    if (indexType == "BTREE") {
+      val writer = BTreeIndexFileWriter(configuration, file, codec)
+      new BTreeIndexRecordWriter(configuration, writer, schema, codec)
     } else if (indexType == "BITMAP") {
       val writer = file.getFileSystem(configuration).create(file, true)
-      new BitmapIndexRecordWriter(configuration, writer, schema)
+      new BitmapIndexRecordWriter(configuration, writer, schema, codec)
     } else {
       throw new OapException("Unknown Index Type: " + indexType)
     }

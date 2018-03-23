@@ -19,13 +19,14 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
+import org.apache.parquet.format.CompressionCodec
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
+import org.apache.spark.sql.execution.datasources.oap.io.CodecFactory
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
@@ -35,17 +36,27 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
   /**
    * This class is used to inject into BTreeRecordWriter and get the data it write.
    */
-  private class TestBTreeIndexFileWriter(conf: Configuration)
+  private class TestBTreeIndexFileWriter(conf: Configuration, codec: CompressionCodec)
     extends BTreeIndexFileWriter(conf, new Path(Utils.createTempDir().getAbsolutePath, "temp")) {
+
+    private val decompressor = new CodecFactory(conf).getDecompressor(codec)
+    val compressedNodes = new ArrayBuffer[Array[Byte]]()
     val nodes = new ArrayBuffer[Array[Byte]]()
     var footer: Array[Byte] = _
     var rowIdList: Array[Byte] = Array()
     override def start(): Unit = {}
     override def end(): Unit = {}
     override def close(): Unit = {}
-    override def writeNode(buf: Array[Byte]): Unit = nodes.append(buf)
-    override def writeRowId(buf: Array[Byte]): Unit = rowIdList ++= buf
-    override def writeFooter(buf: Array[Byte]): Unit = footer = buf
+    override def writeNode(buf: Array[Byte]): Unit = {
+      compressedNodes.append(buf)
+      nodes.append(IndexUtils.decompressIndexData(decompressor, buf))
+    }
+
+    override def writeRowIdList(buf: Array[Byte]): Unit =
+      rowIdList ++= IndexUtils.decompressIndexData(decompressor, buf)
+
+    override def writeFooter(buf: Array[Byte]): Unit =
+      footer = IndexUtils.decompressIndexData(decompressor, buf)
   }
   // Only test simple Int type since read/write based on schema can cover data type test
   private val schema = StructType(StructField("col", IntegerType) :: Nil)
@@ -53,8 +64,10 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
   private val nullKeyRecords = (1 to 5).map(_ => null)
   private val fileWriter = {
     val configuration = new Configuration()
-    val fileWriter = new TestBTreeIndexFileWriter(configuration)
-    val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
+    val codec = CompressionCodec.valueOf(
+      configuration.get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION))
+    val fileWriter = new TestBTreeIndexFileWriter(configuration, codec)
+    val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema, codec)
     nonNullKeyRecords.map(InternalRow(_)).foreach(writer.write(null, _))
     nullKeyRecords.map(InternalRow(_)).foreach(writer.write(null, _))
     writer.close(null)
@@ -88,7 +101,7 @@ class BTreeRecordReaderWriterSuite extends SparkFunSuite {
 
     val nodeSizeSeq = (0 until nodeCount).map(footer.getNodeSize)
     val nodeOffsetSeq = (0 until nodeCount).map(footer.getNodeOffset)
-    assert(nodeSizeSeq === fileWriter.nodes.map(_.length))
+    assert(nodeSizeSeq === fileWriter.compressedNodes.map(_.length))
     assert(nodeOffsetSeq === nodeSizeSeq.scanLeft(0)(_ + _).dropRight(1))
 
     val keyOffsetSeq = (0 until nodeCount).map ( i =>

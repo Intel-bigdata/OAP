@@ -93,20 +93,9 @@ class MemoryManagerSuite extends SharedOapContext {
   override def afterEach(): Unit = {}
 
   test("test data in IndexFiberCache") {
-    // TODO: find a nice way to create FSDataInputStream
-    def createInputStreamFromBytes(bytes: Array[Byte]): FSDataInputStream = {
-      val tempDir = Utils.createTempDir().getAbsolutePath
-      val fileName = new Path(tempDir, "temp")
-      val fs = fileName.getFileSystem(new Configuration())
-      val writer = fs.create(fileName)
-      writer.write(bytes)
-      writer.close()
-      fs.open(fileName)
-    }
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
-    val is = createInputStreamFromBytes(bytes)
-    val indexFiberCache = MemoryManager.putToIndexFiberCache(is, 0, 10240)
+    val indexFiberCache = MemoryManager.putToIndexFiberCache(bytes)
     assert(bytes === indexFiberCache.toArray)
   }
 

@@ -44,7 +44,7 @@ class BTreeFileReaderWriterSuite extends SharedOapContext {
     // Read content from File
     val reader = BTreeIndexFileReader(configuration, path)
     val footerRead = reader.readFooter().toArray
-    val rowIdListRead = reader.readRowIdList().toArray
+    val rowIdListRead = reader.readRowIdList(0, rowIdList.length).toArray
     val nodesRead = (0 until 5).map(i =>
       reader.readNode(nodes.slice(0, i).map(_.length).sum, nodes(i).length).toArray)
     // Check result

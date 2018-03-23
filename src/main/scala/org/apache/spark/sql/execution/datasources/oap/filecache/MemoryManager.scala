@@ -27,6 +27,8 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.ColumnValues
+import org.apache.spark.sql.execution.datasources.oap.index.IndexUtils
+import org.apache.spark.sql.execution.datasources.oap.io.CodecFactory
 import org.apache.spark.storage.{BlockManager, TestBlockId}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
@@ -79,7 +81,7 @@ trait FiberCache extends Logging {
         }
       }
     }
-    logWarning(s"Fiber Cache Dispose waiting detected for ${fiber}")
+    logWarning(s"Fiber Cache Dispose waiting detected for $fiber")
     false
   }
 
@@ -232,11 +234,7 @@ private[oap] object MemoryManager extends Logging {
     logDebug(s"freed ${memoryBlock.size()} memory, used: $memoryUsed")
   }
 
-  // Used by IndexFile
-  // TODO: putToFiberCache(in: Stream, position: Long, length: Int, type: FiberType)
-  def putToIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): IndexFiberCache = {
-    val bytes = new Array[Byte](length)
-    in.readFully(position, bytes)
+  def putToIndexFiberCache(bytes: Array[Byte]): IndexFiberCache = {
     val memoryBlock = allocate(bytes.length)
     Platform.copyMemory(
       bytes,

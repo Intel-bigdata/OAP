@@ -67,8 +67,10 @@ private[index] case class BTreeIndexRecordReader(
       val groupedPos = (start until end).groupBy(i => i / reader.rowIdListSizePerSection)
       groupedPos.toIterator.flatMap {
         case (partIdx, subPosList) =>
+          val rowIdListPartStart = footer.getRowIdListPartOffset(partIdx)
+          val rowIdListPartSize = footer.getRowIdListPartSize(partIdx)
           val rowIdListFiber = BTreeFiber(
-            () => reader.readRowIdList(partIdx),
+            () => reader.readRowIdList(rowIdListPartStart, rowIdListPartSize),
             reader.file.toString,
             reader.rowIdListSectionId, partIdx)
 
@@ -265,7 +267,8 @@ private[index] object BTreeIndexRecordReader {
     private val nodeSizeOffset = IndexUtils.INT_SIZE * 2
     private val minPosOffset = IndexUtils.INT_SIZE * 3
     private val maxPosOffset = IndexUtils.INT_SIZE * 4
-    private val nodeMetaStart = IndexUtils.INT_SIZE * 4
+    private val rowIdListPartStart = IndexUtils.INT_SIZE * 5
+    private val nodeMetaStart = rowIdListPartStart + getRowIdListPartCount * IndexUtils.INT_SIZE * 2
     private val nodeMetaByteSize = IndexUtils.INT_SIZE * 5
     private val statsLengthSize = IndexUtils.INT_SIZE
 
@@ -277,7 +280,15 @@ private[index] object BTreeIndexRecordReader {
 
     def getNullKeyRecordCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 2)
 
-    def getNodesCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 3)
+    def getRowIdListPartCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 3)
+
+    def getRowIdListPartOffset(idx: Int): Int =
+      fiberCache.getInt(rowIdListPartStart + idx * IndexUtils.INT_SIZE * 2)
+
+    def getRowIdListPartSize(idx: Int): Int =
+      fiberCache.getInt(rowIdListPartStart + idx * IndexUtils.INT_SIZE * 2 + IndexUtils.INT_SIZE)
+
+    def getNodesCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 4)
 
     // get idx Node's max value
     def getMaxValue(idx: Int, schema: StructType): InternalRow =

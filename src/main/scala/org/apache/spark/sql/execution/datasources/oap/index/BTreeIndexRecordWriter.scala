@@ -25,24 +25,32 @@ import scala.collection.JavaConverters._
 import com.google.common.collect.ArrayListMultimap
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
+import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
+import org.apache.spark.sql.execution.datasources.oap.io.{CodecFactory, IndexFile}
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsWriteManager
 import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils, NonNullKeyWriter}
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
 
 private[index] case class BTreeIndexRecordWriter(
     configuration: Configuration,
     fileWriter: BTreeIndexFileWriter,
-    keySchema: StructType) extends RecordWriter[Void, InternalRow] {
+    keySchema: StructType,
+    codec: CompressionCodec = CompressionCodec.UNCOMPRESSED)
+  extends RecordWriter[Void, InternalRow] {
 
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
-  private lazy val nnkw = new NonNullKeyWriter(keySchema)
+  @transient private lazy val nnkw = new NonNullKeyWriter(keySchema)
+  @transient private val compressor = new CodecFactory(configuration).getCompressor(codec)
+
+  private val rowIdListSizePerSection =
+    configuration.getInt(OapConf.OAP_BTREE_ROW_LIST_PART_SIZE.key, 1024 * 1024)
 
   private val multiHashMap = ArrayListMultimap.create[InternalRow, Int]()
   private var recordCount: Int = 0
@@ -119,19 +127,33 @@ private[index] case class BTreeIndexRecordWriter(
    */
   private[index] def flush(): Unit = {
     val (nullKeys, nonNullUniqueKeys) = sortUniqueKeys()
-    val treeShape = BTreeUtils.generate2(nonNullUniqueKeys.length)
-    // Trick here. If root node has no child, then write root node as a child.
-    val children = if (treeShape.children.nonEmpty) treeShape.children else treeShape :: Nil
 
     // Start
     fileWriter.start()
     // Write Node
+    val nodeMetaSeq = serializeAndWriteNode(nonNullUniqueKeys)
+    // Write Row Id List
+    val rowIdListPartLengthSeq = serializeAndWriteRowIdLists(nonNullUniqueKeys ++ nullKeys)
+    // Write Footer
+    val nullKeyRowCount = nullKeys.map(multiHashMap.get(_).size()).sum
+    fileWriter.writeFooter(serializeFooter(nullKeyRowCount, nodeMetaSeq, rowIdListPartLengthSeq))
+    // End
+    fileWriter.end()
+  }
+
+  private[index] def serializeAndWriteNode(
+      nonNullUniqueKeys: Seq[InternalRow]): Seq[BTreeNodeMetaData] = {
+
+    val treeShape = BTreeUtils.generate2(nonNullUniqueKeys.length)
+    // Trick here. If root node has no child, then write root node as a child.
+    val children = if (treeShape.children.nonEmpty) treeShape.children else treeShape :: Nil
+
     var startPosInKeyList = 0
     var startPosInRowList = 0
-    val nodes = children.map { node =>
+    children.map { node =>
       val keyCount = sumKeyCount(node) // total number of keys of this node
-      val nodeUniqueKeys =
-        nonNullUniqueKeys.slice(startPosInKeyList, startPosInKeyList + keyCount)
+      val nodeUniqueKeys = nonNullUniqueKeys.slice(startPosInKeyList, startPosInKeyList + keyCount)
+
       // total number of row ids of this node
       val rowCount = nodeUniqueKeys.map(multiHashMap.get(_).size()).sum
 
@@ -142,16 +164,10 @@ private[index] case class BTreeIndexRecordWriter(
       if (keyCount == 0 || nodeUniqueKeys.isEmpty || nonNullUniqueKeys.isEmpty) {
         // this node is an empty node
         BTreeNodeMetaData(0, nodeBuf.length, null, null)
+      } else {
+        BTreeNodeMetaData(rowCount, nodeBuf.length, nodeUniqueKeys.head, nodeUniqueKeys.last)
       }
-      else BTreeNodeMetaData(rowCount, nodeBuf.length, nodeUniqueKeys.head, nodeUniqueKeys.last)
     }
-    // Write Row Id List
-    serializeAndWriteRowIdLists(nonNullUniqueKeys ++ nullKeys)
-    // Write Footer
-    val nullKeyRowCount = nullKeys.map(multiHashMap.get(_).size()).sum
-    fileWriter.writeFooter(serializeFooter(nullKeyRowCount, nodes))
-    // End
-    fileWriter.end()
   }
 
   /**
@@ -183,7 +199,7 @@ private[index] case class BTreeIndexRecordWriter(
       nnkw.writeKey(keyBuffer, key)
       rowPos += multiHashMap.get(key).size()
     }
-    buffer.toByteArray ++ keyBuffer.toByteArray
+    IndexUtils.compressIndexData(compressor, buffer.toByteArray ++ keyBuffer.toByteArray)
   }
 
   // TODO: BTreeNode can be re-write. It doesn't carry any values.
@@ -197,12 +213,23 @@ private[index] case class BTreeIndexRecordWriter(
    * Key:    1 2 3 4 1 2 3 4 1 2
    * Then Row Id List is Stored as: 0481592637
    */
-  private def serializeAndWriteRowIdLists(uniqueKeys: Seq[InternalRow]): Unit = {
-    uniqueKeys.foreach { key =>
-      multiHashMap.get(key).asScala.foreach(x =>
-        fileWriter.writeRowId(IndexUtils.toBytes(x))
-      )
-    }
+  private def serializeAndWriteRowIdLists(uniqueKeys: Seq[InternalRow]): Seq[Int] = {
+    var i = 0
+    uniqueKeys.grouped(rowIdListSizePerSection).map { partedUniqueKeys =>
+      val bytes = serializeRowIdList(partedUniqueKeys)
+      i += 1
+      fileWriter.writeRowIdList(bytes)
+      bytes.length
+    }.toSeq
+  }
+
+  private def serializeRowIdList(keys: Seq[InternalRow]): Array[Byte] = {
+    val bytes = keys.flatMap { key =>
+      multiHashMap.get(key).asScala.flatMap { rowId =>
+        IndexUtils.toBytes(rowId)
+      }
+    }.toArray
+    IndexUtils.compressIndexData(compressor, bytes)
   }
 
   /**
@@ -211,7 +238,13 @@ private[index] case class BTreeIndexRecordWriter(
    * Index Version Number           4 Bytes
    * Row Count with Non-Null Key    4 Bytes
    * Row Count With Null Key        4 Bytes
+   * Row Id List Partition Count    4 Bytes
    * Node Count                     4 Bytes
+   * Row Id List Part #1 Start      4 Bytes
+   * Row Id List Part #1 Size       4 Bytes
+   * ...
+   * Row Id List Part #N Start      4 Bytes
+   * Row Id List Part #N Size       4 Bytes
    * Nodes Meta Data                Node Count * 20 Bytes
    * Row Count                        4 Bytes
    * Start Pos                        4 Bytes
@@ -229,7 +262,11 @@ private[index] case class BTreeIndexRecordWriter(
    * Max Key For Child #N - Max
    * TODO: Make serialize and deserialize(in reader) in same style.
    */
-  private def serializeFooter(nullKeyRowCount: Int, nodes: Seq[BTreeNodeMetaData]): Array[Byte] = {
+  private def serializeFooter(
+      nullKeyRowCount: Int,
+      nodes: Seq[BTreeNodeMetaData],
+      rowIdListPartLengthSeq: Seq[Int]): Array[Byte] = {
+
     val buffer = new ByteArrayOutputStream()
     val keyBuffer = new ByteArrayOutputStream()
     val statsBuffer = new ByteArrayOutputStream()
@@ -240,10 +277,21 @@ private[index] case class BTreeIndexRecordWriter(
     IndexUtils.writeInt(buffer, nodes.map(_.rowCount).sum)
     // Count of Record(s) that have null key
     IndexUtils.writeInt(buffer, nullKeyRowCount)
+    // Row Id List Partition Count
+    IndexUtils.writeInt(buffer, rowIdListPartLengthSeq.length)
     // Child Count
     IndexUtils.writeInt(buffer, nodes.size)
 
     var offset = 0
+    rowIdListPartLengthSeq.foreach { rowIdListPartLength =>
+      // Start Pos for each Row Id List Part
+      IndexUtils.writeInt(buffer, offset)
+      // Length for each Row Id List Part
+      IndexUtils.writeInt(buffer, rowIdListPartLength)
+      offset += rowIdListPartLength
+    }
+
+    offset = 0
     nodes.foreach { node =>
       // Row Count for each Child
       IndexUtils.writeInt(buffer, node.rowCount)
@@ -266,7 +314,10 @@ private[index] case class BTreeIndexRecordWriter(
     // the return of write should be equal to statsBuffer.size
     statisticsManager.write(statsBuffer)
     IndexUtils.writeInt(buffer, statsBuffer.size)
-    buffer.toByteArray ++ statsBuffer.toByteArray ++ keyBuffer.toByteArray
+    IndexUtils.compressIndexData(
+      compressor,
+      buffer.toByteArray ++ statsBuffer.toByteArray ++ keyBuffer.toByteArray
+    )
   }
 }
 

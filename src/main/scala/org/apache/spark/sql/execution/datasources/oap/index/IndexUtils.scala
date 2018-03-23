@@ -23,8 +23,8 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
-import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
-
+import org.apache.spark.sql.execution.datasources.oap.io.{BytesCompressor, BytesDecompressor, CodecFactory, IndexFile}
+import org.apache.spark.unsafe.Platform
 
 /**
  * Utils for Index read/write
@@ -192,5 +192,25 @@ private[oap] object IndexUtils {
       if (!found) m = s
       (m, found)
     }
+  }
+
+  private val CODEC_MAGIC: Array[Byte] = "CODEC".getBytes("UTF-8")
+
+  def compressIndexData(compressor: BytesCompressor, bytes: Array[Byte]): Array[Byte] = {
+    CODEC_MAGIC ++ toBytes(bytes.length) ++ compressor.compress(bytes)
+  }
+
+  def decompressIndexData(decompressor: BytesDecompressor, bytes: Array[Byte]): Array[Byte] = {
+    if (CODEC_MAGIC.sameElements(bytes.slice(0, CODEC_MAGIC.length))) {
+      val length = Platform.getInt(bytes, Platform.BYTE_ARRAY_OFFSET + CODEC_MAGIC.length)
+      decompressor.decompress(bytes.slice(CODEC_MAGIC.length + INT_SIZE, bytes.length), length)
+    } else {
+      bytes
+    }
+  }
+
+  def hash(bytes: Array[Byte]): String = {
+    val digest = java.security.MessageDigest.getInstance("MD5")
+    digest.digest(bytes).map(0xFF & _).map { "%02x".format(_) }.foldLeft("") { _ + _ }
   }
 }

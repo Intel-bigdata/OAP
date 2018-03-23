@@ -24,6 +24,7 @@ import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
+import org.apache.parquet.format.CompressionCodec
 import org.roaringbitmap.FastAggregation
 import org.roaringbitmap.RoaringBitmap
 
@@ -32,7 +33,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
-import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
+import org.apache.spark.sql.execution.datasources.oap.io.{BytesDecompressor, CodecFactory, IndexFile}
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsManager
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
 import org.apache.spark.util.ShutdownHookManager
@@ -46,7 +47,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   @transient
   protected lazy val nnkr: NonNullKeyReader = new NonNullKeyReader(keySchema)
 
-  private val BITMAP_FOOTER_SIZE = 4 + 5 * 8
+  private val BITMAP_FOOTER_SIZE = 6 * 8
 
   private var bmUniqueKeyListTotalSize: Int = _
   private var bmUniqueKeyListCount: Int = _
@@ -68,6 +69,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private var fin: FSDataInputStream = _
 
+  @transient private var decompressor: BytesDecompressor = _
+
   @transient private var bmRowIdIterator: Iterator[Integer] = _
   private var empty: Boolean = _
 
@@ -75,12 +78,21 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   override def next(): Int = bmRowIdIterator.next()
 
+  private def readData(in: FSDataInputStream, position: Long, length: Int): Array[Byte] = {
+
+    assert(length <= Int.MaxValue, "Try to read too large index data")
+
+    val bytes = new Array[Byte](length)
+    in.readFully(position, bytes)
+    IndexUtils.decompressIndexData(decompressor, bytes)
+  }
+
   private def loadBmFooter(fin: FSDataInputStream, bmFooterOffset: Int): FiberCache = {
-    MemoryManager.putToIndexFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE)
+    MemoryManager.putToIndexFiberCache(readData(fin, bmFooterOffset, BITMAP_FOOTER_SIZE))
   }
 
   private def loadBmStatsContent(fin: FSDataInputStream, offset: Long, size: Long): FiberCache = {
-    MemoryManager.putToIndexFiberCache(fin, offset, size.toInt)
+    MemoryManager.putToIndexFiberCache(readData(fin, offset, size.toInt))
   }
 
   private def cacheBitmapFooterSegment(idxPath: Path, conf: Configuration): Unit = {
@@ -99,6 +111,11 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     }
     if (bmFooterCache == null) {
       bmFooterCache = WrappedFiberCache(FiberCacheManager.get(bmFooterFiber, conf))
+    }
+    if (decompressor == null) {
+      val codecValue = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 7)
+      val codec = CompressionCodec.findByValue(codecValue)
+      decompressor = new CodecFactory(conf).getDecompressor(codec)
     }
   }
 
@@ -148,7 +165,8 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   private def loadBmKeyList(fin: FSDataInputStream, bmUniqueKeyListOffset: Int): FiberCache = {
     // TODO: seems not supported yet on my local dev machine(hadoop is 2.7.3).
     // fin.setReadahead(bmUniqueKeyListTotalSize)
-    MemoryManager.putToIndexFiberCache(fin, bmUniqueKeyListOffset, bmUniqueKeyListTotalSize)
+    MemoryManager.putToIndexFiberCache(
+      readData(fin, bmUniqueKeyListOffset, bmUniqueKeyListTotalSize))
   }
 
   private def readBmUniqueKeyListFromCache(data: FiberCache): IndexedSeq[InternalRow] = {
@@ -163,19 +181,20 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private def loadBmEntryList(
       fin: FSDataInputStream, bmEntryListOffset: Int, bmEntryListTotalSize: Int): FiberCache = {
-    MemoryManager.putToIndexFiberCache(fin, bmEntryListOffset, bmEntryListTotalSize)
+    MemoryManager.putToIndexFiberCache(readData(fin, bmEntryListOffset, bmEntryListTotalSize))
   }
 
   private def loadBmOffsetList(
       fin: FSDataInputStream,
       bmOffsetListOffset: Int,
       bmOffsetListTotalSize: Int): FiberCache = {
-    MemoryManager.putToIndexFiberCache(fin, bmOffsetListOffset, bmOffsetListTotalSize)
+    MemoryManager.putToIndexFiberCache(
+      readData(fin, bmOffsetListOffset, bmOffsetListTotalSize))
   }
 
   private def loadBmNullList(
       fin: FSDataInputStream, bmNullEntryOffset: Int, bmNullEntrySize: Int): FiberCache = {
-    MemoryManager.putToIndexFiberCache(fin, bmNullEntryOffset, bmNullEntrySize)
+    MemoryManager.putToIndexFiberCache(readData(fin, bmNullEntryOffset, bmNullEntrySize))
   }
 
   private def checkVersionNum(versionNum: Int, fin: FSDataInputStream): Unit = {

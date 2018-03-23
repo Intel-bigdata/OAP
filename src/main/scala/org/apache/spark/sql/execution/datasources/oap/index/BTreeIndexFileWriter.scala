@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 
@@ -37,7 +38,8 @@ import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
  */
 private case class BTreeIndexFileWriter(
     configuration: Configuration,
-    file: Path) {
+    file: Path,
+    codec: CompressionCodec = CompressionCodec.UNCOMPRESSED) {
 
   private lazy val writer = file.getFileSystem(configuration).create(file, true)
 
@@ -50,11 +52,6 @@ private case class BTreeIndexFileWriter(
 
   def writeNode(buf: Array[Byte]): Unit = {
     writer.write(buf)
-  }
-
-  def writeRowId(buf: Array[Byte]): Unit = {
-    writer.write(buf)
-    rowIdListSize += buf.length
   }
 
   def writeRowIdList(buf: Array[Byte]): Unit = {
@@ -70,6 +67,7 @@ private case class BTreeIndexFileWriter(
   def end(): Unit = {
     IndexUtils.writeLong(writer, rowIdListSize)
     IndexUtils.writeInt(writer, footerSize)
+    IndexUtils.writeInt(writer, codec.getValue)
   }
 
   def close(): Unit = writer.close()
