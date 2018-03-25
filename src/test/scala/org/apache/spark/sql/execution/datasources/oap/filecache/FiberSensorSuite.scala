@@ -61,8 +61,6 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
   }
 
   test("test FiberCacheManagerSensor with sql") {
-    sparkContext.env.conf.set(
-      OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SEC.key, 0L.toString)
     // make each dataFile has 2 rowGroup.
     // 3000 columns in total, 2 data file by default, 1500 columns each file.
     // So, each file will have 2 rowGroup.
@@ -77,6 +75,7 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
     sql("create oindex index1 on oap_test (a) using btree")
     checkAnswer(sql("SELECT * FROM oap_test WHERE a > 500 AND a < 2500"),
       data.filter(r => r._1 > 500 && r._1 < 2500).map(r => Row(r._1, r._2)))
+    CacheStats.reset
 
     // Data/Index file statistic
     val files = FileSystem.get(new Configuration()).listStatus(new Path(currentPath))
@@ -94,7 +93,7 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
     // wait for a heartbeat
     Thread.sleep(20 * 1000)
     val summary = FiberCacheManagerSensor.summary()
-    logInfo(s"Summary1: ${summary.toDebugString}")
+    logWarning(s"Summary1: ${summary.toDebugString}")
     assertResult(1)(FiberCacheManagerSensor.executorToCacheManager.size())
     assertResult(dataFileCount * 4)(summary.dataFiberCount)
 
@@ -103,9 +102,10 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
     // wait for a heartbeat period
     checkAnswer(sql("SELECT * FROM oap_test WHERE a > 200 AND a < 2400"),
       data.filter(r => r._1 > 200 && r._1 < 2400).map(r => Row(r._1, r._2)))
+    CacheStats.reset
     Thread.sleep(15 * 1000)
     val summary2 = FiberCacheManagerSensor.summary()
-    logInfo(s"Summary2: ${summary2.toDebugString}")
+    logWarning(s"Summary2: ${summary2.toDebugString}")
     assertResult(1)(FiberCacheManagerSensor.executorToCacheManager.size())
     assert(summary.hitCount < summary2.hitCount)
     assertResult(summary.missCount)(summary2.missCount)
