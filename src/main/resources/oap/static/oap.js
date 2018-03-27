@@ -48,13 +48,11 @@ function createTemplateURI(appId) {
     var words = document.baseURI.split('/');
     var ind = words.indexOf("proxy");
     if (ind > 0) {
-        var baseURI = words.slice(0, ind + 1).join('/') + '/' + appId + '/static/oap/oap-template.html';
-        return baseURI;
+        return words.slice(0, ind + 1).join('/') + '/' + appId + '/static/oap/oap-template.html';
     }
     ind = words.indexOf("history");
     if(ind > 0) {
-        var baseURI = words.slice(0, ind).join('/') + '/static/oap/oap-template.html';
-        return baseURI;
+        return words.slice(0, ind).join('/') + '/static/oap/oap-template.html';
     }
     return location.origin + "/static/oap/oap-template.html";
 }
