@@ -21,24 +21,20 @@ import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.Map;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
+import org.apache.spark.sql.catalyst.InternalRow;
+import org.apache.spark.sql.types.StructType;
 
 public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader {
 
-    // pageNumber -> rowIdsList, use to decide：
-    // 1. Is this pageNumber has data to read ?
-    // 2. Use rowIdsList to mark which row need read.
-    private Map<Integer, IntList> idsMap = Maps.newHashMap();
+    private PageContext pageContext;
     // Record current PageNumber
     private int currentPageNumber;
     // Rowid list of file granularity
@@ -97,6 +93,18 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       return columnarBatch.getRow(batchIds.get(batchIdx - 1));
     }
 
+    @Override
+    public void initBatch(StructType partitionColumns, InternalRow partitionValues) {
+      super.initBatch(partitionColumns, partitionValues);
+      this.pageContext = new PageContext(columnarBatch.capacity());
+    }
+
+    @Override
+    public void enableReturningBatches() {
+      super.enableReturningBatches();
+      this.pageContext.enableReturnColumnarBatch();
+    }
+
     /**
      * Advances to the next batch of rows. Returns false if there are no more.
      */
@@ -104,7 +112,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     public boolean nextBatch() throws IOException {
       // if idsMap is Empty, needn't read remaining data in this row group
       // rowsReturned = totalCountLoadedSoFar to skip remaining data
-      if (idsMap.isEmpty()) {
+      if (pageContext.isEmpty()) {
         rowsReturned = totalCountLoadedSoFar;
       }
       return super.nextBatch() && filterRowsWithIndex();
@@ -122,54 +130,24 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     }
 
     private boolean filterRowsWithIndex() throws IOException {
-      IntList ids = idsMap.remove(currentPageNumber);
+      IntList ids = pageContext.remove(currentPageNumber);
       if (ids == null || ids.isEmpty()) {
         currentPageNumber++;
         return this.nextBatch();
       } else {
-        // if returnColumnarBatch, mark columnarBatch filtered status.
-        // else assignment batchIdsIter.
-        if (returnColumnarBatch) {
-          // we can do same operation use markFiltered as follow code:
-          // int current = 0;
-          // for (Integer target : ids)
-          // { while (current < target){
-          // columnarBatch.markFiltered(current);
-          // current++; }
-          // current++; }
-          // current++;
-          // while (current < numBatched){
-          // columnarBatch.markFiltered(current); current++; }
-          // it a little complex and use current version,
-          // we can revert use above code if need.
-          columnarBatch.markAllFiltered();
-            for (Integer rowId : ids) {
-              columnarBatch.markValid(rowId);
-            }
-          } else {
-            batchIds = ids;
-            numBatched = ids.size();
-          }
-          currentPageNumber++;
-          return true;
+        if (!returnColumnarBatch) {
+          batchIds = ids;
+          numBatched = ids.size();
+        }
+        currentPageNumber++;
+        return true;
       }
     }
 
     private void divideRowIdsIntoPages() {
-      Preconditions.checkState(idsMap.isEmpty(), IDS_MAP_STATE_ERROR_MSG);
+      Preconditions.checkState(pageContext.isEmpty(), IDS_MAP_STATE_ERROR_MSG);
       Preconditions.checkState(rowIdsIter.hasNext(), IDS_ITER_STATE_ERROR_MSG);
-      this.currentPageNumber = 0;
-      int pageSize = columnarBatch.capacity();
-      IntList currentIndexList = rowIdsIter.next();
-      for (int rowId : currentIndexList) {
-        int pageNumber = rowId / pageSize;
-        if (idsMap.containsKey(pageNumber)) {
-          idsMap.get(pageNumber).add(rowId - pageNumber * pageSize);
-        } else {
-          IntArrayList ids = new IntArrayList(pageSize / 2);
-          ids.add(rowId - pageNumber * pageSize);
-          idsMap.put(pageNumber, ids);
-        }
-      }
+      currentPageNumber = 0;
+      pageContext.put(rowIdsIter.next());
     }
 }

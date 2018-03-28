@@ -185,6 +185,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
         val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
         try {
           reader.initialize()
+          reader.initBatch(null, null)
           val result = mutable.ArrayBuffer.empty[(Int, String)]
           while (reader.nextKeyValue()) {
             val row = reader.getCurrentValue.asInstanceOf[InternalRow]
@@ -205,6 +206,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
         val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
         try {
           reader.initialize()
+          reader.initBatch(null, null)
           val result = mutable.ArrayBuffer.empty[(String)]
           while (reader.nextKeyValue()) {
             val row = reader.getCurrentValue.asInstanceOf[InternalRow]
@@ -224,6 +226,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
         val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
         try {
           reader.initialize()
+          reader.initBatch(null, null)
           val result = mutable.ArrayBuffer.empty[(String, Int)]
           while (reader.nextKeyValue()) {
             val row = reader.getCurrentValue.asInstanceOf[InternalRow]
@@ -243,6 +246,7 @@ class VectorizedOapIOSuite extends QueryTest with ParquetTest with SharedOapCont
         val reader = new IndexedVectorizedOapRecordReader(path, configuration, null, rowIds)
         try {
           reader.initialize()
+          reader.initBatch(null, null)
           var result = 0
           while (reader.nextKeyValue()) {
             result += 1
