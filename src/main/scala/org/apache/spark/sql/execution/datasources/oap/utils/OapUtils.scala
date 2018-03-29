@@ -25,7 +25,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.parquet.bytes.BytesUtils
 import org.apache.parquet.io.api.Binary
-import org.apache.spark.SparkConf
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
