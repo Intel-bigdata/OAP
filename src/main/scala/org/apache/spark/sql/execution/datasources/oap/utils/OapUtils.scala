@@ -25,6 +25,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.parquet.bytes.BytesUtils
 import org.apache.parquet.io.api.Binary
+import org.apache.spark.SparkConf
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
@@ -199,5 +200,28 @@ object OapUtils extends Logging {
       partitionSpec: Option[TablePartitionSpec] = None): Seq[PartitionDirectory] = {
     fileIndex.refresh()
     getPartitions(fileIndex, partitionSpec)
+  }
+
+  def getOutPutPath(
+      fileIndex: FileIndex,
+      partitionSpec: Option[TablePartitionSpec] = None): Path = {
+    def getTargetPath(path: Path, times: Int): Path = {
+      if (times > 0) getTargetPath(path.getParent, times - 1)
+      else path
+    }
+    def getTableBaseDir(
+        path: Path,
+        partitionSpec: Option[TablePartitionSpec] = None): Path = {
+      partitionSpec match {
+        case Some(p) => getTargetPath(path, p.size)
+        case _ => path
+      }
+    }
+    val paths = fileIndex.rootPaths
+    assert(paths.nonEmpty, "Expected at least one path of fileIndex.rootPaths, but no value")
+    paths.length match {
+      case 1 => paths.head
+      case _ => getTableBaseDir(paths.head, partitionSpec)
+    }
   }
 }

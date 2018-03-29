@@ -150,7 +150,7 @@ case class CreateIndexCommand(
       ds = ds.filter(s"$k='$v'")
     }
 
-    val outPutPath = fileCatalog.rootPaths.head
+    val outPutPath = OapUtils.getOutPutPath(fileCatalog, partitionSpec)
     assert(outPutPath != null, "Expected exactly one path to be specified, but no value")
 
     val qualifiedOutputPath = {
