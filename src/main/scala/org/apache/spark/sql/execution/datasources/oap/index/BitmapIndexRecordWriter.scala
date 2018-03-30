@@ -190,7 +190,7 @@ private[oap] class BitmapIndexRecordWriter(
     bmIndexEnd = bmEntryListOffset + bmEntryListTotalSize + bmNullEntrySize + bmOffsetListTotalSize
     // The index end is also the starting position of statistics part.
     val statSize = statisticsWriteManager.write(writer)
-    IndexUtils.writeInt(writer, IndexFile.VERSION_NUM)
+    IndexUtils.writeInt(writer, IndexFile.BITMAP_VERSION_NUM)
     IndexUtils.writeInt(writer, bmUniqueKeyListTotalSize)
     IndexUtils.writeInt(writer, bmUniqueKeyListCount)
     IndexUtils.writeInt(writer, bmEntryListTotalSize)
@@ -203,7 +203,7 @@ private[oap] class BitmapIndexRecordWriter(
   }
 
   private def flushToFile(): Unit = {
-    IndexUtils.writeHead(writer, IndexFile.VERSION_NUM)
+    IndexUtils.writeHead(writer, IndexFile.BITMAP_VERSION_NUM)
     writeUniqueKeyList()
     writeBmEntryList()
     writeBmOffsetList()

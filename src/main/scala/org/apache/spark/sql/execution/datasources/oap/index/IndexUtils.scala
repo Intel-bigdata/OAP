@@ -47,7 +47,7 @@ private[oap] object IndexUtils {
   def readHead(reader: FSDataInputStream, offset: Int): Int = {
     val magic = new Array[Byte](IndexFile.VERSION_LENGTH)
     reader.readFully(offset, magic)
-    (1 to IndexFile.VERSION_NUM)
+    (1 to math.max(IndexFile.BTREE_VERSION_NUM, IndexFile.BITMAP_VERSION_NUM))
       .find(version => magic sameElements serializeVersion(version))
       .getOrElse(IndexFile.UNKNOWN_VERSION)
   }

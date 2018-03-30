@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap.io
 private[oap] object IndexFile {
   val VERSION_LENGTH = 8
   val VERSION_PREFIX = "OAPIDX"
-  val VERSION_NUM = 1
+  val BITMAP_VERSION_NUM = 1
+  val BTREE_VERSION_NUM = 1
   val UNKNOWN_VERSION = -1
 }

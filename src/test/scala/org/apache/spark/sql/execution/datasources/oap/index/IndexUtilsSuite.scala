@@ -87,14 +87,15 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
   }
 
   test("writeHead to write common and consistent index version to all the index file headers") {
-    val buf = new ByteArrayOutputStream(8)
-    val out = new DataOutputStream(buf)
-    IndexUtils.writeHead(out, IndexFile.VERSION_NUM)
-    val bytes = buf.toByteArray
-    assert(Platform.getByte(bytes, Platform.BYTE_ARRAY_OFFSET + 6) ==
-      (IndexFile.VERSION_NUM >> 8).toByte)
-    assert(Platform.getByte(bytes, Platform.BYTE_ARRAY_OFFSET + 7) ==
-      (IndexFile.VERSION_NUM & 0xFF).toByte)
+    val maxVersion = math.max(IndexFile.BITMAP_VERSION_NUM, IndexFile.BTREE_VERSION_NUM)
+    (1 to maxVersion).foreach { v =>
+      val buf = new ByteArrayOutputStream(8)
+      val out = new DataOutputStream(buf)
+      IndexUtils.writeHead(out, v)
+      val bytes = buf.toByteArray
+      assert(Platform.getByte(bytes, Platform.BYTE_ARRAY_OFFSET + 6) == (v >> 8).toByte)
+      assert(Platform.getByte(bytes, Platform.BYTE_ARRAY_OFFSET + 7) == (v & 0xFF).toByte)
+    }
   }
 
   test("binary search") {

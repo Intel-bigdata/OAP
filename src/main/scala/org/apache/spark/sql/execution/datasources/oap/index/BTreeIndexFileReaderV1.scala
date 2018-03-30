@@ -65,7 +65,7 @@ private[oap] case class BTreeIndexFileReaderV1(
     Platform.getInt(buffer, Platform.BYTE_ARRAY_OFFSET + offset)
 
   def checkVersionNum(versionNum: Int): Unit = {
-    if (IndexFile.VERSION_NUM != versionNum) {
+    if (IndexFile.BTREE_VERSION_NUM != versionNum) {
       throw new OapException("Btree Index File version is not compatible!")
     }
   }

@@ -187,7 +187,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   private def checkVersionNum(versionNum: Int, fin: FSDataInputStream): Unit = {
-    if (IndexFile.VERSION_NUM != versionNum) {
+    if (IndexFile.BITMAP_VERSION_NUM != versionNum) {
       throw new OapException("Bitmap Index File version is not compatible!")
     }
   }
