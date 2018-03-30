@@ -35,7 +35,7 @@ class OapUtilsSuite extends SharedOapContext {
     }
   }
 
-  test("test rootPaths eq 1") {
+  test("test rootPaths length eq 1 no partitioned") {
     val tablePath = new Path("/table")
     val rootPaths = Seq(tablePath)
     val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, None)
@@ -43,7 +43,18 @@ class OapUtilsSuite extends SharedOapContext {
     assert(ret.equals(tablePath))
   }
 
-  test("test rootPaths more than 1") {
+  test("test rootPaths length eq 1 partitioned") {
+    val tablePath = new Path("/table")
+    val partitionSchema = new StructType()
+      .add(StructField("a", StringType))
+      .add(StructField("b", StringType))
+    val rootPaths = Seq(tablePath)
+    val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
+    val ret = OapUtils.getOutPutPath(fileIndex)
+    assert(ret.equals(tablePath))
+  }
+
+  test("test rootPaths length more than 1") {
     val part1 = new Path("/table/a=1/b=1")
     val part2 = new Path("/table/a=1/b=2")
     val tablePath = new Path("/table")
@@ -54,5 +65,16 @@ class OapUtilsSuite extends SharedOapContext {
     val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
     val ret = OapUtils.getOutPutPath(fileIndex)
     assert(ret.equals(tablePath))
+  }
+
+  test("test rootPaths length eq 1 but partitioned") {
+    val part1 = new Path("/table/a=1/b=1")
+    val partitionSchema = new StructType()
+      .add(StructField("a", StringType))
+      .add(StructField("b", StringType))
+    val rootPaths = Seq(part1)
+    val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
+    val ret = OapUtils.getOutPutPath(fileIndex)
+    assert(ret.equals(part1))
   }
 }
