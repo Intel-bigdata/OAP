@@ -201,26 +201,16 @@ object OapUtils extends Logging {
     getPartitions(fileIndex, partitionSpec)
   }
 
-  def getOutPutPath(
-      fileIndex: FileIndex,
-      partitionSpec: Option[TablePartitionSpec] = None): Path = {
+  def getOutPutPath(fileIndex: FileIndex): Path = {
     def getTargetPath(path: Path, times: Int): Path = {
       if (times > 0) getTargetPath(path.getParent, times - 1)
       else path
-    }
-    def getTableBaseDir(
-        path: Path,
-        partitionSpec: Option[TablePartitionSpec] = None): Path = {
-      partitionSpec match {
-        case Some(p) => getTargetPath(path, p.size)
-        case _ => path
-      }
     }
     val paths = fileIndex.rootPaths
     assert(paths.nonEmpty, "Expected at least one path of fileIndex.rootPaths, but no value")
     paths.length match {
       case 1 => paths.head
-      case _ => getTableBaseDir(paths.head, partitionSpec)
+      case _ => getTargetPath(paths.head, fileIndex.partitionSchema.length)
     }
   }
 }

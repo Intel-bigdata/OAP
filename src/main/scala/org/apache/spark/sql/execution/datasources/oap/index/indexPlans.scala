@@ -150,7 +150,7 @@ case class CreateIndexCommand(
       ds = ds.filter(s"$k='$v'")
     }
 
-    val outPutPath = OapUtils.getOutPutPath(fileCatalog, partitionSpec)
+    val outPutPath = OapUtils.getOutPutPath(fileCatalog)
     assert(outPutPath != null, "Expected exactly one path to be specified, but no value")
 
     val qualifiedOutputPath = {
@@ -370,7 +370,7 @@ case class RefreshIndexCommand(
         ds = ds.filter(s"$k='$v'")
       }
 
-      val outPutPath = OapUtils.getOutPutPath(fileCatalog, partitionSpec)
+      val outPutPath = OapUtils.getOutPutPath(fileCatalog)
       assert(outPutPath != null, "Expected exactly one path to be specified, but no value")
 
       val qualifiedOutputPath = {
