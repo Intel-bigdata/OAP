@@ -14,13 +14,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import java.io.DataInput
 import java.io.EOFException
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+import scala.util.control.Breaks._
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
@@ -159,7 +161,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     MemoryManager.putToIndexFiberCache(fin, bmUniqueKeyListOffset, bmUniqueKeyListTotalSize)
   }
 
-  private def readBmUniqueKeyListFromCache(data: FiberCache): IndexedSeq[InternalRow] = {
+  private def readBmUniqueKeyListFromCache(data: FiberCache): Seq[InternalRow] = {
     var curOffset = 0
     (0 until bmUniqueKeyListCount).map( idx => {
       val (value, length) =
@@ -259,7 +261,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   private def getBitmapIdx(
-      keySeq: IndexedSeq[InternalRow],
+      keySeq: Seq[InternalRow],
       range: RangeInterval): (Int, Int) = {
     val keyLength = keySeq.length
     val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
@@ -309,7 +311,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       byteCache: FiberCache,
       position: Int,
       startIdx: Int,
-      endIdx: Int): IndexedSeq[RoaringBitmap] = {
+      endIdx: Int): Seq[RoaringBitmap] = {
     if (byteCache.size() != 0) {
       val bmStream = new BitmapDataInputStream(byteCache)
       bmStream.skipBytes(position)
@@ -320,11 +322,11 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
         bmEntry
       })
     } else {
-      IndexedSeq.empty
+      Seq.empty
     }
   }
 
-  private def getDesiredBitmapArray: mutable.ArrayBuffer[RoaringBitmap] = {
+  private def getDesiredBitmapArray: ArrayBuffer[RoaringBitmap] = {
     val keySeq = readBmUniqueKeyListFromCache(bmUniqueKeyListCache.fc)
     intervalArray.flatMap{
       case range if !range.isNullPredicate =>
@@ -513,4 +515,97 @@ private[oap] class BitmapDataInputStream(bitsStream: FiberCache) extends DataInp
    throw new UnsupportedOperationException("Bitmap doesn't need this." +
      "It' inlegal to use it in bitmap!!!")
  }
+}
+
+// The chunks are physically consecutive, so it doesn't require to set chunk offset.
+private[oap] case class ChunksInSingleFiberCacheIterator(
+    wfc: OapBitmapWrappedFiberCache)
+  extends ChunksIterator {
+
+  override def init(): Iterator[Int] = {
+    totalLength = wfc.getTotalChunkLength
+    if (idx < totalLength) {
+      iteratorForChunk = wfc.getIteratorForChunk(idx)
+      val cks = wfc.getChunkKeys
+      highPart = (cks(idx) & 0xFFFF) << 16
+    }
+    return this
+  }
+}
+
+// The chunks are not physically consecutive, so it requires to set chunk offset.
+private[oap] case class ChunksInMultiFiberCachesIterator(
+    chunksInFc: ArrayBuffer[OapBitmapChunkInFiberCache])
+  extends ChunksIterator {
+
+  override def init(): Iterator[Int] = {
+    totalLength = chunksInFc.length
+    if (idx < totalLength) {
+      val wfc = chunksInFc(idx).wfc
+      val chunkIdx = chunksInFc(idx).chunkIdx
+      wfc.setOffset(chunkIdx)
+      iteratorForChunk = wfc.getIteratorForChunk(chunkIdx)
+      highPart = (chunksInFc(idx).getChunkKey & 0xFFFF) << 16
+    }
+    return this
+  }
+}
+
+private[oap] object OapBitmapFastAggregation {
+
+  // Just get array of the chunks across multi fiber caches in acending order of key.
+  def or(wfcSeq: Seq[OapBitmapWrappedFiberCache]): ArrayBuffer[OapBitmapChunkInFiberCache] = {
+    val firstWfc = wfcSeq(0)
+    firstWfc.init
+    val initialChunkLength = firstWfc.getTotalChunkLength
+    val finalChunkArray = new ArrayBuffer[OapBitmapChunkInFiberCache]()
+    var initialIdx = 0
+    var nextIdx = 0
+    (0 until initialChunkLength).map(idx => {
+      finalChunkArray += OapBitmapChunkInFiberCache(firstWfc, idx)
+    })
+    (1 until wfcSeq.length).foreach(idx => {
+      initialIdx = 0
+      var initialKey = finalChunkArray(initialIdx).getChunkKey
+      val nextWfc = wfcSeq(idx)
+      nextWfc.init
+      nextIdx = 0
+      val nextChunkLength = nextWfc.getTotalChunkLength
+      val nextChunkKeys = nextWfc.getChunkKeys
+      var nextKey = nextChunkKeys(nextIdx)
+      breakable {
+        while (true) {
+          val result = initialKey - nextKey
+          result match {
+            case res if res < 0 =>
+              initialIdx += 1
+              if (initialIdx == finalChunkArray.length) break
+              initialKey = finalChunkArray(initialIdx).getChunkKey
+            case res if res == 0 =>
+              // Just link the next chunk to be adjacent for traversing.
+              finalChunkArray.insert(initialIdx, OapBitmapChunkInFiberCache(nextWfc, nextIdx))
+              // Bypass the two adjacent chunks with equal keys.
+              initialIdx += 2
+              nextIdx += 1
+              if (initialIdx == finalChunkArray.length || nextIdx == nextChunkLength) break
+              initialKey = finalChunkArray(initialIdx).getChunkKey
+              nextKey = nextChunkKeys(nextIdx)
+            case res if res > 0 =>
+              // Insert the next chunk with nextIdx from the next fiber cache.
+              finalChunkArray.insert(initialIdx, OapBitmapChunkInFiberCache(nextWfc, nextIdx))
+              initialIdx += 1
+              nextIdx += 1
+              if (nextIdx == nextChunkLength) break
+              nextKey = nextChunkKeys(nextIdx)
+          }
+        }
+      }
+      if (initialIdx == finalChunkArray.length && nextIdx < nextChunkLength) {
+        // Append the remaining chunks from the above next fiber cache.
+        (nextIdx until nextChunkLength).foreach(idx =>
+          finalChunkArray += OapBitmapChunkInFiberCache(nextWfc, idx))
+      }
+    })
+    finalChunkArray
+  }
 }

@@ -160,6 +160,8 @@ private[oap] class BitmapIndexRecordWriter(
       dos.close()
       bos.close()
     })
+    // Add another offset in order to easily get the offset for the last entry.
+    bmOffsetListBuffer.append(bmEntryListOffset + totalBitmapSize)
     bmEntryListTotalSize = totalBitmapSize
 
     // Write entry for null value rows if exists

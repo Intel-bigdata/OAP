@@ -20,12 +20,18 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import java.io._
 import java.util
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FSDataInputStream, Path}
+import org.roaringbitmap.FastAggregation
 import org.roaringbitmap.RoaringBitmap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
+import org.apache.spark.sql.execution.datasources.oap.filecache._
+import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.{collection, Utils}
@@ -43,6 +49,20 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedOapContext with Bef
   private val scalaBs = new mutable.BitSet()
   private val javaBs = new util.BitSet()
   private val rb = new RoaringBitmap()
+
+  // Below data are used to test the functionality and performance of directly getting
+  // row IDs from fiber caches without roarting bitmap involved.
+  private val BITMAP_FOOTER_SIZE = 4 + 5 * 8
+  private val dataForRunChunk: Seq[(Int, String)] =
+    (1 to 20000).map{i => (i / 100, s"this is test $i")}
+  private val dataForArrayChunk: Seq[(Int, String)] =
+    (1 to 20000).map{i => (i, s"this is test $i")}
+  private val dataForBitmapChunk: Seq[(Int, String)] =
+    (1 to 20000).map{i => (i % 2, s"this is test $i")}
+  private val dataCombination =
+    dataForBitmapChunk ++ dataForArrayChunk ++ dataForRunChunk
+  private val dataArray =
+    Array(dataForRunChunk, dataForArrayChunk, dataForBitmapChunk, dataCombination)
 
   override def beforeEach(): Unit = {
     dir = Utils.createTempDir()
@@ -267,4 +287,240 @@ class BitmapMicroBenchmarkSuite extends QueryTest with SharedOapContext with Bef
      */
   }
 
+  // Below are just borrowed from BitMapScanner.scala in order to easily load bitmap index files.
+  private def loadBmFooter(
+      fin: FSDataInputStream,
+      bmFooterOffset: Int): FiberCache =
+    MemoryManager.putToIndexFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE)
+
+  private def loadBmEntry(
+      fin: FSDataInputStream,
+      offset: Int,
+      size: Int): FiberCache =
+    MemoryManager.putToIndexFiberCache(fin, offset, size)
+
+  private def loadBmOffsetList(
+      fin: FSDataInputStream,
+      bmOffsetListOffset: Int,
+      bmOffsetListTotalSize: Int): FiberCache =
+    MemoryManager.putToIndexFiberCache(fin, bmOffsetListOffset, bmOffsetListTotalSize)
+
+  private def getIdxOffset(
+      fiberCache: FiberCache,
+      baseOffset: Long,
+      idx: Int): Int = {
+    val idxOffset = baseOffset + idx * 4
+    fiberCache.getInt(idxOffset)
+  }
+
+  private def getMetaDataAndFiberCaches(
+      fin: FSDataInputStream,
+      idxPath: Path,
+      conf: Configuration): (Int, WrappedFiberCache, WrappedFiberCache) = {
+    val idxFileSize = idxPath.getFileSystem(conf).getFileStatus(idxPath).getLen
+    val bmFooterOffset = idxFileSize.toInt - BITMAP_FOOTER_SIZE
+    val bmFooterFiber = BitmapFiber(
+      () => loadBmFooter(fin, bmFooterOffset),
+      idxPath.toString, BitmapIndexSectionId.footerSection, 0)
+    val bmFooterCache = WrappedFiberCache(FiberCacheManager.get(bmFooterFiber, conf))
+    val bmUniqueKeyListTotalSize = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE)
+    val keyCount = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 2)
+    val bmEntryListTotalSize = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 3)
+    val bmOffsetListTotalSize = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 4)
+    val bmNullEntrySize = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 6)
+    val bmUniqueKeyListOffset = IndexFile.VERSION_LENGTH
+    val bmEntryListOffset = bmUniqueKeyListOffset + bmUniqueKeyListTotalSize
+    val bmOffsetListOffset = bmEntryListOffset + bmEntryListTotalSize + bmNullEntrySize
+    val bmOffsetListFiber = BitmapFiber(
+      () => loadBmOffsetList(fin, bmOffsetListOffset, bmOffsetListTotalSize),
+      idxPath.toString, BitmapIndexSectionId.entryOffsetsSection, 0)
+    val bmOffsetListCache = WrappedFiberCache(FiberCacheManager.get(bmOffsetListFiber, conf))
+    (keyCount, bmOffsetListCache, bmFooterCache)
+  }
+
+  test("test the functionality of directly traversing single fiber cache without roaring bitmap") {
+    dataArray.foreach(dataIdx => {
+      dataIdx.toDF("key", "value").createOrReplaceTempView("t")
+      sql("insert overwrite table oap_test select * from t")
+      sql("create oindex index_bm on oap_test (a) USING BITMAP")
+      var maxRowId = 0
+      dir.listFiles.foreach(fileName => {
+        if (fileName.toString.endsWith(OapFileFormat.OAP_INDEX_EXTENSION)) {
+          val idxPath = new Path(fileName.toString)
+          val conf = new Configuration()
+          val fin = idxPath.getFileSystem(conf).open(idxPath)
+          val (keyCount, bmOffsetListCache, bmFooterCache) =
+            getMetaDataAndFiberCaches(fin, idxPath, conf)
+          var maxRowIdInPartition = 0
+          (0 until keyCount).map( idx => {
+            val curIdxOffset = getIdxOffset(bmOffsetListCache.fc, 0L, idx)
+            val entrySize = getIdxOffset(bmOffsetListCache.fc, 0L, idx + 1) - curIdxOffset
+            val entryFiber = BitmapFiber(
+              () => loadBmEntry(fin, curIdxOffset, entrySize), idxPath.toString,
+            BitmapIndexSectionId.entryListSection, idx)
+            val wfc = new OapBitmapWrappedFiberCache(FiberCacheManager.get(entryFiber, conf))
+            wfc.init()
+            val max = ChunksInSingleFiberCacheIterator(wfc).init.max
+            if (maxRowIdInPartition < max) maxRowIdInPartition = max
+            wfc.release
+          })
+          // The row id is starting from 0.
+          maxRowId += maxRowIdInPartition + 1
+          bmFooterCache.release
+          bmOffsetListCache.release
+          fin.close
+        }
+      })
+      assert(sql("select * from t").count == maxRowId)
+      sql("drop oindex index_bm on oap_test")
+    })
+  }
+
+  test("test the functionality of directly bitwise OR case for multi fiber caches") {
+    dataArray.foreach(dataIdx => {
+      dataIdx.toDF("key", "value").createOrReplaceTempView("t")
+      sql("insert overwrite table oap_test select * from t")
+      sql("create oindex index_bm on oap_test (a) USING BITMAP")
+      var maxRowId = 0
+      dir.listFiles.foreach(fileName => {
+        if (fileName.toString.endsWith(OapFileFormat.OAP_INDEX_EXTENSION)) {
+          val idxPath = new Path(fileName.toString)
+          val conf = new Configuration()
+          val fin = idxPath.getFileSystem(conf).open(idxPath)
+          val (keyCount, bmOffsetListCache, bmFooterCache) =
+            getMetaDataAndFiberCaches(fin, idxPath, conf)
+          val wfcSeq = (0 until keyCount).map(idx => {
+            val curIdxOffset = getIdxOffset(bmOffsetListCache.fc, 0L, idx)
+            val entrySize = getIdxOffset(bmOffsetListCache.fc, 0L, idx + 1) - curIdxOffset
+            val entryFiber = BitmapFiber(
+              () => loadBmEntry(fin, curIdxOffset, entrySize), idxPath.toString,
+              BitmapIndexSectionId.entryListSection, idx)
+            new OapBitmapWrappedFiberCache(FiberCacheManager.get(entryFiber, conf))
+          })
+          val chunkList = OapBitmapFastAggregation.or(wfcSeq)
+          var maxRowIdInPartition = ChunksInMultiFiberCachesIterator(chunkList).init.max
+          // The row id is starting from 0.
+          maxRowId += maxRowIdInPartition + 1
+          wfcSeq.foreach(wfc => wfc.release)
+          bmFooterCache.release
+          bmOffsetListCache.release
+          fin.close
+        }
+      })
+      assert(sql("select * from t").count == maxRowId)
+      sql("drop oindex index_bm on oap_test")
+    })
+  }
+
+  test("test the benefit of directly traversing the row IDs in single fiber cache") {
+    dataArray.foreach(dataIdx => {
+      dataIdx.toDF("key", "value").createOrReplaceTempView("t")
+      sql("insert overwrite table oap_test select * from t")
+      sql("create oindex index_bm on oap_test (a) USING BITMAP")
+      val comparison = Array[Boolean](true, false)
+      comparison.foreach(usingRb => {
+        val startTime = System.nanoTime
+        dir.listFiles.foreach(fileName => {
+          if (fileName.toString.endsWith(OapFileFormat.OAP_INDEX_EXTENSION)) {
+            val idxPath = new Path(fileName.toString)
+            val conf = new Configuration()
+            val fin = idxPath.getFileSystem(conf).open(idxPath)
+            val (keyCount, bmOffsetListCache, bmFooterCache) =
+              getMetaDataAndFiberCaches(fin, idxPath, conf)
+            (0 until keyCount).map( idx => {
+              val curIdxOffset = getIdxOffset(bmOffsetListCache.fc, 0L, idx)
+              val entrySize = getIdxOffset(bmOffsetListCache.fc, 0L, idx + 1) - curIdxOffset
+              val entryFiber = BitmapFiber(
+                () => loadBmEntry(fin, curIdxOffset, entrySize), idxPath.toString,
+                BitmapIndexSectionId.entryListSection, idx)
+              usingRb match {
+                case true =>
+                  val wfc = WrappedFiberCache(FiberCacheManager.get(entryFiber, conf))
+                  val bmEntryStream = new BitmapDataInputStream(wfc.fc)
+                  val bmEntry = new RoaringBitmap()
+                  // Below is directly reading from byte array rather than deserializing into java object.
+                  bmEntry.deserialize(bmEntryStream)
+                  // The max is in the last element. So it will traverse all elements.
+                  val max = bmEntry.iterator.asScala.max
+                  wfc.release
+                case false =>
+                  val wfc = new OapBitmapWrappedFiberCache(FiberCacheManager.get(entryFiber, conf))
+                  wfc.init()
+                  // The max is in the last element. So it will traverse all elements.
+                  val max = ChunksInSingleFiberCacheIterator(wfc).init.max
+                  wfc.release
+              }
+            })
+            bmFooterCache.release
+            bmOffsetListCache.release
+          }
+        })
+        val endTime = System.nanoTime
+        // The unit is ms.
+        val elapsedTime = (endTime - startTime) / 1000000
+      })
+      sql("drop oindex index_bm on oap_test")
+    })
+  }
+
+  test("test the benefit of directly traversing the row IDs in the multi fiber caches") {
+    dataArray.foreach(dataIdx => {
+      dataIdx.toDF("key", "value").createOrReplaceTempView("t")
+      sql("insert overwrite table oap_test select * from t")
+      sql("create oindex index_bm on oap_test (a) USING BITMAP")
+      val comparison = Array[Boolean](true, false)
+      comparison.foreach(usingRb => {
+        val startTime = System.nanoTime
+        dir.listFiles.foreach(fileName => {
+          if (fileName.toString.endsWith(OapFileFormat.OAP_INDEX_EXTENSION)) {
+            val idxPath = new Path(fileName.toString)
+            val conf = new Configuration()
+            val fin = idxPath.getFileSystem(conf).open(idxPath)
+            val (keyCount, bmOffsetListCache, bmFooterCache) =
+              getMetaDataAndFiberCaches(fin, idxPath, conf)
+            usingRb match {
+              case true =>
+                val wfcSeq = (0 until keyCount).map(idx => {
+                  val curIdxOffset = getIdxOffset(bmOffsetListCache.fc, 0L, idx)
+                  val entrySize = getIdxOffset(bmOffsetListCache.fc, 0L, idx + 1) - curIdxOffset
+                  val entryFiber = BitmapFiber(
+                    () => loadBmEntry(fin, curIdxOffset, entrySize), idxPath.toString,
+                    BitmapIndexSectionId.entryListSection, idx)
+                      val bmEntryCache = WrappedFiberCache(FiberCacheManager.get(entryFiber, conf))
+                      val bmEntry = new RoaringBitmap()
+                      val bmEntryStream = new BitmapDataInputStream(bmEntryCache.fc)
+                      // Below is directly reading from byte array rather than deserializing into java object.
+                      bmEntry.deserialize(bmEntryStream)
+                      bmEntryCache.release
+                      bmEntry
+                })
+                // The max is in the last element. So it will traverse all elements.
+                val max = wfcSeq.reduceLeft(FastAggregation.or(_, _)).iterator.asScala.max
+            case false =>
+              val wfcSeq = (0 until keyCount).map(idx => {
+                val curIdxOffset = getIdxOffset(bmOffsetListCache.fc, 0L, idx)
+                val nextIdxOffset = getIdxOffset(bmOffsetListCache.fc, 0L, idx + 1)
+                val entrySize = nextIdxOffset - curIdxOffset
+                val entryFiber = BitmapFiber(
+                  () => loadBmEntry(fin, curIdxOffset, entrySize), idxPath.toString,
+                  BitmapIndexSectionId.entryListSection, idx)
+                val wfc = new OapBitmapWrappedFiberCache(FiberCacheManager.get(entryFiber, conf))
+                wfc
+              })
+              val chunkList = OapBitmapFastAggregation.or(wfcSeq)
+              // The max is in the last element. So it will traverse all elements.
+              val max = ChunksInMultiFiberCachesIterator(chunkList).init.max
+              wfcSeq.foreach(wfc => wfc.release)
+            }
+            bmFooterCache.release
+            bmOffsetListCache.release
+          }
+        })
+        val endTime = System.nanoTime
+        // The unit is ms.
+        val elapsedTime = (endTime - startTime) / 1000000
+      })
+      sql("drop oindex index_bm on oap_test")
+    })
+  }
 }
