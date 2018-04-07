@@ -148,7 +148,7 @@ object FiberCacheManager extends Logging {
   }
 
   // Used by test suite
-  private[filecache] def clearAllFibers(): Unit = cacheBackend.cleanUp
+  private[oap] def clearAllFibers(): Unit = cacheBackend.cleanUp
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly
   private[filecache] def status: String = {
@@ -172,6 +172,8 @@ object FiberCacheManager extends Logging {
   def cacheStats: CacheStats = cacheBackend.cacheStats
 
   def cacheSize: Long = cacheBackend.cacheSize
+
+  def cacheCount: Long = cacheBackend.cacheCount
 
   // Used by test suite
   private[filecache] def pendingCount: Int = cacheBackend.pendingFiberCount
