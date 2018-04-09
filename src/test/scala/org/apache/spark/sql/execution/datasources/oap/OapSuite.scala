@@ -92,7 +92,7 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
   test("Add the corresponding compression type for the OAP data file name if any") {
     // Case insensitive.
     Seq("GZIP", "gzip", "SNAPPY", "snappy", "LZO", "lzo", "UNCOMPRESSED", "uncompressed")
-      .foreach (codec => {
+      .foreach{ codec =>
         sqlConf.setConfString(OapConf.OAP_COMPRESSION.key, codec)
         val df = sqlContext.read.format("oap").load(path.getAbsolutePath)
         df.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
@@ -109,8 +109,7 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
             }
           }
         }
-      })
-
+      }
     // Restore compression type back to default.
     sqlConf.setConfString(OapConf.OAP_COMPRESSION.key, OapConf.OAP_COMPRESSION.defaultValueString)
   }
