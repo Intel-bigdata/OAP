@@ -420,7 +420,7 @@ private[oap] class OapOutputWriterFactory(
 
     val compressionType =
       context.getConfiguration
-          .get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).trim
+          .get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).trim.toUpperCase()
 
     extensionMap(compressionType) + OapFileFormat.OAP_DATA_EXTENSION
   }
