@@ -114,6 +114,7 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
     assertResult(summary.dataFiberSize)(summary2.dataFiberSize)
     assertResult(summary.indexFiberCount)(summary2.indexFiberCount)
     assertResult(summary.indexFiberSize)(summary2.indexFiberSize)
+    SparkEnv.get.oapRpcManager.asInstanceOf[OapRpcManagerSlave].stopOapHeartbeater()
   }
 
   test("test FiberCacheManagerSensor onCustomInfoUpdate FiberCacheManagerMessager") {

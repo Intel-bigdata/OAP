@@ -89,6 +89,10 @@ private[spark] class OapRpcManagerSlave(
       heartbeatTask, initialDelay, intervalMs, TimeUnit.MILLISECONDS)
   }
 
+  private[spark] def stopOapHeartbeater(): Unit = {
+    oapHeartbeater.shutdown()
+  }
+
   private[spark] def registerHeartbeat(getMaterials: Seq[() => Heartbeat]): Unit = {
     getMaterials.foreach(oapHeartbeatMaterials +=)
   }
