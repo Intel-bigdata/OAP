@@ -134,6 +134,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       if (bmFooterCache != null) {
         bmFooterCache.release()
         bmFooterCache = null
+        bmFooterFiber = null
       }
       if (bmStatsContentCache != null) {
         bmStatsContentCache.release()
