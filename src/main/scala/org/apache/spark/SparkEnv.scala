@@ -379,10 +379,10 @@ object SparkEnv extends Logging {
     val oapRpcDriverEndpoint = registerOrLookupEndpoint(
       OapRpcManagerMaster.DRIVER_ENDPOINT_NAME, oapRpcManagerMasterEndpoint)
 
-    val oapRpcManager = if (isDriver) {
-      new OapRpcManagerMaster(oapRpcManagerMasterEndpoint)
+    val oapRpcManager = if (isDriver && !isLocal) {
+      new OapRpcManagerMaster(oapRpcManagerMasterEndpoint, isLocal)
     } else {
-      new OapRpcManagerSlave(rpcEnv, oapRpcDriverEndpoint, executorId, conf)
+      new OapRpcManagerSlave(rpcEnv, oapRpcDriverEndpoint, executorId, isLocal, conf)
     }
 
     val envInstance = new SparkEnv(

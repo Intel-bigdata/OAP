@@ -26,7 +26,7 @@ import org.apache.spark.sql.oap.rpc.OapMessages.OapMessage
  * Note that not all functions need to be implemented in OapRpcManagerMaster/Slave
  */
 
-trait OapRpcManager extends Logging {
+abstract class OapRpcManager(val isLocal: Boolean) extends Logging {
 
   private[spark] def send(message: OapMessage): Unit
 

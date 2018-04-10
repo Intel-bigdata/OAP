@@ -19,8 +19,10 @@ package org.apache.spark.sql.oap.rpc
 
 import scala.collection.mutable
 
+import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.{RpcCallContext, RpcEndpointRef, RpcEnv, ThreadSafeRpcEndpoint}
+import org.apache.spark.scheduler.{SparkListenerCustomInfoUpdate, SparkListenerOapIndexInfoUpdate}
 import org.apache.spark.sql.oap.rpc.OapMessages._
 
 /**
@@ -28,8 +30,10 @@ import org.apache.spark.sql.oap.rpc.OapMessages._
  * @param oapRpcManagerMasterEndpoint The OapRpcManagerMasterEndpoint it holds, dealing with
  *                                    messages' receiving
  */
-private[spark] class OapRpcManagerMaster(oapRpcManagerMasterEndpoint: OapRpcManagerMasterEndpoint)
-    extends OapRpcManager with Logging {
+private[spark] class OapRpcManagerMaster(
+    oapRpcManagerMasterEndpoint: OapRpcManagerMasterEndpoint,
+    isLocal: Boolean)
+  extends OapRpcManager(isLocal) with Logging {
 
   private def sendOneWayMessageToExecutors(message: OapMessage): Unit = {
     oapRpcManagerMasterEndpoint.rpcEndpointRefByExecutor.foreach {
@@ -78,6 +82,15 @@ private[spark] class OapRpcManagerMasterEndpoint(
   }
 
   private def handleHeartbeat(heartbeat: Heartbeat) = heartbeat match {
+    case FiberCacheHeartbeat(executorId, blockManagerId, content) =>
+      SparkContext.getOrCreate().listenerBus.post(SparkListenerCustomInfoUpdate(
+        blockManagerId.host, executorId, "OapFiberCacheHeartBeatMessager", content))
+    case FiberCacheMetricsHeartbeat(executorId, blockManagerId, content) =>
+      SparkContext.getOrCreate().listenerBus.post(SparkListenerCustomInfoUpdate(
+        blockManagerId.host, executorId, "FiberCacheManagerMessager", content))
+    case IndexHeartbeat(executorId, blockManagerId, content) =>
+      SparkContext.getOrCreate().listenerBus.post(SparkListenerOapIndexInfoUpdate(
+        blockManagerId.host, executorId, content))
     case DummyHeartbeat(someContent) =>
       logWarning(s"Dummy message received on Driver with content: $someContent")
     case _ =>

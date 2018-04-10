@@ -61,7 +61,7 @@ class OapRpcManagerSuite extends SparkFunSuite with BeforeAndAfterEach with Priv
     sc = new SparkContext(conf)
     rpcEnv = sc.env.rpcEnv
     rpcManagerMasterEndpoint = spy(new OapRpcManagerMasterEndpoint(rpcEnv))
-    rpcManagerMaster = new OapRpcManagerMaster(rpcManagerMasterEndpoint)
+    rpcManagerMaster = new OapRpcManagerMaster(rpcManagerMasterEndpoint, isLocal = true)
     rpcDriverEndpoint = rpcEnv.setupEndpoint("driver", rpcManagerMasterEndpoint)
   }
 
@@ -98,7 +98,9 @@ class OapRpcManagerSuite extends SparkFunSuite with BeforeAndAfterEach with Priv
   test("Send heartbeat message from Executor to Driver") {
     val rpcManagerSlave1 = addRpcManagerSlave(executorId1)
 
-    rpcManagerSlave1.registerHearbeat(Seq(() => heartbeat))
+    // Manually start it due to in local mode heartbeater is off by default
+    rpcManagerSlave1.startOapHeartbeater()
+    rpcManagerSlave1.registerHeartbeat(Seq(() => heartbeat))
 
     // Initial delay is at most 2 * interval
     Thread.sleep(2000 + 2 * sc.conf.getTimeAsMs(
@@ -116,7 +118,7 @@ class OapRpcManagerSuite extends SparkFunSuite with BeforeAndAfterEach with Priv
 
   // This doesn't need to be spied due to it's used to send messages
   private def addRpcManagerSlave(executorId: String): OapRpcManagerSlave = {
-    new OapRpcManagerSlave(rpcEnv, rpcDriverEndpoint, executorId, sc.conf)
+    new OapRpcManagerSlave(rpcEnv, rpcDriverEndpoint, executorId, isLocal = true, sc.conf)
   }
 
 }

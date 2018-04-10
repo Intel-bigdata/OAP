@@ -18,17 +18,16 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import org.scalatest.BeforeAndAfterEach
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
+import org.apache.spark.sql.execution.datasources.oap.io.{OapDataFileHandle, OapDataReader}
 import org.apache.spark.sql.execution.datasources.oap.listener.FiberInfoListener
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.rpc.OapRpcManagerSlave
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
@@ -89,6 +88,8 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
       }
     }
 
+    // Start heartbeater manually due to in local mode it's off by default
+    SparkEnv.get.oapRpcManager.asInstanceOf[OapRpcManagerSlave].startOapHeartbeater()
     // Only one executor in local-mode, each data file has 4 dataFiber(2 cols * 2 rgs/col)
     // wait for a heartbeat
     Thread.sleep(20 * 1000)

@@ -34,8 +34,12 @@ import org.apache.spark.util.{ThreadUtils, Utils}
  * Similar OapRpcManager class with [[OapRpcManagerMaster]], however running on Executor
  */
 private[spark] class OapRpcManagerSlave(
-    rpcEnv: RpcEnv, val driverEndpoint: RpcEndpointRef, executorId: String, conf: SparkConf)
-        extends OapRpcManager {
+    rpcEnv: RpcEnv,
+    val driverEndpoint: RpcEndpointRef,
+    executorId: String,
+    isLocal: Boolean,
+    conf: SparkConf)
+  extends OapRpcManager(isLocal) {
 
   // Send OapHeartbeatMessage to Driver timed
   private val oapHeartbeater =
@@ -50,7 +54,11 @@ private[spark] class OapRpcManagerSlave(
 
   initialize()
 
-  startOapHeartbeater()
+  // In local mode(includes unit test, etc.), most cases do not need RPC, so do not start the
+  // heartbeater in order to prevent `RpcEnv already stopped`. If RPC is needed, start it manually
+  if (!isLocal) {
+    startOapHeartbeater()
+  }
 
   private def initialize() = {
     driverEndpoint.askWithRetry[Boolean](RegisterOapRpcManager(executorId, slaveEndpoint))
@@ -58,7 +66,7 @@ private[spark] class OapRpcManagerSlave(
 
   override private[spark] def send(message: OapMessage): Unit = driverEndpoint.send(message)
 
-  private def startOapHeartbeater(): Unit = {
+  private[spark] def startOapHeartbeater(): Unit = {
 
     def reportHeartbeat(): Unit = {
       // When the object is just initialized, this is empty, elements add to it after
@@ -81,7 +89,7 @@ private[spark] class OapRpcManagerSlave(
       heartbeatTask, initialDelay, intervalMs, TimeUnit.MILLISECONDS)
   }
 
-  private[spark] def registerHearbeat(getMaterials: Seq[() => Heartbeat]): Unit = {
+  private[spark] def registerHeartbeat(getMaterials: Seq[() => Heartbeat]): Unit = {
     getMaterials.foreach(oapHeartbeatMaterials +=)
   }
 }
