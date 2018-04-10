@@ -55,7 +55,8 @@ private[spark] class OapRpcManagerSlave(
   initialize()
 
   // In local mode(includes unit test, etc.), most cases do not need RPC, so do not start the
-  // heartbeater in order to prevent `RpcEnv already stopped`. If RPC is needed, start it manually
+  // heartbeater in order to prevent `RpcEnv already stopped`. If RPC is needed, start and stop it
+  // manually
   if (!isLocal) {
     startOapHeartbeater()
   }
