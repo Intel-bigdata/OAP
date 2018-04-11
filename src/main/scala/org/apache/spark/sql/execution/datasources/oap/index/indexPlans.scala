@@ -38,6 +38,7 @@ import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.rpc.OapMessages.CacheDrop
 import org.apache.spark.sql.types._
@@ -159,6 +160,9 @@ case class CreateIndexCommand(
       outPutPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
     }
 
+    configuration.set(SQLConf.OUTPUT_COMMITTER_CLASS.key,
+      "org.apache.spark.sql.execution.datasources.oap.OapIndexFileOutputCommitter")
+
     val committer = FileCommitProtocol.instantiate(
       sparkSession.sessionState.conf.fileCommitProtocolClass,
       jobId = java.util.UUID.randomUUID().toString,
@@ -184,6 +188,8 @@ case class CreateIndexCommand(
       bucketSpec = Option.empty,
       refreshFunction = _ => Unit,
       options = options).asInstanceOf[Seq[Seq[IndexBuildResult]]]
+
+    configuration.unset(SQLConf.OUTPUT_COMMITTER_CLASS.key)
 
     val retMap = retVal.flatten.groupBy(_.parent)
     bAndP.foreach(bp =>
@@ -380,6 +386,9 @@ case class RefreshIndexCommand(
         outPutPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
       }
 
+      configuration.set(SQLConf.OUTPUT_COMMITTER_CLASS.key,
+        "org.apache.spark.sql.execution.datasources.oap.OapIndexFileOutputCommitter")
+
       val committer = FileCommitProtocol.instantiate(
         sparkSession.sessionState.conf.fileCommitProtocolClass,
         jobId = java.util.UUID.randomUUID().toString,
@@ -393,7 +402,7 @@ case class RefreshIndexCommand(
         "indexType" -> indexType.toString
       )
 
-      FileFormatWriter.write(
+      val ret = FileFormatWriter.write(
         sparkSession = sparkSession,
         queryExecution = ds.queryExecution,
         fileFormat = new OapIndexFileFormat,
@@ -405,6 +414,8 @@ case class RefreshIndexCommand(
         bucketSpec = Option.empty,
         refreshFunction = _ => Unit,
         options = options).asInstanceOf[Seq[Seq[IndexBuildResult]]]
+      configuration.unset(SQLConf.OUTPUT_COMMITTER_CLASS.key)
+      ret
     })
     if (buildrst.nonEmpty) {
       val retMap = buildrst.head.flatten.groupBy(_.parent)
