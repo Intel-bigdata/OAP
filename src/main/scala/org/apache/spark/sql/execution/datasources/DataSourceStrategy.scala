@@ -24,20 +24,23 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.{CatalystConf, CatalystTypeConverters, InternalRow, TableIdentifier}
+import org.apache.spark.sql.catalyst.{CatalystConf, CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.catalyst.CatalystTypeConverters.convertToScala
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTablePartition, SimpleCatalogRelation}
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
 import org.apache.spark.sql.catalyst.expressions
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project, Union}
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, UnknownPartitioning}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{RowDataSourceScanExec, SparkPlan}
+import org.apache.spark.sql.execution.{RowDataSourceScanExec, SortExec, SparkPlan}
+import org.apache.spark.sql.execution.aggregate.OapAggUtils
 import org.apache.spark.sql.execution.command._
+import org.apache.spark.sql.execution.datasources.oap.index.{PrepareForIndexBuild, RowIdScan, RowIdScanExec}
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
@@ -314,7 +317,6 @@ class FindDataSourceTable(sparkSession: SparkSession) extends Rule[LogicalPlan] 
   }
 }
 
-
 /**
  * A Strategy for planning scans over data sources defined using the sources API.
  */
@@ -355,6 +357,42 @@ object DataSourceStrategy extends Strategy with Logging {
       part, query, overwrite, false) if part.isEmpty =>
       ExecutedCommandExec(InsertIntoDataSourceCommand(l, query, overwrite)) :: Nil
 
+    case p @ PrepareForIndexBuild(RowIdScan(child, out), _) =>
+      val childWithRowId = RowIdScanExec(planLater(child), out)
+      val groupingExpressionsForLists = childWithRowId.output.slice(0, 2)
+      val groupingAttributesForLists = groupingExpressionsForLists.map(_.toAttribute)
+      val localKeyAggregateExpressions =
+        Seq(AggregateExpression(
+          CollectList(childWithRowId.output(2)), Complete, isDistinct = false))
+      val localKeyAggregateAttributes = localKeyAggregateExpressions.map(_.resultAttribute)
+      val fileKeyListExpressions = groupingAttributesForLists ++ localKeyAggregateAttributes
+      // aggr by filename and key
+      val aggrByFileAndKey = OapAggUtils.createLocalAggregate(
+        groupingExpressions = groupingExpressionsForLists,
+        aggregateExpressions = localKeyAggregateExpressions,
+        aggregateAttributes = localKeyAggregateAttributes,
+        resultExpressions = fileKeyListExpressions,
+        child = childWithRowId
+      )
+      val ordering = fileKeyListExpressions.slice(0, 2).map(SortOrder(_, Ascending))
+      val aggrByFileAndKeySorted = SortExec(ordering, global = false, aggrByFileAndKey)
+      val groupingExpressionsForSummary = aggrByFileAndKey.output.slice(0, 1)
+      val localSummaryExpressions =
+        Seq(
+          AggregateExpression(Count(aggrByFileAndKey.output(1)), Complete, isDistinct = true),
+          AggregateExpression(CollectListWithNull(
+            CreateStruct(aggrByFileAndKey.output.slice(1, 3))), Complete, isDistinct = false)
+        )
+      val localSummaryAttributes = localSummaryExpressions.map(_.resultAttribute)
+      // aggr by filename only to get distinct count
+      val aggrByFile = OapAggUtils.createLocalAggregate(
+        groupingExpressions = groupingExpressionsForSummary,
+        aggregateExpressions = localSummaryExpressions,
+        aggregateAttributes = localSummaryAttributes,
+        resultExpressions = p.output,
+        child = aggrByFileAndKeySorted
+      )
+      Seq(aggrByFile)
     case _ => Nil
   }
 

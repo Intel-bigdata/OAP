@@ -29,12 +29,12 @@ import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsWriteManager
 import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils, NonNullKeyWriter}
 import org.apache.spark.sql.types._
-
 
 private[index] case class BTreeIndexRecordWriter(
     configuration: Configuration,
@@ -275,3 +275,204 @@ private case class BTreeNodeMetaData(
     byteSize: Int,
     min: InternalRow,
     max: InternalRow)
+
+private[index] case class BTreeIndexRecordWriter2(
+    configuration: Configuration,
+    fileWriter: BTreeIndexFileWriter,
+    keySchema: StructType) extends RecordWriter[Void, InternalRow] {
+
+  private lazy val nnkw = new NonNullKeyWriter(keySchema)
+
+  private lazy val statisticsManager = new StatisticsWriteManager {
+    this.initialize(BTreeIndexType, keySchema, configuration)
+  }
+
+  override def write(key: Void, value: InternalRow): Unit = {
+    val data = value.getArray(2) // UnsafeArrayData
+    // val uniqueCntExceptNull = value.getInt(1)
+    val uniqueCntExceptNull = value.getStruct(1, 1).getInt(0)
+    // TODO statistics can also be retrieved directly from local aggr
+    // val v = genericProjector(value.getStruct(0, keySchema.length)).copy()
+    // statisticsManager.addOapKey(v)
+
+    val firstRow = data.getStruct(0, 2).getStruct(0, keySchema.length)
+    val (nonNullStartIdx, nullKeyRowCount) = if (firstRow.anyNull) {
+      require(keySchema.length == 1, "No support for multi-column index building with null keys!")
+      (1, data.getStruct(0, 2).getArray(1).numElements())
+    } else {
+      (0, 0)
+    }
+    val treeShape = BTreeUtils.generate2(uniqueCntExceptNull)
+    // Trick here. If root node has no child, then write root node as a child.
+    val children = if (treeShape.children.nonEmpty) treeShape.children else treeShape :: Nil
+
+    // Start
+    fileWriter.start()
+    // Write Node
+    var startPosInKeyList = 0
+    var startPosInRowList = 0
+    val nodes = children.map { node =>
+      val keyCount = sumKeyCount(node) // total number of keys of this node
+      val nodeUniqueKeyMaps = Range(startPosInKeyList, startPosInKeyList + keyCount).map { i =>
+        data.getStruct(i + nonNullStartIdx, 2)
+      }
+      val rowCount = nodeUniqueKeyMaps.map(_.getArray(1).numElements()).sum
+
+      val nodeBuf = serializeNode2(nodeUniqueKeyMaps, startPosInRowList)
+      fileWriter.writeNode(nodeBuf)
+      startPosInKeyList += keyCount
+      startPosInRowList += rowCount
+      if (keyCount == 0 || data.numElements() == nonNullStartIdx) {
+        // this node is an empty node
+        BTreeNodeMetaData(0, nodeBuf.length, null, null)
+      } else {
+        BTreeNodeMetaData(
+          rowCount,
+          nodeBuf.length,
+          extractKeyFromAggrRow(nodeUniqueKeyMaps.head),
+          extractKeyFromAggrRow(nodeUniqueKeyMaps.last))
+      }
+    }
+    // Write Row Id List
+    serializeAndWriteRowIdLists2(data, nonNullStartIdx)
+    // Write Footer
+    fileWriter.writeFooter(serializeFooter(nullKeyRowCount, nodes))
+    // End
+    fileWriter.end()
+    fileWriter.close()
+  }
+
+  private def extractKeyFromAggrRow(row: InternalRow): InternalRow = {
+    row.getStruct(0, keySchema.length)
+  }
+
+  private def extractListSizeFromAggrRow(row: InternalRow): Int = {
+    row.getArray(1).numElements()
+  }
+
+  override def close(context: TaskAttemptContext): Unit = {
+  }
+
+  /**
+   * Layout of node:
+   * Field Description                        Byte Size
+   * Key Meta Section                         4 + 4 * N
+   * Key Count                                 4 Bytes
+   * Start Pos for Key #1 in Key Data          4 Bytes
+   * Start Pos for Key #1 in Row Id List       4 Bytes
+   * ...
+   * Start Pos for Key #N in Key Data          4 Bytes
+   * Start Pos for Key #N in Row Id List       4 Bytes
+   * Key Data Section                         M Bytes
+   * Key Data For Key #1
+   * ...
+   * Key Data For Key #N
+   */
+  private[index] def serializeNode2(
+      uniqueKeyMaps: Seq[InternalRow],
+      startPosInRowList: Int): Array[Byte] = {
+    val buffer = new ByteArrayOutputStream()
+    val keyBuffer = new ByteArrayOutputStream()
+
+    IndexUtils.writeInt(buffer, uniqueKeyMaps.length)
+    var rowPos = startPosInRowList
+    uniqueKeyMaps.foreach { keyMap =>
+      val key = extractKeyFromAggrRow(keyMap)
+      IndexUtils.writeInt(buffer, keyBuffer.size())
+      IndexUtils.writeInt(buffer, rowPos)
+      nnkw.writeKey(keyBuffer, key)
+      rowPos += extractListSizeFromAggrRow(keyMap)
+    }
+    buffer.toByteArray ++ keyBuffer.toByteArray
+  }
+
+  // TODO: BTreeNode can be re-write. It doesn't carry any values.
+  private def sumKeyCount(node: BTreeNode): Int = {
+    if (node.children.nonEmpty) node.children.map(sumKeyCount).sum else node.root
+  }
+
+  /**
+   * Example of Row Id List:
+   * Row Id: 0 1 2 3 4 5 6 7 8 9
+   * Key:    1 2 3 4 1 2 3 4 1 2
+   * Then Row Id List is Stored as: 0481592637
+   */
+  private def serializeAndWriteRowIdLists2(uniqueKeyMaps: ArrayData, nonNullStart: Int): Unit = {
+    def extractListFromAggrRow(row: InternalRow): ArrayData = {
+      row.getArray(1)
+    }
+    val total = uniqueKeyMaps.numElements()
+    val writeSeq = Range(nonNullStart, nonNullStart + total).map(_ % total)
+    writeSeq.foreach { idx =>
+      val list = extractListFromAggrRow(uniqueKeyMaps.getStruct(idx, 2))
+      val listCount = list.numElements()
+      // Range(0, listCount).foreach(i => fileWriter.writeRowId(IndexUtils.toBytes(list.getInt(i))))
+      Range(0, listCount).foreach(i => fileWriter.writeRowId(
+        IndexUtils.toBytes(list.getStruct(i, 1).getInt(0))))
+    }
+  }
+
+  /**
+   * Layout of Footer:
+   * Field Description              Byte Size
+   * Index Version Number           4 Bytes
+   * Row Count with Non-Null Key    4 Bytes
+   * Row Count With Null Key        4 Bytes
+   * Node Count                     4 Bytes
+   * Nodes Meta Data                Node Count * 20 Bytes
+   * Row Count                        4 Bytes
+   * Start Pos                        4 Bytes
+   * Size In Byte                     4 Bytes
+   * Min Key Pos in Key Data          4 Bytes
+   * Max Key Pos in Key Data          4 Bytes
+   *
+   * Statistic info Size              4 Bytes
+   * Statistic Info                   X Bytes
+   * Key Data - Variable Bytes      M
+   * Min Key For Child #1 - Min
+   * Max Key For Child #1
+   * ...
+   * Min Key For Child #N
+   * Max Key For Child #N - Max
+   * TODO: Make serialize and deserialize(in reader) in same style.
+   */
+  private def serializeFooter(nullKeyRowCount: Int, nodes: Seq[BTreeNodeMetaData]): Array[Byte] = {
+    val buffer = new ByteArrayOutputStream()
+    val keyBuffer = new ByteArrayOutputStream()
+    val statsBuffer = new ByteArrayOutputStream()
+
+    // Index File Version Number
+    IndexUtils.writeInt(buffer, IndexFile.VERSION_NUM)
+    // Record Count(all with non-null key) of all nodes in B+ tree
+    IndexUtils.writeInt(buffer, nodes.map(_.rowCount).sum)
+    // Count of Record(s) that have null key
+    IndexUtils.writeInt(buffer, nullKeyRowCount)
+    // Child Count
+    IndexUtils.writeInt(buffer, nodes.size)
+
+    var offset = 0
+    nodes.foreach { node =>
+      // Row Count for each Child
+      IndexUtils.writeInt(buffer, node.rowCount)
+      // Start Pos for each Child
+      IndexUtils.writeInt(buffer, offset)
+      // Size for each Child
+      IndexUtils.writeInt(buffer, node.byteSize)
+      // Min Key Pos for each Child
+      IndexUtils.writeInt(buffer, keyBuffer.size())
+      if (node.min != null) {
+        nnkw.writeKey(keyBuffer, node.min)
+      }
+      // Max Key Pos for each Child
+      IndexUtils.writeInt(buffer, keyBuffer.size())
+      if (node.max != null) {
+        nnkw.writeKey(keyBuffer, node.max)
+      }
+      offset += node.byteSize
+    }
+    // the return of write should be equal to statsBuffer.size
+    statisticsManager.write(statsBuffer)
+    IndexUtils.writeInt(buffer, statsBuffer.size)
+    buffer.toByteArray ++ statsBuffer.toByteArray ++ keyBuffer.toByteArray
+  }
+}

@@ -24,14 +24,16 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.io.FileCommitProtocol
+import org.apache.spark.rdd.{InputFileNameHolder, RDD}
 import org.apache.spark.scheduler.cluster.CoarseGrainedSchedulerBackend
 import org.apache.spark.scheduler.local.LocalSchedulerBackend
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes._
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.Project
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project, UnaryNode}
+import org.apache.spark.sql.execution.{SparkPlan, UnaryExecNode}
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap._
@@ -41,6 +43,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.rpc.OapMessages.CacheDrop
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.UTF8String
 
 
 /**
@@ -172,18 +175,34 @@ case class CreateIndexCommand(
       "indexType" -> indexType.toString
     )
 
-    val retVal = FileFormatWriter.write(
-      sparkSession = sparkSession,
-      queryExecution = ds.queryExecution,
-      fileFormat = new OapIndexFileFormat,
-      committer = committer,
-      outputSpec = FileFormatWriter.OutputSpec(
-        qualifiedOutputPath.toUri.getPath, Map.empty),
-      hadoopConf = configuration,
-      partitionColumns = Seq.empty,
-      bucketSpec = Option.empty,
-      refreshFunction = _ => Unit,
-      options = options).asInstanceOf[Seq[Seq[IndexBuildResult]]]
+    val retVal = if (indexType == BTreeIndexType) {
+      FileFormatWriter.write(
+        sparkSession = sparkSession,
+        queryExecution = Dataset.ofRows(
+          sparkSession, PrepareForIndexBuild(ds.logicalPlan)).queryExecution,
+        fileFormat = new OapIndexFileFormat2,
+        committer = committer,
+        outputSpec = FileFormatWriter.OutputSpec(
+          qualifiedOutputPath.toUri.getPath, Map.empty),
+        hadoopConf = configuration,
+        partitionColumns = Seq.empty,
+        bucketSpec = Option.empty,
+        refreshFunction = _ => Unit,
+        options = options).asInstanceOf[Seq[Seq[IndexBuildResult]]]
+    } else {
+      FileFormatWriter.write(
+        sparkSession = sparkSession,
+        queryExecution = ds.queryExecution,
+        fileFormat = new OapIndexFileFormat,
+        committer = committer,
+        outputSpec = FileFormatWriter.OutputSpec(
+          qualifiedOutputPath.toUri.getPath, Map.empty),
+        hadoopConf = configuration,
+        partitionColumns = Seq.empty,
+        bucketSpec = Option.empty,
+        refreshFunction = _ => Unit,
+        options = options).asInstanceOf[Seq[Seq[IndexBuildResult]]]
+    }
 
     val retMap = retVal.flatten.groupBy(_.parent)
     bAndP.foreach(bp =>
@@ -691,5 +710,78 @@ case class OapEnableIndexCommand(indexName: String) extends RunnableCommand {
     }
     sparkSession.conf.set(OapConf.OAP_INDEX_DISABLE_LIST.key, refreshedDisableList.mkString(", "))
     Seq.empty
+  }
+}
+
+/**
+ * This is used for index build pre-aggregate for each file.
+ * The output looks like
+ * Row("filename1.oap", 2, [Row(NullRow, [7,8]), Row(Row(1), [0,1,3,4,5,6]), Row(Row(5), [2,9])])
+ * The operation is like
+ * "select filename, count(distinct index_col), collect_list((index_col, id_list))
+ * from
+ * (
+ *   select filename, index_col, collect_list(row_id) as id_list from _RowIdScan
+ *   group by filename, index_col order by filename, index_col
+ * ) temp_agg
+ * group by filename"
+ */
+case class PrepareForIndexBuild(child: LogicalPlan, output: Seq[Attribute]) extends UnaryNode {
+  override def producedAttributes: AttributeSet = AttributeSet(output)
+}
+
+/** Factory for constructing new `RowIdScan` nodes. */
+object PrepareForIndexBuild {
+  def apply(child: LogicalPlan): PrepareForIndexBuild = {
+    val output = StructType(Seq(
+      StructField("_oap_filename", StringType),
+      StructField("_oap_unique_count", IntegerType),
+      StructField("_oap_grouped_keys", ArrayType(StructType(Seq(
+        StructField("key", child.output.toStructType),
+        StructField("ids", ArrayType(IntegerType))))))
+    )).toAttributes
+    new PrepareForIndexBuild(RowIdScan(child), output)
+  }
+}
+
+case class RowIdScan(child: LogicalPlan, output: Seq[Attribute]) extends UnaryNode {
+  override def producedAttributes: AttributeSet = AttributeSet(output)
+}
+
+case class RowIdScanExec(child: SparkPlan, output: Seq[Attribute]) extends UnaryExecNode {
+  override protected def doExecute(): RDD[Key] = {
+    child.execute().mapPartitions { iter =>
+      new Iterator[Key] {
+        private var cnt = 0
+        private var oldName: Option[UTF8String] = None
+        override def hasNext: Boolean = iter.hasNext
+        override def next(): Key = {
+          val fName = InputFileNameHolder.getInputFileName()
+          if (!oldName.getOrElse(UTF8String.EMPTY_UTF8).equals(fName)) {
+            cnt = 0
+            oldName = Some(fName)
+          }
+          val ret = InternalRow(iter.next(), oldName.getOrElse(UTF8String.EMPTY_UTF8), cnt)
+          if (cnt == Int.MaxValue) {
+            throw new OapException("Cannot support indexing more than 2G rows!")
+          }
+          cnt += 1
+          ret
+        }
+      }
+    }
+  }
+}
+
+/** Factory for constructing new `RowIdScan` nodes. */
+object RowIdScan {
+  def apply(child: LogicalPlan): RowIdScan = {
+    val output = child.output ++ StructType(Seq(
+      StructField("_oap_index_key", StructType(child.output.map(att =>
+        StructField(att.name, att.dataType, att.nullable)))),
+      StructField("_oap_filename", StringType),
+      StructField("_oap_row_id", IntegerType)
+    )).toAttributes
+    new RowIdScan(child, output)
   }
 }

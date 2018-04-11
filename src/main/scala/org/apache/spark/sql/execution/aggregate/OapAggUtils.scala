@@ -54,6 +54,35 @@ object OapAggUtils {
     }
   }
 
+  def createLocalAggregate(
+      groupingExpressions: Seq[NamedExpression] = Nil,
+      aggregateExpressions: Seq[AggregateExpression] = Nil,
+      aggregateAttributes: Seq[Attribute] = Nil,
+      resultExpressions: Seq[NamedExpression] = Nil,
+      child: SparkPlan): SparkPlan = {
+    val useHash = HashAggregateExec.supportsAggregate(
+      aggregateExpressions.flatMap(_.aggregateFunction.aggBufferAttributes))
+    if (useHash) {
+      HashAggregateExec(
+        requiredChildDistributionExpressions = None,
+        groupingExpressions = groupingExpressions,
+        aggregateExpressions = aggregateExpressions,
+        aggregateAttributes = aggregateAttributes,
+        initialInputBufferOffset = 0,
+        resultExpressions = resultExpressions,
+        child = child)
+    } else {
+      SortAggregateExec(
+        requiredChildDistributionExpressions = None,
+        groupingExpressions = groupingExpressions,
+        aggregateExpressions = aggregateExpressions,
+        aggregateAttributes = aggregateAttributes,
+        initialInputBufferOffset = 0,
+        resultExpressions = resultExpressions,
+        child = child)
+    }
+  }
+
   def planAggregateWithoutDistinct(
       groupingExpressions: Seq[NamedExpression],
       aggregateExpressions: Seq[AggregateExpression],
