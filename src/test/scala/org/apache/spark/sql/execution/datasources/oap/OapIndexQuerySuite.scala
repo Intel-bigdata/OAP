@@ -137,6 +137,7 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
     checkAnswer(sql("SELECT * FROM oap_test_1 WHERE b like 'this3%'"),
       Row(3, "this3 is test") :: Row(30, "this30 is test") :: Nil)
     sqlConf.setConf(OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY, true)
+    sql("drop oindex index1 on oap_test_1")
   }
 
   test("startswith using multi-dimension index") {
@@ -149,6 +150,7 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
     checkAnswer(sql("SELECT * FROM oap_test_1 WHERE b like 'this3%'"),
       Row(3, "this3 is test") :: Row(30, "this30 is test") :: Nil)
     sqlConf.setConf(OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY, true)
+    sql("drop oindex index1 on oap_test_1")
   }
 
   test("startswith using multi-dimension index - multi-filters") {
@@ -161,6 +163,7 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
     checkAnswer(sql("SELECT * FROM oap_test_1 WHERE a = 3 and b like 'this3%'"),
       Row(3, "this3 is test") :: Nil)
     sqlConf.setConf(OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY, true)
+    sql("drop oindex index1 on oap_test_1")
   }
 
   test("startswith using multi-dimension index 2") {
@@ -174,5 +177,6 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
     checkAnswer(sql("SELECT * FROM oap_test_1 WHERE b like 'this3%'"),
       Row(3, "this3 is test") :: Row(30, "this30 is test") :: Nil)
     sqlConf.setConf(OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY, true)
+    sql("drop oindex index1 on oap_test_1")
   }
 }

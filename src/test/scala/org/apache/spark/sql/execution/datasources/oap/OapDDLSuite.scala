@@ -57,6 +57,7 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     val oapDf = spark.read.format("oap").load(path)
     oapDf.createOrReplaceTempView("t")
     sql("create oindex index1 on t (key)")
+    sql("drop oindex index1 on t")
   }
 
   test("show index") {
@@ -86,6 +87,14 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
         Row("oap_test_2", "index6", 0, "a", "A", "BITMAP", true) ::
         Row("oap_test_2", "index1", 0, "a", "D", "BTREE", true) ::
         Row("oap_test_2", "index1", 1, "b", "D", "BTREE", true) :: Nil)
+
+    sql("drop oindex index1 on oap_test_1")
+    sql("drop oindex index2 on oap_test_1")
+    sql("drop oindex index3 on oap_test_1")
+    sql("drop oindex index4 on oap_test_2")
+    sql("drop oindex index5 on oap_test_2")
+    sql("drop oindex index6 on oap_test_2")
+    sql("drop oindex index1 on oap_test_2")
   }
 
   test("create and drop index with partition specify") {
@@ -131,6 +140,7 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     assert(path.getFileSystem(
       configuration).globStatus(new Path(path,
       "oap_partition_table/b=2/c=c2/*.index")).length != 0)
+    sql("drop oindex index1 on oap_partition_table partition (b=2, c='c2')")
   }
 
   test("create duplicated name index") {
@@ -154,5 +164,6 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       fileStatus.getPath.getName
     }
     assert(indexFiles1 === indexFiles2)
+    sql("drop oindex idxa on t")
   }
 }

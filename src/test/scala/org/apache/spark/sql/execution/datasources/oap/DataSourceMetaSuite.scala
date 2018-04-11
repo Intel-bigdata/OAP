@@ -183,6 +183,9 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
     assert(fileMetas2(0).dataFileName.endsWith(OapFileFormat.OAP_DATA_EXTENSION))
     assert(oapMeta2.schema === oapMeta.schema)
     assert(oapMeta2.dataReaderClassName === oapMeta.dataReaderClassName)
+    // clean index after case
+    sql("drop oindex index1 on oapt1")
+    sql("drop oindex index3 on oapt1")
   }
 
   test("Oap IndexMeta Test") {
@@ -210,6 +213,8 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
       BTreeIndexEntry(2, Descending),
       BTreeIndexEntry(1, Ascending)
     )))
+    // clean index after case
+    sql("drop oindex mi on oapt1")
   }
 
   test("Oap Meta integration test for parquet") {
@@ -239,6 +244,9 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
     assert(fileHeader2.recordCount === 100)
     assert(fileHeader2.dataFileCount === 3)
     assert(fileHeader2.indexCount === 2)
+    // clean index after case
+    sql("drop oindex index1 on oapt1")
+    sql("drop oindex index3 on oapt1")
   }
 
   test("FileMeta's data file name test for parquet") {
@@ -264,6 +272,8 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
     assert(fileMetas.map(_.recordCount).sum === 100)
     assert(fileMetas(0).dataFileName.endsWith(".parquet"))
     assert(fileMetas(0).dataFileName.startsWith("part"))
+    // clean index after case
+    sql("drop oindex index1 on t")
   }
 
   test("Oap meta for partitioned table") {
@@ -529,6 +539,10 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
     assert(
       multi_column6.zip(multiRequirements)
         .map(x => meta.isSupportedByIndex(x._1, Some(x._2))).reduce(_ && _))
+    // clean index after case
+    sql("drop oindex indexA on oapt1")
+    sql("drop oindex indexC on oapt1")
+    sql("drop oindex indexABC on oapt1")
 
   }
 }

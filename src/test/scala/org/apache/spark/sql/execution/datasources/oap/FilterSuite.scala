@@ -212,6 +212,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND b = 'this is test 2'"),
       Row(2, "this is test 2") :: Nil)
+    sql("drop oindex index1 on parquet_test")
   }
 
   test("filtering parquet2") {
@@ -234,6 +235,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
       Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+    sql("drop oindex index1 on parquet_test")
   }
 
   test("test refresh in parquet format on same partition") {
@@ -263,6 +265,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("select * from t_refresh_parquet"),
       Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 1) :: Nil)
+    sql("drop oindex index1 on t_refresh_parquet")
   }
 
   test("test refresh in parquet format on different partition") {
@@ -299,6 +302,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("select * from t_refresh_parquet"),
       Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(5, 1) :: Row(4, 2) :: Nil)
+    sql("drop oindex index1 on t_refresh_parquet")
   }
 
   test("test refresh in parquet format on a partition") {
@@ -349,6 +353,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("select * from t_refresh_parquet"),
       Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Row(3, 2) :: Row(4, 3) :: Nil)
+
+    sql("drop oindex index1 on t_refresh_parquet partition (b=1)")
+    sql("drop oindex index1 on t_refresh_parquet partition (b=2)")
   }
 
   test("test refresh in oap format on same partition") {
@@ -378,6 +385,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("select * from t_refresh"),
       Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 1) :: Nil)
+    sql("drop oindex index1 on t_refresh")
   }
 
   test("test refresh in oap format on different partition") {
@@ -414,6 +422,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("select * from t_refresh"),
       Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 2) :: Row(5, 1) :: Nil)
+    sql("drop oindex index1 on t_refresh")
   }
 
   test("test refresh in oap format on a partition") {
@@ -464,6 +473,8 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("select * from t_refresh"),
       Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Row(3, 2) :: Row(4, 3) :: Nil)
+    sql("drop oindex index1 on t_refresh partition (b=1)")
+    sql("drop oindex index1 on t_refresh partition (b=2)")
   }
 
   test("refresh table of oap format without partition") {
@@ -485,6 +496,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
       Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
+    sql("drop oindex index1 on oap_test")
   }
 
   test("refresh table of parquet format without partition") {
@@ -501,6 +513,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
       Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
+    sql("drop oindex index1 on parquet_test")
   }
 
   test("filtering by string") {
@@ -517,6 +530,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
       Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
+    sql("drop oindex index1 on oap_test")
   }
 
   test("support data append without refresh") {
@@ -529,6 +543,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql("insert into table oap_test select * from t where key = 100")
     checkAnswer(sql("SELECT * FROM oap_test WHERE a = 100"),
       Row(100, "this is test 100") :: Nil)
+    sql("drop oindex index1 on oap_test")
 
     sql("insert overwrite table parquet_test select * from t where key > 100")
     sql("create oindex index1 on parquet_test (a)")
@@ -536,6 +551,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql("insert into table parquet_test select * from t where key = 100")
     checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 100"),
       Row(100, "this is test 100") :: Nil)
+    sql("drop oindex index1 on parquet_test")
   }
 
   test("filtering by string with duplicate refresh") {
@@ -562,6 +578,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
       Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
+    sql("drop oindex index1 on oap_test")
   }
 
   test("filtering with string type index") {
@@ -589,6 +606,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       "b in('this is test 1','this is test 2','this is test 4')"),
       Row(1, "this is test 1") :: Row(2, "this is test 2")
         :: Row(4, "this is test 4") :: Nil)
+    sql("drop oindex index1 on parquet_test")
   }
 
   test("test parquet use in StringFieldNotCastDouble") {
@@ -602,6 +620,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       "b in(1,2,4)"),
       Row(1, "1") :: Row(2, "2")
         :: Row(4, "4") :: Nil)
+    sql("drop oindex index1 on parquet_test")
   }
 
   test("test parquet use in IntFieldNotCastDouble") {
@@ -613,6 +632,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     // will use a in (20,30,40), value cast to int
     checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
       "a=10 AND a in (20,30,40)"), Nil)
+    sql("drop oindex index1 on parquet_test")
   }
 
   test("test parquet query include in") {
@@ -651,6 +671,8 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       "b='10' or b in (10,20,30)"),
       Row(10, "10") :: Row(20, "20")
         :: Row(30, "30")  :: Nil)
+    sql("drop oindex index1 on parquet_test")
+    sql("drop oindex index2 on parquet_test")
   }
 
 
@@ -666,6 +688,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       "a BETWEEN 10 AND 12"),
       Row(10, "10") :: Row(11, "11")
         :: Row(12, "12") :: Nil)
+    sql("drop oindex index1 on parquet_test")
   }
 
   test("test oap use in") {
@@ -687,7 +710,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM oap_test WHERE " +
       "b in('this is test 1','this is test 2','this is test 1')"),
       Row(1, "this is test 1") :: Row(2, "this is test 2") :: Nil)
-
+    sql("drop oindex index1 on oap_test")
   }
 
 
@@ -700,6 +723,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     // will use a in (20,30,40), value cast to int
     checkAnswer(sql("SELECT * FROM oap_test WHERE " +
       "a=10 AND a in (20,30,40)"), Nil)
+    sql("drop oindex index1 on oap_test")
   }
 
   test("test oap query include in") {
@@ -738,6 +762,8 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM oap_test WHERE " +
       "b='10' or (b = '20' and a in (10,20,30))"),
       Row(10, "10") :: Row(20, "20") :: Nil)
+    sql("drop oindex index1 on oap_test")
+    sql("drop oindex index2 on oap_test")
   }
 
   test("test parquet inner join") {
@@ -751,6 +777,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       "inner join parquet_test t2 on t1.a = t2.a " +
       "group by t2.a"),
       Row(3, 3450.0) :: Nil)
+    sql("drop oindex index1 on parquet_test")
   }
 
   test("filtering null key") {

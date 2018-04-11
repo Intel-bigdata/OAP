@@ -17,10 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import org.scalatest.BeforeAndAfterEach
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkConf
 import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
@@ -113,6 +112,7 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
     assertResult(summary.dataFiberSize)(summary2.dataFiberSize)
     assertResult(summary.indexFiberCount)(summary2.indexFiberCount)
     assertResult(summary.indexFiberSize)(summary2.indexFiberSize)
+    sql("drop oindex index1 on oap_test")
   }
 
   test("test FiberCacheManagerSensor onCustomInfoUpdate FiberCacheManagerMessager") {

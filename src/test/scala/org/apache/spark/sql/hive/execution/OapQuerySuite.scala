@@ -71,6 +71,7 @@ class OapQuerySuite extends HiveComparisonTest with BeforeAndAfter  {
     sql("create oindex if not exists p_index on p_table(key)")
 
     assert(sql("select val from p_table where key = 238").collect().head.getString(0) == "val_238")
+    sql("drop oindex p_index on p_table")
     sql("drop table p_table")
   }
 
@@ -80,5 +81,6 @@ class OapQuerySuite extends HiveComparisonTest with BeforeAndAfter  {
 
     sql("create oindex p_index on p_table1(key)")
     assertDupIndex { sql("create oindex p_index on p_table1(key)") }
+    sql("drop oindex p_index on p_table1")
   }
 }

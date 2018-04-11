@@ -336,7 +336,8 @@ class OapPlannerSuite
         assert(tmpDir.listFiles.nonEmpty)
         checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
 
-        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
+        checkAnswer(sql(s"show oindex from $tabName"),
+          Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
         sql(s"DROP TABLE $tabName")
         assert(tmpDir.listFiles.nonEmpty)
       }
@@ -407,6 +408,7 @@ class OapPlannerSuite
         checkAnswer(
           sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
         checkAnswer(sql(s"select a from $tabName where a=555"), Row(555))
+        sql(s"drop oindex idxa on $tabName")
         sql(s"DROP TABLE $tabName")
         assert(tmpDir.listFiles.nonEmpty)
       }
@@ -453,6 +455,7 @@ class OapPlannerSuite
           sql(s"check oindex on $tabName"),
           Row(s"Data file: $dirPath/$dataFileName not found!"))
 
+        sql(s"drop oindex idxa on $tabName")
         sql(s"DROP TABLE $tabName")
         assert(tmpDir.listFiles.nonEmpty)
       }

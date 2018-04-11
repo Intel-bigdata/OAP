@@ -106,6 +106,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
 
     checkAnswer(sql("check oindex on oap_partition_table"),
       Row(s"Meta file not found in partition: ${partitionPath.toUri.getPath}"))
+    sql("drop oindex idx1 on oap_partition_table")
   }
 
   test("check index on table") {
@@ -117,6 +118,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
 
     sql("create oindex index1 on oap_test_2 (a)")
     checkAnswer(sql("check oindex on oap_test_2"), Nil)
+    sql("drop oindex index1 on oap_test_2")
   }
 
   test("check index on table: Missing data file") {
@@ -172,6 +174,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
           |indexColumn(s): key, indexType: BTree
           |for Data File: $path/$dataFileName
           |of table: t""".stripMargin))
+    sql("drop oindex idx1 on t")
   }
 
   test("check index on partitioned table") {
@@ -202,6 +205,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
     sql("create oindex idx1 on oap_partition_table(a)")
 
     checkAnswer(sql("check oindex on oap_partition_table"), Nil)
+    sql("drop oindex idx1 on oap_partition_table")
   }
 
   test("check index on partitioned table: Missing data file") {
@@ -237,6 +241,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
     // Check again
     checkAnswer(sql("check oindex on oap_partition_table"),
       Seq(Row(s"Data file: ${partitionPath.toUri.getPath}/$dataFileName not found!")))
+    sql("drop oindex idx1 on oap_partition_table")
   }
 
   test("check index on partitioned table: Missing index file") {
@@ -283,6 +288,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
           |indexColumn(s): a, indexType: BTree
           |for Data File: ${partitionPath.toUri.getPath}/$dataFileName
           |of table: oap_partition_table""".stripMargin))
+    sql("drop oindex idx1 on oap_partition_table")
   }
 
   test("check multiple partition directories for ambiguous indices") {
@@ -324,6 +330,8 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
     assert(exception.message.startsWith(
       "\nAmbiguous Index(different indices have the same name):\nindex name:idx1"))
 
+    sql("drop oindex idx1 on oap_partition_table partition(b=1, c='c1')")
+    sql("drop oindex idx1 on oap_partition_table partition(b=2, c='c2')")
   }
 
   test("check index on partitioned table for a specified partition: Missing meta file") {
@@ -359,6 +367,8 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
     checkAnswer(
       sql("check oindex on oap_partition_table partition(b=2, c='c2')"),
       Row(s"Meta file not found in partition: ${partitionPath.toUri.getPath}"))
+
+    sql("drop oindex idx1 on oap_partition_table partition(b=2, c='c2')")
   }
 
   test("check index on partitioned table for a specified partition: Missing data file") {
@@ -397,6 +407,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
     checkAnswer(sql("check oindex on oap_partition_table partition(b=1, c='c1')"), Nil)
     checkAnswer(sql("check oindex on oap_partition_table partition(b=2, c='c2')"),
       Seq(Row(s"Data file: ${partitionPath.toUri.getPath}/$dataFileName not found!")))
+    sql("drop oindex idx1 on oap_partition_table")
   }
 
   test("check index on partitioned table for a specified partition: Missing index file") {
@@ -443,5 +454,6 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
           |indexColumn(s): a, indexType: BTree
           |for Data File: ${partitionPath.toUri.getPath}/$dataFileName
           |of table: oap_partition_table""".stripMargin))
+    sql("drop oindex idx1 on oap_partition_table")
   }
 }

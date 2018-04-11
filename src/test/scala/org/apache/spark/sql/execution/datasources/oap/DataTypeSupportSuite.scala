@@ -116,11 +116,14 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
     sql("create oindex idx1 on oap_partitioned_by_string (a) partition(b='1')")
     checkAnswer(sql("select * from oap_partitioned_by_string where a = 1"),
       Row(1, "1"):: Nil)
+    sql("drop oindex idx1 on oap_partitioned_by_string partition(b='1')")
 
     sql("insert overwrite table parquet_partitioned_by_string select * from t")
     sql("create oindex idx1 on parquet_partitioned_by_string (a) partition(b='1')")
     checkAnswer(sql("select * from parquet_partitioned_by_string where a = 1"),
       Row(1, "1"):: Nil)
+    sql("drop oindex idx1 on parquet_partitioned_by_string partition(b='1')")
+
   }
 
   test("create index on table partitioned by int type") {
@@ -130,11 +133,13 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
     sql("create oindex idx1 on oap_partitioned_by_int (a) partition(b=1)")
     checkAnswer(sql("select * from oap_partitioned_by_int where a = 1"),
       Row(1, 1):: Nil)
+    sql("drop oindex idx1 on oap_partitioned_by_int partition(b=1)")
 
     sql("insert overwrite table parquet_partitioned_by_int select * from t")
     sql("create oindex idx1 on parquet_partitioned_by_int (a) partition(b=1)")
     checkAnswer(sql("select * from parquet_partitioned_by_int where a = 1"),
       Row(1, 1):: Nil)
+    sql("drop oindex idx1 on parquet_partitioned_by_int partition(b=1)")
   }
 
   test("create index on table partitioned by long type") {
@@ -144,11 +149,13 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
     sql("create oindex idx1 on oap_partitioned_by_long (a) partition(b=1)")
     checkAnswer(sql("select * from oap_partitioned_by_long where a = 1"),
       Row(1, 1L):: Nil)
+    sql("drop oindex idx1 on oap_partitioned_by_long partition(b=1)")
 
     sql("insert overwrite table parquet_partitioned_by_long select * from t")
     sql("create oindex idx1 on parquet_partitioned_by_long (a) partition(b=1)")
     checkAnswer(sql("select * from parquet_partitioned_by_long where a = 1"),
       Row(1, 1L):: Nil)
+    sql("drop oindex idx1 on parquet_partitioned_by_long partition(b=1)")
   }
 
   test("create index on table partitioned by boolean type") {
@@ -158,11 +165,13 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
     sql("create oindex idx1 on oap_partitioned_by_boolean (a) partition(b=false)")
     checkAnswer(sql("select * from oap_partitioned_by_boolean where a = 1"),
       Row(1, false):: Nil)
+    sql("drop oindex idx1 on oap_partitioned_by_boolean partition(b=false)")
 
     sql("insert overwrite table parquet_partitioned_by_boolean select * from t")
     sql("create oindex idx1 on parquet_partitioned_by_boolean (a) partition(b=false)")
     checkAnswer(sql("select * from parquet_partitioned_by_boolean where a = 1"),
       Row(1, false):: Nil)
+    sql("drop oindex idx1 on parquet_partitioned_by_boolean partition(b=false)")
   }
 
   test("create index on table partitioned by date type") {
@@ -172,11 +181,13 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
     sql("create oindex idx1 on oap_partitioned_by_date (a) partition(b='1970-01-01')")
     checkAnswer(sql("select * from oap_partitioned_by_date where a = 1"),
       Row(1, DateTimeUtils.toJavaDate(1)):: Nil)
+    sql("drop oindex idx1 on oap_partitioned_by_date partition(b='1970-01-01')")
 
     sql("insert overwrite table parquet_partitioned_by_date select * from t")
     sql("create oindex idx1 on parquet_partitioned_by_date (a) partition(b='1970-01-01')")
     checkAnswer(sql("select * from parquet_partitioned_by_date where a = 1"),
       Row(1, DateTimeUtils.toJavaDate(1)):: Nil)
+    sql("drop oindex idx1 on parquet_partitioned_by_date partition(b='1970-01-01')")
   }
 
   test("create index on table partitioned by double type") {
@@ -186,11 +197,13 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
     sql("create oindex idx1 on oap_partitioned_by_double (a) partition(b=1.0)")
     checkAnswer(sql("select * from oap_partitioned_by_double where a = 1"),
       Row(1, 1.0):: Nil)
+    sql("drop oindex idx1 on oap_partitioned_by_double partition(b=1.0)")
 
     sql("insert overwrite table parquet_partitioned_by_double select * from t")
     sql("create oindex idx1 on parquet_partitioned_by_double (a) partition(b=1.0)")
     checkAnswer(sql("select * from parquet_partitioned_by_double where a = 1"),
       Row(1, 1.0):: Nil)
+    sql("drop oindex idx1 on parquet_partitioned_by_double partition(b=1.0)")
   }
 
   test("create index on table partitioned by float type") {
@@ -200,11 +213,13 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
     sql("create oindex idx1 on oap_partitioned_by_float (a) partition(b=1.0)")
     checkAnswer(sql("select * from oap_partitioned_by_float where a = 1"),
       Row(1, 1.0f):: Nil)
+    sql("drop oindex idx1 on oap_partitioned_by_float partition(b=1.0)")
 
     sql("insert overwrite table parquet_partitioned_by_float select * from t")
     sql("create oindex idx1 on parquet_partitioned_by_float (a) partition(b=1.0)")
     checkAnswer(sql("select * from parquet_partitioned_by_float where a = 1"),
       Row(1, 1.0f):: Nil)
+    sql("drop oindex idx1 on parquet_partitioned_by_float partition(b=1.0)")
   }
 
   test("create index on table partitioned by byte type") {
@@ -214,11 +229,13 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
     sql("create oindex idx1 on oap_partitioned_by_byte (a) partition(b=1)")
     checkAnswer(sql("select * from oap_partitioned_by_byte where a = 1"),
       Row(1, 1.toByte):: Nil)
+    sql("drop oindex idx1 on oap_partitioned_by_byte partition(b=1)")
 
     sql("insert overwrite table parquet_partitioned_by_byte select * from t")
     sql("create oindex idx1 on parquet_partitioned_by_byte (a) partition(b=1)")
     checkAnswer(sql("select * from parquet_partitioned_by_byte where a = 1"),
       Row(1, 1.toByte):: Nil)
+    sql("drop oindex idx1 on parquet_partitioned_by_byte partition(b=1)")
   }
 
   test("create index on table partitioned by short type") {
@@ -228,11 +245,13 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
     sql("create oindex idx1 on oap_partitioned_by_short (a) partition(b=1)")
     checkAnswer(sql("select * from oap_partitioned_by_short where a = 1"),
       Row(1, 1.toShort):: Nil)
+    sql("drop oindex idx1 on oap_partitioned_by_short partition(b=1)")
 
     sql("insert overwrite table parquet_partitioned_by_short select * from t")
     sql("create oindex idx1 on parquet_partitioned_by_short (a) partition(b=1)")
     checkAnswer(sql("select * from parquet_partitioned_by_short where a = 1"),
       Row(1, 1.toShort):: Nil)
+    sql("drop oindex idx1 on parquet_partitioned_by_short partition(b=1)")
   }
 }
 

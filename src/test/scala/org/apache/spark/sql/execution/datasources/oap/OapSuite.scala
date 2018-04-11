@@ -156,6 +156,7 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     val itSetUseIndex = readerIndex.initialize(conf)
     assert(itSetUseIndex.size == 4)
     dir.delete()
+    sql("drop oindex oap_idx on oap_table")
   }
 
   test("OapIndexInfo status and update") {
