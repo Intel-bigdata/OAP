@@ -110,7 +110,7 @@ private[oap] case class OapDataFile(
     // We have to read Array[Byte] from file and decode/decompress it before putToFiberCache
     // TODO: Try to finish this in off-heap memory
     val data = fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
-    MemoryManager.putToDataFiberCache(data)
+    MemoryManager.toDataFiberCache(data)
   }
 
   private def buildIterator(

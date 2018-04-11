@@ -234,7 +234,7 @@ private[oap] object MemoryManager extends Logging {
 
   // Used by IndexFile
   // TODO: putToFiberCache(in: Stream, position: Long, length: Int, type: FiberType)
-  def putToIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): IndexFiberCache = {
+  def toIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): IndexFiberCache = {
     val bytes = new Array[Byte](length)
     in.readFully(position, bytes)
     val memoryBlock = allocate(bytes.length)
@@ -249,7 +249,7 @@ private[oap] object MemoryManager extends Logging {
 
   // Used by OapDataFile since we need to parse the raw data in on-heap memory before put it into
   // off-heap memory
-  def putToDataFiberCache(bytes: Array[Byte]): DataFiberCache = {
+  def toDataFiberCache(bytes: Array[Byte]): DataFiberCache = {
     val memoryBlock = allocate(bytes.length)
     Platform.copyMemory(
       bytes,
