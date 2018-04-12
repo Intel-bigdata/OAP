@@ -35,14 +35,17 @@ import org.apache.spark.sql.types.StructType;
 public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
 
     private int blockId;
+    private int rowGroupCount;
   
     public SingleGroupOapRecordReader(
           Path file,
           Configuration configuration,
           ParquetMetadata footer,
-          int blockId) {
+          int blockId,
+          int rowGroupCount) {
       super(file, configuration, footer);
       this.blockId = blockId;
+      this.rowGroupCount = rowGroupCount;
     }
   
     /**
@@ -64,13 +67,13 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
       super.initializeInternal();
     }
 
-    public void initBatch(int maxRows) {
+    public void initBatch() {
       StructType batchSchema = new StructType();
       for (StructField f: sparkSchema.fields()) {
         batchSchema = batchSchema.add(f);
       }
   
-      columnarBatch = ColumnarBatch.allocate(batchSchema, DEFAULT_MEMORY_MODE, maxRows);
+      columnarBatch = ColumnarBatch.allocate(batchSchema, DEFAULT_MEMORY_MODE, rowGroupCount);
   
       // Initialize missing columns with nulls.
       for (int i = 0; i < missingColumns.length; i++) {

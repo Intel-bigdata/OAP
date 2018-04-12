@@ -30,6 +30,7 @@ import org.apache.parquet.hadoop.api.RecordReader
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.oap.filecache.{MemoryManager, _}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper
@@ -71,7 +72,7 @@ private[oap] case class ParquetDataFile(
         dataFiberBuilder.append(reader.getCurrentValue.asInstanceOf[ColumnarBatch.Row])
       }
     } else {
-      sys.error("Never reach to here!")
+      throw new OapException("buildFiberByteData never reach to here!")
     }
 
     dataFiberBuilder.build().fiberData
@@ -88,9 +89,9 @@ private[oap] case class ParquetDataFile(
       val requiredId = new Array[Int](1)
       requiredId(0) = fiberId
       addRequestSchemaToConf(conf, requiredId)
-      reader = new SingleGroupOapRecordReader(file, conf, meta.footer, groupId)
+      reader = new SingleGroupOapRecordReader(file, conf, meta.footer, groupId, rowGroupRowCount)
       reader.initialize()
-      reader.initBatch(rowGroupRowCount)
+      reader.initBatch()
       val data = buildFiberByteData(schema(fiberId).dataType, rowGroupRowCount, reader)
       MemoryManager.toDataFiberCache(data)
     } finally {
@@ -146,12 +147,13 @@ private[oap] case class ParquetDataFile(
       fiberCacheGroup = requiredColumnIds.map { id =>
         WrappedFiberCache(FiberCacheManager.get(DataFiber(this, id, groupId), conf))
       }
+
+      val rowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
       val columns = fiberCacheGroup.zip(requiredColumnIds).map { case (fiberCache, id) =>
-        new ColumnValues(meta.footer.getBlocks.get(groupId).getRowCount.toInt,
-          schema(id).dataType, fiberCache.fc)
+        new ColumnValues(rowCount, schema(id).dataType, fiberCache.fc)
       }
 
-      rows.reset(meta.footer.getBlocks.get(groupId).getRowCount.toInt, columns)
+      rows.reset(rowCount, columns)
 
       val iter = groupIdToRowIds match {
         case Some(map) =>
@@ -178,7 +180,11 @@ private[oap] case class ParquetDataFile(
     addRequestSchemaToConf(configuration, requiredIds)
     context match {
       case Some(c) =>
-        if (parquetDataCacheEnable) {
+        // Parquet RowGroupCount can more than Int.MaxValue,
+        // in that sence we should not cache data in memory
+        // and rollback to read this rowgroup from file directly.
+        if (parquetDataCacheEnable &&
+        !meta.footer.getBlocks.asScala.exists(blockMeta => blockMeta.getRowCount > Int.MaxValue)) {
           buildIterator(configuration, requiredIds, rowIds = None)
         } else {
           initVectorizedReader(c,
