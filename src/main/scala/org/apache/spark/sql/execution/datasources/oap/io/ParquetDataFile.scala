@@ -47,14 +47,6 @@ private[oap] case class ParquetDataFile(
   private var context: Option[VectorizedContext] = None
   private val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
   private val file = new Path(StringUtils.unEscapeString(path))
-  private val memoryMode = {
-    if (configuration.getBoolean(OapConf.COLUMN_VECTOR_OFFHEAP_ENABLED.key,
-      OapConf.COLUMN_VECTOR_OFFHEAP_ENABLED.defaultValue.get))  {
-      MemoryMode.OFF_HEAP
-    } else {
-      MemoryMode.ON_HEAP
-    }
-  }
   private val parquetDataCacheEnable =
     configuration.getBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key,
       OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.defaultValue.get)
@@ -97,7 +89,7 @@ private[oap] case class ParquetDataFile(
       addRequestSchemaToConf(conf, requiredId)
       reader = new SingleGroupOapRecordReader(file, conf, meta.footer, groupId)
       reader.initialize()
-      reader.initBatch(memoryMode, rowGroupRowCount)
+      reader.initBatch(rowGroupRowCount)
       val data = getFiberByteData(schema(fiberId).dataType, rowGroupRowCount, reader)
       MemoryManager.toDataFiberCache(data)
     } finally {

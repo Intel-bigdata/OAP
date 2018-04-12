@@ -203,11 +203,4 @@ object OapConf {
       .doc("To indicate if enable parquet data cache, default false")
       .booleanConf
       .createWithDefault(false)
-
-  val COLUMN_VECTOR_OFFHEAP_ENABLED =
-    SQLConfigBuilder("spark.sql.columnVector.offheap.enabled")
-      .internal()
-      .doc("When true, use OffHeapColumnVector in ColumnarBatch.")
-      .booleanConf
-      .createWithDefault(false)
 }
