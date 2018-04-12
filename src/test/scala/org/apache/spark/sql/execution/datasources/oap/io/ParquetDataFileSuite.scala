@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap.io
 import java.io.File
 
 import scala.collection.mutable.ArrayBuffer
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.column.ParquetProperties.WriterVersion
@@ -33,6 +34,7 @@ import org.apache.parquet.schema.{MessageType, PrimitiveType}
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
 import org.apache.parquet.schema.Type.Repetition.REQUIRED
 import org.scalatest.BeforeAndAfterEach
+
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
@@ -432,6 +434,11 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
 
   override def dataVersion: WriterVersion = PARQUET_1_0
 
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    FiberCacheManager.clearAllFibers()
+  }
+
   override def data: Seq[Group] = {
     val factory = new SimpleGroupFactory(parquetSchema)
     (0 until 100000).map(i => factory.newGroup()
@@ -443,7 +450,6 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds and rowIds in fiberCache") {
-    FiberCacheManager.clearAllFibers()
     val context = Some(VectorizedContext(null, null, returningBatch = false))
     val newConf = new Configuration(conf)
     newConf.setBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key, true)
@@ -462,11 +468,10 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
     for (i <- rowIds.indices) {
       assert(rowIds(i) == result(i))
     }
-    assert(FiberCacheManager.cacheCount == 2)
+    assert(FiberCacheManager.cacheCount == 2, "Expected result length does not match.")
   }
 
   test("read by columnIds in fiberCache") {
-    FiberCacheManager.clearAllFibers()
     val context = Some(VectorizedContext(null, null, returningBatch = false))
     val newConf = new Configuration(conf)
     newConf.setBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key, true)
@@ -484,7 +489,7 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
     for (i <- 0 until length) {
       assert(i == result(i))
     }
-    assert(FiberCacheManager.cacheCount == 4)
+    assert(FiberCacheManager.cacheCount == 4, "Expected result length does not match.")
   }
 }
 
