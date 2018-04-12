@@ -28,7 +28,6 @@ import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.hadoop._
 import org.apache.parquet.hadoop.api.RecordReader
 
-import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
@@ -51,8 +50,10 @@ private[oap] case class ParquetDataFile(
     configuration.getBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key,
       OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.defaultValue.get)
 
-  private def getFiberByteData (dataType: DataType, rowGroupRowCount: Int,
-                                reader: SingleGroupOapRecordReader): Array[Byte] = {
+  private def buildFiberByteData(
+       dataType: DataType,
+       rowGroupRowCount: Int,
+       reader: SingleGroupOapRecordReader): Array[Byte] = {
     val dataFiberBuilder: DataFiberBuilder = dataType match {
       case StringType =>
         StringFiberBuilder(rowGroupRowCount, 0)
@@ -90,7 +91,7 @@ private[oap] case class ParquetDataFile(
       reader = new SingleGroupOapRecordReader(file, conf, meta.footer, groupId)
       reader.initialize()
       reader.initBatch(rowGroupRowCount)
-      val data = getFiberByteData(schema(fiberId).dataType, rowGroupRowCount, reader)
+      val data = buildFiberByteData(schema(fiberId).dataType, rowGroupRowCount, reader)
       MemoryManager.toDataFiberCache(data)
     } finally {
       if (reader != null) {
@@ -103,43 +104,41 @@ private[oap] case class ParquetDataFile(
     }
   }
 
-  private def getGroupIdForRowIds(rowIds: Option[Array[Int]]): Option[Map[Int, Array[Int]]] = {
-    rowIds match {
-      case Some(rowIds) =>
-        val totalCount = rowIds.length
-        val roupIdToRowIds = ArrayBuffer[(Int, Array[Int])]()
-        var nextRowGroupStartRowId = 0
-        var index = 0
-        var flag = false
-        var blockId = 0
-        meta.footer.getBlocks.asScala.foreach(block => {
-          val currentRowGroupStartRowId = nextRowGroupStartRowId
-          nextRowGroupStartRowId += block.getRowCount.toInt
-          flag = true
-          val rowIdArray = new ArrayBuffer[Int]()
-          while (flag && index < totalCount) {
-            val globalRowId = rowIds(index)
-            if(globalRowId < nextRowGroupStartRowId) {
-              rowIdArray.append(globalRowId - currentRowGroupStartRowId)
-              index += 1
-            } else {
-              flag = false
-            }
-          }
-          if (rowIdArray.nonEmpty) {
-            roupIdToRowIds.append((blockId, rowIdArray.toArray))
-          }
-          blockId += 1
-        })
-        Some(roupIdToRowIds.toMap)
-      case None => None
-    }
+  private def getGroupIdForRowIds(rowIds: Array[Int]): Map[Int, Array[Int]] = {
+    val totalCount = rowIds.length
+    val groupIdToRowIds = ArrayBuffer[(Int, Array[Int])]()
+    var nextRowGroupStartRowId = 0
+    var index = 0
+    var flag = false
+    var blockId = 0
+    meta.footer.getBlocks.asScala.foreach(block => {
+      val currentRowGroupStartRowId = nextRowGroupStartRowId
+      nextRowGroupStartRowId += block.getRowCount.toInt
+      flag = true
+      val rowIdArray = new ArrayBuffer[Int]()
+      while (flag && index < totalCount) {
+        val globalRowId = rowIds(index)
+        if(globalRowId < nextRowGroupStartRowId) {
+          rowIdArray.append(globalRowId - currentRowGroupStartRowId)
+          index += 1
+        } else {
+          flag = false
+        }
+      }
+      if (rowIdArray.nonEmpty) {
+        groupIdToRowIds.append((blockId, rowIdArray.toArray))
+      }
+      blockId += 1
+    })
+    groupIdToRowIds.toMap
   }
 
-  private def buildIterator(conf: Configuration, requiredColumnIds: Array[Int],
-                            rowIds: Option[Array[Int]]): OapIterator[InternalRow] = {
+  private def buildIterator(
+       conf: Configuration,
+       requiredColumnIds: Array[Int],
+       rowIds: Option[Array[Int]]): OapIterator[InternalRow] = {
     val rows = new BatchColumn()
-    val groupIdToRowIds = getGroupIdForRowIds(rowIds)
+    val groupIdToRowIds = rowIds.map(optionRowIds => getGroupIdForRowIds(optionRowIds))
     val groupIds = groupIdToRowIds.map(_.keys).getOrElse(0 until meta.footer.getBlocks.size())
     var fiberCacheGroup: Array[WrappedFiberCache] = null
 
@@ -152,7 +151,7 @@ private[oap] case class ParquetDataFile(
           schema(id).dataType, fiberCache.fc)
       }
 
-      val rowCount = rows.reset(meta.footer.getBlocks.get(groupId).getRowCount.toInt, columns)
+      rows.reset(meta.footer.getBlocks.get(groupId).getRowCount.toInt, columns)
 
       val iter = groupIdToRowIds match {
         case Some(map) =>

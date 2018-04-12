@@ -214,7 +214,7 @@ private[oap] class OapDataReader(
       options: Map[String, String] = Map.empty): OapIterator[InternalRow] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
-    val fileScanner = DataFile(path.toUri.toString, meta.schema, meta.dataReaderClassName, conf)
+    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
     if (meta.dataReaderClassName.contains("ParquetDataFile")) {
       fileScanner.asInstanceOf[ParquetDataFile].setVectorizedContext(context)
     }

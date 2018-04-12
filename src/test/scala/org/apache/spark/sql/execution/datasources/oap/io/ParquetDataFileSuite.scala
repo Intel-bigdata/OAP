@@ -21,7 +21,6 @@ import java.io.File
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.column.ParquetProperties.WriterVersion
 import org.apache.parquet.column.ParquetProperties.WriterVersion.{PARQUET_1_0, PARQUET_2_0}
@@ -52,32 +51,34 @@ abstract class ParquetDataFileSuite extends SparkFunSuite with SharedOapContext
 
   protected val fileName: String = Utils.tempFileWith(fileDir).getAbsolutePath
 
-  protected val conf: Configuration = {
-    val conf = new Configuration()
-    conf.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING.key,
-      SQLConf.PARQUET_BINARY_AS_STRING.defaultValue.get)
-    conf.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key,
-      SQLConf.PARQUET_INT96_AS_TIMESTAMP.defaultValue.get)
-    conf.setBoolean(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key,
-      SQLConf.PARQUET_WRITE_LEGACY_FORMAT.defaultValue.get)
-    conf
-  }
-
   protected def data: Seq[Group]
 
   protected def parquetSchema: MessageType
 
   protected def dataVersion: WriterVersion
 
-  override def beforeEach(): Unit = prepareData()
+  override def beforeEach(): Unit = {
+    configuration.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING.key,
+      SQLConf.PARQUET_BINARY_AS_STRING.defaultValue.get)
+    configuration.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key,
+      SQLConf.PARQUET_INT96_AS_TIMESTAMP.defaultValue.get)
+    configuration.setBoolean(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key,
+      SQLConf.PARQUET_WRITE_LEGACY_FORMAT.defaultValue.get)
+    prepareData()
+  }
 
-  override def afterEach(): Unit = cleanDir()
+  override def afterEach(): Unit = {
+    configuration.unset(SQLConf.PARQUET_BINARY_AS_STRING.key)
+    configuration.unset(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key)
+    configuration.unset(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key)
+    cleanDir()
+  }
 
   private def prepareData(): Unit = {
     val dictPageSize = 512
     val blockSize = 128 * 1024
     val pageSize = 1024
-    GroupWriteSupport.setSchema(parquetSchema, conf)
+    GroupWriteSupport.setSchema(parquetSchema, configuration)
     val writer = ExampleParquetWriter.builder(new Path(fileName))
       .withCompressionCodec(UNCOMPRESSED)
       .withRowGroupSize(blockSize)
@@ -86,7 +87,7 @@ abstract class ParquetDataFileSuite extends SparkFunSuite with SharedOapContext
       .withDictionaryEncoding(true)
       .withValidation(false)
       .withWriterVersion(dataVersion)
-      .withConf(conf)
+      .withConf(configuration)
       .build()
 
     data.foreach(writer.write)
@@ -95,7 +96,7 @@ abstract class ParquetDataFileSuite extends SparkFunSuite with SharedOapContext
 
   private def cleanDir(): Unit = {
     val path = new Path(fileName)
-    val fs = path.getFileSystem(conf)
+    val fs = path.getFileSystem(configuration)
     if (fs.exists(path.getParent)) {
       fs.delete(path.getParent, true)
     }
@@ -131,7 +132,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds and rowIds") {
-    val reader = ParquetDataFile(fileName, requestSchema, conf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     val requiredIds = Array(0, 1)
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
     val iterator = reader.iterator(requiredIds, rowIds)
@@ -149,7 +150,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds and empty rowIds array") {
-    val reader = ParquetDataFile(fileName, requestSchema, conf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     val requiredIds = Array(0, 1)
     val rowIds = Array.emptyIntArray
     val iterator = reader.iterator(requiredIds, rowIds)
@@ -162,7 +163,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds ") {
-    val reader = ParquetDataFile(fileName, requestSchema, conf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     val requiredIds = Array(0)
     val iterator = reader.iterator(requiredIds)
     val result = ArrayBuffer[ Int ]()
@@ -179,7 +180,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
   }
 
   test("createDataFileHandle") {
-    val reader = ParquetDataFile(fileName, requestSchema, conf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     val meta = reader.createDataFileHandle()
     val footer = meta.footer
     assert(footer.getFileMetaData != null)
@@ -244,7 +245,7 @@ class NestedDataSuite extends ParquetDataFileSuite {
   }
 
   test("skip read record 1") {
-    val reader = ParquetDataFile(fileName, requestStructType, conf)
+    val reader = ParquetDataFile(fileName, requestStructType, configuration)
     val requiredIds = Array(0, 1, 2)
     val rowIds = Array(1)
     val iterator = reader.iterator(requiredIds, rowIds)
@@ -257,7 +258,7 @@ class NestedDataSuite extends ParquetDataFileSuite {
   }
 
   test("read all ") {
-    val reader = ParquetDataFile(fileName, requestStructType, conf)
+    val reader = ParquetDataFile(fileName, requestStructType, configuration)
     val requiredIds = Array(0, 2)
     val iterator = reader.iterator(requiredIds)
     assert(iterator.hasNext)
@@ -304,7 +305,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds and rowIds disable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = false))
-    val reader = ParquetDataFile(fileName, requestSchema, conf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 1134, 1753, 2222, 3928, 4200, 4734)
@@ -323,7 +324,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds and rowIds enable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = true))
-    val reader = ParquetDataFile(fileName, requestSchema, conf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setVectorizedContext(context)
     val requiredIds = Array(0, 1)
     // RowGroup0 => page0: [0, 1, 7, 8, 120, 121, 381, 382]
@@ -349,7 +350,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds and empty rowIds array disable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = false))
-    val reader = ParquetDataFile(fileName, requestSchema, conf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array.emptyIntArray
@@ -363,7 +364,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds and empty rowIds array enable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = true))
-    val reader = ParquetDataFile(fileName, requestSchema, conf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array.emptyIntArray
@@ -377,7 +378,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds disable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = false))
-    val reader = ParquetDataFile(fileName, requestSchema, conf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setVectorizedContext(context)
     val requiredIds = Array(0)
     val iterator = reader.iterator(requiredIds)
@@ -395,7 +396,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds enable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = true))
-    val reader = ParquetDataFile(fileName, requestSchema, conf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setVectorizedContext(context)
     val requiredIds = Array(0)
     val iterator = reader.iterator(requiredIds)
@@ -436,7 +437,13 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
 
   override def beforeEach(): Unit = {
     super.beforeEach()
+    configuration.setBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key, true)
     FiberCacheManager.clearAllFibers()
+  }
+
+  override def afterEach(): Unit = {
+    super.afterEach()
+    configuration.unset(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key)
   }
 
   override def data: Seq[Group] = {
@@ -451,9 +458,7 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
 
   test("read by columnIds and rowIds in fiberCache") {
     val context = Some(VectorizedContext(null, null, returningBatch = false))
-    val newConf = new Configuration(conf)
-    newConf.setBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key, true)
-    val reader = ParquetDataFile(fileName, requestSchema, newConf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 1134, 1753, 2222, 3928, 4200, 4734)
@@ -464,18 +469,16 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
       assert(row.numFields == 2)
       result += row.getInt(0)
     }
-    assert(rowIds.length == result.length)
+    assert(rowIds.length == result.length, "Expected result length does not match.")
     for (i <- rowIds.indices) {
       assert(rowIds(i) == result(i))
     }
-    assert(FiberCacheManager.cacheCount == 2, "Expected result length does not match.")
+    assert(FiberCacheManager.cacheCount == 2, "Cache count does not match.")
   }
 
   test("read by columnIds in fiberCache") {
     val context = Some(VectorizedContext(null, null, returningBatch = false))
-    val newConf = new Configuration(conf)
-    newConf.setBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key, true)
-    val reader = ParquetDataFile(fileName, requestSchema, newConf)
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setVectorizedContext(context)
     val requiredIds = Array(0)
     val iterator = reader.iterator(requiredIds)
@@ -485,11 +488,11 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
       result += row.getInt(0)
     }
     val length = data.length
-    assert(length == result.length)
+    assert(length == result.length, "Expected result length does not match.")
     for (i <- 0 until length) {
       assert(i == result(i))
     }
-    assert(FiberCacheManager.cacheCount == 4, "Expected result length does not match.")
+    assert(FiberCacheManager.cacheCount == 4, "Cache count does not match.")
   }
 }
 
