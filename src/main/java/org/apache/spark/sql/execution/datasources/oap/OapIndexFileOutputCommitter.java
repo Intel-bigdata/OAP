@@ -30,7 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Oap Can Use OapIndexFileOutputCommitter to optimize Commit Job phase of Index DDL operation.
+ * Oap can use OapIndexFileOutputCommitter to optimize Commit Job phase of Index DDL operation.
  */
 public class OapIndexFileOutputCommitter extends FileOutputCommitter {
 
@@ -110,16 +110,16 @@ public class OapIndexFileOutputCommitter extends FileOutputCommitter {
         FileSystem fs,
         final FileStatus from,
         final Path to) throws IOException {
-      logger.debug("Merging Index file from "+from+" to "+to);
+      logger.debug("Merging Index file from " + from + " to " + to);
       if (from.isFile()) {
         if (fs.exists(to)) {
           // for refresh cmd.
           if (!fs.delete(to, true)) {
-            throw new IOException("Failed to delete "+to);
+            throw new IOException("Failed to delete " + to);
           }
         }
         if (!fs.rename(from.getPath(), to)) {
-          throw new IOException("Failed to rename Index File "+from+" to "+to);
+          throw new IOException("Failed to rename Index File " + from + " to " + to);
         }
       } else if(from.isDirectory()) {
         if (fs.exists(to)) {
