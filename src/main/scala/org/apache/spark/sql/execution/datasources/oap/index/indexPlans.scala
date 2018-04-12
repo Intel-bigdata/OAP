@@ -160,6 +160,9 @@ case class CreateIndexCommand(
       outPutPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
     }
 
+    // SQLHadoopMapReduceCommitProtocol use this config to init OutputCommitter,
+    // for create index cmd it will use OapIndexFileOutputCommitter do commitTask,
+    // default value is FileOutputCommitter.
     configuration.set(SQLConf.OUTPUT_COMMITTER_CLASS.key,
       "org.apache.spark.sql.execution.datasources.oap.OapIndexFileOutputCommitter")
 
@@ -386,6 +389,9 @@ case class RefreshIndexCommand(
         outPutPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
       }
 
+      // SQLHadoopMapReduceCommitProtocol use this config to init OutputCommitter,
+      // for refresh index cmd it will use OapIndexFileOutputCommitter do commitTask,
+      // default value is FileOutputCommitter.
       configuration.set(SQLConf.OUTPUT_COMMITTER_CLASS.key,
         "org.apache.spark.sql.execution.datasources.oap.OapIndexFileOutputCommitter")
 
