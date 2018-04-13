@@ -136,7 +136,8 @@ private[sql] class OapFileFormat extends FileFormat
       conf.parquetVectorizedReaderEnabled &&
       conf.wholeStageEnabled &&
       schema.length <= conf.wholeStageMaxNumFields &&
-      schema.forall(_.dataType.isInstanceOf[AtomicType])
+      schema.forall(_.dataType.isInstanceOf[AtomicType]) &&
+      !sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
   }
 
   override def isSplitable(
@@ -293,7 +294,7 @@ private[sql] class OapFileFormat extends FileFormat
           sparkSession.sessionState.conf.parquetVectorizedReaderEnabled &&
           resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
         val returningBatch = supportBatch(sparkSession, resultSchema)
-
+        val parquetDataCacheEnable = sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
@@ -336,9 +337,10 @@ private[sql] class OapFileFormat extends FileFormat
             val totalRows = reader.totalRows()
             oapMetrics.updateTotalRows(totalRows)
             oapMetrics.updateIndexAndRowRead(reader, totalRows)
-            // if enableVectorizedReader == true, return iter directly because of partitionValues
+            // if enableVectorizedReader == true and parquetDataCacheEnable = false,
+            // return iter directly because of partitionValues
             // already filled by VectorizedReader, else use original branch.
-            if (enableVectorizedReader) {
+            if (enableVectorizedReader && !parquetDataCacheEnable) {
               iter
             } else {
               val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes

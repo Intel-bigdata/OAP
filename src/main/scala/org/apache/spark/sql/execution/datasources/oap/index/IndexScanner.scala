@@ -176,15 +176,6 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
   def initialize(dataPath: Path, conf: Configuration): IndexScanner
 }
 
-// A dummy scanner will actually not do any scanning
-private[oap] object DUMMY_SCANNER extends IndexScanner(null) {
-  override def initialize(path: Path, configuration: Configuration): IndexScanner = { this }
-  override def hasNext: Boolean = false
-  override def next(): Int = throw new NoSuchElementException("end of iterating.")
-  override def meta: IndexMeta = throw new NotImplementedError()
-  override def totalRows(): Long = 0
-}
-
 // The building of Search Scanner according to the filter and indices,
 private[oap] object ScannerBuilder extends Logging {
 

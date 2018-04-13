@@ -87,7 +87,7 @@ private[oap] case class FixedSizeTypeFiberBuilder(
     case IntegerType => IntegerType.defaultSize
     case LongType => LongType.defaultSize
     case ShortType => ShortType.defaultSize
-    case _ => throw new NotImplementedError("unknown data type default size")
+    case _ => throw new NotImplementedError(s"data type $dataType default size unknown")
   }
   private val baseOffset = bitStream.toLongArray().length * 8 + Platform.BYTE_ARRAY_OFFSET
   // TODO use the memory pool?
@@ -121,7 +121,7 @@ private[oap] case class FixedSizeTypeFiberBuilder(
       case ShortType =>
         Platform.putShort(bytes, baseOffset + currentRowId * typeDefaultSize,
           row.getShort(ordinal))
-      case _ => throw new NotImplementedError("not implemented Data Type")
+      case _ => throw new NotImplementedError(s"not implemented Data Type $dataType")
     }
   }
 
@@ -321,7 +321,7 @@ object DataFiberBuilder {
         FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, LongType)
       case ShortType =>
         FixedSizeTypeFiberBuilder(defaultRowGroupRowCount, ordinal, ShortType)
-      case _ => throw new NotImplementedError("not implemented type for fiber builder")
+      case _ => throw new NotImplementedError(s"not implemented type $dataType for fiber builder")
     }
   }
 

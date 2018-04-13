@@ -26,7 +26,7 @@ import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 import org.apache.spark.util.collection.BitSet
 
 class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache) {
-  require(dataType.isInstanceOf[AtomicType], "Only atomic type accepted for now.")
+  require(dataType.isInstanceOf[AtomicType], s"Only atomic type accepted for now, got $dataType.")
 
   // for any FiberData, the first defaultSize / 8 will be the bitmask
   // TODO what if defaultSize / 8 is not an integer?
@@ -165,10 +165,10 @@ class BatchColumn {
     override def numFields: Int = values.length
 
     override def setNullAt(i: Int): Unit =
-      throw new NotImplementedError("")
+      throw new NotImplementedError("oap column set null")
 
     override def update(i: Int, value: Any): Unit =
-      throw new NotImplementedError("")
+      throw new NotImplementedError("update oap column value")
 
     override def copy(): InternalRow = {
       val row = new Array[Any](values.length)
@@ -188,7 +188,7 @@ class BatchColumn {
     override def get(ordinal: Int, dataType: DataType): AnyRef = values(ordinal).get(currentIndex)
 
     override def getArray(ordinal: Int): ArrayData =
-      throw new NotImplementedError("")
+      throw new NotImplementedError("get array type")
 
     override def getBinary(ordinal: Int): Array[Byte] = values(ordinal).getBinaryValue(currentIndex)
 
@@ -197,7 +197,7 @@ class BatchColumn {
     override def getByte(ordinal: Int): Byte = values(ordinal).getByteValue(currentIndex)
 
     override def getDecimal(ordinal: Int, precision: Int, scale: Int): Decimal =
-      throw new NotImplementedError("")
+      throw new NotImplementedError("get decimal type")
 
     override def getDouble(ordinal: Int): Double = values(ordinal).getDoubleValue(currentIndex)
 
@@ -206,17 +206,17 @@ class BatchColumn {
     override def getInt(ordinal: Int): Int = values(ordinal).getIntValue(currentIndex)
 
     override def getInterval(ordinal: Int): CalendarInterval =
-      throw new NotImplementedError("")
+      throw new NotImplementedError("get interval type")
 
     override def getLong(ordinal: Int): Long = values(ordinal).getLongValue(currentIndex)
 
     override def getMap(ordinal: Int): MapData =
-      throw new NotImplementedError("")
+      throw new NotImplementedError("get map type")
 
     override def getShort(ordinal: Int): Short = values(ordinal).getShortValue(currentIndex)
 
     override def getStruct(ordinal: Int, numFields: Int): InternalRow =
-      throw new NotImplementedError("")
+      throw new NotImplementedError("get struct type")
 
     override def isNullAt(ordinal: Int): Boolean = values(ordinal).isNullAt(currentIndex)
   }

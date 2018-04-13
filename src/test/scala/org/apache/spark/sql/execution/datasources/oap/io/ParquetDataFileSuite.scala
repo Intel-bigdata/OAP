@@ -21,7 +21,6 @@ import java.io.File
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.column.ParquetProperties.WriterVersion
 import org.apache.parquet.column.ParquetProperties.WriterVersion.{PARQUET_1_0, PARQUET_2_0}
@@ -37,28 +36,20 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.execution.vectorized.ColumnarBatch
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
-abstract class ParquetDataFileSuite extends SparkFunSuite
+abstract class ParquetDataFileSuite extends SparkFunSuite with SharedOapContext
   with BeforeAndAfterEach with Logging {
 
   protected val fileDir: File = Utils.createTempDir()
 
   protected val fileName: String = Utils.tempFileWith(fileDir).getAbsolutePath
-
-  protected val configuration: Configuration = {
-    val conf = new Configuration()
-    conf.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING.key,
-      SQLConf.PARQUET_BINARY_AS_STRING.defaultValue.get)
-    conf.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key,
-      SQLConf.PARQUET_INT96_AS_TIMESTAMP.defaultValue.get)
-    conf.setBoolean(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key,
-      SQLConf.PARQUET_WRITE_LEGACY_FORMAT.defaultValue.get)
-    conf
-  }
 
   protected def data: Seq[Group]
 
@@ -66,9 +57,22 @@ abstract class ParquetDataFileSuite extends SparkFunSuite
 
   protected def dataVersion: WriterVersion
 
-  override def beforeEach(): Unit = prepareData()
+  override def beforeEach(): Unit = {
+    configuration.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING.key,
+      SQLConf.PARQUET_BINARY_AS_STRING.defaultValue.get)
+    configuration.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key,
+      SQLConf.PARQUET_INT96_AS_TIMESTAMP.defaultValue.get)
+    configuration.setBoolean(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key,
+      SQLConf.PARQUET_WRITE_LEGACY_FORMAT.defaultValue.get)
+    prepareData()
+  }
 
-  override def afterEach(): Unit = cleanDir()
+  override def afterEach(): Unit = {
+    configuration.unset(SQLConf.PARQUET_BINARY_AS_STRING.key)
+    configuration.unset(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key)
+    configuration.unset(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key)
+    cleanDir()
+  }
 
   private def prepareData(): Unit = {
     val dictPageSize = 512
@@ -410,6 +414,85 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
     for (i <- 0 until length) {
       assert(i == result(i))
     }
+  }
+}
+
+class ParquetCacheDataSuite extends ParquetDataFileSuite {
+
+  private val requestSchema: StructType = new StructType()
+    .add(StructField("int32_field", IntegerType))
+    .add(StructField("int64_field", LongType))
+    .add(StructField("boolean_field", BooleanType))
+    .add(StructField("float_field", FloatType))
+
+  override def parquetSchema: MessageType = new MessageType("test",
+    new PrimitiveType(REQUIRED, INT32, "int32_field"),
+    new PrimitiveType(REQUIRED, INT64, "int64_field"),
+    new PrimitiveType(REQUIRED, BOOLEAN, "boolean_field"),
+    new PrimitiveType(REQUIRED, FLOAT, "float_field"),
+    new PrimitiveType(REQUIRED, DOUBLE, "double_field")
+  )
+
+  override def dataVersion: WriterVersion = PARQUET_1_0
+
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    configuration.setBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key, true)
+    FiberCacheManager.clearAllFibers()
+  }
+
+  override def afterEach(): Unit = {
+    super.afterEach()
+    configuration.unset(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key)
+  }
+
+  override def data: Seq[Group] = {
+    val factory = new SimpleGroupFactory(parquetSchema)
+    (0 until 100000).map(i => factory.newGroup()
+      .append("int32_field", i)
+      .append("int64_field", 64L)
+      .append("boolean_field", true)
+      .append("float_field", 1.0f)
+      .append("double_field", 2.0d))
+  }
+
+  test("read by columnIds and rowIds in fiberCache") {
+    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
+    val requiredIds = Array(0, 1)
+    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 1134, 1753, 2222, 3928, 4200, 4734)
+    val iterator = reader.iterator(requiredIds, rowIds)
+    val result = ArrayBuffer[Int]()
+    while (iterator.hasNext) {
+      val row = iterator.next()
+      assert(row.numFields == 2)
+      result += row.getInt(0)
+    }
+    assert(rowIds.length == result.length, "Expected result length does not match.")
+    for (i <- rowIds.indices) {
+      assert(rowIds(i) == result(i))
+    }
+    assert(FiberCacheManager.cacheCount == 2, "Cache count does not match.")
+  }
+
+  test("read by columnIds in fiberCache") {
+    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setVectorizedContext(context)
+    val requiredIds = Array(0)
+    val iterator = reader.iterator(requiredIds)
+    val result = ArrayBuffer[Int]()
+    while (iterator.hasNext) {
+      val row = iterator.next()
+      result += row.getInt(0)
+    }
+    val length = data.length
+    assert(length == result.length, "Expected result length does not match.")
+    for (i <- 0 until length) {
+      assert(i == result(i))
+    }
+    assert(FiberCacheManager.cacheCount == 4, "Cache count does not match.")
   }
 }
 

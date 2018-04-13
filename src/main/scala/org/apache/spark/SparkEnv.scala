@@ -93,6 +93,7 @@ class SparkEnv (
       blockManager.master.stop()
       metricsSystem.stop()
       outputCommitCoordinator.stop()
+      oapRpcManager.stop()
       rpcEnv.shutdown()
       rpcEnv.awaitTermination()
 

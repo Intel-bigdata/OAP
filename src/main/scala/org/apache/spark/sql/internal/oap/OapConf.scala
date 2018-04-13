@@ -203,4 +203,11 @@ object OapConf {
       .doc("To indicate if enable/disable oap use executor side commit job")
       .booleanConf
       .createWithDefault(false)
+
+  val OAP_PARQUET_DATA_CACHE_ENABLED =
+    SQLConfigBuilder("spark.sql.oap.parquet.data.cache.enable")
+      .internal()
+      .doc("To indicate if enable parquet data cache, default false")
+      .booleanConf
+      .createWithDefault(false)
 }

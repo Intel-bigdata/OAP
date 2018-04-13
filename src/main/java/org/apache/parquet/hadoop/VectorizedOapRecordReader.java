@@ -311,7 +311,8 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
       for (int i = 0; i < requestedSchema.getFieldCount(); ++i) {
         Type t = requestedSchema.getFields().get(i);
         if (!t.isPrimitive() || t.isRepetition(Type.Repetition.REPEATED)) {
-          throw new UnsupportedOperationException("Complex types not supported.");
+          throw new UnsupportedOperationException(
+            "Complex types " + t.getName() + " not supported.");
         }
 
         String[] colPath = requestedSchema.getPaths().get(i);
