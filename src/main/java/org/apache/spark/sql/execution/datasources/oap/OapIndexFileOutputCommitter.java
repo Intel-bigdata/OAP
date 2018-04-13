@@ -99,8 +99,7 @@ public class OapIndexFileOutputCommitter extends FileOutputCommitter {
     }
 
     /**
-     * Merge two paths together.  Anything in from will be moved into to, if there
-     * are any name conflicts while merging the files or directories in from win.
+     * do mv -r 'from.getPath.getName' 'to.getName'
      * @param fs the File System to use
      * @param from the path data is coming from.
      * @param to the path data is going to.
