@@ -184,7 +184,7 @@ private[oap] case class ParquetDataFile(
         // in that sence we should not cache data in memory
         // and rollback to read this rowgroup from file directly.
         if (parquetDataCacheEnable &&
-        !meta.footer.getBlocks.asScala.exists(blockMeta => blockMeta.getRowCount > Int.MaxValue)) {
+          !meta.footer.getBlocks.asScala.exists(_.getRowCount > Int.MaxValue)) {
           buildIterator(configuration, requiredIds, rowIds = None)
         } else {
           initVectorizedReader(c,
