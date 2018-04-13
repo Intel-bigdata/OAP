@@ -196,4 +196,11 @@ object OapConf {
       .doc("The interval of fiber cache metrics update")
       .longConf
       .createWithDefault(10L)
+
+  val OAP_ENABLE_EXECUTOR_COMMIT_JOB =
+    SQLConfigBuilder("spark.sql.oap.executor.commit.job.enabled")
+      .internal()
+      .doc("To indicate if enable/disable oap use executor side commit job")
+      .booleanConf
+      .createWithDefault(false)
 }
