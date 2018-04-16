@@ -20,9 +20,6 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import java.io.ByteArrayOutputStream
 import java.util.Comparator
 
-import scala.collection.JavaConverters._
-
-import com.google.common.collect.ArrayListMultimap
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
@@ -37,6 +34,7 @@ import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsWriteManager
 import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils, NonNullKeyWriter}
 import org.apache.spark.sql.types._
+import org.apache.spark.util.collection.OpenHashMap
 
 private[index] object BTreeIndexRecordWriter {
   def apply(
@@ -60,7 +58,7 @@ private[index] case class BTreeIndexRecordWriter(
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
   private lazy val nnkw = new NonNullKeyWriter(keySchema)
 
-  private val multiHashMap = ArrayListMultimap.create[InternalRow, Int]()
+  private val openHashMap = new OpenHashMap[InternalRow, Seq[Int]]()
   private var recordCount: Int = 0
   private lazy val statisticsManager = new StatisticsWriteManager {
     this.initialize(BTreeIndexType, keySchema, configuration)
@@ -68,7 +66,7 @@ private[index] case class BTreeIndexRecordWriter(
 
   override def write(key: Void, value: InternalRow): Unit = {
     val v = genericProjector(value).copy()
-    multiHashMap.put(v, recordCount)
+    openHashMap.changeValue(v, Seq(recordCount), oldV => oldV :+ recordCount)
     statisticsManager.addOapKey(v)
     if (recordCount == Int.MaxValue) {
       throw new OapException("Cannot support indexing more than 2G rows!")
@@ -98,8 +96,8 @@ private[index] case class BTreeIndexRecordWriter(
     }
 
     lazy val ordering = buildOrdering(keySchema)
-    val partitionUniqueSize = multiHashMap.keySet().size()
-    val uniqueKeys = multiHashMap.keySet().toArray(new Array[InternalRow](partitionUniqueSize))
+    val partitionUniqueSize = openHashMap.size
+    val uniqueKeys = openHashMap.iterator.map(_._1).toArray
     assert(uniqueKeys.size == partitionUniqueSize)
     val (nullKeys, nonNullKeys) = uniqueKeys.partition(_.anyNull)
     assert(nullKeys.length + nonNullKeys.length == partitionUniqueSize)
@@ -149,7 +147,7 @@ private[index] case class BTreeIndexRecordWriter(
       val nodeUniqueKeys =
         nonNullUniqueKeys.slice(startPosInKeyList, startPosInKeyList + keyCount)
       // total number of row ids of this node
-      val rowCount = nodeUniqueKeys.map(multiHashMap.get(_).size()).sum
+      val rowCount = nodeUniqueKeys.map(openHashMap.apply(_).size).sum
 
       val nodeBuf = serializeNode(nodeUniqueKeys, startPosInRowList)
       fileWriter.writeNode(nodeBuf)
@@ -164,7 +162,7 @@ private[index] case class BTreeIndexRecordWriter(
     // Write Row Id List
     serializeAndWriteRowIdLists(nonNullUniqueKeys ++ nullKeys)
     // Write Footer
-    val nullKeyRowCount = nullKeys.map(multiHashMap.get(_).size()).sum
+    val nullKeyRowCount = nullKeys.map(openHashMap.apply(_).size).sum
     fileWriter.writeFooter(serializeFooter(nullKeyRowCount, nodes))
     // End
     fileWriter.end()
@@ -197,7 +195,7 @@ private[index] case class BTreeIndexRecordWriter(
       IndexUtils.writeInt(buffer, keyBuffer.size())
       IndexUtils.writeInt(buffer, rowPos)
       nnkw.writeKey(keyBuffer, key)
-      rowPos += multiHashMap.get(key).size()
+      rowPos += openHashMap.apply(key).size
     }
     buffer.toByteArray ++ keyBuffer.toByteArray
   }
@@ -215,7 +213,7 @@ private[index] case class BTreeIndexRecordWriter(
    */
   private def serializeAndWriteRowIdLists(uniqueKeys: Seq[InternalRow]): Unit = {
     uniqueKeys.foreach { key =>
-      multiHashMap.get(key).asScala.foreach(x =>
+      openHashMap.apply(key).foreach(x =>
         fileWriter.writeRowId(IndexUtils.toBytes(x))
       )
     }

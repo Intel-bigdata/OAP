@@ -34,6 +34,7 @@ import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsWriteManager
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyWriter
 import org.apache.spark.sql.types._
+import org.apache.spark.util.collection.OpenHashMap
 
 private[oap] object BitmapIndexSectionId {
   val headerSection : Int = 1 // header
@@ -82,7 +83,7 @@ private[oap] class BitmapIndexRecordWriter(
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
   @transient private lazy val nnkw = new NonNullKeyWriter(keySchema)
 
-  private val rowMapBitmap = new mutable.HashMap[InternalRow, RoaringBitmap]()
+  private val openHashMap = new OpenHashMap[InternalRow, RoaringBitmap]()
   private var recordCount: Int = 0
   private lazy val statisticsWriteManager = new StatisticsWriteManager {
     this.initialize(BitMapIndexType, keySchema, configuration)
@@ -104,14 +105,11 @@ private[oap] class BitmapIndexRecordWriter(
 
   override def write(key: Void, value: InternalRow): Unit = {
     val v = genericProjector(value).copy()
-    if (!rowMapBitmap.contains(v)) {
-      val bm = new RoaringBitmap()
+    def put(bm: RoaringBitmap): RoaringBitmap = {
       bm.add(recordCount)
-      rowMapBitmap.put(v, bm)
-      statisticsWriteManager.addOapKey(v)
-    } else {
-      rowMapBitmap.get(v).get.add(recordCount)
+      bm
     }
+    openHashMap.changeValue(v, put(new RoaringBitmap()), put)
     if (recordCount == Int.MaxValue) {
       throw new OapException("Cannot support indexing more than 2G rows!")
     }
@@ -126,7 +124,7 @@ private[oap] class BitmapIndexRecordWriter(
   private def writeUniqueKeyList(): Unit = {
     val ordering = GenerateOrdering.create(keySchema)
     // val (bmNullKeyList, bmUniqueKeyList) =
-    val (nullKeyList, uniqueKeyList) = rowMapBitmap.keySet.toList.partition(_.anyNull)
+    val (nullKeyList, uniqueKeyList) = openHashMap.iterator.map(_._1).toList.partition(_.anyNull)
     bmNullKeyList = nullKeyList
     assert(bmNullKeyList.size <= 1) // At most one null key exists.
     bmUniqueKeyList = uniqueKeyList.sorted(ordering)
@@ -147,7 +145,7 @@ private[oap] class BitmapIndexRecordWriter(
     var totalBitmapSize = 0
     bmUniqueKeyList.foreach(uniqueKey => {
       bmOffsetListBuffer.append(bmEntryListOffset + totalBitmapSize)
-      val bm = rowMapBitmap.get(uniqueKey).get
+      val bm = openHashMap.apply(uniqueKey)
       bm.runOptimize()
       val bos = new ByteArrayOutputStream()
       val dos = new DataOutputStream(bos)
@@ -165,7 +163,7 @@ private[oap] class BitmapIndexRecordWriter(
     // Write entry for null value rows if exists
     if (bmNullKeyList.nonEmpty) {
       bmNullEntryOffset = bmEntryListOffset + totalBitmapSize
-      val bm = rowMapBitmap.get(bmNullKeyList.head).get
+      val bm = openHashMap.apply(bmNullKeyList.head)
       bm.runOptimize()
       val bos = new ByteArrayOutputStream()
       val dos = new DataOutputStream(bos)
