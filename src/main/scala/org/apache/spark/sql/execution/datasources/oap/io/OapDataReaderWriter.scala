@@ -53,7 +53,7 @@ private[oap] class OapDataWriter(
   logDebug(s"${OapFileFormat.ROW_GROUP_SIZE} setting to $ROW_GROUP_SIZE")
 
   private val COMPRESSION_CODEC = CompressionCodec.valueOf(
-    conf.get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION))
+    conf.get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).toUpperCase())
   logDebug(s"${OapFileFormat.COMPRESSION} setting to ${COMPRESSION_CODEC.name()}")
 
   private var rowCount: Int = 0

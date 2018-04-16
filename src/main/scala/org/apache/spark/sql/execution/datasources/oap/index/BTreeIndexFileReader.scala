@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 
 
@@ -33,13 +34,17 @@ object BTreeIndexFileReader {
     val reader = fs.open(file)
     val fileLen = fs.getFileStatus(file).getLen
 
-    val version = IndexUtils.readHead(reader, 0)
-    if (version == 1) {
-      BTreeIndexFileReaderV1(configuration, reader, file, fileLen)
-    } else if (version == IndexFile.UNKNOWN_VERSION) {
-      throw new OapException("not a valid index file")
-    } else {
-      throw new OapException(s"not support index version: $version")
+    val magic = new Array[Byte](IndexFile.VERSION_LENGTH)
+    reader.readFully(0, magic)
+
+    IndexUtils.deserializeVersion(magic) match {
+      case Some(version) =>
+        IndexVersion.fromId(version) match {
+          case IndexVersion.OAP_INDEX_V1 =>
+            BTreeIndexFileReaderV1(configuration, reader, file, fileLen)
+        }
+      case None =>
+        throw new OapException("not a valid index file")
     }
   }
 }

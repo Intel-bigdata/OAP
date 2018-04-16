@@ -44,8 +44,8 @@ private[oap] case class ParquetDataFile(
     schema: StructType,
     configuration: Configuration) extends DataFile {
 
-  private lazy val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
   private var context: Option[VectorizedContext] = None
+  private lazy val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
   private val file = new Path(StringUtils.unEscapeString(path))
   private val parquetDataCacheEnable =
     configuration.getBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key,

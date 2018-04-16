@@ -419,8 +419,8 @@ private[oap] class OapOutputWriterFactory(
       "LZO" -> ".lzo")
 
     val compressionType =
-      context.getConfiguration
-          .get(OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).trim
+      context.getConfiguration.get(
+        OapFileFormat.COMPRESSION, OapFileFormat.DEFAULT_COMPRESSION).trim.toUpperCase()
 
     extensionMap(compressionType) + OapFileFormat.OAP_DATA_EXTENSION
   }

@@ -37,19 +37,23 @@ private[oap] object IndexUtils {
       Array((versionNum >> 8).toByte, (versionNum & 0xFF).toByte)
   }
 
+  def deserializeVersion(bytes: Array[Byte]): Option[Int] = {
+    val prefix = IndexFile.VERSION_PREFIX.getBytes("UTF-8")
+    val versionPos = bytes.length - 2
+    assert(bytes.length == prefix.length + 2)
+    if (bytes.slice(0, prefix.length) sameElements prefix) {
+      val version = bytes(versionPos) << 8 | bytes(versionPos + 1)
+      Some(version)
+    } else {
+      None
+    }
+  }
+
   def writeHead(writer: OutputStream, versionNum: Int): Int = {
     val versionData = serializeVersion(versionNum)
     assert(versionData.length == IndexFile.VERSION_LENGTH)
     writer.write(versionData)
     IndexFile.VERSION_LENGTH
-  }
-
-  def readHead(reader: FSDataInputStream, offset: Int): Int = {
-    val magic = new Array[Byte](IndexFile.VERSION_LENGTH)
-    reader.readFully(offset, magic)
-    (1 to IndexFile.VERSION_NUM)
-      .find(version => magic sameElements serializeVersion(version))
-      .getOrElse(IndexFile.UNKNOWN_VERSION)
   }
 
   def indexFileFromDataFile(dataFile: Path, name: String, time: String): Path = {

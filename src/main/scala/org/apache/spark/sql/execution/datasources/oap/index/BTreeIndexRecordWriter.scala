@@ -24,17 +24,33 @@ import scala.collection.JavaConverters._
 
 import com.google.common.collect.ArrayListMultimap
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion
+import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion.IndexVersion
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsWriteManager
 import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils, NonNullKeyWriter}
 import org.apache.spark.sql.types._
 
+private[index] object BTreeIndexRecordWriter {
+  def apply(
+      configuration: Configuration,
+      indexFile: Path,
+      schema: StructType,
+      indexVersion: IndexVersion): BTreeIndexRecordWriter = {
+    val writer = BTreeIndexFileWriter(configuration, indexFile)
+    indexVersion match {
+      case IndexVersion.OAP_INDEX_V1 =>
+        BTreeIndexRecordWriter(configuration, writer, schema)
+    }
+  }
+}
 
 private[index] case class BTreeIndexRecordWriter(
     configuration: Configuration,
