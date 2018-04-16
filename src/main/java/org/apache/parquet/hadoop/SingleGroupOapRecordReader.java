@@ -27,7 +27,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.execution.vectorized.ColumnarBatch;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -38,11 +37,11 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
     private int rowGroupCount;
   
     public SingleGroupOapRecordReader(
-          Path file,
-          Configuration configuration,
-          ParquetMetadata footer,
-          int blockId,
-          int rowGroupCount) {
+        Path file,
+        Configuration configuration,
+        ParquetMetadata footer,
+        int blockId,
+        int rowGroupCount) {
       super(file, configuration, footer);
       this.blockId = blockId;
       this.rowGroupCount = rowGroupCount;
@@ -57,7 +56,7 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
     @Override
     public void initialize() throws IOException, InterruptedException {
       if (this.footer == null) {
-          footer = readFooter(configuration, file, NO_FILTER);
+        footer = readFooter(configuration, file, NO_FILTER);
       }
       List<BlockMetaData> inputBlockList = Lists.newArrayList();
       inputBlockList.add(footer.getBlocks().get(blockId));
@@ -83,4 +82,4 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
         }
       }
     }
-  }
+}
