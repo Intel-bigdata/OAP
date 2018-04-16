@@ -91,25 +91,32 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
 
   test("Add the corresponding compression type for the OAP data file name if any") {
     // Case insensitive.
-    Seq("GZIP", "Gzip", "SNAPPY", "snappy", "LZO", "lZo", "UNCOMPRESSED", "UnCompressed")
-      .foreach { codec =>
-        sqlConf.setConfString(OapConf.OAP_COMPRESSION.key, codec)
-        val df = sqlContext.read.format("oap").load(path.getAbsolutePath)
-        df.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
-        val compressionType =
-          sqlConf.getConfString(OapConf.OAP_COMPRESSION.key).toLowerCase()
-        val fileNameIterator = path.listFiles()
-        for (fileName <- fileNameIterator) {
-          if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
-            // If the OAP data file is uncompressed, keep the original file name.
-            if (!codec.toUpperCase().matches("UNCOMPRESSED")) {
-              assert(fileName.toString.contains(compressionType))
-            } else {
-              assert(!fileName.toString.contains(compressionType))
-            }
+    Seq(
+      "GZIP",
+      "Gzip",
+      "SNAPPY",
+      "snappy",
+      "LZO",
+      "lZo",
+      "UNCOMPRESSED",
+      "UnCompressed").foreach { codec =>
+      sqlConf.setConfString(OapConf.OAP_COMPRESSION.key, codec)
+      val df = sqlContext.read.format("oap").load(path.getAbsolutePath)
+      df.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
+      val compressionType =
+        sqlConf.getConfString(OapConf.OAP_COMPRESSION.key).toLowerCase()
+      val fileNameIterator = path.listFiles()
+      for (fileName <- fileNameIterator) {
+        if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
+          // If the OAP data file is uncompressed, keep the original file name.
+          if (!codec.toUpperCase().matches("UNCOMPRESSED")) {
+            assert(fileName.toString.contains(compressionType))
+          } else {
+            assert(!fileName.toString.contains(compressionType))
           }
         }
       }
+    }
     // Restore compression type back to default.
     sqlConf.setConfString(OapConf.OAP_COMPRESSION.key, OapConf.OAP_COMPRESSION.defaultValueString)
   }
