@@ -196,4 +196,18 @@ object OapConf {
       .doc("The interval of fiber cache metrics update")
       .longConf
       .createWithDefault(10L)
+
+  val OAP_INDEX_BTREE_WRITER_VERSION =
+    SQLConfigBuilder("spark.sql.oap.index.btree.writer.version")
+      .internal()
+      .doc("The writer version of BTree index")
+      .stringConf
+      .createWithDefault("v1")
+
+  val OAP_PARQUET_DATA_CACHE_ENABLED =
+    SQLConfigBuilder("spark.sql.oap.parquet.data.cache.enable")
+      .internal()
+      .doc("To indicate if enable parquet data cache, default false")
+      .booleanConf
+      .createWithDefault(false)
 }

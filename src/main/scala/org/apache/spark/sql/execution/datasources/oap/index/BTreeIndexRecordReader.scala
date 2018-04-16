@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatsAnalysisResult
 import org.apache.spark.sql.types._
 
-trait BTreeIndexRecordReader extends Iterator[Int] {
+private[index] trait BTreeIndexRecordReader extends Iterator[Int] {
   def initialize(path: Path, intervalArray: ArrayBuffer[RangeInterval]): Unit
   def analyzeStatistics(
       keySchema: StructType,
@@ -34,7 +34,7 @@ trait BTreeIndexRecordReader extends Iterator[Int] {
   def close(): Unit
 }
 
-object BTreeIndexRecordReader {
+private[index] object BTreeIndexRecordReader {
   def apply(
       configuration: Configuration,
       schema: StructType,

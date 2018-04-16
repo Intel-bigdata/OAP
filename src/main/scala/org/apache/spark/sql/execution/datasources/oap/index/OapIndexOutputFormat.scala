@@ -24,9 +24,19 @@ import org.apache.parquet.hadoop.util.ContextUtil
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
 
 private[index] class OapIndexOutputFormat extends FileOutputFormat[Void, InternalRow] {
+
+  private val BTREE_WRITER_VERSION = OapConf.OAP_INDEX_BTREE_WRITER_VERSION.key
+  private def getWriterVersion(taskAttemptContext: TaskAttemptContext) = {
+    val configuration = ContextUtil.getConfiguration(taskAttemptContext)
+    val indexVersion =
+      configuration.get(BTREE_WRITER_VERSION, OapIndexProperties.DEFAULT_WRITER_VERSION.toString)
+    IndexVersion.fromString(indexVersion)
+  }
 
   override def getRecordWriter(
       taskAttemptContext: TaskAttemptContext): RecordWriter[Void, InternalRow] = {
@@ -43,6 +53,8 @@ private[index] class OapIndexOutputFormat extends FileOutputFormat[Void, Interna
       }
     }
 
+    val writerVersion = getWriterVersion(taskAttemptContext)
+
     val extension = "." + configuration.get(OapIndexFileFormat.INDEX_TIME) +
         "." + configuration.get(OapIndexFileFormat.INDEX_NAME) +
         ".index"
@@ -56,8 +68,7 @@ private[index] class OapIndexOutputFormat extends FileOutputFormat[Void, Interna
     if (canBeSkipped(file)) {
       new DummyIndexRecordWriter()
     } else if (indexType == "BTREE") {
-      val writer = BTreeIndexFileWriter(configuration, file)
-      new BTreeIndexRecordWriter(configuration, writer, schema)
+      BTreeIndexRecordWriter(configuration, file, schema, writerVersion)
     } else if (indexType == "BITMAP") {
       val writer = file.getFileSystem(configuration).create(file, true)
       new BitmapIndexRecordWriter(configuration, writer, schema)

@@ -30,4 +30,6 @@ trait OapRpcManager extends Logging {
 
   private[spark] def send(message: OapMessage): Unit
 
+  private[spark] def stop(): Unit = {}
+
 }

@@ -20,11 +20,13 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import java.io.{ByteArrayOutputStream, DataOutputStream}
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.catalyst.InternalRow
 import org.junit.Assert._
 
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.unsafe.Platform
 
@@ -155,5 +157,24 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
       0, 1, i => InternalRow(i / 3), InternalRow(0), compare) == (0, true))
     assert(IndexUtils.binarySearchForEnd(
       0, 10, i => InternalRow(i * 2), InternalRow(3), compare) == (2, false))
+  }
+
+  test("index version test") {
+    // Simple test to check IndexVersion conversion. Should never fail.
+    IndexVersion.values.foreach { v =>
+      assert(IndexVersion.fromId(v.id) == v)
+    }
+    IndexVersion.values.foreach { v =>
+      assert(IndexVersion.fromString(v.toString) == v)
+    }
+    // Check invalid id/name conversion
+    val exception1 = intercept[OapException] {
+      IndexVersion.fromId(-1)
+    }
+    assert(exception1.getMessage == "Unsupported index version. id: -1")
+    val exception2 = intercept[OapException] {
+      IndexVersion.fromString("v-1")
+    }
+    assert(exception2.getMessage == "Unsupported index version. name: v-1")
   }
 }
