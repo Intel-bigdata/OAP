@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
 import org.apache.spark.sql.execution.datasources.oap.listener.FiberInfoListener
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.sql.internal.oap.OapConf
-import org.apache.spark.sql.test.oap.SharedOapContext
+import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex}
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
 
@@ -71,48 +71,49 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
     data.toDF("key", "value").createOrReplaceTempView("t")
     checkAnswer(sql("SELECT * FROM oap_test"), Seq.empty[Row])
     sql("insert overwrite table oap_test select * from t")
-    sql("create oindex index1 on oap_test (a) using btree")
-    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 500 AND a < 2500"),
-      data.filter(r => r._1 > 500 && r._1 < 2500).map(r => Row(r._1, r._2)))
-    CacheStats.reset
+    withIndex(TestIndex("oap_test", "index1")) {
+      sql("create oindex index1 on oap_test (a) using btree")
+      checkAnswer(sql("SELECT * FROM oap_test WHERE a > 500 AND a < 2500"),
+        data.filter(r => r._1 > 500 && r._1 < 2500).map(r => Row(r._1, r._2)))
+      CacheStats.reset
 
-    // Data/Index file statistic
-    val files = FileSystem.get(new Configuration()).listStatus(new Path(currentPath))
-    var indexFileCount = 0L
-    var dataFileCount = 0L
-    for (file <- files) {
-      if (file.getPath.getName.endsWith(".index")) {
-        indexFileCount += 1L
-      } else if (file.getPath.getName.endsWith(".data")) {
-        dataFileCount += 1L
+      // Data/Index file statistic
+      val files = FileSystem.get(new Configuration()).listStatus(new Path(currentPath))
+      var indexFileCount = 0L
+      var dataFileCount = 0L
+      for (file <- files) {
+        if (file.getPath.getName.endsWith(".index")) {
+          indexFileCount += 1L
+        } else if (file.getPath.getName.endsWith(".data")) {
+          dataFileCount += 1L
+        }
       }
+
+      // Only one executor in local-mode, each data file has 4 dataFiber(2 cols * 2 rgs/col)
+      // wait for a heartbeat
+      Thread.sleep(20 * 1000)
+      val summary = FiberCacheManagerSensor.summary()
+      logWarning(s"Summary1: ${summary.toDebugString}")
+      assertResult(1)(FiberCacheManagerSensor.executorToCacheManager.size())
+      assertResult(dataFileCount * 4)(summary.dataFiberCount)
+
+      // all data are cached when run another sql.
+      // Expect: 1.hitCount increase; 2.missCount equal
+      // wait for a heartbeat period
+      checkAnswer(sql("SELECT * FROM oap_test WHERE a > 200 AND a < 2400"),
+        data.filter(r => r._1 > 200 && r._1 < 2400).map(r => Row(r._1, r._2)))
+      CacheStats.reset
+      Thread.sleep(15 * 1000)
+      val summary2 = FiberCacheManagerSensor.summary()
+      logWarning(s"Summary2: ${summary2.toDebugString}")
+      assertResult(1)(FiberCacheManagerSensor.executorToCacheManager.size())
+      assert(summary.hitCount < summary2.hitCount)
+      assertResult(summary.missCount)(summary2.missCount)
+      assertResult(summary.dataFiberCount)(summary2.dataFiberCount)
+      assertResult(summary.dataFiberSize)(summary2.dataFiberSize)
+      assertResult(summary.indexFiberCount)(summary2.indexFiberCount)
+      assertResult(summary.indexFiberSize)(summary2.indexFiberSize)
     }
-
-    // Only one executor in local-mode, each data file has 4 dataFiber(2 cols * 2 rgs/col)
-    // wait for a heartbeat
-    Thread.sleep(20 * 1000)
-    val summary = FiberCacheManagerSensor.summary()
-    logWarning(s"Summary1: ${summary.toDebugString}")
-    assertResult(1)(FiberCacheManagerSensor.executorToCacheManager.size())
-    assertResult(dataFileCount * 4)(summary.dataFiberCount)
-
-    // all data are cached when run another sql.
-    // Expect: 1.hitCount increase; 2.missCount equal
-    // wait for a heartbeat period
-    checkAnswer(sql("SELECT * FROM oap_test WHERE a > 200 AND a < 2400"),
-      data.filter(r => r._1 > 200 && r._1 < 2400).map(r => Row(r._1, r._2)))
-    CacheStats.reset
-    Thread.sleep(15 * 1000)
-    val summary2 = FiberCacheManagerSensor.summary()
-    logWarning(s"Summary2: ${summary2.toDebugString}")
-    assertResult(1)(FiberCacheManagerSensor.executorToCacheManager.size())
-    assert(summary.hitCount < summary2.hitCount)
-    assertResult(summary.missCount)(summary2.missCount)
-    assertResult(summary.dataFiberCount)(summary2.dataFiberCount)
-    assertResult(summary.dataFiberSize)(summary2.dataFiberSize)
-    assertResult(summary.indexFiberCount)(summary2.indexFiberCount)
-    assertResult(summary.indexFiberSize)(summary2.indexFiberSize)
-    sql("drop oindex index1 on oap_test")
   }
 
   test("test FiberCacheManagerSensor onCustomInfoUpdate FiberCacheManagerMessager") {
