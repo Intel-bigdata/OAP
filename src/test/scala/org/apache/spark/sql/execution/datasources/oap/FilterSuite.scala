@@ -50,6 +50,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   override def beforeEach(): Unit = {
+
     val path = Utils.createTempDir().getAbsolutePath
     currentPath = path
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b STRING)

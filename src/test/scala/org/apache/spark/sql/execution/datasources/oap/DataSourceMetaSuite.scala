@@ -140,31 +140,30 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
   }
 
   test("Oap Meta integration test") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i + 100, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("oap").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val oapDf = sqlContext.read.format("oap").load(tmpDir.getAbsolutePath)
+    oapDf.createOrReplaceTempView("oapt1")
+
+    val path = new Path(
+      new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
+    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+
+    val fileHeader = oapMeta.fileHeader
+    assert(fileHeader.recordCount === 100)
+    assert(fileHeader.dataFileCount === 3)
+    assert(fileHeader.indexCount === 0)
+
+    val fileMetas = oapMeta.fileMetas
+    assert(fileMetas.length === 3)
+    assert(fileMetas.map(_.recordCount).sum === 100)
+    assert(fileMetas(0).dataFileName.endsWith(OapFileFormat.OAP_DATA_EXTENSION))
+
+    assert(oapMeta.schema === df.schema)
     withIndex(TestIndex("oapt1", "index1"),
       TestIndex("oapt1", "index3")) {
-      val df = sparkContext.parallelize(1 to 100, 3)
-        .map(i => (i, i + 100, s"this is row $i"))
-        .toDF("a", "b", "c")
-      df.write.format("oap").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
-      val oapDf = sqlContext.read.format("oap").load(tmpDir.getAbsolutePath)
-      oapDf.createOrReplaceTempView("oapt1")
-
-      val path = new Path(
-        new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
-      val oapMeta = DataSourceMeta.initialize(path, new Configuration())
-
-      val fileHeader = oapMeta.fileHeader
-      assert(fileHeader.recordCount === 100)
-      assert(fileHeader.dataFileCount === 3)
-      assert(fileHeader.indexCount === 0)
-
-      val fileMetas = oapMeta.fileMetas
-      assert(fileMetas.length === 3)
-      assert(fileMetas.map(_.recordCount).sum === 100)
-      assert(fileMetas(0).dataFileName.endsWith(OapFileFormat.OAP_DATA_EXTENSION))
-
-      assert(oapMeta.schema === df.schema)
-
       withIndex(TestIndex("oapt1", "index2")) {
         sql("create oindex index1 on oapt1 (a)")
         sql("create oindex index2 on oapt1 (a asc)") // dup as index1, still creating
@@ -190,17 +189,16 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
   }
 
   test("Oap IndexMeta Test") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i + 100, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("oap").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val oapDf = sqlContext.read.format("oap").load(tmpDir.getAbsolutePath)
+    oapDf.createOrReplaceTempView("oapt1")
+
+    val path = new Path(
+      new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
     withIndex(TestIndex("oapt1", "mi")) {
-      val df = sparkContext.parallelize(1 to 100, 3)
-        .map(i => (i, i + 100, s"this is row $i"))
-        .toDF("a", "b", "c")
-      df.write.format("oap").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
-      val oapDf = sqlContext.read.format("oap").load(tmpDir.getAbsolutePath)
-      oapDf.createOrReplaceTempView("oapt1")
-
-      val path = new Path(
-        new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
-
       sql("create oindex mi on oapt1 (a, c desc, b asc)")
 
       val oapMeta = DataSourceMeta.initialize(path, new Configuration())
@@ -219,21 +217,20 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
   }
 
   test("Oap Meta integration test for parquet") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i + 100, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val oapDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
+    oapDf.createOrReplaceTempView("oapt1")
+
+    val path = new Path(
+      new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
+
+    val fs = path.getFileSystem(new Configuration())
+    assert(!fs.exists(path))
     withIndex(TestIndex("oapt1", "index1"),
       TestIndex("oapt1", "index3")) {
-      val df = sparkContext.parallelize(1 to 100, 3)
-        .map(i => (i, i + 100, s"this is row $i"))
-        .toDF("a", "b", "c")
-      df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
-      val oapDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
-      oapDf.createOrReplaceTempView("oapt1")
-
-      val path = new Path(
-        new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
-
-      val fs = path.getFileSystem(new Configuration())
-      assert(!fs.exists(path))
-
       withIndex(TestIndex("oapt1", "index2")) {
         sql("create oindex index1 on oapt1 (a)")
         sql("create oindex index2 on oapt1 (a asc)") // dup as index1, still creating
@@ -252,20 +249,20 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
   }
 
   test("FileMeta's data file name test for parquet") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i + 100, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val oapDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
+    oapDf.createOrReplaceTempView("t")
+
+    val path = new Path(
+      new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
+
+    val fs = path.getFileSystem(new Configuration())
+    assert(!fs.exists(path))
+
     withIndex(TestIndex("t", "index1")) {
-      val df = sparkContext.parallelize(1 to 100, 3)
-        .map(i => (i, i + 100, s"this is row $i"))
-        .toDF("a", "b", "c")
-      df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
-      val oapDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
-      oapDf.createOrReplaceTempView("t")
-
-      val path = new Path(
-        new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
-
-      val fs = path.getFileSystem(new Configuration())
-      assert(!fs.exists(path))
-
       sql("create oindex index1 on t (a)") // this will create index files along with meta file
       assert(fs.exists(path))
 
@@ -379,16 +376,15 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
   }
 
   test("test hasAvailableIndex from Meta") {
+    val df = sparkContext.parallelize(1 to 100, 3)
+      .map(i => (i, i + 100, s"this is row $i"))
+      .toDF("a", "b", "c")
+    df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+    val oapDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
+    oapDf.createOrReplaceTempView("oapt1")
     withIndex(TestIndex("oapt1", "indexA"),
       TestIndex("oapt1", "indexC"),
       TestIndex("oapt1", "indexABC")) {
-      val df = sparkContext.parallelize(1 to 100, 3)
-        .map(i => (i, i + 100, s"this is row $i"))
-        .toDF("a", "b", "c")
-      df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
-      val oapDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
-      oapDf.createOrReplaceTempView("oapt1")
-
       sql("create oindex indexA on oapt1 (a)")
       sql("create oindex indexC on oapt1 (c) using bitmap")
       sql("create oindex indexABC on oapt1 (a,b,c)")
