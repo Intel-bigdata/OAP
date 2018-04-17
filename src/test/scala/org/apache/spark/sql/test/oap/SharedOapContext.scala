@@ -88,4 +88,25 @@ trait SharedOapContextBase extends SharedSQLContext {
         ret ++ set.getOrElse(Nil)
       }
   }
+
+  protected def withIndex(indices: TestIndex*)(f: => Unit): Unit = {
+    try f finally {
+      indices.foreach { index =>
+        val baseSql = s"DROP OINDEX ${index.indexName} on ${index.tableName}"
+        index.partitions.length match {
+          case 0 => spark.sql(baseSql)
+          case _ =>
+            val partitionPart = index.partitions.map(p => s"${p.key} = ${p.value}").mkString(",")
+            spark.sql(s"$baseSql partition ($partitionPart)")
+        }
+      }
+    }
+  }
 }
+
+case class TestPartition(key: String, value: String)
+
+case class TestIndex(
+    tableName: String,
+    indexName: String,
+    partitions: TestPartition*)
