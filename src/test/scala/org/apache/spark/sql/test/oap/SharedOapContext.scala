@@ -96,7 +96,7 @@ trait SharedOapContextBase extends SharedSQLContext {
         index.partitions.length match {
           case 0 => spark.sql(baseSql)
           case _ =>
-            val partitionPart = index.partitions.map(p => s"${p.key} = ${p.value}").mkString(",")
+            val partitionPart = index.partitions.map(p => s"${p.key} = '${p.value}'").mkString(",")
             spark.sql(s"$baseSql partition ($partitionPart)")
         }
       }
