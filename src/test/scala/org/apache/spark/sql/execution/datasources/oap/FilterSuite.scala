@@ -133,10 +133,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
     withIndex(TestIndex("oap_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (a)")
 
       checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
@@ -154,14 +154,13 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering2") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t where key = 1")
+    sql("insert into table oap_test select * from t where key = 2")
+    sql("insert into table oap_test select * from t where key = 3")
+    sql("insert into table oap_test select * from t where key = 4")
     withIndex(TestIndex("oap_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table oap_test select * from t where key = 1")
-      sql("insert into table oap_test select * from t where key = 2")
-      sql("insert into table oap_test select * from t where key = 3")
-      sql("insert into table oap_test select * from t where key = 4")
-
       sql("create oindex index1 on oap_test (a)")
 
       val checkPath = new Path(currentPath)
@@ -178,10 +177,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering multi index") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
     withIndex(TestIndex("oap_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (a, b)")
 
       checkAnswer(sql("SELECT * FROM oap_test WHERE a = 150 and b < 'this is test 3'"),
@@ -199,10 +198,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering parquet") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
     withIndex(TestIndex("parquet_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table parquet_test select * from t")
       sql("create oindex index1 on parquet_test (a)")
 
       checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
@@ -217,14 +216,13 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering parquet2") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t where key = 1")
+    sql("insert into table parquet_test select * from t where key = 2")
+    sql("insert into table parquet_test select * from t where key = 3")
+    sql("insert into table parquet_test select * from t where key = 4")
     withIndex(TestIndex("parquet_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table parquet_test select * from t where key = 1")
-      sql("insert into table parquet_test select * from t where key = 2")
-      sql("insert into table parquet_test select * from t where key = 3")
-      sql("insert into table parquet_test select * from t where key = 4")
-
       sql("create oindex index1 on parquet_test (a)")
 
       val checkPath = new Path(currentPath)
@@ -241,10 +239,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test refresh in parquet format on same partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("t_refresh_parquet", "index1")) {
-      val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-
       sql(
         """
           |INSERT OVERWRITE TABLE t_refresh_parquet
@@ -272,10 +269,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test refresh in parquet format on different partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("t_refresh_parquet", "index1")) {
-      val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-
       sql(
         """
           |INSERT OVERWRITE TABLE t_refresh_parquet
@@ -310,11 +306,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test refresh in parquet format on a partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("t_refresh_parquet", "index1", TestPartition("b", "1")),
       TestIndex("t_refresh_parquet", "index1", TestPartition("b", "2"))) {
-      val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-
       sql(
         """
           |INSERT OVERWRITE TABLE t_refresh_parquet
@@ -363,10 +358,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test refresh in oap format on same partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("t_refresh", "index1")) {
-      val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-
       sql(
         """
           |INSERT OVERWRITE TABLE t_refresh
@@ -394,10 +388,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test refresh in oap format on different partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("t_refresh", "index1")) {
-      val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-
       sql(
         """
           |INSERT OVERWRITE TABLE t_refresh
@@ -432,11 +425,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test refresh in oap format on a partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("t_refresh", "index1", TestPartition("b", "1")),
       TestIndex("t_refresh", "index1", TestPartition("b", "2"))) {
-      val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-
       sql(
         """
           |INSERT OVERWRITE TABLE t_refresh
@@ -485,9 +477,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("refresh table of oap format without partition") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("oap_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (a)")
 
@@ -508,9 +500,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("refresh table of parquet format without partition") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("parquet_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table parquet_test select * from t")
       sql("create oindex index1 on parquet_test (a)")
 
@@ -526,9 +518,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering by string") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("oap_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (a) using btree")
 
@@ -544,10 +536,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("support data append without refresh") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("parquet_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-
       sql("insert overwrite table oap_test select * from t where key > 100")
       sql("create oindex index1 on oap_test (a)")
       checkAnswer(sql("SELECT * FROM oap_test WHERE a = 100"), Nil)
@@ -566,9 +557,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering by string with duplicate refresh") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("oap_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (a) using btree")
 
@@ -594,10 +585,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering with string type index") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
     withIndex(TestIndex("oap_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (b)")
 
       checkAnswer(sql("SELECT * FROM oap_test WHERE b = 'this is test 1'"),
@@ -609,10 +600,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test paruet use in") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
     withIndex(TestIndex("parquet_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table parquet_test select * from t")
       sql("create oindex index1 on parquet_test (b)")
 
       // will use b in (....)
@@ -624,10 +615,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test parquet use in StringFieldNotCastDouble") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
     withIndex(TestIndex("parquet_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table parquet_test select * from t")
       sql("create oindex index1 on parquet_test (b)")
 
       // will use b in(1,2,4), values cast to string
@@ -639,10 +630,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test parquet use in IntFieldNotCastDouble") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
     withIndex(TestIndex("parquet_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table parquet_test select * from t")
       sql("create oindex index1 on parquet_test (a)")
 
       // will use a in (20,30,40), value cast to int
@@ -652,11 +643,11 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test parquet query include in") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
     withIndex(TestIndex("parquet_test", "index1"),
       TestIndex("parquet_test", "index2")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table parquet_test select * from t")
       sql("create oindex index1 on parquet_test (a)")
       sql("create oindex index2 on parquet_test (b)")
 
@@ -694,10 +685,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
 
   test("test parquet use between") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
     withIndex(TestIndex("parquet_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table parquet_test select * from t")
       sql("create oindex index1 on parquet_test (a)")
 
       // (a#12 >= 10) && (a#12 <= 30)
@@ -710,10 +701,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test oap use in") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
     withIndex(TestIndex("oap_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (b)")
 
       // will use b in (....)
@@ -734,10 +725,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
 
   test("test oap use in IntFieldNotCastDouble") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
     withIndex(TestIndex("oap_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (a)")
 
       // will use a in (20,30,40), value cast to int
@@ -747,11 +738,11 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test oap query include in") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
     withIndex(TestIndex("oap_test", "index1"),
       TestIndex("oap_test", "index2")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (a)")
       sql("create oindex index2 on oap_test (b)")
 
@@ -788,10 +779,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test parquet inner join") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i / 10, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
     withIndex(TestIndex("parquet_test", "index1")) {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i / 10, s"$i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table parquet_test select * from t")
       sql("create oindex index1 on parquet_test (a)")
 
       checkAnswer(sql("select t2.a, sum(t2.b) " +
@@ -869,20 +860,19 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering non-null key") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 10).map { i =>
+      if (i <= 3) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nonNullKeyRows = (4 to 10).map(i => Row(i, s"this is row $i"))
+
+    sql("insert overwrite table oap_test select * from t")
     withIndex(TestIndex("oap_test", "idx1")) {
-      val rowRDD = spark.sparkContext.parallelize(1 to 10).map { i =>
-        if (i <= 3) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
-      }.map(Row.fromSeq)
-      val schema =
-        StructType(
-          StructField("a", IntegerType) ::
-            StructField("c", StringType) :: Nil)
-      val df = spark.createDataFrame(rowRDD, schema)
-      df.createOrReplaceTempView("t")
-      val nonNullKeyRows = (4 to 10).map(i => Row(i, s"this is row $i"))
-
-      sql("insert overwrite table oap_test select * from t")
-
       sql("create oindex idx1 on oap_test (a)")
 
       checkAnswer(sql("SELECT * FROM oap_test WHERE a is not null"), nonNullKeyRows)
@@ -895,20 +885,19 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering non-null key in Parquet format") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 10).map { i =>
+      if (i <= 3) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nonNullKeyRows = (4 to 10).map(i => Row(i, s"this is row $i"))
+
+    sql("insert overwrite table parquet_test select * from t")
     withIndex(TestIndex("parquet_test", "idx1")) {
-      val rowRDD = spark.sparkContext.parallelize(1 to 10).map { i =>
-        if (i <= 3) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
-      }.map(Row.fromSeq)
-      val schema =
-        StructType(
-          StructField("a", IntegerType) ::
-            StructField("c", StringType) :: Nil)
-      val df = spark.createDataFrame(rowRDD, schema)
-      df.createOrReplaceTempView("t")
-      val nonNullKeyRows = (4 to 10).map(i => Row(i, s"this is row $i"))
-
-      sql("insert overwrite table parquet_test select * from t")
-
       sql("create oindex idx1 on parquet_test (a)")
 
       checkAnswer(sql("SELECT * FROM parquet_test WHERE a is not null"), nonNullKeyRows)
@@ -921,19 +910,19 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering null key and normal key mixed") {
-    withIndex(TestIndex("oap_test", "idx1")) {
-      val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
-        if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
-      }.map(Row.fromSeq)
-      val schema =
-        StructType(
-          StructField("a", IntegerType) ::
-            StructField("c", StringType) :: Nil)
-      val df = spark.createDataFrame(rowRDD, schema)
-      df.createOrReplaceTempView("t")
-      val nullKeyRows = (1 to 5).map(i => Row(null, s"this is row $i"))
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
+      if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nullKeyRows = (1 to 5).map(i => Row(null, s"this is row $i"))
 
-      sql("insert overwrite table oap_test select * from t")
+    sql("insert overwrite table oap_test select * from t")
+    withIndex(TestIndex("oap_test", "idx1")) {
       sql("create oindex idx1 on oap_test (a)")
 
       checkAnswer(sql("SELECT * FROM oap_test WHERE a > 11 AND a <= 13 or a is null"),
@@ -944,19 +933,19 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering null key and normal key mixed in Parquet format") {
-    withIndex(TestIndex("parquet_test", "idx1")) {
-      val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
-        if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
-      }.map(Row.fromSeq)
-      val schema =
-        StructType(
-          StructField("a", IntegerType) ::
-            StructField("c", StringType) :: Nil)
-      val df = spark.createDataFrame(rowRDD, schema)
-      df.createOrReplaceTempView("t")
-      val nullKeyRows = (1 to 5).map(i => Row(null, s"this is row $i"))
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
+      if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nullKeyRows = (1 to 5).map(i => Row(null, s"this is row $i"))
 
-      sql("insert overwrite table parquet_test select * from t")
+    sql("insert overwrite table parquet_test select * from t")
+    withIndex(TestIndex("parquet_test", "idx1")) {
       sql("create oindex idx1 on parquet_test (a)")
 
       checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 11 AND a <= 13 or a is null"),
@@ -967,18 +956,19 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("get columns hit index") {
-    withIndex(TestIndex("parquet_test", "idx1"),
-      TestIndex("parquet_test", "idx2")) {
-      val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
-        Seq(i, s"this is row $i")).map(Row.fromSeq)
-      val schema =
-        StructType(
-          StructField("a", IntegerType) ::
-            StructField("c", StringType) :: Nil)
-      val df = spark.createDataFrame(rowRDD, schema)
-      df.createOrReplaceTempView("t")
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map(i =>
+      Seq(i, s"this is row $i")).map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
 
-      sql("insert overwrite table parquet_test select * from t")
+    sql("insert overwrite table parquet_test select * from t")
+    withIndex(
+      TestIndex("parquet_test", "idx1"),
+      TestIndex("parquet_test", "idx2")) {
       sql("create oindex idx1 on parquet_test (a)")
       sql("create oindex idx2 on parquet_test (a, b)")
 
@@ -998,18 +988,16 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering parquet in FiberCache") {
-    withIndex(TestIndex("parquet_test", "index1")) {
       withSQLConf("spark.sql.oap.parquet.data.cache.enable" -> "true") {
         val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
         data.toDF("key", "value").createOrReplaceTempView("t")
         sql("insert overwrite table parquet_test select * from t")
-        sql("create oindex index1 on parquet_test (a)")
-
-        checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
-          Row(1, "this is test 1") :: Nil)
-
-        checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
-          Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+        withIndex(TestIndex("parquet_test", "index1")) {
+          sql("create oindex index1 on parquet_test (a)")
+          checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
+            Row(1, "this is test 1") :: Nil)
+          checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
+            Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
       }
     }
   }
