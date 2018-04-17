@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.execution.vectorized.ColumnarBatch;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -71,8 +72,9 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
       for (StructField f: sparkSchema.fields()) {
         batchSchema = batchSchema.add(f);
       }
-  
-      columnarBatch = ColumnarBatch.allocate(batchSchema, DEFAULT_MEMORY_MODE, rowGroupCount);
+
+      System.out.println("songzhan  initBatch");
+      columnarBatch = ColumnarBatch.allocate(batchSchema, MemoryMode.OFF_HEAP, rowGroupCount);
   
       // Initialize missing columns with nulls.
       for (int i = 0; i < missingColumns.length; i++) {

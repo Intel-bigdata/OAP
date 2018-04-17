@@ -109,7 +109,7 @@ trait FiberCache extends Logging {
     }
     fiberData.getBaseObject
   }
-  protected def getBaseOffset: Long = fiberData.getBaseOffset
+  def getBaseOffset: Long = fiberData.getBaseOffset
 
   def getBoolean(offset: Long): Boolean = Platform.getBoolean(getBaseObj, getBaseOffset + offset)
 

@@ -303,6 +303,16 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
       .append("double_field", 2.0d))
   }
 
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    configuration.setBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key, false)
+  }
+
+  override def afterEach(): Unit = {
+    super.afterEach()
+    configuration.unset(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key)
+  }
+
   test("read by columnIds and rowIds disable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
@@ -488,6 +498,9 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
       result += row.getInt(0)
     }
     val length = data.length
+    logWarning(s"songzhan: length = ${length}")
+    logWarning(s"songzhan: result.length = ${result.length}")
+
     assert(length == result.length, "Expected result length does not match.")
     for (i <- 0 until length) {
       assert(i == result(i))

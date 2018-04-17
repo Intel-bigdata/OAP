@@ -499,9 +499,15 @@ public final class ColumnarBatch {
 
     for (int i = 0; i < schema.fields().length; ++i) {
       StructField field = schema.fields()[i];
+      System.out.println("songzhan: ColumnarBatch: " + i);
       columns[i] = ColumnVector.allocate(maxRows, field.dataType(), memMode);
     }
 
     this.row = new Row(this);
+  }
+
+  public Row moveToRow(int idx) {
+    row.rowId = idx;
+    return row;
   }
 }

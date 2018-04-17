@@ -28,10 +28,10 @@ import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.hadoop._
 import org.apache.parquet.hadoop.api.RecordReader
 
+import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.oap.filecache.{MemoryManager, _}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper
 import org.apache.spark.sql.execution.vectorized.ColumnarBatch
@@ -51,33 +51,6 @@ private[oap] case class ParquetDataFile(
     configuration.getBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key,
       OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.defaultValue.get)
 
-  private def buildFiberByteData(
-       dataType: DataType,
-       rowGroupRowCount: Int,
-       reader: SingleGroupOapRecordReader): Array[Byte] = {
-    val dataFiberBuilder: DataFiberBuilder = dataType match {
-      case StringType =>
-        StringFiberBuilder(rowGroupRowCount, 0)
-      case BinaryType =>
-        BinaryFiberBuilder(rowGroupRowCount, 0)
-      case BooleanType | ByteType | DateType | DoubleType | FloatType | IntegerType |
-           LongType | ShortType =>
-        FixedSizeTypeFiberBuilder(rowGroupRowCount, 0, dataType)
-      case _ => throw new NotImplementedError(s"${dataType.simpleString} data type " +
-        s"is not implemented for fiber builder")
-    }
-
-    if (reader.nextBatch()) {
-      while (reader.nextKeyValue()) {
-        dataFiberBuilder.append(reader.getCurrentValue.asInstanceOf[ColumnarBatch.Row])
-      }
-    } else {
-      throw new OapException("buildFiberByteData never reach to here!")
-    }
-
-    dataFiberBuilder.build().fiberData
-  }
-
   def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
     var reader: SingleGroupOapRecordReader = null
     try {
@@ -92,8 +65,13 @@ private[oap] case class ParquetDataFile(
       reader = new SingleGroupOapRecordReader(file, conf, meta.footer, groupId, rowGroupRowCount)
       reader.initialize()
       reader.initBatch()
-      val data = buildFiberByteData(schema(fiberId).dataType, rowGroupRowCount, reader)
-      MemoryManager.toDataFiberCache(data)
+      reader.enableReturningBatches()
+      if (reader.nextBatch()) {
+        val data = reader.getCurrentValue.asInstanceOf[ColumnarBatch].column(0).dumpBytes
+        MemoryManager.toDataFiberCache(data)
+      } else {
+        throw new OapException("buildFiberByteData never reach to here!")
+      }
     } finally {
       if (reader != null) {
         try {
@@ -134,11 +112,24 @@ private[oap] case class ParquetDataFile(
     groupIdToRowIds.toMap
   }
 
+  private[oap] class CacheIterator[T](columnarBatch: ColumnarBatch) extends Iterator[T]
+    with Closeable {
+    val inner = columnarBatch.rowIterator()
+    override def hasNext: Boolean = inner.hasNext
+    override def next(): T = inner.next().asInstanceOf[T]
+    override def close(): Unit = {}
+    def moveToRow(idx: Int): T = columnarBatch.moveToRow(idx).asInstanceOf[T]
+  }
+
   private def buildIterator(
        conf: Configuration,
        requiredColumnIds: Array[Int],
        rowIds: Option[Array[Int]]): OapIterator[InternalRow] = {
-    val rows = new BatchColumn()
+    var requestSchema = new StructType
+    for (index <- requiredColumnIds) {
+      requestSchema = requestSchema.add(schema(index))
+    }
+
     val groupIdToRowIds = rowIds.map(optionRowIds => getGroupIdForRowIds(optionRowIds))
     val groupIds = groupIdToRowIds.map(_.keys).getOrElse(0 until meta.footer.getBlocks.size())
     var fiberCacheGroup: Array[WrappedFiberCache] = null
@@ -147,19 +138,19 @@ private[oap] case class ParquetDataFile(
       fiberCacheGroup = requiredColumnIds.map { id =>
         WrappedFiberCache(FiberCacheManager.get(DataFiber(this, id, groupId), conf))
       }
-
       val rowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
-      val columns = fiberCacheGroup.zip(requiredColumnIds).map { case (fiberCache, id) =>
-        new ColumnValues(rowCount, schema(id).dataType, fiberCache.fc)
+      val newRows = ColumnarBatch.allocate(requestSchema, MemoryMode.OFF_HEAP, rowCount)
+      newRows.setNumRows(rowCount)
+      fiberCacheGroup.zipWithIndex.map { case (fiberCache, id) =>
+        newRows.column(id).loadBytes(fiberCache.fc.getBaseOffset)
       }
 
-      rows.reset(rowCount, columns)
-
+      val cacheIter = new CacheIterator[InternalRow](newRows)
       val iter = groupIdToRowIds match {
         case Some(map) =>
-          map(groupId).iterator.map(rowId => rows.moveToRow(rowId))
+          map(groupId).iterator.map(rowId => cacheIter.moveToRow(rowId))
         case None =>
-          rows.toIterator
+          cacheIter
       }
 
       CompletionIterator[InternalRow, Iterator[InternalRow]](iter,
