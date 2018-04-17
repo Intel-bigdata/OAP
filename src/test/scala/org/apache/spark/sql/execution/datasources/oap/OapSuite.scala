@@ -32,7 +32,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.test.oap.SharedOapContext
+import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.apache.spark.util.Utils
 
@@ -79,13 +79,11 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     val maxPartitionBytes = 100L
     sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, maxPartitionBytes)
     val numTasks = sql("select * from parquet_table").queryExecution.toRdd.partitions.length
-    try {
+    withIndex(TestIndex("parquet_table", "parquet_idx")) {
       sql("create oindex parquet_idx on parquet_table (a)")
       assert(numTasks == parquetPath.listFiles().filter(_.getName.endsWith(".parquet"))
         .map(f => Math.ceil(f.length().toDouble / maxPartitionBytes).toInt).sum)
       sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, defaultMaxBytes)
-    } finally {
-      sql("drop oindex parquet_idx on parquet_table")
     }
   }
 
@@ -140,32 +138,33 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     }
     val df = sqlContext.read.format("oap").load(dir.getAbsolutePath)
     df.createOrReplaceTempView("oap_table")
-    sql("create oindex oap_idx on oap_table (a)")
-    val conf = configuration
-    val filePath = new Path(oapDataFile.toString)
-    val metaPath = new Path(oapMetaFile.toString)
-    val dataSourceMeta = DataSourceMeta.initialize(metaPath, conf)
-    val requiredIds = Array(0, 1)
-    // No index scanner is used.
-    val readerNoIndex = new OapDataReader(filePath, dataSourceMeta, None, requiredIds)
-    val itNoIndex = readerNoIndex.initialize(conf)
-    assert(itNoIndex.size == 100)
-    val ic = new IndexContext(dataSourceMeta)
-    val filters: Array[Filter] = Array(
-      And(GreaterThan("a", 9), LessThan("a", 14)))
-    ScannerBuilder.build(filters, ic)
-    val filterScanners = ic.getScanners
-    val readerIndex = new OapDataReader(filePath, dataSourceMeta, filterScanners, requiredIds)
-    val itIndex = readerIndex.initialize(conf)
-    assert(itIndex.size == 4)
-    conf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key, false)
-    val itSetIgnoreIndex = readerIndex.initialize(conf)
-    assert(itSetIgnoreIndex.size == 100)
-    conf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key, true)
-    val itSetUseIndex = readerIndex.initialize(conf)
-    assert(itSetUseIndex.size == 4)
-    dir.delete()
-    sql("drop oindex oap_idx on oap_table")
+    withIndex(TestIndex("oap_table", "oap_idx")) {
+      sql("create oindex oap_idx on oap_table (a)")
+      val conf = configuration
+      val filePath = new Path(oapDataFile.toString)
+      val metaPath = new Path(oapMetaFile.toString)
+      val dataSourceMeta = DataSourceMeta.initialize(metaPath, conf)
+      val requiredIds = Array(0, 1)
+      // No index scanner is used.
+      val readerNoIndex = new OapDataReader(filePath, dataSourceMeta, None, requiredIds)
+      val itNoIndex = readerNoIndex.initialize(conf)
+      assert(itNoIndex.size == 100)
+      val ic = new IndexContext(dataSourceMeta)
+      val filters: Array[Filter] = Array(
+        And(GreaterThan("a", 9), LessThan("a", 14)))
+      ScannerBuilder.build(filters, ic)
+      val filterScanners = ic.getScanners
+      val readerIndex = new OapDataReader(filePath, dataSourceMeta, filterScanners, requiredIds)
+      val itIndex = readerIndex.initialize(conf)
+      assert(itIndex.size == 4)
+      conf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key, false)
+      val itSetIgnoreIndex = readerIndex.initialize(conf)
+      assert(itSetIgnoreIndex.size == 100)
+      conf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key, true)
+      val itSetUseIndex = readerIndex.initialize(conf)
+      assert(itSetUseIndex.size == 4)
+      dir.delete()
+    }
   }
 
   test("OapIndexInfo status and update") {
