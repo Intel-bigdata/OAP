@@ -98,12 +98,12 @@ trait SharedOapContextBase extends SharedSQLContext {
     try f finally {
       indices.foreach { index =>
         val baseSql = s"DROP OINDEX ${index.indexName} on ${index.tableName}"
-        index.partitions.length match {
-          case 0 => spark.sql(baseSql)
-          case _ =>
-            val partitionPart = index.partitions.map(p => s"${p.key} = '${p.value}'")
-              .mkString(" partition (", ",", ")")
-            spark.sql(s"$baseSql $partitionPart")
+        if (index.partitions.isEmpty) {
+          spark.sql(baseSql)
+        } else {
+          val partitionPart = index.partitions.map(p => s"${p.key} = '${p.value}'")
+            .mkString(" partition (", ",", ")")
+          spark.sql(s"$baseSql $partitionPart")
         }
       }
     }
