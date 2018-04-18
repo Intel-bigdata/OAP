@@ -89,6 +89,11 @@ trait SharedOapContextBase extends SharedSQLContext {
       }
   }
 
+  /**
+   * Drop oindex by `TestIndex` after calling `f`, `TestIndex` use to
+   * specify the `tableName`, `indexName` and `partitions`.
+   * `partitions` is not necessary unless create index also specify `partitions`.
+   */
   protected def withIndex(indices: TestIndex*)(f: => Unit): Unit = {
     try f finally {
       indices.foreach { index =>
@@ -96,8 +101,9 @@ trait SharedOapContextBase extends SharedSQLContext {
         index.partitions.length match {
           case 0 => spark.sql(baseSql)
           case _ =>
-            val partitionPart = index.partitions.map(p => s"${p.key} = '${p.value}'").mkString(",")
-            spark.sql(s"$baseSql partition ($partitionPart)")
+            val partitionPart = index.partitions.map(p => s"${p.key} = '${p.value}'")
+              .mkString(" partition (", ",", ")")
+            spark.sql(s"$baseSql $partitionPart")
         }
       }
     }
