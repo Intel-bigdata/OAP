@@ -157,7 +157,7 @@ object FiberCacheManager extends Logging {
       case fiber: DataFiber => fiber
     }
 
-    val statusRawData = dataFibers.groupBy(_.file).map {
+    val statusRawData = dataFibers.groupBy(_.file).filter(_._1.isInstanceOf[OapDataFile]).map {
       case (dataFile, fiberSet) =>
         val fileMeta = DataFileHandleCacheManager(dataFile).asInstanceOf[OapDataFileHandle]
         val fiberBitSet = new BitSet(fileMeta.groupCount * fileMeta.fieldCount)
