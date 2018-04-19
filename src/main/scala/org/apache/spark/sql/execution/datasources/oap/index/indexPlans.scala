@@ -69,6 +69,8 @@ case class CreateIndexCommand(
           throw new OapException(s"turn on ${
             OapConf.OAP_PARQUET_ENABLED.key} to allow index building on parquet files")
         }
+        // Use UnSplitParquetFileFormat instead of ParquetFileFormat because of
+        // UnSplitParquetFileFormat.isSplitable return false
         val fsRelation = _fsRelation.copy(
           fileFormat = new UnSplitParquetFileFormat(),
           options = _fsRelation.options)(_fsRelation.sparkSession)
@@ -300,6 +302,8 @@ case class RefreshIndexCommand(
         (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, opRelation)
       case LogicalRelation(
       _fsRelation @ HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), attributes, id) =>
+        // Use UnSplitParquetFileFormat instead of ParquetFileFormat because of
+        // UnSplitParquetFileFormat.isSplitable return false
         val fsRelation = _fsRelation.copy(
           fileFormat = new UnSplitParquetFileFormat(),
           options = _fsRelation.options)(_fsRelation.sparkSession)
