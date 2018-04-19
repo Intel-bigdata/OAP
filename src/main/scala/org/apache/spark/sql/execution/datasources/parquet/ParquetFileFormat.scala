@@ -271,7 +271,7 @@ class ParquetFileFormat
   override def isSplitable(
       sparkSession: SparkSession,
       options: Map[String, String],
-      path: Path): Boolean = false
+      path: Path): Boolean = true
 
   override def buildReaderWithPartitionValues(
       sparkSession: SparkSession,
