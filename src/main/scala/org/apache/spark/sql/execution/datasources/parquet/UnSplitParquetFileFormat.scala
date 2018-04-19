@@ -21,6 +21,10 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.SparkSession
 
+/**
+ * `UnSplitParquetFileFormat` should only use to create and refresh index
+ * because of isSplitable method always return false.
+ */
 class UnSplitParquetFileFormat extends ParquetFileFormat {
 
   override def isSplitable(
