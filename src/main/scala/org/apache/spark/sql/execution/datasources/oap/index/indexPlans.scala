@@ -57,12 +57,12 @@ case class CreateIndexCommand(
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val qe = sparkSession.sessionState.executePlan(UnresolvedRelation(table))
     qe.assertAnalyzed()
-    val opRelation = qe.optimizedPlan
+    val optimized = qe.optimizedPlan
 
-    val (fileCatalog, schema, readerClassName, identifier, relation) = opRelation match {
+    val (fileCatalog, schema, readerClassName, identifier, relation) = optimized match {
       case LogicalRelation(
       _fsRelation @ HadoopFsRelation(f, _, s, _, _: OapFileFormat, _), _, id) =>
-        (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, id, opRelation)
+        (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, id, optimized)
       case LogicalRelation(
       _fsRelation @ HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), attributes, id) =>
         if (!sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED)) {
@@ -74,8 +74,8 @@ case class CreateIndexCommand(
         val fsRelation = _fsRelation.copy(
           fileFormat = new UnSplitParquetFileFormat(),
           options = _fsRelation.options)(_fsRelation.sparkSession)
-        val lRelation = LogicalRelation(fsRelation, attributes, id)
-        (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, id, lRelation)
+        val logical = LogicalRelation(fsRelation, attributes, id)
+        (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, id, logical)
       case other =>
         throw new OapException(s"We don't support index building for ${other.simpleString}")
     }
@@ -294,12 +294,12 @@ case class RefreshIndexCommand(
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val qe = sparkSession.sessionState.executePlan(UnresolvedRelation(table))
     qe.assertAnalyzed()
-    val opRelation = qe.optimizedPlan
+    val optimized = qe.optimizedPlan
 
-    val (fileCatalog, schema, readerClassName, relation) = opRelation match {
+    val (fileCatalog, schema, readerClassName, relation) = optimized match {
       case LogicalRelation(
           HadoopFsRelation(f, _, s, _, _: OapFileFormat, _), _, _) =>
-        (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, opRelation)
+        (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, optimized)
       case LogicalRelation(
       _fsRelation @ HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), attributes, id) =>
         // Use UnSplitParquetFileFormat instead of ParquetFileFormat because of
@@ -307,8 +307,8 @@ case class RefreshIndexCommand(
         val fsRelation = _fsRelation.copy(
           fileFormat = new UnSplitParquetFileFormat(),
           options = _fsRelation.options)(_fsRelation.sparkSession)
-        val lRelation = LogicalRelation(fsRelation, attributes, id)
-        (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, lRelation)
+        val logical = LogicalRelation(fsRelation, attributes, id)
+        (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, logical)
       case other =>
         throw new OapException(s"We don't support index refreshing for ${other.simpleString}")
     }
