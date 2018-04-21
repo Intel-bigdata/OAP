@@ -18,17 +18,27 @@
 package org.apache.spark.sql.execution.datasources.parquet
 
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.mapreduce.Job
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.execution.datasources.OutputWriterFactory
+import org.apache.spark.sql.types.StructType
 
 /**
- * `UnSplitParquetFileFormat` should only use to create and refresh index
- * because of isSplitable method always return false.
+ * `ReadOnlyParquetFileFormat` only support read parquet operation and not support write,
+ * in oap we use it to create and refresh index because of isSplitable method always return false.
  */
-class UnSplitParquetFileFormat extends ParquetFileFormat {
+class ReadOnlyParquetFileFormat extends ParquetFileFormat {
 
   override def isSplitable(
       sparkSession: SparkSession,
       options: Map[String, String],
       path: Path): Boolean = false
+
+  override def prepareWrite(
+      sparkSession: SparkSession,
+      job: Job,
+      options: Map[String, String],
+      dataSchema: StructType): OutputWriterFactory =
+    throw new UnsupportedOperationException("ReadOnlyParquetFileFormat not support write operation")
 }

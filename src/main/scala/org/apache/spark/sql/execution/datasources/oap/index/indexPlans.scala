@@ -37,7 +37,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
-import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, UnSplitParquetFileFormat}
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ReadOnlyParquetFileFormat}
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.rpc.OapMessages.CacheDrop
 import org.apache.spark.sql.types._
@@ -69,10 +69,10 @@ case class CreateIndexCommand(
           throw new OapException(s"turn on ${
             OapConf.OAP_PARQUET_ENABLED.key} to allow index building on parquet files")
         }
-        // Use UnSplitParquetFileFormat instead of ParquetFileFormat because of
-        // UnSplitParquetFileFormat.isSplitable return false
+        // Use ReadOnlyParquetFileFormat instead of ParquetFileFormat because of
+        // ReadOnlyParquetFileFormat.isSplitable always return false.
         val fsRelation = _fsRelation.copy(
-          fileFormat = new UnSplitParquetFileFormat(),
+          fileFormat = new ReadOnlyParquetFileFormat(),
           options = _fsRelation.options)(_fsRelation.sparkSession)
         val logical = LogicalRelation(fsRelation, attributes, id)
         (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, id, logical)
@@ -302,10 +302,10 @@ case class RefreshIndexCommand(
         (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, optimized)
       case LogicalRelation(
       _fsRelation @ HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), attributes, id) =>
-        // Use UnSplitParquetFileFormat instead of ParquetFileFormat because of
-        // UnSplitParquetFileFormat.isSplitable return false
+        // Use ReadOnlyParquetFileFormat instead of ParquetFileFormat because of
+        // ReadOnlyParquetFileFormat.isSplitable always return false
         val fsRelation = _fsRelation.copy(
-          fileFormat = new UnSplitParquetFileFormat(),
+          fileFormat = new ReadOnlyParquetFileFormat(),
           options = _fsRelation.options)(_fsRelation.sparkSession)
         val logical = LogicalRelation(fsRelation, attributes, id)
         (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, logical)
