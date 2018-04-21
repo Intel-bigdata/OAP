@@ -35,7 +35,7 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
 
     private int blockId;
     private int rowGroupCount;
-  
+
     public SingleGroupOapRecordReader(
         Path file,
         Configuration configuration,
@@ -46,7 +46,7 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
       this.blockId = blockId;
       this.rowGroupCount = rowGroupCount;
     }
-  
+
     /**
      * Override initialize method, init footer if need,
      * then call super.initialize and initializeInternal
@@ -71,9 +71,7 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
       for (StructField f: sparkSchema.fields()) {
         batchSchema = batchSchema.add(f);
       }
-  
       columnarBatch = ColumnarBatch.allocate(batchSchema, DEFAULT_MEMORY_MODE, rowGroupCount);
-  
       // Initialize missing columns with nulls.
       for (int i = 0; i < missingColumns.length; i++) {
         if (missingColumns[i]) {
