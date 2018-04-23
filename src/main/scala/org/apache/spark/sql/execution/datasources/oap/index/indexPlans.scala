@@ -38,6 +38,7 @@ import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.rpc.OapMessages.CacheDrop
 import org.apache.spark.sql.types._
@@ -161,6 +162,16 @@ case class CreateIndexCommand(
       outPutPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
     }
 
+    if (sparkSession.conf.get(OapConf.OAP_ENABLE_EXECUTOR_COMMIT_JOB)) {
+      // SQLHadoopMapReduceCommitProtocol use this config to init OutputCommitter,
+      // if `OAP_ENABLE_EXECUTOR_COMMIT_JOB` is true, create index cmd will use
+      // OapIndexFileOutputCommitter do commitTask, default value is FileOutputCommitter.
+      // This configuration is a copy from SparkSession and no impact on the original state,
+      // needn't do unset.
+      configuration.set(SQLConf.OUTPUT_COMMITTER_CLASS.key,
+        "org.apache.spark.sql.execution.datasources.oap.OapIndexFileOutputCommitter")
+    }
+
     val committer = FileCommitProtocol.instantiate(
       sparkSession.sessionState.conf.fileCommitProtocolClass,
       jobId = java.util.UUID.randomUUID().toString,
@@ -186,6 +197,8 @@ case class CreateIndexCommand(
       bucketSpec = Option.empty,
       refreshFunction = _ => Unit,
       options = options).asInstanceOf[Seq[Seq[IndexBuildResult]]]
+
+    configuration.unset(SQLConf.OUTPUT_COMMITTER_CLASS.key)
 
     val retMap = retVal.flatten.groupBy(_.parent)
     bAndP.foreach(bp =>
@@ -380,6 +393,16 @@ case class RefreshIndexCommand(
       val qualifiedOutputPath = {
         val fs = outPutPath.getFileSystem(configuration)
         outPutPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
+      }
+
+      if (sparkSession.conf.get(OapConf.OAP_ENABLE_EXECUTOR_COMMIT_JOB)) {
+        // SQLHadoopMapReduceCommitProtocol use this config to init OutputCommitter,
+        // if `OAP_ENABLE_EXECUTOR_COMMIT_JOB` is true, create index cmd will use
+        // OapIndexFileOutputCommitter do commitTask, default value is FileOutputCommitter.
+        // This configuration is a copy from SparkSession and no impact on the original state,
+        // needn't do unset.
+        configuration.set(SQLConf.OUTPUT_COMMITTER_CLASS.key,
+          "org.apache.spark.sql.execution.datasources.oap.OapIndexFileOutputCommitter")
       }
 
       val committer = FileCommitProtocol.instantiate(
