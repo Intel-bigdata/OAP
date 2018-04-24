@@ -1441,7 +1441,7 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
     IndexColumn(ctx.identifier.getText, ctx.DESC == null)
   }
 
-  override def visitIndexType(ctx: IndexTypeContext): AnyIndexType = if (ctx == null) {
+  override def visitIndexType(ctx: IndexTypeContext): OapIndexType = if (ctx == null) {
     BTreeIndexType
   } else {
     withOrigin(ctx) {

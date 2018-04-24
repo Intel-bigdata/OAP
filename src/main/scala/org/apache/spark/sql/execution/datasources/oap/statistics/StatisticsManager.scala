@@ -52,7 +52,7 @@ class StatisticsWriteManager {
 
   // When a task initialize statisticsWriteManager, we read all config from `conf`,
   // which is created from `SparkUtils`, hence containing all spark config values.
-  def initialize(indexType: AnyIndexType, s: StructType, conf: Configuration): Unit = {
+  def initialize(indexType: OapIndexType, s: StructType, conf: Configuration): Unit = {
     val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter { statType =>
       val typeFromConfig = conf.get(OapConf.OAP_STATISTICS_TYPES.key,
         OapConf.OAP_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
@@ -103,10 +103,9 @@ class StatisticsWriteManager {
 object StatisticsManager {
   val STATISTICSMASK: Long = 0x20170524abcdefabL // a random mask for statistics begin
 
-  val statisticsTypeMap: scala.collection.mutable.Map[AnyIndexType, Array[String]] =
+  val statisticsTypeMap: scala.collection.mutable.Map[OapIndexType, Array[String]] =
     scala.collection.mutable.Map(
-      BTreeIndexType -> Array(
-        "MINMAX", "SAMPLE", "BLOOM", "PARTBYVALUE"),
+      BTreeIndexType -> Array("MINMAX", "SAMPLE", "BLOOM", "PARTBYVALUE"),
       BitMapIndexType -> Array.empty)
 
   def read(fiberCache: FiberCache, offset: Int, s: StructType): Array[StatisticsReader] = {

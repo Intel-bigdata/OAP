@@ -32,7 +32,7 @@ import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
 private[oap] class BloomFilterStatisticsReader(
-    schema: StructType) extends StatisticsReader(schema) {
+  schema: StructType) extends StatisticsReader(schema) {
   override val id: Int = StatisticsType.TYPE_BLOOM_FILTER
 
   protected var bfIndex: BloomFilter = _

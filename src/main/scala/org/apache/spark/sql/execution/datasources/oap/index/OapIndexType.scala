@@ -17,14 +17,14 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-sealed abstract class AnyIndexType {
+sealed abstract class OapIndexType {
   def toString: String
 }
 
-case object BTreeIndexType extends AnyIndexType {
+case object BTreeIndexType extends OapIndexType {
   override def toString: String = "BTREE"
 }
 
-case object BitMapIndexType extends AnyIndexType {
+case object BitMapIndexType extends OapIndexType {
   override def toString: String = "BITMAP"
 }

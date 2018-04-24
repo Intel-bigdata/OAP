@@ -51,7 +51,7 @@ case class CreateIndexCommand(
     table: TableIdentifier,
     indexColumns: Array[IndexColumn],
     allowExists: Boolean,
-    indexType: AnyIndexType,
+    indexType: OapIndexType,
     partitionSpec: Option[TablePartitionSpec]) extends RunnableCommand with Logging {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
@@ -353,7 +353,7 @@ case class RefreshIndexCommand(
     })
 
     val buildrst = indices.map(i => {
-      var indexType: AnyIndexType = BTreeIndexType
+      var indexType: OapIndexType = BTreeIndexType
 
       val indexColumns = i.indexType match {
         case BTreeIndex(entries) =>

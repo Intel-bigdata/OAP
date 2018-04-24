@@ -40,8 +40,7 @@ class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
   }
 }
 
-private[filecache] class CacheGuardian(maxMemory: Long)
-  extends Thread with Logging {
+private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logging {
 
   private val _pendingFiberSize: AtomicLong = new AtomicLong(0)
 
@@ -217,93 +216,6 @@ private[oap] object DataFileHandleCacheManager extends Logging {
 
   def apply[T <: DataFileHandle](fiberCache: DataFile): T = {
     cache.get(fiberCache).asInstanceOf[T]
-  }
-}
-
-private[oap] trait Fiber {
-  def fiber2Data(conf: Configuration): FiberCache
-}
-
-private[oap]
-case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache =
-    file.getFiberData(rowGroupId, columnIndex)
-
-  override def hashCode(): Int = (file.path + columnIndex + rowGroupId).hashCode
-
-  override def equals(obj: Any): Boolean = obj match {
-    case another: DataFiber =>
-      another.columnIndex == columnIndex &&
-        another.rowGroupId == rowGroupId &&
-        another.file.path.equals(file.path)
-    case _ => false
-  }
-
-  override def toString: String = {
-    s"type: DataFiber rowGroup: $rowGroupId column: $columnIndex\n\tfile: ${file.path}"
-  }
-}
-
-private[oap]
-case class BTreeFiber(
-    getFiberData: () => FiberCache,
-    file: String,
-    section: Int,
-    idx: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
-
-  override def hashCode(): Int = (file + section + idx).hashCode
-
-  override def equals(obj: Any): Boolean = obj match {
-    case another: BTreeFiber =>
-      another.section == section &&
-        another.idx == idx &&
-        another.file.equals(file)
-    case _ => false
-  }
-
-  override def toString: String = {
-    s"type: BTreeFiber section: $section idx: $idx\n\tfile: $file"
-  }
-}
-
-private[oap]
-case class BitmapFiber(
-    getFiberData: () => FiberCache,
-    file: String,
-    // "0" means no split sections within file.
-    sectionIdxOfFile: Int,
-    // "0" means no smaller loading units.
-    loadUnitIdxOfSection: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
-
-  override def hashCode(): Int = (file + sectionIdxOfFile + loadUnitIdxOfSection).hashCode
-
-  override def equals(obj: Any): Boolean = obj match {
-    case another: BitmapFiber =>
-      another.sectionIdxOfFile == sectionIdxOfFile &&
-        another.loadUnitIdxOfSection == loadUnitIdxOfSection &&
-        another.file.equals(file)
-    case _ => false
-  }
-
-  override def toString: String = {
-    s"type: BitmapFiber section: $sectionIdxOfFile idx: $loadUnitIdxOfSection\n\tfile: $file"
-  }
-}
-
-private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getData()
-
-  override def hashCode(): Int = name.hashCode()
-
-  override def equals(obj: Any): Boolean = obj match {
-    case another: TestFiber => name.equals(another.name)
-    case _ => false
-  }
-
-  override def toString: String = {
-    s"type: TestFiber name: $name"
   }
 }
 
