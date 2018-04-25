@@ -292,9 +292,8 @@ private[oap] case class ParquetDataFile(
     }
   }
 
-  override def createDataFileHandle(): ParquetDataFileHandle = {
-    new ParquetDataFileHandle().read(configuration, new Path(StringUtils.unEscapeString(path)))
-  }
+  override def createDataFileHandle(): ParquetDataFileHandle =
+    new ParquetDataFileHandle(configuration, new Path(StringUtils.unEscapeString(path)))
 
   override def totalRows(): Long = {
     import scala.collection.JavaConverters._

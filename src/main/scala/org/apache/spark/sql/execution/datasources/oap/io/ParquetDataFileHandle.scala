@@ -24,20 +24,22 @@ import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.metadata.ParquetMetadata
 
 private[oap] class ParquetDataFileHandle(
-  var footer: ParquetMetadata = null)
+  val footer: ParquetMetadata)
   extends DataFileHandle {
+
+  assert(footer != null)
+
+  def this(conf: Configuration, path: Path) {
+    this(ParquetFileReader.readFooter(conf, path, NO_FILTER))
+  }
 
   override def fin: FSDataInputStream = null
 
   override def len: Long = 0
 
-  def read(conf: Configuration, path: Path): ParquetDataFileHandle = {
-    this.footer = ParquetFileReader.readFooter(conf, path, NO_FILTER)
-    this
-  }
-
-  override def getGroupCount: Int = if (footer == null) 0 else footer.getBlocks.size()
+  override def getGroupCount: Int = footer.getBlocks.size()
 
   override def getFieldCount: Int =
-    if (footer == null) 0 else footer.getFileMetaData.getSchema.getColumns.size()
+    footer.getFileMetaData.getSchema.getColumns.size()
+
 }
