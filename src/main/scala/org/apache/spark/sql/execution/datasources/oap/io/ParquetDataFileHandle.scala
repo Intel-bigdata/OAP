@@ -27,7 +27,7 @@ private[oap] class ParquetDataFileHandle(
   val footer: ParquetMetadata)
   extends DataFileHandle {
 
-  assert(footer != null)
+  require(footer != null, "footer of ParquetDataFileHandle should not be null.")
 
   def this(conf: Configuration, path: Path) {
     this(ParquetFileReader.readFooter(conf, path, NO_FILTER))
