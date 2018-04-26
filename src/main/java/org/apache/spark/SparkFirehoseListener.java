@@ -122,14 +122,4 @@ public class SparkFirehoseListener implements SparkListenerInterface {
     public void onOtherEvent(SparkListenerEvent event) {
         onEvent(event);
     }
-
-    @Override
-    public void onCustomInfoUpdate(SparkListenerCustomInfoUpdate customInfoUpdate) {
-        onEvent(customInfoUpdate);
-    }
-
-    @Override
-    public void onOapIndexInfoUpdate(SparkListenerOapIndexInfoUpdate oapIndexInfoUpdate) {
-        onEvent(oapIndexInfoUpdate);
-    }
 }

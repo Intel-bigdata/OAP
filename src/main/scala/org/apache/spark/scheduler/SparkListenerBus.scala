@@ -64,13 +64,6 @@ private[spark] trait SparkListenerBus
       case blockUpdated: SparkListenerBlockUpdated =>
         listener.onBlockUpdated(blockUpdated)
       case logStart: SparkListenerLogStart => // ignore event log metadata
-
-      case customInfoUpdateEvent: SparkListenerCustomInfoUpdate =>
-        listener.onCustomInfoUpdate(customInfoUpdateEvent) // deal with info update event
-
-      case oapIndexInfoUpdateEvent: SparkListenerOapIndexInfoUpdate =>
-        listener.onOapIndexInfoUpdate(oapIndexInfoUpdateEvent) // oap index info update event
-
       case _ => listener.onOtherEvent(event)
     }
   }

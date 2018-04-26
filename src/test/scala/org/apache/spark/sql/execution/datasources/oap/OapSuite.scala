@@ -22,10 +22,10 @@ import java.io.File
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfter
 
-import org.apache.spark.scheduler.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io.{OapDataReader, OapIndexInfo, OapIndexInfoStatus}
+import org.apache.spark.sql.execution.datasources.oap.listener.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf

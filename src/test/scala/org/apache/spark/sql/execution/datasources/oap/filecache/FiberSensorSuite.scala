@@ -22,10 +22,9 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkConf
-import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
-import org.apache.spark.sql.execution.datasources.oap.listener.FiberInfoListener
+import org.apache.spark.sql.execution.datasources.oap.listener.{SparkListenerCustomInfoUpdate, OapListener}
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex}
@@ -41,7 +40,7 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    sparkContext.addSparkListener(new FiberInfoListener)
+    sparkContext.addSparkListener(new OapListener)
   }
 
   override def beforeEach(): Unit = {
@@ -121,13 +120,12 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
     val execID = "exec1"
     val messager = "FiberCacheManagerMessager"
     // Test json empty, no more executor added
-    new FiberInfoListener onCustomInfoUpdate SparkListenerCustomInfoUpdate(
-      host, execID, messager, "")
+    val listener = new OapListener
+    listener.onOtherEvent(SparkListenerCustomInfoUpdate(host, execID, messager, ""))
     assertResult(0)(FiberCacheManagerSensor.executorToCacheManager.size())
 
     // Test json error, no more executor added
-    new FiberInfoListener onCustomInfoUpdate SparkListenerCustomInfoUpdate(
-      host, execID, messager, "error msg")
+    listener.onOtherEvent(SparkListenerCustomInfoUpdate(host, execID, messager, "error msg"))
     assertResult(0)(FiberCacheManagerSensor.executorToCacheManager.size())
 
     // Test normal msg
@@ -135,8 +133,8 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
     val conf: SparkConf = new SparkConf()
     conf.set(OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SEC.key, 0L.toString)
     val cacheStats = CacheStats(2, 19, 10, 2, 0, 0, 213, 23, 23, 123131, 2)
-    new FiberInfoListener onCustomInfoUpdate SparkListenerCustomInfoUpdate(
-      host, execID, messager, CacheStats.status(cacheStats, conf))
+    listener.onOtherEvent(SparkListenerCustomInfoUpdate(
+      host, execID, messager, CacheStats.status(cacheStats, conf)))
     assertResult(1)(FiberCacheManagerSensor.executorToCacheManager.size())
     assertResult(cacheStats.toJson)(
       FiberCacheManagerSensor.executorToCacheManager.get(execID).toJson)
