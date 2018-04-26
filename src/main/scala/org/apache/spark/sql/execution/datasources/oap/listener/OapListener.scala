@@ -31,10 +31,6 @@ case class SparkListenerCustomInfoUpdate(
   override def logEvent: Boolean = false
 }
 
-/**
- * Interface for creating OAP index information listeners which are used to
- * report to OAP users.
- */
 @DeveloperApi
 case class SparkListenerOapIndexInfoUpdate(
     hostName: String,
