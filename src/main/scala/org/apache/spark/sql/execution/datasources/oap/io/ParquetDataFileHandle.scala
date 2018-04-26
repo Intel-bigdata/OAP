@@ -19,18 +19,17 @@ package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
+import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.format.converter.ParquetMetadataConverter._
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.metadata.ParquetMetadata
 
-private[oap] class ParquetDataFileHandle(
-  val footer: ParquetMetadata)
-  extends DataFileHandle {
+private[oap] class ParquetDataFileHandle(val footer: ParquetMetadata) extends DataFileHandle {
 
   require(footer != null, "footer of ParquetDataFileHandle should not be null.")
 
-  def this(conf: Configuration, path: Path) {
-    this(ParquetFileReader.readFooter(conf, path, NO_FILTER))
+  def this(conf: Configuration, path: String) {
+    this(ParquetFileReader.readFooter(conf, new Path(StringUtils.unEscapeString(path)), NO_FILTER))
   }
 
   override def fin: FSDataInputStream = null
