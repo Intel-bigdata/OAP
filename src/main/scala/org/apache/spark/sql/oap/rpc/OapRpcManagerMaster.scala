@@ -22,7 +22,7 @@ import scala.collection.mutable
 import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.{RpcCallContext, RpcEndpointRef, RpcEnv, ThreadSafeRpcEndpoint}
-import org.apache.spark.scheduler.{SparkListenerCustomInfoUpdate, SparkListenerOapIndexInfoUpdate}
+import org.apache.spark.sql.execution.datasources.oap.listener.{SparkListenerCustomInfoUpdate, SparkListenerOapIndexInfoUpdate}
 import org.apache.spark.sql.oap.rpc.OapMessages._
 
 /**
