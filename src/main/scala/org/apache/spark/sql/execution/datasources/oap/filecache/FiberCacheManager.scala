@@ -86,8 +86,6 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
 object FiberCacheManager extends Logging {
 
-  SparkEnv.get.oapRpcManager.asInstanceOf[OapRpcManagerSlave].startOapHeartbeater
-
   private val GUAVA_CACHE = "guava"
   private val SIMPLE_CACHE = "simple"
   private val DEFAULT_CACHE_STRATEGY = GUAVA_CACHE

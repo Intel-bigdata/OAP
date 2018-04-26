@@ -96,13 +96,12 @@ class OapRpcManagerSuite extends SparkFunSuite with BeforeAndAfterEach with Priv
     rpcManagerSlave1.send(message)
     Thread.sleep(2000)
     verify(rpcManagerMasterEndpoint).invokePrivate(_handleNormalOapMessage(message))
+    rpcManagerSlave1.stop()
   }
 
   test("Send heartbeat message from Executor to Driver") {
 
     val rpcManagerSlave1 = addRpcManagerSlave(executorId1)
-
-    rpcManagerSlave1.startOapHeartbeater()
 
     // Initial delay is at most 2 * interval
     Thread.sleep(2000 + 2 * sc.conf.getTimeAsMs(
@@ -122,10 +121,8 @@ class OapRpcManagerSuite extends SparkFunSuite with BeforeAndAfterEach with Priv
 
   // This doesn't need to be spied due to it's used to send messages
   private def addRpcManagerSlave(executorId: String): OapRpcManagerSlave = {
-    class TestDummyHeartbeatMaterials extends OapHeartbeatMaterialsInterface{
-      override def get: HashSet[() => Heartbeat] = HashSet[() => Heartbeat] (() => heartbeat)
+    new OapRpcManagerSlave(rpcEnv, rpcDriverEndpoint, executorId, null, sc.conf) {
+      override def heartbeatMessages: Array[() => Heartbeat] = { Array(() => heartbeat) }
     }
-    new OapRpcManagerSlave(
-      rpcEnv, rpcDriverEndpoint, executorId, null, sc.conf, Some(new TestDummyHeartbeatMaterials))
   }
 }

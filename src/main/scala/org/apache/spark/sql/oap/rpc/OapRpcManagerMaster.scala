@@ -39,8 +39,9 @@ private[spark] class OapRpcManagerMaster(oapRpcManagerMasterEndpoint: OapRpcMana
     }
   }
 
-  override private[spark] def send(message: OapMessage): Unit =
+  override private[spark] def send(message: OapMessage): Unit = {
     sendOneWayMessageToExecutors(message)
+  }
 }
 
 private[spark] object OapRpcManagerMaster {

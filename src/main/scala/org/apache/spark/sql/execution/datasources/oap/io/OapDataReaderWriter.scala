@@ -192,8 +192,6 @@ private[oap] class OapDataReader(
     requiredIds: Array[Int],
     context: Option[VectorizedContext] = None) extends Logging {
 
-  SparkEnv.get.oapRpcManager.asInstanceOf[OapRpcManagerSlave].startOapHeartbeater
-
   import org.apache.spark.sql.execution.datasources.oap.INDEX_STAT._
 
   private var _rowsReadWhenHitIndex: Option[Long] = None
