@@ -505,9 +505,4 @@ public final class ColumnarBatch {
 
     this.row = new Row(this);
   }
-
-  public Row moveToRow(int idx) {
-    row.rowId = idx;
-    return row;
-  }
 }

@@ -34,7 +34,7 @@ import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache.{MemoryManager, _}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper
-import org.apache.spark.sql.execution.vectorized.ColumnarBatch
+import org.apache.spark.sql.execution.vectorized.{ColumnarBatch, ColumnVectorUtils}
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 import org.apache.spark.util.CompletionIterator
@@ -83,6 +83,7 @@ private[oap] case class ParquetDataFile(
     }
   }
 
+  // TODO [LuciferYang] merge with IndexedParquetMetadata.from method
   private def getGroupIdForRowIds(rowIds: Array[Int]): Map[Int, Array[Int]] = {
     val totalCount = rowIds.length
     val groupIdToRowIds = ArrayBuffer[(Int, Array[Int])]()
@@ -112,22 +113,20 @@ private[oap] case class ParquetDataFile(
     groupIdToRowIds.toMap
   }
 
-  private[oap] class CacheIterator[T](columnarBatch: ColumnarBatch) extends Iterator[T]
-    with Closeable {
-    val inner = columnarBatch.rowIterator()
-    override def hasNext: Boolean = inner.hasNext
-    override def next(): T = inner.next().asInstanceOf[T]
-    override def close(): Unit = {}
-    def moveToRow(idx: Int): T = columnarBatch.moveToRow(idx).asInstanceOf[T]
-  }
-
   private def buildIterator(
        conf: Configuration,
        requiredColumnIds: Array[Int],
-       rowIds: Option[Array[Int]]): OapIterator[InternalRow] = {
+       context: VectorizedContext,
+       rowIds: Option[Array[Int]] = None): OapIterator[InternalRow] = {
     var requestSchema = new StructType
     for (index <- requiredColumnIds) {
       requestSchema = requestSchema.add(schema(index))
+    }
+
+    if (context.partitionColumns != null) {
+      for (f <- context.partitionColumns.fields) {
+        requestSchema = requestSchema.add(f)
+      }
     }
 
     val groupIdToRowIds = rowIds.map(optionRowIds => getGroupIdForRowIds(optionRowIds))
@@ -139,23 +138,39 @@ private[oap] case class ParquetDataFile(
         WrappedFiberCache(FiberCacheManager.get(DataFiber(this, id, groupId), conf))
       }
       val rowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
-      val newRows = ColumnarBatch.allocate(requestSchema, MemoryMode.OFF_HEAP, rowCount)
-      newRows.setNumRows(rowCount)
-      fiberCacheGroup.zipWithIndex.map { case (fiberCache, id) =>
-        newRows.column(id).loadBytes(fiberCache.fc.getBaseOffset)
+      val columnarBatch = ColumnarBatch.allocate(requestSchema, MemoryMode.OFF_HEAP, rowCount)
+      columnarBatch.setNumRows(rowCount)
+
+      // populate partitionColumn values
+      if (context.partitionColumns != null) {
+        val partitionIdx = requiredColumnIds.length
+        for(i <- context.partitionColumns.fields.indices) {
+          ColumnVectorUtils.populate(columnarBatch.column(i + partitionIdx),
+            context.partitionValues, i)
+          columnarBatch.column(i + partitionIdx).setIsConstant()
+        }
       }
 
-      val cacheIter = new CacheIterator[InternalRow](newRows)
+      fiberCacheGroup.zipWithIndex.foreach { case (fiberCache, id) =>
+        columnarBatch.column(id).loadBytes(fiberCache.fc.getBaseOffset)
+      }
+
       val iter = groupIdToRowIds match {
+        case Some(map) if context.returningBatch =>
+          columnarBatch.markAllFiltered()
+          map(groupId).foreach(columnarBatch.markValid)
+          Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
         case Some(map) =>
-          map(groupId).iterator.map(rowId => cacheIter.moveToRow(rowId))
+          map(groupId).iterator.map(rowId => columnarBatch.getRow(rowId))
+        case None if context.returningBatch =>
+          Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
         case None =>
-          cacheIter
+          columnarBatch.rowIterator().asScala
       }
 
       CompletionIterator[InternalRow, Iterator[InternalRow]](iter,
         fiberCacheGroup.zip(requiredColumnIds).foreach {
-          case (fiberCache, id) => fiberCache.release()
+          case (fiberCache, _) => fiberCache.release()
         }
       )
     }
@@ -176,7 +191,7 @@ private[oap] case class ParquetDataFile(
         // and rollback to read this rowgroup from file directly.
         if (parquetDataCacheEnable &&
           !meta.footer.getBlocks.asScala.exists(_.getRowCount > Int.MaxValue)) {
-          buildIterator(configuration, requiredIds, rowIds = None)
+          buildIterator(configuration, requiredIds, c)
         } else {
           initVectorizedReader(c,
             new VectorizedOapRecordReader(file, configuration, meta.footer))
@@ -200,7 +215,7 @@ private[oap] case class ParquetDataFile(
       context match {
         case Some(c) =>
           if (parquetDataCacheEnable) {
-            buildIterator(configuration, requiredIds, Some(rowIds))
+            buildIterator(configuration, requiredIds, c, Some(rowIds))
           } else {
             initVectorizedReader(c,
               new IndexedVectorizedOapRecordReader(file,
