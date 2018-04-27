@@ -113,6 +113,7 @@ private[oap] case class ParquetDataFile(
     groupIdToRowIds.toMap
   }
 
+  // TODO extract ParquetCacheReadr & ParquetCachePusher
   private def buildIterator(
        conf: Configuration,
        requiredColumnIds: Array[Int],
