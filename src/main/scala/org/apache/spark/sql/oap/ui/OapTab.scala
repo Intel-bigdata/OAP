@@ -15,12 +15,13 @@
  * limitations under the License.
  */
 
-package org.apache.spark.oap.ui
+package org.apache.spark.sql.oap.ui
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.ui.{SparkUI, SparkUITab}
 
 class OapTab(parent: SparkUI) extends SparkUITab(parent, "OAP") with Logging {
+
   val listener = parent.executorsListener
 
   attachPage(new FiberCacheManagerPage(this))

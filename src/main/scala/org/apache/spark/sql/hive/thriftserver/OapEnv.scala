@@ -21,10 +21,11 @@ import java.io.PrintStream
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
-import org.apache.spark.oap.ui.OapTab
-import org.apache.spark.sql.{OapSession, SQLContext}
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.execution.datasources.oap.listener.OapListener
 import org.apache.spark.sql.hive.{HiveUtils, OapSessionState}
+import org.apache.spark.sql.oap.OapSession
+import org.apache.spark.sql.oap.ui.OapTab
 import org.apache.spark.util.Utils
 
 private[hive] object OapEnv extends Logging {

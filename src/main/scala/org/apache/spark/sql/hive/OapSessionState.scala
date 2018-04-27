@@ -24,6 +24,7 @@ import org.apache.spark.sql.execution.datasources.{DataSourceStrategy, FileSourc
 import org.apache.spark.sql.execution.datasources.oap.OapStrategies
 import org.apache.spark.sql.hive.client.HiveClient
 import org.apache.spark.sql.internal.{SQLConf, VariableSubstitution}
+import org.apache.spark.sql.oap.OapSession
 
 class OapSessionState(sparkSession: OapSession) extends HiveSessionState(sparkSession) {
   self =>

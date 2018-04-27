@@ -18,6 +18,7 @@ package org.apache.spark.sql
 
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.OapSession
 
 object TestOap extends TestOapContext(
   OapSession.builder.config(
