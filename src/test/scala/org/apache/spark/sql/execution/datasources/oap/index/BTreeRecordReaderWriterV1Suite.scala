@@ -21,6 +21,10 @@ import org.apache.hadoop.conf.Configuration
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
 
+import org.apache.spark.memory.{TestMemoryManager, TaskMemoryManager}
+import org.apache.spark.metrics.MetricsSystem
+import org.apache.spark.{SecurityManager, TaskContextImpl, TaskContext, SparkConf}
+
 import scala.util.Random
 
 import org.apache.spark.sql.catalyst.InternalRow
@@ -87,12 +91,27 @@ class BTreeRecordReaderWriterV1Suite extends SharedOapContext {
     val configuration = new Configuration()
     // Create writer
     val fileWriter = new TestIndexFileWriter()
+    val conf = spark.sparkContext.conf
+    TaskContext.setTaskContext(
+      new TaskContextImpl(
+        0,
+        0,
+        0,
+        0,
+        new TaskMemoryManager(new TestMemoryManager(conf), 0),
+        null,
+        MetricsSystem.createMetricsSystem(
+          "BTreeRecordReaderWriterSuite",
+          conf,
+          new SecurityManager(conf))))
     val writer = new BTreeIndexRecordWriter(configuration, fileWriter, schema)
 
     // Write rows
     nonNullKeyRecords.map(InternalRow(_)).foreach(writer.write(null, _))
     nullKeyRecords.map(InternalRow(_)).foreach(writer.write(null, _))
     writer.close(null)
+    TaskContext.get().asInstanceOf[TaskContextImpl].markTaskCompleted()
+    TaskContext.unset()
     val indexData = fileWriter.toByteArray
 
     // Create reader

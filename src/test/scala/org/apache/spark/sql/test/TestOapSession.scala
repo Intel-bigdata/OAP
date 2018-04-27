@@ -43,7 +43,7 @@ private[sql] class TestOapLocalClusterSession(sc: SparkContext) extends TestSpar
   self =>
   def this(sparkConf: SparkConf) {
     this(new SparkContext(
-      s"local-cluster[2, 2, 1024]",
+      s"local-cluster[2, 1, 1024]",
       "test-oap-local-cluster-context",
       sparkConf.set("spark.sql.testkey", "true")
         .set("spark.hadoop.fs.file.impl", classOf[DebugFilesystem].getName)))
