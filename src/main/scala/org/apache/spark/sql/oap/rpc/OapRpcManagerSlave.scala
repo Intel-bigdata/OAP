@@ -69,7 +69,12 @@ private[spark] class OapRpcManagerSlave(
   private[sql] def startOapHeartbeater(): Unit = {
 
     def reportHeartbeat(): Unit = {
-      heartbeatMessages.map(_.apply()).foreach(send)
+      // OapRpcManagerSlave is created in SparkEnv. Before we start the heartbeat, we need make
+      // sure the SparkEnv has been created and the block manager has been initialized. We check
+      // blockManagerId as it will be set after initialization.
+      if (blockManager.blockManagerId != null) {
+        heartbeatMessages.map(_.apply()).foreach(send)
+      }
     }
 
     val intervalMs = conf.getTimeAsMs(
