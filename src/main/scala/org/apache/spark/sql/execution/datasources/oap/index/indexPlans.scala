@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import scala.collection.mutable
 
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
@@ -242,7 +242,7 @@ case class DropIndexCommand(
         }
         val hadoopConfiguration = sparkSession.sparkContext.hadoopConfiguration
         val fs = FileSystem.get(hadoopConfiguration)
-        val dirsCount = targetDirs.map(p => {
+        val dropIndexDirsCount = targetDirs.map(p => {
           val parent = p.files.head.getPath.getParent
           if (fs.exists(new Path(parent, OapFileFormat.OAP_META_FILE))) {
             val metaBuilder = new DataSourceMetaBuilder()
@@ -266,15 +266,10 @@ case class DropIndexCommand(
                 new Path(parent.toString, OapFileFormat.OAP_META_FILE),
                 hadoopConfiguration,
                 metaBuilder.withNewSchema(oldMeta.schema).build())
-              // TODO don't use listFiles Api
-              val allFile = fs.listFiles(parent, false)
-              val filePaths = new Iterator[Path] {
-                override def hasNext: Boolean = allFile.hasNext
-                override def next(): Path = allFile.next().getPath
-              }.toSeq
-              filePaths.filter(_.toString.endsWith(
-                "." + indexName + OapFileFormat.OAP_INDEX_EXTENSION)).foreach(idxPath =>
-                fs.delete(idxPath, true))
+              fs.listStatus(parent, new PathFilter {
+                override def accept(path: Path): Boolean = path.getName.endsWith(
+                  "." + indexName + OapFileFormat.OAP_INDEX_EXTENSION)
+              }).foreach(file => fs.delete(file.getPath, true))
               true
             }
           } else {
@@ -282,7 +277,7 @@ case class DropIndexCommand(
           }
         }).count(_ == true)
         // No actually drop index action and allowNotExists is false, throw AnalysisException
-        if (dirsCount == 0 && !allowNotExists) {
+        if (dropIndexDirsCount == 0 && !allowNotExists) {
           identifier match {
             case Some(catalogTable) =>
               throw new AnalysisException(s"""Index $indexName does not exist on $catalogTable""")
