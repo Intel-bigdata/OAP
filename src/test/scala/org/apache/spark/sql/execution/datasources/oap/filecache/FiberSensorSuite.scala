@@ -23,10 +23,9 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
-import org.apache.spark.sql.execution.datasources.oap.listener.{SparkListenerCustomInfoUpdate, OapListener}
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.listener.{SparkListenerCustomInfoUpdate, OapListener}
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex}
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
