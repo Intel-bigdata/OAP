@@ -281,7 +281,7 @@ case class DropIndexCommand(
             false
           }
         }).count(_ == true)
-        // No actual drop index action and allowNotExists is false, throw AnalysisException
+        // No actually drop index action and allowNotExists is false, throw AnalysisException
         if (dirsCount == 0 && !allowNotExists) {
           identifier match {
             case Some(catalogTable) =>
