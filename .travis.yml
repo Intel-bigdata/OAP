@@ -1,4 +1,2 @@
-sudo: required
-dist: trusty
 language: java
 script: mvn test
