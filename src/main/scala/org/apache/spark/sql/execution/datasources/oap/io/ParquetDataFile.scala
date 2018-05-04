@@ -64,7 +64,6 @@ private[oap] case class ParquetDataFile(
     release(idx)
     inUseFiberCache.update(idx, fiberCache)
   }
-  
   def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
     var reader: SingleGroupOapRecordReader = null
     try {
