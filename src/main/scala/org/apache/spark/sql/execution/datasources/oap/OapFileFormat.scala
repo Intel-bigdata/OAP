@@ -340,6 +340,9 @@ private[sql] class OapFileFormat extends FileFormat
             // already filled by VectorizedReader, else use original branch.
             if (enableVectorizedReader && !parquetDataCacheEnable) {
               iter
+            } else if (partitionSchema.length == 0) {
+              // There is no partition columns, return iter directly.
+              iter
             } else {
               val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
               val joinedRow = new JoinedRow()
