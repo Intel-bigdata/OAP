@@ -238,7 +238,8 @@ case class DropIndexCommand(
         val partitions = OapUtils.getPartitions(fileCatalog, partitionSpec)
         val targetDirs = partitions.filter(_.files.nonEmpty)
         if(targetDirs.isEmpty) {
-          throw new AnalysisException(s"""No data and Index in $partitions""")
+          logWarning(s"""No data and Index in $partitions, DropIndexCommand do nothing.""")
+          return Nil
         }
         val hadoopConfiguration = sparkSession.sparkContext.hadoopConfiguration
         val fs = FileSystem.get(hadoopConfiguration)
