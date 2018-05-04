@@ -15,20 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.executor.custom
+package org.apache.spark.sql.execution.datasources.oap.index
 
-import org.apache.spark._
+sealed abstract class OapIndexType {
+  def toString: String
+}
 
-/**
- * User can extends the Trait to implement method `status`, after that, user can add a
- * configuration of `spark.executor.customInfoClass` to identify the class that user defined.
- */
-trait CustomManager {
-  /**
-   * get the status for users long run service, the status' format is a string which includes
-   * all infos. The string can be a Json string.
-   * @param conf take SparkConf as input for user to handle
-   * @return
-   */
-  def status(conf: SparkConf): String
+case object BTreeIndexType extends OapIndexType {
+  override def toString: String = "BTREE"
+}
+
+case object BitMapIndexType extends OapIndexType {
+  override def toString: String = "BITMAP"
 }

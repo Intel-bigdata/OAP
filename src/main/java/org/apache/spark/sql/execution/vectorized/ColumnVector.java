@@ -295,9 +295,9 @@ public abstract class ColumnVector implements AutoCloseable {
 
     private void throwUnsupportedException(int requiredCapacity, Throwable cause) {
         String message = "Cannot reserve additional contiguous bytes in the vectorized reader " +
-                "(requested = " + requiredCapacity + " bytes). As a workaround, you can disable the " +
-                "vectorized reader by setting " + SQLConf.PARQUET_VECTORIZED_READER_ENABLED().key() +
-                " to false.";
+          "(requested = " + requiredCapacity + " bytes). As a workaround, you can disable the " +
+          "vectorized reader by setting " + SQLConf.PARQUET_VECTORIZED_READER_ENABLED().key() +
+          " to false.";
 
         if (cause != null) {
             throw new RuntimeException(message, cause);
@@ -1003,42 +1003,43 @@ public abstract class ColumnVector implements AutoCloseable {
      * type.
      */
     protected ColumnVector(int capacity, DataType type, MemoryMode memMode) {
-        this.capacity = capacity;
-        this.type = type;
+      this.capacity = capacity;
+      this.type = type;
 
-        if (type instanceof ArrayType || type instanceof BinaryType || type instanceof StringType
-                || DecimalType.isByteArrayDecimalType(type)) {
-            DataType childType;
-            int childCapacity = capacity;
-            if (type instanceof ArrayType) {
-                childType = ((ArrayType)type).elementType();
-            } else {
-                childType = DataTypes.ByteType;
-                childCapacity *= DEFAULT_ARRAY_LENGTH;
-            }
-            this.childColumns = new ColumnVector[1];
-            this.childColumns[0] = ColumnVector.allocate(childCapacity, childType, memMode);
-            this.resultArray = new Array(this.childColumns[0]);
-            this.resultStruct = null;
+      if (type instanceof ArrayType || type instanceof BinaryType || type instanceof StringType
+        || DecimalType.isByteArrayDecimalType(type)) {
+          DataType childType;
+          int childCapacity = capacity;
+          if (type instanceof ArrayType) {
+            childType = ((ArrayType)type).elementType();
+          } else {
+            childType = DataTypes.ByteType;
+            childCapacity *= DEFAULT_ARRAY_LENGTH;
+          }
+          this.childColumns = new ColumnVector[1];
+          this.childColumns[0] = ColumnVector.allocate(childCapacity, childType, memMode);
+          this.resultArray = new Array(this.childColumns[0]);
+          this.resultStruct = null;
         } else if (type instanceof StructType) {
-            StructType st = (StructType)type;
-            this.childColumns = new ColumnVector[st.fields().length];
-            for (int i = 0; i < childColumns.length; ++i) {
-                this.childColumns[i] = ColumnVector.allocate(capacity, st.fields()[i].dataType(), memMode);
-            }
-            this.resultArray = null;
-            this.resultStruct = new ColumnarBatch.Row(this.childColumns);
+          StructType st = (StructType)type;
+          this.childColumns = new ColumnVector[st.fields().length];
+          for (int i = 0; i < childColumns.length; ++i) {
+            this.childColumns[i] =
+              ColumnVector.allocate(capacity, st.fields()[i].dataType(), memMode);
+          }
+          this.resultArray = null;
+          this.resultStruct = new ColumnarBatch.Row(this.childColumns);
         } else if (type instanceof CalendarIntervalType) {
-            // Two columns. Months as int. Microseconds as Long.
-            this.childColumns = new ColumnVector[2];
-            this.childColumns[0] = ColumnVector.allocate(capacity, DataTypes.IntegerType, memMode);
-            this.childColumns[1] = ColumnVector.allocate(capacity, DataTypes.LongType, memMode);
-            this.resultArray = null;
-            this.resultStruct = new ColumnarBatch.Row(this.childColumns);
+          // Two columns. Months as int. Microseconds as Long.
+          this.childColumns = new ColumnVector[2];
+          this.childColumns[0] = ColumnVector.allocate(capacity, DataTypes.IntegerType, memMode);
+          this.childColumns[1] = ColumnVector.allocate(capacity, DataTypes.LongType, memMode);
+          this.resultArray = null;
+          this.resultStruct = new ColumnarBatch.Row(this.childColumns);
         } else {
-            this.childColumns = null;
-            this.resultArray = null;
-            this.resultStruct = null;
+          this.childColumns = null;
+          this.resultArray = null;
+          this.resultStruct = null;
         }
     }
 }

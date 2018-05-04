@@ -530,10 +530,8 @@
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>3.0.0</version>
         <configuration>
-          <verbose>false</verbose>
-          <failOnViolation>false</failOnViolation>
+          <failOnViolation>true</failOnViolation>
           <includeTestSourceDirectory>true</includeTestSourceDirectory>
-          <failOnWarning>false</failOnWarning>
           <sourceDirectories>${basedir}/src/main/java,${basedir}/src/main/scala</sourceDirectories>
           <testSourceDirectories>${basedir}/src/test/java</testSourceDirectories>
           <configLocation>checkstyle.xml</configLocation>
@@ -543,6 +541,7 @@
         </configuration>
         <executions>
           <execution>
+            <phase>compile</phase>
             <goals>
               <goal>check</goal>
             </goals>

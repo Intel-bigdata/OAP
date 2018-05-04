@@ -44,7 +44,6 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjectio
 import org.apache.spark.sql.catalyst.parser.LegacyTypeStringParser
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
@@ -67,10 +66,6 @@ class ParquetFileFormat
   override def hashCode(): Int = getClass.hashCode()
 
   override def equals(other: Any): Boolean = other.isInstanceOf[ParquetFileFormat]
-
-  @transient protected var splitable = true
-
-  def forbidSplit: Unit = splitable = false
 
   override def prepareWrite(
       sparkSession: SparkSession,
@@ -276,7 +271,7 @@ class ParquetFileFormat
   override def isSplitable(
       sparkSession: SparkSession,
       options: Map[String, String],
-      path: Path): Boolean = splitable
+      path: Path): Boolean = true
 
   override def buildReaderWithPartitionValues(
       sparkSession: SparkSession,

@@ -14,29 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql
 
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.internal.oap.OapConf
+package org.apache.spark.sql.execution.datasources.oap.index.impl
 
-object TestOap extends TestOapContext(
-  OapSession.builder.config(
-    (new SparkConf).set("spark.master", "local[2]")
-      .set("spark.app.name", "test-oap-context")
-      .set("spark.sql.testkey", "true")
-      .set("spark.memory.offHeap.size", "100m")
-  ).enableHiveSupport().getOrCreate()) {
-}
+import java.io.OutputStream
 
-/**
- * A locally running test instance of Oap engine.
- */
-class TestOapContext(
-    @transient override val sparkSession: SparkSession)
-  extends SQLContext(sparkSession) {
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 
-  protected def sqlContext: SQLContext = sparkSession.sqlContext
+import org.apache.spark.sql.execution.datasources.oap.index.IndexFileWriter
 
-  // OapStrategy conflicts with EXECUTOR_INDEX_SELECTION.
-  sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
+private[index] case class IndexFileWriterImpl(
+    configuration: Configuration,
+    indexPath: Path) extends IndexFileWriter {
+
+  protected override val os: OutputStream =
+    indexPath.getFileSystem(configuration).create(indexPath, true)
+
+  // Give RecordWriter a chance which file it's writing to.
+  override def getName: String = indexPath.toString
 }

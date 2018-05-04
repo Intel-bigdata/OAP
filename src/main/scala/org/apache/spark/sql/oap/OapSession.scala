@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql
+package org.apache.spark.sql.oap
 
 import java.util.concurrent.atomic.AtomicReference
 
@@ -24,6 +24,7 @@ import scala.util.control.NonFatal
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationEnd}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.ui.SQLListener
 import org.apache.spark.sql.internal.SessionState
 import org.apache.spark.sql.internal.StaticSQLConf.CATALOG_IMPLEMENTATION

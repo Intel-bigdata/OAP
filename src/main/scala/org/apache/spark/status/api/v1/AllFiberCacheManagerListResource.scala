@@ -19,7 +19,7 @@ package org.apache.spark.status.api.v1
 import javax.ws.rs.{GET, Produces}
 import javax.ws.rs.core.MediaType
 
-import org.apache.spark.oap.ui.{FiberCacheManagerPage, FiberCacheManagerSummary}
+import org.apache.spark.sql.oap.ui.{FiberCacheManagerPage, FiberCacheManagerSummary}
 import org.apache.spark.ui.SparkUI
 
 @Produces(Array(MediaType.APPLICATION_JSON))

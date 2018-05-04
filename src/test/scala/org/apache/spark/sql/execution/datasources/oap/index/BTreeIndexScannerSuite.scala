@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
+import org.apache.spark.sql.execution.datasources.oap.index.impl.IndexFileWriterImpl
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.apache.spark.util.Utils
@@ -109,7 +110,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
   test("test findRowIdRange for normal case") {
     val schema = StructType(StructField("col", IntegerType) :: Nil)
     val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
-    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val fileWriter = IndexFileWriterImpl(configuration, path)
     val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
     // Values structure depends on BTreeUtils.generate2()
     // Count = 150, node = 5, (1 - 59), (61 - 119), (121 - 179), (181 - 239) (241 - 299)
@@ -158,7 +159,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
   test("findRowIdRange for isNull filter predicate: empty result") {
     val schema = StructType(StructField("col", IntegerType) :: Nil)
     val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
-    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val fileWriter = IndexFileWriterImpl(configuration, path)
     val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
 
     (1 to 300 by 2).map(InternalRow(_)).foreach(writer.write(null, _))
@@ -183,7 +184,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
   test("findRowIdRange for isNull filter predicate") {
     val schema = StructType(StructField("col", IntegerType) :: Nil)
     val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
-    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val fileWriter = IndexFileWriterImpl(configuration, path)
     val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
 
     (1 to 300 by 2).map(InternalRow(_)).foreach(writer.write(null, _))
@@ -209,7 +210,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
   test("findRowIdRange for isNotNull filter predicate: empty result") {
     val schema = StructType(StructField("col", IntegerType) :: Nil)
     val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
-    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val fileWriter = IndexFileWriterImpl(configuration, path)
     val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
 
     (1 to 5).map(_ => InternalRow(null)).foreach(writer.write(null, _))
@@ -232,7 +233,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
   test("findRowIdRange for isNotNull filter predicate") {
     val schema = StructType(StructField("col", IntegerType) :: Nil)
     val path = new Path(Utils.createTempDir().getAbsolutePath, "tempIndexFile")
-    val fileWriter = BTreeIndexFileWriter(configuration, path)
+    val fileWriter = IndexFileWriterImpl(configuration, path)
     val writer = BTreeIndexRecordWriter(configuration, fileWriter, schema)
 
     (1 to 300 by 2).map(InternalRow(_)).foreach(writer.write(null, _))

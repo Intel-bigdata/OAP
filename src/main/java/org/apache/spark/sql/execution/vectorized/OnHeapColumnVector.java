@@ -469,11 +469,11 @@ public final class OnHeapColumnVector extends ColumnVector {
                 floatData = newData;
             }
         } else if (type instanceof DoubleType) {
-            if (doubleData == null || doubleData.length < newCapacity) {
-                double[] newData = new double[newCapacity];
-                if (doubleData != null) System.arraycopy(doubleData, 0, newData, 0, elementsAppended);
-                doubleData = newData;
-            }
+          if (doubleData == null || doubleData.length < newCapacity) {
+            double[] newData = new double[newCapacity];
+            if (doubleData != null) System.arraycopy(doubleData, 0, newData, 0, elementsAppended);
+              doubleData = newData;
+          }
         } else if (resultStruct != null) {
             // Nothing to store.
         } else {

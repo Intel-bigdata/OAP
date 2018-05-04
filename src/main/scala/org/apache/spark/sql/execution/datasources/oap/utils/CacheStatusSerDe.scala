@@ -94,13 +94,15 @@ private[oap] object CacheStatusSerDe extends SerDe[String, Seq[FiberCacheStatus]
   private[oap] def statusRawDataToJson(statusRawData: FiberCacheStatus): JValue = {
     ("fiberFilePath" -> statusRawData.file) ~
       ("bitSetJValue" -> bitSetToJson(statusRawData.bitmask)) ~
-      ("dataFileMetaJValue" -> dataFileMetaToJson(statusRawData.meta))
+      ("groupCount" -> statusRawData.groupCount) ~
+      ("fieldCount" -> statusRawData.fieldCount)
   }
 
   private[oap] def statusRawDataFromJson(json: JValue): FiberCacheStatus = {
     val path = (json \ "fiberFilePath").extract[String]
     val bitSet = bitSetFromJson(json \ "bitSetJValue")
-    val dataFileMeta = dataFileMetaFromJson(json \ "dataFileMetaJValue")
-    FiberCacheStatus(path, bitSet, dataFileMeta)
+    val groupCount = (json \ "groupCount").extract[Int]
+    val fieldCount = (json \ "fieldCount").extract[Int]
+    FiberCacheStatus(path, bitSet, groupCount, fieldCount)
   }
 }

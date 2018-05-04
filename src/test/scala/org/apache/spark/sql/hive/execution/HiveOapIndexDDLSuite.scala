@@ -74,12 +74,16 @@ class HiveOapIndexDDLSuite
         assert(hiveTable.tableType == CatalogTableType.EXTERNAL)
 
         assert(tmpDir.listFiles.nonEmpty)
-        checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
-
-        checkAnswer(
-          sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
-        sql(s"DROP TABLE $tabName")
-        assert(tmpDir.listFiles.nonEmpty)
+        try {
+          checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
+          checkAnswer(
+            sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
+          sql(s"drop oindex idxa on $tabName")
+          sql(s"DROP TABLE $tabName")
+          assert(tmpDir.listFiles.nonEmpty)
+        } finally {
+          sql(s"drop oindex if exists idxa on $tabName")
+        }
       }
     }
   }
@@ -103,15 +107,18 @@ class HiveOapIndexDDLSuite
         assert(hiveTable.tableType == CatalogTableType.EXTERNAL)
 
         assert(tmpDir.listFiles.nonEmpty)
-        checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
+        try {
+          checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
+          checkAnswer(
+            sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
 
-        checkAnswer(
-          sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
-
-        sql(s"drop oindex idxa on $tabName")
-        checkAnswer(sql(s"show oindex from $tabName"), Nil)
-        sql(s"DROP TABLE $tabName")
-        assert(tmpDir.listFiles.nonEmpty)
+          sql(s"drop oindex idxa on $tabName")
+          checkAnswer(sql(s"show oindex from $tabName"), Nil)
+          sql(s"DROP TABLE $tabName")
+          assert(tmpDir.listFiles.nonEmpty)
+        } finally {
+          sql(s"drop oindex if exists idxa on $tabName")
+        }
       }
     }
   }
@@ -135,21 +142,26 @@ class HiveOapIndexDDLSuite
         assert(hiveTable.tableType == CatalogTableType.EXTERNAL)
 
         assert(tmpDir.listFiles.nonEmpty)
-        checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
+        try {
+          checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
 
-        checkAnswer(
-          sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
+          checkAnswer(
+            sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
 
-        // test refresh oap index
-        (500 to 600).map { i => (i, s"this is test $i") }.toDF("a", "b")
-          .createOrReplaceTempView("t2")
-        sql(s"insert into table $tabName select * from t2")
-        sql(s"refresh oindex on $tabName")
-        checkAnswer(
-          sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
-        checkAnswer(sql(s"select a from $tabName where a=555"), Row(555))
-        sql(s"DROP TABLE $tabName")
-        assert(tmpDir.listFiles.nonEmpty)
+          // test refresh oap index
+          (500 to 600).map { i => (i, s"this is test $i") }.toDF("a", "b")
+            .createOrReplaceTempView("t2")
+          sql(s"insert into table $tabName select * from t2")
+          sql(s"refresh oindex on $tabName")
+          checkAnswer(
+            sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
+          checkAnswer(sql(s"select a from $tabName where a=555"), Row(555))
+          sql(s"drop oindex idxa on $tabName")
+          sql(s"DROP TABLE $tabName")
+          assert(tmpDir.listFiles.nonEmpty)
+        } finally {
+          sql(s"drop oindex if exists idxa on $tabName")
+        }
       }
     }
   }
@@ -173,28 +185,34 @@ class HiveOapIndexDDLSuite
         assert(hiveTable.tableType == CatalogTableType.EXTERNAL)
 
         assert(tmpDir.listFiles.nonEmpty)
-        checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
+        try {
+          checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
 
-        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
+          checkAnswer(sql(s"show oindex from $tabName"),
+            Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
 
-        // test check oap index
-        checkAnswer(sql(s"check oindex on $tabName"), Nil)
-        val dirPath = tmpDir.getAbsolutePath
-        val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, new Path(dirPath))
-        assert(metaOpt.nonEmpty)
-        assert(metaOpt.get.fileMetas.nonEmpty)
-        assert(metaOpt.get.indexMetas.nonEmpty)
-        val dataFileName = metaOpt.get.fileMetas.head.dataFileName
-        // delete a data file
-        Utils.deleteRecursively(new File(dirPath, dataFileName))
+          // test check oap index
+          checkAnswer(sql(s"check oindex on $tabName"), Nil)
+          val dirPath = tmpDir.getAbsolutePath
+          val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, new Path(dirPath))
+          assert(metaOpt.nonEmpty)
+          assert(metaOpt.get.fileMetas.nonEmpty)
+          assert(metaOpt.get.indexMetas.nonEmpty)
+          val dataFileName = metaOpt.get.fileMetas.head.dataFileName
+          // delete a data file
+          Utils.deleteRecursively(new File(dirPath, dataFileName))
 
-        // Check again
-        checkAnswer(
-          sql(s"check oindex on $tabName"),
-          Row(s"Data file: $dirPath/$dataFileName not found!"))
+          // Check again
+          checkAnswer(
+            sql(s"check oindex on $tabName"),
+            Row(s"Data file: $dirPath/$dataFileName not found!"))
 
-        sql(s"DROP TABLE $tabName")
-        assert(tmpDir.listFiles.nonEmpty)
+          sql(s"drop oindex idxa on $tabName")
+          sql(s"DROP TABLE $tabName")
+          assert(tmpDir.listFiles.nonEmpty)
+        } finally {
+          sql(s"drop oindex if exists idxa on $tabName")
+        }
       }
     }
   }

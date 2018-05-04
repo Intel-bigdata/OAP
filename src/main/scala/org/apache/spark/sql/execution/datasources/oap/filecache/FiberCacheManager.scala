@@ -24,24 +24,16 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.{SparkConf, SparkEnv}
-import org.apache.spark.executor.custom.CustomManager
+import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
+import org.apache.spark.sql.oap.rpc.OapRpcManagerSlave
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
 
-// TODO need to register within the SparkContext
-class OapFiberCacheHeartBeatMessager extends CustomManager with Logging {
-  override def status(conf: SparkConf): String = {
-    FiberCacheManager.status
-  }
-}
-
-private[filecache] class CacheGuardian(maxMemory: Long)
-  extends Thread with Logging {
+private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logging {
 
   private val _pendingFiberSize: AtomicLong = new AtomicLong(0)
 
@@ -90,16 +82,6 @@ private[filecache] class CacheGuardian(maxMemory: Long)
       bRemoving = false
     }
   }
-}
-
-/**
- * Fiber Cache Manager
- *
- * TODO: change object to class for better initialization
- */
-class FiberCacheManagerMessager extends CustomManager {
-  override def status(conf: SparkConf): String =
-    CacheStats.status(FiberCacheManager.cacheStats, conf)
 }
 
 object FiberCacheManager extends Logging {
@@ -151,19 +133,27 @@ object FiberCacheManager extends Logging {
   private[oap] def clearAllFibers(): Unit = cacheBackend.cleanUp
 
   // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly
-  private[filecache] def status: String = {
+  private[sql] def status(): String = {
     logDebug(s"Reporting ${cacheBackend.cacheCount} fibers to the master")
     val dataFibers = cacheBackend.getFibers.collect {
       case fiber: DataFiber => fiber
     }
 
+    // Use a bit set to represent current cache status of one file.
+    // Say, there is a file has 3 row groups and 3 columns. Then bit set size is 3 * 3 = 9
+    // Say, cache status is below:
+    //            field#0    field#1     field#2
+    // group#0       -        cached        -          // BitSet(1 + 0 * 3) = 1
+    // group#1       -        cached        -          // BitSet(1 + 1 * 3) = 1
+    // group#2       -          -         cached       // BitSet(2 + 2 * 3) = 1
+    // The final bit set is: 010010001
     val statusRawData = dataFibers.groupBy(_.file).map {
       case (dataFile, fiberSet) =>
-        val fileMeta = DataFileHandleCacheManager(dataFile).asInstanceOf[OapDataFileHandle]
-        val fiberBitSet = new BitSet(fileMeta.groupCount * fileMeta.fieldCount)
+        val fileMeta: DataFileHandle = DataFileHandleCacheManager(dataFile)
+        val fiberBitSet = new BitSet(fileMeta.getGroupCount * fileMeta.getFieldCount)
         fiberSet.foreach(fiber =>
-          fiberBitSet.set(fiber.columnIndex + fileMeta.fieldCount * fiber.rowGroupId))
-        FiberCacheStatus(dataFile.path, fiberBitSet, fileMeta)
+          fiberBitSet.set(fiber.columnIndex + fileMeta.getFieldCount * fiber.rowGroupId))
+        FiberCacheStatus(dataFile.path, fiberBitSet, fileMeta.getGroupCount, fileMeta.getFieldCount)
     }.toSeq
 
     CacheStatusSerDe.serialize(statusRawData)
@@ -215,95 +205,8 @@ private[oap] object DataFileHandleCacheManager extends Logging {
         }
       })
 
-  def apply[T <: DataFileHandle](fiberCache: DataFile): T = {
-    cache.get(fiberCache).asInstanceOf[T]
-  }
-}
-
-private[oap] trait Fiber {
-  def fiber2Data(conf: Configuration): FiberCache
-}
-
-private[oap]
-case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache =
-    file.getFiberData(rowGroupId, columnIndex)
-
-  override def hashCode(): Int = (file.path + columnIndex + rowGroupId).hashCode
-
-  override def equals(obj: Any): Boolean = obj match {
-    case another: DataFiber =>
-      another.columnIndex == columnIndex &&
-        another.rowGroupId == rowGroupId &&
-        another.file.path.equals(file.path)
-    case _ => false
-  }
-
-  override def toString: String = {
-    s"type: DataFiber rowGroup: $rowGroupId column: $columnIndex\n\tfile: ${file.path}"
-  }
-}
-
-private[oap]
-case class BTreeFiber(
-    getFiberData: () => FiberCache,
-    file: String,
-    section: Int,
-    idx: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
-
-  override def hashCode(): Int = (file + section + idx).hashCode
-
-  override def equals(obj: Any): Boolean = obj match {
-    case another: BTreeFiber =>
-      another.section == section &&
-        another.idx == idx &&
-        another.file.equals(file)
-    case _ => false
-  }
-
-  override def toString: String = {
-    s"type: BTreeFiber section: $section idx: $idx\n\tfile: $file"
-  }
-}
-
-private[oap]
-case class BitmapFiber(
-    getFiberData: () => FiberCache,
-    file: String,
-    // "0" means no split sections within file.
-    sectionIdxOfFile: Int,
-    // "0" means no smaller loading units.
-    loadUnitIdxOfSection: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
-
-  override def hashCode(): Int = (file + sectionIdxOfFile + loadUnitIdxOfSection).hashCode
-
-  override def equals(obj: Any): Boolean = obj match {
-    case another: BitmapFiber =>
-      another.sectionIdxOfFile == sectionIdxOfFile &&
-        another.loadUnitIdxOfSection == loadUnitIdxOfSection &&
-        another.file.equals(file)
-    case _ => false
-  }
-
-  override def toString: String = {
-    s"type: BitmapFiber section: $sectionIdxOfFile idx: $loadUnitIdxOfSection\n\tfile: $file"
-  }
-}
-
-private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getData()
-
-  override def hashCode(): Int = name.hashCode()
-
-  override def equals(obj: Any): Boolean = obj match {
-    case another: TestFiber => name.equals(another.name)
-    case _ => false
-  }
-
-  override def toString: String = {
-    s"type: TestFiber name: $name"
+  def apply(fiberCache: DataFile): DataFileHandle = {
+    cache.get(fiberCache)
   }
 }
 

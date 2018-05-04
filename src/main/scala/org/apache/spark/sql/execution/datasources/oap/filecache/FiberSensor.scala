@@ -24,16 +24,16 @@ import scala.collection.JavaConverters._
 import com.google.common.base.Throwables
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.scheduler.SparkListenerCustomInfoUpdate
 import org.apache.spark.sql.execution.datasources.oap.IndexMeta
-import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
+import org.apache.spark.sql.oap.listener.SparkListenerCustomInfoUpdate
 import org.apache.spark.util.collection.BitSet
 
 private[oap] case class FiberCacheStatus(
     file: String,
     bitmask: BitSet,
-    meta: OapDataFileHandle) {
+    groupCount: Int,
+    fieldCount: Int) {
 
   val cachedFiberCount = bitmask.cardinality()
 

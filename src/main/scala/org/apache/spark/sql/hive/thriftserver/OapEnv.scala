@@ -21,10 +21,11 @@ import java.io.PrintStream
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
-import org.apache.spark.oap.ui.OapTab
-import org.apache.spark.sql.{OapSession, SQLContext}
-import org.apache.spark.sql.execution.datasources.oap.listener.{FiberInfoListener, OapIndexInfoListener}
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.hive.{HiveUtils, OapSessionState}
+import org.apache.spark.sql.oap.OapSession
+import org.apache.spark.sql.oap.listener.OapListener
+import org.apache.spark.sql.oap.ui.OapTab
 import org.apache.spark.util.Utils
 
 private[hive] object OapEnv extends Logging {
@@ -64,10 +65,7 @@ private[hive] object OapEnv extends Logging {
       sparkSession.conf.set("spark.sql.hive.version", HiveUtils.hiveExecutionVersion)
     }
 
-    logDebug("register FiberInfoListener")
-    sparkContext.addSparkListener(new FiberInfoListener)
-    logDebug("register OapIndexInfoListener")
-    sparkContext.addSparkListener(new OapIndexInfoListener)
+    sparkContext.addSparkListener(new OapListener)
 
     SparkSQLEnv.sparkContext = sparkContext
     SparkSQLEnv.sqlContext = sqlContext

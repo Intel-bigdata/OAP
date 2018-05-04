@@ -45,11 +45,52 @@ private[oap] case class ParquetDataFile(
     configuration: Configuration) extends DataFile {
 
   private var context: Option[VectorizedContext] = None
-  private lazy val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
+  private lazy val meta = DataFileHandleCacheManager(this).asInstanceOf[ParquetDataFileHandle]
   private val file = new Path(StringUtils.unEscapeString(path))
   private val parquetDataCacheEnable =
     configuration.getBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key,
       OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.defaultValue.get)
+
+  private val inUseFiberCache = new Array[FiberCache](schema.length)
+
+  private def release(idx: Int): Unit = synchronized {
+    Option(inUseFiberCache(idx)).foreach { fiberCache =>
+      fiberCache.release()
+      inUseFiberCache.update(idx, null)
+    }
+  }
+
+  private def update(idx: Int, fiberCache: FiberCache): Unit = {
+    release(idx)
+    inUseFiberCache.update(idx, fiberCache)
+  }
+
+  private def buildFiberByteData(
+       dataType: DataType,
+       rowGroupRowCount: Int,
+       reader: SingleGroupOapRecordReader): Array[Byte] = {
+    val dataFiberBuilder: DataFiberBuilder = dataType match {
+      case StringType =>
+        StringFiberBuilder(rowGroupRowCount, 0)
+      case BinaryType =>
+        BinaryFiberBuilder(rowGroupRowCount, 0)
+      case BooleanType | ByteType | DateType | DoubleType | FloatType | IntegerType |
+           LongType | ShortType =>
+        FixedSizeTypeFiberBuilder(rowGroupRowCount, 0, dataType)
+      case _ => throw new NotImplementedError(s"${dataType.simpleString} data type " +
+        s"is not implemented for fiber builder")
+    }
+
+    if (reader.nextBatch()) {
+      while (reader.nextKeyValue()) {
+        dataFiberBuilder.append(reader.getCurrentValue.asInstanceOf[ColumnarBatch.Row])
+      }
+    } else {
+      throw new OapException("buildFiberByteData never reach to here!")
+    }
+
+    dataFiberBuilder.build().fiberData
+  }
 
   def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
     var reader: SingleGroupOapRecordReader = null
@@ -59,9 +100,7 @@ private[oap] case class ParquetDataFile(
       // read a single column for each group.
       // comments: Parquet vectorized read can get multi-columns every time. However,
       // the minimum unit of cache is one column of one group.
-      val requiredId = new Array[Int](1)
-      requiredId(0) = fiberId
-      addRequestSchemaToConf(conf, requiredId)
+      addRequestSchemaToConf(conf, Array(fiberId))
       reader = new SingleGroupOapRecordReader(file, conf, meta.footer, groupId, rowGroupRowCount)
       reader.initialize()
       reader.initBatch()
@@ -132,11 +171,12 @@ private[oap] case class ParquetDataFile(
 
     val groupIdToRowIds = rowIds.map(optionRowIds => getGroupIdForRowIds(optionRowIds))
     val groupIds = groupIdToRowIds.map(_.keys).getOrElse(0 until meta.footer.getBlocks.size())
-    var fiberCacheGroup: Array[WrappedFiberCache] = null
 
     val iterator = groupIds.iterator.flatMap { groupId =>
-      fiberCacheGroup = requiredColumnIds.map { id =>
-        WrappedFiberCache(FiberCacheManager.get(DataFiber(this, id, groupId), conf))
+      val fiberCacheGroup = requiredColumnIds.map { id =>
+        val fiberCache = FiberCacheManager.get(DataFiber(this, id, groupId), conf)
+        update(id, fiberCache)
+        fiberCache
       }
       val rowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
       val columnarBatch = ColumnarBatch.allocate(requestSchema, MemoryMode.OFF_HEAP, rowCount)
@@ -145,7 +185,7 @@ private[oap] case class ParquetDataFile(
       // populate partitionColumn values
       if (context.partitionColumns != null) {
         val partitionIdx = requiredColumnIds.length
-        for(i <- context.partitionColumns.fields.indices) {
+        for (i <- context.partitionColumns.fields.indices) {
           ColumnVectorUtils.populate(columnarBatch.column(i + partitionIdx),
             context.partitionValues, i)
           columnarBatch.column(i + partitionIdx).setIsConstant()
@@ -153,7 +193,7 @@ private[oap] case class ParquetDataFile(
       }
 
       fiberCacheGroup.zipWithIndex.foreach { case (fiberCache, id) =>
-        columnarBatch.column(id).loadBytes(fiberCache.fc.getBaseOffset)
+        columnarBatch.column(id).loadBytes(fiberCache.getBaseOffset)
       }
 
       val iter = groupIdToRowIds match {
@@ -169,16 +209,13 @@ private[oap] case class ParquetDataFile(
           columnarBatch.rowIterator().asScala
       }
 
-      CompletionIterator[InternalRow, Iterator[InternalRow]](iter,
-        fiberCacheGroup.zip(requiredColumnIds).foreach {
-          case (fiberCache, _) => fiberCache.release()
-        }
-      )
+      CompletionIterator[InternalRow, Iterator[InternalRow]](
+        iter, requiredColumnIds.foreach(release))
     }
     new OapIterator[InternalRow](iterator) {
       override def close(): Unit = {
         // To ensure if any exception happens, caches are still released after calling close()
-        if (fiberCacheGroup != null) fiberCacheGroup.foreach(_.release())
+        inUseFiberCache.indices.foreach(release)
       }
     }
   }
@@ -212,7 +249,7 @@ private[oap] case class ParquetDataFile(
     } else {
       addRequestSchemaToConf(configuration, requiredIds)
       val file = new Path(StringUtils.unEscapeString(path))
-      val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
+      val meta = DataFileHandleCacheManager(this).asInstanceOf[ParquetDataFileHandle]
       context match {
         case Some(c) =>
           if (parquetDataCacheEnable) {
@@ -299,13 +336,12 @@ private[oap] case class ParquetDataFile(
     }
   }
 
-  override def createDataFileHandle(): ParquetDataFileHandle = {
-    new ParquetDataFileHandle().read(configuration, new Path(StringUtils.unEscapeString(path)))
-  }
+  override def createDataFileHandle(): ParquetDataFileHandle =
+    new ParquetDataFileHandle(configuration, path)
 
   override def totalRows(): Long = {
     import scala.collection.JavaConverters._
-    val meta: ParquetDataFileHandle = DataFileHandleCacheManager(this)
+    val meta = DataFileHandleCacheManager(this).asInstanceOf[ParquetDataFileHandle]
     meta.footer.getBlocks.asScala.foldLeft(0L) {
       (sum, block) => sum + block.getRowCount
     }

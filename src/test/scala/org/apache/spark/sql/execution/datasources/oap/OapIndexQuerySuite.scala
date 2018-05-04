@@ -21,7 +21,7 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.internal.oap.OapConf
-import org.apache.spark.sql.test.oap.SharedOapContext
+import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex}
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
@@ -52,14 +52,14 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
       scala.util.Random.shuffle(1 to 300).map{ i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test_1 select * from t")
-    sql("create oindex index1 on oap_test_1 (a) using bitmap")
-
-    val dfwithIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
-    sql("drop oindex index1 on oap_test_1")
-    val dfWithoutIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
-    val dfOriginal = sql("SELECT * FROM t WHERE key > 8 and key <= 200")
-    assert(dfWithoutIdx.count == dfwithIdx.count)
-    assert(dfWithoutIdx.count == dfOriginal.count)
+    withIndex(TestIndex("oap_test_1", "index1")) {
+      val dfWithoutIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
+      val dfOriginal = sql("SELECT * FROM t WHERE key > 8 and key <= 200")
+      sql("create oindex index1 on oap_test_1 (a) using bitmap")
+      val dfwithIdx = sql("SELECT * FROM oap_test_1 WHERE a > 8 and a <= 200")
+      assert(dfWithoutIdx.count == dfwithIdx.count)
+      assert(dfWithoutIdx.count == dfOriginal.count)
+    }
   }
 
   test("index row boundary") {
@@ -70,12 +70,13 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
                                     .map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test_1 select * from t")
-    sql("create oindex index1 on oap_test_1 (a)")
 
-    checkAnswer(sql(s"SELECT * FROM oap_test_1 WHERE a = $testRowId"),
-      Row(testRowId, s"this is test $testRowId") :: Nil)
+    withIndex(TestIndex("oap_test_1", "index1")) {
+      sql("create oindex index1 on oap_test_1 (a)")
 
-    sql("drop oindex index1 on oap_test_1")
+      checkAnswer(sql(s"SELECT * FROM oap_test_1 WHERE a = $testRowId"),
+        Row(testRowId, s"this is test $testRowId") :: Nil)
+    }
   }
 
   test("check sequence reading if parquet format") {
@@ -84,28 +85,29 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
     }
     data.toDF("key", "value").createOrReplaceTempView("t")
 
-    sql("insert overwrite table oap_parquet_test_1 select * from t")
-    sql("create oindex index1 on oap_parquet_test_1 (a)")
+    withIndex(TestIndex("oap_parquet_test_1", "index1")) {
+      sql("insert overwrite table oap_parquet_test_1 select * from t")
+      sql("create oindex index1 on oap_parquet_test_1 (a)")
 
-    // While a in (0, 3), rowIds = (1, 10, 2)
-    // sort to ensure the sequence reading on parquet. so results are (1, 2, 10)
-    val parquetRslt = sql("select * from oap_parquet_test_1 where a > 0 and a < 3")
-    checkAnswer(parquetRslt, Row(1, "this is test 1") ::
-      Row(2, "this is test 2") ::
-      Row(1, "this is test 10") :: Nil)
+      // While a in (0, 3), rowIds = (1, 10, 2)
+      // sort to ensure the sequence reading on parquet. so results are (1, 2, 10)
+      val parquetRslt = sql("select * from oap_parquet_test_1 where a > 0 and a < 3")
+      checkAnswer(parquetRslt, Row(1, "this is test 1") ::
+        Row(2, "this is test 2") ::
+        Row(1, "this is test 10") :: Nil)
+    }
 
-    sql("insert overwrite table oap_test_1 select * from t")
-    sql("create oindex index1 on oap_test_1 (a)")
+    withIndex(TestIndex("oap_test_1", "index1")) {
+      sql("insert overwrite table oap_test_1 select * from t")
+      sql("create oindex index1 on oap_test_1 (a)")
 
-    // Sort is unnecessary for oap format, so rowIds should be (1, 10, 2)
-    val oapResult = sql("select * from oap_test_1 where a > 0 and a < 3")
-    checkAnswer(oapResult,
-      Row(1, "this is test 1") ::
-      Row(1, "this is test 10") ::
-      Row(2, "this is test 2") :: Nil)
-
-    sql("drop oindex index1 on oap_parquet_test_1")
-    sql("drop oindex index1 on oap_test_1")
+      // Sort is unnecessary for oap format, so rowIds should be (1, 10, 2)
+      val oapResult = sql("select * from oap_test_1 where a > 0 and a < 3")
+      checkAnswer(oapResult,
+        Row(1, "this is test 1") ::
+          Row(1, "this is test 10") ::
+          Row(2, "this is test 2") :: Nil)
+    }
   }
 
   test("#604 bitmap index core dump error") {
@@ -119,12 +121,13 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
     df.createOrReplaceTempView("t")
 
     sql("insert overwrite table oap_test_1 select * from t")
-    sql("create oindex bmidx1 on oap_test_1 (a) using bitmap")
 
-    val df1 = sql("SELECT * FROM oap_test_1 WHERE a = 1")
-    checkAnswer(df1, Row(1, "this is row 1") :: Row(1, "this is row 21") :: Nil)
+    withIndex(TestIndex("oap_test_1", "bmidx1")) {
+      sql("create oindex bmidx1 on oap_test_1 (a) using bitmap")
 
-    sql("drop oindex bmidx1 on oap_test_1")
+      val df1 = sql("SELECT * FROM oap_test_1 WHERE a = 1")
+      checkAnswer(df1, Row(1, "this is row 1") :: Row(1, "this is row 21") :: Nil)
+    }
   }
 
   test("startswith using index") {
@@ -133,9 +136,11 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
       scala.util.Random.shuffle(1 to 30).map(i => (i, s"this$i is test"))
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test_1 select * from t")
-    sql("create oindex index1 on oap_test_1 (b) using btree")
-    checkAnswer(sql("SELECT * FROM oap_test_1 WHERE b like 'this3%'"),
-      Row(3, "this3 is test") :: Row(30, "this30 is test") :: Nil)
+    withIndex(TestIndex("oap_test_1", "index1")) {
+      sql("create oindex index1 on oap_test_1 (b) using btree")
+      checkAnswer(sql("SELECT * FROM oap_test_1 WHERE b like 'this3%'"),
+        Row(3, "this3 is test") :: Row(30, "this30 is test") :: Nil)
+    }
     sqlConf.setConf(OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY, true)
   }
 
@@ -145,9 +150,11 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
       scala.util.Random.shuffle(1 to 30).map(i => (i, s"this$i is test"))
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test_1 select * from t")
-    sql("create oindex index1 on oap_test_1 (b, a) using btree")
-    checkAnswer(sql("SELECT * FROM oap_test_1 WHERE b like 'this3%'"),
-      Row(3, "this3 is test") :: Row(30, "this30 is test") :: Nil)
+    withIndex(TestIndex("oap_test_1", "index1")) {
+      sql("create oindex index1 on oap_test_1 (b, a) using btree")
+      checkAnswer(sql("SELECT * FROM oap_test_1 WHERE b like 'this3%'"),
+        Row(3, "this3 is test") :: Row(30, "this30 is test") :: Nil)
+    }
     sqlConf.setConf(OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY, true)
   }
 
@@ -157,9 +164,11 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
       scala.util.Random.shuffle(1 to 30).map(i => (i % 7, s"this$i is test"))
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test_1 select * from t")
-    sql("create oindex index1 on oap_test_1 (a, b) using btree")
-    checkAnswer(sql("SELECT * FROM oap_test_1 WHERE a = 3 and b like 'this3%'"),
-      Row(3, "this3 is test") :: Nil)
+    withIndex(TestIndex("oap_test_1", "index1")) {
+      sql("create oindex index1 on oap_test_1 (a, b) using btree")
+      checkAnswer(sql("SELECT * FROM oap_test_1 WHERE a = 3 and b like 'this3%'"),
+        Row(3, "this3 is test") :: Nil)
+    }
     sqlConf.setConf(OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY, true)
   }
 
@@ -170,9 +179,11 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
       13, 23, 7, 24, 3, 8, 5, 9).map(i => (i, s"this$i is test"))
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test_1 select * from t")
-    sql("create oindex index1 on oap_test_1 (b) using btree")
-    checkAnswer(sql("SELECT * FROM oap_test_1 WHERE b like 'this3%'"),
-      Row(3, "this3 is test") :: Row(30, "this30 is test") :: Nil)
+    withIndex(TestIndex("oap_test_1", "index1")) {
+      sql("create oindex index1 on oap_test_1 (b) using btree")
+      checkAnswer(sql("SELECT * FROM oap_test_1 WHERE b like 'this3%'"),
+        Row(3, "this3 is test") :: Row(30, "this30 is test") :: Nil)
+    }
     sqlConf.setConf(OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY, true)
   }
 }

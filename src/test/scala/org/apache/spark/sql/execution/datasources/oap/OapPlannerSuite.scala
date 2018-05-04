@@ -102,27 +102,29 @@ class OapPlannerSuite
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_sort_opt_table select * from t")
-    sql("create oindex index1 on oap_sort_opt_table (a)")
-    sql("create oindex index2 on oap_sort_opt_table (b)")
+    try {
+      sql("create oindex index1 on oap_sort_opt_table (a)")
+      sql("create oindex index2 on oap_sort_opt_table (b)")
 
-    // check strategy is applied.
-    checkKeywordsExist(
-      sql("explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"),
-      "OapOrderLimitFileScanExec")
+      // check strategy is applied.
+      checkKeywordsExist(
+        sql("explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"),
+        "OapOrderLimitFileScanExec")
 
-    // ASC
-    checkAnswer(
-      sql("SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"),
-                Row(0) :: Row(0) :: Row(1) :: Row(1) :: Row(1) :: Row(2) :: Row(2) :: Nil)
+      // ASC
+      checkAnswer(
+        sql("SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"),
+        Row(0) :: Row(0) :: Row(1) :: Row(1) :: Row(1) :: Row(2) :: Row(2) :: Nil)
 
-    // DESC
-    checkAnswer(
-      sql("SELECT a FROM oap_sort_opt_table WHERE a >= 90 AND a <= 101 ORDER BY a DESC LIMIT 14"),
-          Row(101) :: Row(101) :: Row(100) :: Row(100) :: Row(99) :: Row(99) :: Row(98) ::
+      // DESC
+      checkAnswer(
+        sql("SELECT a FROM oap_sort_opt_table WHERE a >= 90 AND a <= 101 ORDER BY a DESC LIMIT 14"),
+        Row(101) :: Row(101) :: Row(100) :: Row(100) :: Row(99) :: Row(99) :: Row(98) ::
           Row( 98) :: Row( 97) :: Row( 97) :: Row( 96) :: Row(96) :: Row(96) :: Row(95) :: Nil)
-
-    sql("drop oindex index1 on oap_sort_opt_table")
-    sql("drop oindex index2 on oap_sort_opt_table")
+    } finally {
+      sql("drop oindex index1 on oap_sort_opt_table")
+      sql("drop oindex index2 on oap_sort_opt_table")
+    }
   }
 
   test("SortPushDown Test with Different Project") {
@@ -131,18 +133,20 @@ class OapPlannerSuite
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_sort_opt_table select * from t")
-    sql("create oindex index1 on oap_sort_opt_table (a)")
-    sql("create oindex index2 on oap_sort_opt_table (b)")
+    try {
+      sql("create oindex index1 on oap_sort_opt_table (a)")
+      sql("create oindex index2 on oap_sort_opt_table (b)")
 
-    checkAnswer(
-      sql("SELECT b FROM oap_sort_opt_table WHERE a >= 1 AND a <= 10 ORDER BY a LIMIT 4"),
+      checkAnswer(
+        sql("SELECT b FROM oap_sort_opt_table WHERE a >= 1 AND a <= 10 ORDER BY a LIMIT 4"),
         Row("this is test 1") ::
-        Row("this is test 2") ::
-        Row("this is test 3") ::
-        Row("this is test 4") :: Nil)
-
-    sql("drop oindex index1 on oap_sort_opt_table")
-    sql("drop oindex index2 on oap_sort_opt_table")
+          Row("this is test 2") ::
+          Row("this is test 3") ::
+          Row("this is test 4") :: Nil)
+    } finally {
+      sql("drop oindex index1 on oap_sort_opt_table")
+      sql("drop oindex index2 on oap_sort_opt_table")
+    }
   }
 
   test("SortPushDown should consider deserialized plan") {
@@ -151,19 +155,21 @@ class OapPlannerSuite
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_sort_opt_table select * from t")
-    sql("create oindex index1 on oap_sort_opt_table (a)")
+    try {
+      sql("create oindex index1 on oap_sort_opt_table (a)")
 
-    val sqlText = "SELECT b FROM oap_sort_opt_table WHERE a >= 1 AND a <= 10 ORDER BY a LIMIT 4"
-    val logicPlan = spark.sessionState.sqlParser.parsePlan(sqlText)
-    val qe = new QueryExecution(spark, logicPlan)
-    assert(qe.sparkPlan.toString().contains("OapOrderLimitFileScanExec"))
+      val sqlText = "SELECT b FROM oap_sort_opt_table WHERE a >= 1 AND a <= 10 ORDER BY a LIMIT 4"
+      val logicPlan = spark.sessionState.sqlParser.parsePlan(sqlText)
+      val qe = new QueryExecution(spark, logicPlan)
+      assert(qe.sparkPlan.toString().contains("OapOrderLimitFileScanExec"))
 
-    implicit val exprEnc: ExpressionEncoder[Row] = encoderFor(RowEncoder(qe.analyzed.schema))
-    val deserializedPlan = CatalystSerde.deserialize[Row](logicPlan)
-    val qe1 = new QueryExecution(spark, deserializedPlan)
-    assert(qe1.sparkPlan.toString().contains("OapOrderLimitFileScanExec"))
-
-    sql("drop oindex index1 on oap_sort_opt_table")
+      implicit val exprEnc: ExpressionEncoder[Row] = encoderFor(RowEncoder(qe.analyzed.schema))
+      val deserializedPlan = CatalystSerde.deserialize[Row](logicPlan)
+      val qe1 = new QueryExecution(spark, deserializedPlan)
+      assert(qe1.sparkPlan.toString().contains("OapOrderLimitFileScanExec"))
+    } finally {
+      sql("drop oindex index1 on oap_sort_opt_table")
+    }
   }
 
   test("Distinct index scan if SemiJoin Test") {
@@ -181,47 +187,49 @@ class OapPlannerSuite
 
     dataRDD1.toDF("key", "value").createOrReplaceTempView("t1")
     sql("insert overwrite table oap_distinct_opt_table select * from t1")
-    sql("create oindex index1 on oap_distinct_opt_table (a) using bitmap")
+    try {
+      sql("create oindex index1 on oap_distinct_opt_table (a) using bitmap")
 
-    checkKeywordsExist(
-      sql("explain SELECT * " +
-      "FROM oap_sort_opt_table t1 " +
-      "WHERE EXISTS " +
-      "(SELECT 1 FROM oap_distinct_opt_table t2 " +
-      "WHERE t1.a = t2.a AND t2.a IN (1, 2, 3, 4)) " +
-      "ORDER BY a"), "OapDistinctFileScanExec")
+      checkKeywordsExist(
+        sql("explain SELECT * " +
+          "FROM oap_sort_opt_table t1 " +
+          "WHERE EXISTS " +
+          "(SELECT 1 FROM oap_distinct_opt_table t2 " +
+          "WHERE t1.a = t2.a AND t2.a IN (1, 2, 3, 4)) " +
+          "ORDER BY a"), "OapDistinctFileScanExec")
 
-    checkKeywordsNotExist(
-      sql("explain SELECT * " +
-        "FROM oap_sort_opt_table t1 " +
-        "WHERE EXISTS " +
-        "(SELECT 1 FROM oap_distinct_opt_table t2 " +
-        "WHERE t1.a = t2.a AND t1.a IN (1, 2, 3, 4)) " +
-        "ORDER BY a"), "OapDistinctFileScanExec")
+      checkKeywordsNotExist(
+        sql("explain SELECT * " +
+          "FROM oap_sort_opt_table t1 " +
+          "WHERE EXISTS " +
+          "(SELECT 1 FROM oap_distinct_opt_table t2 " +
+          "WHERE t1.a = t2.a AND t1.a IN (1, 2, 3, 4)) " +
+          "ORDER BY a"), "OapDistinctFileScanExec")
 
-    // TODO: SemiJoin should enable this kind of query.
-    checkKeywordsNotExist(
-      sql("explain SELECT * " +
-        "FROM oap_sort_opt_table t1 " +
-        "WHERE EXISTS " +
-        "(SELECT 1 FROM oap_distinct_opt_table t2 " +
-        "WHERE t1.a = t2.a)"), "OapDistinctFileScanExec")
+      // TODO: SemiJoin should enable this kind of query.
+      checkKeywordsNotExist(
+        sql("explain SELECT * " +
+          "FROM oap_sort_opt_table t1 " +
+          "WHERE EXISTS " +
+          "(SELECT 1 FROM oap_distinct_opt_table t2 " +
+          "WHERE t1.a = t2.a)"), "OapDistinctFileScanExec")
 
-    checkAnswer(
-      sql("SELECT * " +
-      "FROM oap_sort_opt_table t1 " +
-      "WHERE EXISTS " +
-      "(SELECT 1 FROM oap_distinct_opt_table t2 " +
-      "WHERE t1.a = t2.a AND t2.a >= 1 AND t1.a < 5) " +
-      "ORDER BY a"),
-      Seq(
-        Row(1, "this is test 1"),
-        Row(2, "this is test 2"),
-        Row(3, "this is test 3"),
-        Row(4, "this is test 4")))
-
-    sql("drop oindex index1 on oap_sort_opt_table")
-    sql("drop oindex index1 on oap_distinct_opt_table")
+      checkAnswer(
+        sql("SELECT * " +
+          "FROM oap_sort_opt_table t1 " +
+          "WHERE EXISTS " +
+          "(SELECT 1 FROM oap_distinct_opt_table t2 " +
+          "WHERE t1.a = t2.a AND t2.a >= 1 AND t1.a < 5) " +
+          "ORDER BY a"),
+        Seq(
+          Row(1, "this is test 1"),
+          Row(2, "this is test 2"),
+          Row(3, "this is test 3"),
+          Row(4, "this is test 4")))
+    } finally {
+      sql("drop oindex index1 on oap_sort_opt_table")
+      sql("drop oindex index1 on oap_distinct_opt_table")
+    }
   }
 
   test("OapFileScan WholeStageCodeGen Check") {
@@ -231,23 +239,25 @@ class OapPlannerSuite
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_sort_opt_table select * from t")
-    sql("create oindex index1 on oap_sort_opt_table (a)")
+    try {
+      sql("create oindex index1 on oap_sort_opt_table (a)")
 
-    spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
-    val sqlString =
-      "explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"
+      spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
+      val sqlString =
+        "explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"
 
-    // OapOrderLimitFileScanExec is applied.
-    checkKeywordsExist(sql(sqlString), "OapOrderLimitFileScanExec")
-    // OapOrderLimitFileScanExec WholeStageCodeGen is disabled.
-    checkKeywordsNotExist(sql(sqlString), "*OapOrderLimitFileScanExec")
+      // OapOrderLimitFileScanExec is applied.
+      checkKeywordsExist(sql(sqlString), "OapOrderLimitFileScanExec")
+      // OapOrderLimitFileScanExec WholeStageCodeGen is disabled.
+      checkKeywordsNotExist(sql(sqlString), "*OapOrderLimitFileScanExec")
 
-    spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "true")
+      spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "true")
 
-    // OapOrderLimitFileScanExec WholeStageCodeGen is enabled.
-    checkKeywordsExist(sql(sqlString), "*OapOrderLimitFileScanExec")
-
-    sql("drop oindex index1 on oap_sort_opt_table")
+      // OapOrderLimitFileScanExec WholeStageCodeGen is enabled.
+      checkKeywordsExist(sql(sqlString), "*OapOrderLimitFileScanExec")
+    } finally {
+      sql("drop oindex index1 on oap_sort_opt_table")
+    }
   }
 
   test("aggregations with group by test") {
@@ -257,24 +267,26 @@ class OapPlannerSuite
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_fix_length_schema_table select * from t")
-    sql("create oindex index1 on oap_fix_length_schema_table (a)")
+    try {
+      sql("create oindex index1 on oap_fix_length_schema_table (a)")
 
-    val sqlString =
-      "SELECT a, min(b), max(b), std(b), avg(b), first(b), last(b) " +
-        "FROM oap_fix_length_schema_table " +
-        "where a < 30 " +
-        "group by a"
+      val sqlString =
+        "SELECT a, min(b), max(b), std(b), avg(b), first(b), last(b) " +
+          "FROM oap_fix_length_schema_table " +
+          "where a < 30 " +
+          "group by a"
 
-    checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
-    val oapDF = sql(sqlString).collect()
+      checkKeywordsExist(sql("explain " + sqlString), "*OapAggregationFileScanExec")
+      val oapDF = sql(sqlString).collect()
 
-    spark.sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")
-    checkKeywordsNotExist(sql("explain " + sqlString), "OapAggregationFileScanExec")
-    val baseDF = sql(sqlString)
-
-    checkAnswer(baseDF, oapDF)
-    spark.sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
-    sql("drop oindex index1 on oap_fix_length_schema_table")
+      spark.sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")
+      checkKeywordsNotExist(sql("explain " + sqlString), "OapAggregationFileScanExec")
+      val baseDF = sql(sqlString)
+      checkAnswer(baseDF, oapDF)
+    } finally {
+      spark.sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "false")
+      sql("drop oindex index1 on oap_fix_length_schema_table")
+    }
   }
 
   test("oapStrategies does not support empty filter") {
@@ -284,15 +296,17 @@ class OapPlannerSuite
 
     dataRDD.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_fix_length_schema_table select * from t")
-    sql("create oindex index1 on oap_fix_length_schema_table (a)")
+    try {
+      sql("create oindex index1 on oap_fix_length_schema_table (a)")
 
-    val aggQuery = "SELECT a, min(b) FROM oap_fix_length_schema_table group by a"
-    checkKeywordsNotExist(sql("explain " + aggQuery), "*OapAggregationFileScanExec")
+      val aggQuery = "SELECT a, min(b) FROM oap_fix_length_schema_table group by a"
+      checkKeywordsNotExist(sql("explain " + aggQuery), "*OapAggregationFileScanExec")
 
-    val orderByLimitQuery = "SELECT a FROM oap_sort_opt_table ORDER BY a LIMIT 7"
-    checkKeywordsNotExist(sql("explain " + orderByLimitQuery), "*OapOrderLimitFileScanExec")
-
-    sql("drop oindex index1 on oap_fix_length_schema_table")
+      val orderByLimitQuery = "SELECT a FROM oap_sort_opt_table ORDER BY a LIMIT 7"
+      checkKeywordsNotExist(sql("explain " + orderByLimitQuery), "*OapOrderLimitFileScanExec")
+    } finally {
+      sql("drop oindex index1 on oap_fix_length_schema_table")
+    }
   }
 
   test("aggregations with multi filters") {
@@ -336,7 +350,8 @@ class OapPlannerSuite
         assert(tmpDir.listFiles.nonEmpty)
         checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
 
-        checkAnswer(sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
+        checkAnswer(sql(s"show oindex from $tabName"),
+          Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
         sql(s"DROP TABLE $tabName")
         assert(tmpDir.listFiles.nonEmpty)
       }
@@ -395,7 +410,6 @@ class OapPlannerSuite
 
         assert(tmpDir.listFiles.nonEmpty)
         checkAnswer(sql(s"create oindex idxa on $tabName(a)"), Nil)
-
         checkAnswer(
           sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
 
@@ -407,6 +421,7 @@ class OapPlannerSuite
         checkAnswer(
           sql(s"show oindex from $tabName"), Row(tabName, "idxa", 0, "a", "A", "BTREE", true))
         checkAnswer(sql(s"select a from $tabName where a=555"), Row(555))
+        sql(s"drop oindex idxa on $tabName")
         sql(s"DROP TABLE $tabName")
         assert(tmpDir.listFiles.nonEmpty)
       }
@@ -453,6 +468,7 @@ class OapPlannerSuite
           sql(s"check oindex on $tabName"),
           Row(s"Data file: $dirPath/$dataFileName not found!"))
 
+        sql(s"drop oindex idxa on $tabName")
         sql(s"DROP TABLE $tabName")
         assert(tmpDir.listFiles.nonEmpty)
       }

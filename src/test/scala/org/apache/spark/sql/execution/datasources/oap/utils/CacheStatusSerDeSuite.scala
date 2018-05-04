@@ -56,9 +56,9 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
     val bitSet = new BitSet(90)
     bitSet.set(3)
     bitSet.set(8)
-    val dataFileMeta = new OapDataFileHandle(
-      rowCountInEachGroup = 3, rowCountInLastGroup = 2, groupCount = 30, fieldCount = 3)
-    val rawData = FiberCacheStatus(path, bitSet, dataFileMeta)
+    val groupCount = 30
+    val fieldCount = 3
+    val rawData = FiberCacheStatus(path, bitSet, groupCount, fieldCount)
     val newRawData =
       CacheStatusSerDe.statusRawDataFromJson(CacheStatusSerDe.statusRawDataToJson(rawData))
     assertStatusRawDataEquals(rawData, newRawData)
@@ -74,12 +74,12 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
     bitSet1.set(8)
     bitSet2.set(5)
     bitSet2.set(6)
-    val dataFileMeta1 = new OapDataFileHandle(
-      rowCountInEachGroup = 3, rowCountInLastGroup = 2, groupCount = 30, fieldCount = 3)
-    val dataFileMeta2 = new OapDataFileHandle(
-      rowCountInEachGroup = 3, rowCountInLastGroup = 1, groupCount = 50, fieldCount = 3)
-    rawDataArray += FiberCacheStatus(path1, bitSet1, dataFileMeta1)
-    rawDataArray += FiberCacheStatus(path2, bitSet2, dataFileMeta2)
+    val groupCount1 = 30
+    val groupCount2 = 50
+    val fieldCount1 = 3
+    val fieldCount2 = 3
+    rawDataArray += FiberCacheStatus(path1, bitSet1, groupCount1, fieldCount1)
+    rawDataArray += FiberCacheStatus(path2, bitSet2, groupCount2, fieldCount2)
     val statusRawDataArrayStr = CacheStatusSerDe.serialize(rawDataArray)
     assertStringEquals(statusRawDataArrayStr, CacheStatusSerDeTestStrs.statusRawDataArrayString)
     val deserRawDataArr = CacheStatusSerDe.deserialize(statusRawDataArrayStr)
@@ -117,7 +117,8 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
   private def assertStatusRawDataEquals(data1: FiberCacheStatus, data2: FiberCacheStatus): Unit = {
     assert(data1.file === data2.file)
     assertBitSetEquals(data1.bitmask, data2.bitmask)
-    assertDataFileMetaEquals(data1.meta, data2.meta)
+    assert(data1.groupCount === data2.groupCount)
+    assert(data1.fieldCount === data2.fieldCount)
   }
 
 }
@@ -153,12 +154,8 @@ private[oap] object CacheStatusSerDeTestStrs {
        |          }
        |        ]
        |      },
-       |      "dataFileMetaJValue" : {
-       |        "rowCountInEachGroup" : 3,
-       |        "rowCountInLastGroup" : 2,
-       |        "groupCount" : 30,
-       |        "fieldCount" : 3
-       |      }
+       |      "groupCount" : 30,
+       |      "fieldCount" : 3
        |    },
        |    {
        |      "fiberFilePath" : "file2",
@@ -175,12 +172,8 @@ private[oap] object CacheStatusSerDeTestStrs {
        |          }
        |        ]
        |      },
-       |      "dataFileMetaJValue" : {
-       |        "rowCountInEachGroup" : 3,
-       |        "rowCountInLastGroup" : 1,
-       |        "groupCount" : 50,
-       |        "fieldCount" : 3
-       |      }
+       |      "groupCount" : 50,
+       |      "fieldCount" : 3
        |    }
        |  ]
        |}

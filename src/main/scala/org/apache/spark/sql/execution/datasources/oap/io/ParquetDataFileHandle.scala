@@ -19,20 +19,26 @@ package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
+import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.format.converter.ParquetMetadataConverter._
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.metadata.ParquetMetadata
 
-private[oap] class ParquetDataFileHandle(
-  var footer: ParquetMetadata = null)
-  extends DataFileHandle {
+private[oap] class ParquetDataFileHandle(val footer: ParquetMetadata) extends DataFileHandle {
+
+  require(footer != null, "footer of ParquetDataFileHandle should not be null.")
+
+  def this(conf: Configuration, path: String) {
+    this(ParquetFileReader.readFooter(conf, new Path(StringUtils.unEscapeString(path)), NO_FILTER))
+  }
 
   override def fin: FSDataInputStream = null
 
   override def len: Long = 0
 
-  def read(conf: Configuration, path: Path): ParquetDataFileHandle = {
-    this.footer = ParquetFileReader.readFooter(conf, path, NO_FILTER)
-    this
-  }
+  override def getGroupCount: Int = footer.getBlocks.size()
+
+  override def getFieldCount: Int =
+    footer.getFileMetaData.getSchema.getColumns.size()
+
 }

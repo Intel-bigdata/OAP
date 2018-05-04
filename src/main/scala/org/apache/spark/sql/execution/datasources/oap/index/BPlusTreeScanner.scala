@@ -28,7 +28,6 @@ import org.apache.spark.sql.execution.datasources.oap.statistics.StatsAnalysisRe
 private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
   override def canBeOptimizedByStatistics: Boolean = true
   override def toString(): String = "BPlusTreeScanner"
-  @transient protected var currentKeyArray: Array[CurrentKey] = _
 
   @transient var recordReader: BTreeIndexRecordReader = _
 

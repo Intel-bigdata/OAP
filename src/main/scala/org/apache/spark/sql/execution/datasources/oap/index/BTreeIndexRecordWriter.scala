@@ -33,6 +33,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion
 import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion.IndexVersion
+import org.apache.spark.sql.execution.datasources.oap.index.impl.IndexFileWriterImpl
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatisticsWriteManager
 import org.apache.spark.sql.execution.datasources.oap.utils.{BTreeNode, BTreeUtils, NonNullKeyWriter}
@@ -44,7 +45,7 @@ private[index] object BTreeIndexRecordWriter {
       indexFile: Path,
       schema: StructType,
       indexVersion: IndexVersion): BTreeIndexRecordWriter = {
-    val writer = BTreeIndexFileWriter(configuration, indexFile)
+    val writer = IndexFileWriterImpl(configuration, indexFile)
     indexVersion match {
       case IndexVersion.OAP_INDEX_V1 =>
         BTreeIndexRecordWriter(configuration, writer, schema)
@@ -54,7 +55,7 @@ private[index] object BTreeIndexRecordWriter {
 
 private[index] case class BTreeIndexRecordWriter(
     configuration: Configuration,
-    fileWriter: BTreeIndexFileWriter,
+    fileWriter: IndexFileWriter,
     keySchema: StructType) extends RecordWriter[Void, InternalRow] {
 
   @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
@@ -124,14 +125,16 @@ private[index] case class BTreeIndexRecordWriter(
     (nullKeys.toSeq, nonNullKeys.toSeq)
   }
 
+  private var rowIdListSize = 0L
+
   /**
    * Working Flow:
-   *  1. Call fileWriter.start() to write some Index Info
+   *  1. Write index magic version into header
    *  2. Split all unique keys into some nodes
    *  3. Serialize nodes and call fileWriter.writeNode()
    *  4. Serialize row id List based on sorted unique keys and call fileWriter.writeRowIdList()
    *  5. Serialize footer and call fileWriter.writeFooter()
-   *  5. Call fileWriter.end() to write some meta data (e.g. file offset for each section)
+   *  5. Write index file meta: footer size, row id list size
    */
   private[index] def flush(): Unit = {
     val (nullKeys, nonNullUniqueKeys) = sortUniqueKeys()
@@ -139,8 +142,8 @@ private[index] case class BTreeIndexRecordWriter(
     // Trick here. If root node has no child, then write root node as a child.
     val children = if (treeShape.children.nonEmpty) treeShape.children else treeShape :: Nil
 
-    // Start
-    fileWriter.start()
+    // Write index magic version into header
+    fileWriter.write(IndexUtils.serializeVersion(IndexFile.VERSION_NUM))
     // Write Node
     var startPosInKeyList = 0
     var startPosInRowList = 0
@@ -152,7 +155,7 @@ private[index] case class BTreeIndexRecordWriter(
       val rowCount = nodeUniqueKeys.map(multiHashMap.get(_).size()).sum
 
       val nodeBuf = serializeNode(nodeUniqueKeys, startPosInRowList)
-      fileWriter.writeNode(nodeBuf)
+      fileWriter.write(nodeBuf)
       startPosInKeyList += keyCount
       startPosInRowList += rowCount
       if (keyCount == 0 || nodeUniqueKeys.isEmpty || nonNullUniqueKeys.isEmpty) {
@@ -165,9 +168,11 @@ private[index] case class BTreeIndexRecordWriter(
     serializeAndWriteRowIdLists(nonNullUniqueKeys ++ nullKeys)
     // Write Footer
     val nullKeyRowCount = nullKeys.map(multiHashMap.get(_).size()).sum
-    fileWriter.writeFooter(serializeFooter(nullKeyRowCount, nodes))
-    // End
-    fileWriter.end()
+    val footerBuf = serializeFooter(nullKeyRowCount, nodes)
+    fileWriter.write(footerBuf)
+    // Write index file meta: footer size, row id list size
+    fileWriter.writeLong(rowIdListSize)
+    fileWriter.writeInt(footerBuf.length)
   }
 
   /**
@@ -215,9 +220,10 @@ private[index] case class BTreeIndexRecordWriter(
    */
   private def serializeAndWriteRowIdLists(uniqueKeys: Seq[InternalRow]): Unit = {
     uniqueKeys.foreach { key =>
-      multiHashMap.get(key).asScala.foreach(x =>
-        fileWriter.writeRowId(IndexUtils.toBytes(x))
-      )
+      multiHashMap.get(key).asScala.foreach { x =>
+        fileWriter.write(IndexUtils.toBytes(x))
+        rowIdListSize += IndexUtils.INT_SIZE
+      }
     }
   }
 

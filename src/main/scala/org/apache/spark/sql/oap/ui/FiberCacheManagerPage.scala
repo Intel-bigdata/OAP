@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.oap.ui
+package org.apache.spark.sql.oap.ui
 
 import javax.servlet.http.HttpServletRequest
 

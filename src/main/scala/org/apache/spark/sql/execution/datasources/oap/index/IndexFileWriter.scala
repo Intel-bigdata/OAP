@@ -15,20 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.oap.listener
+package org.apache.spark.sql.execution.datasources.oap.index
 
-import org.apache.spark.scheduler.{SparkListener, SparkListenerCustomInfoUpdate}
-import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCacheManagerSensor, FiberSensor}
+import java.io.OutputStream
 
-class FiberInfoListener extends SparkListener {
-  override def onCustomInfoUpdate(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
-    if (fiberInfo.clazzName.contains("OapFiberCacheHeartBeatMessager")) {
-      FiberSensor.update(fiberInfo)
-    } else if (fiberInfo.clazzName.contains("FiberCacheManagerMessager")) {
-      FiberCacheManagerSensor.update(fiberInfo)
-    }
-  }
+private[index] trait IndexFileWriter {
 
-  // TODO: implements other events like `onExecutorAdded`, `onExecutorRemoved`, etc. to maintain
-  // the whole info picture on driver side.
+  protected def os: OutputStream
+
+  def getName: String
+
+  def write(bytes: Array[Byte]): Unit = os.write(bytes)
+
+  def writeInt(value: Int): Unit = IndexUtils.writeInt(os, value)
+
+  def writeLong(value: Long): Unit = IndexUtils.writeLong(os, value)
+
+  def close(): Unit = os.close()
 }

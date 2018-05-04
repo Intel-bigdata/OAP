@@ -66,19 +66,26 @@ class OapQuerySuite extends HiveComparisonTest with BeforeAndAfter  {
   }
 
   test("create hive table in parquet format") {
-    sql("create table p_table (key int, val string) stored as parquet")
-    sql("insert overwrite table p_table select * from src")
-    sql("create oindex if not exists p_index on p_table(key)")
-
-    assert(sql("select val from p_table where key = 238").collect().head.getString(0) == "val_238")
-    sql("drop table p_table")
+    try {
+      sql("create table p_table (key int, val string) stored as parquet")
+      sql("insert overwrite table p_table select * from src")
+      sql("create oindex if not exists p_index on p_table(key)")
+      assert(sql("select val from p_table where key = 238")
+        .collect().head.getString(0) == "val_238")
+    } finally {
+      sql("drop oindex p_index on p_table")
+      sql("drop table p_table")
+    }
   }
 
   test("create duplicate hive table in parquet format") {
-    sql("create table p_table1 (key int, val string) stored as parquet")
-    sql("insert overwrite table p_table1 select * from src")
-
-    sql("create oindex p_index on p_table1(key)")
-    assertDupIndex { sql("create oindex p_index on p_table1(key)") }
+    try {
+      sql("create table p_table1 (key int, val string) stored as parquet")
+      sql("insert overwrite table p_table1 select * from src")
+      sql("create oindex p_index on p_table1(key)")
+      assertDupIndex { sql("create oindex p_index on p_table1(key)") }
+    } finally {
+      sql("drop oindex p_index on p_table1")
+    }
   }
 }

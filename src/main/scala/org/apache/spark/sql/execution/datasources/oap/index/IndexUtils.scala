@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import java.io.OutputStream
 
-import org.apache.hadoop.fs.{FSDataInputStream, Path}
+import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
@@ -66,7 +66,7 @@ private[oap] object IndexUtils {
       dataFileName
     }
     new Path(
-      dataFile.getParent, "." + indexFileName + "." + time + "." +  name + OAP_INDEX_EXTENSION)
+      dataFile.getParent, "." + indexFileName + "." + time + "." + name + OAP_INDEX_EXTENSION)
   }
 
   def writeFloat(out: OutputStream, v: Float): Unit =

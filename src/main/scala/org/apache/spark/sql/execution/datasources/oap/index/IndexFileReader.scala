@@ -15,20 +15,25 @@
  * limitations under the License.
  */
 
-package org.apache.spark.oap.ui
+package org.apache.spark.sql.execution.datasources.oap.index
 
-import org.apache.spark.internal.Logging
-import org.apache.spark.ui.{SparkUI, SparkUITab}
+import java.io.InputStream
 
-class OapTab(parent: SparkUI) extends SparkUITab(parent, "OAP") with Logging {
-  val listener = parent.executorsListener
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 
-  attachPage(new FiberCacheManagerPage(this))
+private[oap] trait IndexFileReader {
 
-  parent.attachTab(this)
-  parent.addStaticHandler(OapTab.STATIC_RESOURCE_DIR, "/static/oap")
-}
+  protected def is: InputStream
 
-object OapTab {
-  private val STATIC_RESOURCE_DIR = "oap/static"
+  def readFiberCache(position: Long, length: Int): FiberCache
+
+  def read(position: Long, length: Int): Array[Byte]
+
+  def readFully(position: Long, buf: Array[Byte])
+
+  def getLen: Long
+
+  def getName: String
+
+  def close(): Unit = is.close()
 }

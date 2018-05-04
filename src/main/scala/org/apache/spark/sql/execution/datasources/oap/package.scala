@@ -23,8 +23,11 @@ package object oap {
   type Key = InternalRow
 }
 
-class OapException(message: String, cause: Throwable)
-  extends Exception(message, cause) {
+/**
+ * To express OAP specific exceptions, including but not limited to indicate unsupported operations,
+ * for example: BitMapIndexType only supports one single column
+ */
+class OapException(message: String, cause: Throwable) extends Exception(message, cause) {
 
   def this(message: String) = this(message, null)
 }

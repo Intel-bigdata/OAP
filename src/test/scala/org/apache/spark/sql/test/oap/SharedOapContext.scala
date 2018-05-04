@@ -88,4 +88,31 @@ trait SharedOapContextBase extends SharedSQLContext {
         ret ++ set.getOrElse(Nil)
       }
   }
+
+  /**
+   * Drop oindex by `TestIndex` after calling `f`, `TestIndex` use to
+   * specify the `tableName`, `indexName` and `partitions`.
+   * `partitions` is not necessary unless create index also specify `partitions`.
+   */
+  protected def withIndex(indices: TestIndex*)(f: => Unit): Unit = {
+    try f finally {
+      indices.foreach { index =>
+        val baseSql = s"DROP OINDEX ${index.indexName} on ${index.tableName}"
+        if (index.partitions.isEmpty) {
+          spark.sql(baseSql)
+        } else {
+          val partitionPart = index.partitions.map(p => s"${p.key} = '${p.value}'")
+            .mkString(" partition (", ",", ")")
+          spark.sql(s"$baseSql $partitionPart")
+        }
+      }
+    }
+  }
 }
+
+case class TestPartition(key: String, value: String)
+
+case class TestIndex(
+    tableName: String,
+    indexName: String,
+    partitions: TestPartition*)

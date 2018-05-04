@@ -192,7 +192,7 @@ object OapUtils extends Logging {
    * @param partitionSpec the specification of the partitions
    * @return all valid files grouped into partition(s) on the disk
    */
-  @Deprecated
+  @deprecated
   // deprecated, use "getPartitionPaths" to get valid partition path(s)
   def getPartitionsRefreshed(
       fileIndex: FileIndex,

@@ -100,6 +100,9 @@ abstract class DataFileHandle {
   def fin: FSDataInputStream
   def len: Long
 
+  def getGroupCount: Int
+  def getFieldCount: Int
+
   def close(): Unit = {
     if (fin != null) {
       fin.close()

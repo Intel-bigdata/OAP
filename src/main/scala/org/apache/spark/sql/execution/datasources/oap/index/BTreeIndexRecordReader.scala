@@ -22,6 +22,10 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
+import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion
+import org.apache.spark.sql.execution.datasources.oap.index.impl.IndexFileReaderImpl
+import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatsAnalysisResult
 import org.apache.spark.sql.types._
 
@@ -38,11 +42,23 @@ private[index] object BTreeIndexRecordReader {
   def apply(
       configuration: Configuration,
       schema: StructType,
-      indexPath: Path
-  ): BTreeIndexRecordReader = {
-    BTreeIndexFileReader(configuration, indexPath) match {
-      case fileReader: BTreeIndexFileReaderV1 =>
-        BTreeIndexRecordReaderV1(configuration, schema, fileReader)
+      indexPath: Path): BTreeIndexRecordReader = {
+
+    val fileReader = IndexFileReaderImpl(configuration, indexPath)
+
+    readVersion(fileReader) match {
+      case Some(version) =>
+        IndexVersion(version) match {
+          case IndexVersion.OAP_INDEX_V1 =>
+            BTreeIndexRecordReaderV1(configuration, schema, fileReader)
+        }
+      case None =>
+        throw new OapException("not a valid index file")
     }
+  }
+
+  private def readVersion(fileReader: IndexFileReader): Option[Int] = {
+    val magicBytes = fileReader.read(0, IndexFile.VERSION_LENGTH)
+    IndexUtils.deserializeVersion(magicBytes)
   }
 }

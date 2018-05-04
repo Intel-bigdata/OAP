@@ -37,7 +37,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ReadOnlyParquetFileFormat}
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.rpc.OapMessages.CacheDrop
 import org.apache.spark.sql.types._
@@ -51,26 +51,31 @@ case class CreateIndexCommand(
     table: TableIdentifier,
     indexColumns: Array[IndexColumn],
     allowExists: Boolean,
-    indexType: AnyIndexType,
+    indexType: OapIndexType,
     partitionSpec: Option[TablePartitionSpec]) extends RunnableCommand with Logging {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val qe = sparkSession.sessionState.executePlan(UnresolvedRelation(table))
     qe.assertAnalyzed()
-    val relation = qe.optimizedPlan
+    val optimized = qe.optimizedPlan
 
-    val (fileCatalog, schema, readerClassName, identifier, fsRelation) = relation match {
+    val (fileCatalog, schema, readerClassName, identifier, relation) = optimized match {
       case LogicalRelation(
       _fsRelation @ HadoopFsRelation(f, _, s, _, _: OapFileFormat, _), _, id) =>
-        (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, id, _fsRelation)
+        (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, id, optimized)
       case LogicalRelation(
-      _fsRelation @ HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), _, id) =>
+      _fsRelation @ HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), attributes, id) =>
         if (!sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED)) {
           throw new OapException(s"turn on ${
             OapConf.OAP_PARQUET_ENABLED.key} to allow index building on parquet files")
         }
-        format.forbidSplit
-        (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, id, _fsRelation)
+        // Use ReadOnlyParquetFileFormat instead of ParquetFileFormat because of
+        // ReadOnlyParquetFileFormat.isSplitable always return false.
+        val fsRelation = _fsRelation.copy(
+          fileFormat = new ReadOnlyParquetFileFormat(),
+          options = _fsRelation.options)(_fsRelation.sparkSession)
+        val logical = LogicalRelation(fsRelation, attributes, id)
+        (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, id, logical)
       case other =>
         throw new OapException(s"We don't support index building for ${other.simpleString}")
     }
@@ -123,7 +128,9 @@ case class CreateIndexCommand(
           metaBuilder.addIndexMeta(new IndexMeta(indexName, time, BTreeIndex(entries)))
         case BitMapIndexType =>
           // Currently OAP index type supports the column with one single field.
-          assert(indexColumns.length == 1, "BitMapIndexType only supports one single column")
+          if (indexColumns.length != 1) {
+            throw new OapException("BitMapIndexType only supports one single column")
+          }
           val entries = indexColumns.map(col =>
             schema.map(_.name).toIndexedSeq.indexOf(col.columnName))
           metaBuilder.addIndexMeta(new IndexMeta(indexName, time, BitMapIndex(entries)))
@@ -287,16 +294,21 @@ case class RefreshIndexCommand(
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val qe = sparkSession.sessionState.executePlan(UnresolvedRelation(table))
     qe.assertAnalyzed()
-    val relation = qe.optimizedPlan
+    val optimized = qe.optimizedPlan
 
-    val (fileCatalog, schema, readerClassName) = relation match {
+    val (fileCatalog, schema, readerClassName, relation) = optimized match {
       case LogicalRelation(
           HadoopFsRelation(f, _, s, _, _: OapFileFormat, _), _, _) =>
-        (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME)
+        (f, s, OapFileFormat.OAP_DATA_FILE_CLASSNAME, optimized)
       case LogicalRelation(
-          HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), _, _) =>
-        format.forbidSplit
-        (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME)
+      _fsRelation @ HadoopFsRelation(f, _, s, _, format: ParquetFileFormat, _), attributes, id) =>
+        // Use ReadOnlyParquetFileFormat instead of ParquetFileFormat because of
+        // ReadOnlyParquetFileFormat.isSplitable always return false
+        val fsRelation = _fsRelation.copy(
+          fileFormat = new ReadOnlyParquetFileFormat(),
+          options = _fsRelation.options)(_fsRelation.sparkSession)
+        val logical = LogicalRelation(fsRelation, attributes, id)
+        (f, s, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, logical)
       case other =>
         throw new OapException(s"We don't support index refreshing for ${other.simpleString}")
     }
@@ -351,7 +363,7 @@ case class RefreshIndexCommand(
     })
 
     val buildrst = indices.map(i => {
-      var indexType: AnyIndexType = BTreeIndexType
+      var indexType: OapIndexType = BTreeIndexType
 
       val indexColumns = i.indexType match {
         case BTreeIndex(entries) =>

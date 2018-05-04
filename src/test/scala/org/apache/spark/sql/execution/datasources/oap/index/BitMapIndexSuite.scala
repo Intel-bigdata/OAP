@@ -17,8 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
+import org.apache.spark.sql.execution.datasources.OapException
 import org.scalatest.BeforeAndAfterEach
-
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
@@ -210,9 +210,9 @@ class BitMapIndexSuite extends QueryTest with SharedOapContext with BeforeAndAft
     val data: Seq[(Int, String)] = (0 to 200).map {i => (i, null)}
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table oap_test select * from t")
-    val message = intercept[AssertionError] {
+    val message = intercept[OapException] {
       sql("create oindex index_bf on oap_test (a, b) USING BITMAP")
     }.getMessage
-    assert(message.equals("assertion failed: BitMapIndexType only supports one single column"))
+    assert(message.contains("BitMapIndexType only supports one single column"))
   }
 }

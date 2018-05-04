@@ -52,19 +52,19 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   private var bmUniqueKeyListCount: Int = _
 
   private var bmFooterFiber: BitmapFiber = _
-  private var bmFooterCache: WrappedFiberCache = _
+  private var bmFooterCache: FiberCache = _
 
   private var bmUniqueKeyListFiber: BitmapFiber = _
-  private var bmUniqueKeyListCache: WrappedFiberCache = _
+  private var bmUniqueKeyListCache: FiberCache = _
 
   private var bmOffsetListFiber: BitmapFiber = _
-  private var bmOffsetListCache: WrappedFiberCache = _
+  private var bmOffsetListCache: FiberCache = _
 
   private var bmNullListFiber: BitmapFiber = _
-  private var bmNullListCache: WrappedFiberCache = _
+  private var bmNullListCache: FiberCache = _
 
   private var bmEntryListFiber: BitmapFiber = _
-  private var bmEntryListCache: WrappedFiberCache = _
+  private var bmEntryListCache: FiberCache = _
 
   private var _totalRows: Long = 0
   override def totalRows(): Long = _totalRows
@@ -101,34 +101,34 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
         idxPath.toString, BitmapIndexSectionId.footerSection, 0)
     }
     if (bmFooterCache == null) {
-      bmFooterCache = WrappedFiberCache(FiberCacheManager.get(bmFooterFiber, conf))
+      bmFooterCache = FiberCacheManager.get(bmFooterFiber, conf)
 
       // Calculate total rows right after footer cache is loaded.
-      _totalRows = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 7)
+      _totalRows = bmFooterCache.getInt(IndexUtils.INT_SIZE * 7)
     }
   }
 
   override protected def analyzeStatistics(
       indexPath: Path,
       conf: Configuration): StatsAnalysisResult = {
-    var bmStatsContentCache: WrappedFiberCache = null
+    var bmStatsContentCache: FiberCache = null
     try {
       val fs = indexPath.getFileSystem(conf)
       fin = fs.open(indexPath)
       cacheBitmapFooterSegment(indexPath, conf)
       // The stats offset and size are located in the end of bitmap footer segment.
       // See the comments in BitmapIndexRecordWriter.scala.
-      val statsOffset = bmFooterCache.fc.getLong(BITMAP_FOOTER_SIZE - IndexUtils.LONG_SIZE * 2)
-      val statsSize = bmFooterCache.fc.getLong(BITMAP_FOOTER_SIZE - IndexUtils.LONG_SIZE)
+      val statsOffset = bmFooterCache.getLong(BITMAP_FOOTER_SIZE - IndexUtils.LONG_SIZE * 2)
+      val statsSize = bmFooterCache.getLong(BITMAP_FOOTER_SIZE - IndexUtils.LONG_SIZE)
       // We expect stats fiber and cache to reside in memory for the whole lifecycle of
       // BitmapScanner.
       // Thus we will release them lazily together with other bitmap fiber and cache.
       val bmStatsContentFiber = BitmapFiber(
         () => loadBmStatsContent(fin, statsOffset, statsSize),
         indexPath.toString, BitmapIndexSectionId.statsContentSection, 0)
-      bmStatsContentCache = WrappedFiberCache(FiberCacheManager.get(bmStatsContentFiber, conf))
+      bmStatsContentCache = FiberCacheManager.get(bmStatsContentFiber, conf)
 
-      val stats = StatisticsManager.read(bmStatsContentCache.fc, 0, keySchema)
+      val stats = StatisticsManager.read(bmStatsContentCache, 0, keySchema)
       StatisticsManager.analyse(stats, intervalArray, conf)
     } finally {
       if (bmFooterCache != null) {
@@ -195,7 +195,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private def getIndexVersionNum: Int = {
     assert(bmFooterCache != null)
-    bmFooterCache.fc.getInt(0)
+    bmFooterCache.getInt(0)
   }
 
   private def cacheBitmapAllSegments(idxPath: Path, conf: Configuration): Unit = {
@@ -206,12 +206,12 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       // Thus we need to ensure that bitmap footer is loaded already.
       cacheBitmapFooterSegment(idxPath, conf)
       checkVersionNum(getIndexVersionNum, fin)
-      bmUniqueKeyListTotalSize = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE)
-      bmUniqueKeyListCount = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 2)
-      val bmEntryListTotalSize = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 3)
-      val bmOffsetListTotalSize = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 4)
-      val bmNullEntryOffset = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 5)
-      val bmNullEntrySize = bmFooterCache.fc.getInt(IndexUtils.INT_SIZE * 6)
+      bmUniqueKeyListTotalSize = bmFooterCache.getInt(IndexUtils.INT_SIZE)
+      bmUniqueKeyListCount = bmFooterCache.getInt(IndexUtils.INT_SIZE * 2)
+      val bmEntryListTotalSize = bmFooterCache.getInt(IndexUtils.INT_SIZE * 3)
+      val bmOffsetListTotalSize = bmFooterCache.getInt(IndexUtils.INT_SIZE * 4)
+      val bmNullEntryOffset = bmFooterCache.getInt(IndexUtils.INT_SIZE * 5)
+      val bmNullEntrySize = bmFooterCache.getInt(IndexUtils.INT_SIZE * 6)
 
       // Get the offset for the different segments in bitmap index file.
       val bmUniqueKeyListOffset = IndexFile.VERSION_LENGTH
@@ -221,22 +221,22 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       bmUniqueKeyListFiber = BitmapFiber(
         () => loadBmKeyList(fin, bmUniqueKeyListOffset),
         idxPath.toString, BitmapIndexSectionId.keyListSection, 0)
-      bmUniqueKeyListCache = WrappedFiberCache(FiberCacheManager.get(bmUniqueKeyListFiber, conf))
+      bmUniqueKeyListCache = FiberCacheManager.get(bmUniqueKeyListFiber, conf)
 
       bmEntryListFiber = BitmapFiber(
         () => loadBmEntryList(fin, bmEntryListOffset, bmEntryListTotalSize),
         idxPath.toString, BitmapIndexSectionId.entryListSection, 0)
-      bmEntryListCache = WrappedFiberCache(FiberCacheManager.get(bmEntryListFiber, conf))
+      bmEntryListCache = FiberCacheManager.get(bmEntryListFiber, conf)
 
       bmOffsetListFiber = BitmapFiber(
         () => loadBmOffsetList(fin, bmOffsetListOffset, bmOffsetListTotalSize),
         idxPath.toString, BitmapIndexSectionId.entryOffsetsSection, 0)
-      bmOffsetListCache = WrappedFiberCache(FiberCacheManager.get(bmOffsetListFiber, conf))
+      bmOffsetListCache = FiberCacheManager.get(bmOffsetListFiber, conf)
 
       bmNullListFiber = BitmapFiber(
         () => loadBmNullList(fin, bmNullEntryOffset, bmNullEntrySize),
         idxPath.toString, BitmapIndexSectionId.entryNullSection, 0)
-      bmNullListCache = WrappedFiberCache(FiberCacheManager.get(bmNullListFiber, conf))
+      bmNullListCache = FiberCacheManager.get(bmNullListFiber, conf)
     } finally {
       try {
         if (fin != null) {
@@ -326,7 +326,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   }
 
   private def getDesiredBitmapArray: mutable.ArrayBuffer[RoaringBitmap] = {
-    val keySeq = readBmUniqueKeyListFromCache(bmUniqueKeyListCache.fc)
+    val keySeq = readBmUniqueKeyListFromCache(bmUniqueKeyListCache)
     intervalArray.flatMap{
       case range if !range.isNullPredicate =>
         val (startIdx, endIdx) = getBitmapIdx(keySeq, range)
@@ -334,12 +334,12 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
           // range not fond in cur bitmap, return empty for performance consideration
           Seq.empty[RoaringBitmap]
         } else {
-          val startIdxOffset = getStartIdxOffset(bmOffsetListCache.fc, 0L, startIdx)
+          val startIdxOffset = getStartIdxOffset(bmOffsetListCache, 0L, startIdx)
           val curPosition = startIdxOffset - IndexFile.VERSION_LENGTH - bmUniqueKeyListTotalSize
-          getDesiredBitmaps(bmEntryListCache.fc, curPosition, startIdx, endIdx + 1)
+          getDesiredBitmaps(bmEntryListCache, curPosition, startIdx, endIdx + 1)
         }
       case range if range.isNullPredicate =>
-        getDesiredBitmaps(bmNullListCache.fc, 0, 0, 1)
+        getDesiredBitmaps(bmNullListCache, 0, 0, 1)
     }
   }
 

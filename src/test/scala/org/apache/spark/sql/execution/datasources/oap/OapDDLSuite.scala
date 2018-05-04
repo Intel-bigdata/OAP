@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row, SaveMode}
-import org.apache.spark.sql.test.oap.SharedOapContext
+import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex, TestPartition}
 import org.apache.spark.util.Utils
 
 class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
@@ -56,7 +56,9 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     df.write.format("oap").mode(SaveMode.Overwrite).save(path)
     val oapDf = spark.read.format("oap").load(path)
     oapDf.createOrReplaceTempView("t")
-    sql("create oindex index1 on t (key)")
+    withIndex(TestIndex("t", "index1")) {
+      sql("create oindex index1 on t (key)")
+    }
   }
 
   test("show index") {
@@ -67,25 +69,34 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql("insert overwrite table oap_test_2 select * from t")
     sql("create oindex index1 on oap_test_1 (a)")
     checkAnswer(sql("show oindex from oap_test_2"), Nil)
-    sql("create oindex index2 on oap_test_1 (b desc)")
-    sql("create oindex index3 on oap_test_1 (b asc, a desc)")
-    sql("create oindex index4 on oap_test_2 (a) using btree")
-    sql("create oindex index5 on oap_test_2 (b desc)")
-    sql("create oindex index6 on oap_test_2 (a) using bitmap")
-    sql("create oindex index1 on oap_test_2 (a desc, b desc)")
+    withIndex(
+      TestIndex("oap_test_1", "index1"),
+      TestIndex("oap_test_1", "index2"),
+      TestIndex("oap_test_1", "index3"),
+      TestIndex("oap_test_2", "index4"),
+      TestIndex("oap_test_2", "index5"),
+      TestIndex("oap_test_2", "index6"),
+      TestIndex("oap_test_2", "index1")) {
+      sql("create oindex index2 on oap_test_1 (b desc)")
+      sql("create oindex index3 on oap_test_1 (b asc, a desc)")
+      sql("create oindex index4 on oap_test_2 (a) using btree")
+      sql("create oindex index5 on oap_test_2 (b desc)")
+      sql("create oindex index6 on oap_test_2 (a) using bitmap")
+      sql("create oindex index1 on oap_test_2 (a desc, b desc)")
 
-    checkAnswer(sql("show oindex from oap_test_1"),
-      Row("oap_test_1", "index1", 0, "a", "A", "BTREE", true) ::
-        Row("oap_test_1", "index2", 0, "b", "D", "BTREE", true) ::
-        Row("oap_test_1", "index3", 0, "b", "A", "BTREE", true) ::
-        Row("oap_test_1", "index3", 1, "a", "D", "BTREE", true) :: Nil)
+      checkAnswer(sql("show oindex from oap_test_1"),
+        Row("oap_test_1", "index1", 0, "a", "A", "BTREE", true) ::
+          Row("oap_test_1", "index2", 0, "b", "D", "BTREE", true) ::
+          Row("oap_test_1", "index3", 0, "b", "A", "BTREE", true) ::
+          Row("oap_test_1", "index3", 1, "a", "D", "BTREE", true) :: Nil)
 
-    checkAnswer(sql("show oindex in oap_test_2"),
-      Row("oap_test_2", "index4", 0, "a", "A", "BTREE", true) ::
-        Row("oap_test_2", "index5", 0, "b", "D", "BTREE", true) ::
-        Row("oap_test_2", "index6", 0, "a", "A", "BITMAP", true) ::
-        Row("oap_test_2", "index1", 0, "a", "D", "BTREE", true) ::
-        Row("oap_test_2", "index1", 1, "b", "D", "BTREE", true) :: Nil)
+      checkAnswer(sql("show oindex in oap_test_2"),
+        Row("oap_test_2", "index4", 0, "a", "A", "BTREE", true) ::
+          Row("oap_test_2", "index5", 0, "b", "D", "BTREE", true) ::
+          Row("oap_test_2", "index6", 0, "a", "A", "BITMAP", true) ::
+          Row("oap_test_2", "index1", 0, "a", "D", "BTREE", true) ::
+          Row("oap_test_2", "index1", 1, "b", "D", "BTREE", true) :: Nil)
+    }
   }
 
   test("create and drop index with partition specify") {
@@ -108,29 +119,36 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
         |SELECT key from t where value == 4
       """.stripMargin)
 
-    sql("create oindex index1 on oap_partition_table (a) partition (b=1, c='c1')")
+    withIndex(
+      TestIndex("oap_partition_table", "index1",
+        TestPartition("b", "1"), TestPartition("c", "c1"))) {
+      sql("create oindex index1 on oap_partition_table (a) partition (b=1, c='c1')")
 
-    checkAnswer(sql("select * from oap_partition_table where a < 4"),
-      Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Nil)
+      checkAnswer(sql("select * from oap_partition_table where a < 4"),
+        Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Nil)
 
-    assert(path.getFileSystem(
-      configuration).globStatus(new Path(path,
+      assert(path.getFileSystem(
+        configuration).globStatus(new Path(path,
         "oap_partition_table/b=1/c=c1/*.index")).length != 0)
-    assert(path.getFileSystem(
-      configuration).globStatus(new Path(path,
+      assert(path.getFileSystem(
+        configuration).globStatus(new Path(path,
         "oap_partition_table/b=2/c=c2/*.index")).length == 0)
+    }
 
-    sql("create oindex index1 on oap_partition_table (a) partition (b=2, c='c2')")
-    sql("drop oindex index1 on oap_partition_table partition (b=1, c='c1')")
+    withIndex(
+      TestIndex("oap_partition_table", "index1",
+        TestPartition("b", "2"), TestPartition("c", "c2"))) {
+      sql("create oindex index1 on oap_partition_table (a) partition (b=2, c='c2')")
 
-    checkAnswer(sql("select * from oap_partition_table"),
-      Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Row(4, 2, "c2") :: Nil)
-    assert(path.getFileSystem(
-      configuration).globStatus(new Path(path,
-      "oap_partition_table/b=1/c=c1/*.index")).length == 0)
-    assert(path.getFileSystem(
-      configuration).globStatus(new Path(path,
-      "oap_partition_table/b=2/c=c2/*.index")).length != 0)
+      checkAnswer(sql("select * from oap_partition_table"),
+        Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Row(4, 2, "c2") :: Nil)
+      assert(path.getFileSystem(
+        configuration).globStatus(new Path(path,
+        "oap_partition_table/b=1/c=c1/*.index")).length == 0)
+      assert(path.getFileSystem(
+        configuration).globStatus(new Path(path,
+        "oap_partition_table/b=2/c=c2/*.index")).length != 0)
+    }
   }
 
   test("create duplicated name index") {
@@ -140,19 +158,22 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     df.write.format("oap").mode(SaveMode.Overwrite).save(pathDir)
     val oapDf = spark.read.format("oap").load(pathDir)
     oapDf.createOrReplaceTempView("t")
-    sql("create oindex idxa on t (a)")
-    val path = new Path(pathDir)
-    val fs = path.getFileSystem(sparkContext.hadoopConfiguration)
-    val indexFiles1 = fs.listStatus(path).collect { case fileStatus if fileStatus.isFile &&
-      fileStatus.getPath.getName.endsWith(OapFileFormat.OAP_INDEX_EXTENSION) =>
-        fileStatus.getPath.getName
-    }
 
-    sql("create oindex if not exists idxa on t (a)")
-    val indexFiles2 = fs.listStatus(path).collect { case fileStatus if fileStatus.isFile &&
-      fileStatus.getPath.getName.endsWith(OapFileFormat.OAP_INDEX_EXTENSION) =>
-      fileStatus.getPath.getName
+    withIndex(TestIndex("t", "idxa")) {
+      sql("create oindex idxa on t (a)")
+      val path = new Path(pathDir)
+      val fs = path.getFileSystem(sparkContext.hadoopConfiguration)
+      val indexFiles1 = fs.listStatus(path).collect { case fileStatus if fileStatus.isFile &&
+        fileStatus.getPath.getName.endsWith(OapFileFormat.OAP_INDEX_EXTENSION) =>
+        fileStatus.getPath.getName
+      }
+
+      sql("create oindex if not exists idxa on t (a)")
+      val indexFiles2 = fs.listStatus(path).collect { case fileStatus if fileStatus.isFile &&
+        fileStatus.getPath.getName.endsWith(OapFileFormat.OAP_INDEX_EXTENSION) =>
+        fileStatus.getPath.getName
+      }
+      assert(indexFiles1 === indexFiles2)
     }
-    assert(indexFiles1 === indexFiles2)
   }
 }

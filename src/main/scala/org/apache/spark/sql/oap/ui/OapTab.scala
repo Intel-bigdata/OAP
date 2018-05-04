@@ -15,13 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.oap.listener
+package org.apache.spark.sql.oap.ui
 
-import org.apache.spark.scheduler.{SparkListener, SparkListenerOapIndexInfoUpdate}
-import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
+import org.apache.spark.internal.Logging
+import org.apache.spark.ui.{SparkUI, SparkUITab}
 
-class OapIndexInfoListener extends SparkListener {
-  override def onOapIndexInfoUpdate(indexInfo: SparkListenerOapIndexInfoUpdate): Unit = {
-    OapIndexInfo.update(indexInfo)
-  }
+class OapTab(parent: SparkUI) extends SparkUITab(parent, "OAP") with Logging {
+
+  val listener = parent.executorsListener
+
+  attachPage(new FiberCacheManagerPage(this))
+
+  parent.attachTab(this)
+  parent.addStaticHandler(OapTab.STATIC_RESOURCE_DIR, "/static/oap")
+}
+
+object OapTab {
+  private val STATIC_RESOURCE_DIR = "oap/static"
 }

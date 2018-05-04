@@ -22,24 +22,18 @@ import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.io.api.Binary
 
-import org.apache.spark.SparkConf
-import org.apache.spark.executor.custom.CustomManager
+import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
-import org.apache.spark.scheduler.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Ascending
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
+import org.apache.spark.sql.oap.listener.SparkListenerOapIndexInfoUpdate
+import org.apache.spark.sql.oap.rpc.OapRpcManagerSlave
 import org.apache.spark.sql.types._
 import org.apache.spark.util.TimeStampedHashMap
-
-class OapIndexHeartBeatMessager extends CustomManager with Logging {
-  override def status(conf: SparkConf): String = {
-    OapIndexInfo.status
-  }
-}
 
 // TODO: [linhong] Let's remove the `isCompressed` argument
 private[oap] class OapDataWriter(
@@ -168,7 +162,7 @@ private[oap] class OapDataWriter(
 
 private[oap] case class OapIndexInfoStatus(path: String, useIndex: Boolean)
 
-private[oap] object OapIndexInfo extends Logging {
+private[sql] object OapIndexInfo extends Logging {
   val partitionOapIndex = new TimeStampedHashMap[String, Boolean](updateTimeStampOnGet = true)
 
   def status: String = {

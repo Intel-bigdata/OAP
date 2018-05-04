@@ -28,21 +28,14 @@ import org.apache.spark.util.collection.BitSet
 class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache) {
   require(dataType.isInstanceOf[AtomicType], s"Only atomic type accepted for now, got $dataType.")
 
-  // for any FiberData, the first defaultSize / 8 will be the bitmask
-  // TODO what if defaultSize / 8 is not an integer?
+  // for any FiberData, the first `(defaultSize - 1) >> 6 + 1` longs will be the bitmask
+  // num of bytes needed to hold defaultSize elements is then `((defaultSize - 1) >> 6 << 3) + 8`
+  private val dataOffset = ((defaultSize - 1) >> 6 << 3) + 8
 
-  // TODO get the bitset from the FiberByteData
-  val bitset: BitSet = {
-    val bs = new BitSet(defaultSize)
-    val longs = bs.toLongArray()
-    buffer.copyMemoryToLongs(0, longs)
-
-    bs
+  def isNullAt(idx: Int): Boolean = {
+    val bitmask = 1L << (idx & 0x3f)   // mod 64 and shift
+    (buffer.getLong(idx >> 6 << 3) & bitmask) == 0  // div by 64 and mask
   }
-
-  private val dataOffset = bitset.toLongArray().length * 8
-
-  def isNullAt(idx: Int): Boolean = !bitset.get(idx)
 
   private def genericGet(idx: Int): Any = dataType match {
     case BinaryType => getBinaryValue(idx)
@@ -128,10 +121,7 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache)
     //    value #N
     val length = getIntValue(idx * 2)
     val offset = getIntValue(idx * 2 + 1)
-    val result = new Array[Byte](length)
-    buffer.copyMemoryToBytes(offset, result)
-
-    result
+    buffer.getBytes(offset, length)
   }
 }
 

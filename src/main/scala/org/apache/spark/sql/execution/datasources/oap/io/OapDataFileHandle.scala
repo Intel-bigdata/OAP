@@ -334,4 +334,8 @@ private[oap] class OapDataFileHandle(
     validateConsistency()
     this
   }
+
+  override def getGroupCount: Int = groupCount
+
+  override def getFieldCount: Int = fieldCount
 }
