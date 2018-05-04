@@ -17,15 +17,11 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-import java.io.File
-
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
+import org.apache.hadoop.fs.{Path, PathFilter}
 import org.scalatest.BeforeAndAfterEach
-import org.apache.spark.DebugFilesystem
 
+import org.apache.spark.DebugFilesystem
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex}
-import org.apache.spark.util.Utils
 
 class DropIndexCommandSuite extends SharedOapContext with BeforeAndAfterEach {
 

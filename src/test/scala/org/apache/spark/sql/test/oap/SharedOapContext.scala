@@ -110,6 +110,9 @@ trait SharedOapContextBase extends SharedSQLContext {
     }
   }
 
+  /**
+   * Creates a FileSystem , which is then passed to `f` and will be closed after `f` returns.
+   */
   protected def withFileSystem(f: FileSystem => Unit): Unit = {
     var fs: FileSystem = null
     try {
