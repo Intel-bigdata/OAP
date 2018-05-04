@@ -64,34 +64,7 @@ private[oap] case class ParquetDataFile(
     release(idx)
     inUseFiberCache.update(idx, fiberCache)
   }
-
-  private def buildFiberByteData(
-       dataType: DataType,
-       rowGroupRowCount: Int,
-       reader: SingleGroupOapRecordReader): Array[Byte] = {
-    val dataFiberBuilder: DataFiberBuilder = dataType match {
-      case StringType =>
-        StringFiberBuilder(rowGroupRowCount, 0)
-      case BinaryType =>
-        BinaryFiberBuilder(rowGroupRowCount, 0)
-      case BooleanType | ByteType | DateType | DoubleType | FloatType | IntegerType |
-           LongType | ShortType =>
-        FixedSizeTypeFiberBuilder(rowGroupRowCount, 0, dataType)
-      case _ => throw new NotImplementedError(s"${dataType.simpleString} data type " +
-        s"is not implemented for fiber builder")
-    }
-
-    if (reader.nextBatch()) {
-      while (reader.nextKeyValue()) {
-        dataFiberBuilder.append(reader.getCurrentValue.asInstanceOf[ColumnarBatch.Row])
-      }
-    } else {
-      throw new OapException("buildFiberByteData never reach to here!")
-    }
-
-    dataFiberBuilder.build().fiberData
-  }
-
+  
   def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
     var reader: SingleGroupOapRecordReader = null
     try {
