@@ -209,5 +209,5 @@ object OapConf {
       .internal()
       .doc("To indicate if enable parquet data cache, default false")
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 }
