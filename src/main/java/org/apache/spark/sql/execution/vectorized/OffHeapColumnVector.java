@@ -97,11 +97,9 @@ public final class OffHeapColumnVector extends ColumnVector {
       || type instanceof FloatType) {
       // data: 4 bytes, nulls: 1 byte
       dataBytes = new byte[capacity * (4 + 1)];
-      System.out.println("songzhan: dumpBytes");
       if (dictionary == null) {
         Platform.copyMemory(null, data, dataBytes, Platform.BYTE_ARRAY_OFFSET, capacity * 4);
       } else {
-        System.out.println("songzhan: dictionary");
         if (type instanceof FloatType) {
           for (int i = 0; i < capacity; i++) {
             Platform.putFloat(dataBytes, Platform.FLOAT_ARRAY_OFFSET + i * 4, getFloat(i));

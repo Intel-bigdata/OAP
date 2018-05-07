@@ -499,7 +499,6 @@ public final class ColumnarBatch {
 
     for (int i = 0; i < schema.fields().length; ++i) {
       StructField field = schema.fields()[i];
-      System.out.println("songzhan: ColumnarBatch: " + i);
       columns[i] = ColumnVector.allocate(maxRows, field.dataType(), memMode);
     }
 

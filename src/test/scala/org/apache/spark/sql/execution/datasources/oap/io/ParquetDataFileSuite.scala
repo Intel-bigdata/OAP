@@ -498,9 +498,6 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
       result += row.getInt(0)
     }
     val length = data.length
-    logWarning(s"songzhan: length = ${length}")
-    logWarning(s"songzhan: result.length = ${result.length}")
-
     assert(length == result.length, "Expected result length does not match.")
     for (i <- 0 until length) {
       assert(i == result(i))

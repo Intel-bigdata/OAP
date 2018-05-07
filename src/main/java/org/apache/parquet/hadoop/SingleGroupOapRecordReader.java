@@ -72,7 +72,6 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
       for (StructField f: sparkSchema.fields()) {
         batchSchema = batchSchema.add(f);
       }
-      System.out.println("songzhan  initBatch");
       columnarBatch = ColumnarBatch.allocate(batchSchema, MemoryMode.OFF_HEAP, rowGroupCount);
       // Initialize missing columns with nulls.
       for (int i = 0; i < missingColumns.length; i++) {
