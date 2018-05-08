@@ -19,6 +19,7 @@ package org.apache.parquet.hadoop;
 import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
@@ -56,14 +57,16 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
      *
      * @param footer parquet file footer
      * @param configuration haddoop configuration
+     * @param isReadFromFile
      * @param isFilterRowGroups is do filterRowGroups
      * @throws IOException
      * @throws InterruptedException
      */
     protected void initialize(
-        ParquetMetadata footer,
-        Configuration configuration,
-        boolean isFilterRowGroups) throws IOException, InterruptedException {
+            ParquetMetadata footer,
+            Configuration configuration,
+            boolean isReadFromFile,
+            boolean isFilterRowGroups) throws IOException, InterruptedException {
       this.fileSchema = footer.getFileMetaData().getSchema();
       Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
       ReadSupport.ReadContext readContext = new ParquetReadSupportWrapper().init(new InitContext(
@@ -72,12 +75,16 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
       String sparkRequestedSchemaString =
         configuration.get(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA());
       this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
-      this.reader = ParquetFileReader.open(configuration, file, footer);
-      if (isFilterRowGroups) {
-        this.reader.filterRowGroups(getFilter(configuration));
+      List<BlockMetaData> blocks = footer.getBlocks();
+      if (isReadFromFile) {
+        this.reader = ParquetFileReader.open(configuration, file, footer);
+        if (isFilterRowGroups) {
+          this.reader.filterRowGroups(getFilter(configuration));
+          blocks = this.reader.getRowGroups();
+        }
+        this.reader.setRequestedSchema(requestedSchema);
       }
-      this.reader.setRequestedSchema(requestedSchema);
-      for (BlockMetaData block : this.reader.getRowGroups()) {
+      for (BlockMetaData block : blocks) {
         this.totalRowCount += block.getRowCount();
       }
     }
