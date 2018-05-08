@@ -214,8 +214,6 @@ private[oap] case class ParquetDataFile(
       new OapIterator(Iterator.empty)
     } else {
       addRequestSchemaToConf(configuration, requiredIds)
-      val file = new Path(StringUtils.unEscapeString(path))
-      val meta = DataFileHandleCacheManager(this).asInstanceOf[ParquetDataFileHandle]
       context match {
         case Some(c) =>
           if (parquetDataCacheEnable) {
