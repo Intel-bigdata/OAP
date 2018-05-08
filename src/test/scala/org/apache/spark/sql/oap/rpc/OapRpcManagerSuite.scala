@@ -58,7 +58,7 @@ class OapRpcManagerSuite extends SparkFunSuite with BeforeAndAfterEach with Priv
 
     sc = new SparkContext(conf)
     rpcEnv = sc.env.rpcEnv
-    rpcManagerMasterEndpoint = spy(new OapRpcManagerMasterEndpoint(rpcEnv))
+    rpcManagerMasterEndpoint = spy(new OapRpcManagerMasterEndpoint(rpcEnv, sc.listenerBus))
     rpcManagerMaster = new OapRpcManagerMaster(rpcManagerMasterEndpoint)
     rpcDriverEndpoint = rpcEnv.setupEndpoint("driver", rpcManagerMasterEndpoint)
   }

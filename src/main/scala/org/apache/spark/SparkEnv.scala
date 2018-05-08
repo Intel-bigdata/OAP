@@ -376,7 +376,7 @@ object SparkEnv extends Logging {
       new OutputCommitCoordinatorEndpoint(rpcEnv, outputCommitCoordinator))
     outputCommitCoordinator.coordinatorRef = Some(outputCommitCoordinatorRef)
 
-    val oapRpcManagerMasterEndpoint = new OapRpcManagerMasterEndpoint(rpcEnv)
+    val oapRpcManagerMasterEndpoint = new OapRpcManagerMasterEndpoint(rpcEnv, listenerBus)
     val oapRpcDriverEndpoint = registerOrLookupEndpoint(
       OapRpcManagerMaster.DRIVER_ENDPOINT_NAME, oapRpcManagerMasterEndpoint)
 
