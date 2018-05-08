@@ -133,8 +133,8 @@ public final class OffHeapColumnVector extends ColumnVector {
     } else if (type instanceof BinaryType || type instanceof StringType) {
       // lengthData: 4 bytes, offsetData: 4 bytes, nulls: 1 byte,
       // child.data: childColumns[0].elementsAppended bytes.
-      dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
       if (dictionary == null) {
+        dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
         Platform.copyMemory(null, lengthData, dataBytes, Platform.BYTE_ARRAY_OFFSET, capacity * 4);
         Platform.copyMemory(null, offsetData, dataBytes, Platform.BYTE_ARRAY_OFFSET + capacity * 4,
           capacity * 4);
@@ -143,6 +143,7 @@ public final class OffHeapColumnVector extends ColumnVector {
         Platform.copyMemory(null, childColumns[0].valuesNativeAddress(), dataBytes,
           Platform.BYTE_ARRAY_OFFSET + capacity * 9, childColumns[0].elementsAppended);
       } else {
+        byte[] tempBytes = new byte[capacity * (4 + 4)];
         int offset = 0;
         for (int i = 0; i < capacity; i++) {
           byte[] bytes = null;
@@ -151,14 +152,18 @@ public final class OffHeapColumnVector extends ColumnVector {
           } else {
             bytes = getUTF8String(i).getBytes();
           }
-          Platform.putInt(dataBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
-          Platform.putInt(dataBytes, Platform.INT_ARRAY_OFFSET + capacity * 4 + i * 4, offset);
-          Platform.copyMemory(bytes, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-            Platform.BYTE_ARRAY_OFFSET + capacity * 9 + offset, bytes.length);
+          Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
+          Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + capacity * 4 + i * 4, offset);
+          arrayData().appendBytes(bytes.length, bytes, 0);
           offset += bytes.length;
         }
+        dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
+        Platform.copyMemory(tempBytes, Platform.BYTE_ARRAY_OFFSET, dataBytes,
+          Platform.BYTE_ARRAY_OFFSET, capacity * 8);
         Platform.copyMemory(null, nulls, dataBytes, Platform.BYTE_ARRAY_OFFSET + capacity * 8,
           capacity);
+        Platform.copyMemory(null, childColumns[0].valuesNativeAddress(), dataBytes,
+          Platform.BYTE_ARRAY_OFFSET + capacity * 9, childColumns[0].elementsAppended);
       }
     } else {
       throw new RuntimeException("Unhandled " + type);
