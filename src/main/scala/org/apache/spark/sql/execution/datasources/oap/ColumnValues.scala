@@ -17,15 +17,76 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
+import org.apache.spark.sql.execution.columnar.MutableUnsafeRow
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.types.{BooleanType, ByteType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType, _}
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 import org.apache.spark.util.collection.BitSet
 
-class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache) {
+class BooleanColumnValues(defaultSize: Int, buffer: FiberCache)
+  extends ColumnValues(defaultSize, LongType, buffer) {
+  override def extractTo(row: Key, idx: Int, column: Int): Unit = {
+    row.setBoolean(column, getBooleanValue(idx))
+
+  }
+}
+
+class ByteColumnValues(defaultSize: Int, buffer: FiberCache)
+    extends ColumnValues(defaultSize, LongType, buffer) {
+  override def extractTo(row: Key, idx: Int, column: Int): Unit = {
+    row.setByte(column, getByteValue(idx))
+  }
+}
+
+class DoubleColumnValues(defaultSize: Int, buffer: FiberCache)
+    extends ColumnValues(defaultSize, LongType, buffer) {
+  override def extractTo(row: Key, idx: Int, column: Int): Unit = {
+    row.setDouble(column, getDoubleValue(idx))
+  }
+}
+
+class FloatColumnValues(defaultSize: Int, buffer: FiberCache)
+    extends ColumnValues(defaultSize, LongType, buffer) {
+  override def extractTo(row: Key, idx: Int, column: Int): Unit = {
+    row.setFloat(column, getFloatValue(idx))
+  }
+}
+
+class IntColumnValues(defaultSize: Int, buffer: FiberCache)
+    extends ColumnValues(defaultSize, LongType, buffer) {
+  override def extractTo(row: Key, idx: Int, column: Int): Unit = {
+    row.setInt(column, getIntValue(idx))
+  }
+}
+
+class LongColumnValues(defaultSize: Int, buffer: FiberCache)
+    extends ColumnValues(defaultSize, LongType, buffer) {
+  override def extractTo(row: Key, idx: Int, column: Int): Unit = {
+    row.setLong(column, getLongValue(idx))
+  }
+}
+
+class ShortColumnValues(defaultSize: Int, buffer: FiberCache)
+    extends ColumnValues(defaultSize, LongType, buffer) {
+  override def extractTo(row: Key, idx: Int, column: Int): Unit = {
+    row.setShort(column, getShortValue(idx))
+  }
+}
+
+class StringColumnValues(defaultSize: Int, buffer: FiberCache)
+    extends ColumnValues(defaultSize, LongType, buffer) {
+  override def extractTo(row: Key, idx: Int, column: Int): Unit = {
+    val length = getIntValue(idx * 2)
+    val offset = getIntValue(idx * 2 + 1)
+    row.asInstanceOf[MutableUnsafeRow].writer.write(column, buffer.getBytes(offset, length))
+  }
+}
+
+class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache) extends Logging {
   require(dataType.isInstanceOf[AtomicType], s"Only atomic type accepted for now, got $dataType.")
 
   // for any FiberData, the first `(defaultSize - 1) >> 6 + 1` longs will be the bitmask
@@ -35,6 +96,27 @@ class ColumnValues(defaultSize: Int, dataType: DataType, val buffer: FiberCache)
   def isNullAt(idx: Int): Boolean = {
     val bitmask = 1L << (idx & 0x3f)   // mod 64 and shift
     (buffer.getLong(idx >> 6 << 3) & bitmask) == 0  // div by 64 and mask
+  }
+
+  def extractTo(row: InternalRow, idx: Int, column: Int): Unit = dataType match {
+    case BooleanType => row.setBoolean(column, getBooleanValue(idx))
+    case ByteType => row.setByte(column, getByteValue(idx))
+    case DoubleType => row.setDouble(column, getDoubleValue(idx))
+    case FloatType => row.setFloat(column, getFloatValue(idx))
+    case IntegerType => row.setInt(column, getIntValue(idx))
+    case LongType => row.setLong(column, getLongValue(idx))
+    case ShortType => row.setShort(column, getShortValue(idx))
+    case StringType =>
+      val length = getIntValue(idx * 2)
+      val offset = getIntValue(idx * 2 + 1)
+      row.asInstanceOf[MutableUnsafeRow].writer.write(column, buffer.getBytes(offset, length))
+    case _: ArrayType => throw new NotImplementedError(s"Array")
+    case CalendarIntervalType => throw new NotImplementedError(s"CalendarInterval")
+    case _: DecimalType => throw new NotImplementedError(s"Decimal")
+    case _: MapType => throw new NotImplementedError(s"Map")
+    case _: StructType => throw new NotImplementedError(s"Struct")
+    case TimestampType => throw new NotImplementedError(s"Timestamp")
+    case other => throw new NotImplementedError(s"$other")
   }
 
   private def genericGet(idx: Int): Any = dataType match {
@@ -129,6 +211,7 @@ class BatchColumn {
   private var currentIndex: Int = 0
   private var rowCount: Int = 0
   private var values: Array[ColumnValues] = _
+  var totalTime: Long = 0
 
   def reset(rowCount: Int, values: Array[ColumnValues]): BatchColumn = {
     this.rowCount = rowCount
@@ -198,7 +281,12 @@ class BatchColumn {
     override def getInterval(ordinal: Int): CalendarInterval =
       throw new NotImplementedError("get interval type")
 
-    override def getLong(ordinal: Int): Long = values(ordinal).getLongValue(currentIndex)
+    override def getLong(ordinal: Int): Long = {
+      val t1 = System.currentTimeMillis()
+      val v = values(ordinal).getLongValue(currentIndex)
+      totalTime += (System.currentTimeMillis() - t1)
+      v
+    }
 
     override def getMap(ordinal: Int): MapData =
       throw new NotImplementedError("get map type")

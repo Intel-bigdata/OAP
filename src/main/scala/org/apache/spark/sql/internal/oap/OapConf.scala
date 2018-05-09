@@ -210,4 +210,11 @@ object OapConf {
       .doc("To indicate if enable parquet data cache, default false")
       .booleanConf
       .createWithDefault(false)
+
+  val OAP_DEBUG_FLAG =
+    SQLConfigBuilder("spark.sql.oap.debug.flag")
+        .internal()
+        .doc("for debug")
+        .booleanConf
+        .createWithDefault(false)
 }

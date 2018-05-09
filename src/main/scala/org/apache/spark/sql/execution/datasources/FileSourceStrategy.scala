@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
+import org.apache.spark.sql.execution.datasources.oap.filecache.OapFullScanExec
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
@@ -172,7 +173,18 @@ object FileSourceStrategy extends Strategy with Logging {
         execution.ProjectExec(projects, withFilter)
       }
 
-      withProjections :: Nil
+      if (fsRelation.sparkSession.conf.get(OapConf.OAP_DEBUG_FLAG, false) &&
+            fsRelation.fileFormat.isInstanceOf[OapFileFormat] &&
+            projects == withFilter.output &&
+            filters.isEmpty &&
+            partitionColumns.isEmpty) {
+        OapFullScanExec(
+          fsRelation,
+          outputAttributes,
+          outputSchema) :: Nil
+      } else {
+        withProjections :: Nil
+      }
 
     case _ => Nil
   }

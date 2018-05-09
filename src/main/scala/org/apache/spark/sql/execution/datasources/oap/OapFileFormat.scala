@@ -31,16 +31,17 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Expression, JoinedRow}
-import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateOrdering, GenerateUnsafeProjection}
+import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateOrdering, GenerateSafeProjection, GenerateUnsafeProjection}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, OapUtils}
+import org.apache.spark.sql.execution.datasources.parquet.TestBufferedIterator
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.{AtomicType, StructField, StructType}
+import org.apache.spark.sql.types.{AtomicType, ObjectType, StructField, StructType}
 import org.apache.spark.util.SerializableConfiguration
 
 private[sql] class OapFileFormat extends FileFormat
@@ -364,7 +365,23 @@ private[sql] class OapFileFormat extends FileFormat
               val appendPartitionColumns =
                 GenerateUnsafeProjection.generate(fullSchema, fullSchema)
 
-              iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+              val ret = iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+              // val t1 = System.currentTimeMillis()
+              // val buffer = new TestBufferedIterator()
+              // buffer.init(0, Array(ret.asInstanceOf[Iterator[InternalRow]]))
+              // val newIter = new Iterator[InternalRow] {
+              //   override def hasNext: Boolean = buffer.hasNext
+              //   override def next: InternalRow = buffer.next()
+              // }
+              // newIter.foreach { _ => }
+              // iter.foreach { _ => }
+              // ret.foreach { _ => }
+              // val proj = GenerateSafeProjection.generate(fullSchema, fullSchema)
+              // newIter.map(proj).foreach { _ => }
+              // newIter.map(proj).map(_.get(0, ObjectType(classOf[Row]))).foreach { _ => }
+              // val t2 = System.currentTimeMillis()
+              // logInfo("time to traverse iterator: " + (t2 - t1) + "ms")
+              ret
             }
           }
         }
