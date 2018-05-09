@@ -307,6 +307,7 @@ private[sql] class OapFileFormat extends FileFormat
         val enableVectorizedReader: Boolean =
           m.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
           sparkSession.sessionState.conf.parquetVectorizedReaderEnabled &&
+          sparkSession.sessionState.conf.wholeStageEnabled &&
           resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
         val returningBatch = supportBatch(sparkSession, resultSchema)
         val parquetDataCacheEnable = sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
