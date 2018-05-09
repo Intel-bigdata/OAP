@@ -83,6 +83,7 @@ public final class OnHeapColumnVector extends ColumnVector {
 
     @Override
     public void close() {
+      super.close();
     }
 
     //

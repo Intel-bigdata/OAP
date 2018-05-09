@@ -193,12 +193,14 @@ public final class OffHeapColumnVector extends ColumnVector {
       nulls = nativeAddress + capacity * 8;
     } else if (type instanceof BinaryType || type instanceof StringType) {
       // lengthData::offsetData::nulls::child.data
-      if (childColumns != null) {
-        childColumns[0].close();
-      }
       lengthData = nativeAddress;
       offsetData = nativeAddress + capacity * 4;
       nulls = nativeAddress + capacity * 8;
+      this.childColumns = new ColumnVector[1];
+      this.childColumns[0] = ColumnVector.allocate(capacity,
+        DataTypes.ByteType, MemoryMode.OFF_HEAP);
+      this.resultArray = new Array(this.childColumns[0]);
+      this.childColumns[0].close();
       childColumns[0].setValuesNativeAddress(nativeAddress + capacity * 9);
     } else {
       throw new RuntimeException("Unhandled " + type);
@@ -212,6 +214,7 @@ public final class OffHeapColumnVector extends ColumnVector {
 
   @Override
   public void close() {
+    super.close();
     Platform.freeMemory(nulls);
     Platform.freeMemory(data);
     Platform.freeMemory(lengthData);
