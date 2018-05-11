@@ -301,8 +301,9 @@ private[sql] class OapFileFormat extends FileFormat
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
         val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
 
-        // refer to ParquetFileFormat, use resultSchema to decide if this query support
-        // Vectorized Read and returningBatch.
+        // Refer to ParquetFileFormat, use resultSchema to decide if this query support
+        // Vectorized Read and returningBatch. Also it depends on WHOLE_STAGE_CODE_GEN,
+        // as the essential unsafe projection is done by that.
         val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
         val enableVectorizedReader: Boolean =
           m.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
