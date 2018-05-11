@@ -34,51 +34,65 @@ import org.apache.spark.sql.types.StructType;
 
 public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
 
-    private int blockId;
-    private int rowGroupCount;
+  private int blockId;
+  private int rowGroupCount;
+  private boolean reset = false;
 
-    public SingleGroupOapRecordReader(
-        Path file,
-        Configuration configuration,
-        ParquetMetadata footer,
-        int blockId,
-        int rowGroupCount) {
-      super(file, configuration, footer);
-      this.blockId = blockId;
-      this.rowGroupCount = rowGroupCount;
-    }
+  public SingleGroupOapRecordReader(
+    Path file,
+    Configuration configuration,
+    ParquetMetadata footer,
+    int blockId,
+    int rowGroupCount) {
+    super(file, configuration, footer);
+    this.blockId = blockId;
+    this.rowGroupCount = rowGroupCount;
+  }
 
-    /**
-     * Override initialize method, init footer if need,
-     * then call super.initialize and initializeInternal
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    @Override
-    public void initialize() throws IOException, InterruptedException {
-      if (this.footer == null) {
-        footer = readFooter(configuration, file, NO_FILTER);
-      }
-      List<BlockMetaData> inputBlockList = Lists.newArrayList();
-      inputBlockList.add(footer.getBlocks().get(blockId));
-      ParquetMetadata meta = new ParquetMetadata(footer.getFileMetaData(), inputBlockList);
-      // need't do filterRowGroups.
-      initialize(meta, configuration, true, false);
-      super.initializeInternal();
+  /**
+   * Override initialize method, init footer if need,
+   * then call super.initialize and initializeInternal
+   *
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  @Override
+  public void initialize() throws IOException, InterruptedException {
+    if (this.footer == null) {
+      footer = readFooter(configuration, file, NO_FILTER);
     }
+    List<BlockMetaData> inputBlockList = Lists.newArrayList();
+    inputBlockList.add(footer.getBlocks().get(blockId));
+    ParquetMetadata meta = new ParquetMetadata(footer.getFileMetaData(), inputBlockList);
+    // need't do filterRowGroups.
+    initialize(meta, configuration, true, false);
+    super.initializeInternal();
+  }
 
-    public void initBatch() {
-      StructType batchSchema = new StructType();
-      for (StructField f: sparkSchema.fields()) {
-        batchSchema = batchSchema.add(f);
-      }
-      columnarBatch = ColumnarBatch.allocate(batchSchema, MemoryMode.OFF_HEAP, rowGroupCount);
-      // Initialize missing columns with nulls.
-      for (int i = 0; i < missingColumns.length; i++) {
-        if (missingColumns[i]) {
-          columnarBatch.column(i).putNulls(0, columnarBatch.capacity());
-          columnarBatch.column(i).setIsConstant();
-        }
+  public void initBatch() {
+    StructType batchSchema = new StructType();
+    for (StructField f : sparkSchema.fields()) {
+      batchSchema = batchSchema.add(f);
+    }
+    columnarBatch = ColumnarBatch.allocate(batchSchema, MemoryMode.OFF_HEAP, rowGroupCount);
+    // Initialize missing columns with nulls.
+    for (int i = 0; i < missingColumns.length; i++) {
+      if (missingColumns[i]) {
+        columnarBatch.column(i).putNulls(0, columnarBatch.capacity());
+        columnarBatch.column(i).setIsConstant();
       }
     }
+  }
+
+  public void setNativeAddress(long nativeAddress) {
+    reset = true;
+    columnarBatch.column(0).loadBytes(nativeAddress);
+  }
+
+  public void close() throws IOException {
+    if (reset) {
+      columnarBatch = null;
+    }
+    super.close();
+  }
 }

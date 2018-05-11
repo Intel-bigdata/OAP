@@ -1014,6 +1014,11 @@ public abstract class ColumnVector implements AutoCloseable {
    * Update the dictionary.
    */
   public void setDictionary(Dictionary dictionary) {
+    if (dictionary != null) {
+      System.out.println("dictionary");
+    } else {
+      System.out.println("no dictionary");
+    }
     this.dictionary = dictionary;
   }
 

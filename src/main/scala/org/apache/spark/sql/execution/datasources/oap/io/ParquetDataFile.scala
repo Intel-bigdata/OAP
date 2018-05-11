@@ -77,9 +77,26 @@ private[oap] case class ParquetDataFile(
       reader.initialize()
       reader.initBatch()
       reader.enableReturningBatches()
+      val unitLength = schema(fiberId).dataType match {
+        case ByteType | BooleanType => 2
+        case ShortType => 3
+        case IntegerType | DateType | FloatType => 5
+        case LongType | DoubleType => 9
+        case _ => -1
+      }
+      var fiberCache: FiberCache = null
+      if (unitLength != -1) {
+        fiberCache = MemoryManager.getEmptyDataFiberCache(rowGroupRowCount * unitLength)
+        reader.setNativeAddress(fiberCache.getBaseOffset)
+      }
+
       if (reader.nextBatch()) {
-        val data = reader.getCurrentValue.asInstanceOf[ColumnarBatch].column(0).dumpBytes
-        MemoryManager.toDataFiberCache(data)
+          val data = reader.getCurrentValue.asInstanceOf[ColumnarBatch].column(0).dumpBytes
+          if (data != null) {
+            MemoryManager.toDataFiberCache(data)
+          } else {
+            fiberCache
+          }
       } else {
         throw new OapException("buildFiberByteData never reach to here!")
       }
