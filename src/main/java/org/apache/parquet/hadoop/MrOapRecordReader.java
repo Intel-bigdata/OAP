@@ -18,8 +18,6 @@
  */
 package org.apache.parquet.hadoop;
 
-import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
-import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
 
 import java.io.IOException;
@@ -28,9 +26,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.hadoop.metadata.ParquetFooter;
 
-public class DefaultRecordReader<T> implements RecordReader<T> {
+public class MrOapRecordReader<T> implements RecordReader<T> {
 
     private Configuration configuration;
     private Path file;
@@ -39,13 +37,13 @@ public class DefaultRecordReader<T> implements RecordReader<T> {
 
     private ReadSupport<T> readSupport;
 
-    private ParquetMetadata footer;
+    private ParquetFooter footer;
 
-    public DefaultRecordReader(
+    public MrOapRecordReader(
         ReadSupport<T> readSupport,
         Path file,
         Configuration configuration,
-        ParquetMetadata footer) {
+        ParquetFooter footer) {
       this.readSupport = readSupport;
       this.file = file;
       this.configuration = configuration;
@@ -68,10 +66,8 @@ public class DefaultRecordReader<T> implements RecordReader<T> {
     }
 
     public void initialize() throws IOException, InterruptedException {
-      if (this.footer == null) {
-        footer = readFooter(configuration, file, NO_FILTER);
-      }
-      ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file, footer);
+      ParquetFileReader parquetFileReader =
+        ParquetFileReader.open(configuration, file, footer.toParquetMetadata());
       parquetFileReader.filterRowGroups(getFilter(configuration));
       this.internalReader = new InternalParquetRecordReader<>(readSupport);
       this.internalReader.initialize(parquetFileReader, configuration);

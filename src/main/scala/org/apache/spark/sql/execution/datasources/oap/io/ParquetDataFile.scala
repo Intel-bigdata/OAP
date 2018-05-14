@@ -202,7 +202,7 @@ private[oap] case class ParquetDataFile(
         }
       case _ =>
         initRecordReader(
-          new DefaultRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
+          new MrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
             file, configuration, meta.footer))
     }
   }
@@ -225,7 +225,7 @@ private[oap] case class ParquetDataFile(
           }
         case _ =>
           initRecordReader(
-            new OapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
+            new IndexMrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
               file, configuration, rowIds, meta.footer))
       }
     }
@@ -301,7 +301,7 @@ private[oap] case class ParquetDataFile(
   }
 
   override def createDataFileHandle(): ParquetDataFileHandle =
-    new ParquetDataFileHandle(configuration, path)
+    ParquetDataFileHandle(configuration, path)
 
   override def totalRows(): Long = {
     import scala.collection.JavaConverters._

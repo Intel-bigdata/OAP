@@ -16,17 +16,13 @@
  */
 package org.apache.parquet.hadoop;
 
-import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
-import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
-
 import java.io.IOException;
-import java.util.List;
 
-import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.hadoop.metadata.BlockMetaData;
+import org.apache.parquet.hadoop.metadata.ParquetFooter;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+
 import org.apache.spark.sql.execution.vectorized.ColumnarBatch;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -39,7 +35,7 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
     public SingleGroupOapRecordReader(
         Path file,
         Configuration configuration,
-        ParquetMetadata footer,
+        ParquetFooter footer,
         int blockId,
         int rowGroupCount) {
       super(file, configuration, footer);
@@ -55,12 +51,7 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
      */
     @Override
     public void initialize() throws IOException, InterruptedException {
-      if (this.footer == null) {
-        footer = readFooter(configuration, file, NO_FILTER);
-      }
-      List<BlockMetaData> inputBlockList = Lists.newArrayList();
-      inputBlockList.add(footer.getBlocks().get(blockId));
-      ParquetMetadata meta = new ParquetMetadata(footer.getFileMetaData(), inputBlockList);
+      ParquetMetadata meta = footer.toParquetMetadata(blockId);
       // need't do filterRowGroups.
       initialize(meta, configuration, false);
       super.initializeInternal();

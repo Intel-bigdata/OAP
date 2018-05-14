@@ -18,7 +18,7 @@ package org.apache.spark.sql.execution.vectorized
 
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER
-import org.apache.parquet.hadoop.{ParquetFileReader, ParquetOutputFormat, VectorizedOapRecordReader}
+import org.apache.parquet.hadoop.{ParquetFileReader, OapParquetFileReader, ParquetOutputFormat, VectorizedOapRecordReader}
 
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetCompatibilityTest, ParquetReadSupportWrapper, SpecificParquetRecordReaderBase}
 import org.apache.spark.sql.test.oap.SharedOapContext
@@ -42,26 +42,23 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
         val schema = df.schema.json
         val file = SpecificParquetRecordReaderBase.listDirectory(dir).toArray.head
         val path = new Path(file.asInstanceOf[String])
-        val footer = ParquetFileReader.readFooter(configuration, path, NO_FILTER)
-        (footer :: null :: Nil).foreach { f =>
-          configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
-          val reader = new VectorizedOapRecordReader(path, configuration, f)
-          reader.initialize()
-          val batch = reader.resultBatch()
-          assert(reader.nextBatch())
-          assert(batch.numRows() == n)
-          var i = 0
-          while (i < n) {
-            assert(!batch.isFiltered(i))
-            assert(batch.column(0).getByte(i) == 1)
-            assert(batch.column(1).getInt(i) == 2)
-            assert(batch.column(2).getLong(i) == 3)
-            assert(batch.column(3).getUTF8String(i).toString == "abc")
-            i += 1
-          }
-          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
-          reader.close()
+        configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
+        val reader = new VectorizedOapRecordReader(path, configuration)
+        reader.initialize()
+        val batch = reader.resultBatch()
+        assert(reader.nextBatch())
+        assert(batch.numRows() == n)
+        var i = 0
+        while (i < n) {
+          assert(!batch.isFiltered(i))
+          assert(batch.column(0).getByte(i) == 1)
+          assert(batch.column(1).getInt(i) == 2)
+          assert(batch.column(2).getLong(i) == 3)
+          assert(batch.column(3).getUTF8String(i).toString == "abc")
+          i += 1
         }
+        configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
+        reader.close()
       }
     }
     }
@@ -75,26 +72,23 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
         val schema = df.schema.json
         val file = SpecificParquetRecordReaderBase.listDirectory(dir).toArray.head
         val path = new Path(file.asInstanceOf[String])
-        val footer = ParquetFileReader.readFooter(configuration, path, NO_FILTER)
-        (footer :: null :: Nil).foreach { f =>
-          configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
-          val reader = new VectorizedOapRecordReader(path, configuration, f)
-          reader.initialize()
-          val batch = reader.resultBatch()
-          assert(reader.nextBatch())
-          assert(batch.numRows() == n)
-          var i = 0
-          while (i < n) {
-            assert(!batch.isFiltered(i))
-            assert(batch.column(0).isNullAt(i))
-            assert(batch.column(1).isNullAt(i))
-            assert(batch.column(2).isNullAt(i))
-            assert(batch.column(3).isNullAt(i))
-            i += 1
-          }
-          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
-          reader.close()
+        configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
+        val reader = new VectorizedOapRecordReader(path, configuration)
+        reader.initialize()
+        val batch = reader.resultBatch()
+        assert(reader.nextBatch())
+        assert(batch.numRows() == n)
+        var i = 0
+        while (i < n) {
+          assert(!batch.isFiltered(i))
+          assert(batch.column(0).isNullAt(i))
+          assert(batch.column(1).isNullAt(i))
+          assert(batch.column(2).isNullAt(i))
+          assert(batch.column(3).isNullAt(i))
+          i += 1
         }
+        configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
+        reader.close()
       }
     }
     }
@@ -110,25 +104,21 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
         val schema = df.schema.json
         val file = SpecificParquetRecordReaderBase.listDirectory(dir).toArray.head
         val path = new Path(file.asInstanceOf[String])
-        val footer = ParquetFileReader.readFooter(configuration, path, NO_FILTER)
+        configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
+        val reader = new VectorizedOapRecordReader(path, configuration)
+        reader.initialize()
+        val batch = reader.resultBatch()
+        val column = batch.column(0)
+        assert(reader.nextBatch())
 
-        (footer :: null:: Nil).foreach { f =>
-          configuration.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, schema)
-          val reader = new VectorizedOapRecordReader(path, configuration, f)
-          reader.initialize()
-          val batch = reader.resultBatch()
-          val column = batch.column(0)
-          assert(reader.nextBatch())
-
-          (0 until 512).foreach { i =>
-            assert(!batch.isFiltered(i))
-            assert(column.getUTF8String(3 * i).toString == i.toString)
-            assert(column.getUTF8String(3 * i + 1).toString == i.toString)
-            assert(column.getUTF8String(3 * i + 2).toString == i.toString)
-          }
-          configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
-          reader.close()
+        (0 until 512).foreach { i =>
+          assert(!batch.isFiltered(i))
+          assert(column.getUTF8String(3 * i).toString == i.toString)
+          assert(column.getUTF8String(3 * i + 1).toString == i.toString)
+          assert(column.getUTF8String(3 * i + 2).toString == i.toString)
         }
+        configuration.unset(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
+        reader.close()
       }
     }
   }

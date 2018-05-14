@@ -50,7 +50,7 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
      * rows of all the row groups.
      */
     protected long totalRowCount;
-    protected ParquetFileReader reader;
+    protected OapParquetFileReader reader;
 
     /**
      *
@@ -72,7 +72,7 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
       String sparkRequestedSchemaString =
         configuration.get(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA());
       this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
-      this.reader = ParquetFileReader.open(configuration, file, footer);
+      this.reader = OapParquetFileReader.open(configuration, file, footer);
       if (isFilterRowGroups) {
         this.reader.filterRowGroups(getFilter(configuration));
       }

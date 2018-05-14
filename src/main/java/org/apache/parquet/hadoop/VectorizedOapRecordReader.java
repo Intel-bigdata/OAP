@@ -16,9 +16,6 @@
  */
 package org.apache.parquet.hadoop;
 
-import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
-import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -27,8 +24,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.page.PageReadStore;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.hadoop.metadata.ParquetFooter;
 import org.apache.parquet.schema.Type;
+
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReader;
@@ -112,7 +110,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * not belong to SpecificParquetRecordReaderBase
      */
     protected Configuration configuration;
-    protected ParquetMetadata footer;
+    protected ParquetFooter footer;
 
     /**
      * VectorizedOapRecordReader Contructor
@@ -124,10 +122,18 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
     public VectorizedOapRecordReader(
         Path file,
         Configuration configuration,
-        ParquetMetadata footer) {
+        ParquetFooter footer) {
       this.file = file;
       this.configuration = configuration;
       this.footer = footer;
+    }
+
+    public VectorizedOapRecordReader(
+        Path file,
+        Configuration configuration) throws IOException{
+      this.file = file;
+      this.configuration = configuration;
+      this.footer = OapParquetFileReader.readParquetFooter(configuration, file);
     }
 
     /**
@@ -138,11 +144,8 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      */
     @Override
     public void initialize() throws IOException, InterruptedException {
-      if (this.footer == null) {
-        footer = readFooter(configuration, file, NO_FILTER);
-      }
       // no index to use, try do filterRowGroups to skip rowgroups.
-      initialize(footer, configuration, true);
+      initialize(footer.toParquetMetadata(), configuration, true);
       initializeInternal();
     }
 
@@ -345,9 +348,13 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
 
     protected void readNextRowGroup() throws IOException {
       PageReadStore pages = reader.readNextRowGroup();
+      initColumnReaders(pages);
+    }
+
+    protected void initColumnReaders(PageReadStore pages) throws IOException {
       if (pages == null) {
         throw new IOException("expecting more rows but reached last block. Read "
-          + rowsReturned + " out of " + totalRowCount);
+        + rowsReturned + " out of " + totalRowCount);
       }
       List<ColumnDescriptor> columns = requestedSchema.getColumns();
       columnReaders = new VectorizedColumnReaderWrapper[columns.size()];
