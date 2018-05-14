@@ -16,6 +16,7 @@
  */
 package org.apache.parquet.hadoop.metadata;
 
+import java.util.Collections;
 import java.util.List;
 
 import com.google.common.collect.Lists;
@@ -62,7 +63,6 @@ public class ParquetFooter {
     validBlocks.add(blocks.get(rowGroupId));
     return new ParquetMetadata(fileMetaData, validBlocks);
   }
-
 
   public ParquetMetadata toParquetMetadata(int[] globalRowIds) {
     List<BlockMetaData> validBlocks = Lists.newArrayList();

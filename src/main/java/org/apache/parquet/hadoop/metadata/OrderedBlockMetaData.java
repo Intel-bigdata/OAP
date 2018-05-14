@@ -18,6 +18,9 @@ package org.apache.parquet.hadoop.metadata;
 
 import java.util.List;
 
+/**
+ * OrderedBlockMetaData wrap BlockMetaData and add row group order id.
+ */
 public class OrderedBlockMetaData extends BlockMetaData {
 
   protected final int rowGroupId;
@@ -31,7 +34,22 @@ public class OrderedBlockMetaData extends BlockMetaData {
 
   @Override
   public void setPath(String path) {
-    meta.setPath(path);
+    this.meta.setPath(path);
+  }
+
+  @Override
+  public void setRowCount(long rowCount) {
+    this.meta.setRowCount(rowCount);
+  }
+
+  @Override
+  public void setTotalByteSize(long totalByteSize) {
+    this.meta.setTotalByteSize(totalByteSize);
+  }
+
+  @Override
+  public void addColumn(ColumnChunkMetaData column) {
+    this.meta.addColumn(column);
   }
 
   @Override
@@ -45,23 +63,8 @@ public class OrderedBlockMetaData extends BlockMetaData {
   }
 
   @Override
-  public void setRowCount(long rowCount) {
-    meta.setRowCount(rowCount);
-  }
-
-  @Override
   public long getTotalByteSize() {
     return meta.getTotalByteSize();
-  }
-
-  @Override
-  public void setTotalByteSize(long totalByteSize) {
-    meta.setTotalByteSize(totalByteSize);
-  }
-
-  @Override
-  public void addColumn(ColumnChunkMetaData column) {
-    meta.addColumn(column);
   }
 
   @Override
@@ -86,5 +89,9 @@ public class OrderedBlockMetaData extends BlockMetaData {
 
   public int getRowGroupId() {
     return rowGroupId;
+  }
+
+  public BlockMetaData getMeta() {
+    return meta;
   }
 }
