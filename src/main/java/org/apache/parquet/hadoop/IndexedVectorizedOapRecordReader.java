@@ -44,7 +44,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     private static final String IDS_MAP_STATE_ERROR_MSG =
       "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
     private static final String IDS_ITER_STATE_ERROR_MSG =
-      "The divideRowIdsIntoPages method should not be called when rowIdsIter hasNext if false.";
+      "The divideRowIdsIntoPages method should not be called when currentIndexList is Empty.";
 
     public IndexedVectorizedOapRecordReader(
         Path file,
