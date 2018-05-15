@@ -20,8 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap.io
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.apache.hadoop.util.StringUtils
-import org.apache.parquet.format.converter.ParquetMetadataConverter._
-import org.apache.parquet.hadoop.{OapParquetFileReader, ParquetFileReader}
+import org.apache.parquet.hadoop.OapParquetFileReader
 import org.apache.parquet.hadoop.metadata.ParquetFooter
 
 private[oap] class ParquetDataFileMeta(val footer: ParquetFooter) extends DataFileMeta {
