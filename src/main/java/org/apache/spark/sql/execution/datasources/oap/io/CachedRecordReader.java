@@ -1,4 +1,4 @@
-package org.apache.parquet.hadoop;
+package org.apache.spark.sql.execution.datasources.oap.io;
 
 import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
 import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
@@ -13,6 +13,7 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.Preconditions;
+import org.apache.parquet.hadoop.VectorizedOapRecordReader;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
@@ -21,7 +22,6 @@ import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiber;
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache;
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager;
-import org.apache.spark.sql.execution.datasources.oap.io.ParquetDataFile;
 import org.apache.spark.sql.types.StructType;
 
 public class CachedRecordReader extends VectorizedOapRecordReader {

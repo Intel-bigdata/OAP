@@ -1,4 +1,4 @@
-package org.apache.parquet.hadoop;
+package org.apache.spark.sql.execution.datasources.oap.io;
 
 import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
 import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
@@ -16,8 +16,6 @@ import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
-
-import org.apache.spark.sql.execution.datasources.oap.io.ParquetDataFile;
 
 public class IndexedCachedRecordReader extends CachedRecordReader{
 
