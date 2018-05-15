@@ -92,8 +92,7 @@ public final class OnHeapColumnVector extends ColumnVector {
               Platform.SHORT_ARRAY_OFFSET, capacity * 2);
             Platform.copyMemory(null, nativeAddress + capacity * 2,
               nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
-        } else if (type instanceof IntegerType || type instanceof DateType
-                || type instanceof FloatType) {
+        } else if (type instanceof IntegerType || type instanceof DateType) {
             // data::nulls
             Platform.copyMemory(null, nativeAddress, intData,
                     Platform.INT_ARRAY_OFFSET, capacity * 4);
@@ -105,7 +104,7 @@ public final class OnHeapColumnVector extends ColumnVector {
                     Platform.FLOAT_ARRAY_OFFSET, capacity * 4);
             Platform.copyMemory(null, nativeAddress + capacity * 4,
                     nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
-        } else if (type instanceof LongType || type instanceof DoubleType) {
+        } else if (type instanceof LongType) {
             // data::nulls
             Platform.copyMemory(null, nativeAddress, longData,
                     Platform.LONG_ARRAY_OFFSET, capacity * 8);
