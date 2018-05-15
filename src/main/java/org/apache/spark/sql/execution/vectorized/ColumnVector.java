@@ -380,6 +380,8 @@ public abstract class ColumnVector implements AutoCloseable {
    */
   public abstract void setValuesNativeAddress(long nativeAddress);
 
+  public abstract void setByteData(byte[] data);
+
   /**
    * Sets the value at rowId to null/not null.
    */
@@ -1014,11 +1016,6 @@ public abstract class ColumnVector implements AutoCloseable {
    * Update the dictionary.
    */
   public void setDictionary(Dictionary dictionary) {
-    if (dictionary != null) {
-      System.out.println("dictionary");
-    } else {
-      System.out.println("no dictionary");
-    }
     this.dictionary = dictionary;
   }
 

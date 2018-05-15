@@ -168,7 +168,7 @@ private[oap] case class ParquetDataFile(
         fiberCache
       }
       val rowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
-      val columnarBatch = ColumnarBatch.allocate(requestSchema, MemoryMode.OFF_HEAP, rowCount)
+      val columnarBatch = ColumnarBatch.allocate(requestSchema, MemoryMode.ON_HEAP, rowCount)
       columnarBatch.setNumRows(rowCount)
 
       // populate partitionColumn values

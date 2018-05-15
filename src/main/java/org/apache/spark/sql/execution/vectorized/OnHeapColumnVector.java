@@ -57,6 +57,12 @@ public final class OnHeapColumnVector extends ColumnVector {
         reset();
     }
 
+    public void setByteData(byte[] data) {
+        byteData = data;
+    }
+
+
+
     @Override
     public long valuesNativeAddress() {
         throw new RuntimeException("Cannot get native address for on heap column");
@@ -73,7 +79,65 @@ public final class OnHeapColumnVector extends ColumnVector {
 
     @Override
     public void loadBytes(long nativeAddress) {
-        throw new RuntimeException("Cannot load bytes for on heap column");
+        close();
+        if (type instanceof ByteType || type instanceof BooleanType) {
+            // data::nulls
+            Platform.copyMemory(null, nativeAddress, byteData,
+              Platform.BYTE_ARRAY_OFFSET, capacity);
+            Platform.copyMemory(null, nativeAddress + capacity,
+              nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
+        } else if (type instanceof ShortType) {
+            // data::nulls
+            Platform.copyMemory(null, nativeAddress, shortData,
+              Platform.SHORT_ARRAY_OFFSET, capacity * 2);
+            Platform.copyMemory(null, nativeAddress + capacity * 2,
+              nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
+        } else if (type instanceof IntegerType || type instanceof DateType
+                || type instanceof FloatType) {
+            // data::nulls
+            Platform.copyMemory(null, nativeAddress, intData,
+                    Platform.INT_ARRAY_OFFSET, capacity * 4);
+            Platform.copyMemory(null, nativeAddress + capacity * 4,
+                    nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
+        } else if (type instanceof FloatType) {
+            // data::nulls
+            Platform.copyMemory(null, nativeAddress, floatData,
+                    Platform.FLOAT_ARRAY_OFFSET, capacity * 4);
+            Platform.copyMemory(null, nativeAddress + capacity * 4,
+                    nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
+        } else if (type instanceof LongType || type instanceof DoubleType) {
+            // data::nulls
+            Platform.copyMemory(null, nativeAddress, longData,
+                    Platform.LONG_ARRAY_OFFSET, capacity * 8);
+            Platform.copyMemory(null, nativeAddress + capacity * 8,
+                    nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
+        } else if (type instanceof DoubleType) {
+            // data::nulls
+            Platform.copyMemory(null, nativeAddress, doubleData,
+                    Platform.DOUBLE_ARRAY_OFFSET, capacity * 8);
+            Platform.copyMemory(null, nativeAddress + capacity * 8,
+                    nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
+        } else if (type instanceof BinaryType || type instanceof StringType) {
+            // lengthData::offsetData::nulls::child.data
+            Platform.copyMemory(null, nativeAddress, arrayLengths,
+                    Platform.INT_ARRAY_OFFSET, capacity * 4);
+            Platform.copyMemory(null, nativeAddress + capacity * 4, arrayOffsets,
+                    Platform.INT_ARRAY_OFFSET, capacity * 4);
+            Platform.copyMemory(null, nativeAddress + capacity * 8,
+                    nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
+
+            this.childColumns = new ColumnVector[1];
+            this.childColumns[0] = ColumnVector.allocate(
+              capacity, DataTypes.ByteType, MemoryMode.ON_HEAP);
+            this.resultArray = new Array(this.childColumns[0]);
+            this.childColumns[0].close();
+            byte[] data = new byte[arrayOffsets[capacity -1] + arrayLengths[capacity -1]];
+            Platform.copyMemory(null, nativeAddress + capacity * 9,
+                    data, Platform.BYTE_ARRAY_OFFSET,data.length);
+            this.childColumns[0].setByteData(data);
+        } else {
+            throw new RuntimeException("Unhandled " + type);
+        }
     }
 
     @Override

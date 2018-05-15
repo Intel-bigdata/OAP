@@ -53,6 +53,10 @@ public final class OffHeapColumnVector extends ColumnVector {
     reset();
   }
 
+  public void setByteData(byte[] data) {
+    throw new RuntimeException("Cannot set byteData for on off-heap column");
+  }
+
   @Override
   public long valuesNativeAddress() {
     return data;

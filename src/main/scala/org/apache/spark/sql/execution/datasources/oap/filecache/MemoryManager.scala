@@ -109,7 +109,6 @@ private[oap] object MemoryManager extends Logging {
 
   def getEmptyDataFiberCache(length: Int): FiberCache = {
     val memoryBlock = allocate(length)
-    logWarning(s"getEmptyDataFiberCache length = ${length}")
     FiberCache(memoryBlock)
   }
 }
