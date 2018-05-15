@@ -97,4 +97,22 @@ public class OapParquetFileReader {
       ParquetMetadataConverter.MetadataFilter filter) throws IOException {
     return ParquetFooter.from(ParquetFileReader.readFooter(configuration, file, filter));
   }
+
+  public static class RowGroupDataAndRowIds {
+    private PageReadStore pageReadStore;
+    private IntList rowIds;
+
+    RowGroupDataAndRowIds(PageReadStore pageReadStore, IntList rowIds) {
+      this.pageReadStore = pageReadStore;
+      this.rowIds = rowIds;
+    }
+
+    public PageReadStore getPageReadStore() {
+      return pageReadStore;
+    }
+
+    public IntList getRowIds() {
+      return rowIds;
+    }
+  }
 }

@@ -30,6 +30,7 @@ import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedBlockMetaData;
+import org.apache.parquet.hadoop.OapParquetFileReader.RowGroupDataAndRowIds;
 import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.io.ColumnIOFactory;
 import org.apache.parquet.io.MessageColumnIO;

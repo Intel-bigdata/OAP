@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.ParquetFooter;
+import org.apache.parquet.hadoop.OapParquetFileReader.RowGroupDataAndRowIds;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 

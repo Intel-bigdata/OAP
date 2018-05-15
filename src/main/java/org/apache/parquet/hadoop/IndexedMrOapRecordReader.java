@@ -69,10 +69,10 @@ public class IndexedMrOapRecordReader<T> implements RecordReader<T> {
 
     public void initialize() throws IOException, InterruptedException {
 
-      OapParquetFileReader readerWrapper = OapParquetFileReader.open(configuration, file,
+      OapParquetFileReader reader = OapParquetFileReader.open(configuration, file,
         footer.toParquetMetadata(globalRowIds));
       this.internalReader = new InternalOapRecordReader<>(readSupport);
-      this.internalReader.initialize(readerWrapper, configuration);
+      this.internalReader.initialize(reader, configuration);
 
     }
 
