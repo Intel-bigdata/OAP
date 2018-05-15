@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.io.api.Binary
 
-import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Ascending
@@ -31,7 +30,7 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.oap.listener.SparkListenerOapIndexInfoUpdate
-import org.apache.spark.sql.oap.rpc.OapRpcManagerSlave
+import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types._
 import org.apache.spark.util.TimeStampedHashMap
 
@@ -56,7 +55,8 @@ private[oap] class OapDataWriter(
   private val rowGroup: Array[DataFiberBuilder] =
     DataFiberBuilder.initializeFromSchema(schema, ROW_GROUP_SIZE)
 
-  private val statisticsArray = ColumnStatistics.getStatsFromSchema(schema)
+  private val fileStatiscs = ColumnStatistics.getStatsFromSchema(schema)
+  private var rowGroupstatistics = ColumnStatistics.getStatsFromSchema(schema)
 
   private def updateStats(
       stats: ColumnStatistics.ParquetStatistics,
@@ -80,7 +80,7 @@ private[oap] class OapDataWriter(
     }
   }
 
-  private val fiberMeta = new OapDataFileHandle(
+  private val fiberMeta = new OapDataFileMeta(
     rowCountInEachGroup = ROW_GROUP_SIZE,
     fieldCount = schema.length,
     codec = COMPRESSION_CODEC)
@@ -88,13 +88,12 @@ private[oap] class OapDataWriter(
   private val codecFactory = new CodecFactory(conf)
 
   def write(row: InternalRow) {
-    var idx = 0
-    while (idx < rowGroup.length) {
-      rowGroup(idx).append(row)
-      if (!row.isNullAt(idx)) {
-        updateStats(statisticsArray(idx), row, idx, schema(idx).dataType)
+    rowGroup.zipWithIndex.foreach { case (dataFiberBuilder, i) =>
+      dataFiberBuilder.append(row)
+      if (!row.isNullAt(i)) {
+        updateStats(fileStatiscs(i), row, i, schema(i).dataType)
+        updateStats(rowGroupstatistics(i), row, i, schema(i).dataType)
       }
-      idx += 1
     }
     rowCount += 1
     if (rowCount % ROW_GROUP_SIZE == 0) {
@@ -114,6 +113,8 @@ private[oap] class OapDataWriter(
     rowGroupMeta.withNewStart(out.getPos)
       .withNewFiberLens(fiberLens)
       .withNewUncompressedFiberLens(fiberUncompressedLens)
+      .withNewStatistics(rowGroupstatistics.map(ColumnStatistics(_)).toArray)
+
     while (idx < rowGroup.length) {
       val fiberByteData = rowGroup(idx).build()
       val newUncompressedFiberData = fiberByteData.fiberData
@@ -125,7 +126,7 @@ private[oap] class OapDataWriter(
       rowGroup(idx).clear()
       idx += 1
     }
-
+    rowGroupstatistics = ColumnStatistics.getStatsFromSchema(schema)
     fiberMeta.appendRowGroupMeta(rowGroupMeta.withNewEnd(out.getPos))
   }
 
@@ -136,16 +137,17 @@ private[oap] class OapDataWriter(
       writeRowGroup()
     }
 
-    rowGroup.indices.foreach { i =>
-      val dictByteData = rowGroup(i).buildDictionary
-      val encoding = rowGroup(i).getEncoding
+    rowGroup.zipWithIndex.foreach { case (dataFiberBuilder, i) =>
+      val dictByteData = dataFiberBuilder.buildDictionary
+      val encoding = dataFiberBuilder.getEncoding
       val dictionaryDataLength = dictByteData.length
-      val dictionaryIdSize = rowGroup(i).getDictionarySize
+      val dictionaryIdSize = dataFiberBuilder.getDictionarySize
       if (dictionaryDataLength > 0) {
         out.write(dictByteData)
       }
-      fiberMeta.appendColumnMeta(new ColumnMeta(encoding, dictionaryDataLength, dictionaryIdSize,
-        ColumnStatistics(statisticsArray(i))))
+      fiberMeta.appendColumnMeta(
+        new ColumnMeta(
+          encoding, dictionaryDataLength, dictionaryIdSize, ColumnStatistics(fileStatiscs(i))))
     }
 
     // and update the group count and row count in the last group
@@ -205,7 +207,8 @@ private[oap] class OapDataReader(
 
   def initialize(
       conf: Configuration,
-      options: Map[String, String] = Map.empty): OapIterator[InternalRow] = {
+      options: Map[String, String] = Map.empty,
+      filters: Seq[Filter] = Nil): OapIterator[InternalRow] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
@@ -215,7 +218,7 @@ private[oap] class OapDataReader(
 
     def fullScan: OapIterator[InternalRow] = {
       val start = if (log.isDebugEnabled) System.currentTimeMillis else 0
-      val iter = fileScanner.iterator(requiredIds)
+      val iter = fileScanner.iterator(requiredIds, filters)
       val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
 
       _totalRows = fileScanner.totalRows()
@@ -237,8 +240,7 @@ private[oap] class OapDataReader(
             // Order limit scan options
             val isAscending = options.getOrElse(
               OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY, "true").toBoolean
-            val sameOrder =
-              !((indexScanners.order == Ascending) ^ isAscending)
+            val sameOrder = !((indexScanners.order == Ascending) ^ isAscending)
 
             if (sameOrder) {
               indexScanners.take(limit).toArray
@@ -260,7 +262,7 @@ private[oap] class OapDataReader(
 
         val start = if (log.isDebugEnabled) System.currentTimeMillis else 0
         val rows = getRowIds(options)
-        val iter = fileScanner.iterator(requiredIds, rows)
+        val iter = fileScanner.iteratorWithRowIds(requiredIds, rows, filters)
         val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
 
         _indexStat = HIT_INDEX

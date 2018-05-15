@@ -31,5 +31,9 @@ private[index] trait IndexFileWriter {
 
   def writeLong(value: Long): Unit = IndexUtils.writeLong(os, value)
 
+  def writeRowId(tempWriter: IndexFileWriter): Unit = {}
+
   def close(): Unit = os.close()
+
+  def tempRowIdWriter(): IndexFileWriter = null
 }

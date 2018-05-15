@@ -22,9 +22,9 @@ import java.sql.Date
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
-
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex, TestPartition}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
@@ -1003,5 +1003,24 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
             Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
       }
     }
+  }
+
+  test("filtering parquet without both code gen and off-heap cache") {
+    spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
+    withSQLConf("spark.sql.oap.parquet.data.cache.enable" -> "false") {
+      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+      data.toDF("key", "value").createOrReplaceTempView("t")
+      sql("insert overwrite table parquet_test select * from t")
+      withIndex(TestIndex("parquet_test", "index1")) {
+        sql("create oindex index1 on parquet_test (b)")
+
+        // will use b in (....)
+        checkAnswer(sql("SELECT * FROM parquet_test WHERE " +
+          "b in('this is test 1','this is test 2','this is test 4')"),
+          Row(1, "this is test 1") :: Row(2, "this is test 2")
+            :: Row(4, "this is test 4") :: Nil)
+      }
+    }
+    spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "true")
   }
 }

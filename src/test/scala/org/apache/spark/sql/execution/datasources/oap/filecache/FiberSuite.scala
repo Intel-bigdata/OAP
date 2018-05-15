@@ -107,7 +107,7 @@ class FiberSuite extends SharedOapContext with Logging {
     for (i <- rowCounts.indices) {
       val path = new Path(file.getAbsolutePath, rowCounts(i).toString)
       writeData(path, schema, rowCounts(i))
-      val meta = OapDataFile(path.toString, schema, configuration).createDataFileHandle()
+      val meta = OapDataFile(path.toString, schema, configuration).getDataFileMeta()
       assert(meta.totalRowCount() === rowCounts(i))
       assert(meta.rowCountInLastGroup === rowCountInLastGroups(i))
       assert(meta.rowGroupsMeta.length === rowGroupCounts(i))
@@ -132,7 +132,7 @@ class FiberSuite extends SharedOapContext with Logging {
     val path = new Path(file.getAbsolutePath, 10.toString)
     writeData(path, schema, 10)
 
-    val meta = OapDataFile(path.toString, schema, configuration).createDataFileHandle()
+    val meta = OapDataFile(path.toString, schema, configuration).getDataFileMeta()
     assert(meta.totalRowCount() === 10)
     assert(meta.rowCountInEachGroup === 12345)
     assert(meta.rowCountInLastGroup === 10)

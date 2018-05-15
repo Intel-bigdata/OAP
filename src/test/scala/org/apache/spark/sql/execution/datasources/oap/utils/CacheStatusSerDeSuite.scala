@@ -23,7 +23,7 @@ import org.json4s.jackson.JsonMethods._
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheStatus
-import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
+import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileMeta
 import org.apache.spark.util.collection.BitSet
 
 class CacheStatusSerDeSuite extends SparkFunSuite {
@@ -44,7 +44,7 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
   }
 
   test("test data file meta") {
-    val dataFileMeta = new OapDataFileHandle(
+    val dataFileMeta = new OapDataFileMeta(
       rowCountInEachGroup = 3, rowCountInLastGroup = 2, groupCount = 3, fieldCount = 3)
     val dataFileMetaStr = compact(render(CacheStatusSerDe.dataFileMetaToJson(dataFileMeta)))
     val newDataFileMeta = CacheStatusSerDe.dataFileMetaFromJson(parse(dataFileMetaStr))
@@ -106,8 +106,8 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
   }
 
   private def assertDataFileMetaEquals(
-                                        dataFileMeta1: OapDataFileHandle,
-                                        dataFileMeta2: OapDataFileHandle) {
+                                        dataFileMeta1: OapDataFileMeta,
+                                        dataFileMeta2: OapDataFileMeta) {
     assert(dataFileMeta1.rowCountInEachGroup === dataFileMeta2.rowCountInEachGroup)
     assert(dataFileMeta1.rowCountInLastGroup === dataFileMeta2.rowCountInLastGroup)
     assert(dataFileMeta1.groupCount === dataFileMeta2.groupCount)

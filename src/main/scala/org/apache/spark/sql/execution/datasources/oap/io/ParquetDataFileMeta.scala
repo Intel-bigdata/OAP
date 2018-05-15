@@ -17,18 +17,16 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import java.util
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.format.converter.ParquetMetadataConverter._
-import org.apache.parquet.hadoop.ParquetFileReader
-import org.apache.parquet.hadoop.metadata.{OrderedBlockMetaData, ParquetFooter}
+import org.apache.parquet.hadoop.{OapParquetFileReader, ParquetFileReader}
+import org.apache.parquet.hadoop.metadata.ParquetFooter
 
-private[oap] class ParquetDataFileHandle(val footer: ParquetFooter) extends DataFileHandle {
+private[oap] class ParquetDataFileMeta(val footer: ParquetFooter) extends DataFileMeta {
 
-  require(footer != null, "footer of ParquetDataFileHandle should not be null.")
+  require(footer != null, "footer of ParquetDataFileMeta should not be null.")
 
   override def fin: FSDataInputStream = null
 
@@ -40,10 +38,9 @@ private[oap] class ParquetDataFileHandle(val footer: ParquetFooter) extends Data
     footer.getFileMetaData.getSchema.getColumns.size()
 }
 
-private[oap] object ParquetDataFileHandle {
-  def apply(conf: Configuration, pathString: String): ParquetDataFileHandle = {
+private[oap] object ParquetDataFileMeta {
+  def apply(conf: Configuration, pathString: String): ParquetDataFileMeta = {
     val path = new Path(StringUtils.unEscapeString(pathString))
-    val metadata = ParquetFileReader.readFooter(conf, path, NO_FILTER)
-    new ParquetDataFileHandle(ParquetFooter.from(metadata))
+    new ParquetDataFileMeta(OapParquetFileReader.readParquetFooter(conf, path))
   }
 }

@@ -86,8 +86,8 @@ public class OapParquetFileReader {
   }
 
   public static ParquetFooter readParquetFooter(
-          Configuration configuration,
-          Path file) throws IOException {
+      Configuration configuration,
+      Path file) throws IOException {
     return readParquetFooter(configuration, file, NO_FILTER);
   }
 

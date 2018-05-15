@@ -33,4 +33,26 @@ private[index] case class IndexFileWriterImpl(
 
   // Give RecordWriter a chance which file it's writing to.
   override def getName: String = indexPath.toString
+
+  override def tempRowIdWriter: IndexFileWriter = {
+    val tempFileName = new Path(indexPath.getParent, indexPath.getName + ".id")
+    IndexFileWriterImpl(configuration, tempFileName)
+  }
+
+  override def writeRowId(tempWriter: IndexFileWriter): Unit = {
+    val path = new Path(tempWriter.getName)
+    val is = path.getFileSystem(configuration).open(path)
+    val length = path.getFileSystem(configuration).getFileStatus(path).getLen
+    val bufSize = configuration.getInt("io.file.buffer.size", 4096)
+    val bytes = new Array[Byte](bufSize)
+    var remaining = length
+    while (remaining > 0) {
+      val readSize = math.min(bufSize, remaining).toInt
+      is.readFully(bytes, 0, readSize)
+      os.write(bytes, 0, readSize)
+      remaining -= readSize
+    }
+    is.close()
+    path.getFileSystem(configuration).delete(path, false)
+  }
 }

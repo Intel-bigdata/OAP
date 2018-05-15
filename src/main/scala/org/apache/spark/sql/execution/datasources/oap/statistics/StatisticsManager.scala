@@ -67,7 +67,7 @@ class StatisticsWriteManager {
   }
 
   def addOapKey(key: Key): Unit = {
-    if (key.anyNull) {
+    if (key.anyNull || stats.isEmpty) {
       // stats info does not collect null keys
       return
     }

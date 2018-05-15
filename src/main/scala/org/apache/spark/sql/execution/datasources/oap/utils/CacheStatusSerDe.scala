@@ -22,7 +22,7 @@ import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheStatus
-import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileHandle
+import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileMeta
 import org.apache.spark.util.collection.BitSet
 
 /**
@@ -72,19 +72,19 @@ private[oap] object CacheStatusSerDe extends SerDe[String, Seq[FiberCacheStatus]
 
   // we only transfer 4 items in DataFileMeta to driver, ther are rowCountInEachGroup,
   // rowCountInLastGroup, groupCount, fieldCount respectively
-  private[oap] def dataFileMetaToJson(dataFileMeta: OapDataFileHandle): JValue = {
+  private[oap] def dataFileMetaToJson(dataFileMeta: OapDataFileMeta): JValue = {
     ("rowCountInEachGroup" -> dataFileMeta.rowCountInEachGroup) ~
       ("rowCountInLastGroup" -> dataFileMeta.rowCountInLastGroup) ~
       ("groupCount" -> dataFileMeta.groupCount) ~
       ("fieldCount" -> dataFileMeta.fieldCount)
   }
 
-  private[oap] def dataFileMetaFromJson(json: JValue): OapDataFileHandle = {
+  private[oap] def dataFileMetaFromJson(json: JValue): OapDataFileMeta = {
     val rowCountInEachGroup = (json \ "rowCountInEachGroup").extract[Int]
     val rowCountInLastGroup = (json \ "rowCountInLastGroup").extract[Int]
     val groupCount = (json \ "groupCount").extract[Int]
     val fieldCount = (json \ "fieldCount").extract[Int]
-    new OapDataFileHandle(
+    new OapDataFileMeta(
       rowCountInEachGroup = rowCountInEachGroup,
       rowCountInLastGroup = rowCountInLastGroup,
       groupCount = groupCount,
