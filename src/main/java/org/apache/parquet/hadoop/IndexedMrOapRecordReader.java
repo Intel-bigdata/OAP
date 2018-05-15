@@ -27,7 +27,7 @@ import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
 import org.apache.parquet.hadoop.metadata.ParquetFooter;
 
-public class IndexMrOapRecordReader<T> implements RecordReader<T> {
+public class IndexedMrOapRecordReader<T> implements RecordReader<T> {
 
     private Configuration configuration;
     private Path file;
@@ -38,7 +38,7 @@ public class IndexMrOapRecordReader<T> implements RecordReader<T> {
 
     private ReadSupport<T> readSupport;
 
-    public IndexMrOapRecordReader(
+    public IndexedMrOapRecordReader(
         ReadSupport<T> readSupport,
         Path file,
         Configuration configuration,

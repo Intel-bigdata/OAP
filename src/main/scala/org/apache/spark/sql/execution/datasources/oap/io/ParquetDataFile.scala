@@ -174,7 +174,7 @@ private[oap] case class ParquetDataFile(
           }
         case _ =>
           initRecordReader(
-            new IndexMrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
+            new IndexedMrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
               file, configuration, rowIds, meta.footer))
       }
     }
