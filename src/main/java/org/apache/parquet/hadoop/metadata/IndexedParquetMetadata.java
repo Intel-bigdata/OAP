@@ -26,15 +26,11 @@ public class IndexedParquetMetadata extends ParquetMetadata {
 
     private List<IntList> rowIdsList;
 
-    private IntList needRowGroupIds;
-
     public IndexedParquetMetadata(
         FileMetaData fileMetaData,
-        IntList needRowGroupIds,
         List<BlockMetaData> blocks,
         List<IntList> rowIdsList) {
       super(fileMetaData, blocks);
-      this.needRowGroupIds = needRowGroupIds;
       this.rowIdsList = rowIdsList;
     }
 
@@ -42,21 +38,14 @@ public class IndexedParquetMetadata extends ParquetMetadata {
       return rowIdsList;
     }
 
-    public IntList getNeedRowGroupIds() {
-      return needRowGroupIds;
-    }
-
     public static IndexedParquetMetadata from(ParquetMetadata footer, int[] globalRowIds) {
       List<BlockMetaData> inputBlockList = Lists.newArrayList();
       List<IntList> rowIdsList = Lists.newArrayList();
-      IntList needRowGroupIds = new IntArrayList();
       int nextRowGroupStartRowId = 0;
       int totalCount = globalRowIds.length;
       int index = 0;
-      List<BlockMetaData> blocks = footer.getBlocks();
 
-      for (int id = 0; id < blocks.size(); id++) {
-        BlockMetaData block = blocks.get(id);
+      for (BlockMetaData block : footer.getBlocks()) {
         int currentRowGroupStartRowId = nextRowGroupStartRowId;
         nextRowGroupStartRowId += block.getRowCount();
         IntList rowIdList = new IntArrayList();
@@ -70,15 +59,10 @@ public class IndexedParquetMetadata extends ParquetMetadata {
           }
         }
         if (!rowIdList.isEmpty()) {
-          needRowGroupIds.add(id);
           inputBlockList.add(block);
           rowIdsList.add(rowIdList);
         }
       }
-      return new IndexedParquetMetadata(
-        footer.getFileMetaData(),
-        needRowGroupIds,
-        inputBlockList,
-        rowIdsList);
+      return new IndexedParquetMetadata(footer.getFileMetaData(), inputBlockList, rowIdsList);
     }
 }

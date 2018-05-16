@@ -201,13 +201,6 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
       return (float) rowsReturned / totalRowCount;
     }
 
-    public void initBatch(
-        MemoryMode memMode,
-        StructType partitionColumns,
-        InternalRow partitionValues) {
-      initBatch(memMode, 4096, partitionColumns, partitionValues);
-    }
-
     /**
      * Returns the ColumnarBatch object that will be used for all rows returned by this reader.
      * This object is reused. Calling this enables the vectorized reader. This should be called
@@ -223,7 +216,6 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
     // Column 3: partitionValues[1]
     public void initBatch(
         MemoryMode memMode,
-        int maxRows,
         StructType partitionColumns,
         InternalRow partitionValues) {
       StructType batchSchema = new StructType();
@@ -236,7 +228,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         }
       }
 
-      columnarBatch = ColumnarBatch.allocate(batchSchema, memMode, maxRows);
+      columnarBatch = ColumnarBatch.allocate(batchSchema, memMode);
       if (partitionColumns != null) {
         int partitionIdx = sparkSchema.fields().length;
         for (int i = 0; i < partitionColumns.fields().length; i++) {
