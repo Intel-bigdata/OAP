@@ -1000,8 +1000,8 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
           checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
             Row(1, "this is test 1") :: Nil)
-//          checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
-//            Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+          checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
+            Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
       }
     }
   }

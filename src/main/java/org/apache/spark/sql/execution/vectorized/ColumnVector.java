@@ -366,7 +366,7 @@ public abstract class ColumnVector implements AutoCloseable {
    * Pass data bytes to external components. Only valid
    * to call for off heap columns.
    */
-  public abstract byte[] dumpBytes();
+  public abstract byte[] dumpBytes(long nativeAddress);
 
   /**
    * Loads the data into ColumnVector. Only valid
@@ -381,6 +381,9 @@ public abstract class ColumnVector implements AutoCloseable {
   public abstract void setValuesNativeAddress(long nativeAddress);
 
   public abstract void setByteData(byte[] data);
+
+  public abstract byte[] getByteData();
+
 
   /**
    * Sets the value at rowId to null/not null.

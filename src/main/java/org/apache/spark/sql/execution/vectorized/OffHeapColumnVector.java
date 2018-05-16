@@ -57,6 +57,10 @@ public final class OffHeapColumnVector extends ColumnVector {
     throw new RuntimeException("Cannot set byteData for on off-heap column");
   }
 
+  public byte[] getByteData() {
+    throw new RuntimeException("Cannot set byteData for on off-heap column");
+  }
+
   @Override
   public long valuesNativeAddress() {
     return data;
@@ -68,7 +72,7 @@ public final class OffHeapColumnVector extends ColumnVector {
   }
 
   @Override
-  public byte[] dumpBytes() {
+  public byte[] dumpBytes(long nativeAddress) {
     if (reset) {
       if (dictionary != null) {
         if (type instanceof ByteType) {

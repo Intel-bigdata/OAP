@@ -85,13 +85,18 @@ private[oap] case class ParquetDataFile(
         case _ => -1
       }
       var fiberCache: FiberCache = null
-      if (unitLength != -1) {
+
+      val nativeAddress = if (unitLength != -1) {
         fiberCache = MemoryManager.getEmptyDataFiberCache(rowGroupRowCount * unitLength)
-        reader.setNativeAddress(fiberCache.getBaseOffset)
+        // reader.setNativeAddress(fiberCache.getBaseOffset)
+        fiberCache.getBaseOffset
+      } else {
+        -1
       }
 
       if (reader.nextBatch()) {
-          val data = reader.getCurrentValue.asInstanceOf[ColumnarBatch].column(0).dumpBytes
+          val data = reader.getCurrentValue.asInstanceOf[ColumnarBatch].column(0).
+            dumpBytes(nativeAddress)
           if (data != null) {
             MemoryManager.toDataFiberCache(data)
           } else {
