@@ -142,7 +142,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         footer = readFooter(configuration, file, NO_FILTER);
       }
       // no index to use, try do filterRowGroups to skip rowgroups.
-      initialize(footer, configuration, true, true);
+      initialize(footer, configuration, true);
       initializeInternal();
     }
 

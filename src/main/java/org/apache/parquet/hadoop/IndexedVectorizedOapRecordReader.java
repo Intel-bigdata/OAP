@@ -79,7 +79,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       this.rowIdsIter = indexedFooter.getRowIdsList().iterator();
 
       // use indexedFooter read data, need't do filterRowGroups.
-      initialize(indexedFooter, configuration, true, false);
+      initialize(indexedFooter, configuration, false);
       super.initializeInternal();
     }
 
