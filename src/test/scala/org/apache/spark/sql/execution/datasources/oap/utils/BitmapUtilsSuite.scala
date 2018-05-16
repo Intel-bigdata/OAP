@@ -25,7 +25,7 @@ import org.roaringbitmap.RoaringBitmap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiber, MemoryManager, FiberCache, FiberCacheManager, WrappedFiberCache}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiber, MemoryManager, FiberCache, FiberCacheManager}
 import org.apache.spark.sql.execution.datasources.oap.index.{BitmapIndexSectionId, IndexUtils}
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
@@ -79,24 +79,24 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
   private def getMetaDataAndFiberCaches(
       fin: FSDataInputStream,
       idxPath: Path,
-      conf: Configuration): (Int, WrappedFiberCache, WrappedFiberCache) = {
+      conf: Configuration): (Int, FiberCache, FiberCache) = {
     val idxFileSize = idxPath.getFileSystem(conf).getFileStatus(idxPath).getLen
     val footerOffset = idxFileSize - BITMAP_FOOTER_SIZE
     val footerFiber = BitmapFiber(
       () => loadBmSection(fin, footerOffset, BITMAP_FOOTER_SIZE),
       idxPath.toString, BitmapIndexSectionId.footerSection, 0)
-    val footerCache = WrappedFiberCache(FiberCacheManager.get(footerFiber, conf))
-    val uniqueKeyListTotalSize = footerCache.fc.getInt(IndexUtils.INT_SIZE)
-    val keyCount = footerCache.fc.getInt(IndexUtils.INT_SIZE * 2)
-    val entryListTotalSize = footerCache.fc.getInt(IndexUtils.INT_SIZE * 3)
-    val offsetListTotalSize = footerCache.fc.getInt(IndexUtils.INT_SIZE * 4)
-    val nullEntrySize = footerCache.fc.getInt(IndexUtils.INT_SIZE * 6)
+    val footerCache = FiberCacheManager.get(footerFiber, conf)
+    val uniqueKeyListTotalSize = footerCache.getInt(IndexUtils.INT_SIZE)
+    val keyCount = footerCache.getInt(IndexUtils.INT_SIZE * 2)
+    val entryListTotalSize = footerCache.getInt(IndexUtils.INT_SIZE * 3)
+    val offsetListTotalSize = footerCache.getInt(IndexUtils.INT_SIZE * 4)
+    val nullEntrySize = footerCache.getInt(IndexUtils.INT_SIZE * 6)
     val entryListOffset = IndexFile.VERSION_LENGTH + uniqueKeyListTotalSize
     val offsetListOffset = entryListOffset + entryListTotalSize + nullEntrySize
     val offsetListFiber = BitmapFiber(
       () => loadBmSection(fin, offsetListOffset.toLong, offsetListTotalSize),
       idxPath.toString, BitmapIndexSectionId.entryOffsetsSection, 0)
-    val offsetListCache = WrappedFiberCache(FiberCacheManager.get(offsetListFiber, conf))
+    val offsetListCache = FiberCacheManager.get(offsetListFiber, conf)
     (keyCount, offsetListCache, footerCache)
   }
 
@@ -116,8 +116,8 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
           val (keyCount, offsetListCache, footerCache) =
             getMetaDataAndFiberCaches(fin, idxPath, conf)
           (0 until keyCount).map(idx => {
-            val curIdxOffset = getIdxOffset(offsetListCache.fc, 0L, idx)
-            val entrySize = getIdxOffset(offsetListCache.fc, 0L, idx + 1) - curIdxOffset
+            val curIdxOffset = getIdxOffset(offsetListCache, 0L, idx)
+            val entrySize = getIdxOffset(offsetListCache, 0L, idx + 1) - curIdxOffset
             val entryFiber = BitmapFiber(
               () => loadBmSection(fin, curIdxOffset.toLong, entrySize), idxPath.toString,
             BitmapIndexSectionId.entryListSection, idx)
@@ -158,8 +158,8 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
           val (keyCount, offsetListCache, footerCache) =
             getMetaDataAndFiberCaches(fin, idxPath, conf)
           val wrappedFiberCacheSeq = (0 until keyCount).map(idx => {
-            val curIdxOffset = getIdxOffset(offsetListCache.fc, 0L, idx)
-            val entrySize = getIdxOffset(offsetListCache.fc, 0L, idx + 1) - curIdxOffset
+            val curIdxOffset = getIdxOffset(offsetListCache, 0L, idx)
+            val entrySize = getIdxOffset(offsetListCache, 0L, idx + 1) - curIdxOffset
             val entryFiber = BitmapFiber(
               () => loadBmSection(fin, curIdxOffset.toLong, entrySize), idxPath.toString,
               BitmapIndexSectionId.entryListSection, idx)

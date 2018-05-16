@@ -192,8 +192,7 @@ object OapUtils extends Logging {
    * @param partitionSpec the specification of the partitions
    * @return all valid files grouped into partition(s) on the disk
    */
-  @deprecated
-  // deprecated, use "getPartitionPaths" to get valid partition path(s)
+  @deprecated("use \"getPartitionPaths\" to get valid partition path(s)", "0.3")
   def getPartitionsRefreshed(
       fileIndex: FileIndex,
       partitionSpec: Option[TablePartitionSpec] = None): Seq[PartitionDirectory] = {

@@ -252,7 +252,8 @@ object FileFormatWriter extends Logging {
     override def releaseResources(): Seq[WriteResult] = {
       var writeResults: Seq[WriteResult] = Nil
       if (outputWriter != null) {
-        writeResults = writeResults :+ outputWriter.close()
+        outputWriter.close()
+        writeResults = writeResults :+ outputWriter.writeStatus()
         outputWriter = null
       }
       writeResults
@@ -392,7 +393,8 @@ object FileFormatWriter extends Logging {
         val nextKey = getBucketingKey(sortedIterator.getKey).asInstanceOf[UnsafeRow]
         if (currentKey != nextKey) {
           if (currentWriter != null) {
-            writeResults = writeResults :+ currentWriter.close()
+            currentWriter.close()
+            writeResults = writeResults :+ currentWriter.writeStatus()
             currentWriter = null
           }
           currentKey = nextKey.copy()
@@ -407,7 +409,8 @@ object FileFormatWriter extends Logging {
         currentWriter.writeInternal(sortedIterator.getValue)
       }
       if (currentWriter != null) {
-        writeResults = writeResults :+ currentWriter.close()
+        currentWriter.close()
+        writeResults = writeResults :+ currentWriter.writeStatus()
         currentWriter = null
       }
       (updatedPartitions.toSet, writeResults)
@@ -416,7 +419,8 @@ object FileFormatWriter extends Logging {
     override def releaseResources(): Seq[WriteResult] = {
       var writeResults: Seq[WriteResult] = Nil
       if (currentWriter != null) {
-        writeResults = writeResults :+ currentWriter.close()
+        currentWriter.close()
+        writeResults = writeResults :+ currentWriter.writeStatus()
         currentWriter = null
       }
       writeResults

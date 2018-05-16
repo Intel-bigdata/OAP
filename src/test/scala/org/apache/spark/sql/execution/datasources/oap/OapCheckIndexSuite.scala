@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
-import java.io.File
+import java.io.{File, FileFilter}
 
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
@@ -364,8 +364,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
     checkAnswer(
       sql("check oindex on oap_partition_table partition(b=2, c='c2')"),
       Row(s"Meta file not found in partition: ${partitionPath.toUri.getPath}"))
-    withIndex(
-      TestIndex("oap_partition_table", "idx1", TestPartition("b", "2"), TestPartition("c", "c2"))) {
+
       sql("create oindex idx1 on oap_partition_table(a) partition(b=2, c='c2')")
 
       checkAnswer(sql("check oindex on oap_partition_table partition(b=2, c='c2')"), Nil)
@@ -375,7 +374,11 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       checkAnswer(
         sql("check oindex on oap_partition_table partition(b=2, c='c2')"),
         Row(s"Meta file not found in partition: ${partitionPath.toUri.getPath}"))
-    }
+
+      // meta file not exists, clean index file.
+      new File(partitionPath.toUri.getPath).listFiles(new FileFilter {
+        override def accept(pathname: File): Boolean = pathname.getName.endsWith(".idx1.index")
+      }).foreach(_.delete())
   }
 
   test("check index on partitioned table for a specified partition: Missing data file") {

@@ -39,6 +39,8 @@ import org.apache.spark.scheduler.OutputCommitCoordinator.OutputCommitCoordinato
 import org.apache.spark.security.CryptoStreamUtils
 import org.apache.spark.serializer.{JavaSerializer, Serializer, SerializerManager}
 import org.apache.spark.shuffle.ShuffleManager
+import org.apache.spark.sql.execution.datasources.oap.OapMetricsManager
+import org.apache.spark.sql.oap.OapManager
 import org.apache.spark.sql.oap.rpc.{OapRpcManager, OapRpcManagerMaster, OapRpcManagerMasterEndpoint, OapRpcManagerSlave}
 import org.apache.spark.storage._
 import org.apache.spark.util.{RpcUtils, Utils}
@@ -69,7 +71,7 @@ class SparkEnv (
     val metricsSystem: MetricsSystem,
     val memoryManager: MemoryManager,
     val outputCommitCoordinator: OutputCommitCoordinator,
-    val oapRpcManager: OapRpcManager,
+    val oapManager: OapManager,
     val conf: SparkConf) extends Logging {
 
   private[spark] var isStopped = false
@@ -93,7 +95,7 @@ class SparkEnv (
       blockManager.master.stop()
       metricsSystem.stop()
       outputCommitCoordinator.stop()
-      oapRpcManager.stop()
+      oapManager.stop()
       rpcEnv.shutdown()
       rpcEnv.awaitTermination()
 
@@ -376,7 +378,7 @@ object SparkEnv extends Logging {
       new OutputCommitCoordinatorEndpoint(rpcEnv, outputCommitCoordinator))
     outputCommitCoordinator.coordinatorRef = Some(outputCommitCoordinatorRef)
 
-    val oapRpcManagerMasterEndpoint = new OapRpcManagerMasterEndpoint(rpcEnv)
+    val oapRpcManagerMasterEndpoint = new OapRpcManagerMasterEndpoint(rpcEnv, listenerBus)
     val oapRpcDriverEndpoint = registerOrLookupEndpoint(
       OapRpcManagerMaster.DRIVER_ENDPOINT_NAME, oapRpcManagerMasterEndpoint)
 
@@ -385,6 +387,10 @@ object SparkEnv extends Logging {
     } else {
       new OapRpcManagerSlave(rpcEnv, oapRpcDriverEndpoint, executorId, blockManager, conf)
     }
+
+    val oapMetricsManager = new OapMetricsManager
+
+    val oapManager = new OapManager(oapRpcManager, oapMetricsManager)
 
     val envInstance = new SparkEnv(
       executorId,
@@ -400,7 +406,7 @@ object SparkEnv extends Logging {
       metricsSystem,
       memoryManager,
       outputCommitCoordinator,
-      oapRpcManager,
+      oapManager,
       conf)
 
     // Add a reference to tmp dir created by driver, we will delete this tmp dir when stop() is

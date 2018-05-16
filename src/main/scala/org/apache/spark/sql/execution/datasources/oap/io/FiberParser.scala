@@ -33,7 +33,7 @@ private[oap] trait DataFiberParser {
 object DataFiberParser {
   def apply(
       encoding: Encoding,
-      meta: OapDataFileHandle,
+      meta: OapDataFileMeta,
       dataType: DataType): DataFiberParser = {
 
     encoding match {
@@ -48,7 +48,7 @@ object DictionaryBasedDataFiberParser {
 
   def apply(
       encoding: Encoding,
-      meta: OapDataFileHandle,
+      meta: OapDataFileMeta,
       dictionary: Dictionary,
       dataType: DataType): DataFiberParser = {
     encoding match {
@@ -59,13 +59,13 @@ object DictionaryBasedDataFiberParser {
 }
 
 private[oap] case class PlainDataFiberParser(
-    meta: OapDataFileHandle) extends DataFiberParser{
+    meta: OapDataFileMeta) extends DataFiberParser{
 
   override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = bytes
 }
 
 private[oap] case class DeltaByteArrayDataFiberParser(
-    meta: OapDataFileHandle,
+    meta: OapDataFileMeta,
     dataType: DataType) extends DataFiberParser{
 
   override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = {
@@ -114,7 +114,7 @@ private[oap] case class DeltaByteArrayDataFiberParser(
 }
 
 private[oap] case class PlainDictionaryFiberParser(
-    meta: OapDataFileHandle,
+    meta: OapDataFileMeta,
     dictionary: Dictionary,
     dataType: DataType) extends DataFiberParser {
 

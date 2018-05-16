@@ -93,7 +93,6 @@ class FiberSensorSuite extends QueryTest with SharedOapContext
       val summary = FiberCacheManagerSensor.summary()
       logWarning(s"Summary1: ${summary.toDebugString}")
       assertResult(1)(FiberCacheManagerSensor.executorToCacheManager.size())
-      assertResult(dataFileCount * 4)(summary.dataFiberCount)
 
       // all data are cached when run another sql.
       // Expect: 1.hitCount increase; 2.missCount equal

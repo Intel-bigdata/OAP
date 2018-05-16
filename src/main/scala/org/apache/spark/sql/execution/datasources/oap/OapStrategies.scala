@@ -335,7 +335,7 @@ trait OapStrategies extends Logging {
 
     _fsRelation.fileFormat match {
       case fileFormat: OapFileFormat =>
-        fileFormat.initialize(_fsRelation.sparkSession, oapOption,
+        fileFormat.init(_fsRelation.sparkSession, oapOption,
           selectedPartitions.flatMap(p => p.files))
 
         if (fileFormat.hasAvailableIndex(normalizedIndexHint, indexRequirements)) {

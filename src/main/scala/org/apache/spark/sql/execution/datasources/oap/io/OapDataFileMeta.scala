@@ -72,6 +72,7 @@ private[oap] class RowGroupMeta {
   var end: Long = _
   var fiberLens: Array[Int] = _
   var fiberUncompressedLens: Array[Int] = _
+  var statistics: Array[ColumnStatistics] = _
 
   def withNewStart(newStart: Long): RowGroupMeta = {
     this.start = newStart
@@ -93,12 +94,19 @@ private[oap] class RowGroupMeta {
     this
   }
 
+  def withNewStatistics(newStatistics: Array[ColumnStatistics]): RowGroupMeta = {
+    this.statistics = newStatistics
+    this
+  }
+
   def write(os: FSDataOutputStream): RowGroupMeta = {
     os.writeLong(start)
     os.writeLong(end)
     fiberLens.foreach(os.writeInt)
     fiberUncompressedLens.foreach(os.writeInt)
-
+    statistics.foreach {
+      case ColumnStatistics(bytes) => os.write(bytes)
+    }
     this
   }
 
@@ -110,7 +118,8 @@ private[oap] class RowGroupMeta {
 
     fiberLens.indices.foreach(fiberLens(_) = is.readInt())
     fiberUncompressedLens.indices.foreach(fiberUncompressedLens(_) = is.readInt())
-
+    statistics = new Array[ColumnStatistics](fieldCount)
+    statistics.indices.foreach(statistics(_) = ColumnStatistics(is))
     this
   }
 }
@@ -194,7 +203,7 @@ private[oap] class ColumnMeta(
     val encoding: Encoding,
     val dictionaryDataLength: Int,
     val dictionaryIdSize: Int,
-    val statistics: ColumnStatistics) {}
+    val fileStatistics: ColumnStatistics) {}
 
 private[oap] object ColumnMeta {
 
@@ -204,9 +213,9 @@ private[oap] object ColumnMeta {
     val dictionaryDataLength = in.readInt()
     val dictionaryIdSize = in.readInt()
 
-    val statistics = ColumnStatistics(in)
+    val fileStatistics = ColumnStatistics(in)
 
-    new ColumnMeta(encoding, dictionaryDataLength, dictionaryIdSize, statistics)
+    new ColumnMeta(encoding, dictionaryDataLength, dictionaryIdSize, fileStatistics)
   }
 
   def unapply(columnMeta: ColumnMeta): Option[Array[Byte]] = {
@@ -217,7 +226,7 @@ private[oap] object ColumnMeta {
     out.writeInt(columnMeta.dictionaryDataLength)
     out.writeInt(columnMeta.dictionaryIdSize)
 
-    columnMeta.statistics match {
+    columnMeta.fileStatistics match {
       case ColumnStatistics(bytes) => out.write(bytes)
     }
 
@@ -225,14 +234,14 @@ private[oap] object ColumnMeta {
   }
 }
 
-private[oap] class OapDataFileHandle(
+private[oap] class OapDataFileMeta(
     var rowGroupsMeta: ArrayBuffer[RowGroupMeta] = new ArrayBuffer[RowGroupMeta](),
     var columnsMeta: ArrayBuffer[ColumnMeta] = new ArrayBuffer[ColumnMeta](),
     var rowCountInEachGroup: Int = 0,
     var rowCountInLastGroup: Int = 0,
     var groupCount: Int = 0,
     var fieldCount: Int = 0,
-    var codec: CompressionCodec = CompressionCodec.UNCOMPRESSED) extends DataFileHandle {
+    var codec: CompressionCodec = CompressionCodec.UNCOMPRESSED) extends DataFileMeta {
   private var _fin: FSDataInputStream = _
   private var _len: Long = 0
 
@@ -250,22 +259,22 @@ private[oap] class OapDataFileHandle(
     }
   }
 
-  def appendRowGroupMeta(meta: RowGroupMeta): OapDataFileHandle = {
+  def appendRowGroupMeta(meta: RowGroupMeta): OapDataFileMeta = {
     this.rowGroupsMeta.append(meta)
     this
   }
 
-  def appendColumnMeta(meta: ColumnMeta): OapDataFileHandle = {
+  def appendColumnMeta(meta: ColumnMeta): OapDataFileMeta = {
     this.columnsMeta.append(meta)
     this
   }
 
-  def withRowCountInLastGroup(count: Int): OapDataFileHandle = {
+  def withRowCountInLastGroup(count: Int): OapDataFileMeta = {
     this.rowCountInLastGroup = count
     this
   }
 
-  def withGroupCount(count: Int): OapDataFileHandle = {
+  def withGroupCount(count: Int): OapDataFileMeta = {
     this.groupCount = count
     this
   }
@@ -296,20 +305,20 @@ private[oap] class OapDataFileHandle(
     os.writeInt((endPos - startPos).toInt)
   }
 
-  def read(is: FSDataInputStream, fileLen: Long): OapDataFileHandle = is.synchronized {
+  def read(is: FSDataInputStream, fileLen: Long): OapDataFileMeta = is.synchronized {
     this._fin = is
     this._len = fileLen
 
-    val oapDataFileHandleLengthIndex = fileLen - 4
+    val oapDataFileMetaLengthIndex = fileLen - 4
 
-    // seek to the position of data file handle length
-    is.seek(oapDataFileHandleLengthIndex)
-    val oapDataFileHandleLength = is.readInt()
+    // seek to the position of data file meta length
+    is.seek(oapDataFileMetaLengthIndex)
+    val oapDataFileMetaLength = is.readInt()
 
-    // read all bytes of data file handle
-    val metaBytes = new Array[Byte](oapDataFileHandleLength)
+    // read all bytes of data file meta
+    val metaBytes = new Array[Byte](oapDataFileMetaLength)
 
-    is.readFully(oapDataFileHandleLengthIndex - oapDataFileHandleLength, metaBytes)
+    is.readFully(oapDataFileMetaLengthIndex - oapDataFileMetaLength, metaBytes)
 
     val in = new DataInputStream(new ByteArrayInputStream(metaBytes))
 

@@ -95,9 +95,9 @@ object FileSourceStrategy extends Strategy with Logging {
           if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
           val oapFileFormat = new OapFileFormat
           oapFileFormat
-            .initialize(_fsRelation.sparkSession,
+            .init(_fsRelation.sparkSession,
               _fsRelation.options,
-              selectedPartitions.flatMap(p => p.files).toSeq)
+              selectedPartitions.flatMap(p => p.files))
 
           if (oapFileFormat.hasAvailableIndex(normalizedFilters)) {
             logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
@@ -115,14 +115,17 @@ object FileSourceStrategy extends Strategy with Logging {
 
           } else {
             logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
-            _fsRelation.fileFormat.initialize(_fsRelation.sparkSession, _fsRelation.options,
-              selectedPartitions.flatMap(p => p.files))
             _fsRelation
           }
 
-        case _: FileFormat =>
-          _fsRelation.fileFormat.initialize(_fsRelation.sparkSession, _fsRelation.options,
+        case _: OapFileFormat =>
+          _fsRelation.fileFormat.asInstanceOf[OapFileFormat].init(
+            _fsRelation.sparkSession,
+            _fsRelation.options,
             selectedPartitions.flatMap(p => p.files))
+          _fsRelation
+
+        case _: FileFormat =>
           _fsRelation
       }
 

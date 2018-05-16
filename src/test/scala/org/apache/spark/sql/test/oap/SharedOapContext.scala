@@ -20,6 +20,7 @@ package org.apache.spark.sql.test.oap
 import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.FileSystem
 
 import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.oap.{IndexType, OapFileFormat}
@@ -105,6 +106,21 @@ trait SharedOapContextBase extends SharedSQLContext {
             .mkString(" partition (", ",", ")")
           spark.sql(s"$baseSql $partitionPart")
         }
+      }
+    }
+  }
+
+  /**
+   * Creates a FileSystem , which is then passed to `f` and will be closed after `f` returns.
+   */
+  protected def withFileSystem(f: FileSystem => Unit): Unit = {
+    var fs: FileSystem = null
+    try {
+      fs = FileSystem.get(configuration)
+      f(fs)
+    } finally {
+      if (fs != null) {
+        fs.close()
       }
     }
   }

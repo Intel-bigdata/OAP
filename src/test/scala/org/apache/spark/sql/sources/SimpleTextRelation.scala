@@ -37,7 +37,10 @@ import org.apache.spark.util.SerializableConfiguration
 class SimpleTextSource extends TextBasedFileFormat with DataSourceRegister {
   override def shortName(): String = "test"
 
-  override def inferSchema: Option[StructType] = {
+  override def inferSchema(
+      sparkSession: SparkSession,
+      options: Map[String, String],
+      files: Seq[FileStatus]): Option[StructType] = {
     Some(DataType.fromJson(options("dataSchema")).asInstanceOf[StructType])
   }
 

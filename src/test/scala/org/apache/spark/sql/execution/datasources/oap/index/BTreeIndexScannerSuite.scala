@@ -17,6 +17,10 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
+import org.apache.spark.memory.{TestMemoryManager, TaskMemoryManager}
+import org.apache.spark.metrics.MetricsSystem
+import org.apache.spark.{SparkConf, SecurityManager, TaskContextImpl, TaskContext}
+
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.fs.Path
@@ -32,8 +36,26 @@ import org.apache.spark.util.Utils
 class BTreeIndexScannerSuite extends SharedOapContext {
 
   // Override afterEach because we do not want to check open streams
-  override def beforeEach(): Unit = {}
-  override def afterEach(): Unit = {}
+  override def beforeEach(): Unit = {
+    // set TaskContext for external sorter
+    val conf = new SparkConf()
+    TaskContext.setTaskContext(
+      new TaskContextImpl(
+        0,
+        0,
+        0,
+        0,
+        new TaskMemoryManager(new TestMemoryManager(conf), 0),
+        null,
+        MetricsSystem.createMetricsSystem(
+          "BTreeRecordReaderWriterSuite",
+          conf,
+          new SecurityManager(conf))))
+  }
+  override def afterEach(): Unit = {
+    TaskContext.get().asInstanceOf[TaskContextImpl].markTaskCompleted()
+    TaskContext.unset()
+  }
 
   test("test rowOrdering") {
     // Only check Integer is enough. We use [[GenerateOrdering]] to handle different data types.

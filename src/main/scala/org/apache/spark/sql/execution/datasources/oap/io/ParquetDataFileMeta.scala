@@ -24,9 +24,9 @@ import org.apache.parquet.format.converter.ParquetMetadataConverter._
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.metadata.ParquetMetadata
 
-private[oap] class ParquetDataFileHandle(val footer: ParquetMetadata) extends DataFileHandle {
+private[oap] class ParquetDataFileMeta(val footer: ParquetMetadata) extends DataFileMeta {
 
-  require(footer != null, "footer of ParquetDataFileHandle should not be null.")
+  require(footer != null, "footer of ParquetDataFileMeta should not be null.")
 
   def this(conf: Configuration, path: String) {
     this(ParquetFileReader.readFooter(conf, new Path(StringUtils.unEscapeString(path)), NO_FILTER))

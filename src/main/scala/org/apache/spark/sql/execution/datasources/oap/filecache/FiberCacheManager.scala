@@ -29,7 +29,6 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
-import org.apache.spark.sql.oap.rpc.OapRpcManagerSlave
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
 
@@ -132,7 +131,7 @@ object FiberCacheManager extends Logging {
   // Used by test suite
   private[oap] def clearAllFibers(): Unit = cacheBackend.cleanUp
 
-  // TODO: test case, consider data eviction, try not use DataFileHandle which my be costly
+  // TODO: test case, consider data eviction, try not use DataFileMeta which my be costly
   private[sql] def status(): String = {
     logDebug(s"Reporting ${cacheBackend.cacheCount} fibers to the master")
     val dataFibers = cacheBackend.getFibers.collect {
@@ -149,7 +148,7 @@ object FiberCacheManager extends Logging {
     // The final bit set is: 010010001
     val statusRawData = dataFibers.groupBy(_.file).map {
       case (dataFile, fiberSet) =>
-        val fileMeta: DataFileHandle = DataFileHandleCacheManager(dataFile)
+        val fileMeta: DataFileMeta = DataFileMetaCacheManager(dataFile)
         val fiberBitSet = new BitSet(fileMeta.getGroupCount * fileMeta.getFieldCount)
         fiberSet.foreach(fiber =>
           fiberBitSet.set(fiber.columnIndex + fileMeta.getFieldCount * fiber.rowGroupId))
@@ -175,7 +174,7 @@ object FiberCacheManager extends Logging {
   }
 }
 
-private[oap] object DataFileHandleCacheManager extends Logging {
+private[oap] object DataFileMetaCacheManager extends Logging {
   type ENTRY = DataFile
 
   private val _cacheSize: AtomicLong = new AtomicLong(0)
@@ -187,25 +186,25 @@ private[oap] object DataFileHandleCacheManager extends Logging {
       .newBuilder()
       .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
       .expireAfterAccess(1000, TimeUnit.SECONDS) // auto expire after 1000 seconds.
-      .removalListener(new RemovalListener[ENTRY, DataFileHandle]() {
-        override def onRemoval(n: RemovalNotification[ENTRY, DataFileHandle])
+      .removalListener(new RemovalListener[ENTRY, DataFileMeta]() {
+        override def onRemoval(n: RemovalNotification[ENTRY, DataFileMeta])
         : Unit = {
-          logDebug(s"Evicting Data File Handle ${n.getKey.path}")
+          logDebug(s"Evicting Data File Meta ${n.getKey.path}")
           _cacheSize.addAndGet(-n.getValue.len)
           n.getValue.close
         }
       })
-      .build[ENTRY, DataFileHandle](new CacheLoader[ENTRY, DataFileHandle]() {
+      .build[ENTRY, DataFileMeta](new CacheLoader[ENTRY, DataFileMeta]() {
         override def load(entry: ENTRY)
-        : DataFileHandle = {
-          logDebug(s"Loading Data File Handle ${entry.path}")
-          val handle = entry.createDataFileHandle()
-          _cacheSize.addAndGet(handle.len)
-          handle
+        : DataFileMeta = {
+          logDebug(s"Loading Data File Meta ${entry.path}")
+          val meta = entry.getDataFileMeta()
+          _cacheSize.addAndGet(meta.len)
+          meta
         }
       })
 
-  def apply(fiberCache: DataFile): DataFileHandle = {
+  def apply(fiberCache: DataFile): DataFileMeta = {
     cache.get(fiberCache)
   }
 }

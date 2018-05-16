@@ -15,25 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.oap.index
+package org.apache.spark.sql.oap
 
-import java.io.OutputStream
+import org.apache.spark.sql.execution.datasources.oap.OapMetricsManager
+import org.apache.spark.sql.oap.rpc.OapRpcManager
 
-private[index] trait IndexFileWriter {
-
-  protected def os: OutputStream
-
-  def getName: String
-
-  def write(bytes: Array[Byte]): Unit = os.write(bytes)
-
-  def writeInt(value: Int): Unit = IndexUtils.writeInt(os, value)
-
-  def writeLong(value: Long): Unit = IndexUtils.writeLong(os, value)
-
-  def writeRowId(tempWriter: IndexFileWriter): Unit = {}
-
-  def close(): Unit = os.close()
-
-  def tempRowIdWriter(): IndexFileWriter = null
+/**
+ * This is to hold OAP-specific xxManagers in SparkEnv, so as to bring more convenience for
+ * developers
+ */
+class OapManager(val rpcManager: OapRpcManager, val metricsManager: OapMetricsManager) {
+  def stop(): Unit = {
+    rpcManager.stop()
+  }
 }

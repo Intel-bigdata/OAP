@@ -42,7 +42,6 @@ class ClusteredFilterSuite
     sqlContext.dropTempTable("oap_test")
   }
 
-
   test("filtering") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")

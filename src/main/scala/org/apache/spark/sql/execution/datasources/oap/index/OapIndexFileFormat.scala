@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
+import org.apache.hadoop.fs.FileStatus
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.parquet.hadoop.util.ContextUtil
 
@@ -31,7 +32,10 @@ private[index] class OapIndexFileFormat
   with Logging
   with Serializable {
 
-  override def inferSchema: Option[StructType] = None
+  override def inferSchema(
+      sparkSession: SparkSession,
+      options: Map[String, String],
+      files: Seq[FileStatus]): Option[StructType] = None
 
   /**
    * Prepares a write job and returns an [[OutputWriterFactory]].  Client side job preparation can

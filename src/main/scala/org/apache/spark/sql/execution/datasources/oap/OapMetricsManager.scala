@@ -21,7 +21,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataReader
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 
-private[sql] class OapMetrics extends Serializable {
+private[spark] class OapMetricsManager extends Serializable {
   /**
    * 4 kinds of Tasks and 5 kinds of Rows:
    *   1.skipForStatisticTasks
@@ -49,19 +49,19 @@ private[sql] class OapMetrics extends Serializable {
 
   def initMetrics(metrics: Map[String, SQLMetric]): Unit = {
     // set task-level Accumulator
-    _totalTasks = Some(metrics(OapMetrics.totalTasksName))
-    _skipForStatisticTasks = Some(metrics(OapMetrics.skipForStatisticTasksName))
-    _hitIndexTasks = Some(metrics(OapMetrics.hitIndexTaskName))
-    _ignoreIndexTasks = Some(metrics(OapMetrics.ignoreIndexTasksName))
-    _missIndexTasks = Some(metrics(OapMetrics.missIndexTasksName))
+    _totalTasks = Some(metrics(OapMetricsManager.totalTasksName))
+    _skipForStatisticTasks = Some(metrics(OapMetricsManager.skipForStatisticTasksName))
+    _hitIndexTasks = Some(metrics(OapMetricsManager.hitIndexTaskName))
+    _ignoreIndexTasks = Some(metrics(OapMetricsManager.ignoreIndexTasksName))
+    _missIndexTasks = Some(metrics(OapMetricsManager.missIndexTasksName))
 
     // set row-level Accumulator
-    _totalRows = Some(metrics(OapMetrics.totalRowsName))
-    _rowsSkippedForStatistic = Some(metrics(OapMetrics.rowsSkippedForStatisticName))
-    _rowsReadWhenHitIndex = Some(metrics(OapMetrics.rowsReadWhenHitIndexName))
-    _rowsSkippedWhenHitIndex = Some(metrics(OapMetrics.rowsSkippedWhenHitIndexName))
-    _rowsReadWhenIgnoreIndex = Some(metrics(OapMetrics.rowsReadWhenIgnoreIndexName))
-    _rowsReadWhenMissIndex = Some(metrics(OapMetrics.rowsReadWhenMissIndexName))
+    _totalRows = Some(metrics(OapMetricsManager.totalRowsName))
+    _rowsSkippedForStatistic = Some(metrics(OapMetricsManager.rowsSkippedForStatisticName))
+    _rowsReadWhenHitIndex = Some(metrics(OapMetricsManager.rowsReadWhenHitIndexName))
+    _rowsSkippedWhenHitIndex = Some(metrics(OapMetricsManager.rowsSkippedWhenHitIndexName))
+    _rowsReadWhenIgnoreIndex = Some(metrics(OapMetricsManager.rowsReadWhenIgnoreIndexName))
+    _rowsReadWhenMissIndex = Some(metrics(OapMetricsManager.rowsReadWhenMissIndexName))
   }
 
   def totalTasks: Option[SQLMetric] = _totalTasks
@@ -117,7 +117,7 @@ private[sql] class OapMetrics extends Serializable {
   }
 }
 
-private[sql] object OapMetrics {
+private[sql] object OapMetricsManager {
   val totalTasksName = "totalTasks"
   val skipForStatisticTasksName = "skipForStatisticTasks"
   val hitIndexTaskName = "hitIndexTasks"

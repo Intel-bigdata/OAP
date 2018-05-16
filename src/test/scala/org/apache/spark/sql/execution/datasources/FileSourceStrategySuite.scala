@@ -594,7 +594,10 @@ class TestFileFormat extends TextBasedFileFormat {
    * does not support inference, or no valid files are given should return None.  In these cases
    * Spark will require that user specify the schema manually.
    */
-  override def inferSchema: Option[StructType] =
+  override def inferSchema(
+      sparkSession: SparkSession,
+      options: Map[String, String],
+      files: Seq[FileStatus]): Option[StructType] =
     Some(
       StructType(Nil)
           .add("c1", IntegerType)

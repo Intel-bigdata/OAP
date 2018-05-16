@@ -32,7 +32,7 @@ class DataFileSuite extends QueryTest with SharedOapContext {
     val path = Utils.createTempDir().getAbsolutePath
   }
 
-  // Override afterEach because OapDataFile will open a InputStream for OapDataFileHandle
+  // Override afterEach because OapDataFile will open a InputStream for OapDataFileMeta
   // but no method to manual close it and we can not to check open streams.
   override def afterEach(): Unit = {}
 

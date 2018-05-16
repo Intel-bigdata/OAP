@@ -182,11 +182,7 @@ case class DataSource(
       val equality = sparkSession.sessionState.conf.resolver
       StructType(schema.filterNot(f => partitionSchema.exists(p => equality(p.name, f.name))))
     }.orElse {
-      format.initialize(
-        sparkSession,
-        caseInsensitiveOptions,
-        tempFileIndex.allFiles()
-        ).inferSchema
+      format.inferSchema(sparkSession, caseInsensitiveOptions, tempFileIndex.allFiles())
     }.getOrElse {
       throw new AnalysisException(
         s"Unable to infer schema for $format. It must be specified manually.")
@@ -346,9 +342,8 @@ case class DataSource(
           if hasMetadata(caseInsensitiveOptions.get("path").toSeq ++ paths) =>
         val basePath = new Path((caseInsensitiveOptions.get("path").toSeq ++ paths).head)
         val fileCatalog = new MetadataLogFileIndex(sparkSession, basePath)
-        format.initialize(sparkSession, caseInsensitiveOptions, fileCatalog.allFiles())
         val dataSchema = userSpecifiedSchema.orElse {
-          format.inferSchema
+          format.inferSchema(sparkSession, caseInsensitiveOptions, fileCatalog.allFiles())
         }.getOrElse {
           throw new AnalysisException(
             s"Unable to infer schema for $format at ${fileCatalog.allFiles().mkString(",")}. " +

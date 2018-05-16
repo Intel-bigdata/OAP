@@ -20,13 +20,13 @@ package org.apache.spark.sql.execution.datasources.oap.utils
 import scala.util.control.Breaks._
 
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, WrappedFiberCache}
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 
 // Oap Bitmap Scanner will use below class to directly traverse the row IDs
 // in fiber caches while keeping compatible with Roaring Bitmap format.
 // It doesn't need to create the roaring bitmap object on heap any more.
 // The spec link is https://github.com/RoaringBitmap/RoaringFormatSpec/
-private[oap] class OapBitmapWrappedFiberCache(fc: FiberCache) extends WrappedFiberCache(fc) {
+private[oap] class OapBitmapWrappedFiberCache(fc: FiberCache) {
 
   private var chunkLength: Int = 0
   // It indicates no this section.
@@ -90,6 +90,8 @@ private[oap] class OapBitmapWrappedFiberCache(fc: FiberCache) extends WrappedFib
       ((fc.getByte(curPos + 1) & 0xFF) << 8) |
       (fc.getByte(curPos) & 0xFF)
   }
+
+  def release(): Unit = fc.release
 
   def getShort(): Short = {
     val curPos = curOffset

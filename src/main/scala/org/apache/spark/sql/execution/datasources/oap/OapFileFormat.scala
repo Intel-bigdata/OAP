@@ -19,21 +19,19 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import java.net.URI
 
-import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 
-import org.apache.spark.TaskContext
+import org.apache.spark.{SparkEnv, TaskContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Expression, JoinedRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateOrdering, GenerateUnsafeProjection}
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileHandleCacheManager
+import org.apache.spark.sql.execution.datasources.oap.filecache.DataFileMetaCacheManager
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, OapUtils}
@@ -48,13 +46,20 @@ private[sql] class OapFileFormat extends FileFormat
   with Logging
   with Serializable {
 
-  val oapMetrics = new OapMetrics
+  val oapMetrics = SparkEnv.get.oapManager.metricsManager
 
-  override def initialize(
+  private var initialized = false
+  @transient protected var options: Map[String, String] = _
+  @transient protected var sparkSession: SparkSession = _
+  @transient protected var files: Seq[FileStatus] = _
+
+  def init(
       sparkSession: SparkSession,
       options: Map[String, String],
       files: Seq[FileStatus]): FileFormat = {
-    super.initialize(sparkSession, options, files)
+    this.sparkSession = sparkSession
+    this.options = options
+    this.files = files
 
     val hadoopConf = sparkSession.sparkContext.hadoopConfiguration
     // TODO
@@ -74,8 +79,19 @@ private[sql] class OapFileFormat extends FileFormat
 
     // OapFileFormat.serializeDataSourceMeta(hadoopConf, meta)
     inferSchema = meta.map(_.schema)
+    initialized = true
 
     this
+  }
+
+  override def inferSchema(
+      sparkSession: SparkSession,
+      options: Map[String, String],
+      files: Seq[FileStatus]): Option[StructType] = {
+    if (!initialized) {
+      init(sparkSession, options, files)
+    }
+    inferSchema
   }
 
   // TODO inferSchema could be lazy computed
@@ -188,68 +204,6 @@ private[sql] class OapFileFormat extends FileFormat
           checkAttribute(filter)
         }
 
-        def order(sf: StructField): Ordering[Key] = GenerateOrdering.create(StructType(Array(sf)))
-        def canSkipFile(
-            columnStats: ArrayBuffer[ColumnStatistics],
-            filter: Filter,
-            schema: StructType): Boolean = filter match {
-          case Or(left, right) =>
-            canSkipFile(columnStats, left, schema) && canSkipFile(columnStats, right, schema)
-          case And(left, right) =>
-            canSkipFile(columnStats, left, schema) || canSkipFile(columnStats, right, schema)
-          case IsNotNull(attribute) =>
-            val idx = schema.fieldIndex(attribute)
-            val stat = columnStats(idx)
-            !stat.hasNonNullValue
-          case EqualTo(attribute, handle) =>
-            val key = OapUtils.keyFromAny(handle)
-            val idx = schema.fieldIndex(attribute)
-            val stat = columnStats(idx)
-            val comp = order(schema(idx))
-            (OapUtils.keyFromBytes(stat.min, schema(idx).dataType), OapUtils.keyFromBytes(
-              stat.max, schema(idx).dataType)) match {
-              case (Some(v1), Some(v2)) => comp.gt(v1, key) || comp.lt(v2, key)
-              case _ => false
-            }
-          case LessThan(attribute, handle) =>
-            val key = OapUtils.keyFromAny(handle)
-            val idx = schema.fieldIndex(attribute)
-            val stat = columnStats(idx)
-            val comp = order(schema(idx))
-            OapUtils.keyFromBytes(stat.min, schema(idx).dataType) match {
-              case Some(v) => comp.gteq(v, key)
-              case None => false
-            }
-          case LessThanOrEqual(attribute, handle) =>
-            val key = OapUtils.keyFromAny(handle)
-            val idx = schema.fieldIndex(attribute)
-            val stat = columnStats(idx)
-            val comp = order(schema(idx))
-            OapUtils.keyFromBytes(stat.min, schema(idx).dataType) match {
-              case Some(v) => comp.gt(v, key)
-              case None => false
-            }
-          case GreaterThan(attribute, handle) =>
-            val key = OapUtils.keyFromAny(handle)
-            val idx = schema.fieldIndex(attribute)
-            val stat = columnStats(idx)
-            val comp = order(schema(idx))
-            OapUtils.keyFromBytes(stat.max, schema(idx).dataType) match {
-              case Some(v) => comp.lteq(v, key)
-              case None => false
-            }
-          case GreaterThanOrEqual(attribute, handle) =>
-            val key = OapUtils.keyFromAny(handle)
-            val idx = schema.fieldIndex(attribute)
-            val stat = columnStats(idx)
-            val comp = order(schema(idx))
-            OapUtils.keyFromBytes(stat.max, schema(idx).dataType) match {
-              case Some(v) => comp.lt(v, key)
-              case None => false
-            }
-          case _ => false
-        }
-
         val ic = new IndexContext(m)
 
         if (m.indexMetas.nonEmpty) { // check and use index
@@ -282,12 +236,14 @@ private[sql] class OapFileFormat extends FileFormat
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
         val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
 
-        // refer to ParquetFileFormat, use resultSchema to decide if this query support
-        // Vectorized Read and returningBatch.
+        // Refer to ParquetFileFormat, use resultSchema to decide if this query support
+        // Vectorized Read and returningBatch. Also it depends on WHOLE_STAGE_CODE_GEN,
+        // as the essential unsafe projection is done by that.
         val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
         val enableVectorizedReader: Boolean =
           m.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
           sparkSession.sessionState.conf.parquetVectorizedReaderEnabled &&
+          sparkSession.sessionState.conf.wholeStageEnabled &&
           resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
         val returningBatch = supportBatch(sparkSession, resultSchema)
         val parquetDataCacheEnable = sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
@@ -298,14 +254,14 @@ private[sql] class OapFileFormat extends FileFormat
           assert(file.partitionValues.numFields == partitionSchema.size)
           val conf = broadcastedHadoopConf.value.value
 
-          def canSkipByDataFileStatistics: Boolean = {
+          def isSkippedByFile: Boolean = {
             if (m.dataReaderClassName == OapFileFormat.OAP_DATA_FILE_CLASSNAME) {
               val dataFile = DataFile(file.filePath, m.schema, m.dataReaderClassName, conf)
-              val dataFileHandle =
-                DataFileHandleCacheManager(dataFile).asInstanceOf[OapDataFileHandle]
-              if (filters.exists(filter =>
-                canSkipFile(dataFileHandle.columnsMeta.map(_.statistics), filter, m.schema))) {
-                val totalRows = dataFileHandle.totalRowCount()
+              val dataFileMeta = DataFileMetaCacheManager(dataFile)
+                  .asInstanceOf[OapDataFileMeta]
+              if (filters.exists(filter => isSkippedByStatistics(
+                  dataFileMeta.columnsMeta.map(_.fileStatistics).toArray, filter, m.schema))) {
+                val totalRows = dataFileMeta.totalRowCount()
                 oapMetrics.updateTotalRows(totalRows)
                 oapMetrics.skipForStatistic(totalRows)
                 return true
@@ -314,7 +270,7 @@ private[sql] class OapFileFormat extends FileFormat
             false
           }
 
-          if (canSkipByDataFileStatistics) {
+          if (isSkippedByFile) {
             Iterator.empty
           } else {
             OapIndexInfo.partitionOapIndex.put(file.filePath, false)
@@ -329,7 +285,7 @@ private[sql] class OapFileFormat extends FileFormat
             }
             val reader = new OapDataReader(
               new Path(new URI(file.filePath)), m, filterScanners, requiredIds, context)
-            val iter = reader.initialize(conf, options)
+            val iter = reader.initialize(conf, options, filters)
             Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
             val totalRows = reader.totalRows()
             oapMetrics.updateTotalRows(totalRows)
@@ -521,8 +477,11 @@ private[oap] class OapOutputWriter(
     writer.write(row)
   }
 
-  override def close(): WriteResult = {
+  override def close(): Unit = {
     writer.close()
+  }
+
+  override def writeStatus(): WriteResult = {
     OapWriteResult(dataFileName, rowCount, partitionString)
   }
 

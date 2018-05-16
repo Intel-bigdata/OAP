@@ -87,7 +87,13 @@ abstract class OutputWriter {
    * Closes the [[OutputWriter]]. Invoked on the executor side after all rows are persisted, before
    * the task output is committed.
    */
-  def close(): WriteResult
+  def close(): Unit
+
+  /**
+   * This is to collect data for meta when OAP writing or index writing.
+   * Can be replaced with datasource v2 api from Spark 2.3
+   */
+  def writeStatus(): WriteResult = { }
 
   private var converter: InternalRow => Row = _
 
