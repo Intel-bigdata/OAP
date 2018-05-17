@@ -123,8 +123,8 @@ private[oap] case class ParquetDataFile(
        requiredColumnIds: Array[Int],
        rowIds: Option[Array[Int]]): OapIterator[InternalRow] = {
     val iterator = rowIds match {
-      case Some(ids) => buildIndexedIterator(new BatchColumn(), conf, requiredColumnIds, ids)
-      case None => buildFullScanIterator(new BatchColumn(), conf, requiredColumnIds)
+      case Some(ids) => buildIndexedIterator(conf, requiredColumnIds, ids)
+      case None => buildFullScanIterator(conf, requiredColumnIds)
     }
     new OapIterator[InternalRow](iterator) {
       override def close(): Unit = {
@@ -204,9 +204,9 @@ private[oap] case class ParquetDataFile(
   }
 
   private def buildFullScanIterator(
-      rows: BatchColumn,
       conf: Configuration,
       requiredColumnIds: Array[Int]): Iterator[InternalRow] = {
+    val rows = new BatchColumn()
     val footer = meta.footer.toParquetMetadata
     footer.getBlocks.asScala.iterator.flatMap { rowGroupMeta =>
       val orderedBlockMetaData = rowGroupMeta.asInstanceOf[OrderedBlockMetaData]
@@ -218,10 +218,10 @@ private[oap] case class ParquetDataFile(
   }
 
   private def buildIndexedIterator(
-      rows: BatchColumn,
       conf: Configuration,
       requiredColumnIds: Array[Int],
       rowIds: Array[Int]): Iterator[InternalRow] = {
+    val rows = new BatchColumn()
     val footer = meta.footer.toParquetMetadata(rowIds)
     footer.getBlocks.asScala.iterator.flatMap { rowGroupMeta =>
       val indexedBlockMetaData = rowGroupMeta.asInstanceOf[IndexedBlockMetaData]
