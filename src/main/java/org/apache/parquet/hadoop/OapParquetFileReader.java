@@ -18,6 +18,7 @@ package org.apache.parquet.hadoop;
 
 import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 
@@ -33,7 +34,7 @@ import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.parquet.schema.MessageType;
 
-public class OapParquetFileReader {
+public class OapParquetFileReader implements Closeable {
 
   private ParquetFileReader reader;
   private int currentBlock = 0;
@@ -73,6 +74,7 @@ public class OapParquetFileReader {
     return this.reader.getRowGroups();
   }
 
+  @Override
   public void close() throws IOException {
     this.reader.close();
   }
