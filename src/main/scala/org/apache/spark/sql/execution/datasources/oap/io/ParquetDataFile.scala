@@ -23,7 +23,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.hadoop._
 import org.apache.parquet.hadoop.api.RecordReader
@@ -51,6 +51,7 @@ private[oap] case class ParquetDataFile(
   private val parquetDataCacheEnable =
     configuration.getBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key,
       OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.defaultValue.get)
+  private var inputStream: FSDataInputStream = null;
 
   private val inUseFiberCache = new Array[FiberCache](schema.length)
 
@@ -67,6 +68,9 @@ private[oap] case class ParquetDataFile(
   }
   def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
     var reader: SingleGroupOapRecordReader = null
+    if (inputStream == null) {
+      inputStream = file.getFileSystem(configuration).open(file)
+    }
     try {
       val conf = new Configuration(configuration)
       val rowGroupRowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
@@ -75,7 +79,7 @@ private[oap] case class ParquetDataFile(
       // the minimum unit of cache is one column of one group.
       addRequestSchemaToConf(conf, Array(fiberId))
       reader = new SingleGroupOapRecordReader(file, conf, meta.footer, groupId, rowGroupRowCount)
-      reader.initialize()
+      reader.initialize(inputStream)
       reader.initBatch()
       reader.enableReturningBatches()
       val unitLength = schema(fiberId).dataType match {
@@ -211,6 +215,9 @@ private[oap] case class ParquetDataFile(
       override def close(): Unit = {
         // To ensure if any exception happens, caches are still released after calling close()
         inUseFiberCache.indices.foreach(release)
+        if (inputStream != null) {
+          inputStream.close();
+        }
       }
     }
   }

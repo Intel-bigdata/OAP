@@ -107,7 +107,6 @@ object FiberCacheManager extends Logging {
 
   def get(fiber: Fiber, conf: Configuration): FiberCache = {
     logDebug(s"Getting Fiber: $fiber")
-    cacheBackend.getIfPresent()
     cacheBackend.get(fiber, conf)
   }
 

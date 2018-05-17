@@ -24,6 +24,7 @@ import java.util.List;
 
 import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
@@ -56,8 +57,7 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
    * @throws IOException
    * @throws InterruptedException
    */
-  @Override
-  public void initialize() throws IOException, InterruptedException {
+  public void initialize(FSDataInputStream inputStream) throws IOException, InterruptedException {
     if (this.footer == null) {
       footer = readFooter(configuration, file, NO_FILTER);
     }
@@ -65,7 +65,7 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
     inputBlockList.add(footer.getBlocks().get(blockId));
     ParquetMetadata meta = new ParquetMetadata(footer.getFileMetaData(), inputBlockList);
     // need't do filterRowGroups.
-    initialize(meta, configuration, false, null);
+    initialize(meta, configuration, false, inputStream);
     super.initializeInternal();
   }
 
