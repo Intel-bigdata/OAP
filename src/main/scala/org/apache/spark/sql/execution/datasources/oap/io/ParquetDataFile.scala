@@ -206,11 +206,10 @@ private[oap] case class ParquetDataFile(
   private def buildFullScanIterator(
       conf: Configuration,
       requiredColumnIds: Array[Int]): Iterator[InternalRow] = {
-    val rows = new BatchColumn()
     val footer = meta.footer.toParquetMetadata
     footer.getBlocks.asScala.iterator.flatMap { rowGroupMeta =>
       val orderedBlockMetaData = rowGroupMeta.asInstanceOf[OrderedBlockMetaData]
-      fillDataToBatchColumn(orderedBlockMetaData, rows, conf, requiredColumnIds)
+      val rows = buildBatchColumnFromCache(orderedBlockMetaData, conf, requiredColumnIds)
       val iter = rows.toIterator
       CompletionIterator[InternalRow, Iterator[InternalRow]](
         iter, requiredColumnIds.foreach(release))
@@ -221,11 +220,10 @@ private[oap] case class ParquetDataFile(
       conf: Configuration,
       requiredColumnIds: Array[Int],
       rowIds: Array[Int]): Iterator[InternalRow] = {
-    val rows = new BatchColumn()
     val footer = meta.footer.toParquetMetadata(rowIds)
     footer.getBlocks.asScala.iterator.flatMap { rowGroupMeta =>
       val indexedBlockMetaData = rowGroupMeta.asInstanceOf[IndexedBlockMetaData]
-      fillDataToBatchColumn(indexedBlockMetaData, rows, conf, requiredColumnIds)
+      val rows = buildBatchColumnFromCache(indexedBlockMetaData, conf, requiredColumnIds)
       val iter = indexedBlockMetaData.getNeedRowIds.iterator.
         asScala.map(rowId => rows.moveToRow(rowId))
       CompletionIterator[InternalRow, Iterator[InternalRow]](
@@ -233,23 +231,23 @@ private[oap] case class ParquetDataFile(
     }
   }
 
-  private def fillDataToBatchColumn(
+  private def buildBatchColumnFromCache(
       blockMetaData: OrderedBlockMetaData,
-      rows: BatchColumn,
       conf: Configuration,
-      requiredColumnIds: Array[Int]): Unit = {
+      requiredColumnIds: Array[Int]): BatchColumn = {
+    val rows = new BatchColumn()
     val groupId = blockMetaData.getRowGroupId
     val fiberCacheGroup = requiredColumnIds.map { id =>
       val fiberCache = FiberCacheManager.get(DataFiber(this, id, groupId), conf)
       update(id, fiberCache)
       fiberCache
     }
-
     val rowCount = blockMetaData.getRowCount.toInt
     val columns = fiberCacheGroup.zip(requiredColumnIds).map { case (fiberCache, id) =>
       new ColumnValues(rowCount, schema(id).dataType, fiberCache)
     }
     rows.reset(rowCount, columns)
+    rows
   }
 
   private def addRequestSchemaToConf(conf: Configuration, requiredIds: Array[Int]): Unit = {
