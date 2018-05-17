@@ -122,10 +122,9 @@ private[oap] case class ParquetDataFile(
        conf: Configuration,
        requiredColumnIds: Array[Int],
        rowIds: Option[Array[Int]]): OapIterator[InternalRow] = {
-    val rows = new BatchColumn()
     val iterator = rowIds match {
-      case Some(ids) => buildIndexedIterator(rows, conf, requiredColumnIds, ids)
-      case None => buildFullScanIterator(rows, conf, requiredColumnIds)
+      case Some(ids) => buildIndexedIterator(new BatchColumn(), conf, requiredColumnIds, ids)
+      case None => buildFullScanIterator(new BatchColumn(), conf, requiredColumnIds)
     }
     new OapIterator[InternalRow](iterator) {
       override def close(): Unit = {
