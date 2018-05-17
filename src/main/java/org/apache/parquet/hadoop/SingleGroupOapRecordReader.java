@@ -65,7 +65,7 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
     inputBlockList.add(footer.getBlocks().get(blockId));
     ParquetMetadata meta = new ParquetMetadata(footer.getFileMetaData(), inputBlockList);
     // need't do filterRowGroups.
-    initialize(meta, configuration, false);
+    initialize(meta, configuration, false, null);
     super.initializeInternal();
   }
 
