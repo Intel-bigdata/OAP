@@ -17,12 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.oap.index
 
-
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
 
 import scala.util.Random
-
-import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.{SecurityManager, TaskContext, TaskContextImpl}
 import org.apache.spark.memory.{TaskMemoryManager, TestMemoryManager}
@@ -32,7 +29,8 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, Mem
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
 
-class BTreeRecordReaderWriterV1Suite extends SharedOapContext {
+
+class BTreeRecordReaderWriterV2Suite extends SharedOapContext {
 
   private lazy val random = new Random(0)
   /**
@@ -94,7 +92,6 @@ class BTreeRecordReaderWriterV1Suite extends SharedOapContext {
   private val nullKeyRecords = (1 to 5).map(_ => null)
 
   test("write then read index") {
-    val configuration = new Configuration()
     // Create writer
     val fileWriter = new TestIndexFileWriter()
     val conf = spark.sparkContext.conf
@@ -107,10 +104,10 @@ class BTreeRecordReaderWriterV1Suite extends SharedOapContext {
         new TaskMemoryManager(new TestMemoryManager(conf), 0),
         null,
         MetricsSystem.createMetricsSystem(
-          "BTreeRecordReaderWriterSuiteV1",
+          "BTreeRecordReaderWriterSuiteV2",
           conf,
           new SecurityManager(conf))))
-    val writer = BTreeIndexRecordWriterV1(configuration, fileWriter, schema)
+    val writer = BTreeIndexRecordWriterV2(configuration, fileWriter, schema)
 
     // Write rows
     nonNullKeyRecords.map(InternalRow(_)).foreach(writer.write(null, _))
@@ -122,7 +119,7 @@ class BTreeRecordReaderWriterV1Suite extends SharedOapContext {
 
     // Create reader
     val fileReader = new TestIndexFileReader(indexData)
-    val reader = BTreeIndexRecordReaderV1(configuration, schema, fileReader)
+    val reader = BTreeIndexRecordReaderV2(configuration, schema, fileReader)
     reader.initializeReader()
 
     val allRows = parseIndexData(reader)
@@ -135,7 +132,7 @@ class BTreeRecordReaderWriterV1Suite extends SharedOapContext {
   // Parse index data and restore the record list.
   // Compare it with original ones to verify consistency.
   private def parseIndexData(
-      reader: BTreeIndexRecordReaderV1, debug: Boolean = false): Array[InternalRow] = {
+      reader: BTreeIndexRecordReaderV2, debug: Boolean = false): Array[InternalRow] = {
 
     // Read file meta
     val meta = reader.getFileMeta

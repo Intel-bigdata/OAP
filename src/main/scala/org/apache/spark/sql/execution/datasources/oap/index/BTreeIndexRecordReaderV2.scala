@@ -18,41 +18,47 @@
 package org.apache.spark.sql.execution.datasources.oap.index
 
 import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.filecache._
-import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
+import org.apache.spark.sql.execution.datasources.oap.io.{BytesDecompressor, CodecFactory, IndexFile}
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
-import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
-private[index] case class BTreeIndexRecordReaderV1(
+private[index] case class BTreeIndexRecordReaderV2(
     configuration: Configuration,
     schema: StructType,
     fileReader: IndexFileReader)
   extends BTreeIndexRecordReader(configuration, schema, fileReader) {
 
-  private val META_SIZE = FOOTER_LENGTH_SIZE + ROW_ID_LIST_LENGTH_SIZE
+  private val CODEC_SIZE = IndexUtils.INT_SIZE
+  private val META_SIZE = FOOTER_LENGTH_SIZE + ROW_ID_LIST_LENGTH_SIZE + CODEC_SIZE
 
   protected var footer: BTreeFooter = _
   protected var meta: BTreeMeta = _
+  private var decompressor: BytesDecompressor = _
 
-  protected[index] val rowIdListSizePerSection: Int =
-    configuration.getInt(OapConf.OAP_BTREE_ROW_LIST_PART_SIZE.key, 1024 * 1024)
+  protected[index] def rowIdListSizePerSection: Int = footer.getRowIdListPartSizePerSection
 
   protected[index] def initializeReader(): Unit = {
-    val sectionLengthIndex = fileReader.getLen - FOOTER_LENGTH_SIZE - ROW_ID_LIST_LENGTH_SIZE
-    val sectionLengthBuffer = new Array[Byte](FOOTER_LENGTH_SIZE + ROW_ID_LIST_LENGTH_SIZE)
+    val sectionLengthIndex = fileReader.getLen - META_SIZE
+    val sectionLengthBuffer = new Array[Byte](META_SIZE)
     fileReader.readFully(sectionLengthIndex, sectionLengthBuffer)
     val rowIdListSize = getLongFromBuffer(sectionLengthBuffer, 0)
     val footerSize = getIntFromBuffer(sectionLengthBuffer, ROW_ID_LIST_LENGTH_SIZE)
+    val codecValue =
+      getIntFromBuffer(sectionLengthBuffer, ROW_ID_LIST_LENGTH_SIZE + FOOTER_LENGTH_SIZE)
+    val codec = CompressionCodec.findByValue(codecValue)
     meta = BTreeMetaImpl(fileReader.getLen, footerSize, rowIdListSize)
+    decompressor = new CodecFactory(configuration).getDecompressor(codec)
     footer = readBTreeFooter()
   }
 
   override protected def readData(position: Long, length: Int): Array[Byte] = {
     assert(length <= Int.MaxValue, "Try to read too large index data")
-    fileReader.read(position, length)
+    val bytes = fileReader.read(position, length)
+    IndexUtils.decompressIndexData(decompressor, bytes)
   }
 
   protected[index] def readBTreeFooter(): BTreeFooter = {
@@ -62,21 +68,16 @@ private[index] case class BTreeIndexRecordReaderV1(
   }
 
   protected[index] def readBTreeRowIdList(footer: BTreeFooter, partIdx: Int): BTreeRowIdList = {
-    val partSize = rowIdListSizePerSection.toLong * IndexUtils.INT_SIZE
-    val readLength = if (partIdx * partSize + partSize > meta.rowIdListLength) {
-      meta.rowIdListLength % partSize
-    } else {
-      partSize
-    }
+    val rowIdListPartStart = footer.getRowIdListPartOffset(partIdx)
+    val rowIdListPartSize = footer.getRowIdListPartSize(partIdx)
     val fiberCache = getBTreeFiberCache(
-      meta.rowIdListOffset + partIdx * partSize,
-      readLength.toInt,
+      meta.rowIdListOffset + rowIdListPartStart,
+      rowIdListPartSize,
       rowIdListSectionId, partIdx)
 
     update(rowIdListSectionId, fiberCache)
     BTreeRowIdListImpl(fiberCache)
   }
-
 
   protected[index] def readBTreeNodeData(footer: BTreeFooter, nodeIdx: Int): BTreeNode = {
     val offset = footer.getNodeOffset(nodeIdx)
@@ -98,12 +99,12 @@ private[index] case class BTreeIndexRecordReaderV1(
 
   private[index] case class BTreeFooterImpl(fiberCache: FiberCache, schema: StructType)
       extends BTreeFooter {
-    // TODO move to companion object
     private val nodePosOffset = IndexUtils.INT_SIZE
     private val nodeSizeOffset = IndexUtils.INT_SIZE * 2
     private val minPosOffset = IndexUtils.INT_SIZE * 3
     private val maxPosOffset = IndexUtils.INT_SIZE * 4
-    private val nodeMetaStart = IndexUtils.INT_SIZE * 4
+    private val rowIdListPartStart = IndexUtils.INT_SIZE * 6
+    private val nodeMetaStart = rowIdListPartStart + getRowIdListPartCount * IndexUtils.INT_SIZE * 2
     private val nodeMetaByteSize = IndexUtils.INT_SIZE * 5
     private val statsLengthSize = IndexUtils.INT_SIZE
 
@@ -115,7 +116,17 @@ private[index] case class BTreeIndexRecordReaderV1(
 
     def getNullKeyRecordCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 2)
 
-    def getNodesCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 3)
+    def getRowIdListPartCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 3)
+
+    def getRowIdListPartSizePerSection: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 4)
+
+    def getNodesCount: Int = fiberCache.getInt(IndexUtils.INT_SIZE * 5)
+
+    def getRowIdListPartOffset(idx: Int): Int =
+      fiberCache.getInt(rowIdListPartStart + idx * IndexUtils.INT_SIZE * 2)
+
+    def getRowIdListPartSize(idx: Int): Int =
+      fiberCache.getInt(rowIdListPartStart + idx * IndexUtils.INT_SIZE * 2 + IndexUtils.INT_SIZE)
 
     // get idx Node's max value
     def getMaxValue(idx: Int, schema: StructType): InternalRow =
@@ -147,12 +158,6 @@ private[index] case class BTreeIndexRecordReaderV1(
 
     private def getStatsLength: Int =
       fiberCache.getInt(nodeMetaStart + nodeMetaByteSize * getNodesCount)
-
-    def getRowIdListPartOffset(idx: Int): Int = throw new UnsupportedOperationException()
-
-    def getRowIdListPartSize(idx: Int): Int = throw new UnsupportedOperationException()
-
-    def getRowIdListPartSizePerSection: Int = throw new UnsupportedOperationException()
   }
 
   private[index] case class BTreeRowIdListImpl(fiberCache: FiberCache) extends BTreeRowIdList {

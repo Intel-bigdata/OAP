@@ -38,6 +38,7 @@ private[index] object OapIndexProperties {
     // For every new version, need add pattern match in [[BTreeIndexRecordReader]] and
     // [[BTreeIndexRecordWriter]]
     val OAP_INDEX_V1: IndexVersion = Value(1, "v1")
+    val OAP_INDEX_V2: IndexVersion = Value(2, "v2")
 
     // Same to Enumeration.withName. But re-write the Exception message
     def fromString(name: String): IndexVersion = {

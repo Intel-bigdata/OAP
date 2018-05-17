@@ -90,6 +90,11 @@ private[oap] object MemoryManager extends Logging {
     toFiberCache(bytes)
   }
 
+  // Used by IndexFile. For decompressed data
+  def toIndexFiberCache(bytes: Array[Byte]): FiberCache = {
+    toFiberCache(bytes)
+  }
+
   // Used by OapDataFile since we need to parse the raw data in on-heap memory before put it into
   // off-heap memory
   def toDataFiberCache(bytes: Array[Byte]): FiberCache = {
