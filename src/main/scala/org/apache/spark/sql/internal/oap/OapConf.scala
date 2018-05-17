@@ -103,6 +103,13 @@ object OapConf {
       .booleanConf
       .createWithDefault(false)
 
+  val OAP_FIBERCACHE_USE_OFFHEAP_RATIO =
+    SQLConfigBuilder("spark.sql.oap.fiberCache.use.offheap.ratio")
+      .internal()
+      .doc("Define the ratio of fiber cache use 'spark.memory.offHeap.size' ratio.")
+      .doubleConf
+      .createWithDefault(0.7)
+
   val OAP_COMPRESSION = SQLConfigBuilder("spark.sql.oap.compression.codec")
     .internal()
     .doc("Sets the compression codec use when writing Parquet files. Acceptable values include: " +

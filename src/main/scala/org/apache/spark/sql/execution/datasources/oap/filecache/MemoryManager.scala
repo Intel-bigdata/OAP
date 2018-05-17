@@ -25,6 +25,7 @@ import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.storage.{BlockManager, TestBlockId}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
@@ -52,9 +53,14 @@ private[oap] object MemoryManager extends Logging {
   private val (_cacheMemory, _cacheGuardianMemory) = {
     assert(SparkEnv.get != null, "Oap can't run without SparkContext")
     val memoryManager = SparkEnv.get.memoryManager
-    // TODO: make 0.7 configurable
     assert(memoryManager.maxOffHeapStorageMemory > 0, "Oap can't run without offHeap memory")
-    val oapMemory = (memoryManager.maxOffHeapStorageMemory * 0.7).toLong
+    val useOffHeapRatio = SparkEnv.get.conf.getDouble(
+      OapConf.OAP_FIBERCACHE_USE_OFFHEAP_RATIO.key,
+      OapConf.OAP_FIBERCACHE_USE_OFFHEAP_RATIO.defaultValue.get)
+    logInfo(s"Oap use ${useOffHeapRatio * 100}% of 'spark.memory.offHeap.size' for fiber cache.")
+    assert(useOffHeapRatio > 0 && useOffHeapRatio <1,
+      "OapConf 'spark.sql.oap.fiberCache.use.offheap.ratio' must more than 0 and less than 1.")
+    val oapMemory = (memoryManager.maxOffHeapStorageMemory * useOffHeapRatio).toLong
     if (memoryManager.acquireStorageMemory(
       DUMMY_BLOCK_ID, oapMemory, MemoryMode.OFF_HEAP)) {
       // TODO: make 0.9, 0.1 configurable
