@@ -144,6 +144,7 @@ class OapMetricsSuite extends QueryTest with SharedOapContext with BeforeAndAfte
 
     // hitIndex && rowsRead = 1 && rowsSkipped = 99 && hitIndexTasks = 3
     val fileFormats = getOapFileFormat(df.queryExecution.sparkPlan)
+    println(fileFormats.size)
     fileFormats.foreach(f => assert(f.orNull != null))
     assertAccumulators(fileFormats,
       Some(RowMetrics(100, 0, 1, 99, 0, 0)),

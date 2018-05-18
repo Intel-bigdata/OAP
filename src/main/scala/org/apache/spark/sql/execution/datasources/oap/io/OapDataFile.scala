@@ -138,14 +138,17 @@ private[oap] case class OapDataFile(
     MemoryManager.toDataFiberCache(data)
   }
 
-  private def buildIterator(
-      conf: Configuration,
+  override def iterator(
       requiredIds: Array[Int],
-      rowIds: Option[Array[Int]],
-      filters: Seq[Filter]): OapIterator[InternalRow] = {
+      rowIds: Array[Int] = Array.empty[Int],
+      filters: Seq[Filter] = Nil): OapIterator[InternalRow] = {
     val rows = new BatchColumn()
-    val groupIdToRowIds = rowIds.map(_.groupBy(rowId => rowId / meta.rowCountInEachGroup))
-    val groupIds = groupIdToRowIds.map(_.keys).getOrElse(0 until meta.groupCount)
+    val groupIdToRowIds = rowIds.groupBy(rowId => rowId / meta.rowCountInEachGroup)
+    val groupIds = if (rowIds.isEmpty) {
+      0 until meta.groupCount
+    } else {
+      groupIdToRowIds.keys
+    }
 
     val groupIdsNonSkipped = if (filters.isEmpty) {
       groupIds.iterator
@@ -156,7 +159,7 @@ private[oap] case class OapDataFile(
     val iterator = groupIdsNonSkipped.flatMap {
       groupId =>
         val fiberCacheGroup = requiredIds.map { id =>
-          val fiberCache = FiberCacheManager.get(DataFiber(this, id, groupId), conf)
+          val fiberCache = FiberCacheManager.get(DataFiber(this, id, groupId), configuration)
           update(id, fiberCache)
           fiberCache
         }
@@ -169,11 +172,13 @@ private[oap] case class OapDataFile(
           if (groupId < meta.groupCount - 1) meta.rowCountInEachGroup else meta.rowCountInLastGroup
         rows.reset(rowCount, columns)
 
-        val iter = groupIdToRowIds match {
-          case Some(map) =>
-            map(groupId).iterator.map(rowId => rows.moveToRow(rowId % meta.rowCountInEachGroup))
-          case None => rows.toIterator
+        val iter = if (groupIdToRowIds.isEmpty) {
+          rows.toIterator
+        } else {
+          groupIdToRowIds(groupId).iterator.map(
+            rowId => rows.moveToRow(rowId % meta.rowCountInEachGroup))
         }
+
         CompletionIterator[InternalRow, Iterator[InternalRow]](iter, requiredIds.foreach(release))
     }
     new OapIterator[InternalRow](iterator) {
@@ -183,19 +188,6 @@ private[oap] case class OapDataFile(
         OapDataFile.this.close()
       }
     }
-  }
-
-  // full file scan
-  def iterator(requiredIds: Array[Int], filters: Seq[Filter] = Nil): OapIterator[InternalRow] = {
-    buildIterator(configuration, requiredIds, rowIds = None, filters)
-  }
-
-  // scan by given row ids, and we assume the rowIds are sorted
-  def iteratorWithRowIds(
-      requiredIds: Array[Int],
-      rowIds: Array[Int],
-      filters: Seq[Filter] = Nil): OapIterator[InternalRow] = {
-    buildIterator(configuration, requiredIds, Some(rowIds), filters)
   }
 
   def close(): Unit = {

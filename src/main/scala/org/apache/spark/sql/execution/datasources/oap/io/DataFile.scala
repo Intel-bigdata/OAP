@@ -40,10 +40,14 @@ abstract class DataFile {
 
   def getDataFileMeta(): DataFileMeta
   def getFiberData(groupId: Int, fiberId: Int): FiberCache
-  def iterator(requiredIds: Array[Int], filters: Seq[Filter] = Nil): OapIterator[InternalRow]
-  def iteratorWithRowIds(requiredIds: Array[Int], rowIds: Array[Int], filters: Seq[Filter] = Nil)
-    : OapIterator[InternalRow]
 
+  // If rowIds is empty, full file scan is applied
+  // If rowIds is not empty, scan by given row ids is applied, a sorted rowIds array is ensured
+  // filters is used for skipping RowGroup/file according to which and statistics
+  def iterator(
+      requiredIds: Array[Int],
+      rowIds: Array[Int] = Array.empty[Int],
+      filters: Seq[Filter] = Nil): OapIterator[InternalRow]
   def totalRows(): Long
 }
 
