@@ -42,7 +42,7 @@ import org.apache.spark.util.CompletionIterator
 
 /**
  * ParquetDataFile use xxRecordReader read Parquet Data File,
- * RecordReader divided into 3 categories:
+ * RecordReader divided into 2 categories:
  * <p><b>Vectorized Record Reader</b></p>
  * <ol>
  *   <li><p><b>SpecificOapRecordReaderBase:</b> base of Vectorized Record Reader, similar to
