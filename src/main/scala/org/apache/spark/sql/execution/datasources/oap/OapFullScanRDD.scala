@@ -49,7 +49,9 @@ class OapFullScanRDD(
       val fileScanner = DataFile(file.filePath, meta.schema, meta.dataReaderClassName, conf)
       val s = meta.schema
       val ids = schema.map { field => s.indexOf(field)}
-      fileScanner.asInstanceOf[OapDataFile].iterator(ids.toArray)
+      val iter = fileScanner.asInstanceOf[OapDataFile].iterator(ids.toArray)
+      Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
+      iter
     }
   }
 
