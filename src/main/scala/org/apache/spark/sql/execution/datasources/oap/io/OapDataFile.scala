@@ -28,19 +28,21 @@ import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.{PlainB
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
+import org.apache.spark.sql.execution.datasources.oap.io.meta.OapDataFileMetaV1
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.CompletionIterator
 
+private[oap] abstract class OapDataFile extends DataFile
 
-private[oap] case class OapDataFile(
+private[oap] case class OapDataFileV1(
     path: String,
     schema: StructType,
-    configuration: Configuration) extends DataFile {
+    configuration: Configuration) extends OapDataFile {
 
   private val dictionaries = new Array[Dictionary](schema.length)
   private val codecFactory = new CodecFactory(configuration)
-  private val meta = DataFileMetaCacheManager(this).asInstanceOf[OapDataFileMeta]
+  private val meta = DataFileMetaCacheManager(this).asInstanceOf[OapDataFileMetaV1]
 
   def isSkippedByRowGroup(filters: Seq[Filter] = Nil, rowGroupId: Int): Boolean = {
     if (filters.exists(filter =>
@@ -120,9 +122,9 @@ private[oap] case class OapDataFile(
     val dictionary = getDictionary(fiberId)
     val fiberParser =
       if (dictionary != null) {
-        DictionaryBasedDataFiberParser(encoding, meta, dictionary, dataType)
+        DictionaryBasedDataFiberParserV1(encoding, meta, dictionary, dataType)
       } else {
-        DataFiberParser(encoding, meta, dataType)
+        DataFiberParserV1(encoding, meta, dataType)
       }
 
     val rowCount =
@@ -180,7 +182,7 @@ private[oap] case class OapDataFile(
       override def close(): Unit = {
         // To ensure if any exception happens, caches are still released after calling close()
         inUseFiberCache.indices.foreach(release)
-        OapDataFile.this.close()
+        OapDataFileV1.this.close()
       }
     }
   }
@@ -203,12 +205,12 @@ private[oap] case class OapDataFile(
     codecFactory.release()
   }
 
-  override def getDataFileMeta(): OapDataFileMeta = {
+  override def getDataFileMeta(): OapDataFileMetaV1 = {
     val p = new Path(StringUtils.unEscapeString(path))
 
     val fs = p.getFileSystem(configuration)
 
-    new OapDataFileMeta().read(fs.open(p), fs.getFileStatus(p).getLen)
+    new OapDataFileMetaV1().read(fs.open(p), fs.getFileStatus(p).getLen)
   }
 
   def totalRows(): Long = meta.totalRowCount()

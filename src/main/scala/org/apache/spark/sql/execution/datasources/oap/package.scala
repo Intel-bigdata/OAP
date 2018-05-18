@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
-import org.apache.spark.sql.execution.datasources.oap.io.ColumnStatistics
+import org.apache.spark.sql.execution.datasources.oap.io.meta.ColumnStatistics
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{StructField, StructType}

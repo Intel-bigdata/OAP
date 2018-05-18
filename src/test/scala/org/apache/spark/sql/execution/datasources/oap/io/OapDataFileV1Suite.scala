@@ -26,7 +26,7 @@ import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
 
-class DataFileSuite extends QueryTest with SharedOapContext {
+class OapDataFileV1Suite extends QueryTest with SharedOapContext {
 
   override def beforeEach(): Unit = {
     val path = Utils.createTempDir().getAbsolutePath
@@ -46,7 +46,7 @@ class DataFileSuite extends QueryTest with SharedOapContext {
       df.repartition(1).write.format("oap").save(dir.getAbsolutePath)
       val file = SpecificParquetRecordReaderBase.listDirectory(dir).get(0)
       val datafile =
-        DataFile(file, schema, OapFileFormat.OAP_DATA_FILE_CLASSNAME, config)
+        DataFile(file, schema, OapFileFormat.OAP_DATA_FILE_V1_CLASSNAME, config)
       assert(datafile.path == file)
       assert(datafile.schema == schema)
       assert(datafile.configuration == config)

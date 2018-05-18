@@ -33,6 +33,7 @@ import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.{BatchColumn, ColumnValues}
 import org.apache.spark.sql.execution.datasources.oap.filecache.{MemoryManager, _}
+import org.apache.spark.sql.execution.datasources.oap.io.meta.ParquetDataFileMeta
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper
 import org.apache.spark.sql.execution.vectorized.ColumnarBatch
 import org.apache.spark.sql.internal.oap.OapConf

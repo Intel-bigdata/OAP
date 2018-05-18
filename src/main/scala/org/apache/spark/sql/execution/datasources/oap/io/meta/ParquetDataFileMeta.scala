@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.oap.io
+package org.apache.spark.sql.execution.datasources.oap.io.meta
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
@@ -23,6 +23,8 @@ import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.format.converter.ParquetMetadataConverter._
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.metadata.ParquetMetadata
+
+import org.apache.spark.sql.execution.datasources.oap.io.DataFileMeta
 
 private[oap] class ParquetDataFileMeta(val footer: ParquetMetadata) extends DataFileMeta {
 

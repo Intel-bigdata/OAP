@@ -22,51 +22,51 @@ import org.apache.parquet.column.values.deltastrings.DeltaByteArrayReader
 import org.apache.parquet.column.values.dictionary.DictionaryValuesReader
 import org.apache.parquet.format.Encoding
 
+import org.apache.spark.sql.execution.datasources.oap.io.meta.OapDataFileMetaV1
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.collection.BitSet
 
-private[oap] trait DataFiberParser {
+private[oap] trait DataFiberParserV1 {
   def parse(bytes: Array[Byte], rowCount: Int): Array[Byte]
 }
 
-object DataFiberParser {
+object DataFiberParserV1 {
   def apply(
       encoding: Encoding,
-      meta: OapDataFileMeta,
-      dataType: DataType): DataFiberParser = {
+      meta: OapDataFileMetaV1,
+      dataType: DataType): DataFiberParserV1 = {
 
     encoding match {
-      case Encoding.PLAIN => PlainDataFiberParser(meta)
-      case Encoding.DELTA_BYTE_ARRAY => DeltaByteArrayDataFiberParser(meta, dataType)
+      case Encoding.PLAIN => new PlainDataFiberParser
+      case Encoding.DELTA_BYTE_ARRAY => DeltaByteArrayDataFiberParserV1(meta, dataType)
       case _ => sys.error(s"Not support encoding type: $encoding")
     }
   }
 }
 
-object DictionaryBasedDataFiberParser {
+object DictionaryBasedDataFiberParserV1 {
 
   def apply(
       encoding: Encoding,
-      meta: OapDataFileMeta,
+      meta: OapDataFileMetaV1,
       dictionary: Dictionary,
-      dataType: DataType): DataFiberParser = {
+      dataType: DataType): DataFiberParserV1 = {
     encoding match {
-      case Encoding.PLAIN_DICTIONARY => PlainDictionaryFiberParser(meta, dictionary, dataType)
+      case Encoding.PLAIN_DICTIONARY => PlainDictionaryFiberParserV1(meta, dictionary, dataType)
       case _ => sys.error(s"Not support encoding type: $encoding")
     }
   }
 }
 
-private[oap] case class PlainDataFiberParser(
-    meta: OapDataFileMeta) extends DataFiberParser{
+private[oap] class PlainDataFiberParser extends DataFiberParserV1{
 
   override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = bytes
 }
 
-private[oap] case class DeltaByteArrayDataFiberParser(
-    meta: OapDataFileMeta,
-    dataType: DataType) extends DataFiberParser{
+private[oap] case class DeltaByteArrayDataFiberParserV1(
+    meta: OapDataFileMetaV1,
+    dataType: DataType) extends DataFiberParserV1{
 
   override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = {
 
@@ -113,10 +113,10 @@ private[oap] case class DeltaByteArrayDataFiberParser(
   }
 }
 
-private[oap] case class PlainDictionaryFiberParser(
-    meta: OapDataFileMeta,
+private[oap] case class PlainDictionaryFiberParserV1(
+    meta: OapDataFileMetaV1,
     dictionary: Dictionary,
-    dataType: DataType) extends DataFiberParser {
+    dataType: DataType) extends DataFiberParserV1 {
 
   override def parse(bytes: Array[Byte], rowCount: Int): Array[Byte] = {
     val valuesReader = new DictionaryValuesReader(dictionary)

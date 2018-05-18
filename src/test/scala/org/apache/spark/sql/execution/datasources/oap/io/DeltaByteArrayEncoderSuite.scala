@@ -20,10 +20,10 @@ package org.apache.spark.sql.execution.datasources.oap.io
 import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop.forAll
 import org.scalatest.prop.Checkers
-
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.filecache.StringFiberBuilder
+import org.apache.spark.sql.execution.datasources.oap.io.meta.OapDataFileMetaV1
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.unsafe.types.UTF8String
 
@@ -46,8 +46,8 @@ class DeltaByteArrayEncoderCheck extends Properties("DeltaByteArrayEncoder") {
           // to validate.
           val referenceFiberBuilder = StringFiberBuilder(rowCount, 0)
           val fiberBuilder = DeltaByteArrayFiberBuilder(rowCount, 0, StringType)
-          val fiberParser = DeltaByteArrayDataFiberParser(
-            new OapDataFileMeta(rowCountInEachGroup = rowCount), StringType)
+          val fiberParser = DeltaByteArrayDataFiberParserV1(
+            new OapDataFileMetaV1(rowCountInEachGroup = rowCount), StringType)
           !(0 until groupCount).exists { group =>
             // If lastCount > rowCount, assume lastCount = rowCount
             val count = if (group < groupCount - 1) {

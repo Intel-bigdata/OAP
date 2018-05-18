@@ -18,7 +18,7 @@
 package org.apache.spark.sql.execution.datasources.oap
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.execution.datasources.oap.io.OapDataReader
+import org.apache.spark.sql.execution.datasources.oap.io.OapDataScannerV1
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 
 private[spark] class OapMetricsManager extends Serializable {
@@ -103,7 +103,7 @@ private[spark] class OapMetricsManager extends Serializable {
     _totalTasks.foreach(_.add(1L))
   }
 
-  def updateIndexAndRowRead(r: OapDataReader, totalRows: Long): Unit = {
+  def updateIndexAndRowRead(r: OapDataScannerV1, totalRows: Long): Unit = {
     import org.apache.spark.sql.execution.datasources.oap.INDEX_STAT._
     r.indexStat match {
       case HIT_INDEX =>

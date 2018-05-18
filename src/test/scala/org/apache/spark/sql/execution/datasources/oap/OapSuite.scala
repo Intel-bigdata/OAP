@@ -24,7 +24,7 @@ import org.scalatest.BeforeAndAfter
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
-import org.apache.spark.sql.execution.datasources.oap.io.{OapDataReader, OapIndexInfo, OapIndexInfoStatus}
+import org.apache.spark.sql.execution.datasources.oap.io.{OapDataScannerV1, OapIndexInfo, OapIndexInfoStatus}
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
@@ -144,7 +144,7 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
       val dataSourceMeta = DataSourceMeta.initialize(metaPath, conf)
       val requiredIds = Array(0, 1)
       // No index scanner is used.
-      val readerNoIndex = new OapDataReader(filePath, dataSourceMeta, None, requiredIds)
+      val readerNoIndex = new OapDataScannerV1(filePath, dataSourceMeta, None, requiredIds)
       val itNoIndex = readerNoIndex.initialize(conf)
       assert(itNoIndex.size == 100)
       val ic = new IndexContext(dataSourceMeta)
@@ -152,7 +152,7 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
         And(GreaterThan("a", 9), LessThan("a", 14)))
       ScannerBuilder.build(filters, ic)
       val filterScanners = ic.getScanners
-      val readerIndex = new OapDataReader(filePath, dataSourceMeta, filterScanners, requiredIds)
+      val readerIndex = new OapDataScannerV1(filePath, dataSourceMeta, filterScanners, requiredIds)
       val itIndex = readerIndex.initialize(conf)
       assert(itIndex.size == 4)
       conf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key, false)

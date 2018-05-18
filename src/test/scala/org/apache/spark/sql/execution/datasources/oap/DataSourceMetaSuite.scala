@@ -136,7 +136,7 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
     assert(oapMeta.fileMetas.length === 0)
     assert(oapMeta.indexMetas.length === 0)
     assert(oapMeta.schema.length === 0)
-    assert(oapMeta.dataReaderClassName === OapFileFormat.OAP_DATA_FILE_CLASSNAME)
+    assert(oapMeta.dataReaderClassName === OapFileFormat.OAP_DATA_FILE_V1_CLASSNAME)
   }
 
   test("Oap Meta integration test") {
@@ -311,7 +311,7 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
     assert(fileMetas.length === 3)
     assert(fileMetas.map(_.recordCount).sum === 50)
     assert(fileMetas(0).dataFileName.endsWith(OapFileFormat.OAP_DATA_EXTENSION))
-    assert(oapMeta.dataReaderClassName === OapFileFormat.OAP_DATA_FILE_CLASSNAME)
+    assert(oapMeta.dataReaderClassName === OapFileFormat.OAP_DATA_FILE_V1_CLASSNAME)
 
 
     val readDf = sqlContext.read.format("oap").load(tmpDir.getAbsolutePath)

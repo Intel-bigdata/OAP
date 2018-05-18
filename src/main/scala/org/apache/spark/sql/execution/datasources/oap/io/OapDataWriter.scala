@@ -18,23 +18,19 @@
 package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataOutputStream, Path}
+import org.apache.hadoop.fs.FSDataOutputStream
 import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.io.api.Binary
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.Ascending
-import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberBuilder
-import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
-import org.apache.spark.sql.oap.listener.SparkListenerOapIndexInfoUpdate
-import org.apache.spark.sql.sources.Filter
+import org.apache.spark.sql.execution.datasources.oap.io.meta.{ColumnMetaV1, ColumnStatistics, OapDataFileMetaV1, RowGroupMetaV1}
 import org.apache.spark.sql.types._
-import org.apache.spark.util.TimeStampedHashMap
 
 // TODO: [linhong] Let's remove the `isCompressed` argument
+// Note: For Oap dataFile writer, we only main a single latest version
 private[oap] class OapDataWriter(
     isCompressed: Boolean,
     out: FSDataOutputStream,
@@ -80,7 +76,7 @@ private[oap] class OapDataWriter(
     }
   }
 
-  private val fiberMeta = new OapDataFileMeta(
+  private val fiberMeta = new OapDataFileMetaV1(
     rowCountInEachGroup = ROW_GROUP_SIZE,
     fieldCount = schema.length,
     codec = COMPRESSION_CODEC)
@@ -108,12 +104,12 @@ private[oap] class OapDataWriter(
     val fiberUncompressedLens = new Array[Int](rowGroup.length)
     var idx: Int = 0
     var totalDataSize = 0L
-    val rowGroupMeta = new RowGroupMeta()
+    val rowGroupMeta = new RowGroupMetaV1()
 
     rowGroupMeta.withNewStart(out.getPos)
-      .withNewFiberLens(fiberLens)
-      .withNewUncompressedFiberLens(fiberUncompressedLens)
-      .withNewStatistics(rowGroupstatistics.map(ColumnStatistics(_)).toArray)
+        .withNewFiberLens(fiberLens)
+        .withNewUncompressedFiberLens(fiberUncompressedLens)
+        .withNewStatistics(rowGroupstatistics.map(ColumnStatistics(_)).toArray)
 
     while (idx < rowGroup.length) {
       val fiberByteData = rowGroup(idx).build()
@@ -146,15 +142,15 @@ private[oap] class OapDataWriter(
         out.write(dictByteData)
       }
       fiberMeta.appendColumnMeta(
-        new ColumnMeta(
+        new ColumnMetaV1(
           encoding, dictionaryDataLength, dictionaryIdSize, ColumnStatistics(fileStatiscs(i))))
     }
 
     // and update the group count and row count in the last group
     fiberMeta
-      .withGroupCount(rowGroupCount)
-      .withRowCountInLastGroup(
-        if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else ROW_GROUP_SIZE)
+        .withGroupCount(rowGroupCount)
+        .withRowCountInLastGroup(
+          if (remainingRowCount != 0 || rowCount == 0) remainingRowCount else ROW_GROUP_SIZE)
 
     fiberMeta.write(out)
     codecFactory.release()
@@ -162,118 +158,3 @@ private[oap] class OapDataWriter(
   }
 }
 
-private[oap] case class OapIndexInfoStatus(path: String, useIndex: Boolean)
-
-private[sql] object OapIndexInfo extends Logging {
-  val partitionOapIndex = new TimeStampedHashMap[String, Boolean](updateTimeStampOnGet = true)
-
-  def status: String = {
-    val indexInfoStatusSeq = partitionOapIndex.map(kv => OapIndexInfoStatus(kv._1, kv._2)).toSeq
-    val threshTime = System.currentTimeMillis()
-    partitionOapIndex.clearOldValues(threshTime)
-    logDebug("current partition files: \n" +
-      indexInfoStatusSeq.map { indexInfoStatus =>
-        "partition file: " + indexInfoStatus.path +
-          " use index: " + indexInfoStatus.useIndex + "\n" }.mkString("\n"))
-    val indexStatusRawData = OapIndexInfoStatusSerDe.serialize(indexInfoStatusSeq)
-    indexStatusRawData
-  }
-
-  def update(indexInfo: SparkListenerOapIndexInfoUpdate): Unit = {
-    val indexStatusRawData = OapIndexInfoStatusSerDe.deserialize(indexInfo.oapIndexInfo)
-    indexStatusRawData.foreach {oapIndexInfo =>
-      logInfo("\nhost " + indexInfo.hostName + " executor id: " + indexInfo.executorId +
-        "\npartition file: " + oapIndexInfo.path + " use OAP index: " + oapIndexInfo.useIndex)}
-  }
-}
-
-private[oap] class OapDataReader(
-    path: Path,
-    meta: DataSourceMeta,
-    filterScanners: Option[IndexScanners],
-    requiredIds: Array[Int],
-    context: Option[VectorizedContext] = None) extends Logging {
-
-  import org.apache.spark.sql.execution.datasources.oap.INDEX_STAT._
-
-  private var _rowsReadWhenHitIndex: Option[Long] = None
-  private var _indexStat = MISS_INDEX
-
-  def rowsReadByIndex: Option[Long] = _rowsReadWhenHitIndex
-  def indexStat: INDEX_STAT = _indexStat
-
-  def totalRows(): Long = _totalRows
-  private var _totalRows: Long = 0
-
-  def initialize(
-      conf: Configuration,
-      options: Map[String, String] = Map.empty,
-      filters: Seq[Filter] = Nil): OapIterator[InternalRow] = {
-    logDebug("Initializing OapDataReader...")
-    // TODO how to save the additional FS operation to get the Split size
-    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
-    if (meta.dataReaderClassName.contains("ParquetDataFile")) {
-      fileScanner.asInstanceOf[ParquetDataFile].setVectorizedContext(context)
-    }
-
-    def fullScan: OapIterator[InternalRow] = {
-      val start = if (log.isDebugEnabled) System.currentTimeMillis else 0
-      val iter = fileScanner.iterator(requiredIds, filters)
-      val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
-
-      _totalRows = fileScanner.totalRows()
-
-      logDebug("Construct File Iterator: " + (end - start) + " ms")
-      iter
-    }
-
-    filterScanners match {
-      case Some(indexScanners) if indexScanners.indexIsAvailable(path, conf) =>
-        def getRowIds(options: Map[String, String]): Array[Int] = {
-          indexScanners.initialize(path, conf)
-
-          _totalRows = indexScanners.totalRows()
-
-          // total Row count can be get from the index scanner
-          val limit = options.getOrElse(OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY, "0").toInt
-          val rowIds = if (limit > 0) {
-            // Order limit scan options
-            val isAscending = options.getOrElse(
-              OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY, "true").toBoolean
-            val sameOrder = !((indexScanners.order == Ascending) ^ isAscending)
-
-            if (sameOrder) {
-              indexScanners.take(limit).toArray
-            } else {
-              indexScanners.toArray.reverse.take(limit)
-            }
-          } else {
-            indexScanners.toArray
-          }
-
-          // Parquet reader does not support backward scan, so rowIds must be sorted.
-          if (meta.dataReaderClassName.contains("ParquetDataFile")) {
-            rowIds.sorted
-          } else {
-            rowIds
-          }
-        }
-
-
-        val start = if (log.isDebugEnabled) System.currentTimeMillis else 0
-        val rows = getRowIds(options)
-        val iter = fileScanner.iteratorWithRowIds(requiredIds, rows, filters)
-        val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
-
-        _indexStat = HIT_INDEX
-        _rowsReadWhenHitIndex = Some(rows.length)
-        logDebug("Construct File Iterator: " + (end - start) + "ms")
-        iter
-      case Some(_) =>
-        _indexStat = IGNORE_INDEX
-        fullScan
-      case _ =>
-        fullScan
-    }
-  }
-}
