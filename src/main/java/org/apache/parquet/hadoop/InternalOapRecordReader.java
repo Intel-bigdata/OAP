@@ -16,12 +16,10 @@
  */
 package org.apache.parquet.hadoop;
 
-import static java.lang.String.format;
 import static org.apache.parquet.Log.DEBUG;
 import static org.apache.parquet.hadoop.ParquetInputFormat.STRICT_TYPE_CHECKING;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -29,8 +27,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.hadoop.api.InitContext;
 import org.apache.parquet.hadoop.api.ReadSupport;
+import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.FileMetaData;
-import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
+import org.apache.parquet.hadoop.metadata.IndexedBlockMetaData;
+import org.apache.parquet.hadoop.OapParquetFileReader.RowGroupDataAndRowIds;
 import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.io.ColumnIOFactory;
 import org.apache.parquet.io.MessageColumnIO;
@@ -65,11 +65,9 @@ public class InternalOapRecordReader<T> {
 
     private long totalCountLoadedSoFar = 0;
 
-    private ParquetFileReader reader;
+    private OapParquetFileReader reader;
 
     private RecordReader<T> recordReader;
-
-    private Iterator<IntList> rowIdsIter;
 
     private String createdBy;
 
@@ -90,7 +88,8 @@ public class InternalOapRecordReader<T> {
 
         LOG.info("at row " + current + ". reading next block");
         metrics.startReadOneRowGroup();
-        PageReadStore pages = reader.readNextRowGroup();
+        RowGroupDataAndRowIds rowGroupDataAndRowIds = reader.readNextRowGroupAndRowIds();
+        PageReadStore pages = rowGroupDataAndRowIds.getPageReadStore();
         checkIOState(pages);
         metrics.overReadOneRowGroup(pages);
         if (LOG.isDebugEnabled()) {
@@ -98,7 +97,7 @@ public class InternalOapRecordReader<T> {
         }
         MessageColumnIO columnIO =
           columnIOFactory.getColumnIO(requestedSchema, fileSchema, strictTypeChecking);
-        IntList rowIdList = rowIdsIter.next();
+        IntList rowIdList = rowGroupDataAndRowIds.getRowIds();
         this.recordReader = getRecordReader(columnIO,pages,rowIdList);
         metrics.startRecordAssemblyTime();
         totalCountLoadedSoFar += rowIdList.size();
@@ -120,10 +119,10 @@ public class InternalOapRecordReader<T> {
       }
     }
 
-    public void initialize(ParquetFileReader parquetFileReader, Configuration configuration)
+    public void initialize(OapParquetFileReader readerWrapper, Configuration configuration)
       throws IOException {
-      this.reader = parquetFileReader;
-      FileMetaData parquetFileMetadata = parquetFileReader.getFooter().getFileMetaData();
+      this.reader = readerWrapper;
+      FileMetaData parquetFileMetadata = readerWrapper.getFooter().getFileMetaData();
       this.fileSchema = parquetFileMetadata.getSchema();
       Map<String, String> fileMetadata = parquetFileMetadata.getKeyValueMetaData();
       ReadSupport.ReadContext readContext = readSupport.init(new InitContext(
@@ -135,11 +134,9 @@ public class InternalOapRecordReader<T> {
       this.recordConverter = readSupport.prepareForRead(
         configuration, fileMetadata, fileSchema, readContext);
       this.strictTypeChecking = configuration.getBoolean(STRICT_TYPE_CHECKING, true);
-      List<IntList> rowIdsList =
-        ((IndexedParquetMetadata)parquetFileReader.getFooter()).getRowIdsList();
-      this.rowIdsIter = rowIdsList.iterator();
-      for (IntList rowIdList : rowIdsList) {
-        total += rowIdList.size();
+      List<BlockMetaData> rowGroups = readerWrapper.getRowGroups();
+      for (BlockMetaData rowGroup : rowGroups) {
+        total += ((IndexedBlockMetaData)rowGroup).getNeedRowIds().size();
       }
       this.reader.setRequestedSchema(requestedSchema);
       this.metrics = new ParquetReadMetrics();
@@ -172,7 +169,7 @@ public class InternalOapRecordReader<T> {
           }
         } catch (RuntimeException e) {
           throw new ParquetDecodingException(
-            format("Can not read value at %d in block %d in file %s",
+            String.format("Can not read value at %d in block %d in file %s",
               current,
               currentBlock,
               reader.getPath()),

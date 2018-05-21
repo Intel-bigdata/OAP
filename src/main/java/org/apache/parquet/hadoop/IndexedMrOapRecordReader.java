@@ -18,9 +18,6 @@
  */
 package org.apache.parquet.hadoop;
 
-import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
-import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
-
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
@@ -28,26 +25,25 @@ import org.apache.hadoop.fs.Path;
 import org.apache.parquet.Preconditions;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
-import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.hadoop.metadata.ParquetFooter;
 
-public class OapRecordReader<T> implements RecordReader<T> {
+public class IndexedMrOapRecordReader<T> implements RecordReader<T> {
 
     private Configuration configuration;
     private Path file;
     private int[] globalRowIds;
-    private ParquetMetadata footer;
+    private ParquetFooter footer;
 
     private InternalOapRecordReader<T> internalReader;
 
     private ReadSupport<T> readSupport;
 
-    public OapRecordReader(
+    public IndexedMrOapRecordReader(
         ReadSupport<T> readSupport,
         Path file,
         Configuration configuration,
         int[] globalRowIds,
-        ParquetMetadata footer) {
+        ParquetFooter footer) {
       Preconditions.checkNotNull(globalRowIds,"index collection can not be null!");
       this.readSupport = readSupport;
       this.file = file;
@@ -72,14 +68,11 @@ public class OapRecordReader<T> implements RecordReader<T> {
     }
 
     public void initialize() throws IOException, InterruptedException {
-      if (this.footer == null) {
-        this.footer = readFooter(configuration, file, NO_FILTER);
-      }
-      IndexedParquetMetadata indexedFooter = IndexedParquetMetadata.from(footer, globalRowIds);
-      ParquetFileReader parquetFileReader = ParquetFileReader.open(configuration, file,
-        indexedFooter);
+
+      OapParquetFileReader reader = OapParquetFileReader.open(configuration, file,
+        footer.toParquetMetadata(globalRowIds));
       this.internalReader = new InternalOapRecordReader<>(readSupport);
-      this.internalReader.initialize(parquetFileReader, configuration);
+      this.internalReader.initialize(reader, configuration);
 
     }
 

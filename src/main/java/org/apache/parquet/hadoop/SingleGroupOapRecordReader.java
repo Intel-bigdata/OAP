@@ -16,17 +16,12 @@
  */
 package org.apache.parquet.hadoop;
 
-import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
-import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
-
 import java.io.IOException;
-import java.util.List;
 
-import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.hadoop.metadata.BlockMetaData;
+import org.apache.parquet.hadoop.metadata.ParquetFooter;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.execution.vectorized.ColumnarBatch;
@@ -35,64 +30,59 @@ import org.apache.spark.sql.types.StructType;
 
 public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
 
-  private int blockId;
-  private int rowGroupCount;
-  private boolean reset = false;
+    private int blockId;
+    private int rowGroupCount;
+    private boolean reset = false;
 
-  public SingleGroupOapRecordReader(
-    Path file,
-    Configuration configuration,
-    ParquetMetadata footer,
-    int blockId,
-    int rowGroupCount) {
-    super(file, configuration, footer);
-    this.blockId = blockId;
-    this.rowGroupCount = rowGroupCount;
-  }
-
-  /**
-   * Override initialize method, init footer if need,
-   * then call super.initialize and initializeInternal
-   *
-   * @throws IOException
-   * @throws InterruptedException
-   */
-  public void initialize(FSDataInputStream inputStream) throws IOException, InterruptedException {
-    if (this.footer == null) {
-      footer = readFooter(configuration, file, NO_FILTER);
+    public SingleGroupOapRecordReader(
+        Path file,
+        Configuration configuration,
+        ParquetFooter footer,
+        int blockId,
+        int rowGroupCount) {
+      super(file, configuration, footer);
+      this.blockId = blockId;
+      this.rowGroupCount = rowGroupCount;
     }
-    List<BlockMetaData> inputBlockList = Lists.newArrayList();
-    inputBlockList.add(footer.getBlocks().get(blockId));
-    ParquetMetadata meta = new ParquetMetadata(footer.getFileMetaData(), inputBlockList);
-    // need't do filterRowGroups.
-    initialize(meta, configuration, false, inputStream);
-    super.initializeInternal();
-  }
 
-  public void initBatch() {
-    StructType batchSchema = new StructType();
-    for (StructField f : sparkSchema.fields()) {
-      batchSchema = batchSchema.add(f);
+    /**
+     * Override initialize method, init footer if need,
+     * then call super.initialize and initializeInternal
+     *
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public void initialize(FSDataInputStream inputStream) throws IOException, InterruptedException {
+      ParquetMetadata meta = footer.toParquetMetadata(blockId);
+      // need't do filterRowGroups.
+      initialize(meta, configuration, false, inputStream);
+      super.initializeInternal();
     }
-    columnarBatch = ColumnarBatch.allocate(batchSchema, MemoryMode.ON_HEAP, rowGroupCount);
-    // Initialize missing columns with nulls.
-    for (int i = 0; i < missingColumns.length; i++) {
-      if (missingColumns[i]) {
-        columnarBatch.column(i).putNulls(0, columnarBatch.capacity());
-        columnarBatch.column(i).setIsConstant();
+
+    public void initBatch() {
+      StructType batchSchema = new StructType();
+      for (StructField f : sparkSchema.fields()) {
+        batchSchema = batchSchema.add(f);
+      }
+      columnarBatch = ColumnarBatch.allocate(batchSchema, MemoryMode.ON_HEAP, rowGroupCount);
+      // Initialize missing columns with nulls.
+      for (int i = 0; i < missingColumns.length; i++) {
+        if (missingColumns[i]) {
+          columnarBatch.column(i).putNulls(0, columnarBatch.capacity());
+          columnarBatch.column(i).setIsConstant();
+        }
       }
     }
-  }
 
-  public void setNativeAddress(long nativeAddress) {
-    reset = true;
-    columnarBatch.column(0).loadBytes(nativeAddress);
-  }
-
-  public void close() throws IOException {
-    if (reset) {
-      columnarBatch = null;
+    public void setNativeAddress(long nativeAddress) {
+      reset = true;
+      columnarBatch.column(0).loadBytes(nativeAddress);
     }
-    super.close();
-  }
+
+    public void close() throws IOException {
+      if (reset) {
+        columnarBatch = null;
+      }
+      super.close();
+    }
 }

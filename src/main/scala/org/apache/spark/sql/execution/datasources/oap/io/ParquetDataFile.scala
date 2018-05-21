@@ -20,13 +20,13 @@ package org.apache.spark.sql.execution.datasources.oap.io
 import java.io.Closeable
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.hadoop._
 import org.apache.parquet.hadoop.api.RecordReader
+import org.apache.parquet.hadoop.metadata.{IndexedBlockMetaData, OrderedBlockMetaData}
 
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.catalyst.InternalRow
@@ -51,7 +51,7 @@ private[oap] case class ParquetDataFile(
   private val parquetDataCacheEnable =
     configuration.getBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key,
       OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.defaultValue.get)
-  private var inputStream: FSDataInputStream = null;
+  private var inputStream: FSDataInputStream = _
 
   private val inUseFiberCache = new Array[FiberCache](schema.length)
 
@@ -121,37 +121,6 @@ private[oap] case class ParquetDataFile(
     }
   }
 
-  // TODO [LuciferYang] merge with IndexedParquetMetadata.from method
-  private def getGroupIdForRowIds(rowIds: Array[Int]): Map[Int, Array[Int]] = {
-    val totalCount = rowIds.length
-    val groupIdToRowIds = ArrayBuffer[(Int, Array[Int])]()
-    var nextRowGroupStartRowId = 0
-    var index = 0
-    var flag = false
-    var blockId = 0
-    meta.footer.getBlocks.asScala.foreach(block => {
-      val currentRowGroupStartRowId = nextRowGroupStartRowId
-      nextRowGroupStartRowId += block.getRowCount.toInt
-      flag = true
-      val rowIdArray = new ArrayBuffer[Int]()
-      while (flag && index < totalCount) {
-        val globalRowId = rowIds(index)
-        if(globalRowId < nextRowGroupStartRowId) {
-          rowIdArray.append(globalRowId - currentRowGroupStartRowId)
-          index += 1
-        } else {
-          flag = false
-        }
-      }
-      if (rowIdArray.nonEmpty) {
-        groupIdToRowIds.append((blockId, rowIdArray.toArray))
-      }
-      blockId += 1
-    })
-    groupIdToRowIds.toMap
-  }
-
-  // TODO extract ParquetCacheReadr & ParquetCachePusher
   private def buildIterator(
        conf: Configuration,
        requiredColumnIds: Array[Int],
@@ -168,55 +137,19 @@ private[oap] case class ParquetDataFile(
       }
     }
 
-    val groupIdToRowIds = rowIds.map(optionRowIds => getGroupIdForRowIds(optionRowIds))
-    val groupIds = groupIdToRowIds.map(_.keys).getOrElse(0 until meta.footer.getBlocks.size())
-
-    val iterator = groupIds.iterator.flatMap { groupId =>
-      val fiberCacheGroup = requiredColumnIds.map { id =>
-        val fiberCache = FiberCacheManager.get(DataFiber(this, id, groupId), conf)
-        update(id, fiberCache)
-        fiberCache
-      }
-      val rowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
-      val columnarBatch = ColumnarBatch.allocate(requestSchema, MemoryMode.ON_HEAP, rowCount)
-      columnarBatch.setNumRows(rowCount)
-
-      // populate partitionColumn values
-      if (context.partitionColumns != null) {
-        val partitionIdx = requiredColumnIds.length
-        for (i <- context.partitionColumns.fields.indices) {
-          ColumnVectorUtils.populate(columnarBatch.column(i + partitionIdx),
-            context.partitionValues, i)
-          columnarBatch.column(i + partitionIdx).setIsConstant()
-        }
-      }
-
-      fiberCacheGroup.zipWithIndex.foreach { case (fiberCache, id) =>
-        columnarBatch.column(id).loadBytes(fiberCache.getBaseOffset)
-      }
-
-      val iter = groupIdToRowIds match {
-        case Some(map) if context.returningBatch =>
-          columnarBatch.markAllFiltered()
-          map(groupId).foreach(columnarBatch.markValid)
-          Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
-        case Some(map) =>
-          map(groupId).iterator.map(rowId => columnarBatch.getRow(rowId))
-        case None if context.returningBatch =>
-          Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
-        case None =>
-          columnarBatch.rowIterator().asScala
-      }
-
-      CompletionIterator[InternalRow, Iterator[InternalRow]](
-        iter, requiredColumnIds.foreach(release))
+    val iterator = rowIds match {
+      case Some(ids) => buildIndexedIterator(conf,
+        requiredColumnIds, requestSchema, context, ids)
+      case None => buildFullScanIterator(conf,
+        requiredColumnIds, requestSchema, context)
     }
+
     new OapIterator[InternalRow](iterator) {
       override def close(): Unit = {
         // To ensure if any exception happens, caches are still released after calling close()
         inUseFiberCache.indices.foreach(release)
         if (inputStream != null) {
-          inputStream.close();
+          inputStream.close()
         }
       }
     }
@@ -238,7 +171,7 @@ private[oap] case class ParquetDataFile(
         }
       case _ =>
         initRecordReader(
-          new DefaultRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
+          new MrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
             file, configuration, meta.footer))
     }
   }
@@ -262,7 +195,7 @@ private[oap] case class ParquetDataFile(
           }
         case _ =>
           initRecordReader(
-            new OapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
+            new IndexedMrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
               file, configuration, rowIds, meta.footer))
       }
     }
@@ -289,6 +222,81 @@ private[oap] case class ParquetDataFile(
     new OapIterator[InternalRow](iterator.asInstanceOf[Iterator[InternalRow]]) {
       override def close(): Unit = iterator.close()
     }
+  }
+
+  private def buildFullScanIterator(
+      conf: Configuration,
+      requiredColumnIds: Array[Int],
+      requestSchema: StructType,
+      context: VectorizedContext): Iterator[InternalRow] = {
+    val footer = meta.footer.toParquetMetadata
+    footer.getBlocks.asScala.iterator.flatMap { rowGroupMeta =>
+      val orderedBlockMetaData = rowGroupMeta.asInstanceOf[OrderedBlockMetaData]
+      val columnarBatch = buildColumnarBatchFromCache(orderedBlockMetaData,
+        conf, requestSchema, requiredColumnIds, context)
+      val iter = if (context.returningBatch) {
+        Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
+      } else {
+        columnarBatch.rowIterator().asScala
+      }
+      CompletionIterator[InternalRow, Iterator[InternalRow]](
+        iter, requiredColumnIds.foreach(release))
+    }
+  }
+
+  private def buildIndexedIterator(
+      conf: Configuration,
+      requiredColumnIds: Array[Int],
+      requestSchema: StructType,
+      context: VectorizedContext,
+      rowIds: Array[Int]): Iterator[InternalRow] = {
+    val footer = meta.footer.toParquetMetadata(rowIds)
+    footer.getBlocks.asScala.iterator.flatMap { rowGroupMeta =>
+      val indexedBlockMetaData = rowGroupMeta.asInstanceOf[IndexedBlockMetaData]
+      val columnarBatch = buildColumnarBatchFromCache(indexedBlockMetaData,
+        conf, requestSchema, requiredColumnIds, context)
+      val iter = if (context.returningBatch) {
+        columnarBatch.markAllFiltered()
+        indexedBlockMetaData.getNeedRowIds.iterator.
+          asScala.foreach(rowId => columnarBatch.markValid(rowId))
+        Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
+      } else {
+        indexedBlockMetaData.getNeedRowIds.iterator.
+          asScala.map(rowId => columnarBatch.getRow(rowId))
+      }
+      CompletionIterator[InternalRow, Iterator[InternalRow]](
+        iter, requiredColumnIds.foreach(release))
+    }
+  }
+
+  private def buildColumnarBatchFromCache(
+      blockMetaData: OrderedBlockMetaData,
+      conf: Configuration,
+      requestSchema: StructType,
+      requiredColumnIds: Array[Int],
+      context: VectorizedContext): ColumnarBatch = {
+    val groupId = blockMetaData.getRowGroupId
+    val fiberCacheGroup = requiredColumnIds.map { id =>
+      val fiberCache = FiberCacheManager.get(DataFiber(this, id, groupId), conf)
+      update(id, fiberCache)
+      fiberCache
+    }
+    val rowCount = blockMetaData.getRowCount.toInt
+    val columnarBatch = ColumnarBatch.allocate(requestSchema, MemoryMode.ON_HEAP, rowCount)
+    columnarBatch.setNumRows(rowCount)
+    // populate partitionColumn values
+    if (context.partitionColumns != null) {
+      val partitionIdx = requiredColumnIds.length
+      for (i <- context.partitionColumns.fields.indices) {
+        ColumnVectorUtils.populate(columnarBatch.column(i + partitionIdx),
+          context.partitionValues, i)
+        columnarBatch.column(i + partitionIdx).setIsConstant()
+      }
+    }
+    fiberCacheGroup.zipWithIndex.foreach { case (fiberCache, id) =>
+      columnarBatch.column(id).loadBytes(fiberCache.getBaseOffset)
+    }
+    columnarBatch
   }
 
   private def addRequestSchemaToConf(conf: Configuration, requiredIds: Array[Int]): Unit = {
@@ -338,7 +346,7 @@ private[oap] case class ParquetDataFile(
   }
 
   override def getDataFileMeta(): ParquetDataFileMeta =
-    new ParquetDataFileMeta(configuration, path)
+    ParquetDataFileMeta(configuration, path)
 
   override def totalRows(): Long = {
     import scala.collection.JavaConverters._

@@ -16,22 +16,17 @@
  */
 package org.apache.parquet.hadoop;
 
-import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
-import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
-
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.Map;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.parquet.hadoop.metadata.IndexedParquetMetadata;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.hadoop.metadata.ParquetFooter;
+import org.apache.parquet.hadoop.OapParquetFileReader.RowGroupDataAndRowIds;
+import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
+import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader {
 
@@ -43,8 +38,6 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     private int currentPageNumber;
     // Rowid list of file granularity
     private int[] globalRowIds;
-    // Rowid Iter of RowGroup granularity
-    private Iterator<IntList> rowIdsIter;
     // for returnColumnarBatch is false branch,
     // secondary indexes to call columnarBatch.getRow
     private IntList batchIds;
@@ -52,14 +45,22 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     private static final String IDS_MAP_STATE_ERROR_MSG =
       "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
     private static final String IDS_ITER_STATE_ERROR_MSG =
-      "The divideRowIdsIntoPages method should not be called when rowIdsIter hasNext if false.";
+      "The divideRowIdsIntoPages method should not be called when currentIndexList is Empty.";
 
     public IndexedVectorizedOapRecordReader(
         Path file,
         Configuration configuration,
-        ParquetMetadata footer,
+        ParquetFooter footer,
         int[] globalRowIds) {
       super(file, configuration, footer);
+      this.globalRowIds = globalRowIds;
+    }
+
+    public IndexedVectorizedOapRecordReader(
+        Path file,
+        Configuration configuration,
+        int[] globalRowIds) throws IOException{
+      super(file, configuration);
       this.globalRowIds = globalRowIds;
     }
 
@@ -72,14 +73,8 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
      */
     @Override
     public void initialize() throws IOException, InterruptedException {
-      if (this.footer == null) {
-        footer = readFooter(configuration, file, NO_FILTER);
-      }
-      IndexedParquetMetadata indexedFooter = IndexedParquetMetadata.from(footer, globalRowIds);
-      this.rowIdsIter = indexedFooter.getRowIdsList().iterator();
-
       // use indexedFooter read data, need't do filterRowGroups.
-      initialize(indexedFooter, configuration, false, null);
+      initialize(footer.toParquetMetadata(globalRowIds), configuration, false, null);
       super.initializeInternal();
     }
 
@@ -117,8 +112,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       }
       // if rowsReturned == totalCountLoadedSoFar
       // readNextRowGroup & divideRowIdsIntoPages
-      super.readNextRowGroup();
-      this.divideRowIdsIntoPages();
+      readNextRowGroup();
     }
 
     private boolean filterRowsWithIndex() throws IOException {
@@ -155,12 +149,11 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       }
     }
 
-    private void divideRowIdsIntoPages() {
+    private void divideRowIdsIntoPages(IntList currentIndexList) {
       Preconditions.checkState(idsMap.isEmpty(), IDS_MAP_STATE_ERROR_MSG);
-      Preconditions.checkState(rowIdsIter.hasNext(), IDS_ITER_STATE_ERROR_MSG);
+      Preconditions.checkState(!currentIndexList.isEmpty(), IDS_ITER_STATE_ERROR_MSG);
       this.currentPageNumber = 0;
       int pageSize = columnarBatch.capacity();
-      IntList currentIndexList = rowIdsIter.next();
       for (int rowId : currentIndexList) {
         int pageNumber = rowId / pageSize;
         if (idsMap.containsKey(pageNumber)) {
@@ -172,4 +165,11 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         }
       }
     }
+
+  @Override
+  protected void readNextRowGroup() throws IOException {
+    RowGroupDataAndRowIds rowGroupDataAndRowIds = reader.readNextRowGroupAndRowIds();
+    initColumnReaders(rowGroupDataAndRowIds.getPageReadStore());
+    divideRowIdsIntoPages(rowGroupDataAndRowIds.getRowIds());
+  }
 }
