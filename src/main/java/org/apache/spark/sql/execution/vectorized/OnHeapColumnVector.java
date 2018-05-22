@@ -86,7 +86,9 @@ public final class OnHeapColumnVector extends ColumnVector {
                         nativeAddress, capacity);
             } else {
                 for (int i = 0; i < capacity; i++) {
+                  if (!isNullAt(i)) {
                     Platform.putByte(null, nativeAddress + i, getByte(i));
+                  }
                 }
             }
             Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
@@ -98,8 +100,10 @@ public final class OnHeapColumnVector extends ColumnVector {
                         nativeAddress, capacity);
             } else {
                 for (int i = 0; i < capacity; i++) {
+                  if (!isNullAt(i)) {
                     Platform.putByte(null, nativeAddress + i,
                             (byte) ((getBoolean(i)) ? 1 : 0));
+                  }
                 }
             }
             Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
@@ -111,7 +115,9 @@ public final class OnHeapColumnVector extends ColumnVector {
                         nativeAddress, capacity * 2);
             } else {
                 for (int i = 0; i < capacity; i++) {
+                  if (!isNullAt(i)) {
                     Platform.putShort(null, nativeAddress + i * 2, getShort(i));
+                  }
                 }
             }
             Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
@@ -123,7 +129,9 @@ public final class OnHeapColumnVector extends ColumnVector {
                         nativeAddress, capacity * 4);
             } else {
                 for (int i = 0; i < capacity; i++) {
+                  if (!isNullAt(i)) {
                     Platform.putInt(null, nativeAddress + i * 4, getInt(i));
+                  }
                 }
             }
             Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
@@ -136,7 +144,9 @@ public final class OnHeapColumnVector extends ColumnVector {
                         nativeAddress, capacity * 4);
             } else {
                 for (int i = 0; i < capacity; i++) {
+                  if (!isNullAt(i)) {
                     Platform.putFloat(null, nativeAddress + i * 4, getFloat(i));
+                  }
                 }
             }
             Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
@@ -148,7 +158,9 @@ public final class OnHeapColumnVector extends ColumnVector {
                         nativeAddress, capacity * 8);
             } else {
                 for (int i = 0; i < capacity; i++) {
-                    Platform.putLong(null, nativeAddress+ i * 8, getLong(i));
+                  if (!isNullAt(i)) {
+                    Platform.putLong(null, nativeAddress + i * 8, getLong(i));
+                  }
                 }
             }
             Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
@@ -160,7 +172,9 @@ public final class OnHeapColumnVector extends ColumnVector {
                         nativeAddress, capacity * 8);
             } else {
                 for (int i = 0; i < capacity; i++) {
+                  if (!isNullAt(i)) {
                     Platform.putDouble(null, nativeAddress + i * 8, getDouble(i));
+                  }
                 }
             }
             Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
@@ -184,6 +198,7 @@ public final class OnHeapColumnVector extends ColumnVector {
                 byte[] tempBytes = new byte[capacity * (4 + 4)];
                 int offset = 0;
                 for (int i = 0; i < capacity; i++) {
+                  if (!isNullAt(i)) {
                     byte[] bytes = null;
                     bytes = getBinary(i);
                     Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
@@ -191,6 +206,7 @@ public final class OnHeapColumnVector extends ColumnVector {
                             offset);
                     arrayData().appendBytes(bytes.length, bytes, 0);
                     offset += bytes.length;
+                  }
                 }
                 dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
                 Platform.copyMemory(tempBytes, Platform.BYTE_ARRAY_OFFSET, dataBytes,
@@ -222,6 +238,7 @@ public final class OnHeapColumnVector extends ColumnVector {
                 byte[] tempBytes = new byte[capacity * (4 + 4)];
                 int offset = 0;
                 for (int i = 0; i < capacity; i++) {
+                  if (!isNullAt(i)) {
                     byte[] bytes = null;
                     bytes = getUTF8String(i).getBytes();
                     Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
@@ -229,6 +246,7 @@ public final class OnHeapColumnVector extends ColumnVector {
                             offset);
                     arrayData().appendBytes(bytes.length, bytes, 0);
                     offset += bytes.length;
+                  }
                 }
                 dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
                 Platform.copyMemory(tempBytes, Platform.BYTE_ARRAY_OFFSET, dataBytes,
@@ -298,10 +316,16 @@ public final class OnHeapColumnVector extends ColumnVector {
               capacity, DataTypes.ByteType, MemoryMode.ON_HEAP);
             this.resultArray = new Array(this.childColumns[0]);
             this.childColumns[0].close();
-            byte[] data = new byte[arrayOffsets[capacity -1] + arrayLengths[capacity -1]];
+          int lastIndex = capacity - 1;
+          while (lastIndex >= 0 && isNullAt(lastIndex)) {
+            lastIndex--;
+          }
+          if (lastIndex >= 0) {
+            byte[] data = new byte[arrayOffsets[lastIndex] + arrayLengths[lastIndex]];
             Platform.copyMemory(null, nativeAddress + capacity * 9,
                     data, Platform.BYTE_ARRAY_OFFSET,data.length);
             this.childColumns[0].setByteData(data);
+          }
         } else {
             throw new RuntimeException("Unhandled " + type);
         }

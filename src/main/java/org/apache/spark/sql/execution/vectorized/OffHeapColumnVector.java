@@ -77,32 +77,46 @@ public final class OffHeapColumnVector extends ColumnVector {
       if (dictionary != null) {
         if (type instanceof ByteType) {
           for (int i = 0; i < capacity; i++) {
-            Platform.putByte(null, data + i, getByte(i));
+            if (!isNullAt(i)) {
+              Platform.putByte(null, data + i, getByte(i));
+            }
           }
         } else if (type instanceof BooleanType) {
           for (int i = 0; i < capacity; i++) {
-            Platform.putByte(null, data + i,
-                    (byte) ((getBoolean(i)) ? 1 : 0));
+            if (!isNullAt(i)) {
+              Platform.putByte(null, data + i,
+                      (byte) ((getBoolean(i)) ? 1 : 0));
+            }
           }
         } else if (type instanceof ShortType) {
           for (int i = 0; i < capacity; i++) {
-            Platform.putShort(null, data+ i * 2, getShort(i));
+            if (!isNullAt(i)) {
+              Platform.putShort(null, data + i * 2, getShort(i));
+            }
           }
         } else if (type instanceof IntegerType || type instanceof DateType) {
           for (int i = 0; i < capacity; i++) {
-            Platform.putInt(null, data + i * 4, getInt(i));
+            if (!isNullAt(i)) {
+              Platform.putInt(null, data + i * 4, getInt(i));
+            }
           }
         } else if (type instanceof FloatType) {
           for (int i = 0; i < capacity; i++) {
-            Platform.putFloat(null, data+ i * 4, getFloat(i));
+            if (!isNullAt(i)) {
+              Platform.putFloat(null, data + i * 4, getFloat(i));
+            }
           }
         } else if (type instanceof LongType) {
           for (int i = 0; i < capacity; i++) {
-            Platform.putLong(null, data + i * 8, getLong(i));
+            if (!isNullAt(i)) {
+              Platform.putLong(null, data + i * 8, getLong(i));
+            }
           }
         } else if (type instanceof DoubleType) {
           for (int i = 0; i < capacity; i++) {
-            Platform.putDouble(null, data + i * 8, getDouble(i));
+            if (!isNullAt(i)) {
+              Platform.putDouble(null, data + i * 8, getDouble(i));
+            }
           }
         }
       }
@@ -116,7 +130,9 @@ public final class OffHeapColumnVector extends ColumnVector {
           Platform.copyMemory(null, data, dataBytes, Platform.BYTE_ARRAY_OFFSET, capacity);
         } else {
           for (int i = 0; i < capacity; i++) {
-            Platform.putByte(dataBytes, Platform.BYTE_ARRAY_OFFSET + i, getByte(i));
+            if (!isNullAt(i)) {
+              Platform.putByte(dataBytes, Platform.BYTE_ARRAY_OFFSET + i, getByte(i));
+            }
           }
         }
         Platform.copyMemory(null, nulls, dataBytes, Platform.BYTE_ARRAY_OFFSET + capacity,
@@ -128,8 +144,10 @@ public final class OffHeapColumnVector extends ColumnVector {
           Platform.copyMemory(null, data, dataBytes, Platform.BYTE_ARRAY_OFFSET, capacity);
         } else {
           for (int i = 0; i < capacity; i++) {
-            Platform.putByte(dataBytes, Platform.BYTE_ARRAY_OFFSET + i,
-                    (byte) ((getBoolean(i)) ? 1 : 0));
+            if (!isNullAt(i)) {
+              Platform.putByte(dataBytes, Platform.BYTE_ARRAY_OFFSET + i,
+                      (byte) ((getBoolean(i)) ? 1 : 0));
+            }
           }
         }
         Platform.copyMemory(null, nulls, dataBytes, Platform.BYTE_ARRAY_OFFSET + capacity,
@@ -141,7 +159,9 @@ public final class OffHeapColumnVector extends ColumnVector {
           Platform.copyMemory(null, data, dataBytes, Platform.BYTE_ARRAY_OFFSET, capacity * 2);
         } else {
           for (int i = 0; i < capacity; i++) {
-            Platform.putShort(dataBytes, Platform.SHORT_ARRAY_OFFSET + i * 2, getShort(i));
+            if (!isNullAt(i)) {
+              Platform.putShort(dataBytes, Platform.SHORT_ARRAY_OFFSET + i * 2, getShort(i));
+            }
           }
         }
         Platform.copyMemory(null, nulls, dataBytes, Platform.BYTE_ARRAY_OFFSET + capacity * 2,
@@ -153,7 +173,9 @@ public final class OffHeapColumnVector extends ColumnVector {
           Platform.copyMemory(null, data, dataBytes, Platform.BYTE_ARRAY_OFFSET, capacity * 4);
         } else {
           for (int i = 0; i < capacity; i++) {
-            Platform.putInt(dataBytes, Platform.INT_ARRAY_OFFSET + i * 4, getInt(i));
+            if (!isNullAt(i)) {
+              Platform.putInt(dataBytes, Platform.INT_ARRAY_OFFSET + i * 4, getInt(i));
+            }
           }
         }
         Platform.copyMemory(null, nulls, dataBytes, Platform.BYTE_ARRAY_OFFSET + capacity * 4,
@@ -165,7 +187,9 @@ public final class OffHeapColumnVector extends ColumnVector {
           Platform.copyMemory(null, data, dataBytes, Platform.BYTE_ARRAY_OFFSET, capacity * 4);
         } else {
           for (int i = 0; i < capacity; i++) {
-            Platform.putFloat(dataBytes, Platform.FLOAT_ARRAY_OFFSET + i * 4, getFloat(i));
+            if (!isNullAt(i)) {
+              Platform.putFloat(dataBytes, Platform.FLOAT_ARRAY_OFFSET + i * 4, getFloat(i));
+            }
           }
         }
         Platform.copyMemory(null, nulls, dataBytes, Platform.BYTE_ARRAY_OFFSET + capacity * 4,
@@ -177,7 +201,9 @@ public final class OffHeapColumnVector extends ColumnVector {
           Platform.copyMemory(null, data, dataBytes, Platform.BYTE_ARRAY_OFFSET, capacity * 8);
         } else {
           for (int i = 0; i < capacity; i++) {
-            Platform.putLong(dataBytes, Platform.LONG_ARRAY_OFFSET + i * 8, getLong(i));
+            if (!isNullAt(i)) {
+              Platform.putLong(dataBytes, Platform.LONG_ARRAY_OFFSET + i * 8, getLong(i));
+            }
           }
         }
         Platform.copyMemory(null, nulls, dataBytes, Platform.BYTE_ARRAY_OFFSET + capacity * 8,
@@ -189,7 +215,9 @@ public final class OffHeapColumnVector extends ColumnVector {
           Platform.copyMemory(null, data, dataBytes, Platform.BYTE_ARRAY_OFFSET, capacity * 8);
         } else {
           for (int i = 0; i < capacity; i++) {
-            Platform.putDouble(dataBytes, Platform.DOUBLE_ARRAY_OFFSET + i * 8, getDouble(i));
+            if (!isNullAt(i)) {
+              Platform.putDouble(dataBytes, Platform.DOUBLE_ARRAY_OFFSET + i * 8, getDouble(i));
+            }
           }
         }
         Platform.copyMemory(null, nulls, dataBytes, Platform.BYTE_ARRAY_OFFSET + capacity * 8,
@@ -211,12 +239,14 @@ public final class OffHeapColumnVector extends ColumnVector {
           byte[] tempBytes = new byte[capacity * (4 + 4)];
           int offset = 0;
           for (int i = 0; i < capacity; i++) {
-            byte[] bytes = null;
-            bytes = getBinary(i);
-            Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
-            Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + capacity * 4 + i * 4, offset);
-            arrayData().appendBytes(bytes.length, bytes, 0);
-            offset += bytes.length;
+            if (!isNullAt(i)) {
+              byte[] bytes = null;
+              bytes = getBinary(i);
+              Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
+              Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + capacity * 4 + i * 4, offset);
+              arrayData().appendBytes(bytes.length, bytes, 0);
+              offset += bytes.length;
+            }
           }
           dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
           Platform.copyMemory(tempBytes, Platform.BYTE_ARRAY_OFFSET, dataBytes,
@@ -243,12 +273,14 @@ public final class OffHeapColumnVector extends ColumnVector {
           byte[] tempBytes = new byte[capacity * (4 + 4)];
           int offset = 0;
           for (int i = 0; i < capacity; i++) {
-            byte[] bytes = null;
-            bytes = getUTF8String(i).getBytes();
-            Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
-            Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + capacity * 4 + i * 4, offset);
-            arrayData().appendBytes(bytes.length, bytes, 0);
-            offset += bytes.length;
+            if (!isNullAt(i)) {
+              byte[] bytes = null;
+              bytes = getUTF8String(i).getBytes();
+              Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
+              Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + capacity * 4 + i * 4, offset);
+              arrayData().appendBytes(bytes.length, bytes, 0);
+              offset += bytes.length;
+            }
           }
           dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
           Platform.copyMemory(tempBytes, Platform.BYTE_ARRAY_OFFSET, dataBytes,
