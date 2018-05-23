@@ -322,6 +322,7 @@
          <executions>
            <execution>
              <id>enforce-maven-3</id>
+             <phase>validate</phase>
              <goals>
                <goal>enforce</goal>
              </goals>
