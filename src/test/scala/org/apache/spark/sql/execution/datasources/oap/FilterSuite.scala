@@ -1023,4 +1023,26 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     }
     spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "true")
   }
+
+  test("OAP-764 BloomFilterStatisticsReader#analyse unexpected return SkipFile") {
+    // dig holes
+    val data: Seq[(Int, String)] = (1 to 300).map { i => {
+      if (i % 13 == 0) {
+        (-1, "-1")
+      } else {
+        (i, s"this is test $i")
+      }
+    }}
+
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    withSQLConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key -> "true") {
+      withIndex(TestIndex("parquet_test", "index1")) {
+        sql("create oindex index1 on parquet_test (a)")
+        // 13, 26, 39, 52 not in this file
+        checkAnswer(sql("SELECT * FROM parquet_test WHERE a in (1, 13, 26, 39, 52)"),
+          Row(1, "this is test 1"):: Nil)
+      }
+    }
+  }
 }
