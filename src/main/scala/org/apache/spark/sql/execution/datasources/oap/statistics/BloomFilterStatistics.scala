@@ -80,19 +80,19 @@ private[oap] class BloomFilterStatisticsReader(
      *    2.1 interval.start == interval.end (numFields == schema.length) and NOT exist in bfIndex
      *    2.2 interval.start != interval.end (not equal or DUMMY_KEY). Just return false
      */
-    val skipIndex = intervalArray.exists { interval =>
+    val skipIndex = !intervalArray.exists { interval =>
       val numFields = math.min(interval.start.numFields, interval.end.numFields)
       if (schema.length > 1) {
         if (numFields == schema.length && ordering.compare(interval.start, interval.end) == 0) {
-          !bfIndex.checkExist(converter(interval.start).getBytes)
+          bfIndex.checkExist(converter(interval.start).getBytes)
         } else {
-          !bfIndex.checkExist(partialConverter(interval.start).getBytes)
+          bfIndex.checkExist(partialConverter(interval.start).getBytes)
         }
       } else {
         if (numFields == 1 && ordering.compare(interval.start, interval.end) == 0) {
-          !bfIndex.checkExist(converter(interval.start).getBytes)
+          bfIndex.checkExist(converter(interval.start).getBytes)
         } else {
-          false
+          true
         }
       }
     }
