@@ -984,4 +984,23 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
     sql("drop oindex idx1 on parquet_test")
   }
+
+  test("OAP-764 BloomFilterStatisticsReader#analyse unexpected return SkipFile") {
+    // dig holes
+    val data: Seq[(Int, String)] = (1 to 300).map { i => {
+      if (i % 13 == 0) {
+        (-1, "-1")
+      } else {
+        (i, s"this is test $i")
+      }
+    }}
+
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create oindex index1 on parquet_test (a)")
+    // 13, 26, 39, 52 not in this file
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE a in (1, 13, 26, 39, 52)"),
+      Row(1, "this is test 1"):: Nil)
+    sql("drop oindex index1 on parquet_test")
+  }
 }
