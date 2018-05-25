@@ -28,6 +28,7 @@ import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.{PlainB
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.CompletionIterator
@@ -135,7 +136,7 @@ private[oap] case class OapDataFile(
     // We have to read Array[Byte] from file and decode/decompress it before putToFiberCache
     // TODO: Try to finish this in off-heap memory
     val data = fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
-    MemoryManager.toDataFiberCache(data)
+    OapRuntime.getOrCreate.memoryManager.toDataFiberCache(data)
   }
 
   private def buildIterator(
@@ -156,7 +157,8 @@ private[oap] case class OapDataFile(
     val iterator = groupIdsNonSkipped.flatMap {
       groupId =>
         val fiberCacheGroup = requiredIds.map { id =>
-          val fiberCache = FiberCacheManager.get(DataFiber(this, id, groupId), conf)
+          val fiberCache = OapRuntime.getOrCreate.fiberCacheManager.get(
+            DataFiber(this, id, groupId), conf)
           update(id, fiberCache)
           fiberCache
         }

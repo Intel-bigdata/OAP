@@ -31,10 +31,10 @@ import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCo
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OapMetricsManager}
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberSensor
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources.{BaseRelation, Filter}
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.util.Utils
@@ -502,7 +502,7 @@ case class FileSourceScanExec(
               partition.values, file.getPath.toUri.toString, offset, size, hosts)
           }
         } else {
-          val cachedHosts = FiberSensor.getHosts(file.getPath.toString)
+          val cachedHosts = OapRuntime.getOrCreate.fiberSensor.getHosts(file.getPath.toString)
           val hosts = cachedHosts.toBuffer ++ getBlockHosts(blockLocations, 0, file.getLen)
           Seq(PartitionedFile(
             partition.values, file.getPath.toUri.toString, 0, file.getLen, hosts.toArray))

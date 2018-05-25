@@ -23,9 +23,10 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
 import org.roaringbitmap.RoaringBitmap
 
-import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiber, MemoryManager, FiberCache, FiberCacheManager}
 import org.apache.spark.sql.QueryTest
+import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiber, FiberCache}
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
@@ -34,7 +35,7 @@ class OapBitmapWrappedFiberCacheSuite
   extends QueryTest with SharedOapContext {
 
   private def loadRbFile(fin: FSDataInputStream, offset: Long, size: Int): FiberCache =
-    MemoryManager.toIndexFiberCache(fin, offset, size)
+    OapRuntime.getOrCreate.memoryManager.toIndexFiberCache(fin, offset, size)
 
   test("test the functionality of OapBitmapWrappedFiberCache class") {
     val CHUNK_SIZE = 1 << 16
@@ -64,7 +65,8 @@ class OapBitmapWrappedFiberCacheSuite
       val fin = rbPath.getFileSystem(conf).open(rbPath)
       val rbFileSize = rbPath.getFileSystem(conf).getFileStatus(rbPath).getLen
       val rbFiber = BitmapFiber(() => loadRbFile(fin, 0L, rbFileSize.toInt), rbPath.toString, 0, 0)
-      val rbWfc = new OapBitmapWrappedFiberCache(FiberCacheManager.get(rbFiber, conf))
+      val rbWfc = new OapBitmapWrappedFiberCache(
+        OapRuntime.getOrCreate.fiberCacheManager.get(rbFiber, conf))
       rbWfc.init
       val chunkLength = rbWfc.getTotalChunkLength
       val length = dataIdx.size / CHUNK_SIZE

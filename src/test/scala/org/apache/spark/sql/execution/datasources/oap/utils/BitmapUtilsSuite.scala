@@ -17,18 +17,18 @@
 
 package org.apache.spark.sql.execution.datasources.oap.utils
 
-import java.io.{ByteArrayOutputStream, DataOutputStream, File, FileOutputStream}
+import java.io.File
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
-import org.roaringbitmap.RoaringBitmap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiber, MemoryManager, FiberCache, FiberCacheManager}
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
+import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiber, FiberCache}
 import org.apache.spark.sql.execution.datasources.oap.index.{BitmapIndexSectionId, IndexUtils}
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
-import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
@@ -54,6 +54,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
     Array((dataForRunChunk, expectedRowIdSeq), (dataForArrayChunk, expectedRowIdSeq),
       (dataForBitmapChunk, expectedRowIdSeq),
       (dataCombinationTotal, expectedRowIdSeqCombinationTotal))
+  private lazy val fiberCacheManager = OapRuntime.getOrCreate.fiberCacheManager
 
   override def beforeEach(): Unit = {
     dir = Utils.createTempDir()
@@ -69,7 +70,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
   }
 
   private def loadBmSection(fin: FSDataInputStream, offset: Long, size: Int): FiberCache =
-    MemoryManager.toIndexFiberCache(fin, offset, size)
+    OapRuntime.getOrCreate.memoryManager.toIndexFiberCache(fin, offset, size)
 
   private def getIdxOffset(fiberCache: FiberCache, baseOffset: Long, idx: Int): Int = {
     val idxOffset = baseOffset + idx * 4
@@ -85,7 +86,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
     val footerFiber = BitmapFiber(
       () => loadBmSection(fin, footerOffset, BITMAP_FOOTER_SIZE),
       idxPath.toString, BitmapIndexSectionId.footerSection, 0)
-    val footerCache = FiberCacheManager.get(footerFiber, conf)
+    val footerCache = fiberCacheManager.get(footerFiber, conf)
     val uniqueKeyListTotalSize = footerCache.getInt(IndexUtils.INT_SIZE)
     val keyCount = footerCache.getInt(IndexUtils.INT_SIZE * 2)
     val entryListTotalSize = footerCache.getInt(IndexUtils.INT_SIZE * 3)
@@ -96,7 +97,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
     val offsetListFiber = BitmapFiber(
       () => loadBmSection(fin, offsetListOffset.toLong, offsetListTotalSize),
       idxPath.toString, BitmapIndexSectionId.entryOffsetsSection, 0)
-    val offsetListCache = FiberCacheManager.get(offsetListFiber, conf)
+    val offsetListCache = fiberCacheManager.get(offsetListFiber, conf)
     (keyCount, offsetListCache, footerCache)
   }
 
@@ -122,7 +123,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
               () => loadBmSection(fin, curIdxOffset.toLong, entrySize), idxPath.toString,
             BitmapIndexSectionId.entryListSection, idx)
             val wrappedFiberCacheSeq =
-              Seq(new OapBitmapWrappedFiberCache(FiberCacheManager.get(entryFiber, conf)))
+              Seq(new OapBitmapWrappedFiberCache(fiberCacheManager.get(entryFiber, conf)))
             BitmapUtils.iterator(wrappedFiberCacheSeq).foreach(rowId => {
               actualRowIdSeq :+= rowId + accumulatorRowId
               if (maxRowIdInPartition < rowId) maxRowIdInPartition = rowId
@@ -163,7 +164,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
             val entryFiber = BitmapFiber(
               () => loadBmSection(fin, curIdxOffset.toLong, entrySize), idxPath.toString,
               BitmapIndexSectionId.entryListSection, idx)
-            new OapBitmapWrappedFiberCache(FiberCacheManager.get(entryFiber, conf))
+            new OapBitmapWrappedFiberCache(fiberCacheManager.get(entryFiber, conf))
           })
           BitmapUtils.iterator(wrappedFiberCacheSeq).foreach(rowId => {
             actualRowIdSeq :+= rowId + accumulatorRowId

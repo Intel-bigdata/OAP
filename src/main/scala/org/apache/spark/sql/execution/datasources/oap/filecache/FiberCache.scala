@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.unsafe.types.UTF8String
@@ -78,7 +79,7 @@ case class FiberCache(protected val fiberData: MemoryBlock) extends Logging {
   def isDisposed: Boolean = disposed
   protected[filecache] def realDispose(fiber: Fiber): Unit = {
     if (!disposed) {
-      MemoryManager.free(fiberData)
+      OapRuntime.get.foreach(_.memoryManager.free(fiberData))
       FiberLockManager.removeFiberLock(fiber)
     }
     disposed = true

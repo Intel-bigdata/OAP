@@ -33,18 +33,15 @@ import org.apache.spark.internal.config._
 import org.apache.spark.memory.{MemoryManager, StaticMemoryManager, UnifiedMemoryManager}
 import org.apache.spark.metrics.MetricsSystem
 import org.apache.spark.network.netty.NettyBlockTransferService
-import org.apache.spark.rpc._
+import org.apache.spark.rpc.{RpcEndpoint, RpcEndpointRef, RpcEnv}
 import org.apache.spark.scheduler.{LiveListenerBus, OutputCommitCoordinator}
 import org.apache.spark.scheduler.OutputCommitCoordinator.OutputCommitCoordinatorEndpoint
 import org.apache.spark.security.CryptoStreamUtils
 import org.apache.spark.serializer.{JavaSerializer, Serializer, SerializerManager}
 import org.apache.spark.shuffle.ShuffleManager
-import org.apache.spark.sql.execution.datasources.oap.OapMetricsManager
-import org.apache.spark.sql.oap.OapManager
-import org.apache.spark.sql.oap.rpc.{OapRpcManager, OapRpcManagerMaster, OapRpcManagerMasterEndpoint, OapRpcManagerSlave}
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.storage._
 import org.apache.spark.util.{RpcUtils, Utils}
-
 
 /**
  * :: DeveloperApi ::
@@ -71,7 +68,6 @@ class SparkEnv (
     val metricsSystem: MetricsSystem,
     val memoryManager: MemoryManager,
     val outputCommitCoordinator: OutputCommitCoordinator,
-    val oapManager: OapManager,
     val conf: SparkConf) extends Logging {
 
   private[spark] var isStopped = false
@@ -88,6 +84,7 @@ class SparkEnv (
     if (!isStopped) {
       isStopped = true
       pythonWorkers.values.foreach(_.stop())
+      OapRuntime.stop()
       mapOutputTracker.stop()
       shuffleManager.stop()
       broadcastManager.stop()
@@ -95,7 +92,6 @@ class SparkEnv (
       blockManager.master.stop()
       metricsSystem.stop()
       outputCommitCoordinator.stop()
-      oapManager.stop()
       rpcEnv.shutdown()
       rpcEnv.awaitTermination()
 
@@ -378,20 +374,6 @@ object SparkEnv extends Logging {
       new OutputCommitCoordinatorEndpoint(rpcEnv, outputCommitCoordinator))
     outputCommitCoordinator.coordinatorRef = Some(outputCommitCoordinatorRef)
 
-    val oapRpcManagerMasterEndpoint = new OapRpcManagerMasterEndpoint(rpcEnv, listenerBus)
-    val oapRpcDriverEndpoint = registerOrLookupEndpoint(
-      OapRpcManagerMaster.DRIVER_ENDPOINT_NAME, oapRpcManagerMasterEndpoint)
-
-    val oapRpcManager = if (isDriver && !isLocal) {
-      new OapRpcManagerMaster(oapRpcManagerMasterEndpoint)
-    } else {
-      new OapRpcManagerSlave(rpcEnv, oapRpcDriverEndpoint, executorId, blockManager, conf)
-    }
-
-    val oapMetricsManager = new OapMetricsManager
-
-    val oapManager = new OapManager(oapRpcManager, oapMetricsManager)
-
     val envInstance = new SparkEnv(
       executorId,
       rpcEnv,
@@ -406,7 +388,6 @@ object SparkEnv extends Logging {
       metricsSystem,
       memoryManager,
       outputCommitCoordinator,
-      oapManager,
       conf)
 
     // Add a reference to tmp dir created by driver, we will delete this tmp dir when stop() is

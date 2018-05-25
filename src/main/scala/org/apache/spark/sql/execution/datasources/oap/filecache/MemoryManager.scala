@@ -34,35 +34,26 @@ import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
  * Memory Manager
  *
  * Acquire fixed amount of memory from spark during initialization.
- *
- * TODO: Should change object to class for better initialization.
- * For example, we can't test two MemoryManger in one test suite.
  */
-private[oap] object MemoryManager extends Logging {
+private[sql] class MemoryManager(sparkEnv: SparkEnv) extends Logging {
 
-  /**
-   * Dummy block id to acquire memory from [[org.apache.spark.memory.MemoryManager]]
-   *
-   * NOTE: We do acquire some memory from Spark without adding a Block into[[BlockManager]]
-   * It may cause consistent problem.
-   * (i.e. total size of blocks in BlockManager is not equal to Spark used storage memory)
-   */
-  private val DUMMY_BLOCK_ID = TestBlockId("oap_memory_request_block")
+  private lazy val memoryManager = sparkEnv.memoryManager
 
-  // TODO: a config to control max memory size
-  private val (_cacheMemory, _cacheGuardianMemory) = {
-    assert(SparkEnv.get != null, "Oap can't run without SparkContext")
-    val memoryManager = SparkEnv.get.memoryManager
+  private lazy val oapMemory = {
     assert(memoryManager.maxOffHeapStorageMemory > 0, "Oap can't run without offHeap memory")
-    val useOffHeapRatio = SparkEnv.get.conf.getDouble(
+    val useOffHeapRatio = sparkEnv.conf.getDouble(
       OapConf.OAP_FIBERCACHE_USE_OFFHEAP_RATIO.key,
       OapConf.OAP_FIBERCACHE_USE_OFFHEAP_RATIO.defaultValue.get)
     logInfo(s"Oap use ${useOffHeapRatio * 100}% of 'spark.memory.offHeap.size' for fiber cache.")
     assert(useOffHeapRatio > 0 && useOffHeapRatio <1,
       "OapConf 'spark.sql.oap.fiberCache.use.offheap.ratio' must more than 0 and less than 1.")
-    val oapMemory = (memoryManager.maxOffHeapStorageMemory * useOffHeapRatio).toLong
+    (memoryManager.maxOffHeapStorageMemory * useOffHeapRatio).toLong
+  }
+
+  // TODO: a config to control max memory size
+  private val (_cacheMemory, _cacheGuardianMemory) = {
     if (memoryManager.acquireStorageMemory(
-      DUMMY_BLOCK_ID, oapMemory, MemoryMode.OFF_HEAP)) {
+      MemoryManager.DUMMY_BLOCK_ID, oapMemory, MemoryMode.OFF_HEAP)) {
       // TODO: make 0.9, 0.1 configurable
       ((oapMemory * 0.9).toLong, (oapMemory * 0.1).toLong)
     } else {
@@ -122,4 +113,21 @@ private[oap] object MemoryManager extends Logging {
     val memoryBlock = allocate(length)
     FiberCache(memoryBlock)
   }
+
+  def stop(): Unit = {
+    memoryManager.releaseStorageMemory(oapMemory, MemoryMode.OFF_HEAP)
+  }
+}
+
+private[filecache] object MemoryManager {
+  /**
+   * Dummy block id to acquire memory from [[org.apache.spark.memory.MemoryManager]]
+   *
+   * NOTE: We do acquire some memory from Spark without adding a Block into[[BlockManager]]
+   * It may cause consistent problem.
+   * (i.e. total size of blocks in BlockManager is not equal to Spark used storage memory)
+   *
+   * TODO should avoid using [[TestBlockId]]
+   */
+  private val DUMMY_BLOCK_ID = TestBlockId("oap_memory_request_block")
 }

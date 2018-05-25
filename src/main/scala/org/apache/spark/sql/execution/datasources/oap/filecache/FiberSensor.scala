@@ -52,8 +52,6 @@ private[oap] case class IndexFiberCacheStatus(file: String, meta: IndexMeta)
 // TODO FiberSensor doesn't consider the fiber cache, but only the number of cached
 // fiber count
 private[oap] trait AbstractFiberSensor extends Logging {
-  val OAP_CACHE_HOST_PREFIX = "OAP_HOST_"
-  val OAP_CACHE_EXECUTOR_PREFIX = "_OAP_EXECUTOR_"
   case class HostFiberCache(host: String, status: FiberCacheStatus)
 
   private val fileToHost = new ConcurrentHashMap[String, HostFiberCache]
@@ -61,8 +59,8 @@ private[oap] trait AbstractFiberSensor extends Logging {
   def update(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
     val updateExecId = fiberInfo.executorId
     val updateHostName = fiberInfo.hostName
-    val host = OAP_CACHE_HOST_PREFIX + updateHostName +
-      OAP_CACHE_EXECUTOR_PREFIX + updateExecId
+    val host = FiberSensor.OAP_CACHE_HOST_PREFIX + updateHostName +
+      FiberSensor.OAP_CACHE_EXECUTOR_PREFIX + updateExecId
     val fibersOnExecutor = CacheStatusSerDe.deserialize(fiberInfo.customizedInfo)
     logDebug(s"Got updated fiber info from host: $updateHostName, executorId: $updateExecId," +
       s"host is $host, info array len is ${fibersOnExecutor.size}")
@@ -92,7 +90,12 @@ private[oap] trait AbstractFiberSensor extends Logging {
   }
 }
 
-object FiberSensor extends AbstractFiberSensor
+private[oap] object FiberSensor {
+  val OAP_CACHE_HOST_PREFIX = "OAP_HOST_"
+  val OAP_CACHE_EXECUTOR_PREFIX = "_OAP_EXECUTOR_"
+}
+
+private[sql] class FiberSensor extends AbstractFiberSensor
 
 object FiberCacheManagerSensor extends AbstractFiberSensor {
   val executorToCacheManager = new ConcurrentHashMap[String, CacheStats]()

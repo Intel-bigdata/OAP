@@ -83,23 +83,26 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
   }
 }
 
-object FiberCacheManager extends Logging {
+private[sql] class FiberCacheManager(
+    sparkEnv: SparkEnv, memoryManager: MemoryManager) extends Logging {
 
   private val GUAVA_CACHE = "guava"
   private val SIMPLE_CACHE = "simple"
   private val DEFAULT_CACHE_STRATEGY = GUAVA_CACHE
 
   private val cacheBackend: OapCache = {
-    val sparkEnv = SparkEnv.get
-    assert(sparkEnv != null, "Oap can't run without SparkContext")
     val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
     if (cacheName.equals(GUAVA_CACHE)) {
-      new GuavaOapCache(MemoryManager.cacheMemory, MemoryManager.cacheGuardianMemory)
+      new GuavaOapCache(memoryManager.cacheMemory, memoryManager.cacheGuardianMemory)
     } else if (cacheName.equals(SIMPLE_CACHE)) {
       new SimpleOapCache()
     } else {
       throw new OapException(s"Unsupported cache strategy $cacheName")
     }
+  }
+
+  def stop(): Unit = {
+    cacheBackend.cleanUp()
   }
 
   // NOTE: all members' init should be placed before this line.

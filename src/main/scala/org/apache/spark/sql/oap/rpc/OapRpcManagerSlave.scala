@@ -25,6 +25,7 @@ import org.apache.spark.rpc.{RpcEndpointRef, RpcEnv, ThreadSafeRpcEndpoint}
 import org.apache.spark.sql.execution.datasources.oap.filecache.{CacheStats, FiberCacheManager}
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.rpc.OapMessages._
 import org.apache.spark.storage.BlockManager
 import org.apache.spark.util.{ThreadUtils, Utils}
@@ -37,6 +38,7 @@ private[spark] class OapRpcManagerSlave(
     val driverEndpoint: RpcEndpointRef,
     executorId: String,
     blockManager: BlockManager,
+    fiberCacheManager: FiberCacheManager,
     conf: SparkConf) extends OapRpcManager {
 
   // Send OapHeartbeatMessage to Driver timed
@@ -44,7 +46,7 @@ private[spark] class OapRpcManagerSlave(
     ThreadUtils.newDaemonSingleThreadScheduledExecutor("driver-heartbeater")
 
   private val slaveEndpoint = rpcEnv.setupEndpoint(
-    s"OapRpcManagerSlave_$executorId", new OapRpcManagerSlaveEndpoint(rpcEnv))
+    s"OapRpcManagerSlave_$executorId", new OapRpcManagerSlaveEndpoint(rpcEnv, fiberCacheManager))
 
   initialize()
   startOapHeartbeater()
@@ -52,10 +54,10 @@ private[spark] class OapRpcManagerSlave(
   protected def heartbeatMessages: Array[() => Heartbeat] = {
     Array(
       () => FiberCacheHeartbeat(
-        executorId, blockManager.blockManagerId, FiberCacheManager.status()),
+        executorId, blockManager.blockManagerId, fiberCacheManager.status()),
       () => IndexHeartbeat(executorId, blockManager.blockManagerId, OapIndexInfo.status),
       () => FiberCacheMetricsHeartbeat(executorId, blockManager.blockManagerId,
-        CacheStats.status(FiberCacheManager.cacheStats, conf)))
+        CacheStats.status(fiberCacheManager.cacheStats, conf)))
   }
 
   private def initialize() = {
@@ -95,7 +97,8 @@ private[spark] class OapRpcManagerSlave(
   }
 }
 
-private[spark] class OapRpcManagerSlaveEndpoint(override val rpcEnv: RpcEnv)
+private[spark] class OapRpcManagerSlaveEndpoint(
+    override val rpcEnv: RpcEnv, fiberCacheManager: FiberCacheManager)
   extends ThreadSafeRpcEndpoint with Logging {
 
   override def receive: PartialFunction[Any, Unit] = {
@@ -104,7 +107,8 @@ private[spark] class OapRpcManagerSlaveEndpoint(override val rpcEnv: RpcEnv)
   }
 
   private def handleOapMessage(message: OapMessage): Unit = message match {
-    case CacheDrop(indexName) => FiberCacheManager.removeIndexCache(indexName)
+    case CacheDrop(indexName) =>
+      fiberCacheManager.removeIndexCache(indexName)
     case _ =>
   }
 }

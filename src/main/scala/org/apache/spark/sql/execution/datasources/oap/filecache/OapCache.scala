@@ -43,7 +43,7 @@ trait OapCache {
   def cacheCount: Long
   def cacheStats: CacheStats
   def pendingFiberCount: Int
-  def cleanUp: Unit = {
+  def cleanUp(): Unit = {
     invalidateAll(getFibers)
     dataFiberSize.set(0L)
     dataFiberCount.set(0L)

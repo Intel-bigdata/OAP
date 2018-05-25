@@ -35,10 +35,10 @@ import org.apache.spark.sql.catalyst.plans.logical.Project
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap._
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManager
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ReadOnlyParquetFileFormat}
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.rpc.OapMessages.CacheDrop
 import org.apache.spark.sql.types._
 
@@ -226,9 +226,10 @@ case class DropIndexCommand(
 
     val scheduler = sparkSession.sparkContext.schedulerBackend
     scheduler match {
-      case scheduler: CoarseGrainedSchedulerBackend =>
-        SparkEnv.get.oapManager.rpcManager.send(CacheDrop(indexName))
-      case _: LocalSchedulerBackend => FiberCacheManager.removeIndexCache(indexName)
+      case _: CoarseGrainedSchedulerBackend =>
+        OapRuntime.getOrCreate.oapRpcManager.send(CacheDrop(indexName))
+      case _: LocalSchedulerBackend =>
+        OapRuntime.getOrCreate.fiberCacheManager.removeIndexCache(indexName)
     }
 
     relation match {

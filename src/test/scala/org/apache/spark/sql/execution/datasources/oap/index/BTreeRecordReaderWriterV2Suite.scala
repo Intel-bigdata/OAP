@@ -25,7 +25,8 @@ import org.apache.spark.{SecurityManager, TaskContext, TaskContextImpl}
 import org.apache.spark.memory.{TaskMemoryManager, TestMemoryManager}
 import org.apache.spark.metrics.MetricsSystem
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryManager}
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
 
@@ -64,7 +65,7 @@ class BTreeRecordReaderWriterV2Suite extends SharedOapContext {
     override def readFiberCache(position: Long, length: Int): FiberCache = {
       // Note: Use DataFiberCache instead of IndexFiberCache to reuse current interface
       // DataFiberCache and IndexFiberCache are identical actually.
-      MemoryManager.toDataFiberCache(read(position, length))
+      OapRuntime.getOrCreate.memoryManager.toDataFiberCache(read(position, length))
     }
 
     override def read(position: Long, length: Int): Array[Byte] = {

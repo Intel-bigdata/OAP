@@ -31,6 +31,7 @@ import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.I
 import org.apache.spark.sql.execution.datasources.oap.index.impl.IndexFileReaderImpl
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.{StatisticsManager, StatsAnalysisResult}
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.CompletionIterator
@@ -84,9 +85,10 @@ private[index] abstract class BTreeIndexRecordReader(
   protected def getBTreeFiberCache(
       offset: Long, length: Int, sectionId: Int, idx: Int): FiberCache = {
 
-    val readFunc = () => MemoryManager.toIndexFiberCache(readData(offset, length))
+    val readFunc =
+      () => OapRuntime.getOrCreate.memoryManager.toIndexFiberCache(readData(offset, length))
     val fiber = BTreeFiber(readFunc, fileReader.getName, sectionId, idx)
-    FiberCacheManager.get(fiber, configuration)
+    OapRuntime.getOrCreate.fiberCacheManager.get(fiber, configuration)
   }
 
   protected def getLongFromBuffer(buffer: Array[Byte], offset: Int): Long =

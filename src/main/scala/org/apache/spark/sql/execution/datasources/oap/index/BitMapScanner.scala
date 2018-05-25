@@ -35,6 +35,7 @@ import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.{StatisticsManager, StatsAnalysisResult}
 import org.apache.spark.sql.execution.datasources.oap.utils.NonNullKeyReader
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.util.ShutdownHookManager
 
 private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
@@ -78,12 +79,15 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   override def next(): Int = bmRowIdIterator.next()
 
+  private def memoryManager = OapRuntime.getOrCreate.memoryManager
+  private def fiberCacheManager = OapRuntime.getOrCreate.fiberCacheManager
+
   private def loadBmFooter(fin: FSDataInputStream, bmFooterOffset: Int): FiberCache = {
-    MemoryManager.toIndexFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE)
+    memoryManager.toIndexFiberCache(fin, bmFooterOffset, BITMAP_FOOTER_SIZE)
   }
 
   private def loadBmStatsContent(fin: FSDataInputStream, offset: Long, size: Long): FiberCache = {
-    MemoryManager.toIndexFiberCache(fin, offset, size.toInt)
+    memoryManager.toIndexFiberCache(fin, offset, size.toInt)
   }
 
   private def cacheBitmapFooterSegment(idxPath: Path, conf: Configuration): Unit = {
@@ -101,7 +105,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
         idxPath.toString, BitmapIndexSectionId.footerSection, 0)
     }
     if (bmFooterCache == null) {
-      bmFooterCache = FiberCacheManager.get(bmFooterFiber, conf)
+      bmFooterCache = fiberCacheManager.get(bmFooterFiber, conf)
 
       // Calculate total rows right after footer cache is loaded.
       _totalRows = bmFooterCache.getInt(IndexUtils.INT_SIZE * 7)
@@ -126,7 +130,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       val bmStatsContentFiber = BitmapFiber(
         () => loadBmStatsContent(fin, statsOffset, statsSize),
         indexPath.toString, BitmapIndexSectionId.statsContentSection, 0)
-      bmStatsContentCache = FiberCacheManager.get(bmStatsContentFiber, conf)
+      bmStatsContentCache = fiberCacheManager.get(bmStatsContentFiber, conf)
 
       val stats = StatisticsManager.read(bmStatsContentCache, 0, keySchema)
       StatisticsManager.analyse(stats, intervalArray, conf)
@@ -157,7 +161,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
   private def loadBmKeyList(fin: FSDataInputStream, bmUniqueKeyListOffset: Int): FiberCache = {
     // TODO: seems not supported yet on my local dev machine(hadoop is 2.7.3).
     // fin.setReadahead(bmUniqueKeyListTotalSize)
-    MemoryManager.toIndexFiberCache(fin, bmUniqueKeyListOffset, bmUniqueKeyListTotalSize)
+    memoryManager.toIndexFiberCache(fin, bmUniqueKeyListOffset, bmUniqueKeyListTotalSize)
   }
 
   private def readBmUniqueKeyListFromCache(data: FiberCache): IndexedSeq[InternalRow] = {
@@ -172,19 +176,19 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
 
   private def loadBmEntryList(
       fin: FSDataInputStream, bmEntryListOffset: Int, bmEntryListTotalSize: Int): FiberCache = {
-    MemoryManager.toIndexFiberCache(fin, bmEntryListOffset, bmEntryListTotalSize)
+    memoryManager.toIndexFiberCache(fin, bmEntryListOffset, bmEntryListTotalSize)
   }
 
   private def loadBmOffsetList(
       fin: FSDataInputStream,
       bmOffsetListOffset: Int,
       bmOffsetListTotalSize: Int): FiberCache = {
-    MemoryManager.toIndexFiberCache(fin, bmOffsetListOffset, bmOffsetListTotalSize)
+    memoryManager.toIndexFiberCache(fin, bmOffsetListOffset, bmOffsetListTotalSize)
   }
 
   private def loadBmNullList(
       fin: FSDataInputStream, bmNullEntryOffset: Int, bmNullEntrySize: Int): FiberCache = {
-    MemoryManager.toIndexFiberCache(fin, bmNullEntryOffset, bmNullEntrySize)
+    memoryManager.toIndexFiberCache(fin, bmNullEntryOffset, bmNullEntrySize)
   }
 
   private def checkVersionNum(versionNum: Int, fin: FSDataInputStream): Unit = {
@@ -221,22 +225,22 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       bmUniqueKeyListFiber = BitmapFiber(
         () => loadBmKeyList(fin, bmUniqueKeyListOffset),
         idxPath.toString, BitmapIndexSectionId.keyListSection, 0)
-      bmUniqueKeyListCache = FiberCacheManager.get(bmUniqueKeyListFiber, conf)
+      bmUniqueKeyListCache = fiberCacheManager.get(bmUniqueKeyListFiber, conf)
 
       bmEntryListFiber = BitmapFiber(
         () => loadBmEntryList(fin, bmEntryListOffset, bmEntryListTotalSize),
         idxPath.toString, BitmapIndexSectionId.entryListSection, 0)
-      bmEntryListCache = FiberCacheManager.get(bmEntryListFiber, conf)
+      bmEntryListCache = fiberCacheManager.get(bmEntryListFiber, conf)
 
       bmOffsetListFiber = BitmapFiber(
         () => loadBmOffsetList(fin, bmOffsetListOffset, bmOffsetListTotalSize),
         idxPath.toString, BitmapIndexSectionId.entryOffsetsSection, 0)
-      bmOffsetListCache = FiberCacheManager.get(bmOffsetListFiber, conf)
+      bmOffsetListCache = fiberCacheManager.get(bmOffsetListFiber, conf)
 
       bmNullListFiber = BitmapFiber(
         () => loadBmNullList(fin, bmNullEntryOffset, bmNullEntrySize),
         idxPath.toString, BitmapIndexSectionId.entryNullSection, 0)
-      bmNullListCache = FiberCacheManager.get(bmNullListFiber, conf)
+      bmNullListCache = fiberCacheManager.get(bmNullListFiber, conf)
     } finally {
       try {
         if (fin != null) {
