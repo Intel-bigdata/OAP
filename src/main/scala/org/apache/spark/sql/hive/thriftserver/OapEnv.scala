@@ -37,8 +37,6 @@ private[hive] object OapEnv extends Logging {
   def init() {
     if (sqlContext == null) {
       val sparkConf = new SparkConf(loadDefaults = true)
-      val maybeSerializer = sparkConf.getOption("spark.serializer")
-      val maybeKryoReferenceTracking = sparkConf.getOption("spark.kryo.referenceTracking")
       // If user doesn't specify the appName, we want to get [SparkSQL::localHostName] instead of
       // the default appName [SparkSQLCLIDriver] in cli or beeline.
       val maybeAppName = sparkConf
@@ -47,12 +45,6 @@ private[hive] object OapEnv extends Logging {
 
       sparkConf
         .setAppName(maybeAppName.getOrElse(s"SparkSQL::${Utils.localHostName()}"))
-        .set(
-          "spark.serializer",
-          maybeSerializer.getOrElse("org.apache.spark.serializer.KryoSerializer"))
-        .set(
-          "spark.kryo.referenceTracking",
-          maybeKryoReferenceTracking.getOrElse("false"))
 
       val sparkSession = OapSession.builder.config(sparkConf).enableHiveSupport().getOrCreate()
       sparkContext = sparkSession.sparkContext
