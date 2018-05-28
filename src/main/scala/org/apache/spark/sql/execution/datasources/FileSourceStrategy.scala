@@ -99,8 +99,13 @@ object FileSourceStrategy extends Strategy with Logging {
               _fsRelation.options,
               selectedPartitions.flatMap(p => p.files))
 
-          if (oapFileFormat.hasAvailableIndex(normalizedFilters)) {
-            logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
+          def needToConvert: Boolean = {
+            oapFileFormat.hasAvailableIndex(normalizedFilters) ||
+            _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
+          }
+
+          if (needToConvert) {
+            logInfo("needToConvert = true, will replace with OapFileFormat.")
             val parquetOptions: Map[String, String] =
               Map(SQLConf.PARQUET_BINARY_AS_STRING.key ->
                 _fsRelation.sparkSession.sessionState.conf.isParquetBinaryAsString.toString,
@@ -114,7 +119,7 @@ object FileSourceStrategy extends Strategy with Logging {
               options = parquetOptions)(_fsRelation.sparkSession)
 
           } else {
-            logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
+            logInfo("needToConvert = false, will retain ParquetFileFormat.")
             _fsRelation
           }
 
