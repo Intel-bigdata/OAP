@@ -84,6 +84,7 @@ class DataFileSuite extends QueryTest with SharedOapContext {
       val datafile2 =
         DataFile(file, schema, OapFileFormat.PARQUET_DATA_FILE_CLASSNAME, config)
       assert(datafile1.equals(datafile2))
+      assert(datafile1.hashCode() == datafile2.hashCode())
     }
 
     withTempPath { dir =>
@@ -95,6 +96,7 @@ class DataFileSuite extends QueryTest with SharedOapContext {
       val datafile2 =
         DataFile(file, schema, OapFileFormat.OAP_DATA_FILE_CLASSNAME, config)
       assert(datafile1.equals(datafile2))
+      assert(datafile1.hashCode() == datafile2.hashCode())
     }
   }
 }
