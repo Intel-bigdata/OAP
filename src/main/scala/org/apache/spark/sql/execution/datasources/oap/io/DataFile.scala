@@ -45,6 +45,11 @@ abstract class DataFile {
     : OapIterator[InternalRow]
 
   def totalRows(): Long
+  override def hashCode(): Int = path.hashCode
+  override def equals(other: Any): Boolean = other match {
+    case df: DataFile => path.equals(df.path)
+    case _ => false
+  }
 }
 
 private[oap] class OapIterator[T](inner: Iterator[T]) extends Iterator[T] with Closeable {
