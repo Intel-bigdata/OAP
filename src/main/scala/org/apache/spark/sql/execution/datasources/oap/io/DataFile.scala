@@ -39,7 +39,7 @@ abstract class DataFile {
   def configuration: Configuration
 
   def getDataFileMeta(): DataFileMeta
-  def getFiberData(groupId: Int, fiberId: Int): FiberCache
+  def cache(groupId: Int, fiberId: Int): FiberCache
   def iterator(requiredIds: Array[Int], filters: Seq[Filter] = Nil): OapIterator[InternalRow]
   def iteratorWithRowIds(requiredIds: Array[Int], rowIds: Array[Int], filters: Seq[Filter] = Nil)
     : OapIterator[InternalRow]

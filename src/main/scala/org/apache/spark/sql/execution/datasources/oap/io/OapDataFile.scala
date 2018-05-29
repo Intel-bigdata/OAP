@@ -92,7 +92,7 @@ private[oap] case class OapDataFile(
     }
   }
 
-  def getFiberData(groupId: Int, fiberId: Int): FiberCache = {
+  def cache(groupId: Int, fiberId: Int): FiberCache = {
     val groupMeta = meta.rowGroupsMeta(groupId)
     val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
 

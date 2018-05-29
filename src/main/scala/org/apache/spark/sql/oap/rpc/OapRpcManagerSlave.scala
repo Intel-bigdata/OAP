@@ -107,8 +107,7 @@ private[spark] class OapRpcManagerSlaveEndpoint(
   }
 
   private def handleOapMessage(message: OapMessage): Unit = message match {
-    case CacheDrop(indexName) =>
-      fiberCacheManager.removeIndexCache(indexName)
+    case CacheDrop(indexName) => fiberCacheManager.releaseIndexCache(indexName)
     case _ =>
   }
 }

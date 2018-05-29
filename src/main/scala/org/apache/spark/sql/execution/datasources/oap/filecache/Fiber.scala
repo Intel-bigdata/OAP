@@ -22,12 +22,12 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.execution.datasources.oap.io.DataFile
 
 private[oap] trait Fiber {
-  def fiber2Data(conf: Configuration): FiberCache
+  def cache(conf: Configuration): FiberCache
 }
 
 private[oap] case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache =
-    file.getFiberData(rowGroupId, columnIndex)
+  override def cache(conf: Configuration): FiberCache =
+    file.cache(rowGroupId, columnIndex)
 
   override def hashCode(): Int = (file.path + columnIndex + rowGroupId).hashCode
 
@@ -49,7 +49,7 @@ private[oap] case class BTreeFiber(
     file: String,
     section: Int,
     idx: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+  override def cache(conf: Configuration): FiberCache = getFiberData()
 
   override def hashCode(): Int = (file + section + idx).hashCode
 
@@ -73,7 +73,7 @@ private[oap] case class BitmapFiber(
     sectionIdxOfFile: Int,
     // "0" means no smaller loading units.
     loadUnitIdxOfSection: Int) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getFiberData()
+  override def cache(conf: Configuration): FiberCache = getFiberData()
 
   override def hashCode(): Int = (file + sectionIdxOfFile + loadUnitIdxOfSection).hashCode
 
@@ -91,7 +91,7 @@ private[oap] case class BitmapFiber(
 }
 
 private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
-  override def fiber2Data(conf: Configuration): FiberCache = getData()
+  override def cache(conf: Configuration): FiberCache = getData()
 
   override def hashCode(): Int = name.hashCode()
 

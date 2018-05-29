@@ -229,7 +229,7 @@ case class DropIndexCommand(
       case _: CoarseGrainedSchedulerBackend =>
         OapRuntime.getOrCreate.oapRpcManager.send(CacheDrop(indexName))
       case _: LocalSchedulerBackend =>
-        OapRuntime.getOrCreate.fiberCacheManager.removeIndexCache(indexName)
+        OapRuntime.getOrCreate.fiberCacheManager.releaseIndexCache(indexName)
     }
 
     relation match {
