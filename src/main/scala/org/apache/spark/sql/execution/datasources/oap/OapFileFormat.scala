@@ -287,7 +287,7 @@ private[sql] class OapFileFormat extends FileFormat
               None
             }
             val reader = new OapDataReader(
-              new Path(new URI(file.filePath)), m, filterScanners, requiredIds, context)
+              file.filePath, m, filterScanners, requiredIds, context)
             val iter = reader.initialize(conf, options, filters)
             Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
             val totalRows = reader.totalRows()

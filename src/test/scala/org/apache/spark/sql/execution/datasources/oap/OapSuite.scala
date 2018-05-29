@@ -100,12 +100,12 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
       val df = sqlContext.read.format("oap").load(path.getAbsolutePath)
       df.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
       val compressionType =
-        sqlConf.getConfString(OapConf.OAP_COMPRESSION.key).toLowerCase()
+        sqlConf.getConfString(OapConf.OAP_COMPRESSION.key).toLowerCase
       val fileNameIterator = path.listFiles()
       for (fileName <- fileNameIterator) {
         if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
           // If the OAP data file is uncompressed, keep the original file name.
-          if (!codec.toUpperCase().matches("UNCOMPRESSED")) {
+          if (!codec.toUpperCase.matches("UNCOMPRESSED")) {
             assert(fileName.toString.contains(compressionType))
           } else {
             assert(!fileName.toString.contains(compressionType))
@@ -139,7 +139,7 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     withIndex(TestIndex("oap_table", "oap_idx")) {
       sql("create oindex oap_idx on oap_table (a)")
       val conf = configuration
-      val filePath = new Path(oapDataFile.toString)
+      val filePath = oapDataFile.toString
       val metaPath = new Path(oapMetaFile.toString)
       val dataSourceMeta = DataSourceMeta.initialize(metaPath, conf)
       val requiredIds = Array(0, 1)
@@ -172,7 +172,7 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
     val useIndex2 = false
     val rawData1 = OapIndexInfoStatus(path1, useIndex1)
     val rawData2 = OapIndexInfoStatus(path2, useIndex2)
-    OapIndexInfo.partitionOapIndex.clear
+    OapIndexInfo.partitionOapIndex.clear()
     OapIndexInfo.partitionOapIndex.put(path1, useIndex1)
     OapIndexInfo.partitionOapIndex.put(path2, useIndex2)
     val indexInfoStatusSerializeStr = OapIndexInfo.status

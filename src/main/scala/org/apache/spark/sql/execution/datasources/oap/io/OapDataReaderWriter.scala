@@ -188,7 +188,7 @@ private[sql] object OapIndexInfo extends Logging {
 }
 
 private[oap] class OapDataReader(
-    path: Path,
+    pathStr: String,
     meta: DataSourceMeta,
     filterScanners: Option[IndexScanners],
     requiredIds: Array[Int],
@@ -204,6 +204,7 @@ private[oap] class OapDataReader(
 
   def totalRows(): Long = _totalRows
   private var _totalRows: Long = 0
+  private val path = new Path(pathStr)
 
   def initialize(
       conf: Configuration,
@@ -211,7 +212,7 @@ private[oap] class OapDataReader(
       filters: Seq[Filter] = Nil): OapIterator[InternalRow] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
-    val fileScanner = DataFile(path.toString, meta.schema, meta.dataReaderClassName, conf)
+    val fileScanner = DataFile(pathStr, meta.schema, meta.dataReaderClassName, conf)
     if (meta.dataReaderClassName.contains("ParquetDataFile")) {
       fileScanner.asInstanceOf[ParquetDataFile].setVectorizedContext(context)
     }
