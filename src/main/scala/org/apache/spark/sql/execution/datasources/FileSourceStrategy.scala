@@ -101,7 +101,8 @@ object FileSourceStrategy extends Strategy with Logging {
 
           def needToConvert: Boolean = {
             oapFileFormat.hasAvailableIndex(normalizedFilters) ||
-            _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
+            (_fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED) &&
+             _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_FULL_SCAN_ENABLED))
           }
 
           if (needToConvert) {

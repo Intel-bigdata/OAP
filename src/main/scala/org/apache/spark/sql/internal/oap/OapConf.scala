@@ -227,4 +227,11 @@ object OapConf {
       .doc("To indicate if enable parquet data cache, default false")
       .booleanConf
       .createWithDefault(false)
+
+  val OAP_PARQUET_DATA_CACHE_FULL_SCAN_ENABLED =
+    SQLConfigBuilder("spark.sql.oap.parquet.data.cache.full.scan.enable")
+      .internal()
+      .doc("To indicate if enable parquet full table scan with data cache, default false")
+      .booleanConf
+      .createWithDefault(false)
 }
