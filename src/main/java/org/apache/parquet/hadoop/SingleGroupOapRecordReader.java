@@ -79,10 +79,20 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
       columnarBatch.column(0).loadBytes(nativeAddress);
     }
 
+    @Override
     public void close() throws IOException {
       if (reset) {
         columnarBatch = null;
       }
-      super.close();
+
+      if (columnarBatch != null) {
+        columnarBatch.close();
+        columnarBatch = null;
+      }
+
+      if (reader != null) {
+        reader.closeCodecFactory();
+        reader = null;
+      }
     }
 }

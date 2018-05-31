@@ -51,11 +51,7 @@ public class OapParquetFileReader implements Closeable {
 
   public static OapParquetFileReader open(Configuration conf, Path file, ParquetMetadata footer,
       FSDataInputStream inputStream) throws IOException {
-    if (inputStream == null) {
-      return new OapParquetFileReader(new ParquetFileReader(conf, file, footer));
-    } else {
-      return new OapParquetFileReader(new ParquetFileReader(conf, file, footer, inputStream));
-    }
+    return new OapParquetFileReader(ParquetFileReader.open(conf, file, footer, inputStream));
   }
 
   public RowGroupDataAndRowIds readNextRowGroupAndRowIds() throws IOException {
@@ -126,5 +122,9 @@ public class OapParquetFileReader implements Closeable {
     public IntList getRowIds() {
       return rowIds;
     }
+  }
+
+  public void closeCodecFactory() throws IOException {
+    this.reader.closeCodecFactory();
   }
 }

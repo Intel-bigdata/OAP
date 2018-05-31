@@ -41,6 +41,33 @@ import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types._
 import org.apache.spark.util.CompletionIterator
 
+/**
+ * ParquetDataFile use xxRecordReader read Parquet Data File,
+ * RecordReader divided into 2 categories:
+ * <p><b>Vectorized Record Reader</b></p>
+ * <ol>
+ *   <li><p><b>SpecificOapRecordReaderBase:</b> base of Vectorized Record Reader, similar to
+ *     SpecificParquetRecordReaderBase, include initialize and close method.</p></li>
+ *   <li><p><b>VectorizedOapRecordReader:</b> extends SpecificOapRecordReaderBase, similar to
+ *   VectorizedParquetRecordReader, use for full table scan, support batchReturn feature.</p></li>
+ *   <li><p><b>IndexedVectorizedOapRecordReader:</b> extends VectorizedOapRecordReader, use for
+ *   indexed table scan, mark valid records in result ColumnarBatch.</p></li>
+ *   <li><p><b>SingleGroupOapRecordReader:</b> extends VectorizedOapRecordReader, only read
+ *   one RowGroup data of one column, use for load data into DataFiber.</p></li>
+ * </ol>
+ * <p><b>MapReduce Record Reader</b></p>
+ * <ol>
+ *   <li><p><b>MrOapRecordReader:</b> similar to ParquetRecordReader of parquet-hadoop module,
+ *   use for full table scan, it slow than VectorizedOapRecordReader, but can read all data types
+ *   not just AtomicType data.</p></li>
+ *   <li><p><b>IndexedMrOapRecordReader:</b> use for indexed table scan, only return row data
+ *   in rowIds, it slow than IndexedVectorizedOapRecordReader, but can read all data types
+ *   not just AtomicType data.</p></li>
+ * </ol>
+ * @param path data file path
+ * @param schema parquet data file schema
+ * @param configuration hadoop configuration
+ */
 private[oap] case class ParquetDataFile(
     path: String,
     schema: StructType,

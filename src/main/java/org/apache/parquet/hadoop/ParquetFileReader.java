@@ -862,13 +862,19 @@ public class ParquetFileReader implements Closeable {
   @Override
   public void close() throws IOException {
     try {
-    //      if (f != null) {
-    //        f.close();
-    //      }
+      if (f != null) {
+        f.close();
+      }
     } finally {
       if (codecFactory != null) {
         codecFactory.release();
       }
+    }
+  }
+
+  public void closeCodecFactory() throws IOException {
+    if (codecFactory != null) {
+      codecFactory.release();
     }
   }
 
