@@ -555,11 +555,12 @@
           <failOnViolation>true</failOnViolation>
           <includeTestSourceDirectory>true</includeTestSourceDirectory>
           <sourceDirectories>
-            <directory>{basedir}/src/main/java</directory>
-            <directory>{basedir}/src/main/scala</directory>
+            <directory>${basedir}/src/main/java</directory>
+            <directory>${basedir}/src/main/scala</directory>
           </sourceDirectories>
           <testSourceDirectories>
-            <directory>{basedir}/src/test/java</directory>
+            <directory>${basedir}/src/test/java</directory>
+            <directory>${basedir}/src/test/scala</directory>
           </testSourceDirectories>
           <configLocation>checkstyle.xml</configLocation>
           <outputFile>${basedir}/target/checkstyle-output.xml</outputFile>
