@@ -32,7 +32,6 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
 
     private int blockId;
     private int rowGroupCount;
-    private boolean reset = false;
 
     public SingleGroupOapRecordReader(
         Path file,
@@ -74,17 +73,8 @@ public class SingleGroupOapRecordReader extends VectorizedOapRecordReader {
       }
     }
 
-    public void setNativeAddress(long nativeAddress) {
-      reset = true;
-      columnarBatch.column(0).loadBytes(nativeAddress);
-    }
-
     @Override
     public void close() throws IOException {
-      if (reset) {
-        columnarBatch = null;
-      }
-
       if (columnarBatch != null) {
         columnarBatch.close();
         columnarBatch = null;

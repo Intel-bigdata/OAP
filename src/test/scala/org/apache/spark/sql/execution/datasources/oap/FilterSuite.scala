@@ -782,12 +782,11 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test parquet inner join") {
-    val data: Seq[(Int, String)] = (1 to 300).map { i => (i/10, s"$i") }
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i / 10, s"$i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
     withIndex(TestIndex("parquet_test", "index1")) {
       sql("create oindex index1 on parquet_test (a)")
-
       checkAnswer(sql("select t2.a, sum(t2.b) " +
         "from (select a from parquet_test where a = 3 ) t1 " +
         "inner join parquet_test t2 on t1.a = t2.a " +

@@ -123,7 +123,6 @@ private[oap] case class ParquetDataFile(
       val nativeAddress = if (unitLength != -1) {
         fiberCache = OapRuntime.getOrCreate.memoryManager.
           getEmptyDataFiberCache(rowGroupRowCount * unitLength)
-        // reader.setNativeAddress(fiberCache.getBaseOffset)
         fiberCache.getBaseOffset
       } else {
         -1
