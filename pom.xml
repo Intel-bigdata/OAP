@@ -381,8 +381,8 @@
         <configuration>
           <verbose>false</verbose>
           <failOnViolation>true</failOnViolation>
-          <includeTestSourceDirectory>false</includeTestSourceDirectory>
           <failOnWarning>false</failOnWarning>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
           <sourceDirectory>src/main/scala</sourceDirectory>
           <testSourceDirectory>src/test/scala</testSourceDirectory>
           <configLocation>scalastyle-config.xml</configLocation>
@@ -554,8 +554,13 @@
         <configuration>
           <failOnViolation>true</failOnViolation>
           <includeTestSourceDirectory>true</includeTestSourceDirectory>
-          <sourceDirectories>${basedir}/src/main/java,${basedir}/src/main/scala</sourceDirectories>
-          <testSourceDirectories>${basedir}/src/test/java</testSourceDirectories>
+          <sourceDirectories>
+            <directory>{basedir}/src/main/java</directory>
+            <directory>{basedir}/src/main/scala</directory>
+          </sourceDirectories>
+          <testSourceDirectories>
+            <directory>{basedir}/src/test/java</directory>
+          </testSourceDirectories>
           <configLocation>checkstyle.xml</configLocation>
           <outputFile>${basedir}/target/checkstyle-output.xml</outputFile>
           <inputEncoding>${project.build.sourceEncoding}</inputEncoding>

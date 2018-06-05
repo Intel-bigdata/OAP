@@ -18,8 +18,8 @@
 package org.apache.spark.sql.test
 
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.DebugFilesystem
+import org.apache.spark.sql.SparkSession
 
 /**
  * A special [[SparkSession]] prepared for OAP testing.

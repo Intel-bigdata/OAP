@@ -66,8 +66,8 @@ class OapRpcManagerSuite extends SparkFunSuite with BeforeAndAfterEach with Priv
   }
 
   /**
-    * After each test, clean up all state and stop the [[SparkContext]].
-    */
+   * After each test, clean up all state and stop the [[SparkContext]].
+   */
   override def afterEach(): Unit = {
     super.afterEach()
     sc = null
@@ -104,7 +104,7 @@ class OapRpcManagerSuite extends SparkFunSuite with BeforeAndAfterEach with Priv
     Thread.sleep(2000 + 2 * sc.conf.getTimeAsMs(
       OapConf.OAP_HEARTBEAT_INTERVAL.key, OapConf.OAP_HEARTBEAT_INTERVAL.defaultValue.get))
     verify(rpcManagerMasterEndpoint, new AtLeast(1)).invokePrivate(_handleHeartbeat(heartbeat))
-    
+
     rpcManagerSlave1.stop()
   }
 

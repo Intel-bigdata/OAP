@@ -700,9 +700,9 @@ class ColumnarBatchSuite extends SparkFunSuite {
     }}
 
   /**
-    * This test generates a random schema data, serializes it to column batches and verifies the
-    * results.
-    */
+   * This test generates a random schema data, serializes it to column batches and verifies the
+   * results.
+   */
   def testRandomRows(flatSchema: Boolean, numFields: Int) {
     // TODO: Figure out why StringType doesn't work on jenkins.
     val types = Array(

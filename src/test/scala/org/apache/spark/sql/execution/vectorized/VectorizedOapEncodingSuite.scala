@@ -18,7 +18,7 @@ package org.apache.spark.sql.execution.vectorized
 
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER
-import org.apache.parquet.hadoop.{ParquetFileReader, OapParquetFileReader, ParquetOutputFormat, VectorizedOapRecordReader}
+import org.apache.parquet.hadoop.{OapParquetFileReader, ParquetFileReader, ParquetOutputFormat, VectorizedOapRecordReader}
 
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetCompatibilityTest, ParquetReadSupportWrapper, SpecificParquetRecordReaderBase}
 import org.apache.spark.sql.test.oap.SharedOapContext
