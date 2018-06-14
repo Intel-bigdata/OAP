@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.filter2.compat.FilterCompat;
@@ -47,11 +46,6 @@ public class OapParquetFileReader implements Closeable {
   public static OapParquetFileReader open(Configuration conf, Path file, ParquetMetadata footer)
           throws IOException {
     return new OapParquetFileReader(new ParquetFileReader(conf, file, footer));
-  }
-
-  public static OapParquetFileReader open(Configuration conf, Path file, ParquetMetadata footer,
-      FSDataInputStream inputStream) throws IOException {
-    return new OapParquetFileReader(ParquetFileReader.open(conf, file, footer, inputStream));
   }
 
   public RowGroupDataAndRowIds readNextRowGroupAndRowIds() throws IOException {
@@ -122,9 +116,5 @@ public class OapParquetFileReader implements Closeable {
     public IntList getRowIds() {
       return rowIds;
     }
-  }
-
-  public void closeCodecFactory() throws IOException {
-    this.reader.closeCodecFactory();
   }
 }

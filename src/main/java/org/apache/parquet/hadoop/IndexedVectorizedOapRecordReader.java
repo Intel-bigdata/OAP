@@ -74,7 +74,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     @Override
     public void initialize() throws IOException, InterruptedException {
       // use indexedFooter read data, need't do filterRowGroups.
-      initialize(footer.toParquetMetadata(globalRowIds), configuration, false, null);
+      initialize(footer.toParquetMetadata(globalRowIds), configuration, false);
       super.initializeInternal();
     }
 

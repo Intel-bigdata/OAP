@@ -22,7 +22,7 @@ import java.io.Closeable
 import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataInputStream, Path}
+import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.hadoop._
 import org.apache.parquet.hadoop.api.RecordReader
@@ -31,7 +31,6 @@ import org.apache.parquet.hadoop.metadata.{IndexedBlockMetaData, OrderedBlockMet
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
-import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper
 import org.apache.spark.sql.execution.vectorized.{ColumnarBatch, ColumnVectorUtils}
@@ -79,7 +78,8 @@ private[oap] case class ParquetDataFile(
   private val parquetDataCacheEnable =
     configuration.getBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key,
       OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.defaultValue.get)
-  private var inputStream: FSDataInputStream = _
+
+  private var fiberDataReader: ParquetFiberDataReader = _
 
   private val inUseFiberCache = new Array[FiberCache](schema.length)
 
@@ -96,21 +96,22 @@ private[oap] case class ParquetDataFile(
   }
 
   def cache(groupId: Int, fiberId: Int): FiberCache = {
-    var reader: SingleGroupOapRecordReader = null
-    if (inputStream == null) {
-      inputStream = file.getFileSystem(configuration).open(file)
+    var loader: ParquetFiberDataLoader = null
+
+    if(fiberDataReader == null) {
+      // TODO Is there ParquetFooter enough?
+      fiberDataReader =
+        ParquetFiberDataReader.open(configuration, file, meta.footer.toParquetMetadata)
     }
+
     try {
       val conf = new Configuration(configuration)
-      val rowGroupRowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
+      val rowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
       // read a single column for each group.
       // comments: Parquet vectorized read can get multi-columns every time. However,
       // the minimum unit of cache is one column of one group.
       addRequestSchemaToConf(conf, Array(fiberId))
-      reader = new SingleGroupOapRecordReader(file, conf, meta.footer, groupId, rowGroupRowCount)
-      reader.initialize(inputStream)
-      reader.initBatch()
-      reader.enableReturningBatches()
+      loader = new ParquetFiberDataLoader(conf, fiberDataReader, groupId, rowCount)
       val unitLength = schema(fiberId).dataType match {
         case ByteType | BooleanType => 2
         case ShortType => 3
@@ -122,29 +123,24 @@ private[oap] case class ParquetDataFile(
 
       val nativeAddress = if (unitLength != -1) {
         fiberCache = OapRuntime.getOrCreate.memoryManager.
-          getEmptyDataFiberCache(rowGroupRowCount * unitLength)
+          getEmptyDataFiberCache(rowCount * unitLength)
         fiberCache.getBaseOffset
       } else {
         -1
       }
 
-      if (reader.nextBatch()) {
-          val data = reader.getCurrentValue.asInstanceOf[ColumnarBatch].column(0).
-            dumpBytes(nativeAddress)
-          if (data != null) {
-            OapRuntime.getOrCreate.memoryManager.toDataFiberCache(data)
-          } else {
-            fiberCache
-          }
+      val data = loader.load().column(0).dumpBytes(nativeAddress)
+      if (data != null) {
+        OapRuntime.getOrCreate.memoryManager.toDataFiberCache(data)
       } else {
-        throw new OapException("buildFiberByteData never reach to here!")
+        fiberCache
       }
     } finally {
-      if (reader != null) {
+      if (loader != null) {
         try {
-          reader.close()
+          loader.close()
         } finally {
-          reader = null
+          loader = null
         }
       }
     }
@@ -177,8 +173,8 @@ private[oap] case class ParquetDataFile(
       override def close(): Unit = {
         // To ensure if any exception happens, caches are still released after calling close()
         inUseFiberCache.indices.foreach(release)
-        if (inputStream != null) {
-          inputStream.close()
+        if (fiberDataReader != null) {
+          fiberDataReader.close()
         }
       }
     }

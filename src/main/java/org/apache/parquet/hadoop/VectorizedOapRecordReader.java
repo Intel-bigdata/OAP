@@ -145,7 +145,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
     @Override
     public void initialize() throws IOException, InterruptedException {
       // no index to use, try do filterRowGroups to skip rowgroups.
-      initialize(footer.toParquetMetadata(), configuration, true, null);
+      initialize(footer.toParquetMetadata(), configuration, true);
       initializeInternal();
     }
 
