@@ -137,11 +137,7 @@ private[oap] case class ParquetDataFile(
       }
     } finally {
       if (loader != null) {
-        try {
-          loader.close()
-        } finally {
-          loader = null
-        }
+        loader.close()
       }
     }
   }
