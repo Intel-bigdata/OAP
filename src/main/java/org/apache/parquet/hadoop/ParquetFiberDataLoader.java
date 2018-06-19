@@ -20,8 +20,8 @@ import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper;
 import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReader;
 import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReaderWrapper;
-import org.apache.spark.sql.execution.vectorized.ColumnarBatch;
-import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.execution.vectorized.ColumnVector;
+import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructType$;
 
@@ -32,7 +32,7 @@ public class ParquetFiberDataLoader implements Closeable {
 
   private final Configuration configuration;
   private final ParquetFiberDataReader reader;
-  private ColumnarBatch columnarBatch;
+  private ColumnVector columnVector;
 
   public ParquetFiberDataLoader(
       Configuration configuration,
@@ -45,7 +45,7 @@ public class ParquetFiberDataLoader implements Closeable {
     this.rowGroupCount = rowGroupCount;
   }
 
-  public ColumnarBatch load() throws IOException {
+  public ColumnVector load() throws IOException {
     ParquetMetadata footer = reader.getFooter();
     MessageType fileSchema = footer.getFileMetaData().getSchema();
     Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
@@ -57,16 +57,12 @@ public class ParquetFiberDataLoader implements Closeable {
     StructType sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
     boolean isMissing = isMissingColumn(fileSchema, requestedSchema);
 
-
-    StructType batchSchema = new StructType();
-    for (StructField f : sparkSchema.fields()) {
-      batchSchema = batchSchema.add(f);
-    }
-    columnarBatch = ColumnarBatch.allocate(batchSchema, MemoryMode.ON_HEAP, rowGroupCount);
+    DataType dataType = sparkSchema.fields()[0].dataType();
+    columnVector =ColumnVector.allocate(rowGroupCount, dataType, MemoryMode.ON_HEAP);
 
     if(isMissing) {
-      columnarBatch.column(0).putNulls(0, columnarBatch.capacity());
-      columnarBatch.column(0).setIsConstant();
+      columnVector.putNulls(0, rowGroupCount);
+      columnVector.setIsConstant();
     } else {
       // add assert requestedSchema.getColumns().size must 1.
       ColumnDescriptor columnDescriptor = requestedSchema.getColumns().get(0);
@@ -75,10 +71,10 @@ public class ParquetFiberDataLoader implements Closeable {
       VectorizedColumnReaderWrapper columnReader = new VectorizedColumnReaderWrapper(
               new VectorizedColumnReader(columnDescriptor,
                       pageReadStore.getPageReader(columnDescriptor)));
-      columnReader.readBatch(rowGroupCount, columnarBatch.column(0));
+      columnReader.readBatch(rowGroupCount, columnVector);
     }
 
-    return columnarBatch;
+    return columnVector;
   }
 
   private boolean isMissingColumn(
@@ -107,11 +103,9 @@ public class ParquetFiberDataLoader implements Closeable {
 
   @Override
   public void close() throws IOException {
-    if(columnarBatch != null) {
-      if (columnarBatch != null) {
-        columnarBatch.close();
-        columnarBatch = null;
-      }
+    if (columnVector != null) {
+      columnVector.close();
+      columnVector = null;
     }
   }
 
