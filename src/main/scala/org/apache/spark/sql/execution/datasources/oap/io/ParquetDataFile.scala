@@ -112,11 +112,17 @@ private[oap] case class ParquetDataFile(
       // the minimum unit of cache is one column of one group.
       addRequestSchemaToConf(conf, Array(fiberId))
       loader = new ParquetFiberDataLoader(conf, fiberDataReader, groupId, rowCount)
+      // Now we only support primitive type.
       val unitLength = schema(fiberId).dataType match {
+        // data: 1 byte, nulls: 1 byte
         case ByteType | BooleanType => 2
+        // data: 2 byte, nulls: 1 byte
         case ShortType => 3
+        // data: 4 byte, nulls: 1 byte
         case IntegerType | DateType | FloatType => 5
+        // data: 8 byte, nulls: 1 byte
         case LongType | DoubleType => 9
+        // data: variable length, such as StringType and BinaryType
         case _ => -1
       }
       var fiberCache: FiberCache = null
