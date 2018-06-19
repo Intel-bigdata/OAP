@@ -95,9 +95,7 @@ public abstract class ColumnVector implements AutoCloseable {
       }
 
       @Override
-      public int numElements() {
-        return length;
-      }
+      public int numElements() { return length; }
 
       @Override
       public ArrayData copy() {
@@ -178,9 +176,7 @@ public abstract class ColumnVector implements AutoCloseable {
       }
 
       @Override
-      public boolean isNullAt(int ordinal) {
-        return data.isNullAt(offset + ordinal);
-      }
+      public boolean isNullAt(int ordinal) { return data.isNullAt(offset + ordinal); }
 
       @Override
       public boolean getBoolean(int ordinal) {
@@ -188,9 +184,7 @@ public abstract class ColumnVector implements AutoCloseable {
       }
 
       @Override
-      public byte getByte(int ordinal) {
-        return data.getByte(offset + ordinal);
-      }
+      public byte getByte(int ordinal) { return data.getByte(offset + ordinal); }
 
       @Override
       public short getShort(int ordinal) {
@@ -198,9 +192,7 @@ public abstract class ColumnVector implements AutoCloseable {
       }
 
       @Override
-      public int getInt(int ordinal) {
-        return data.getInt(offset + ordinal);
-      }
+      public int getInt(int ordinal) { return data.getInt(offset + ordinal); }
 
       @Override
       public long getLong(int ordinal) {
@@ -263,9 +255,7 @@ public abstract class ColumnVector implements AutoCloseable {
     /**
      * Returns the data type of this column.
      */
-    public final DataType dataType() {
-      return type;
-    }
+    public final DataType dataType() { return type; }
 
     /**
      * Resets this column for writing. The currently stored values are no longer accessible.
@@ -342,17 +332,13 @@ public abstract class ColumnVector implements AutoCloseable {
     /**
      * Returns the number of nulls in this column.
      */
-    public final int numNulls() {
-      return numNulls;
-    }
+    public final int numNulls() { return numNulls; }
 
     /**
      * Returns true if any of the nulls indicator are set for this column. This can be used
      * as an optimization to prevent setting nulls.
      */
-    public final boolean anyNullsSet() {
-      return anyNullsSet;
-    }
+    public final boolean anyNullsSet() { return anyNullsSet; }
 
     /**
      * Returns the off heap ptr for the arrays backing the NULLs and values buffer. Only valid

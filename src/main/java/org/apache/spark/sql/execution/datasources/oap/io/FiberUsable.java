@@ -29,13 +29,13 @@ public interface FiberUsable {
   void loadBytes(long nativeAddress);
 
   /**
-   * set prt for values buffer. Only valid
+   * set ptr for values buffer. Only valid
    * to call for off heap columns.
    */
   void setValuesNativeAddress(long nativeAddress);
 
   /**
-   * set or get prt for values buffer. Only valid
+   * set or get ptr for values buffer. Only valid
    * to call for on heap columns.
    */
   void setByteData(byte[] data);
