@@ -129,7 +129,8 @@ private[oap] case class ParquetDataFile(
         -1
       }
 
-      val data = loader.load().column(0).dumpBytes(nativeAddress)
+      val data = loader.load().column(0).asInstanceOf[FiberUsable]
+        .dumpBytes(nativeAddress)
       if (data != null) {
         OapRuntime.getOrCreate.memoryManager.toDataFiberCache(data)
       } else {
@@ -316,7 +317,8 @@ private[oap] case class ParquetDataFile(
       }
     }
     fiberCacheGroup.zipWithIndex.foreach { case (fiberCache, id) =>
-      columnarBatch.column(id).loadBytes(fiberCache.getBaseOffset)
+      columnarBatch.column(id).asInstanceOf[FiberUsable]
+        .loadBytes(fiberCache.getBaseOffset)
     }
     columnarBatch
   }

@@ -20,13 +20,14 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import org.apache.spark.memory.MemoryMode;
+import org.apache.spark.sql.execution.datasources.oap.io.FiberUsable;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
 
 /**
  * Column data backed using offheap memory.
  */
-public final class OffHeapColumnVector extends ColumnVector {
+public final class OffHeapColumnVector extends ColumnVector implements FiberUsable {
 
   private static final boolean bigEndianPlatform =
           ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN);
@@ -268,7 +269,7 @@ public final class OffHeapColumnVector extends ColumnVector {
               DataTypes.ByteType, MemoryMode.OFF_HEAP);
       this.resultArray = new Array(this.childColumns[0]);
       this.childColumns[0].close();
-      childColumns[0].setValuesNativeAddress(nativeAddress + capacity * 9);
+      ((FiberUsable)childColumns[0]).setValuesNativeAddress(nativeAddress + capacity * 9);
     } else {
       throw new RuntimeException("Unhandled " + type);
     }

@@ -363,30 +363,6 @@ public abstract class ColumnVector implements AutoCloseable {
     public abstract long valuesNativeAddress();
 
     /**
-     * Pass data bytes to external components.
-     */
-    public abstract byte[] dumpBytes(long nativeAddress);
-
-    /**
-     * Loads the data into ColumnVector.
-     */
-    public abstract void loadBytes(long nativeAddress);
-
-    /**
-     * set prt for values buffer. Only valid
-     * to call for off heap columns.
-     */
-    public abstract void setValuesNativeAddress(long nativeAddress);
-
-    /**
-     * set or get prt for values buffer. Only valid
-     * to call for on heap columns.
-     */
-    public abstract void setByteData(byte[] data);
-
-    public abstract byte[] getByteData();
-
-    /**
      * Sets the value at rowId to null/not null.
      */
     public abstract void putNotNull(int rowId);

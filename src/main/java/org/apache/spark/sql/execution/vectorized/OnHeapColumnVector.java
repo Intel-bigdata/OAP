@@ -21,6 +21,7 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import org.apache.spark.memory.MemoryMode;
+import org.apache.spark.sql.execution.datasources.oap.io.FiberUsable;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
 
@@ -28,7 +29,7 @@ import org.apache.spark.unsafe.Platform;
  * A column backed by an in memory JVM array. This stores the NULLs as a byte per value
  * and a java array for the values.
  */
-public final class OnHeapColumnVector extends ColumnVector {
+public final class OnHeapColumnVector extends ColumnVector implements FiberUsable {
 
   private static final boolean bigEndianPlatform =
           ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN);
@@ -188,7 +189,7 @@ public final class OnHeapColumnVector extends ColumnVector {
                 Platform.BYTE_ARRAY_OFFSET + capacity * 4, capacity * 4);
         Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = childColumns[0].getByteData();
+        byte[] data = ((FiberUsable)childColumns[0]).getByteData();
         Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 9,
                 childColumns[0].elementsAppended);
@@ -211,7 +212,7 @@ public final class OnHeapColumnVector extends ColumnVector {
                 Platform.BYTE_ARRAY_OFFSET, capacity * 8);
         Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET , dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = childColumns[0].getByteData();
+        byte[] data = ((FiberUsable)childColumns[0]).getByteData();
         Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 9,
                 childColumns[0].elementsAppended);
@@ -227,7 +228,7 @@ public final class OnHeapColumnVector extends ColumnVector {
                 Platform.BYTE_ARRAY_OFFSET + capacity * 4, capacity * 4);
         Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = childColumns[0].getByteData();
+        byte[] data = ((FiberUsable)childColumns[0]).getByteData();
         Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 9,
                 childColumns[0].elementsAppended);
@@ -250,7 +251,7 @@ public final class OnHeapColumnVector extends ColumnVector {
                 Platform.BYTE_ARRAY_OFFSET, capacity * 8);
         Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET , dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = childColumns[0].getByteData();
+        byte[] data = ((FiberUsable)childColumns[0]).getByteData();
         Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 9,
                 childColumns[0].elementsAppended);
@@ -321,7 +322,7 @@ public final class OnHeapColumnVector extends ColumnVector {
         byte[] data = new byte[arrayOffsets[lastIndex] + arrayLengths[lastIndex]];
         Platform.copyMemory(null, nativeAddress + capacity * 9,
                 data, Platform.BYTE_ARRAY_OFFSET,data.length);
-        this.childColumns[0].setByteData(data);
+        ((FiberUsable)this.childColumns[0]).setByteData(data);
       }
     } else {
       throw new RuntimeException("Unhandled " + type);
