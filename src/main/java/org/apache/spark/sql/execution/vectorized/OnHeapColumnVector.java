@@ -306,12 +306,6 @@ public final class OnHeapColumnVector extends ColumnVector implements FiberUsabl
               Platform.INT_ARRAY_OFFSET, capacity * 4);
       Platform.copyMemory(null, nativeAddress + capacity * 8,
               nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
-
-      this.childColumns = new ColumnVector[1];
-      this.childColumns[0] = ColumnVector.allocate(
-              capacity, DataTypes.ByteType, MemoryMode.ON_HEAP);
-      this.resultArray = new Array(this.childColumns[0]);
-      this.childColumns[0].close();
       int lastIndex = capacity - 1;
       while (lastIndex >= 0 && isNullAt(lastIndex)) {
         lastIndex--;
@@ -329,7 +323,6 @@ public final class OnHeapColumnVector extends ColumnVector implements FiberUsabl
 
   @Override
   public void close() {
-    super.close();
   }
 
   //
