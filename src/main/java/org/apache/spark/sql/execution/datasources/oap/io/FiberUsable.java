@@ -27,22 +27,4 @@ public interface FiberUsable {
    * Loads the data into ColumnVector.
    */
   void loadBytes(long nativeAddress);
-
-  /**
-   * set ptr for values buffer. Only valid
-   * to call for off heap columns.
-   */
-  void setValuesNativeAddress(long nativeAddress);
-
-  /**
-   * set or get ptr for values buffer. Only valid
-   * to call for on heap columns.
-   */
-  void setByteData(byte[] data);
-
-  /**
-   *
-   * @return
-   */
-  byte[] getByteData();
 }

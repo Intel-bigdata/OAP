@@ -57,13 +57,11 @@ public final class OnHeapColumnVector extends ColumnVector implements FiberUsabl
     reserveInternal(capacity);
     reset();
   }
-  @Override
-  public void setByteData(byte[] data) {
+  private void setByteData(byte[] data) {
     byteData = data;
   }
 
-  @Override
-  public byte[] getByteData() {
+  private byte[] getByteData() {
     return byteData;
   }
 
@@ -189,7 +187,7 @@ public final class OnHeapColumnVector extends ColumnVector implements FiberUsabl
                 Platform.BYTE_ARRAY_OFFSET + capacity * 4, capacity * 4);
         Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = ((FiberUsable)childColumns[0]).getByteData();
+        byte[] data = ((OnHeapColumnVector)childColumns[0]).getByteData();
         Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 9,
                 childColumns[0].elementsAppended);
@@ -212,7 +210,7 @@ public final class OnHeapColumnVector extends ColumnVector implements FiberUsabl
                 Platform.BYTE_ARRAY_OFFSET, capacity * 8);
         Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET , dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = ((FiberUsable)childColumns[0]).getByteData();
+        byte[] data = ((OnHeapColumnVector)childColumns[0]).getByteData();
         Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 9,
                 childColumns[0].elementsAppended);
@@ -228,7 +226,7 @@ public final class OnHeapColumnVector extends ColumnVector implements FiberUsabl
                 Platform.BYTE_ARRAY_OFFSET + capacity * 4, capacity * 4);
         Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = ((FiberUsable)childColumns[0]).getByteData();
+        byte[] data = ((OnHeapColumnVector)childColumns[0]).getByteData();
         Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 9,
                 childColumns[0].elementsAppended);
@@ -251,7 +249,7 @@ public final class OnHeapColumnVector extends ColumnVector implements FiberUsabl
                 Platform.BYTE_ARRAY_OFFSET, capacity * 8);
         Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET , dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = ((FiberUsable)childColumns[0]).getByteData();
+        byte[] data = ((OnHeapColumnVector)childColumns[0]).getByteData();
         Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
                 Platform.BYTE_ARRAY_OFFSET + capacity * 9,
                 childColumns[0].elementsAppended);
@@ -322,16 +320,11 @@ public final class OnHeapColumnVector extends ColumnVector implements FiberUsabl
         byte[] data = new byte[arrayOffsets[lastIndex] + arrayLengths[lastIndex]];
         Platform.copyMemory(null, nativeAddress + capacity * 9,
                 data, Platform.BYTE_ARRAY_OFFSET,data.length);
-        ((FiberUsable)this.childColumns[0]).setByteData(data);
+        ((OnHeapColumnVector)this.childColumns[0]).setByteData(data);
       }
     } else {
       throw new RuntimeException("Unhandled " + type);
     }
-  }
-
-  @Override
-  public void setValuesNativeAddress(long nativeAddress) {
-    throw new RuntimeException("Cannot set nativeAddress for on heap column");
   }
 
   @Override

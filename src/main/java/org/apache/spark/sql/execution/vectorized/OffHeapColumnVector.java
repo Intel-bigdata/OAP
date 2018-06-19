@@ -52,14 +52,6 @@ public final class OffHeapColumnVector extends ColumnVector implements FiberUsab
     reset();
   }
 
-  public void setByteData(byte[] data) {
-    throw new RuntimeException("Cannot set byteData for on off-heap column");
-  }
-
-  public byte[] getByteData() {
-    throw new RuntimeException("Cannot set byteData for on off-heap column");
-  }
-
   @Override
   public long valuesNativeAddress() {
     return data;
@@ -269,14 +261,13 @@ public final class OffHeapColumnVector extends ColumnVector implements FiberUsab
               DataTypes.ByteType, MemoryMode.OFF_HEAP);
       this.resultArray = new Array(this.childColumns[0]);
       this.childColumns[0].close();
-      ((FiberUsable)childColumns[0]).setValuesNativeAddress(nativeAddress + capacity * 9);
+      ((OffHeapColumnVector)childColumns[0]).setValuesNativeAddress(nativeAddress + capacity * 9);
     } else {
       throw new RuntimeException("Unhandled " + type);
     }
   }
 
-  @Override
-  public void setValuesNativeAddress(long nativeAddress) {
+  private void setValuesNativeAddress(long nativeAddress) {
     data = nativeAddress;
   }
 
