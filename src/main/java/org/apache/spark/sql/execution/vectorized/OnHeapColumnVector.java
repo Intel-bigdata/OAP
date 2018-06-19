@@ -21,7 +21,6 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import org.apache.spark.memory.MemoryMode;
-import org.apache.spark.sql.execution.datasources.oap.io.FiberUsable;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
 
@@ -29,7 +28,11 @@ import org.apache.spark.unsafe.Platform;
  * A column backed by an in memory JVM array. This stores the NULLs as a byte per value
  * and a java array for the values.
  */
-public final class OnHeapColumnVector extends ColumnVector implements FiberUsable {
+
+// To avoid adding methods directly to OnHeapColumnVector，there are some changes that
+// remove class final modifier and change member variables from private to protected.
+// TODO: More elegant implementation need to be achieved in the future.
+public class OnHeapColumnVector extends ColumnVector {
 
   private static final boolean bigEndianPlatform =
           ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN);
@@ -38,31 +41,24 @@ public final class OnHeapColumnVector extends ColumnVector implements FiberUsabl
   // directly pass this buffer to external components.
 
   // This is faster than a boolean array and we optimize this over memory footprint.
-  private byte[] nulls;
+  protected byte[] nulls;
 
   // Array for each type. Only 1 is populated for any type.
-  private byte[] byteData;
-  private short[] shortData;
-  private int[] intData;
-  private long[] longData;
-  private float[] floatData;
-  private double[] doubleData;
+  protected byte[] byteData;
+  protected short[] shortData;
+  protected int[] intData;
+  protected long[] longData;
+  protected float[] floatData;
+  protected double[] doubleData;
 
   // Only set if type is Array.
-  private int[] arrayLengths;
-  private int[] arrayOffsets;
+  protected int[] arrayLengths;
+  protected int[] arrayOffsets;
 
   protected OnHeapColumnVector(int capacity, DataType type) {
     super(capacity, type, MemoryMode.ON_HEAP);
     reserveInternal(capacity);
     reset();
-  }
-  private void setByteData(byte[] data) {
-    byteData = data;
-  }
-
-  private byte[] getByteData() {
-    return byteData;
   }
 
   @Override
@@ -72,253 +68,6 @@ public final class OnHeapColumnVector extends ColumnVector implements FiberUsabl
   @Override
   public long nullsNativeAddress() {
     throw new RuntimeException("Cannot get native nativeAddress for on heap column");
-  }
-
-  @Override
-  public byte[] dumpBytes(long nativeAddress) {
-    byte[] dataBytes = null;
-    if (type instanceof ByteType) {
-      // data: 1 byte, nulls: 1 byte
-      if (dictionary == null) {
-        Platform.copyMemory(byteData, Platform.BYTE_ARRAY_OFFSET, null,
-                nativeAddress, capacity);
-      } else {
-        for (int i = 0; i < capacity; i++) {
-          if (!isNullAt(i)) {
-            Platform.putByte(null, nativeAddress + i, getByte(i));
-          }
-        }
-      }
-      Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity, capacity);
-    } else if (type instanceof BooleanType) {
-      // data: 1 byte, nulls: 1 byte
-      if (dictionary == null) {
-        Platform.copyMemory(byteData, Platform.BYTE_ARRAY_OFFSET, null,
-                nativeAddress, capacity);
-      } else {
-        for (int i = 0; i < capacity; i++) {
-          if (!isNullAt(i)) {
-            Platform.putByte(null, nativeAddress + i,
-                    (byte) ((getBoolean(i)) ? 1 : 0));
-          }
-        }
-      }
-      Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity, capacity);
-    } else if (type instanceof ShortType) {
-      // data: 2 bytes, nulls: 1 byte
-      if (dictionary == null) {
-        Platform.copyMemory(shortData, Platform.SHORT_ARRAY_OFFSET, null,
-                nativeAddress, capacity * 2);
-      } else {
-        for (int i = 0; i < capacity; i++) {
-          if (!isNullAt(i)) {
-            Platform.putShort(null, nativeAddress + i * 2, getShort(i));
-          }
-        }
-      }
-      Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 2, capacity);
-    } else if (type instanceof IntegerType || type instanceof DateType) {
-      // data: 4 bytes, nulls: 1 byte
-      if (dictionary == null) {
-        Platform.copyMemory(intData, Platform.INT_ARRAY_OFFSET, null,
-                nativeAddress, capacity * 4);
-      } else {
-        for (int i = 0; i < capacity; i++) {
-          if (!isNullAt(i)) {
-            Platform.putInt(null, nativeAddress + i * 4, getInt(i));
-          }
-        }
-      }
-      Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 4, capacity);
-    } else if (type instanceof FloatType) {
-      // data: 4 bytes, nulls: 1 byte
-      if (dictionary == null) {
-        Platform.copyMemory(floatData, Platform.FLOAT_ARRAY_OFFSET, null,
-                nativeAddress, capacity * 4);
-      } else {
-        for (int i = 0; i < capacity; i++) {
-          if (!isNullAt(i)) {
-            Platform.putFloat(null, nativeAddress + i * 4, getFloat(i));
-          }
-        }
-      }
-      Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 4, capacity);
-    } else if (type instanceof LongType) {
-      // data: 8 bytes, nulls: 1 byte
-      if (dictionary == null) {
-        Platform.copyMemory(longData, Platform.LONG_ARRAY_OFFSET, null,
-                nativeAddress, capacity * 8);
-      } else {
-        for (int i = 0; i < capacity; i++) {
-          if (!isNullAt(i)) {
-            Platform.putLong(null, nativeAddress + i * 8, getLong(i));
-          }
-        }
-      }
-      Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 8, capacity);
-    } else if (type instanceof DoubleType) {
-      // data: 8 bytes, nulls: 1 byte
-      if (dictionary == null) {
-        Platform.copyMemory(doubleData, Platform.DOUBLE_ARRAY_OFFSET, null,
-                nativeAddress, capacity * 8);
-      } else {
-        for (int i = 0; i < capacity; i++) {
-          if (!isNullAt(i)) {
-            Platform.putDouble(null, nativeAddress + i * 8, getDouble(i));
-          }
-        }
-      }
-      Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 8, capacity);
-    } else if (type instanceof BinaryType) {
-      // lengthData: 4 bytes, offsetData: 4 bytes, nulls: 1 byte,
-      // child.data: childColumns[0].elementsAppended bytes.
-      if (dictionary == null) {
-        dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
-        Platform.copyMemory(arrayLengths, Platform.INT_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET, capacity * 4);
-        Platform.copyMemory(arrayOffsets, Platform.INT_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET + capacity * 4, capacity * 4);
-        Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = ((OnHeapColumnVector)childColumns[0]).getByteData();
-        Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET + capacity * 9,
-                childColumns[0].elementsAppended);
-      } else {
-        byte[] tempBytes = new byte[capacity * (4 + 4)];
-        int offset = 0;
-        for (int i = 0; i < capacity; i++) {
-          if (!isNullAt(i)) {
-            byte[] bytes = null;
-            bytes = getBinary(i);
-            Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
-            Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + capacity * 4 + i * 4,
-                    offset);
-            arrayData().appendBytes(bytes.length, bytes, 0);
-            offset += bytes.length;
-          }
-        }
-        dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
-        Platform.copyMemory(tempBytes, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET, capacity * 8);
-        Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET , dataBytes,
-                Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = ((OnHeapColumnVector)childColumns[0]).getByteData();
-        Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET + capacity * 9,
-                childColumns[0].elementsAppended);
-      }
-    } else if (type instanceof StringType) {
-      // lengthData: 4 bytes, offsetData: 4 bytes, nulls: 1 byte,
-      // child.data: childColumns[0].elementsAppended bytes.
-      if (dictionary == null) {
-        dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
-        Platform.copyMemory(arrayLengths, Platform.INT_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET, capacity * 4);
-        Platform.copyMemory(arrayOffsets, Platform.INT_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET + capacity * 4, capacity * 4);
-        Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = ((OnHeapColumnVector)childColumns[0]).getByteData();
-        Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET + capacity * 9,
-                childColumns[0].elementsAppended);
-      } else {
-        byte[] tempBytes = new byte[capacity * (4 + 4)];
-        int offset = 0;
-        for (int i = 0; i < capacity; i++) {
-          if (!isNullAt(i)) {
-            byte[] bytes = null;
-            bytes = getUTF8String(i).getBytes();
-            Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
-            Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + capacity * 4 + i * 4,
-                    offset);
-            arrayData().appendBytes(bytes.length, bytes, 0);
-            offset += bytes.length;
-          }
-        }
-        dataBytes = new byte[capacity * (4 + 4 + 1) + childColumns[0].elementsAppended];
-        Platform.copyMemory(tempBytes, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET, capacity * 8);
-        Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET , dataBytes,
-                Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
-        byte[] data = ((OnHeapColumnVector)childColumns[0]).getByteData();
-        Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-                Platform.BYTE_ARRAY_OFFSET + capacity * 9,
-                childColumns[0].elementsAppended);
-      }
-    } else {
-      throw new RuntimeException("Unhandled " + type);
-    }
-    return dataBytes;
-  }
-
-  @Override
-  public void loadBytes(long nativeAddress) {
-    if (type instanceof ByteType || type instanceof BooleanType) {
-      // data::nulls
-      Platform.copyMemory(null, nativeAddress, byteData,
-              Platform.BYTE_ARRAY_OFFSET, capacity);
-      Platform.copyMemory(null, nativeAddress + capacity,
-              nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
-    } else if (type instanceof ShortType) {
-      // data::nulls
-      Platform.copyMemory(null, nativeAddress, shortData,
-              Platform.SHORT_ARRAY_OFFSET, capacity * 2);
-      Platform.copyMemory(null, nativeAddress + capacity * 2,
-              nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
-    } else if (type instanceof IntegerType || type instanceof DateType) {
-      // data::nulls
-      Platform.copyMemory(null, nativeAddress, intData,
-              Platform.INT_ARRAY_OFFSET, capacity * 4);
-      Platform.copyMemory(null, nativeAddress + capacity * 4,
-              nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
-    } else if (type instanceof FloatType) {
-      // data::nulls
-      Platform.copyMemory(null, nativeAddress, floatData,
-              Platform.FLOAT_ARRAY_OFFSET, capacity * 4);
-      Platform.copyMemory(null, nativeAddress + capacity * 4,
-              nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
-    } else if (type instanceof LongType) {
-      // data::nulls
-      Platform.copyMemory(null, nativeAddress, longData,
-              Platform.LONG_ARRAY_OFFSET, capacity * 8);
-      Platform.copyMemory(null, nativeAddress + capacity * 8,
-              nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
-    } else if (type instanceof DoubleType) {
-      // data::nulls
-      Platform.copyMemory(null, nativeAddress, doubleData,
-              Platform.DOUBLE_ARRAY_OFFSET, capacity * 8);
-      Platform.copyMemory(null, nativeAddress + capacity * 8,
-              nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
-    } else if (type instanceof BinaryType || type instanceof StringType) {
-      // lengthData::offsetData::nulls::child.data
-      Platform.copyMemory(null, nativeAddress, arrayLengths,
-              Platform.INT_ARRAY_OFFSET, capacity * 4);
-      Platform.copyMemory(null, nativeAddress + capacity * 4, arrayOffsets,
-              Platform.INT_ARRAY_OFFSET, capacity * 4);
-      Platform.copyMemory(null, nativeAddress + capacity * 8,
-              nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
-      int lastIndex = capacity - 1;
-      while (lastIndex >= 0 && isNullAt(lastIndex)) {
-        lastIndex--;
-      }
-      if (lastIndex >= 0) {
-        byte[] data = new byte[arrayOffsets[lastIndex] + arrayLengths[lastIndex]];
-        Platform.copyMemory(null, nativeAddress + capacity * 9,
-                data, Platform.BYTE_ARRAY_OFFSET,data.length);
-        ((OnHeapColumnVector)this.childColumns[0]).setByteData(data);
-      }
-    } else {
-      throw new RuntimeException("Unhandled " + type);
-    }
   }
 
   @Override
