@@ -26,8 +26,7 @@ public class OapOnHeapColumnVector extends OnHeapColumnVector implements FiberUs
     super(capacity, type);
   }
   @Override
-  public byte[] dumpBytes(long nativeAddress) {
-    byte[] dataBytes = null;
+  public void dumpBytesToCache(long nativeAddress) {
     if (type instanceof ByteType) {
       // data: 1 byte, nulls: 1 byte
       if (dictionary == null) {
@@ -127,7 +126,15 @@ public class OapOnHeapColumnVector extends OnHeapColumnVector implements FiberUs
       }
       Platform.copyMemory(nulls, Platform.BYTE_ARRAY_OFFSET, null,
               nativeAddress + capacity * 8, capacity);
-    } else if (type instanceof BinaryType) {
+    } else {
+      throw new RuntimeException("Unhandled " + type);
+    }
+  }
+
+  @Override
+  public byte[] dumpBytesToCache() {
+    byte[] dataBytes = null;
+    if (type instanceof BinaryType) {
       // lengthData: 4 bytes, offsetData: 4 bytes, nulls: 1 byte,
       // child.data: childColumns[0].elementsAppended bytes.
       if (dictionary == null) {
@@ -212,7 +219,7 @@ public class OapOnHeapColumnVector extends OnHeapColumnVector implements FiberUs
   }
 
   @Override
-  public void loadBytes(long nativeAddress) {
+  public void loadBytesFromCache(long nativeAddress) {
     if (type instanceof ByteType || type instanceof BooleanType) {
       // data::nulls
       Platform.copyMemory(null, nativeAddress, byteData,
@@ -257,6 +264,7 @@ public class OapOnHeapColumnVector extends OnHeapColumnVector implements FiberUs
               Platform.INT_ARRAY_OFFSET, capacity * 4);
       Platform.copyMemory(null, nativeAddress + capacity * 8,
               nulls, Platform.BYTE_ARRAY_OFFSET, capacity);
+      // Need to determine the total length of data bytes.
       int lastIndex = capacity - 1;
       while (lastIndex >= 0 && isNullAt(lastIndex)) {
         lastIndex--;

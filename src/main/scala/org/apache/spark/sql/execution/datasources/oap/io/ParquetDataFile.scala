@@ -31,6 +31,7 @@ import org.apache.parquet.hadoop.metadata.{IndexedBlockMetaData, OrderedBlockMet
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper
 import org.apache.spark.sql.execution.vectorized.{ColumnarBatch, ColumnVectorUtils}
@@ -113,34 +114,29 @@ private[oap] case class ParquetDataFile(
       addRequestSchemaToConf(conf, Array(fiberId))
       loader = new ParquetFiberDataLoader(conf, fiberDataReader, groupId, rowCount)
       // Now we only support primitive type.
-      val unitLength = schema(fiberId).dataType match {
+      val fixedLength = schema(fiberId).dataType match {
         // data: 1 byte, nulls: 1 byte
-        case ByteType | BooleanType => 2
+        case ByteType | BooleanType => (true, 2)
         // data: 2 byte, nulls: 1 byte
-        case ShortType => 3
+        case ShortType => (true, 3)
         // data: 4 byte, nulls: 1 byte
-        case IntegerType | DateType | FloatType => 5
+        case IntegerType | DateType | FloatType => (true, 5)
         // data: 8 byte, nulls: 1 byte
-        case LongType | DoubleType => 9
+        case LongType | DoubleType => (true, 9)
         // data: variable length, such as StringType and BinaryType
-        case _ => -1
+        case StringType | BinaryType => (false, -1)
+        case otherTypes: DataType => throw new OapException(s"${otherTypes.simpleString}" +
+          s" data type is not implemented for cache.")
       }
-      var fiberCache: FiberCache = null
-
-      val nativeAddress = if (unitLength != -1) {
-        fiberCache = OapRuntime.getOrCreate.memoryManager.
-          getEmptyDataFiberCache(rowCount * unitLength)
-        fiberCache.getBaseOffset
-      } else {
-        -1
-      }
-
-      val data = loader.load().asInstanceOf[FiberUsable]
-        .dumpBytes(nativeAddress)
-      if (data != null) {
-        OapRuntime.getOrCreate.memoryManager.toDataFiberCache(data)
-      } else {
-        fiberCache
+      fixedLength match {
+        case (true, length) =>
+          val fiberCache = OapRuntime.getOrCreate.memoryManager.
+            getEmptyDataFiberCache(rowCount * length)
+          loader.load().asInstanceOf[FiberUsable].dumpBytesToCache(fiberCache.getBaseOffset)
+          fiberCache
+        case (false, _) =>
+          OapRuntime.getOrCreate.memoryManager.toDataFiberCache(
+            loader.load().asInstanceOf[FiberUsable].dumpBytesToCache)
       }
     } finally {
       if (loader != null) {
@@ -324,7 +320,7 @@ private[oap] case class ParquetDataFile(
     }
     fiberCacheGroup.zipWithIndex.foreach { case (fiberCache, id) =>
       columnarBatch.column(id).asInstanceOf[FiberUsable]
-        .loadBytes(fiberCache.getBaseOffset)
+        .loadBytesFromCache(fiberCache.getBaseOffset)
     }
     columnarBatch
   }

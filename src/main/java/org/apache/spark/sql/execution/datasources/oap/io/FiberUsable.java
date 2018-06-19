@@ -21,10 +21,12 @@ public interface FiberUsable {
   /**
    * Pass data bytes to external components.
    */
-  byte[] dumpBytes(long nativeAddress);
+  byte[] dumpBytesToCache();
+
+  void dumpBytesToCache(long nativeAddress);
 
   /**
    * Loads the data into ColumnVector.
    */
-  void loadBytes(long nativeAddress);
+  void loadBytesFromCache(long nativeAddress);
 }
