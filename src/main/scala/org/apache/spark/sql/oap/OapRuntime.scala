@@ -131,11 +131,13 @@ object OapRuntime {
   // OapRuntime always ready, since Oap can take a lot of memory. By manually call stop(),
   // user can delete every instance of OAP, use stock spark without restart cluster.
   // Now we rely on SparkEnv to call stop() for us.
-  def init(sparkEnv: SparkEnv): OapRuntime = {
-    rt = if (isDriver(sparkEnv.conf)) {
-      new OapDriverRuntime(sparkEnv)
-    } else {
-      new OapExecutorRuntime(sparkEnv)
+  def init(sparkEnv: SparkEnv): OapRuntime = synchronized {
+    if (rt == null) {
+      rt = if (isDriver(sparkEnv.conf)) {
+        new OapDriverRuntime(sparkEnv)
+      } else {
+        new OapExecutorRuntime(sparkEnv)
+      }
     }
     rt
   }
