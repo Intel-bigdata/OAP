@@ -112,7 +112,7 @@ private[oap] class OapExecutorRuntime(sparkEnv: SparkEnv) extends OapRuntime {
   }
 }
 
-object OapRuntime {
+object OapRuntime extends Logging{
   private var rt: OapRuntime = _
   /**
    * user transparent initialization
@@ -132,11 +132,13 @@ object OapRuntime {
   // user can delete every instance of OAP, use stock spark without restart cluster.
   // Now we rely on SparkEnv to call stop() for us.
   def init(sparkEnv: SparkEnv): OapRuntime = {
+    logWarning(s"jiake + count the number of init method is called")
     rt = if (isDriver(sparkEnv.conf)) {
       new OapDriverRuntime(sparkEnv)
     } else {
       new OapExecutorRuntime(sparkEnv)
     }
+
     rt
   }
 
