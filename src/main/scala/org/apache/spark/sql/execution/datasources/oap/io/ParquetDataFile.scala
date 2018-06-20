@@ -318,8 +318,10 @@ private[oap] case class ParquetDataFile(
       }
     }
     fiberCacheGroup.zipWithIndex.foreach { case (fiberCache, id) =>
-      new OapOnHeapColumnVectorFiber(columnarBatch.column(id).asInstanceOf[OnHeapColumnVector])
-        .loadBytesFromCache(fiberCache.getBaseOffset)
+      new OapOnHeapColumnVectorFiber(
+        columnarBatch.column(id).asInstanceOf[OnHeapColumnVector],
+        rowCount,
+        requestSchema(id).dataType).loadBytesFromCache(fiberCache.getBaseOffset)
     }
     columnarBatch
   }

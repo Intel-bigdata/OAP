@@ -16,12 +16,14 @@ import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.Type;
 
+import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.execution.datasources.oap.io.FiberUsable;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper;
 import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReader;
 import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReaderWrapper;
 import org.apache.spark.sql.execution.vectorized.ColumnVector;
 import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVectorFiber;
+import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructType$;
@@ -59,8 +61,9 @@ public class ParquetFiberDataLoader implements Closeable {
     boolean isMissing = isMissingColumn(fileSchema, requestedSchema);
 
     DataType dataType = sparkSchema.fields()[0].dataType();
-    this.fiber = new OapOnHeapColumnVectorFiber(rowGroupCount, dataType);
-    ColumnVector vector = fiber.getVector();
+    ColumnVector vector = ColumnVector.allocate(rowGroupCount, dataType, MemoryMode.ON_HEAP);
+    this.fiber =
+      new OapOnHeapColumnVectorFiber((OnHeapColumnVector) vector, rowGroupCount, dataType);
 
     if(isMissing) {
       vector.putNulls(0, rowGroupCount);

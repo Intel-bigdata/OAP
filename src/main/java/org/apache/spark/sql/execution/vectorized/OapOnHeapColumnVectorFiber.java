@@ -42,18 +42,14 @@ public class OapOnHeapColumnVectorFiber implements FiberUsable, Closeable {
   private final int capacity;
   private final DataType type;
 
-  public OapOnHeapColumnVectorFiber(int capacity, DataType type) {
-    this.vector = new OnHeapColumnVector(capacity, type);
+  public OapOnHeapColumnVectorFiber(
+      OnHeapColumnVector vector,
+      int capacity,
+      DataType type) {
+    this.vector = vector;
     this.capacity = capacity;
     this.type = type;
   }
-
-  public OapOnHeapColumnVectorFiber(OnHeapColumnVector vector) {
-    this.vector = vector;
-    this.capacity = (int)OnHeapCoumnVectorFiledAccessor.getFieldValue(vector, "capacity");
-    this.type = (DataType)OnHeapCoumnVectorFiledAccessor.getFieldValue(vector, "type");
-  }
-
 
   @Override
   public void dumpBytesToCache(long nativeAddress) {
@@ -412,10 +408,6 @@ public class OapOnHeapColumnVectorFiber implements FiberUsable, Closeable {
 
   private Object arrayOffsets() {
     return OnHeapCoumnVectorFiledAccessor.getFieldValue(vector, "arrayOffsets");
-  }
-
-  public OnHeapColumnVector getVector() {
-    return vector;
   }
 
   @Override
