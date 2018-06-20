@@ -16,7 +16,7 @@
  */
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import java.io.{Closeable, IOException}
+import java.io.IOException
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.ParquetFiberDataReader
@@ -25,20 +25,21 @@ import org.apache.parquet.hadoop.utils.Collections3
 import org.apache.parquet.schema.{MessageType, Type}
 
 import org.apache.spark.memory.MemoryMode
+import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportWrapper, VectorizedColumnReader, VectorizedColumnReaderWrapper}
 import org.apache.spark.sql.execution.vectorized.{ColumnVector, OapOnHeapColumnVectorFiber, OnHeapColumnVector}
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.oap.OapRuntime
+import org.apache.spark.sql.types._
 
 private[oap] case class ParquetFiberDataLoader(
     configuration: Configuration,
     reader: ParquetFiberDataReader,
     blockId: Int,
-    rowCount: Int) extends Closeable {
-
-  private var fiber: OapOnHeapColumnVectorFiber = _
+    rowCount: Int) {
 
   @throws[IOException]
-  def load: FiberUsable = {
+  def load: FiberCache = {
     val footer = reader.getFooter
     val fileSchema = footer.getFileMetaData.getSchema
     val fileMetadata = footer.getFileMetaData.getKeyValueMetaData
@@ -50,22 +51,38 @@ private[oap] case class ParquetFiberDataLoader(
     val sparkSchema = StructType.fromString(sparkRequestedSchemaString)
     val dataType = sparkSchema.fields(0).dataType
     val vector = ColumnVector.allocate(rowCount, dataType, MemoryMode.ON_HEAP)
-    this.fiber =
+
+    // Construct OapOnHeapColumnVectorFiber out of try block because of no exception throw when init
+    // OapOnHeapColumnVectorFiber instance.
+    val fiber =
       new OapOnHeapColumnVectorFiber(vector.asInstanceOf[OnHeapColumnVector], rowCount, dataType)
 
-    if (isMissingColumn(fileSchema, requestedSchema)) {
-      vector.putNulls(0, rowCount)
-      vector.setIsConstant()
-    } else {
-      val columnDescriptor = requestedSchema.getColumns.get(0)
-      val blockMetaData = footer.getBlocks.get(blockId)
-      val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
-      val columnReader =
-        new VectorizedColumnReaderWrapper(
-          new VectorizedColumnReader(columnDescriptor, fiberData.getPageReader(columnDescriptor)))
-      columnReader.readBatch(rowCount, vector)
+    try {
+      if (isMissingColumn(fileSchema, requestedSchema)) {
+        vector.putNulls(0, rowCount)
+        vector.setIsConstant()
+      } else {
+        val columnDescriptor = requestedSchema.getColumns.get(0)
+        val blockMetaData = footer.getBlocks.get(blockId)
+        val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
+        val columnReader =
+          new VectorizedColumnReaderWrapper(
+            new VectorizedColumnReader(columnDescriptor, fiberData.getPageReader(columnDescriptor)))
+        columnReader.readBatch(rowCount, vector)
+      }
+
+      fixedAndLength(dataType) match {
+        case (true, length) =>
+          val fiberCache = OapRuntime.getOrCreate.memoryManager.
+            getEmptyDataFiberCache(rowCount * length)
+          fiber.dumpBytesToCache(fiberCache.getBaseOffset)
+          fiberCache
+        case (false, _) =>
+          fiber.dumpBytesToCache
+      }
+    } finally {
+      fiber.close()
     }
-    fiber
   }
 
   @throws[UnsupportedOperationException]
@@ -90,16 +107,18 @@ private[oap] case class ParquetFiberDataLoader(
     }
   }
 
-  override def close(): Unit = {
-    if (fiber != null) {
-      fiber.close()
-    }
-  }
-
-  def closeWithReader(): Unit = {
-    close()
-    if (reader != null) {
-      reader.close()
-    }
+  private def fixedAndLength(dataType: DataType): (Boolean, Int) = dataType match {
+    // data: 1 byte, nulls: 1 byte
+    case ByteType | BooleanType => (true, 2)
+    // data: 2 byte, nulls: 1 byte
+    case ShortType => (true, 3)
+    // data: 4 byte, nulls: 1 byte
+    case IntegerType | DateType | FloatType => (true, 5)
+    // data: 8 byte, nulls: 1 byte
+    case LongType | DoubleType => (true, 9)
+    // data: variable length, such as StringType and BinaryType
+    case StringType | BinaryType => (false, -1)
+    case otherTypes: DataType => throw new OapException(s"${otherTypes.simpleString}" +
+      s" data type is not implemented for cache.")
   }
 }

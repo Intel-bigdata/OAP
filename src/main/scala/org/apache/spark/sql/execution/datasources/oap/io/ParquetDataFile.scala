@@ -97,51 +97,19 @@ private[oap] case class ParquetDataFile(
   }
 
   def cache(groupId: Int, fiberId: Int): FiberCache = {
-    var loader: ParquetFiberDataLoader = null
-
-    if(fiberDataReader == null) {
+    if (fiberDataReader == null) {
       // TODO Is there ParquetFooter enough?
       fiberDataReader =
         ParquetFiberDataReader.open(configuration, file, meta.footer.toParquetMetadata)
     }
 
-    try {
-      val conf = new Configuration(configuration)
-      val rowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
-      // read a single column for each group.
-      // comments: Parquet vectorized read can get multi-columns every time. However,
-      // the minimum unit of cache is one column of one group.
-      addRequestSchemaToConf(conf, Array(fiberId))
-      loader = ParquetFiberDataLoader(conf, fiberDataReader, groupId, rowCount)
-      // Now we only support primitive type.
-      val fixedLength = schema(fiberId).dataType match {
-        // data: 1 byte, nulls: 1 byte
-        case ByteType | BooleanType => (true, 2)
-        // data: 2 byte, nulls: 1 byte
-        case ShortType => (true, 3)
-        // data: 4 byte, nulls: 1 byte
-        case IntegerType | DateType | FloatType => (true, 5)
-        // data: 8 byte, nulls: 1 byte
-        case LongType | DoubleType => (true, 9)
-        // data: variable length, such as StringType and BinaryType
-        case StringType | BinaryType => (false, -1)
-        case otherTypes: DataType => throw new OapException(s"${otherTypes.simpleString}" +
-          s" data type is not implemented for cache.")
-      }
-      fixedLength match {
-        case (true, length) =>
-          val fiberCache = OapRuntime.getOrCreate.memoryManager.
-            getEmptyDataFiberCache(rowCount * length)
-          loader.load.dumpBytesToCache(fiberCache.getBaseOffset)
-          fiberCache
-        case (false, _) =>
-          loader.load.dumpBytesToCache
-      }
-    } finally {
-      if (loader != null) {
-        loader.close()
-      }
-    }
+    val conf = new Configuration(configuration)
+    val rowCount = meta.footer.getBlocks.get(groupId).getRowCount.toInt
+    // read a single column for each group.
+    // comments: Parquet vectorized read can get multi-columns every time. However,
+    // the minimum unit of cache is one column of one group.
+    addRequestSchemaToConf(conf, Array(fiberId))
+    ParquetFiberDataLoader(conf, fiberDataReader, groupId, rowCount).load
   }
 
   private def buildIterator(
