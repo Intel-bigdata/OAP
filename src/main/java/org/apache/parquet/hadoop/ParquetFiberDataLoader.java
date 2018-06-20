@@ -16,6 +16,7 @@ import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.Type;
 
+import org.apache.spark.sql.execution.datasources.oap.io.FiberUsable;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper;
 import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReader;
 import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReaderWrapper;
@@ -45,7 +46,7 @@ public class ParquetFiberDataLoader implements Closeable {
     this.rowGroupCount = rowGroupCount;
   }
 
-  public ColumnVector load() throws IOException {
+  public FiberUsable load() throws IOException {
     ParquetMetadata footer = reader.getFooter();
     MessageType fileSchema = footer.getFileMetaData().getSchema();
     Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
@@ -74,7 +75,7 @@ public class ParquetFiberDataLoader implements Closeable {
       columnReader.readBatch(rowGroupCount, columnVector);
     }
 
-    return columnVector;
+    return (FiberUsable)columnVector;
   }
 
   private boolean isMissingColumn(

@@ -16,7 +16,9 @@
  */
 package org.apache.spark.sql.execution.vectorized;
 
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache;
 import org.apache.spark.sql.execution.datasources.oap.io.FiberUsable;
+import org.apache.spark.sql.oap.OapRuntime$;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
 
@@ -25,6 +27,7 @@ public class OapOnHeapColumnVector extends OnHeapColumnVector implements FiberUs
   public OapOnHeapColumnVector(int capacity, DataType type) {
     super(capacity, type);
   }
+
   @Override
   public void dumpBytesToCache(long nativeAddress) {
     if (type instanceof ByteType) {
@@ -132,7 +135,7 @@ public class OapOnHeapColumnVector extends OnHeapColumnVector implements FiberUs
   }
 
   @Override
-  public byte[] dumpBytesToCache() {
+  public FiberCache dumpBytesToCache() {
     byte[] dataBytes = null;
     if (type instanceof BinaryType) {
       // lengthData: 4 bytes, offsetData: 4 bytes, nulls: 1 byte,
@@ -215,7 +218,7 @@ public class OapOnHeapColumnVector extends OnHeapColumnVector implements FiberUs
     } else {
       throw new RuntimeException("Unhandled " + type);
     }
-    return dataBytes;
+    return OapRuntime$.MODULE$.getOrCreate().memoryManager().toDataFiberCache(dataBytes);
   }
 
   @Override

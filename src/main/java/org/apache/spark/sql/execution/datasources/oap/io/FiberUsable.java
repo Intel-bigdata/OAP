@@ -16,12 +16,14 @@
  */
 package org.apache.spark.sql.execution.datasources.oap.io;
 
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache;
+
 public interface FiberUsable {
 
   /**
    * Pass data bytes to external components.
    */
-  byte[] dumpBytesToCache();
+  FiberCache dumpBytesToCache();
 
   void dumpBytesToCache(long nativeAddress);
 

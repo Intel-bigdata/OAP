@@ -132,11 +132,10 @@ private[oap] case class ParquetDataFile(
         case (true, length) =>
           val fiberCache = OapRuntime.getOrCreate.memoryManager.
             getEmptyDataFiberCache(rowCount * length)
-          loader.load().asInstanceOf[FiberUsable].dumpBytesToCache(fiberCache.getBaseOffset)
+          loader.load().dumpBytesToCache(fiberCache.getBaseOffset)
           fiberCache
         case (false, _) =>
-          OapRuntime.getOrCreate.memoryManager.toDataFiberCache(
-            loader.load().asInstanceOf[FiberUsable].dumpBytesToCache)
+          loader.load().dumpBytesToCache
       }
     } finally {
       if (loader != null) {
