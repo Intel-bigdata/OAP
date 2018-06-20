@@ -499,7 +499,7 @@ public final class ColumnarBatch {
 
     for (int i = 0; i < schema.fields().length; ++i) {
       StructField field = schema.fields()[i];
-      columns[i] = new OapOnHeapColumnVector(maxRows, field.dataType());
+      columns[i] = new OnHeapColumnVector(maxRows, field.dataType());
     }
 
     this.row = new Row(this);

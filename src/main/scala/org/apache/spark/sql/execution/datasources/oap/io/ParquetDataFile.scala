@@ -34,7 +34,7 @@ import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper
-import org.apache.spark.sql.execution.vectorized.{ColumnarBatch, ColumnVectorUtils}
+import org.apache.spark.sql.execution.vectorized.{ColumnarBatch, ColumnVectorUtils, OapOnHeapColumnVectorFiber, OnHeapColumnVector}
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources.Filter
@@ -318,7 +318,7 @@ private[oap] case class ParquetDataFile(
       }
     }
     fiberCacheGroup.zipWithIndex.foreach { case (fiberCache, id) =>
-      columnarBatch.column(id).asInstanceOf[FiberUsable]
+      new OapOnHeapColumnVectorFiber(columnarBatch.column(id).asInstanceOf[OnHeapColumnVector])
         .loadBytesFromCache(fiberCache.getBaseOffset)
     }
     columnarBatch

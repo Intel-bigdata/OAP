@@ -21,7 +21,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrap
 import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReader;
 import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReaderWrapper;
 import org.apache.spark.sql.execution.vectorized.ColumnVector;
-import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector;
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVectorFiber;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructType$;
@@ -33,7 +33,7 @@ public class ParquetFiberDataLoader implements Closeable {
 
   private final Configuration configuration;
   private final ParquetFiberDataReader reader;
-  private ColumnVector columnVector;
+  private OapOnHeapColumnVectorFiber fiber;
 
   public ParquetFiberDataLoader(
       Configuration configuration,
@@ -59,11 +59,12 @@ public class ParquetFiberDataLoader implements Closeable {
     boolean isMissing = isMissingColumn(fileSchema, requestedSchema);
 
     DataType dataType = sparkSchema.fields()[0].dataType();
-    columnVector = new OapOnHeapColumnVector(rowGroupCount, dataType);
+    this.fiber = new OapOnHeapColumnVectorFiber(rowGroupCount, dataType);
+    ColumnVector vector = fiber.getVector();
 
     if(isMissing) {
-      columnVector.putNulls(0, rowGroupCount);
-      columnVector.setIsConstant();
+      vector.putNulls(0, rowGroupCount);
+      vector.setIsConstant();
     } else {
       // add assert requestedSchema.getColumns().size must 1.
       ColumnDescriptor columnDescriptor = requestedSchema.getColumns().get(0);
@@ -72,10 +73,10 @@ public class ParquetFiberDataLoader implements Closeable {
       VectorizedColumnReaderWrapper columnReader = new VectorizedColumnReaderWrapper(
               new VectorizedColumnReader(columnDescriptor,
                       pageReadStore.getPageReader(columnDescriptor)));
-      columnReader.readBatch(rowGroupCount, columnVector);
+      columnReader.readBatch(rowGroupCount, vector);
     }
 
-    return (FiberUsable)columnVector;
+    return fiber;
   }
 
   private boolean isMissingColumn(
@@ -104,9 +105,9 @@ public class ParquetFiberDataLoader implements Closeable {
 
   @Override
   public void close() throws IOException {
-    if (columnVector != null) {
-      columnVector.close();
-      columnVector = null;
+    if (fiber != null) {
+      fiber.close();
+      fiber = null;
     }
   }
 
