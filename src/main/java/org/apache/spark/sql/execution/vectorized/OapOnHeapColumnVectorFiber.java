@@ -19,8 +19,6 @@ package org.apache.spark.sql.execution.vectorized;
 import java.io.Closeable;
 import java.io.IOException;
 
-import com.google.common.primitives.Longs;
-
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache;
 import org.apache.spark.sql.execution.datasources.oap.io.FiberUsable;
 import org.apache.spark.sql.oap.OapRuntime$;
