@@ -42,3 +42,4 @@ class OapRuntimeSuite extends QueryTest with SharedOapLocalClusterContext {
     assert(oapruntime(0) == oapruntime(1))
   }
 }
+
