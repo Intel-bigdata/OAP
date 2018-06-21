@@ -150,8 +150,7 @@ private[sql] class OapFileFormat extends FileFormat
       conf.parquetVectorizedReaderEnabled &&
       conf.wholeStageEnabled &&
       schema.length <= conf.wholeStageMaxNumFields &&
-      schema.forall(_.dataType.isInstanceOf[AtomicType]) &&
-      !sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
+      schema.forall(_.dataType.isInstanceOf[AtomicType])
   }
 
   override def isSplitable(
@@ -295,7 +294,7 @@ private[sql] class OapFileFormat extends FileFormat
             // if enableVectorizedReader == true and parquetDataCacheEnable = false,
             // return iter directly because of partitionValues
             // already filled by VectorizedReader, else use original branch.
-            if (enableVectorizedReader && !parquetDataCacheEnable) {
+            if (enableVectorizedReader) {
               iter
             } else {
               val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes

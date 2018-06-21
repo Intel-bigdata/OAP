@@ -303,6 +303,16 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
       .append("double_field", 2.0d))
   }
 
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    configuration.setBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key, false)
+  }
+
+  override def afterEach(): Unit = {
+    super.afterEach()
+    configuration.unset(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key)
+  }
+
   test("read by columnIds and rowIds disable returningBatch") {
     val context = Some(VectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
