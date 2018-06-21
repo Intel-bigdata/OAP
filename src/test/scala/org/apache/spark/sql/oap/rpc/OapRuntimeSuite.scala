@@ -17,11 +17,10 @@
 
 package org.apache.spark.sql.oap
 
-import java.util.concurrent.{ Executors, ExecutorService}
+import java.util.concurrent.{Executors, ExecutorService, TimeUnit}
 
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.test.oap.SharedOapLocalClusterContext
-
 
 class OapRuntimeSuite extends QueryTest with SharedOapLocalClusterContext {
 
@@ -36,6 +35,7 @@ class OapRuntimeSuite extends QueryTest with SharedOapLocalClusterContext {
           }
         })
       }
+      threadPool.awaitTermination(1000, TimeUnit.MILLISECONDS)
     } finally {
       threadPool.shutdown()
     }
