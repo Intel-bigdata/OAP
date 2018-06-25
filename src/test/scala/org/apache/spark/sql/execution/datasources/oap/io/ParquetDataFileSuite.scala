@@ -500,11 +500,6 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
 }
 
 class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
-  private val requestSchema: StructType = new StructType()
-    .add(StructField("int32_field", IntegerType))
-    .add(StructField("int64_field", LongType))
-    .add(StructField("boolean_field", BooleanType))
-    .add(StructField("float_field", FloatType))
 
   override def parquetSchema: MessageType = new MessageType("test",
     new PrimitiveType(REQUIRED, INT32, "int32_field"),

@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.parquet.Preconditions;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.page.DataPage;
@@ -64,6 +65,7 @@ public class ParquetFiberDataReader implements Closeable {
   private final ParquetMetadataConverter converter;
   private final SeekableInputStream f;
   private final CodecFactory codecFactory;
+  // TODO Is ParquetFooter enough？If true, we can save the object transformation.
   private ParquetMetadata footer;
 
   public static ParquetFiberDataReader open(
@@ -94,8 +96,10 @@ public class ParquetFiberDataReader implements Closeable {
   public PageReadStore readFiberData(
       BlockMetaData block,
       ColumnDescriptor columnDescriptor) throws IOException {
+    Preconditions.checkNotNull(block, "block must not null");
+    Preconditions.checkNotNull(columnDescriptor, "columnDescriptor must not null");
     if (block.getRowCount() == 0) {
-      throw new RuntimeException("Illegal row group of 0 rows");
+      throw new IllegalArgumentException("Illegal row group of 0 rows");
     }
     ColumnChunkPageReadStore rowGroup = new ColumnChunkPageReadStore(block.getRowCount());
     ColumnChunkMetaData mc = findColumnMeta(block, columnDescriptor);
@@ -106,8 +110,10 @@ public class ParquetFiberDataReader implements Closeable {
         mc,
         mc.getStartingPos(),
         (int) mc.getTotalSize());
-    // actually read the chunk.
+    // readChunkData will read binary data to DataFiber.
     DataFiber dataFiber = readChunkData(descriptor);
+    // dataFiber.readAllPages() will resolution binary data to rowGroup memory representation but
+    // data page not decompress and deserialize.
     rowGroup.addColumn(dataFiber.descriptor.col, dataFiber.readAllPages());
     return rowGroup;
   }
@@ -139,9 +145,15 @@ public class ParquetFiberDataReader implements Closeable {
     f.seek(descriptor.fileOffset);
     byte[] chunksBytes = new byte[descriptor.size];
     f.readFully(chunksBytes);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("read binary data of {}  {} offset = {}, length = {} ",
+        this.fileStatus.getPath(), descriptor.col, descriptor.fileOffset, descriptor.size);
+    }
     return new DataFiber(descriptor, chunksBytes, 0, f) ;
   }
 
+
+  // TODO Use stream api if we use Java 8+.
   private ColumnChunkMetaData findColumnMeta(
       BlockMetaData block,
       ColumnDescriptor columnDescriptor) throws IOException {
@@ -152,7 +164,7 @@ public class ParquetFiberDataReader implements Closeable {
         return mc;
       }
     }
-    throw new IOException("Can not found column meta of cloumn + " + columnPath);
+    throw new IOException("Can not found column meta of column + " + columnPath);
   }
 
   private FileMetaData getFileMetaData() {
@@ -160,7 +172,7 @@ public class ParquetFiberDataReader implements Closeable {
   }
 
   /**
-   * The data for a column chunk.
+   * The data for a parquet data fiber.
    */
   private class DataFiber extends ByteArrayInputStream {
 
@@ -248,6 +260,7 @@ public class ParquetFiberDataReader implements Closeable {
             valuesCountReadSoFar += dataHeaderV1.getNum_values();
             break;
           case DATA_PAGE_V2:
+            // actually VectorizedColumnReader not support DATA_PAGE_V2 format now.
             DataPageHeaderV2 dataHeaderV2 = pageHeader.getData_page_header_v2();
             int dataSize = compressedPageSize - dataHeaderV2.getRepetition_levels_byte_length()
               - dataHeaderV2.getDefinition_levels_byte_length();
@@ -317,7 +330,7 @@ public class ParquetFiberDataReader implements Closeable {
   }
 
   /**
-   * information needed to read a column chunk
+   * information needed to read a data fiber
    */
   private static class DataFiberDescriptor {
     private final ColumnDescriptor col;
@@ -345,16 +358,18 @@ public class ParquetFiberDataReader implements Closeable {
 
   private static class CorruptParquetFileException extends IOException {
 
+    private static final String ERR_MESSAGE = "Expected {0} values in column chunk at {1} "
+      + "offset {2} but got {3} values instead over {4} pages ending at file offset {5}.";
+
     CorruptParquetFileException(
         DataFiberDescriptor descriptor,
         Path path,
         long valuesCountReadSoFar,
         int pagesInChunkSize,
         int position) {
-      super("Expected " + descriptor.metadata.getValueCount() + " values in column chunk at " +
-        path + " offset " + descriptor.metadata.getFirstDataPageOffset() +
-        " but got " + valuesCountReadSoFar + " values instead over " + pagesInChunkSize
-        + " pages ending at file offset " + (descriptor.fileOffset + position));
+      super(String.format(ERR_MESSAGE, descriptor.metadata.getValueCount(), path,
+              descriptor.metadata.getFirstDataPageOffset(), valuesCountReadSoFar,
+              pagesInChunkSize, descriptor.fileOffset + position));
     }
   }
 }
