@@ -499,7 +499,7 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
   }
 }
 
-class ParquetFiberDataReaderSuite extends ParquetCacheDataSuite {
+class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
   private val requestSchema: StructType = new StructType()
     .add(StructField("int32_field", IntegerType))
     .add(StructField("int64_field", LongType))

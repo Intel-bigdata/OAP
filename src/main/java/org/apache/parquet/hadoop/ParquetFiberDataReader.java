@@ -52,6 +52,9 @@ import org.apache.parquet.schema.PrimitiveType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * The Parquet file reader implement that read a single column for one group at each time.
+ */
 public class ParquetFiberDataReader implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(ParquetFiberDataReader.class);
@@ -83,6 +86,11 @@ public class ParquetFiberDataReader implements Closeable {
     this.codecFactory = new CodecFactory(conf);
   }
 
+  /**
+   * Reads one column requested from the row group at the current file.
+   * @throws IOException if an error occurs while reading
+   * @return the PageReadStore which can provide PageReaders for each column.
+   */
   public PageReadStore readFiberData(
       BlockMetaData block,
       ColumnDescriptor columnDescriptor) throws IOException {
@@ -98,6 +106,7 @@ public class ParquetFiberDataReader implements Closeable {
         mc,
         mc.getStartingPos(),
         (int) mc.getTotalSize());
+    // actually read the chunk.
     DataFiber dataFiber = readChunkData(descriptor);
     rowGroup.addColumn(dataFiber.descriptor.col, dataFiber.readAllPages());
     return rowGroup;
@@ -120,6 +129,11 @@ public class ParquetFiberDataReader implements Closeable {
     return footer;
   }
 
+  /**
+   * @param descriptor the descriptor of the chunk
+   * @return the chunk
+   * @throws IOException
+   */
   private DataFiber readChunkData(
       DataFiberDescriptor descriptor) throws IOException {
     f.seek(descriptor.fileOffset);
@@ -145,11 +159,20 @@ public class ParquetFiberDataReader implements Closeable {
     return fileMetaData;
   }
 
+  /**
+   * The data for a column chunk.
+   */
   private class DataFiber extends ByteArrayInputStream {
 
     private final DataFiberDescriptor descriptor;
     private final SeekableInputStream f;
 
+    /**
+     * @param descriptor the descriptor of the chunk
+     * @param data contains the data of the chunk at offset
+     * @param offset where the chunk starts in data
+     * @param f the file stream positioned at the end of this chunk
+     */
     DataFiber(DataFiberDescriptor descriptor,
         byte[] data,
         int offset,
@@ -166,13 +189,23 @@ public class ParquetFiberDataReader implements Closeable {
       try {
         pageHeader = Util.readPageHeader(this);
       } catch (IOException e) {
-        this.pos = initialPos;
+        // this is to workaround a bug where the compressedLength
+        // of the chunk is missing the size of the header of the dictionary
+        // to allow reading older files (using dictionary) we need this.
+        // usually 13 to 19 bytes are missing
+        // if the last page is smaller than this, the page header itself is truncated in the buffer.
+        this.pos = initialPos; // resetting the buffer to the position before we got the error
         LOG.info("completing the column chunk to read the page header");
+        // trying again from the buffer + remainder of the stream.
         pageHeader = Util.readPageHeader(new SequenceInputStream(this, f));
       }
       return pageHeader;
     }
 
+    /**
+     * Read all of the pages in a given column chunk.
+     * @return the list of pages
+     */
     ColumnChunkPageReadStore.ColumnChunkPageReader readAllPages() throws IOException {
       List<DataPage> pagesInChunk = new ArrayList<>();
       DictionaryPage dictionaryPage = null;
@@ -258,6 +291,10 @@ public class ParquetFiberDataReader implements Closeable {
 
     private BytesInput readAsBytesInput(int size) throws IOException {
       if (pos + size > count) {
+        // this is to workaround a bug where the compressedLength
+        // of the chunk is missing the size of the header of the dictionary
+        // to allow reading older files (using dictionary) we need this.
+        // usually 13 to 19 bytes are missing
         int l1 = count - pos;
         int l2 = size - l1;
         LOG.info("completed the column chunk with {} bytes", l2);
@@ -267,6 +304,11 @@ public class ParquetFiberDataReader implements Closeable {
       return readAsBytesInputInternal(size);
     }
 
+    /**
+     * @param size the size of the page
+     * @return the page
+     * @throws IOException
+     */
     private BytesInput readAsBytesInputInternal(int size) {
       final BytesInput r = BytesInput.from(this.buf, this.pos, size);
       this.pos += size;
@@ -274,12 +316,21 @@ public class ParquetFiberDataReader implements Closeable {
     }
   }
 
+  /**
+   * information needed to read a column chunk
+   */
   private static class DataFiberDescriptor {
     private final ColumnDescriptor col;
     private final ColumnChunkMetaData metadata;
     private final long fileOffset;
     private final int size;
 
+    /**
+     * @param col column this chunk is part of
+     * @param metadata metadata for the column
+     * @param fileOffset offset in the file where this chunk starts
+     * @param size size of the chunk
+     */
     private DataFiberDescriptor(
         ColumnDescriptor col,
         ColumnChunkMetaData metadata,
