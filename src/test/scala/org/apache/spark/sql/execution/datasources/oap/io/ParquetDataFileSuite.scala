@@ -17,11 +17,12 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import java.io.File
+import java.io.{File, IOException}
 
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.fs.Path
+import org.apache.parquet.column.ColumnDescriptor
 import org.apache.parquet.column.ParquetProperties.WriterVersion
 import org.apache.parquet.column.ParquetProperties.WriterVersion.{PARQUET_1_0, PARQUET_2_0}
 import org.apache.parquet.example.Paper
@@ -538,6 +539,21 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
     for (i <- 0 until rowCount) {
       assert(i * 2 == vector.getInt(i))
     }
+  }
+
+  test("can not found column meta") {
+    val meta = ParquetDataFileMeta(configuration, fileName)
+    val reader = ParquetFiberDataReader.open(configuration,
+      new Path(fileName), meta.footer.toParquetMetadata)
+    val footer = reader.getFooter
+    val rowCount = footer.getBlocks.get(0).getRowCount.toInt
+    val vector = ColumnVector.allocate(rowCount, IntegerType, MemoryMode.ON_HEAP)
+    val blockMetaData = footer.getBlocks.get(0)
+    val columnDescriptor = new ColumnDescriptor(Array(s"${fileName}_temp"), INT32, 0, 0)
+    val exception = intercept[IOException] {
+      reader.readFiberData(blockMetaData, columnDescriptor)
+    }
+    assert(exception.getMessage.contains("Can not found column meta of column"))
   }
 }
 
