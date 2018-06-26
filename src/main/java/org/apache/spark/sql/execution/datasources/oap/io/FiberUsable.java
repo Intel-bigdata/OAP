@@ -18,8 +18,10 @@ package org.apache.spark.sql.execution.datasources.oap.io;
 
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache;
 
+/**
+ * Define two interfaces for ColumnVector.
+ */
 public interface FiberUsable {
-
   /**
    * Pass data bytes to external components.
    * @return FiberCache which is an alias of MemoryBlock.

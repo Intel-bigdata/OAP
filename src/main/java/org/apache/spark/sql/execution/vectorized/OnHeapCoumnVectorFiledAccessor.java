@@ -22,6 +22,10 @@ import java.util.Map;
 
 import com.google.common.collect.Maps;
 
+/**
+ * It's a helper class for OnHeapColumnVector that helps
+ * to modify private variable of OnHeapColumnVector by reflection.
+ */
 public class OnHeapCoumnVectorFiledAccessor {
 
   private static final Map<String, Field> FIELD_MAP = Maps.newHashMap();
