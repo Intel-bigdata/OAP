@@ -20,7 +20,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache;
-import org.apache.spark.sql.execution.datasources.oap.io.FiberUsable;
+import org.apache.spark.sql.execution.datasources.oap.io.FiberCacheSerDes;
 import org.apache.spark.sql.oap.OapRuntime$;
 import org.apache.spark.sql.types.BinaryType;
 import org.apache.spark.sql.types.BooleanType;
@@ -36,7 +36,7 @@ import org.apache.spark.sql.types.StringType;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.UTF8String;
 
-public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
+public class OnHeapColumnVectorFiber implements FiberCacheSerDes, Closeable {
 
   private final OnHeapColumnVector vector;
   private final int capacity;
