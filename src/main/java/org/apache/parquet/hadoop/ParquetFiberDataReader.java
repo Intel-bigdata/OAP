@@ -55,8 +55,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The Parquet file reader implement that read a single column for one group at each time.
- * Notes: this class is mainly copied from org.apache.parquet.hadoop.ParquetFileReader,
- * it may need to change when parquet changed its code.
+ * Notes: this class is derived from org.apache.parquet.hadoop.ParquetFileReader, it is give
+ * special features for our read process, it hold the inputstream at the life cycle of the
+ * cache load and can read one column of one rowgroup use readFiberData method.
+ * It doesn't need to change if parquet doesn't have protocol changes.
  */
 public class ParquetFiberDataReader implements Closeable {
 
