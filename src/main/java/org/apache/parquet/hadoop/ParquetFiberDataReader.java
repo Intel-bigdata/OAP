@@ -55,6 +55,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The Parquet file reader implement that read a single column for one group at each time.
+ * Notes: this class is mainly copied from org.apache.parquet.hadoop.ParquetFileReader,
+ * it may need to change when parquet changed its code.
  */
 public class ParquetFiberDataReader implements Closeable {
 
@@ -164,7 +166,7 @@ public class ParquetFiberDataReader implements Closeable {
         return mc;
       }
     }
-    throw new IOException("Can not found column meta of column + " + columnPath);
+    throw new IOException("Can not find column meta of column + " + columnPath);
   }
 
   private FileMetaData getFileMetaData() {
@@ -368,8 +370,8 @@ public class ParquetFiberDataReader implements Closeable {
         int pagesInChunkSize,
         int position) {
       super(String.format(ERR_MESSAGE, descriptor.metadata.getValueCount(), path,
-              descriptor.metadata.getFirstDataPageOffset(), valuesCountReadSoFar,
-              pagesInChunkSize, descriptor.fileOffset + position));
+        descriptor.metadata.getFirstDataPageOffset(), valuesCountReadSoFar,
+        pagesInChunkSize, descriptor.fileOffset + position));
     }
   }
 }

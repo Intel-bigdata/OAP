@@ -541,7 +541,7 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
     }
   }
 
-  test("can not found column meta") {
+  test("can not find column meta") {
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -553,7 +553,7 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
     val exception = intercept[IOException] {
       reader.readFiberData(blockMetaData, columnDescriptor)
     }
-    assert(exception.getMessage.contains("Can not found column meta of column"))
+    assert(exception.getMessage.contains("Can not find column meta of column"))
   }
 }
 
