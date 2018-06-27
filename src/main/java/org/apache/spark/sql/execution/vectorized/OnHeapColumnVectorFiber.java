@@ -79,49 +79,49 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
     if (dataType instanceof ByteType || dataType instanceof BooleanType) {
       // memory layout: data(1 byte * capacity)::nulls(1 byte * capacity)
       Platform.copyMemory(null, nativeAddress, byteData(),
-              Platform.BYTE_ARRAY_OFFSET, capacity);
+        Platform.BYTE_ARRAY_OFFSET, capacity);
       Platform.copyMemory(null, nativeAddress + capacity,
-              nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
+        nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
     } else if (dataType instanceof ShortType) {
       // memory layout: data(2 bytes * capacity)::nulls(1 byte * capacity)
       Platform.copyMemory(null, nativeAddress, shortData(),
-              Platform.SHORT_ARRAY_OFFSET, capacity * 2);
+        Platform.SHORT_ARRAY_OFFSET, capacity * 2);
       Platform.copyMemory(null, nativeAddress + capacity * 2,
-              nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
+        nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
     } else if (dataType instanceof IntegerType || dataType instanceof DateType) {
       // memory layout: data(4 bytes * capacity)::nulls(1 byte * capacity)
       Platform.copyMemory(null, nativeAddress, intData(),
-              Platform.INT_ARRAY_OFFSET, capacity * 4);
+        Platform.INT_ARRAY_OFFSET, capacity * 4);
       Platform.copyMemory(null, nativeAddress + capacity * 4,
-              nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
+        nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
     } else if (dataType instanceof FloatType) {
       // memory layout: data(4 bytes * capacity)::nulls(1 byte * capacity)
       Platform.copyMemory(null, nativeAddress, floatData(),
-              Platform.FLOAT_ARRAY_OFFSET, capacity * 4);
+        Platform.FLOAT_ARRAY_OFFSET, capacity * 4);
       Platform.copyMemory(null, nativeAddress + capacity * 4,
-              nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
+        nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
     } else if (dataType instanceof LongType) {
       // memory layout: data(8 bytes * capacity)::nulls(1 byte * capacity)
       Platform.copyMemory(null, nativeAddress, longData(),
-              Platform.LONG_ARRAY_OFFSET, capacity * 8);
+        Platform.LONG_ARRAY_OFFSET, capacity * 8);
       Platform.copyMemory(null, nativeAddress + capacity * 8,
-              nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
+        nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
     } else if (dataType instanceof DoubleType) {
       // memory layout: data(8 bytes * capacity)::nulls(1 byte * capacity)
       Platform.copyMemory(null, nativeAddress, doubleData(),
-              Platform.DOUBLE_ARRAY_OFFSET, capacity * 8);
+        Platform.DOUBLE_ARRAY_OFFSET, capacity * 8);
       Platform.copyMemory(null, nativeAddress + capacity * 8,
-              nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
+        nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
     } else if (dataType instanceof BinaryType || dataType instanceof StringType) {
       // lengthData and offsetData will be set and data will be put in child if type is Array.
       // memory layout: lengthData(4 bytes * capacity)::offsetData(4 bytes * capacity)
       // ::nulls(1 byte * capacity)::child.data(unfixed length)
       Platform.copyMemory(null, nativeAddress, arrayLengths(),
-              Platform.INT_ARRAY_OFFSET, capacity * 4);
+        Platform.INT_ARRAY_OFFSET, capacity * 4);
       Platform.copyMemory(null, nativeAddress + capacity * 4, arrayOffsets(),
-              Platform.INT_ARRAY_OFFSET, capacity * 4);
+        Platform.INT_ARRAY_OFFSET, capacity * 4);
       Platform.copyMemory(null, nativeAddress + capacity * 8,
-              nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
+        nulls(), Platform.BYTE_ARRAY_OFFSET, capacity);
       // Need to determine the total length of data bytes.
       int lastIndex = capacity - 1;
       while (lastIndex >= 0 && isNullAt(lastIndex)) {
@@ -130,7 +130,7 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
       if (lastIndex >= 0) {
         byte[] data = new byte[getArrayOffset(lastIndex) + getArrayLength(lastIndex)];
         Platform.copyMemory(null, nativeAddress + capacity * 9,
-                data, Platform.BYTE_ARRAY_OFFSET,data.length);
+          data, Platform.BYTE_ARRAY_OFFSET,data.length);
         setByteData(getChildColumn0(), data);
       }
     } else {
@@ -147,45 +147,45 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
     if (dataType instanceof ByteType) {
       // data: 1 byte, nulls: 1 byte
       Platform.copyMemory(byteData(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress, capacity);
+        nativeAddress, capacity);
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity, capacity);
+        nativeAddress + capacity, capacity);
     } else if (dataType instanceof BooleanType) {
       // data: 1 byte, nulls: 1 byte
       Platform.copyMemory(byteData(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress, capacity);
+        nativeAddress, capacity);
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity, capacity);
+        nativeAddress + capacity, capacity);
     } else if (dataType instanceof ShortType) {
       // data: 2 bytes, nulls: 1 byte
       Platform.copyMemory(shortData(), Platform.SHORT_ARRAY_OFFSET, null,
-              nativeAddress, capacity * 2);
+        nativeAddress, capacity * 2);
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 2, capacity);
+        nativeAddress + capacity * 2, capacity);
     } else if (dataType instanceof IntegerType || dataType instanceof DateType) {
       // data: 4 bytes, nulls: 1 byte
       Platform.copyMemory(intData(), Platform.INT_ARRAY_OFFSET, null,
-              nativeAddress, capacity * 4);
+        nativeAddress, capacity * 4);
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 4, capacity);
+        nativeAddress + capacity * 4, capacity);
     } else if (dataType instanceof FloatType) {
       // data: 4 bytes, nulls: 1 byte
       Platform.copyMemory(floatData(), Platform.FLOAT_ARRAY_OFFSET, null,
-              nativeAddress, capacity * 4);
+        nativeAddress, capacity * 4);
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 4, capacity);
+        nativeAddress + capacity * 4, capacity);
     } else if (dataType instanceof LongType) {
       // data: 8 bytes, nulls: 1 byte
       Platform.copyMemory(longData(), Platform.LONG_ARRAY_OFFSET, null,
-              nativeAddress, capacity * 8);
+        nativeAddress, capacity * 8);
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 8, capacity);
+        nativeAddress + capacity * 8, capacity);
     } else if (dataType instanceof DoubleType) {
       // data: 8 bytes, nulls: 1 byte
       Platform.copyMemory(doubleData(), Platform.DOUBLE_ARRAY_OFFSET, null,
-              nativeAddress, capacity * 8);
+        nativeAddress, capacity * 8);
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 8, capacity);
+        nativeAddress + capacity * 8, capacity);
     } else {
       throw new IllegalArgumentException("Unhandled " + dataType);
     }
@@ -200,17 +200,17 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
         }
       }
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity, capacity);
+        nativeAddress + capacity, capacity);
     } else if (dataType instanceof BooleanType) {
       // data: 1 byte, nulls: 1 byte
       for (int i = 0; i < capacity; i++) {
         if (!isNullAt(i)) {
           Platform.putByte(null, nativeAddress + i,
-                  (byte) ((getBoolean(i)) ? 1 : 0));
+            (byte) ((getBoolean(i)) ? 1 : 0));
         }
       }
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity, capacity);
+        nativeAddress + capacity, capacity);
     } else if (dataType instanceof ShortType) {
       // data: 2 bytes, nulls: 1 byte
       for (int i = 0; i < capacity; i++) {
@@ -219,7 +219,7 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
         }
       }
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 2, capacity);
+        nativeAddress + capacity * 2, capacity);
     } else if (dataType instanceof IntegerType || dataType instanceof DateType) {
       // data: 4 bytes, nulls: 1 byte
       for (int i = 0; i < capacity; i++) {
@@ -228,7 +228,7 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
         }
       }
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 4, capacity);
+        nativeAddress + capacity * 4, capacity);
     } else if (dataType instanceof FloatType) {
       // data: 4 bytes, nulls: 1 byte
       for (int i = 0; i < capacity; i++) {
@@ -237,7 +237,7 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
         }
       }
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 4, capacity);
+        nativeAddress + capacity * 4, capacity);
     } else if (dataType instanceof LongType) {
       // data: 8 bytes, nulls: 1 byte
       for (int i = 0; i < capacity; i++) {
@@ -246,7 +246,7 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
         }
       }
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 8, capacity);
+        nativeAddress + capacity * 8, capacity);
     } else if (dataType instanceof DoubleType) {
       // data: 8 bytes, nulls: 1 byte
       for (int i = 0; i < capacity; i++) {
@@ -255,7 +255,7 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
         }
       }
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, null,
-              nativeAddress + capacity * 8, capacity);
+        nativeAddress + capacity * 8, capacity);
     } else {
       throw new IllegalArgumentException("Unhandled " + dataType);
     }
@@ -268,15 +268,15 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
       // child.data: childColumns[0].elementsAppended bytes.
       byte[] dataBytes = new byte[capacity * (4 + 4 + 1) + getChildColumn0().elementsAppended];
       Platform.copyMemory(arrayLengths(), Platform.INT_ARRAY_OFFSET, dataBytes,
-              Platform.BYTE_ARRAY_OFFSET, capacity * 4);
+        Platform.BYTE_ARRAY_OFFSET, capacity * 4);
       Platform.copyMemory(arrayOffsets(), Platform.INT_ARRAY_OFFSET, dataBytes,
-              Platform.BYTE_ARRAY_OFFSET + capacity * 4, capacity * 4);
+        Platform.BYTE_ARRAY_OFFSET + capacity * 4, capacity * 4);
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET, dataBytes,
-              Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
+        Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
       byte[] data = byteData(getChildColumn0());
       Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-              Platform.BYTE_ARRAY_OFFSET + capacity * 9,
-              getChildColumn0().elementsAppended);
+        Platform.BYTE_ARRAY_OFFSET + capacity * 9,
+        getChildColumn0().elementsAppended);
       return OapRuntime$.MODULE$.getOrCreate().memoryManager().toDataFiberCache(dataBytes);
     } else {
       throw new IllegalArgumentException("Unhandled " + dataType);
@@ -295,20 +295,20 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
           byte[] bytes = getBinary(i);
           Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
           Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + capacity * 4 + i * 4,
-                  offset);
+            offset);
           arrayData().appendBytes(bytes.length, bytes, 0);
           offset += bytes.length;
         }
       }
       byte[] dataBytes = new byte[capacity * (4 + 4 + 1) + getChildColumn0().elementsAppended];
       Platform.copyMemory(tempBytes, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-              Platform.BYTE_ARRAY_OFFSET, capacity * 8);
+        Platform.BYTE_ARRAY_OFFSET, capacity * 8);
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET , dataBytes,
-              Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
+        Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
       byte[] data = byteData(getChildColumn0());
       Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-              Platform.BYTE_ARRAY_OFFSET + capacity * 9,
-              getChildColumn0().elementsAppended);
+        Platform.BYTE_ARRAY_OFFSET + capacity * 9,
+        getChildColumn0().elementsAppended);
       return OapRuntime$.MODULE$.getOrCreate().memoryManager().toDataFiberCache(dataBytes);
     } else if (dataType instanceof StringType) {
       // lengthData: 4 bytes, offsetData: 4 bytes, nulls: 1 byte,
@@ -320,20 +320,20 @@ public class OnHeapColumnVectorFiber implements FiberUsable, Closeable {
           byte[] bytes = getUTF8String(i).getBytes();
           Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + i * 4, bytes.length);
           Platform.putInt(tempBytes, Platform.INT_ARRAY_OFFSET + capacity * 4 + i * 4,
-                  offset);
+            offset);
           arrayData().appendBytes(bytes.length, bytes, 0);
           offset += bytes.length;
         }
       }
       byte[] dataBytes = new byte[capacity * (4 + 4 + 1) + getChildColumn0().elementsAppended];
       Platform.copyMemory(tempBytes, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-              Platform.BYTE_ARRAY_OFFSET, capacity * 8);
+        Platform.BYTE_ARRAY_OFFSET, capacity * 8);
       Platform.copyMemory(nulls(), Platform.BYTE_ARRAY_OFFSET , dataBytes,
-              Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
+        Platform.BYTE_ARRAY_OFFSET + capacity * 8, capacity);
       byte[] data = byteData(getChildColumn0());
       Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
-              Platform.BYTE_ARRAY_OFFSET + capacity * 9,
-              getChildColumn0().elementsAppended);
+        Platform.BYTE_ARRAY_OFFSET + capacity * 9,
+         getChildColumn0().elementsAppended);
       return OapRuntime$.MODULE$.getOrCreate().memoryManager().toDataFiberCache(dataBytes);
     } else {
       throw new IllegalArgumentException("Unhandled " + dataType);
