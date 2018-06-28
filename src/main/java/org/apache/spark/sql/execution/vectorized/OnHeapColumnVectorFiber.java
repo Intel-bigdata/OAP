@@ -61,15 +61,17 @@ public class OnHeapColumnVectorFiber implements FiberCacheSerDe, Closeable {
     if(vector.hasDictionary()) {
       dumpBytesToCacheWithDictionary(nativeAddress);
     } else {
+      // use batch memory copy strategy to speed up
       dumpBytesToCacheWithoutDictionary(nativeAddress);
     }
   }
 
   @Override
   public FiberCache dumpBytesToCache() {
-    if( vector.hasDictionary()) {
+    if(vector.hasDictionary()) {
       return dumpBytesToCacheWithDictionary();
     } else {
+      // use batch memory copy strategy to speed up
       return dumpBytesToCacheWithoutDictionary();
     }
   }
