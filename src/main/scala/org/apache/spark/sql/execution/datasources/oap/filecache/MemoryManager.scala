@@ -109,7 +109,7 @@ private[sql] class MemoryManager(sparkEnv: SparkEnv) extends Logging {
     FiberCache(memoryBlock)
   }
 
-  def getEmptyDataFiberCache(length: Int): FiberCache = {
+  def getEmptyDataFiberCache(length: Long): FiberCache = {
     val memoryBlock = allocate(length)
     FiberCache(memoryBlock)
   }

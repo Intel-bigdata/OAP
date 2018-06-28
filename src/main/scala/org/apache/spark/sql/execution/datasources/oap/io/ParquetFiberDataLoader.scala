@@ -50,7 +50,8 @@ private[oap] case class ParquetFiberDataLoader(
     val sparkRequestedSchemaString =
       configuration.get(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA)
     val sparkSchema = StructType.fromString(sparkRequestedSchemaString)
-    Preconditions.checkArgument(sparkSchema.length == 1, "Can not get multi-columns every time")
+    Preconditions.checkArgument(sparkSchema.length == 1, s"Only can get single column every time " +
+      s"by loadSingleColumn, the columns = ${sparkSchema.mkString}")
     val dataType = sparkSchema.fields(0).dataType
     val vector = ColumnVector.allocate(rowCount, dataType, MemoryMode.ON_HEAP)
 
@@ -73,7 +74,7 @@ private[oap] case class ParquetFiberDataLoader(
         columnReader.readBatch(rowCount, vector)
       }
 
-      fixedAndLength(dataType) match {
+      getDataTypeInfo(dataType) match {
         case (true, length) =>
           val fiberCache = OapRuntime.getOrCreate.memoryManager.
             getEmptyDataFiberCache(rowCount * length)
@@ -110,17 +111,21 @@ private[oap] case class ParquetFiberDataLoader(
     }
   }
 
-  private def fixedAndLength(dataType: DataType): (Boolean, Int) = dataType match {
+  /**
+   * @param dataType DataType
+   * @return tuple(fixed or variable length DataType, length of DataType)
+   */
+  private def getDataTypeInfo(dataType: DataType): (Boolean, Long) = dataType match {
     // data: 1 byte, nulls: 1 byte
-    case ByteType | BooleanType => (true, 2)
+    case ByteType | BooleanType => (true, 2L)
     // data: 2 byte, nulls: 1 byte
-    case ShortType => (true, 3)
+    case ShortType => (true, 3L)
     // data: 4 byte, nulls: 1 byte
-    case IntegerType | DateType | FloatType => (true, 5)
+    case IntegerType | DateType | FloatType => (true, 5L)
     // data: 8 byte, nulls: 1 byte
-    case LongType | DoubleType => (true, 9)
+    case LongType | DoubleType => (true, 9L)
     // data: variable length, such as StringType and BinaryType
-    case StringType | BinaryType => (false, -1)
+    case StringType | BinaryType => (false, -1L)
     case otherTypes: DataType => throw new OapException(s"${otherTypes.simpleString}" +
       s" data type is not implemented for cache.")
   }

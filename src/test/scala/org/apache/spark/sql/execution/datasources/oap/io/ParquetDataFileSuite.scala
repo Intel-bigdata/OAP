@@ -639,7 +639,7 @@ class ParquetFiberDataLoaderSuite extends ParquetDataFileSuite {
     val exception = intercept[IllegalArgumentException] {
       loadSingleColumn(Array(0, 1))
     }
-    assert(exception.getMessage.contains("Can not get multi-columns every time"))
+    assert(exception.getMessage.contains("Only can get single column every time"))
   }
 }
 
