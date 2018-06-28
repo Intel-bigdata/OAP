@@ -21,6 +21,7 @@ import java.io.{File, IOException}
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.column.ColumnDescriptor
 import org.apache.parquet.column.ParquetProperties.WriterVersion
@@ -39,13 +40,15 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
-import org.apache.spark.sql.execution.datasources.parquet.{VectorizedColumnReader, VectorizedColumnReaderWrapper}
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportWrapper, VectorizedColumnReader, VectorizedColumnReaderWrapper}
 import org.apache.spark.sql.execution.vectorized.{ColumnarBatch, ColumnVector}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
 
 abstract class ParquetDataFileSuite extends SparkFunSuite with SharedOapContext
@@ -554,6 +557,89 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
       reader.readFiberData(blockMetaData, columnDescriptor)
     }
     assert(exception.getMessage.contains("Can not find column meta of column"))
+  }
+}
+
+class ParquetFiberDataLoaderSuite extends ParquetDataFileSuite {
+
+  private val requestSchema: StructType = new StructType()
+    .add(StructField("int32_field", IntegerType))
+    .add(StructField("int64_field", LongType))
+    .add(StructField("boolean_field", BooleanType))
+    .add(StructField("float_field", FloatType))
+    .add(StructField("string_field", StringType))
+
+  override def parquetSchema: MessageType = new MessageType("test",
+    new PrimitiveType(REQUIRED, INT32, "int32_field"),
+    new PrimitiveType(REQUIRED, INT64, "int64_field"),
+    new PrimitiveType(REQUIRED, BOOLEAN, "boolean_field"),
+    new PrimitiveType(REQUIRED, FLOAT, "float_field"),
+    new PrimitiveType(REQUIRED, BINARY, "string_field")
+  )
+
+  override def dataVersion: WriterVersion = PARQUET_1_0
+
+  override def data: Seq[Group] = {
+    val factory = new SimpleGroupFactory(parquetSchema)
+    (0 until 100).map(i => factory.newGroup()
+      .append("int32_field", i)
+      .append("int64_field", 64L)
+      .append("boolean_field", true)
+      .append("float_field", 1.0f)
+      .append("string_field", s"str$i"))
+  }
+
+  var reader: ParquetFiberDataReader = null
+
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    reader = ParquetFiberDataReader.open(configuration, new Path(fileName),
+      ParquetDataFileMeta(configuration, fileName).footer.toParquetMetadata)
+  }
+
+  override def afterEach(): Unit = {
+    reader.close()
+    super.afterEach()
+  }
+
+  private def addRequestSchemaToConf(conf: Configuration, requiredIds: Array[Int]): Unit = {
+    val requestSchemaString = {
+      var schema = new StructType
+      for (index <- requiredIds) {
+        schema = schema.add(requestSchema(index))
+      }
+      schema.json
+    }
+    conf.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
+  }
+
+  private def loadSingleColumn(requiredId: Array[Int]): (FiberCache, Int) = {
+    val conf = new Configuration(configuration)
+    addRequestSchemaToConf(conf, requiredId)
+    val rowCount = reader.getFooter.getBlocks.get(0).getRowCount.toInt
+    val fiberCache = ParquetFiberDataLoader(conf, reader, 0, rowCount).loadSingleColumn
+    (fiberCache, rowCount)
+  }
+
+  test("test loadSingleColumn with reuse reader") {
+    // fixed length data type
+    val (intFiberCache, intRowCount) = loadSingleColumn(Array(0))
+    (0 until intRowCount).foreach(i => assert(intFiberCache.getInt(i * 4) == i))
+    // variable length data type
+    val (strFiberCache, strRowCount) = loadSingleColumn(Array(4))
+    (0 until strRowCount).map { i =>
+      val length = strFiberCache.getInt(i * 4)
+      val offset = strFiberCache.getInt(strRowCount * 4 + i * 4)
+      assert(strFiberCache.getUTF8String(strRowCount * 9 + offset, length).
+        equals(UTF8String.fromString(s"str$i")))
+    }
+  }
+
+  test("test load multi-columns every time") {
+    val exception = intercept[IllegalArgumentException] {
+      loadSingleColumn(Array(0, 1))
+    }
+    assert(exception.getMessage.contains("Can not get multi-columns every time"))
   }
 }
 
