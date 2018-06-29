@@ -33,11 +33,18 @@ import org.apache.spark.sql.execution.vectorized.{ColumnVector, OnHeapColumnVect
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.types._
 
+/**
+ * The main purpose of this loader is help to obtain
+ * one column of one rowgroup in data loading phase.
+ *
+ * @param configuration hadoop configuration
+ * @param reader which holds the inputstream at the life cycle of the cache load.
+ * @param blockId represents which block will be load.
+  */
 private[oap] case class ParquetFiberDataLoader(
     configuration: Configuration,
     reader: ParquetFiberDataReader,
-    blockId: Int,
-    rowCount: Int) {
+    blockId: Int) {
 
   @throws[IOException]
   def loadSingleColumn: FiberCache = {
@@ -53,6 +60,8 @@ private[oap] case class ParquetFiberDataLoader(
     Preconditions.checkArgument(sparkSchema.length == 1, s"Only can get single column every time " +
       s"by loadSingleColumn, the columns = ${sparkSchema.mkString}")
     val dataType = sparkSchema.fields(0).dataType
+    // Notes: rowIds is IntegerType in oap index.
+    val rowCount = reader.getFooter.getBlocks.get(blockId).getRowCount.toInt
     val vector = ColumnVector.allocate(rowCount, dataType, MemoryMode.ON_HEAP)
 
     // Construct OapOnHeapColumnVectorFiber out of try block because of no exception throw when init

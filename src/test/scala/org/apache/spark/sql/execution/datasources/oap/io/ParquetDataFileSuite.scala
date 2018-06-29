@@ -613,24 +613,23 @@ class ParquetFiberDataLoaderSuite extends ParquetDataFileSuite {
     conf.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
   }
 
-  private def loadSingleColumn(requiredId: Array[Int]): (FiberCache, Int) = {
+  private def loadSingleColumn(requiredId: Array[Int]): FiberCache = {
     val conf = new Configuration(configuration)
     addRequestSchemaToConf(conf, requiredId)
-    val rowCount = reader.getFooter.getBlocks.get(0).getRowCount.toInt
-    val fiberCache = ParquetFiberDataLoader(conf, reader, 0, rowCount).loadSingleColumn
-    (fiberCache, rowCount)
+    ParquetFiberDataLoader(conf, reader, 0).loadSingleColumn
   }
 
   test("test loadSingleColumn with reuse reader") {
     // fixed length data type
-    val (intFiberCache, intRowCount) = loadSingleColumn(Array(0))
-    (0 until intRowCount).foreach(i => assert(intFiberCache.getInt(i * 4) == i))
+    val rowCount = reader.getFooter.getBlocks.get(0).getRowCount.toInt
+    val intFiberCache = loadSingleColumn(Array(0))
+    (0 until rowCount).foreach(i => assert(intFiberCache.getInt(i * 4) == i))
     // variable length data type
-    val (strFiberCache, strRowCount) = loadSingleColumn(Array(4))
-    (0 until strRowCount).map { i =>
+    val strFiberCache = loadSingleColumn(Array(4))
+    (0 until rowCount).map { i =>
       val length = strFiberCache.getInt(i * 4)
-      val offset = strFiberCache.getInt(strRowCount * 4 + i * 4)
-      assert(strFiberCache.getUTF8String(strRowCount * 9 + offset, length).
+      val offset = strFiberCache.getInt(rowCount * 4 + i * 4)
+      assert(strFiberCache.getUTF8String(rowCount * 9 + offset, length).
         equals(UTF8String.fromString(s"str$i")))
     }
   }
