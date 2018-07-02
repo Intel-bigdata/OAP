@@ -203,7 +203,6 @@ private[oap] class OapDataReaderV1(
     metrics: OapMetricsManager,
     conf: Configuration,
     enableVectorizedReader: Boolean = false,
-    parquetDataCacheEnable: Boolean = false,
     options: Map[String, String] = Map.empty,
     filters: Seq[Filter] = Seq.empty,
     context: Option[VectorizedContext] = None) extends OapDataReader with Logging {
@@ -319,10 +318,9 @@ private[oap] class OapDataReaderV1(
       val tot = totalRows()
       metrics.updateTotalRows(tot)
       metrics.updateIndexAndRowRead(this, tot)
-      // if enableVectorizedReader == true and parquetDataCacheEnable = false,
-      // return iter directly because of partitionValues
+      // if enableVectorizedReader == true , return iter directly because of partitionValues
       // already filled by VectorizedReader, else use original branch.
-      if (enableVectorizedReader && !parquetDataCacheEnable) {
+      if (enableVectorizedReader) {
         iter
       } else {
         val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
