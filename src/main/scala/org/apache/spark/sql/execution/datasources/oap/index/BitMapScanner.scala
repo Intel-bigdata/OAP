@@ -24,6 +24,7 @@ import org.apache.spark.sql.execution.datasources.oap.IndexMeta
 import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion
 import org.apache.spark.sql.execution.datasources.oap.index.impl.IndexFileReaderImpl
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatsAnalysisResult
+import org.apache.spark.sql.internal.oap.OapConf
 
 private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
 
@@ -40,7 +41,10 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     assert(keySchema ne null)
     // Currently OAP index type supports the column with one single field.
     assert(keySchema.fields.length == 1)
-    val idxPath = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
+
+    val indexDirectory = conf.get(OapConf.OAP_INDEX_DIRECTORY.key,
+      OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+    val idxPath = IndexUtils.indexFileFromDirectory(indexDirectory, dataPath, meta.name, meta.time)
     val fileReader = IndexFileReaderImpl(conf, idxPath)
 
     val bitmapReader = IndexUtils.readVersion(fileReader) match {

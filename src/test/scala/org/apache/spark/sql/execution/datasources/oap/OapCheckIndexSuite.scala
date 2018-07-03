@@ -25,6 +25,7 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql.{AnalysisException, QueryTest, Row, SaveMode}
 import org.apache.spark.sql.execution.datasources.oap.index.IndexUtils
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex, TestPartition}
 import org.apache.spark.util.Utils
 
@@ -166,9 +167,13 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       assert(metaOpt.get.indexMetas.nonEmpty)
       val indexMeta = metaOpt.get.indexMetas.head
       val dataFileName = metaOpt.get.fileMetas.head.dataFileName
-      val indexFileName =
-        IndexUtils.indexFileFromDataFile(new Path(path, dataFileName),
-          indexMeta.name, indexMeta.time).toUri.getPath
+      val indexDirectory = sparkContext.hadoopConfiguration.
+        get(OapConf.OAP_INDEX_DIRECTORY.key,
+        OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+
+      val indexFileName = IndexUtils.indexFileFromDirectory(indexDirectory,
+        new Path(path, dataFileName),
+        indexMeta.name, indexMeta.time).toUri.getPath
       Utils.deleteRecursively(new File(indexFileName))
 
       // Check again
@@ -282,9 +287,12 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       val indexMeta = metaOpt.get.indexMetas.head
 
       val dataFileName = metaOpt.get.fileMetas.head.dataFileName
-      val indexFileName =
-        IndexUtils.indexFileFromDataFile(
-          new Path(partitionPath, dataFileName), indexMeta.name, indexMeta.time).toUri.getPath
+      val indexDirectory = sparkContext.hadoopConfiguration.
+        get(OapConf.OAP_INDEX_DIRECTORY.key,
+          OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+      val indexFileName = IndexUtils.indexFileFromDirectory(indexDirectory,
+        new Path(partitionPath, dataFileName),
+        indexMeta.name, indexMeta.time).toUri.getPath
       Utils.deleteRecursively(new File(indexFileName))
 
       // Check again
@@ -454,9 +462,13 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       val indexMeta = metaOpt.get.indexMetas.head
 
       val dataFileName = metaOpt.get.fileMetas.head.dataFileName
-      val indexFileName =
-        IndexUtils.indexFileFromDataFile(
-          new Path(partitionPath, dataFileName), indexMeta.name, indexMeta.time).toUri.getPath
+      val indexDirecroty = sparkContext.hadoopConfiguration.
+        get(OapConf.OAP_INDEX_DIRECTORY.key,
+          OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+
+      val indexFileName = IndexUtils.indexFileFromDirectory(indexDirecroty,
+        new Path(partitionPath, dataFileName),
+        indexMeta.name, indexMeta.time).toUri.getPath
       Utils.deleteRecursively(new File(indexFileName))
 
       // Check again

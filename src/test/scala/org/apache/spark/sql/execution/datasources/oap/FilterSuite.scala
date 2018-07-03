@@ -163,9 +163,14 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql("insert into table oap_test select * from t where key = 3")
     sql("insert into table oap_test select * from t where key = 4")
     withIndex(TestIndex("oap_test", "index1")) {
+      var time = System.currentTimeMillis()
+      sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+        s"/tmp/$time")
       sql("create oindex index1 on oap_test (a)")
 
-      val checkPath = new Path(currentPath)
+      val checkPath = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+        OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
+
       val fs = checkPath.getFileSystem(new Configuration())
       val indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
       assert(indexFiles.length == 4)
@@ -227,9 +232,13 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql("insert into table parquet_test select * from t where key = 3")
     sql("insert into table parquet_test select * from t where key = 4")
     withIndex(TestIndex("parquet_test", "index1")) {
+      var time = System.currentTimeMillis()
+      sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+        s"/tmp/$time")
       sql("create oindex index1 on parquet_test (a)")
 
-      val checkPath = new Path(currentPath)
+      val checkPath = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+        OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
       val fs = checkPath.getFileSystem(new Configuration())
       val indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
       assert(indexFiles.length == 4)
@@ -314,6 +323,11 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("t_refresh_parquet", "index1", TestPartition("b", "1")),
       TestIndex("t_refresh_parquet", "index1", TestPartition("b", "2"))) {
+
+      var time = System.currentTimeMillis()
+      sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+        s"/tmp/$time")
+
       sql(
         """
           |INSERT OVERWRITE TABLE t_refresh_parquet
@@ -350,11 +364,11 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
       sql("refresh oindex on t_refresh_parquet partition (b=2)")
 
-      val fs = new Path(currentPath).getFileSystem(new Configuration())
-      val tablePath = sqlConf.warehousePath + "/t_refresh_parquet/"
-      assert(fs.globStatus(new Path(tablePath + "b=1/*.index")).length == 1)
-      assert(fs.globStatus(new Path(tablePath + "b=2/*.index")).length == 2)
-      assert(fs.globStatus(new Path(tablePath + "b=3/*.index")).length == 0)
+      val checkPath = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+        OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
+      val fs = checkPath.getFileSystem(new Configuration())
+      val indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      assert(indexFiles.length == 3)
 
       checkAnswer(sql("select * from t_refresh_parquet"),
         Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Row(3, 2) :: Row(4, 3) :: Nil)
@@ -433,6 +447,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     data.toDF("key", "value").createOrReplaceTempView("t")
     withIndex(TestIndex("t_refresh", "index1", TestPartition("b", "1")),
       TestIndex("t_refresh", "index1", TestPartition("b", "2"))) {
+      var time = System.currentTimeMillis()
+      sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+        s"/tmp/$time")
+
       sql(
         """
           |INSERT OVERWRITE TABLE t_refresh
@@ -469,11 +487,11 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
       sql("refresh oindex on t_refresh partition (b=2)")
 
-      val fs = new Path(currentPath).getFileSystem(new Configuration())
-      val tablePath = sqlConf.warehousePath + "/t_refresh/"
-      assert(fs.globStatus(new Path(tablePath + "b=1/*.index")).length == 1)
-      assert(fs.globStatus(new Path(tablePath + "b=2/*.index")).length == 2)
-      assert(fs.globStatus(new Path(tablePath + "b=3/*.index")).length == 0)
+      val checkPath = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+        OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
+      val fs = checkPath.getFileSystem(new Configuration())
+      val indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      assert(indexFiles.length == 3)
 
       checkAnswer(sql("select * from t_refresh"),
         Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Row(3, 2) :: Row(4, 3) :: Nil)
@@ -483,6 +501,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   test("refresh table of oap format without partition") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
+    var time = System.currentTimeMillis()
+    sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+      s"/tmp/$time")
     withIndex(TestIndex("oap_test", "index1")) {
       sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (a)")
@@ -491,12 +512,16 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
         Row(1, "this is test 1") :: Nil)
 
       sql("insert into table oap_test select * from t")
-      val checkPath = new Path(currentPath)
+      val checkPath = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+        OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
       val fs = checkPath.getFileSystem(new Configuration())
-      assert(fs.globStatus(new Path(checkPath, "*.index")).length == 2)
+      var indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      assert(indexFiles.length == 2)
 
       sql("refresh oindex on oap_test")
-      assert(fs.globStatus(new Path(checkPath, "*.index")).length == 4)
+      indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      assert(indexFiles.length == 4)
+
 
       checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
         Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
@@ -563,6 +588,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   test("filtering by string with duplicate refresh") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
+    var time = System.currentTimeMillis()
+    sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+      s"/tmp/$time")
     withIndex(TestIndex("oap_test", "index1")) {
       sql("insert overwrite table oap_test select * from t")
       sql("create oindex index1 on oap_test (a) using btree")
@@ -571,12 +599,15 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
         Row(1, "this is test 1") :: Nil)
 
       sql("insert into table oap_test select * from t")
-      val check_path = new Path(currentPath)
-      assert(check_path.getFileSystem(
-        new Configuration()).globStatus(new Path(check_path, "*.index")).length == 2)
+      val checkPath = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+        OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
+      val fs = checkPath.getFileSystem(new Configuration())
+      var indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      assert(indexFiles.length == 2)
+
       sql("refresh oindex on oap_test")
-      assert(check_path.getFileSystem(
-        new Configuration()).globStatus(new Path(check_path, "*.index")).length == 4)
+      indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      assert(indexFiles.length == 4)
 
       checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
         Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)

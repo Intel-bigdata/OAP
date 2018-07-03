@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row, SaveMode}
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex, TestPartition}
 import org.apache.spark.util.Utils
 
@@ -102,8 +103,10 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   test("create and drop index with partition specify") {
     val data: Seq[(Int, Int)] = (1 to 10).map { i => (i, i) }
     data.toDF("key", "value").createOrReplaceTempView("t")
-
-    val path = new Path(sqlConf.warehousePath)
+    sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+      "/tmp")
+    val path = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+      OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
 
     sql(
       """
@@ -129,10 +132,8 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
       assert(path.getFileSystem(
         configuration).globStatus(new Path(path,
-        "oap_partition_table/b=1/c=c1/*.index")).length != 0)
-      assert(path.getFileSystem(
-        configuration).globStatus(new Path(path,
-        "oap_partition_table/b=2/c=c2/*.index")).length == 0)
+        "*.index")).length != 0)
+
     }
 
     withIndex(
@@ -142,12 +143,10 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
       checkAnswer(sql("select * from oap_partition_table"),
         Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Row(4, 2, "c2") :: Nil)
+
       assert(path.getFileSystem(
         configuration).globStatus(new Path(path,
-        "oap_partition_table/b=1/c=c1/*.index")).length == 0)
-      assert(path.getFileSystem(
-        configuration).globStatus(new Path(path,
-        "oap_partition_table/b=2/c=c2/*.index")).length != 0)
+        "*.index")).length != 0)
     }
   }
 

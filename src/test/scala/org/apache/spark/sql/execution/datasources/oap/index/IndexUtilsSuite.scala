@@ -28,9 +28,12 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
+import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.unsafe.Platform
 
-class IndexUtilsSuite extends SparkFunSuite with Logging {
+class IndexUtilsSuite extends SparkFunSuite with Logging with SharedOapContext {
+
   test("write int to unsafe") {
     val buf = new ByteArrayOutputStream(8)
     val out = new DataOutputStream(buf)
@@ -57,35 +60,50 @@ class IndexUtilsSuite extends SparkFunSuite with Logging {
   }
 
   test("index path generating") {
-    assertEquals("/path/to/.t1.ABC.index1.index",
-      IndexUtils.indexFileFromDataFile(new Path("/path/to/t1.data"), "index1", "ABC").toString)
-    assertEquals("/.t1.1F23.index1.index",
-      IndexUtils.indexFileFromDataFile(new Path("/t1.data"), "index1", "1F23").toString)
-    assertEquals("/path/to/.t1.0.index1.index",
-      IndexUtils.indexFileFromDataFile(new Path("/path/to/t1.parquet"), "index1", "0").toString)
-    assertEquals("/path/to/.t1.F91.index1.index",
-      IndexUtils.indexFileFromDataFile(new Path("/path/to/t1"), "index1", "F91").toString)
+    sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+      "/tmp")
+    val indexDirectory = sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+      OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+    assertEquals(s"$indexDirectory/.t1.ABC.index1.index",
+      IndexUtils.indexFileFromDirectory(indexDirectory,
+        new Path("/path/to/t1.data"), "index1", "ABC").toString)
+    assertEquals(s"$indexDirectory/.t1.1F23.index1.index",
+      IndexUtils.indexFileFromDirectory(indexDirectory,
+        new Path("/t1.data"), "index1", "1F23").toString)
+    assertEquals(s"$indexDirectory/.t1.0.index1.index",
+      IndexUtils.indexFileFromDirectory(indexDirectory,
+        new Path("/path/to/t1.parquet"), "index1", "0").toString)
+    assertEquals(s"$indexDirectory/.t1.F91.index1.index",
+      IndexUtils.indexFileFromDirectory(indexDirectory,
+        new Path("/path/to/t1"), "index1", "F91").toString)
   }
 
   test("get index work file path") {
-    assertEquals("/path/to/_temp/0/.t1.ABC.index1.index",
+    sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+      "/tmp")
+    var indexDirectory = sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+      OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+    var indexPath = new Path(indexDirectory)
+
+    assertEquals(s"$indexPath/.t1.ABC.index1.index",
       IndexUtils.getIndexWorkPath(
-        new Path("/path/to/.t1.data"),
-        new Path("/path/to"),
-        new Path("/path/to/_temp/0"),
-        ".t1.ABC.index1.index").toString)
-    assertEquals("hdfs:/path/to/_temp/1/a=3/b=4/.t1.ABC.index1.index",
+        indexPath, ".t1.ABC.index1.index").toString)
+    sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+      "hdfs://tmp/path")
+    indexDirectory = sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+      OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+    indexPath = new Path(indexDirectory)
+    assertEquals(s"$indexPath/.t1.ABC.index1.index",
       IndexUtils.getIndexWorkPath(
-        new Path("hdfs:/path/to/a=3/b=4/.t1.data"),
-        new Path("/path/to"),
-        new Path("/path/to/_temp/1"),
-        ".t1.ABC.index1.index").toString)
-    assertEquals("hdfs://remote:8020/path/to/_temp/2/x=1/.t1.ABC.index1.index",
+        indexPath, ".t1.ABC.index1.index").toString)
+    sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+      "hdfs://remote:8020/path")
+    indexDirectory = sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+      OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+    indexPath = new Path(indexDirectory)
+    assertEquals(s"$indexPath/.t1.ABC.index1.index",
       IndexUtils.getIndexWorkPath(
-        new Path("hdfs://remote:8020/path/to/x=1/.t1.data"),
-        new Path("/path/to/"),
-        new Path("/path/to/_temp/2/"),
-        ".t1.ABC.index1.index").toString)
+        indexPath, ".t1.ABC.index1.index").toString)
   }
 
   test("writeHead to write common and consistent index version to all the index file headers") {

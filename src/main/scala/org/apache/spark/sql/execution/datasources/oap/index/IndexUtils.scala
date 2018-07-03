@@ -21,6 +21,7 @@ import java.io.OutputStream
 
 import org.apache.hadoop.fs.Path
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.oap.io.{BytesCompressor, BytesDecompressor, IndexFile}
@@ -61,7 +62,8 @@ private[oap] object IndexUtils {
     IndexFile.VERSION_LENGTH
   }
 
-  def indexFileFromDataFile(dataFile: Path, name: String, time: String): Path = {
+  def indexFileFromDirectory(indexDirectory: String,
+                             dataFile: Path, name: String, time: String): Path = {
     import OapFileFormat._
     val dataFileName = dataFile.getName
     val pos = dataFileName.lastIndexOf(".")
@@ -70,8 +72,14 @@ private[oap] object IndexUtils {
     } else {
       dataFileName
     }
-    new Path(
-      dataFile.getParent, "." + indexFileName + "." + time + "." + name + OAP_INDEX_EXTENSION)
+
+    if (indexDirectory == "") {
+      new Path(
+        dataFile.getParent, "." + indexFileName + "." + time + "." + name + OAP_INDEX_EXTENSION)
+    } else {
+      new Path(
+        indexDirectory, "." + indexFileName + "." + time + "." + name + OAP_INDEX_EXTENSION)
+    }
   }
 
   def writeFloat(out: OutputStream, v: Float): Unit =
@@ -118,11 +126,16 @@ private[oap] object IndexUtils {
    * API, so `outputPath` should be simple enough, without scheme and authority.
    */
   def getIndexWorkPath(
-      inputFile: Path, outputPath: Path, attemptPath: Path, indexFile: String): Path = {
-    new Path(inputFile.getParent.toString.replace(
-      outputPath.toString, attemptPath.toString), indexFile)
+                        inputFile: Path, outputPath: Path,
+                        attemptPath: Path, indexFile: String,
+                      indexDirectory: String): Path = {
+    if (indexDirectory == "") {
+      new Path(inputFile.getParent.toString.replace(
+        outputPath.toString, attemptPath.toString), indexFile)
+    } else {
+      new Path(indexDirectory, indexFile)
+    }
   }
-
   val INT_SIZE = 4
   val LONG_SIZE = 8
 

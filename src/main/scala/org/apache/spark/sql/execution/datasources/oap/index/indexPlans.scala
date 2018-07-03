@@ -565,7 +565,7 @@ case class OapCheckIndexCommand(
     val fileMetas = m.get.fileMetas
     val indexMetas = m.get.indexMetas
     checkDataFileInEachPartition(fs, dataSchema, fileMetas, partitionDir) ++
-      checkIndexInEachPartition(fs, dataSchema, fileMetas, indexMetas, partitionDir)
+      checkIndexInEachPartition(fs, sparkSession, dataSchema, fileMetas, indexMetas, partitionDir)
   }
 
   private def checkDataFileInEachPartition(
@@ -581,6 +581,7 @@ case class OapCheckIndexCommand(
 
   private def checkIndexInEachPartition(
       fs: FileSystem,
+      sparkSession: SparkSession,
       dataSchema: StructType,
       fileMetas: Seq[FileMeta],
       indexMetas: Seq[IndexMeta],
@@ -596,9 +597,15 @@ case class OapCheckIndexCommand(
           ("Bitmap", entries.map(dataSchema(_).name).mkString(","))
         case other => throw new OapException(s"We don't support this type of index: $other")
       }
+
+      val indexDirectory = sparkSession.sparkContext.
+        hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+        OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+
       val dataFilesWithoutIndices = fileMetas.filter { file_meta =>
         val indexFile =
-          IndexUtils.indexFileFromDataFile(new Path(partitionPath, file_meta.dataFileName),
+          IndexUtils.indexFileFromDirectory(indexDirectory,
+            new Path(partitionPath, file_meta.dataFileName),
             index_meta.name, index_meta.time)
         !fs.exists(indexFile)
       }

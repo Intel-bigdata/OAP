@@ -28,6 +28,7 @@ import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiber, FiberCache}
 import org.apache.spark.sql.execution.datasources.oap.index.{BitmapIndexSectionId, IndexUtils}
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
@@ -104,14 +105,21 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
   test("test how to directly get the row ID list from single fiber cache without roaring bitmap") {
     dataSourceArray.foreach(dataSourceElement => {
       dataSourceElement._1.toDF("key", "value").createOrReplaceTempView("t")
+      var time = System.currentTimeMillis()
+      sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+        s"/tmp/$time")
       sql("insert overwrite table oap_test select * from t")
       sql("create oindex index_bm on oap_test (a) USING BITMAP")
       var actualRowIdSeq = Seq.empty[Int]
       var accumulatorRowId = 0
-      dir.listFiles.foreach(fileName => {
-        if (fileName.toString.endsWith(OapFileFormat.OAP_INDEX_EXTENSION)) {
+      val checkPath = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+        OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
+      val fs = checkPath.getFileSystem(new Configuration())
+      var indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      indexFiles.foreach(indexFile => {
+        if (indexFile.isFile) {
           var maxRowIdInPartition = 0
-          val idxPath = new Path(fileName.toString)
+          val idxPath = indexFile.getPath
           val conf = new Configuration()
           val fin = idxPath.getFileSystem(conf).open(idxPath)
           val (keyCount, offsetListCache, footerCache) =
@@ -146,14 +154,21 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
   test("test how to directly get the row Id list after bitwise OR among multi fiber caches") {
     dataSourceArray.foreach(dataSourceElement => {
       dataSourceElement._1.toDF("key", "value").createOrReplaceTempView("t")
+      var time = System.currentTimeMillis()
+      sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
+        s"/tmp/$time")
       sql("insert overwrite table oap_test select * from t")
       sql("create oindex index_bm on oap_test (a) USING BITMAP")
       var actualRowIdSeq = Seq.empty[Int]
       var accumulatorRowId = 0
-      dir.listFiles.foreach(fileName => {
-        if (fileName.toString.endsWith(OapFileFormat.OAP_INDEX_EXTENSION)) {
+      val checkPath = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+        OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
+      val fs = checkPath.getFileSystem(new Configuration())
+      var indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      indexFiles.foreach(indexFile => {
+        if (indexFile.isFile) {
           var maxRowIdInPartition = 0
-          val idxPath = new Path(fileName.toString)
+          val idxPath = indexFile.getPath
           val conf = new Configuration()
           val fin = idxPath.getFileSystem(conf).open(idxPath)
           val (keyCount, offsetListCache, footerCache) =
