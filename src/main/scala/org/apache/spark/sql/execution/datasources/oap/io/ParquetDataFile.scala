@@ -104,9 +104,8 @@ private[oap] case class ParquetDataFile(
     }
 
     val conf = new Configuration(configuration)
-    // read a single column for each group.
-    // comments: Parquet vectorized read can get multi-columns every time. However,
-    // the minimum unit of cache is one column of one group.
+    // setting required column to conf enables us to
+    // Vectorized read & cache certain(not all) columns
     addRequestSchemaToConf(conf, Array(fiberId))
     ParquetFiberDataLoader(conf, fiberDataReader, groupId).loadSingleColumn
   }
@@ -145,7 +144,6 @@ private[oap] case class ParquetDataFile(
   def iterator(
     requiredIds: Array[Int],
     filters: Seq[Filter] = Nil): OapCompletionIterator[InternalRow] = {
-    addRequestSchemaToConf(configuration, requiredIds)
     context match {
       case Some(c) =>
         // Parquet RowGroupCount can more than Int.MaxValue,
@@ -155,10 +153,12 @@ private[oap] case class ParquetDataFile(
           !meta.footer.getBlocks.asScala.exists(_.getRowCount > Int.MaxValue)) {
           buildIterator(configuration, requiredIds, c)
         } else {
+          addRequestSchemaToConf(configuration, requiredIds)
           initVectorizedReader(c,
             new VectorizedOapRecordReader(file, configuration, meta.footer))
         }
       case _ =>
+        addRequestSchemaToConf(configuration, requiredIds)
         initRecordReader(
           new MrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
             file, configuration, meta.footer))
@@ -172,7 +172,6 @@ private[oap] case class ParquetDataFile(
     if (rowIds == null || rowIds.length == 0) {
       new OapCompletionIterator(Iterator.empty, {})
     } else {
-      addRequestSchemaToConf(configuration, requiredIds)
       context match {
         case Some(c) =>
           // Parquet RowGroupCount can more than Int.MaxValue,
@@ -182,11 +181,13 @@ private[oap] case class ParquetDataFile(
             !meta.footer.getBlocks.asScala.exists(_.getRowCount > Int.MaxValue)) {
             buildIterator(configuration, requiredIds, c, Some(rowIds))
           } else {
+            addRequestSchemaToConf(configuration, requiredIds)
             initVectorizedReader(c,
               new IndexedVectorizedOapRecordReader(file,
                 configuration, meta.footer, rowIds))
           }
         case _ =>
+          addRequestSchemaToConf(configuration, requiredIds)
           initRecordReader(
             new IndexedMrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
               file, configuration, rowIds, meta.footer))
@@ -227,13 +228,11 @@ private[oap] case class ParquetDataFile(
       val orderedBlockMetaData = rowGroupMeta.asInstanceOf[OrderedBlockMetaData]
       val columnarBatch = buildColumnarBatchFromCache(orderedBlockMetaData,
         conf, requestSchema, requiredColumnIds, context)
-      val iter = if (context.returningBatch) {
+      if (context.returningBatch) {
         Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
       } else {
         columnarBatch.rowIterator().asScala
       }
-      CompletionIterator[InternalRow, Iterator[InternalRow]](
-        iter, {})
     }
   }
 
@@ -248,7 +247,7 @@ private[oap] case class ParquetDataFile(
       val indexedBlockMetaData = rowGroupMeta.asInstanceOf[IndexedBlockMetaData]
       val columnarBatch = buildColumnarBatchFromCache(indexedBlockMetaData,
         conf, requestSchema, requiredColumnIds, context)
-      val iter = if (context.returningBatch) {
+      if (context.returningBatch) {
         columnarBatch.markAllFiltered()
         indexedBlockMetaData.getNeedRowIds.iterator.
           asScala.foreach(rowId => columnarBatch.markValid(rowId))
@@ -257,8 +256,6 @@ private[oap] case class ParquetDataFile(
         indexedBlockMetaData.getNeedRowIds.iterator.
           asScala.map(rowId => columnarBatch.getRow(rowId))
       }
-      CompletionIterator[InternalRow, Iterator[InternalRow]](
-        iter, {})
     }
   }
 
