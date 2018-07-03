@@ -83,27 +83,34 @@ class IndexUtilsSuite extends SparkFunSuite with Logging with SharedOapContext {
       "/tmp")
     var indexDirectory = sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
       OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
-    var indexPath = new Path(indexDirectory)
 
-    assertEquals(s"$indexPath/.t1.ABC.index1.index",
+    assertEquals(s"$indexDirectory/.t1.ABC.index1.index",
       IndexUtils.getIndexWorkPath(
-        indexPath, ".t1.ABC.index1.index").toString)
+        new Path("/path/to/.t1.data"),
+        new Path("/path/to"),
+        new Path("/path/to/_temp/0"),
+        ".t1.ABC.index1.index",
+        indexDirectory ).toString)
     sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
       "hdfs://tmp/path")
     indexDirectory = sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
       OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
-    indexPath = new Path(indexDirectory)
-    assertEquals(s"$indexPath/.t1.ABC.index1.index",
+    assertEquals(s"$indexDirectory/.t1.ABC.index1.index",
       IndexUtils.getIndexWorkPath(
-        indexPath, ".t1.ABC.index1.index").toString)
+        new Path("hdfs:/path/to/a=3/b=4/.t1.data"),
+        new Path("/path/to"),
+        new Path("/path/to/_temp/1"),
+        ".t1.ABC.index1.index", indexDirectory).toString)
     sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
       "hdfs://remote:8020/path")
     indexDirectory = sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
       OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
-    indexPath = new Path(indexDirectory)
-    assertEquals(s"$indexPath/.t1.ABC.index1.index",
+    assertEquals(s"$indexDirectory/.t1.ABC.index1.index",
       IndexUtils.getIndexWorkPath(
-        indexPath, ".t1.ABC.index1.index").toString)
+        new Path("hdfs://remote:8020/path/to/x=1/.t1.data"),
+        new Path("/path/to/"),
+        new Path("/path/to/_temp/2/"),
+        ".t1.ABC.index1.index", indexDirectory).toString)
   }
 
   test("writeHead to write common and consistent index version to all the index file headers") {
