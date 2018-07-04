@@ -134,6 +134,8 @@ private[oap] case class ParquetDataFile(
     }
     new OapCompletionIterator[InternalRow](iterator, requiredColumnIds.foreach(release)) {
       override def close(): Unit = {
+        // To ensure if any exception happens, caches are still released after calling close()
+        inUseFiberCache.indices.foreach(release)
         if (fiberDataReader != null) {
           fiberDataReader.close()
         }
