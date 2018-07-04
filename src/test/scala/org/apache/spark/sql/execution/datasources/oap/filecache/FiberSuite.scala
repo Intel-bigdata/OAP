@@ -27,6 +27,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, OapFileFormat}
 import org.apache.spark.sql.execution.datasources.oap.io._
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
@@ -107,7 +108,7 @@ class FiberSuite extends SharedOapContext with Logging {
     for (i <- rowCounts.indices) {
       val path = new Path(file.getAbsolutePath, rowCounts(i).toString)
       writeData(path, schema, rowCounts(i))
-      val meta = OapDataFile(path.toString, schema, configuration).getDataFileMeta()
+      val meta = OapDataFileV1(path.toString, schema, configuration).getDataFileMeta()
       assert(meta.totalRowCount() === rowCounts(i))
       assert(meta.rowCountInLastGroup === rowCountInLastGroups(i))
       assert(meta.rowGroupsMeta.length === rowGroupCounts(i))
@@ -132,7 +133,7 @@ class FiberSuite extends SharedOapContext with Logging {
     val path = new Path(file.getAbsolutePath, 10.toString)
     writeData(path, schema, 10)
 
-    val meta = OapDataFile(path.toString, schema, configuration).getDataFileMeta()
+    val meta = OapDataFileV1(path.toString, schema, configuration).getDataFileMeta()
     assert(meta.totalRowCount() === 10)
     assert(meta.rowCountInEachGroup === 12345)
     assert(meta.rowCountInLastGroup === 10)
@@ -203,8 +204,11 @@ class FiberSuite extends SharedOapContext with Logging {
     val m = DataSourceMeta.newBuilder().
       withNewSchema(schema).
       withNewDataReaderClassName(OapFileFormat.OAP_DATA_FILE_CLASSNAME).build()
-    val reader = new OapDataReader(path.toString, m, None, requiredIds)
-    val it = reader.initialize(configuration)
+    val reader = new OapDataReaderV1(path.toString, m, StructType(Seq()),
+      StructType(Seq()), None, requiredIds, None, OapRuntime.getOrCreate.oapMetricsManager,
+      conf = configuration)
+
+    val it = reader.initialize()
 
     var idx = 0
     while (it.hasNext) {

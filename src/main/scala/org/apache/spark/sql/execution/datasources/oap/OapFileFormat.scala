@@ -17,22 +17,20 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
-import java.net.URI
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
+import org.apache.hadoop.util.StringUtils
 
-import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Expression, JoinedRow}
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
+import org.apache.spark.sql.catalyst.expressions.{Expression}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io._
+import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileProperties.DataFileVersion
 import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, OapUtils}
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.internal.oap.OapConf
@@ -101,8 +99,7 @@ private[sql] class OapFileFormat extends FileFormat
   // map of columns->IndexType
   private var hitIndexColumns: Map[String, IndexType] = _
 
-  def initMetrics(metrics: Map[String, SQLMetric]): Unit =
-    oapMetrics.initMetrics(metrics)
+  def initMetrics(metrics: Map[String, SQLMetric]): Unit = oapMetrics.initMetrics(metrics)
 
   def getHitIndexColumns: Map[String, IndexType] = {
     if (this.hitIndexColumns == null) {
@@ -241,6 +238,7 @@ private[sql] class OapFileFormat extends FileFormat
         // Refer to ParquetFileFormat, use resultSchema to decide if this query support
         // Vectorized Read and returningBatch. Also it depends on WHOLE_STAGE_CODE_GEN,
         // as the essential unsafe projection is done by that.
+        val isParquet = m.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME)
         val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
         val enableVectorizedReader: Boolean =
           m.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
@@ -256,56 +254,37 @@ private[sql] class OapFileFormat extends FileFormat
           assert(file.partitionValues.numFields == partitionSchema.size)
           val conf = broadcastedHadoopConf.value.value
 
-          def isSkippedByFile: Boolean = {
-            if (m.dataReaderClassName == OapFileFormat.OAP_DATA_FILE_CLASSNAME) {
-              val dataFile = DataFile(file.filePath, m.schema, m.dataReaderClassName, conf)
-              val dataFileMeta = OapRuntime.getOrCreate.dataFileMetaCacheManager.get(dataFile)
-                  .asInstanceOf[OapDataFileMeta]
-              if (filters.exists(filter => isSkippedByStatistics(
-                  dataFileMeta.columnsMeta.map(_.fileStatistics).toArray, filter, m.schema))) {
-                val totalRows = dataFileMeta.totalRowCount()
-                oapMetrics.updateTotalRows(totalRows)
-                oapMetrics.skipForStatistic(totalRows)
-                return true
-              }
-            }
-            false
-          }
-
-          if (isSkippedByFile) {
-            Iterator.empty
+          // if enableVectorizedReader == true, init VectorizedContext,
+          // else context is None.
+          val context = if (enableVectorizedReader) {
+            Some(VectorizedContext(partitionSchema, file.partitionValues, returningBatch))
           } else {
-            OapIndexInfo.partitionOapIndex.put(file.filePath, false)
-            FilterHelper.setFilterIfExist(conf, pushed)
-            // if enableVectorizedReader == true, init VectorizedContext,
-            // else context is None.
-            val context = if (enableVectorizedReader) {
-              Some(VectorizedContext(partitionSchema,
-                file.partitionValues, returningBatch))
-            } else {
-              None
-            }
-            val reader = new OapDataReader(
-              file.filePath, m, filterScanners, requiredIds, context)
-            val iter = reader.initialize(conf, options, filters)
-            Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
-            val totalRows = reader.totalRows()
-            oapMetrics.updateTotalRows(totalRows)
-            oapMetrics.updateIndexAndRowRead(reader, totalRows)
-            // if enableVectorizedReader == true and parquetDataCacheEnable = false,
-            // return iter directly because of partitionValues
-            // already filled by VectorizedReader, else use original branch.
-            if (enableVectorizedReader && !parquetDataCacheEnable) {
-              iter
-            } else {
-              val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
-              val joinedRow = new JoinedRow()
-              val appendPartitionColumns =
-                GenerateUnsafeProjection.generate(fullSchema, fullSchema)
-
-              iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
-            }
+            None
           }
+
+          val path = new Path(StringUtils.unEscapeString(file.filePath))
+          val fs = path.getFileSystem(broadcastedHadoopConf.value.value)
+
+          val version = if (isParquet) {
+            // Currently Parquet is using OapDataReaderV1
+            DataFileVersion.OAP_DATAFILE_V1
+          } else {
+            OapDataReader.readVersion(fs.open(path), fs.getFileStatus(path).getLen)
+          }
+
+          version match {
+            case DataFileVersion.OAP_DATAFILE_V1 =>
+              val reader = new OapDataReaderV1(file.filePath, m, partitionSchema, requiredSchema,
+                filterScanners, requiredIds, pushed, oapMetrics, conf, enableVectorizedReader,
+                parquetDataCacheEnable, options, filters, context = context)
+              reader.read(file)
+            // Actually it shouldn't get to this line, because unsupported version will cause
+            // exception thrown in readVersion call
+            case _ =>
+              throw new OapException("Unexpected data file version")
+              Iterator.empty
+          }
+
         }
       case None => (_: PartitionedFile) => {
         // TODO need to think about when there is no oap.meta file at all
@@ -494,7 +473,14 @@ private[sql] object OapFileFormat {
   val OAP_DATA_EXTENSION = ".data"
   val OAP_INDEX_EXTENSION = ".index"
   val OAP_META_FILE = ".oap.meta"
+  // This is used in DataSourceMeta file to indicate Parquet/OAP file format
+  // For OAP data files, the version info is written in data file header, hence various versions of
+  // OAP data file(i.e. one partition uses V1 while another uses V2) are supported in different
+  // distributed tasks
   val OAP_DATA_FILE_CLASSNAME = classOf[OapDataFile].getCanonicalName
+  // This is used while actually reading a Parquet/OAP data file
+  val OAP_DATA_FILE_V1_CLASSNAME = classOf[OapDataFileV1].getCanonicalName
+
   val PARQUET_DATA_FILE_CLASSNAME = classOf[ParquetDataFile].getCanonicalName
 
   val COMPRESSION = "oap.compression"

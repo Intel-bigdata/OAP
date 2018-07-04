@@ -47,7 +47,7 @@ class DeltaByteArrayEncoderCheck extends Properties("DeltaByteArrayEncoder") {
           val referenceFiberBuilder = StringFiberBuilder(rowCount, 0)
           val fiberBuilder = DeltaByteArrayFiberBuilder(rowCount, 0, StringType)
           val fiberParser = DeltaByteArrayDataFiberParser(
-            new OapDataFileMeta(rowCountInEachGroup = rowCount), StringType)
+            new OapDataFileMetaV1(rowCountInEachGroup = rowCount), StringType)
           !(0 until groupCount).exists { group =>
             // If lastCount > rowCount, assume lastCount = rowCount
             val count = if (group < groupCount - 1) {

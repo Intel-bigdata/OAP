@@ -22,7 +22,7 @@ import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheStatus
-import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileMeta
+import org.apache.spark.sql.execution.datasources.oap.io.{OapDataFileMeta, OapDataFileMetaV1}
 import org.apache.spark.util.collection.BitSet
 
 /**
@@ -84,7 +84,7 @@ private[oap] object CacheStatusSerDe extends SerDe[String, Seq[FiberCacheStatus]
     val rowCountInLastGroup = (json \ "rowCountInLastGroup").extract[Int]
     val groupCount = (json \ "groupCount").extract[Int]
     val fieldCount = (json \ "fieldCount").extract[Int]
-    new OapDataFileMeta(
+    new OapDataFileMetaV1(
       rowCountInEachGroup = rowCountInEachGroup,
       rowCountInLastGroup = rowCountInLastGroup,
       groupCount = groupCount,
