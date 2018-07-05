@@ -69,6 +69,7 @@ private[oap] class SampleBasedStatisticsReader(
           hitCnt += 1
         }
       }
+      print("\t%4d".format(hitCnt * 20))
       StatsAnalysisResult(hitCnt * 1.0 / sampleArray.length)
     }
   }

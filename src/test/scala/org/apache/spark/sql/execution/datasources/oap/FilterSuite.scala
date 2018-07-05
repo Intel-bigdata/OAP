@@ -17,16 +17,25 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
+import java.io.ByteArrayOutputStream
 import java.sql.Date
+
+import scala.collection.mutable.ArrayBuffer
+import scala.util.Random
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.execution.datasources.oap.index.RangeInterval
+import org.apache.spark.sql.execution.datasources.oap.statistics._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex, TestPartition}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.util.Utils
@@ -1063,5 +1072,112 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
           Row(1, "this is test 1"):: Nil)
       }
     }
+  }
+
+  // scalastyle:off println
+  test("test") {
+
+    def testStat(
+        statReader: StatisticsReader,
+        statWriter: StatisticsWriter,
+        sortedKeys: ArrayBuffer[Key],
+        intervalArray: ArrayBuffer[RangeInterval]): Unit = {
+
+      val writer = new ByteArrayOutputStream()
+      statWriter.write(writer, sortedKeys)
+      val bytes = writer.toByteArray
+
+      val fiberCache = OapRuntime.getOrCreate.memoryManager.toDataFiberCache(bytes)
+      statReader.read(fiberCache, 0)
+      statReader.analyse(intervalArray)
+    }
+
+    def intervalList(): Seq[ArrayBuffer[RangeInterval]] = {
+      (0 until 100).map { i =>
+        val interval = RangeInterval(s = InternalRow.fromSeq(i :: Nil),
+          e = InternalRow.fromSeq(i :: Nil), includeStart = true, includeEnd = true)
+        val intervals = new ArrayBuffer[RangeInterval]()
+        intervals.append(interval)
+        intervals
+      }
+    }
+
+    def randomIntervalList(): Seq[ArrayBuffer[RangeInterval]] = {
+      val random = new Random(1)
+      (0 until 100).map { _ =>
+        // Range [-100, 200]
+        val v1 = random.nextInt(300) - 100
+        val v2 = random.nextInt(300) - 100
+        val (start, end) = if (v1 < v2) (v1, v2) else (v2, v1)
+        val (startInclude, endInclude) = if (v1 == v2) {
+          (true, true)
+        } else {
+          (random.nextBoolean(), random.nextBoolean())
+        }
+        val interval = RangeInterval(s = InternalRow.fromSeq(start :: Nil),
+          e = InternalRow.fromSeq(end :: Nil), includeStart = startInclude, includeEnd = endInclude)
+        val intervals = new ArrayBuffer[RangeInterval]()
+        intervals.append(interval)
+        intervals
+      }
+    }
+
+    def keyList(schema: StructType): Seq[ArrayBuffer[Key]] = {
+
+      val ordering = GenerateOrdering.create(schema)
+      val random = new Random(0)
+      val keys = new ArrayBuffer[InternalRow]()
+      (0 until 1000).foreach(_ => keys.append(InternalRow.fromSeq(random.nextInt(100) :: Nil)))
+      val sortedKeys = keys.sortWith((l, r) => ordering.compare(l, r) < 0)
+      sortedKeys :: Nil
+    }
+
+    def statList(
+        schema: StructType,
+        configuration: Configuration): Seq[(StatisticsReader, StatisticsWriter)] = {
+
+      Seq(
+        (new SampleStatisticsReader(schema),
+            new SampleStatisticsWriter(schema, configuration)),
+        (new SampleBasedStatisticsReader(schema),
+            new SampleBasedStatisticsWriter(schema, configuration)),
+        (new PartByValueStatisticsReader(schema),
+            new PartByValueStatisticsWriter(schema, configuration)))
+    }
+
+    def intervalString(interval: RangeInterval): String = {
+      val s = (if (interval.startInclude) "[" else "(") +
+          interval.start.getInt(0) + "," + interval.end.getInt(0) +
+          (if (interval.endInclude) "]" else ")")
+      s + " " * (10 - s.length)
+    }
+
+    def intervalHit(interval: RangeInterval, keys: ArrayBuffer[Key]): Int = {
+      keys.count { key =>
+        val a = key.getInt(0) > interval.start.getInt(0) && key.getInt(0) < interval.end.getInt(0)
+        val b = interval.startInclude && interval.start.getInt(0) == key.getInt(0)
+        val c = interval.endInclude && interval.end.getInt(0) == key.getInt(0)
+        a || b || c
+      }
+
+    }
+
+    val schema = StructType(StructField("a", IntegerType) :: Nil)
+    val configuration = new Configuration()
+
+    println("interval\treal\tsqlite\tsample\tpartbyvalue")
+
+    keyList(schema).foreach { keys =>
+      // intervalList().foreach { intervalArray =>
+      randomIntervalList().foreach { intervalArray =>
+        print(intervalString(intervalArray.head))
+        print("\t" + "%4d".format(intervalHit(intervalArray.head, keys)))
+        statList(schema, configuration).foreach {
+          case (statReader, statWriter) => testStat(statReader, statWriter, keys, intervalArray)
+        }
+        println("")
+      }
+    }
+
   }
 }

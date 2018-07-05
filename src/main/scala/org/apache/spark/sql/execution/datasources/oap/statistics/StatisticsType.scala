@@ -26,6 +26,7 @@ private[oap] object StatisticsType {
   val TYPE_SAMPLE_BASE: Int = 1
   val TYPE_PART_BY_VALUE: Int = 2
   val TYPE_BLOOM_FILTER: Int = 3
+  val TYPE_SAMPLE: Int = 4
 
   def unapply(t: Int): Option[StructType => StatisticsReader] = t match {
     case TYPE_MIN_MAX => Some(new MinMaxStatisticsReader(_))

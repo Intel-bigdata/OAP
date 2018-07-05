@@ -120,6 +120,7 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
 
       if (left == -1 || right == 0) {
         // interval.min > partition.max || interval.max < partition.min
+        print("\t%4d".format(0))
         StatsAnalysisResult.SKIP_INDEX
       } else {
         var cover: Double =
@@ -134,6 +135,7 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
           cover -= 0.5 * (metas(right).accumulatorCnt - metas(right - 1).accumulatorCnt)
         }
 
+        print("\t%4d".format(cover.toInt))
         if (cover > wholeCount) {
           StatsAnalysisResult.FULL_SCAN
         } else if (cover < 0) {
