@@ -412,11 +412,11 @@ object FileFormatWriter extends Logging {
       val ext = f"$bucketId.c$fileCounter%03d" +
         desc.outputWriterFactory.getFileExtension(taskAttemptContext)
 
-      val customPath = partDir match {
+      val (customPath, partitionString) = partDir match {
         case Some(dir) =>
-          desc.customPartitionLocations.get(PartitioningUtils.parsePathFragment(dir))
+          (desc.customPartitionLocations.get(PartitioningUtils.parsePathFragment(dir)), dir)
         case _ =>
-          None
+          (None, "")
       }
       val path = if (customPath.isDefined) {
         committer.newTaskTempFileAbsPath(taskAttemptContext, customPath.get, ext)
@@ -428,6 +428,7 @@ object FileFormatWriter extends Logging {
         path = path,
         dataSchema = desc.dataColumns.toStructType,
         context = taskAttemptContext)
+      currentWriter.setPartitionString(partitionString)
     }
 
     override def execute(iter: Iterator[InternalRow]): (Set[String], Seq[WriteResult]) = {
