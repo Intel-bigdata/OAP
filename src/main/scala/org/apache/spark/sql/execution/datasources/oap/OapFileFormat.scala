@@ -147,8 +147,7 @@ private[sql] class OapFileFormat extends FileFormat
       conf.parquetVectorizedReaderEnabled &&
       conf.wholeStageEnabled &&
       schema.length <= conf.wholeStageMaxNumFields &&
-      schema.forall(_.dataType.isInstanceOf[AtomicType]) &&
-      !sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
+      schema.forall(_.dataType.isInstanceOf[AtomicType])
   }
 
   override def isSplitable(
@@ -246,7 +245,6 @@ private[sql] class OapFileFormat extends FileFormat
           sparkSession.sessionState.conf.wholeStageEnabled &&
           resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
         val returningBatch = supportBatch(sparkSession, resultSchema)
-        val parquetDataCacheEnable = sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
@@ -276,7 +274,7 @@ private[sql] class OapFileFormat extends FileFormat
             case DataFileVersion.OAP_DATAFILE_V1 =>
               val reader = new OapDataReaderV1(file.filePath, m, partitionSchema, requiredSchema,
                 filterScanners, requiredIds, pushed, oapMetrics, conf, enableVectorizedReader,
-                parquetDataCacheEnable, options, filters, context = context)
+                options, filters, context = context)
               reader.read(file)
             // Actually it shouldn't get to this line, because unsupported version will cause
             // exception thrown in readVersion call

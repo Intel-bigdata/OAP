@@ -28,8 +28,6 @@ import org.apache.spark.sql.internal.oap.OapConf
 
 private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(idxMeta) {
 
-  override def canBeOptimizedByStatistics: Boolean = true
-
   private var _totalRows: Long = 0
   @transient private var bmRowIdIterator: Iterator[Int] = _
   override def hasNext: Boolean = bmRowIdIterator.hasNext
@@ -67,7 +65,7 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
         throw new OapException("not a valid index file")
     }
     _totalRows = bitmapReader.totalRows
-    fileReader.close
+    fileReader.close()
     this
   }
 
@@ -76,8 +74,12 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
       conf: Configuration): StatsAnalysisResult = {
     val fileReader = IndexFileReaderImpl(conf, idxPath)
     val reader = BitmapReader(fileReader, intervalArray, keySchema, conf)
-    fileReader.close
-    reader.analyzeStatistics
+    _totalRows = reader.totalRows
+    try {
+      reader.analyzeStatistics()
+    } finally {
+      fileReader.close()
+    }
   }
 
   override def toString: String = "BitMapScanner"
