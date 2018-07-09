@@ -167,12 +167,12 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       assert(metaOpt.get.indexMetas.nonEmpty)
       val indexMeta = metaOpt.get.indexMetas.head
       val dataFileName = metaOpt.get.fileMetas.head.dataFileName
-      val indexDirectory = sparkContext.hadoopConfiguration.
-        get(OapConf.OAP_INDEX_DIRECTORY.key,
+      val indexDirectory = sparkContext.hadoopConfiguration.get(
+        OapConf.OAP_INDEX_DIRECTORY.key,
         OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
 
-      val indexFileName = IndexUtils.indexFileFromDirectory(indexDirectory,
-        new Path(path, dataFileName),
+      val indexFileName = IndexUtils.indexFileFromDirectory(
+        indexDirectory, new Path(path, dataFileName),
         indexMeta.name, indexMeta.time).toUri.getPath
       Utils.deleteRecursively(new File(indexFileName))
 
@@ -287,11 +287,10 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       val indexMeta = metaOpt.get.indexMetas.head
 
       val dataFileName = metaOpt.get.fileMetas.head.dataFileName
-      val indexDirectory = sparkContext.hadoopConfiguration.
-        get(OapConf.OAP_INDEX_DIRECTORY.key,
-          OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
-      val indexFileName = IndexUtils.indexFileFromDirectory(indexDirectory,
-        new Path(partitionPath, dataFileName),
+      val indexDirectory = sparkContext.hadoopConfiguration.get(
+        OapConf.OAP_INDEX_DIRECTORY.key, OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+      val indexFileName = IndexUtils.indexFileFromDirectory(
+        indexDirectory, new Path(partitionPath, dataFileName),
         indexMeta.name, indexMeta.time).toUri.getPath
       Utils.deleteRecursively(new File(indexFileName))
 
@@ -462,12 +461,11 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       val indexMeta = metaOpt.get.indexMetas.head
 
       val dataFileName = metaOpt.get.fileMetas.head.dataFileName
-      val indexDirecroty = sparkContext.hadoopConfiguration.
-        get(OapConf.OAP_INDEX_DIRECTORY.key,
-          OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+      val indexDirecroty = sparkContext.hadoopConfiguration.get(
+        OapConf.OAP_INDEX_DIRECTORY.key, OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
 
-      val indexFileName = IndexUtils.indexFileFromDirectory(indexDirecroty,
-        new Path(partitionPath, dataFileName),
+      val indexFileName = IndexUtils.indexFileFromDirectory(
+        indexDirecroty, new Path(partitionPath, dataFileName),
         indexMeta.name, indexMeta.time).toUri.getPath
       Utils.deleteRecursively(new File(indexFileName))
 

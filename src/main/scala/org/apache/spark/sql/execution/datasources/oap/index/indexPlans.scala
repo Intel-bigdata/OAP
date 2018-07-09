@@ -158,7 +158,12 @@ case class CreateIndexCommand(
       ds = ds.filter(s"$k='$v'")
     }
 
-    val outPutPath = OapUtils.getOutPutPath(fileCatalog)
+    var outPutPath = OapUtils.getOutPutPath(fileCatalog)
+    val indexDirectory = sparkSession.conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
+    if (indexDirectory != "") {
+      outPutPath = new Path (
+        indexDirectory + Path.getPathWithoutSchemeAndAuthority(outPutPath).toString)
+    }
     assert(outPutPath != null, "Expected exactly one path to be specified, but no value")
 
     val qualifiedOutputPath = {
@@ -394,7 +399,12 @@ case class RefreshIndexCommand(
         ds = ds.filter(s"$k='$v'")
       }
 
-      val outPutPath = OapUtils.getOutPutPath(fileCatalog)
+      var outPutPath = OapUtils.getOutPutPath(fileCatalog)
+      val indexDirectory = sparkSession.conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
+      if (indexDirectory != "") {
+        outPutPath = new Path (
+          indexDirectory + Path.getPathWithoutSchemeAndAuthority(outPutPath).toString)
+      }
       assert(outPutPath != null, "Expected exactly one path to be specified, but no value")
 
       val qualifiedOutputPath = {
@@ -598,14 +608,13 @@ case class OapCheckIndexCommand(
         case other => throw new OapException(s"We don't support this type of index: $other")
       }
 
-      val indexDirectory = sparkSession.sparkContext.
-        hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
-        OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+      val indexDirectory = sparkSession.sparkContext.hadoopConfiguration.get(
+        OapConf.OAP_INDEX_DIRECTORY.key, OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
 
       val dataFilesWithoutIndices = fileMetas.filter { file_meta =>
         val indexFile =
-          IndexUtils.indexFileFromDirectory(indexDirectory,
-            new Path(partitionPath, file_meta.dataFileName),
+          IndexUtils.indexFileFromDirectory(
+            indexDirectory, new Path(partitionPath, file_meta.dataFileName),
             index_meta.name, index_meta.time)
         !fs.exists(indexFile)
       }

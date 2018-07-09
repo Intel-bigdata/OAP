@@ -66,9 +66,8 @@ class DropIndexCommandSuite extends SharedOapContext with BeforeAndAfterEach {
         withTempDir { dir =>
           val pathString = dir.getAbsolutePath
           val basePath = new Path(pathString)
-          var time = System.currentTimeMillis()
-          sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
-            s"/tmp/$time")
+          val time = System.currentTimeMillis()
+          spark.conf.set(OapConf.OAP_INDEX_DIRECTORY.key, s"/tmp/$time")
           withTable("partitioned_table") {
             sql(
               s"""CREATE TABLE partitioned_table (a int, b int)
@@ -86,9 +85,9 @@ class DropIndexCommandSuite extends SharedOapContext with BeforeAndAfterEach {
               sql("CREATE OINDEX a_index ON partitioned_table(a)")
 
               // after create, record index file count
-              var checkPath = new Path(sparkContext.hadoopConfiguration.
-                get(OapConf.OAP_INDEX_DIRECTORY.key,
+              var indexDirectory = new Path(spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key,
                 OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
+              var checkPath = new Path(indexDirectory + basePath.toString + "/b=1")
               val bEq1IndexCount = fs.listStatus(checkPath, new PathFilter {
                 override def accept(path: Path): Boolean = path.getName.endsWith(".a_index.index")
               }).length
@@ -110,12 +109,13 @@ class DropIndexCommandSuite extends SharedOapContext with BeforeAndAfterEach {
               sql("REFRESH OINDEX ON partitioned_table")
 
               // after refresh, record index file count
-              checkPath = new Path(sparkContext.hadoopConfiguration.get
-              (OapConf.OAP_INDEX_DIRECTORY.key,
+              indexDirectory = new Path(spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key,
                 OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
+              checkPath = new Path(indexDirectory + basePath.toString + "/b=1")
               val bEq1IndexCountNew = fs.listStatus(checkPath, new PathFilter {
                 override def accept(path: Path): Boolean = path.getName.endsWith(".a_index.index")
               }).length
+              checkPath = new Path(indexDirectory + basePath.toString + "/b=2")
               val bEq2IndexCount = fs.listStatus(checkPath, new PathFilter {
                 override def accept(path: Path): Boolean = path.getName.endsWith(".a_index.index")
               }).length

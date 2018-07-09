@@ -62,8 +62,9 @@ private[oap] object IndexUtils {
     IndexFile.VERSION_LENGTH
   }
 
-  def indexFileFromDirectory(indexDirectory: String,
-                             dataFile: Path, name: String, time: String): Path = {
+  def indexFileFromDirectory(
+      indexDirectory: String,
+      dataFile: Path, name: String, time: String): Path = {
     import OapFileFormat._
     val dataFileName = dataFile.getName
     val pos = dataFileName.lastIndexOf(".")
@@ -78,7 +79,8 @@ private[oap] object IndexUtils {
         dataFile.getParent, "." + indexFileName + "." + time + "." + name + OAP_INDEX_EXTENSION)
     } else {
       new Path(
-        indexDirectory, "." + indexFileName + "." + time + "." + name + OAP_INDEX_EXTENSION)
+        indexDirectory + "/" + Path.getPathWithoutSchemeAndAuthority(dataFile.getParent), "." +
+          indexFileName + "." + time + "." + name + OAP_INDEX_EXTENSION)
     }
   }
 
@@ -126,15 +128,10 @@ private[oap] object IndexUtils {
    * API, so `outputPath` should be simple enough, without scheme and authority.
    */
   def getIndexWorkPath(
-                        inputFile: Path, outputPath: Path,
-                        attemptPath: Path, indexFile: String,
-                      indexDirectory: String): Path = {
-    if (indexDirectory == "") {
+      inputFile: Path, outputPath: Path,
+      attemptPath: Path, indexFile: String): Path = {
       new Path(inputFile.getParent.toString.replace(
         outputPath.toString, attemptPath.toString), indexFile)
-    } else {
-      new Path(indexDirectory, indexFile)
-    }
   }
   val INT_SIZE = 4
   val LONG_SIZE = 8

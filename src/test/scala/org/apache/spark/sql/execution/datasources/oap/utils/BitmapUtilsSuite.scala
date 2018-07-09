@@ -105,17 +105,17 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
   test("test how to directly get the row ID list from single fiber cache without roaring bitmap") {
     dataSourceArray.foreach(dataSourceElement => {
       dataSourceElement._1.toDF("key", "value").createOrReplaceTempView("t")
-      var time = System.currentTimeMillis()
-      sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
-        s"/tmp/$time")
+      val time = System.currentTimeMillis()
+      spark.conf.set(OapConf.OAP_INDEX_DIRECTORY.key, s"/tmp/$time")
       sql("insert overwrite table oap_test select * from t")
       sql("create oindex index_bm on oap_test (a) USING BITMAP")
       var actualRowIdSeq = Seq.empty[Int]
       var accumulatorRowId = 0
-      val checkPath = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+      val indexDirectory = new Path(spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key,
         OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
+      val checkPath = new Path(indexDirectory + dir.toString)
       val fs = checkPath.getFileSystem(new Configuration())
-      var indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      val indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
       indexFiles.foreach(indexFile => {
         if (indexFile.isFile) {
           var maxRowIdInPartition = 0
@@ -154,17 +154,17 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
   test("test how to directly get the row Id list after bitwise OR among multi fiber caches") {
     dataSourceArray.foreach(dataSourceElement => {
       dataSourceElement._1.toDF("key", "value").createOrReplaceTempView("t")
-      var time = System.currentTimeMillis()
-      sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
-        s"/tmp/$time")
+      val time = System.currentTimeMillis()
+      spark.conf.set(OapConf.OAP_INDEX_DIRECTORY.key, s"/tmp/$time")
       sql("insert overwrite table oap_test select * from t")
       sql("create oindex index_bm on oap_test (a) USING BITMAP")
       var actualRowIdSeq = Seq.empty[Int]
       var accumulatorRowId = 0
-      val checkPath = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
+      val indexDirectory = new Path(spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key,
         OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
+      val checkPath = new Path(indexDirectory + dir.toString)
       val fs = checkPath.getFileSystem(new Configuration())
-      var indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      val indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
       indexFiles.foreach(indexFile => {
         if (indexFile.isFile) {
           var maxRowIdInPartition = 0

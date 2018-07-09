@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
@@ -103,10 +104,6 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   test("create and drop index with partition specify") {
     val data: Seq[(Int, Int)] = (1 to 10).map { i => (i, i) }
     data.toDF("key", "value").createOrReplaceTempView("t")
-    sparkContext.hadoopConfiguration.set(OapConf.OAP_INDEX_DIRECTORY.key,
-      "/tmp")
-    val path = new Path(sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
-      OapConf.OAP_INDEX_DIRECTORY.defaultValueString))
 
     sql(
       """
@@ -125,28 +122,56 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     withIndex(
       TestIndex("oap_partition_table", "index1",
         TestPartition("b", "1"), TestPartition("c", "c1"))) {
+      val time = System.currentTimeMillis()
+      spark.conf.set(OapConf.OAP_INDEX_DIRECTORY.key, s"/tmp/$time")
       sql("create oindex index1 on oap_partition_table (a) partition (b=1, c='c1')")
 
       checkAnswer(sql("select * from oap_partition_table where a < 4"),
         Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Nil)
 
-      assert(path.getFileSystem(
-        configuration).globStatus(new Path(path,
-        "*.index")).length != 0)
 
+      val path = new Path(sqlConf.warehousePath)
+      val fs = path.getFileSystem(new Configuration())
+      val tablePath = path.toString + "/oap_partition_table/"
+      val tablePathSchema = new Path(tablePath).toString.split(":")(0)
+      val indexDirectory = spark.conf.get(
+        OapConf.OAP_INDEX_DIRECTORY.key, OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
+
+      assert(fs.globStatus(new Path(
+        tablePathSchema + ":" + indexDirectory +
+          Path.getPathWithoutSchemeAndAuthority(new Path(tablePath)) +
+          "/b=1/c=c1/*.index")).length != 0 )
+
+      assert(fs.globStatus(new Path(
+        tablePathSchema + ":" + indexDirectory +
+          Path.getPathWithoutSchemeAndAuthority(new Path(tablePath)) +
+          "/b=2/c=c2/*.index")).length == 0 )
     }
 
     withIndex(
       TestIndex("oap_partition_table", "index1",
         TestPartition("b", "2"), TestPartition("c", "c2"))) {
+
+      val time = System.currentTimeMillis()
+      spark.conf.set(OapConf.OAP_INDEX_DIRECTORY.key, s"/tmp/$time")
       sql("create oindex index1 on oap_partition_table (a) partition (b=2, c='c2')")
 
       checkAnswer(sql("select * from oap_partition_table"),
         Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Row(4, 2, "c2") :: Nil)
+      val path = new Path(sqlConf.warehousePath)
+      val fs = path.getFileSystem(new Configuration())
+      val tablePath = path.toString + "/oap_partition_table/"
+      val tablePathSchema = new Path(tablePath).toString.split(":")(0)
+      val indexDirectory = spark.conf.get(
+        OapConf.OAP_INDEX_DIRECTORY.key, OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
 
-      assert(path.getFileSystem(
-        configuration).globStatus(new Path(path,
-        "*.index")).length != 0)
+      assert(fs.globStatus(new Path(tablePathSchema + ":" + indexDirectory +
+          Path.getPathWithoutSchemeAndAuthority(new Path(tablePath)) +
+          "/b=1/c=c1/*.index")).length == 0 )
+
+      assert(fs.globStatus(new Path(tablePathSchema + ":" + indexDirectory +
+          Path.getPathWithoutSchemeAndAuthority(new Path(tablePath)) +
+          "/b=2/c=c2/*.index")).length != 0 )
     }
   }
 
