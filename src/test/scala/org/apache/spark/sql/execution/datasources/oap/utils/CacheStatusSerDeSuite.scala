@@ -17,13 +17,12 @@
 
 package org.apache.spark.sql.execution.datasources.oap.utils
 
-import scala.collection.mutable.ArrayBuffer
-
 import org.json4s.jackson.JsonMethods._
+import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheStatus
-import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileMeta
+import org.apache.spark.sql.execution.datasources.oap.io.{OapDataFileMeta, OapDataFileMetaV1}
 import org.apache.spark.util.collection.BitSet
 
 class CacheStatusSerDeSuite extends SparkFunSuite {
@@ -44,7 +43,7 @@ class CacheStatusSerDeSuite extends SparkFunSuite {
   }
 
   test("test data file meta") {
-    val dataFileMeta = new OapDataFileMeta(
+    val dataFileMeta = new OapDataFileMetaV1(
       rowCountInEachGroup = 3, rowCountInLastGroup = 2, groupCount = 3, fieldCount = 3)
     val dataFileMetaStr = compact(render(CacheStatusSerDe.dataFileMetaToJson(dataFileMeta)))
     val newDataFileMeta = CacheStatusSerDe.dataFileMetaFromJson(parse(dataFileMetaStr))

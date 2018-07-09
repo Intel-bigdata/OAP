@@ -44,10 +44,6 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
 
   def totalRows(): Long
 
-  // TODO Currently, only B+ tree supports indexs, so this flag is toggled only in
-  // BPlusTreeScanner we can add other index-aware stats for other type of index later
-  def canBeOptimizedByStatistics: Boolean = false
-
   var intervalArray: ArrayBuffer[RangeInterval] = _
 
   protected var keySchema: StructType = _
@@ -71,99 +67,89 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
 
   def getSchema: StructType = keySchema
 
-  def readBehavior(dataPath: Path, conf: Configuration): StatsAnalysisResult = {
+  /**
+   * Executor's analysis result by policies(include conf & statistics)
+   * Process:
+   *  1. See OAP_ENABLE_OINDEX
+   *  2. See OAP_EXECUTOR_INDEX_SELECTION(allow to check by later policies)
+   *  3. Compare Index file size / data file size ratio with OAP_INDEX_FILE_SIZE_MAX_RATIO
+   *  4. Statistics(Min_Max, BloomFilter, Sample, Part_By_Value) by calling analysisResByStatistics
+   *
+   * @return FULL_SCAN / SKIP_INDEX(skip file by index)/ USE_INDEX / StatsAnalysisResult(coverage)
+   *         -> letting upper level decide due to it sees the whole pictures of each IndexScanner's
+   *         result.
+   */
+  def analysisResByPolicies(dataPath: Path, conf: Configuration): StatsAnalysisResult = {
     val indexPath = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
     if (!indexPath.getFileSystem(conf).exists(indexPath)) {
       logDebug("No index file exist for data file: " + dataPath)
       StatsAnalysisResult.FULL_SCAN
     } else {
-      val start = System.currentTimeMillis()
-      val enableOIndex = conf.getBoolean(OapConf.OAP_ENABLE_OINDEX.key,
+      val enableIndex = conf.getBoolean(OapConf.OAP_ENABLE_OINDEX.key,
         OapConf.OAP_ENABLE_OINDEX.defaultValue.get)
-      var behavior: StatsAnalysisResult = StatsAnalysisResult.FULL_SCAN
-      val useIndex = enableOIndex && {
-        behavior = readBehavior(indexPath, dataPath, conf)
-        behavior != StatsAnalysisResult.FULL_SCAN
-      }
-      val end = System.currentTimeMillis()
-      logDebug("Index Selection Time (Executor): " + (end - start) + "ms")
-      if (!useIndex) {
-        logWarning("OAP index is skipped. Disable OAP_EXECUTOR_INDEX_SELECTION to use index.")
+      if (!enableIndex) {
+        StatsAnalysisResult.FULL_SCAN
       } else {
-        OapIndexInfo.partitionOapIndex.put(dataPath.toString, true)
-        logInfo("Partition File " + dataPath.toString + " will use OAP index.\n")
+        val enableIndexSelection = conf.getBoolean(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key,
+          OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.defaultValue.get)
+        if (!enableIndexSelection) {
+          // Index selection is disabled, executor always uses the index
+          StatsAnalysisResult.USE_INDEX
+        } else {
+          // Not blindly use the index, determining by more policies
+          val res = analysisResByStatistics(indexPath, dataPath, conf)
+          if (res != StatsAnalysisResult.FULL_SCAN) {
+            OapIndexInfo.partitionOapIndex.put(dataPath.toString, true)
+          }
+          res
+        }
       }
-      behavior
     }
   }
 
-  /**
-   * Executor chooses to use index or not according to policies.
-   *  1. OAP_EXECUTOR_INDEX_SELECTION is enabled.
-   *  2. Statistics info recommends index scan.
-   *  3. Considering about file I/O, index file size should be less
-   *     than data file.
-   *  4. TODO: add more.
-   *
-   * @param indexPath: index file path.
-   * @param conf: configurations
-   * @return Double to indicate if executor use index behavior,
-    *         like FULL_SCAN, USE_INDEX or SKIP_INDEX
-   */
-  private def readBehavior(
-      indexPath: Path,
-      dataPath: Path,
-      conf: Configuration): StatsAnalysisResult = {
-    if (conf.getBoolean(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key,
-      OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.defaultValue.get)) {
-      // Index selection is enabled, executor chooses index according to policy.
+  // Decide by size ratio(generalized statistics : )) & statistics in index file
+  private def analysisResByStatistics(indexPath: Path, dataPath: Path, conf: Configuration)
+    : StatsAnalysisResult = {
+    val fs = dataPath.getFileSystem(conf)
+    require(fs.isFile(indexPath), s"Index file path $indexPath is a directory, it should be a file")
 
-      // Policy 1: index file size < data file size.
-      val indexFileSize = indexPath.getFileSystem(conf).getContentSummary(indexPath).getLength
-      val dataFileSize = dataPath.getFileSystem(conf).getContentSummary(dataPath).getLength
-      val ratio = conf.getDouble(OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
-        OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
+    // Policy 3: index file size < data file size)
 
-      val filePolicyEnable =
-        conf.getBoolean(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key,
+    val filePolicyEnable =
+      conf.getBoolean(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key,
         OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.defaultValue.get)
-      if (filePolicyEnable && indexFileSize > dataFileSize * ratio) {
-        return StatsAnalysisResult.FULL_SCAN
-      }
 
+    val indexFileSize = fs.getFileStatus(indexPath).getLen
+    val dataFileSize = fs.getFileStatus(dataPath).getLen
+    val ratio = conf.getDouble(OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
+      OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
+
+    if (filePolicyEnable && indexFileSize > dataFileSize * ratio) {
+      StatsAnalysisResult.FULL_SCAN
+    } else {
       val statsPolicyEnable =
         conf.getBoolean(OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY.key,
           OapConf.OAP_EXECUTOR_INDEX_SELECTION_STATISTICS_POLICY.defaultValue.get)
 
-      // Policy 2: statistics tells the scan cost
+      // Policy 4: statistics tells the scan cost
       if (statsPolicyEnable) {
-        tryAnalyzeStatistics(indexPath, conf)
+        if (intervalArray.isEmpty) {
+          StatsAnalysisResult.SKIP_INDEX
+        } else {
+          analyzeStatistics(indexPath, conf)
+        }
       } else {
         StatsAnalysisResult.USE_INDEX
       }
       // More Policies
-    } else {
-      // Index selection is disabled, executor always uses index.
-      StatsAnalysisResult.USE_INDEX
     }
   }
 
   /**
-   * Through getting statistics from related index file,
-   * judging if we should bypass this datafile or full scan or by index.
+   * Judging if we should bypass this datafile or full scan or by index through statistics from
+   * related index file,
    * return -1 means bypass, close to 1 means full scan and close to 0 means by index.
-   * called before invoking [[initialize]].
    */
-  private def tryAnalyzeStatistics(indexPath: Path, conf: Configuration): StatsAnalysisResult = {
-    if (!canBeOptimizedByStatistics) {
-      StatsAnalysisResult.USE_INDEX
-    } else if (intervalArray.isEmpty) {
-      StatsAnalysisResult.SKIP_INDEX
-    } else {
-      analyzeStatistics(indexPath, conf)
-    }
-  }
-
   protected def analyzeStatistics(indexPath: Path, conf: Configuration): StatsAnalysisResult = {
     StatsAnalysisResult.USE_INDEX
   }
@@ -341,22 +327,20 @@ private[oap] object ScannerBuilder extends Logging {
 private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
   extends Iterator[Int] with Serializable with Logging{
 
-  private var actualUsedScanners: Seq[IndexScanner] = _
+  private var actualUsedScanners: Seq[IndexScanner] = Seq.empty
 
   private var backendIter: Iterator[Int] = _
 
-  def indexIsAvailable(dataPath: Path, conf: Configuration): Boolean = {
-    val scannersAndStatics = scanners
-      .map(scanner => (scanner, scanner.readBehavior(dataPath, conf)))
-      // _ is (scanner, StaticsAnalysisResult)
-      .filter(_._2 != StatsAnalysisResult.FULL_SCAN)
-    scannersAndStatics.length match {
-      case 0 => false
-      case _ if scannersAndStatics.exists(_._2 == StatsAnalysisResult.SKIP_INDEX) =>
-        actualUsedScanners = Seq.empty
-        true
-      case _ => actualUsedScanners = scannersAndStatics.map(_._1)
-        true
+  // Either it directs us to skip this file(SKIP_INDEX) or use index(USE_INDEX)
+  def isIndexFileBeneficial(dataPath: Path, conf: Configuration): Boolean = {
+    val analysisResults = scanners.map(s => (s, s.analysisResByPolicies(dataPath, conf)))
+    if (analysisResults.forall(_._2 == StatsAnalysisResult.FULL_SCAN)) {
+      false
+    } else {
+      if (analysisResults.forall(_._2 != StatsAnalysisResult.SKIP_INDEX)) {
+        actualUsedScanners = analysisResults.map(_._1)
+      }
+      true
     }
   }
 

@@ -24,10 +24,11 @@ import org.scalatest.BeforeAndAfter
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
-import org.apache.spark.sql.execution.datasources.oap.io.{OapDataReader, OapIndexInfo, OapIndexInfoStatus}
+import org.apache.spark.sql.execution.datasources.oap.io.{OapDataReaderV1, OapIndexInfo, OapIndexInfoStatus}
 import org.apache.spark.sql.execution.datasources.oap.utils.OapIndexInfoStatusSerDe
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.listener.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex}
@@ -144,22 +145,25 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
       val dataSourceMeta = DataSourceMeta.initialize(metaPath, conf)
       val requiredIds = Array(0, 1)
       // No index scanner is used.
-      val readerNoIndex = new OapDataReader(filePath, dataSourceMeta, None, requiredIds)
-      val itNoIndex = readerNoIndex.initialize(conf)
+      val readerNoIndex = new OapDataReaderV1(filePath, dataSourceMeta, StructType(Seq()),
+        StructType(Seq()), None, requiredIds, None, OapRuntime.getOrCreate.oapMetricsManager, conf)
+      val itNoIndex = readerNoIndex.initialize()
       assert(itNoIndex.size == 100)
       val ic = new IndexContext(dataSourceMeta)
       val filters: Array[Filter] = Array(
         And(GreaterThan("a", 9), LessThan("a", 14)))
       ScannerBuilder.build(filters, ic)
       val filterScanners = ic.getScanners
-      val readerIndex = new OapDataReader(filePath, dataSourceMeta, filterScanners, requiredIds)
-      val itIndex = readerIndex.initialize(conf)
+      val readerIndex = new OapDataReaderV1(filePath, dataSourceMeta, StructType(Seq()),
+        StructType(Seq()), filterScanners, requiredIds, None,
+        OapRuntime.getOrCreate.oapMetricsManager, conf)
+      val itIndex = readerIndex.initialize()
       assert(itIndex.size == 4)
       conf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key, false)
-      val itSetIgnoreIndex = readerIndex.initialize(conf)
+      val itSetIgnoreIndex = readerIndex.initialize()
       assert(itSetIgnoreIndex.size == 100)
       conf.setBoolean(OapConf.OAP_ENABLE_OINDEX.key, true)
-      val itSetUseIndex = readerIndex.initialize(conf)
+      val itSetUseIndex = readerIndex.initialize()
       assert(itSetUseIndex.size == 4)
       dir.delete()
     }

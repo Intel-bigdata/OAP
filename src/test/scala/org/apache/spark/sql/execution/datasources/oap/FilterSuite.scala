@@ -992,16 +992,34 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering parquet in FiberCache") {
-      withSQLConf("spark.sql.oap.parquet.data.cache.enable" -> "true") {
-        val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-        data.toDF("key", "value").createOrReplaceTempView("t")
-        sql("insert overwrite table parquet_test select * from t")
-        withIndex(TestIndex("parquet_test", "index1")) {
-          sql("create oindex index1 on parquet_test (a)")
-          checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
-            Row(1, "this is test 1") :: Nil)
-          checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
-            Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+    withSQLConf("spark.sql.oap.parquet.data.cache.enable" -> "true") {
+      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+      data.toDF("key", "value").createOrReplaceTempView("t")
+      sql("insert overwrite table parquet_test select * from t")
+      withIndex(TestIndex("parquet_test", "index1")) {
+        sql("create oindex index1 on parquet_test (a)")
+        checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
+          Row(1, "this is test 1") :: Nil)
+        checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
+          Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+      }
+    }
+  }
+
+  test("filtering parquet in FiberCache with partition") {
+    withSQLConf("spark.sql.oap.parquet.data.cache.enable" -> "true") {
+      val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+      data.toDF("key", "value").createOrReplaceTempView("t")
+      sql(
+        """
+          |INSERT OVERWRITE TABLE t_refresh_parquet
+          |partition (b=1)
+          |SELECT key from t where value < 4
+        """.stripMargin)
+      withIndex(TestIndex("t_refresh_parquet", "index1")) {
+        sql("create oindex index1 on t_refresh_parquet (a)")
+        checkAnswer(sql("select * from t_refresh_parquet where b = '1' and a = 2"),
+          Row(2, 1) :: Nil)
       }
     }
   }

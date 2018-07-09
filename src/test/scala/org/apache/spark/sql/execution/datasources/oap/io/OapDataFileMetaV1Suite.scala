@@ -34,7 +34,7 @@ class OapDataFileMetaCheck extends Properties("OapDataFileMeta") {
   private val tmpDir = Utils.createTempDir()
   private val conf = new Configuration()
 
-  private lazy val genOapDataFileMeta: Gen[OapDataFileMeta] = {
+  private lazy val genOapDataFileMeta: Gen[OapDataFileMetaV1] = {
     // TODO: [linhong] Need determine the range of each value.
     for { rowGroupCount <- Gen.choose[Int](1, 1000)
       defaultRowCount <- Gen.choose[Int](1, 1048576)
@@ -59,7 +59,7 @@ class OapDataFileMetaCheck extends Properties("OapDataFileMeta") {
       rowGroupStatistics.toArray)
   }
 
-  implicit lazy val arbOapDataFileMeta: Arbitrary[OapDataFileMeta] = {
+  implicit lazy val arbOapDataFileMeta: Arbitrary[OapDataFileMetaV1] = {
     Arbitrary(genOapDataFileMeta)
   }
 
@@ -72,7 +72,7 @@ class OapDataFileMetaCheck extends Properties("OapDataFileMeta") {
       uncompressedFiberLens: Array[Int],
       columnsMeta: Seq[ColumnMeta],
       codec: CompressionCodec,
-      rowGroupStatistics: Array[ColumnStatistics]): OapDataFileMeta = {
+      rowGroupStatistics: Array[ColumnStatistics]): OapDataFileMetaV1 = {
 
     val rowGroupMetaArray = new Array[RowGroupMeta](rowGroupCount)
     rowGroupMetaArray.indices.foreach(
@@ -84,7 +84,7 @@ class OapDataFileMetaCheck extends Properties("OapDataFileMeta") {
         .withNewStatistics(rowGroupStatistics)
     )
 
-    val oapDataFileMeta = new OapDataFileMeta(
+    val oapDataFileMeta = new OapDataFileMetaV1(
       rowCountInEachGroup = defaultRowCount,
       fieldCount = fieldCount,
       codec = codec
@@ -139,7 +139,7 @@ class OapDataFileMetaCheck extends Properties("OapDataFileMeta") {
       }
   }
 
-  private def isEqual(l: OapDataFileMeta, r: OapDataFileMeta): Boolean = {
+  private def isEqual(l: OapDataFileMetaV1, r: OapDataFileMetaV1): Boolean = {
 
     l.rowCountInEachGroup == r.rowCountInEachGroup &&
       l.rowCountInLastGroup == r.rowCountInLastGroup &&
@@ -195,7 +195,7 @@ class OapDataFileMetaCheck extends Properties("OapDataFileMeta") {
   }
 
   property("read/write OapDataFileMeta") =
-    forAll { (oapDataFileMeta: OapDataFileMeta) =>
+    forAll { (oapDataFileMeta: OapDataFileMetaV1) =>
 
     val file = new Path(
       new File(tmpDir.getAbsolutePath, "testOapDataFileMeta.meta").getAbsolutePath)
@@ -206,14 +206,14 @@ class OapDataFileMetaCheck extends Properties("OapDataFileMeta") {
     output.close()
 
     // Read OapDataFileMeta from file
-    val fileMeta = new OapDataFileMeta().read(fs.open(file), fs.getFileStatus(file).getLen)
+    val fileMeta = new OapDataFileMetaV1().read(fs.open(file), fs.getFileStatus(file).getLen)
     fs.delete(file, false)
 
     isEqual(fileMeta, oapDataFileMeta)
   }
 }
 
-class OapDataFileMetaSuite extends SparkFunSuite with Checkers {
+class OapDataFileMetaV1Suite extends SparkFunSuite with Checkers {
 
   test("Check OapDataFileMeta Read/Write") {
     check(new OapDataFileMetaCheck)

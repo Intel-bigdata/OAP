@@ -46,7 +46,7 @@ class DataFileSuite extends QueryTest with SharedOapContext {
       df.repartition(1).write.format("oap").save(dir.getAbsolutePath)
       val file = SpecificParquetRecordReaderBase.listDirectory(dir).get(0)
       val datafile =
-        DataFile(file, schema, OapFileFormat.OAP_DATA_FILE_CLASSNAME, config)
+        DataFile(file, schema, OapFileFormat.OAP_DATA_FILE_V1_CLASSNAME, config)
       assert(datafile.path == file)
       assert(datafile.schema == schema)
       assert(datafile.configuration == config)
@@ -92,9 +92,9 @@ class DataFileSuite extends QueryTest with SharedOapContext {
       df.repartition(1).write.format("oap").save(dir.getAbsolutePath)
       val file = SpecificParquetRecordReaderBase.listDirectory(dir).get(0)
       val datafile1 =
-        DataFile(file, schema, OapFileFormat.OAP_DATA_FILE_CLASSNAME, config)
+        DataFile(file, schema, OapFileFormat.OAP_DATA_FILE_V1_CLASSNAME, config)
       val datafile2 =
-        DataFile(file, schema, OapFileFormat.OAP_DATA_FILE_CLASSNAME, config)
+        DataFile(file, schema, OapFileFormat.OAP_DATA_FILE_V1_CLASSNAME, config)
       assert(datafile1.equals(datafile2))
       assert(datafile1.hashCode() == datafile2.hashCode())
     }
