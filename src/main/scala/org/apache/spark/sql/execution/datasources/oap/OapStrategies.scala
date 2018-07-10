@@ -19,7 +19,8 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{execution, SparkSession, Strategy}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.{expressions, InternalRow}
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.expressions._
@@ -28,10 +29,11 @@ import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCo
 import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalAggregation, PhysicalOperation}
 import org.apache.spark.sql.catalyst.plans.{logical, LeftSemi}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
+import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.aggregate.OapAggUtils
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.oap.utils.CaseInsensitiveMap
 import org.apache.spark.sql.execution.joins.BuildRight
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.util.Utils
@@ -104,7 +106,7 @@ trait OapStrategies extends Logging {
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
         if (orderAttributes.size == 1 && filterAttributes == orderAttributes) {
-          val oapOption = new CaseInsensitiveMap(file.options +
+          val oapOption = CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY -> limit.toString) +
             (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
           val indexRequirement = filters.map(_ => BTreeIndex())
@@ -169,7 +171,7 @@ trait OapStrategies extends Logging {
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
         if (orderAttributes.size == 1 || filterAttributes == orderAttributes) {
-          val oapOption = new CaseInsensitiveMap(file.options +
+          val oapOption = CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY -> "1"))
           val indexRequirement = filters.map(_ => BitMapIndex())
 
@@ -253,7 +255,7 @@ trait OapStrategies extends Logging {
         val indexRequirement = filters.map(_ => BTreeIndex())
 
         if (groupingAttributes.size == 1 && filterAttributes == groupingAttributes) {
-          val oapOption = new CaseInsensitiveMap(file.options +
+          val oapOption = CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
 
           createOapFileScanPlan(
