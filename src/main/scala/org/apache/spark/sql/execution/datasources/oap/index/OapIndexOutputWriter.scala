@@ -39,34 +39,9 @@ private[index] class OapIndexOutputWriter(
     override def getDefaultWorkFile(context: TaskAttemptContext, extension: String): Path = {
       val outputPath = FileOutputFormat.getOutputPath(context)
       val inputFile = new Path(inputFileName)
-
-      val dataName = inputFile.getName
-      val pos = dataName.lastIndexOf(".")
-      val indexFileName = if (pos > 0) {
-        dataName.substring(0, pos)
-      } else {
-        dataName
-      }
-
       val configuration = ContextUtil.getConfiguration(context)
-      val indexDirectory = configuration.get(OapConf.OAP_INDEX_DIRECTORY.key,
-        OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
-      if (indexDirectory != "") {
-        // here the outputpath = indexDirectory + tablePath
-        val tablePath =
-          Path.getPathWithoutSchemeAndAuthority(
-            outputPath).toString.replaceFirst(indexDirectory.toString, "")
-        val partitionPath =
-          Path.getPathWithoutSchemeAndAuthority(
-            inputFile.getParent).toString.replaceFirst(tablePath.toString, "")
-        new Path (new Path(path).getParent.toString + "/"
-            + partitionPath + "/." + indexFileName + extension)
-      } else {
-        // Workaround: FileFormatWriter passes a temp file name to us. But index file name is not
-        // a random name. So we only use the upper directory.
-        IndexUtils.getIndexWorkPath(
-          inputFile, outputPath, new Path(path).getParent, "." + indexFileName + extension)
-      }
+      IndexUtils.getIndexPathFromDirectoryOrDataFile(
+        configuration, inputFile, outputPath, new Path(path), extension)
     }
   }
 

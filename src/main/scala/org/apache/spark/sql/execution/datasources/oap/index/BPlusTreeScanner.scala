@@ -37,12 +37,8 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
 
   def initialize(dataPath: Path, conf: Configuration): IndexScanner = {
     assert(keySchema ne null)
-
-    val indexDirectory = conf.get(
-      OapConf.OAP_INDEX_DIRECTORY.key, OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
-    val indexPath = IndexUtils.indexFileFromDirectory(
-      indexDirectory, dataPath, meta.name, meta.time)
-
+    val indexPath = IndexUtils.indexFileFromDirectoryOrDataFile(
+      conf, dataPath, meta.name, meta.time)
     logDebug("Loading Index File: " + indexPath)
     logDebug("\tFile Size: " + indexPath.getFileSystem(conf).getFileStatus(indexPath).getLen)
 

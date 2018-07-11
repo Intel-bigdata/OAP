@@ -241,5 +241,5 @@ object OapConf {
       .doc("To specify the directory of index file, if the value " +
         "is null, it will still store in the data file path")
       .stringConf
-      .createWithDefault("")
+      .createWithDefault("/tmp")
 }

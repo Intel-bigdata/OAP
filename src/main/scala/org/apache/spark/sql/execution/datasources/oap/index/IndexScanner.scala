@@ -80,10 +80,8 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
    *         result.
    */
   def analysisResByPolicies(dataPath: Path, conf: Configuration): StatsAnalysisResult = {
-    val indexDirectory = conf.get(
-      OapConf.OAP_INDEX_DIRECTORY.key, OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
-    val indexPath = IndexUtils.indexFileFromDirectory(
-      indexDirectory, dataPath, meta.name, meta.time)
+    val indexPath = IndexUtils.indexFileFromDirectoryOrDataFile(
+      conf, dataPath, meta.name, meta.time)
     if (!indexPath.getFileSystem(conf).exists(indexPath)) {
       logDebug("No index file exist for data file: " + dataPath)
       StatsAnalysisResult.FULL_SCAN

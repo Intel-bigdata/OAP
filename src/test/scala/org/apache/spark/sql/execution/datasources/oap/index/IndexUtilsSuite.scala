@@ -60,20 +60,14 @@ class IndexUtilsSuite extends SparkFunSuite with Logging with SharedOapContext {
   }
 
   test("index path generating") {
-    val indexDirectory = sparkContext.hadoopConfiguration.get(OapConf.OAP_INDEX_DIRECTORY.key,
-      OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
-    assertEquals(s"$indexDirectory/path/to/.t1.ABC.index1.index",
-      IndexUtils.indexFileFromDirectory(indexDirectory,
-        new Path("/path/to/t1.data"), "index1", "ABC").toString)
-    assertEquals(s"$indexDirectory/.t1.1F23.index1.index",
-      IndexUtils.indexFileFromDirectory(indexDirectory,
-        new Path("/t1.data"), "index1", "1F23").toString)
-    assertEquals(s"$indexDirectory/path/to/.t1.0.index1.index",
-      IndexUtils.indexFileFromDirectory(indexDirectory,
-        new Path("/path/to/t1.parquet"), "index1", "0").toString)
-    assertEquals(s"$indexDirectory/path/to/.t1.F91.index1.index",
-      IndexUtils.indexFileFromDirectory(indexDirectory,
-        new Path("/path/to/t1"), "index1", "F91").toString)
+    assertEquals("/path/to/.t1.ABC.index1.index",
+      IndexUtils.indexFileFromDataFile(new Path("/path/to/t1.data"), "index1", "ABC").toString)
+    assertEquals("/.t1.1F23.index1.index",
+      IndexUtils.indexFileFromDataFile(new Path("/t1.data"), "index1", "1F23").toString)
+    assertEquals("/path/to/.t1.0.index1.index",
+      IndexUtils.indexFileFromDataFile(new Path("/path/to/t1.parquet"), "index1", "0").toString)
+    assertEquals("/path/to/.t1.F91.index1.index",
+      IndexUtils.indexFileFromDataFile(new Path("/path/to/t1"), "index1", "F91").toString)
   }
 
   test("get index work file path") {

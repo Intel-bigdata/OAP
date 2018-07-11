@@ -190,7 +190,6 @@ class DataTypeSupportSuite extends QueryTest with SharedOapContext with BeforeAn
     withIndex(TestIndex("parquet_partitioned_by_date", "idx1", TestPartition("b", "1970-01-01"))) {
       sql("insert overwrite table parquet_partitioned_by_date select * from t")
       sql("create oindex idx1 on parquet_partitioned_by_date (a) partition(b='1970-01-01')")
-      // currently this pr does not pass in this query. The answer of the following sql is null
       checkAnswer(sql("select * from parquet_partitioned_by_date where a = 1"),
         Row(1, DateTimeUtils.toJavaDate(1)):: Nil)
     }
