@@ -86,7 +86,7 @@ object OapUtils extends Logging {
     } else {
       Nil
     }
-    fileIndex.listFiles(filters)
+    fileIndex.listFiles(filters, Nil)
   }
 
   /**
