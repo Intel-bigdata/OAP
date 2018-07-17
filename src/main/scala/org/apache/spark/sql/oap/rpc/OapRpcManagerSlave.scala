@@ -26,6 +26,7 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.{CacheStats, Fib
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
+import org.apache.spark.sql.oap.adapter.RpcEndpointRefAdapter
 import org.apache.spark.sql.oap.rpc.OapMessages._
 import org.apache.spark.storage.BlockManager
 import org.apache.spark.util.{ThreadUtils, Utils}
@@ -61,7 +62,8 @@ private[spark] class OapRpcManagerSlave(
   }
 
   private def initialize() = {
-    driverEndpoint.askWithRetry[Boolean](RegisterOapRpcManager(executorId, slaveEndpoint))
+    RpcEndpointRefAdapter.askSync[Boolean](
+      driverEndpoint, RegisterOapRpcManager(executorId, slaveEndpoint))
   }
 
   override private[spark] def send(message: OapMessage): Unit = {
