@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatsAnalysisResult
-import org.apache.spark.sql.internal.oap.OapConf
 
 // we scan the index from the smallest to the largest,
 // this will scan the B+ Tree (index) leaf node.

@@ -22,12 +22,10 @@ import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.parquet.hadoop.util.ContextUtil
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OutputWriter
-import org.apache.spark.sql.internal.oap.OapConf
 
 // TODO: parameter name "path" is ambiguous
 private[index] class OapIndexOutputWriter(

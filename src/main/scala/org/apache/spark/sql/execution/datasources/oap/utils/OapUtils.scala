@@ -27,12 +27,13 @@ import org.apache.parquet.bytes.BytesUtils
 import org.apache.parquet.io.api.Binary
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.AnalysisException
+import org.apache.spark.sql.{AnalysisException, RuntimeConfig}
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes._
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, EqualTo, Literal}
 import org.apache.spark.sql.execution.datasources.{FileIndex, PartitionDirectory, PartitioningUtils}
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, Key, OapFileFormat}
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
@@ -198,6 +199,24 @@ object OapUtils extends Logging {
       partitionSpec: Option[TablePartitionSpec] = None): Seq[PartitionDirectory] = {
     fileIndex.refresh()
     getPartitions(fileIndex, partitionSpec)
+  }
+
+  /**
+   * Generate the outPutPath based on OapConf.OAP_INDEX_DIRECTORY and the data path,
+   * here the dataPath does not contain the partition path
+   * @param fileIndex [[FileIndex]] of a relation
+   * @param conf the configuration to get the value of OapConf.OAP_INDEX_DIRECTORY
+   * @return the outPutPath to save the job temporary data
+   */
+  def getOutputPathFromIndexDirectory(fileIndex: FileIndex, conf: RuntimeConfig): Path = {
+    val dataPath = OapUtils.getOutPutPath(fileIndex)
+    val indexDirectory = conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
+    if (indexDirectory != "") {
+      new Path (
+        indexDirectory + Path.getPathWithoutSchemeAndAuthority(dataPath).toString)
+    } else {
+      dataPath
+    }
   }
 
   /**
