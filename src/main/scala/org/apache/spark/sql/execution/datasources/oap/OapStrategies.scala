@@ -35,7 +35,9 @@ import org.apache.spark.sql.execution.aggregate.OapAggUtils
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.utils.CaseInsensitiveMap
 import org.apache.spark.sql.execution.joins.BuildRight
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.adapter.LogicalPlanAdapter
 import org.apache.spark.util.Utils
 
 trait OapStrategies extends Logging {
@@ -149,8 +151,8 @@ trait OapStrategies extends Logging {
       // We can take a much larger threshold here since if this optimization
       // is applicable, only distinct item will be broadcasted, those data
       // should much less than the origin table.
-      plan.statistics.isBroadcastable ||
-        plan.statistics.sizeInBytes <= conf.autoBroadcastJoinThreshold
+      val stats = LogicalPlanAdapter.getStatistics(plan, conf)
+      stats.sizeInBytes <= conf.autoBroadcastJoinThreshold
     }
 
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
