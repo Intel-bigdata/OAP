@@ -21,7 +21,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
@@ -110,8 +110,14 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
   // Decide by size ratio(generalized statistics : )) & statistics in index file
   private def analysisResByStatistics(indexPath: Path, dataPath: Path, conf: Configuration)
     : StatsAnalysisResult = {
+
+    def dataFileSize(fs: FileSystem): Long = fs.getFileStatus(dataPath).getLen
+
+    def ratio: Double = indexFileSizeMaxRatio(conf)
+
     val fs = dataPath.getFileSystem(conf)
-    require(fs.isFile(indexPath), s"Index file path $indexPath is a directory, it should be a file")
+    val indexFile = fs.getFileStatus(indexPath)
+    require(indexFile.isFile, s"Index file path $indexPath is a directory, it should be a file")
 
     // Policy 3: index file size < data file size)
 
@@ -119,12 +125,7 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       conf.getBoolean(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key,
         OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.defaultValue.get)
 
-    val indexFileSize = fs.getFileStatus(indexPath).getLen
-    val dataFileSize = fs.getFileStatus(dataPath).getLen
-    val ratio = conf.getDouble(OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
-      OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
-
-    if (filePolicyEnable && indexFileSize > dataFileSize * ratio) {
+    if (filePolicyEnable && isIndexFileTooLarge(indexFile.getLen, dataFileSize(fs), ratio)) {
       StatsAnalysisResult.FULL_SCAN
     } else {
       val statsPolicyEnable =
@@ -144,6 +145,13 @@ private[oap] abstract class IndexScanner(idxMeta: IndexMeta)
       // More Policies
     }
   }
+
+  private def isIndexFileTooLarge(indexFileSize: Long,
+      dataFileSize: Long, ratio: Double): Boolean = indexFileSize > dataFileSize * ratio
+
+  protected def indexFileSizeMaxRatio(conf: Configuration): Double =
+    conf.getDouble(OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key,
+      OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.defaultValue.get)
 
   /**
    * Judging if we should bypass this datafile or full scan or by index through statistics from

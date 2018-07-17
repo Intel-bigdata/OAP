@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatsAnalysisResult
+import org.apache.spark.sql.internal.oap.OapConf
 
 // we scan the index from the smallest to the largest,
 // this will scan the B+ Tree (index) leaf node.
@@ -67,4 +68,8 @@ private[oap] class BPlusTreeScanner(idxMeta: IndexMeta) extends IndexScanner(idx
   override def hasNext: Boolean = recordReader.hasNext
 
   override def next(): Int = recordReader.next()
+
+  override protected def indexFileSizeMaxRatio(conf: Configuration): Double =
+    conf.getDouble(OapConf.OAP_INDEX_WITH_PARTIAL_LOADING_FILE_SIZE_MAX_RATIO.key,
+      OapConf.OAP_INDEX_WITH_PARTIAL_LOADING_FILE_SIZE_MAX_RATIO.defaultValue.get)
 }

@@ -31,6 +31,7 @@ class CombiningIndexSuite extends QueryTest with SharedOapContext with BeforeAnd
     spark.conf.set(OapConf.OAP_INDEXER_CHOICE_MAX_SIZE.key, "2")
     spark.conf.set(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")
     spark.conf.set(OapConf.OAP_INDEX_FILE_SIZE_MAX_RATIO.key, "1000")
+    spark.conf.set(OapConf.OAP_INDEX_WITH_PARTIAL_LOADING_FILE_SIZE_MAX_RATIO.key, "1000")
     val path = Utils.createTempDir().getAbsolutePath
     currentPath = path
     sql(s"""CREATE TEMPORARY VIEW oap_test (a INT, b INT, c INT)

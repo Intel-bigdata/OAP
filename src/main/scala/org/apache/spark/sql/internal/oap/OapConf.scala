@@ -184,6 +184,15 @@ object OapConf {
       .doubleConf
       .createWithDefault(0.7)
 
+  val OAP_INDEX_WITH_PARTIAL_LOADING_FILE_SIZE_MAX_RATIO =
+    SQLConfigBuilder("spark.sql.oap.oindex.partial.loading.size.ratio")
+      .internal()
+      .doc("To indicate if enable/disable index cbo which helps to choose a fast query path, " +
+        "this config has the same effect as OAP_INDEX_FILE_SIZE_MAX_RATIO, " +
+        "the difference is this index support partial loading.")
+      .doubleConf
+      .createWithDefault(1.0)
+
   val OAP_INDEXER_CHOICE_MAX_SIZE =
     SQLConfigBuilder("spark.sql.oap.indexer.max.use.size")
       .internal()
