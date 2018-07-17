@@ -37,7 +37,7 @@ import org.apache.spark.sql.execution.datasources.oap.utils.CaseInsensitiveMap
 import org.apache.spark.sql.execution.joins.BuildRight
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
-import org.apache.spark.sql.oap.adapter.LogicalPlanAdapter
+import org.apache.spark.sql.oap.adapter.{AggregateFunctionAdapter, LogicalPlanAdapter}
 import org.apache.spark.util.Utils
 
 trait OapStrategies extends Logging {
@@ -218,7 +218,8 @@ trait OapStrategies extends Logging {
         }
 
         val aggregateOperator =
-          if (aggregateExpressions.map(_.aggregateFunction).exists(!_.supportsPartial)) {
+          if (aggregateExpressions.map(_.aggregateFunction).exists(
+            AggregateFunctionAdapter.supportsPartial)) {
             if (functionsWithDistinct.nonEmpty) {
               sys.error("Distinct columns cannot exist in Aggregate operator containing " +
                 "aggregate functions which don't support partial aggregation.")
