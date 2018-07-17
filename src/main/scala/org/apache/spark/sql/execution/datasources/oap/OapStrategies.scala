@@ -336,7 +336,7 @@ trait OapStrategies extends Logging {
       ExpressionSet(normalizedFilters.filter(_.references.subsetOf(partitionSet)))
     logInfo(s"Pruning directories with: ${partitionKeyFilters.mkString(",")}")
 
-    val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq)
+    val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq, Nil)
 
     _fsRelation.fileFormat match {
       case fileFormat: OapFileFormat =>

@@ -82,7 +82,7 @@ object FileSourceStrategy extends Strategy with Logging {
         ExpressionSet(normalizedFilters.filter(_.references.subsetOf(partitionSet)))
       logInfo(s"Pruning directories with: ${partitionKeyFilters.mkString(",")}")
 
-      val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq)
+      val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq, Nil)
 
       val fsRelation: HadoopFsRelation = _fsRelation.fileFormat match {
         // TODO a better rule to check if we need to substitute the ParquetFileFormat
