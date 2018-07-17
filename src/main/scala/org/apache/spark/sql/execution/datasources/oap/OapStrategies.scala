@@ -35,9 +35,8 @@ import org.apache.spark.sql.execution.aggregate.OapAggUtils
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.utils.CaseInsensitiveMap
 import org.apache.spark.sql.execution.joins.BuildRight
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
-import org.apache.spark.sql.oap.adapter.{AggregateFunctionAdapter, LogicalPlanAdapter}
+import org.apache.spark.sql.oap.adapter.{AggregateFunctionAdapter, FileSourceScanExecAdapter, LogicalPlanAdapter}
 import org.apache.spark.util.Utils
 
 trait OapStrategies extends Logging {
@@ -365,20 +364,16 @@ trait OapStrategies extends Logging {
           val outputSchema = readDataColumns.toStructType
           logInfo(s"Output Data Schema: ${outputSchema.simpleString(5)}")
 
-          val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
-          logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
-
           val outputAttributes = readDataColumns ++ partitionColumns
 
           val oapRelation = _fsRelation.copy(options = oapOption)(_fsRelation.sparkSession)
-          val scan =
-            new FileSourceScanExec(
-              oapRelation,
-              outputAttributes,
-              outputSchema,
-              partitionKeyFilters.toSeq,
-              pushedDownFilters,
-              table.map(_.identifier))
+          val scan = FileSourceScanExecAdapter.createFileSourceScanExec(
+            oapRelation,
+            outputAttributes,
+            outputSchema,
+            partitionKeyFilters.toSeq,
+            dataFilters,
+            table.map(_.identifier))
 
           val afterScanFilter = afterScanFilters.toSeq.reduceOption(expressions.And)
           val withFilter = afterScanFilter.map(execution.FilterExec(_, scan)).getOrElse(scan)
