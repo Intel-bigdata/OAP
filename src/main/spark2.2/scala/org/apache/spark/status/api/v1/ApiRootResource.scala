@@ -235,7 +235,7 @@ private[v1] class ApiRootResource extends ApiRequestContext {
    */
   @Path("applications/{appId}/fibercachemanagers")
   def getCacheManagers(@PathParam("appId") appId: String): AllFiberCacheManagerListResource = {
-    uiRoot.withSparkUI(appId, None) { ui =>
+    withSparkUI(appId, None) { ui =>
       new AllFiberCacheManagerListResource(ui)
     }
   }
