@@ -140,14 +140,14 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
         TestPartition("b", "2"), TestPartition("c", "c2"))) {
       sql("create oindex index1 on oap_partition_table (a) partition (b=2, c='c2')")
 
+      checkAnswer(sql("select * from oap_partition_table"),
+        Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Row(4, 2, "c2") :: Nil)
       assert(path.getFileSystem(
         configuration).globStatus(new Path(path,
         "oap_partition_table/b=1/c=c1/*.index")).length == 0)
       assert(path.getFileSystem(
         configuration).globStatus(new Path(path,
         "oap_partition_table/b=2/c=c2/*.index")).length != 0)
-      checkAnswer(sql("select * from oap_partition_table"),
-        Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Row(4, 2, "c2") :: Nil)
     }
   }
 

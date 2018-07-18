@@ -65,6 +65,7 @@ class DropIndexCommandSuite extends SharedOapContext with BeforeAndAfterEach {
         withTempDir { dir =>
           val pathString = dir.getAbsolutePath
           val basePath = new Path(pathString)
+
           withTable("partitioned_table") {
             sql(
               s"""CREATE TABLE partitioned_table (a int, b int)

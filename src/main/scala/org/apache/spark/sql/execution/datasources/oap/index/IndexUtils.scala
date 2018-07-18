@@ -22,7 +22,6 @@ import java.io.OutputStream
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql.RuntimeConfig
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.oap.io.{BytesCompressor, BytesDecompressor, IndexFile}
@@ -87,14 +86,13 @@ private[oap] object IndexUtils {
   }
 
   /**
-   * Get the index file name based on the data file
-   * For example the data file is
+   * Get the data file name as the index file name. For example the data file is
    * "/tmp/part-00000-df7c3ca8-560f-4089-a0b1-58ab817bc2c3.snappy.parquet",
    * the index file name is part-00000-df7c3ca8-560f-4089-a0b1-58ab817bc2c3.snappy
    * @param dataFile the data file
    * @return the index file name
    */
-  def getIndexFileNameFromDatafile (dataFile: Path): String = {
+  private def getIndexFileNameFromDatafile (dataFile: Path): String = {
     val dataFileName = dataFile.getName
     val pos = dataFileName.lastIndexOf(".")
     if (pos > 0) {

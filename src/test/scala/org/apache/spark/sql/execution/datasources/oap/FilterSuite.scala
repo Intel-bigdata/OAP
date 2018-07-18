@@ -571,13 +571,13 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
         Row(1, "this is test 1") :: Nil)
 
       sql("insert into table oap_test select * from t")
-      val checkPath = new Path(currentPath)
-      assert(checkPath.getFileSystem(
-        new Configuration()).globStatus(new Path(checkPath, "*.index")).length == 2)
+      val check_path = new Path(currentPath)
+      assert(check_path.getFileSystem(
+        new Configuration()).globStatus(new Path(check_path, "*.index")).length == 2)
 
       sql("refresh oindex on oap_test")
-      assert(checkPath.getFileSystem(
-        new Configuration()).globStatus(new Path(checkPath, "*.index")).length == 4)
+      assert(check_path.getFileSystem(
+        new Configuration()).globStatus(new Path(check_path, "*.index")).length == 4)
 
 
       checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
