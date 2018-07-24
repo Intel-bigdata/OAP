@@ -208,33 +208,24 @@ object OapUtils extends Logging {
    * @param conf the configuration to get the value of OapConf.OAP_INDEX_DIRECTORY
    * @return the outPutPath to save the job temporary data
    */
-  def getOutputPathFromIndexDirectory(fileIndex: FileIndex, conf: RuntimeConfig): Path = {
-    val dataPath = OapUtils.getOutPutPath(fileIndex)
-    val indexDirectory = conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
-    if (indexDirectory != "") {
-      new Path (
-        indexDirectory + Path.getPathWithoutSchemeAndAuthority(dataPath).toString)
-    } else {
-      dataPath
-    }
-  }
-
-  /**
-   * If fileIndex.rootPaths has only one item, it will use as job temporary dir,
-   * else get table base dir use as job temporary dir.
-   * @param fileIndex [[FileIndex]] of a relation
-   * @return path use to save job temporary data
-   */
-  def getOutPutPath(fileIndex: FileIndex): Path = {
+  def getOutputPathBasedConfiguration(fileIndex: FileIndex, conf: RuntimeConfig): Path = {
     def getTableBaseDir(path: Path, times: Int): Path = {
       if (times > 0) getTableBaseDir(path.getParent, times - 1)
       else path
     }
     val paths = fileIndex.rootPaths
     assert(paths.nonEmpty, "Expected at least one path of fileIndex.rootPaths, but no value")
-    paths.length match {
+    val dataPath = paths.length match {
       case 1 => paths.head
       case _ => getTableBaseDir(paths.head, fileIndex.partitionSchema.length)
+    }
+
+    val indexDirectory = conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
+    if (indexDirectory != "") {
+      new Path (
+        indexDirectory + Path.getPathWithoutSchemeAndAuthority(dataPath).toString)
+    } else {
+      dataPath
     }
   }
 }

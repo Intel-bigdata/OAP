@@ -38,7 +38,7 @@ private[index] class OapIndexOutputWriter(
       val outputPath = FileOutputFormat.getOutputPath(context)
       val inputFile = new Path(inputFileName)
       val configuration = ContextUtil.getConfiguration(context)
-      IndexUtils.getIndexPathFromDirectoryOrDataFile(
+      IndexUtils.generateTempIndexFilePath(
         configuration, inputFile, outputPath, new Path(path), extension)
     }
   }

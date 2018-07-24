@@ -31,7 +31,7 @@ class OapUtilsSuite extends SharedOapContext {
   test("test rootPaths empty") {
     val fileIndex = new InMemoryFileIndex(spark, Seq.empty, Map.empty, None)
     intercept[AssertionError] {
-      OapUtils.getOutPutPath(fileIndex)
+      OapUtils.getOutputPathBasedConfiguration(fileIndex, spark.conf)
     }
   }
 
@@ -39,7 +39,7 @@ class OapUtilsSuite extends SharedOapContext {
     val tablePath = new Path("/table")
     val rootPaths = Seq(tablePath)
     val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, None)
-    val ret = OapUtils.getOutPutPath(fileIndex)
+    val ret = OapUtils.getOutputPathBasedConfiguration(fileIndex, spark.conf)
     assert(ret.equals(tablePath))
   }
 
@@ -50,7 +50,7 @@ class OapUtilsSuite extends SharedOapContext {
       .add(StructField("b", StringType))
     val rootPaths = Seq(tablePath)
     val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
-    val ret = OapUtils.getOutPutPath(fileIndex)
+    val ret = OapUtils.getOutputPathBasedConfiguration(fileIndex, spark.conf)
     assert(ret.equals(tablePath))
   }
 
@@ -63,7 +63,7 @@ class OapUtilsSuite extends SharedOapContext {
       .add(StructField("b", StringType))
     val rootPaths = Seq(part1, part2)
     val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
-    val ret = OapUtils.getOutPutPath(fileIndex)
+    val ret = OapUtils.getOutputPathBasedConfiguration(fileIndex, spark.conf)
     assert(ret.equals(tablePath))
   }
 
@@ -74,7 +74,7 @@ class OapUtilsSuite extends SharedOapContext {
       .add(StructField("b", StringType))
     val rootPaths = Seq(part1)
     val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
-    val ret = OapUtils.getOutPutPath(fileIndex)
+    val ret = OapUtils.getOutputPathBasedConfiguration(fileIndex, spark.conf)
     assert(ret.equals(part1))
   }
 }

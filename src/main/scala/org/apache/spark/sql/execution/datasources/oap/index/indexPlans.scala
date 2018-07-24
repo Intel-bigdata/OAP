@@ -159,7 +159,7 @@ case class CreateIndexCommand(
     }
     // Generate the outPutPath based on OapConf.OAP_INDEX_DIRECTORY and the data path,
     // here the dataPath does not contain the partition path
-    val outPutPath = OapUtils.getOutputPathFromIndexDirectory(fileCatalog, sparkSession.conf)
+    val outPutPath = OapUtils.getOutputPathBasedConfiguration(fileCatalog, sparkSession.conf)
     assert(outPutPath != null, "Expected exactly one path to be specified, but no value")
 
     val qualifiedOutputPath = {
@@ -397,7 +397,7 @@ case class RefreshIndexCommand(
 
       // Generate the outPutPath based on OapConf.OAP_INDEX_DIRECTORY and the data path,
       // here the dataPath does not contain the partition path
-      val outPutPath = OapUtils.getOutputPathFromIndexDirectory(fileCatalog, sparkSession.conf)
+      val outPutPath = OapUtils.getOutputPathBasedConfiguration(fileCatalog, sparkSession.conf)
       assert(outPutPath != null, "Expected exactly one path to be specified, but no value")
 
       val qualifiedOutputPath = {
@@ -605,7 +605,7 @@ case class OapCheckIndexCommand(
           OapConf.OAP_INDEX_DIRECTORY.key -> sparkSession.conf.get(OapConf.OAP_INDEX_DIRECTORY.key))
         val conf = sparkSession.sessionState.newHadoopConfWithOptions(option)
         val indexFile =
-          IndexUtils.indexFileFromDirectoryOrDataFile(
+          IndexUtils.getIndexFilePath(
             conf, new Path(partitionPath, file_meta.dataFileName),
             index_meta.name, index_meta.time)
         !fs.exists(indexFile)
