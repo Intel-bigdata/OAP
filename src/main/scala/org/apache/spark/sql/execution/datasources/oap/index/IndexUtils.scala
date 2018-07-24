@@ -168,9 +168,10 @@ private[oap] object IndexUtils {
    * @return the index path
    */
   def generateTempIndexFilePath(
-      conf: Configuration, inputFile: Path,
-      outputPath: Path, attemptPath: Path, extension: String): Path = {
-    val indexFileName = getIndexFileNameFromDatafile(inputFile)
+      conf: Configuration, inputFile: String,
+      outputPath: Path, attemptPath: String, extension: String): Path = {
+    val inputFilePath = new Path(inputFile)
+    val indexFileName = getIndexFileNameFromDatafile(inputFilePath)
     val indexDirectory = conf.get(OapConf.OAP_INDEX_DIRECTORY.key,
       OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
     if (indexDirectory != "") {
@@ -180,12 +181,13 @@ private[oap] object IndexUtils {
         outputPath).toString.replaceFirst(indexDirectory.toString, "")
       val partitionPath =
         Path.getPathWithoutSchemeAndAuthority(
-          inputFile.getParent).toString.replaceFirst(tablePath.toString, "")
-      new Path(attemptPath.getParent.toString + "/"
+          inputFilePath.getParent).toString.replaceFirst(tablePath.toString, "")
+      new Path(new Path(attemptPath).getParent.toString + "/"
         + partitionPath + "/." + indexFileName + extension)
     } else {
-      new Path(inputFile.getParent.toString.replace(
-        outputPath.toString, attemptPath.getParent.toString), "." + indexFileName + extension)
+      new Path(inputFilePath.getParent.toString.replace(
+        outputPath.toString, new Path(attemptPath).getParent.toString),
+        "." + indexFileName + extension)
     }
   }
   val INT_SIZE = 4

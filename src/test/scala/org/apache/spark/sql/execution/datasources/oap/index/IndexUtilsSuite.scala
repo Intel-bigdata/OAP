@@ -111,21 +111,21 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
     val conf = spark.sessionState.newHadoopConfWithOptions(option)
     assertEquals("/path/to/_temp/0/.t1.ABC.index1.index",
       IndexUtils.generateTempIndexFilePath(conf,
-        new Path("/path/to/t1.data"),
+        "/path/to/t1.data",
         new Path(s"$indexDirectory/path/to"),
-        new Path(s"$indexDirectory/path/to/_temp/0/.index"),
+        s"$indexDirectory/path/to/_temp/0/.index",
         ".ABC.index1.index").toString)
     assertEquals("hdfs:/path/to/_temp/1/a=3/b=4/.t1.ABC.index1.index",
       IndexUtils.generateTempIndexFilePath(conf,
-        new Path("hdfs:/path/to/a=3/b=4/t1.data"),
+        "hdfs:/path/to/a=3/b=4/t1.data",
         new Path(s"$indexDirectory/path/to"),
-        new Path(s"$indexDirectory/path/to/_temp/1/.index"),
+        s"$indexDirectory/path/to/_temp/1/.index",
         ".ABC.index1.index").toString)
     assertEquals("hdfs://remote:8020/path/to/_temp/2/x=1/.t1.ABC.index1.index",
       IndexUtils.generateTempIndexFilePath(conf,
-        new Path("hdfs://remote:8020/path/to/x=1/t1.data"),
+        "hdfs://remote:8020/path/to/x=1/t1.data",
         new Path(s"$indexDirectory/path/to/"),
-        new Path(s"$indexDirectory/path/to/_temp/2/.index"),
+        s"$indexDirectory/path/to/_temp/2/.index",
         ".ABC.index1.index").toString)
 
     // set the configuration of OapConf.OAP_INDEX_DIRECTORY
@@ -137,21 +137,21 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
       val conf = spark.sessionState.newHadoopConfWithOptions(option)
       assertEquals(s"$indexDirectory/path/to/_temp/0/.t1.ABC.index1.index",
         IndexUtils.generateTempIndexFilePath(conf,
-          new Path("/path/to/t1.data"),
+          "/path/to/t1.data",
           new Path(s"$indexDirectory/path/to"),
-          new Path(s"$indexDirectory/path/to/_temp/0/.index"),
+          s"$indexDirectory/path/to/_temp/0/.index",
           ".ABC.index1.index").toString)
       assertEquals(s"$indexDirectory/path/to/_temp/1/a=3/b=4/.t1.ABC.index1.index",
         IndexUtils.generateTempIndexFilePath(conf,
-          new Path("hdfs:/path/to/a=3/b=4/t1.data"),
+          "hdfs:/path/to/a=3/b=4/t1.data",
           new Path(s"$indexDirectory/path/to"),
-          new Path(s"$indexDirectory/path/to/_temp/1/.index"),
+          s"$indexDirectory/path/to/_temp/1/.index",
           ".ABC.index1.index").toString)
       assertEquals(s"$indexDirectory/path/to/_temp/2/x=1/.t1.ABC.index1.index",
         IndexUtils.generateTempIndexFilePath(conf,
-          new Path("hdfs://remote:8020/path/to/x=1/t1.data"),
+          "hdfs://remote:8020/path/to/x=1/t1.data",
           new Path(s"$indexDirectory/path/to/"),
-          new Path(s"$indexDirectory/path/to/_temp/2/.index"),
+          s"$indexDirectory/path/to/_temp/2/.index",
           ".ABC.index1.index").toString)
     }
 

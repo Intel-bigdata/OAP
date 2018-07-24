@@ -36,10 +36,9 @@ private[index] class OapIndexOutputWriter(
   private val outputFormat = new OapIndexOutputFormat() {
     override def getDefaultWorkFile(context: TaskAttemptContext, extension: String): Path = {
       val outputPath = FileOutputFormat.getOutputPath(context)
-      val inputFile = new Path(inputFileName)
       val configuration = ContextUtil.getConfiguration(context)
       IndexUtils.generateTempIndexFilePath(
-        configuration, inputFile, outputPath, new Path(path), extension)
+        configuration, inputFileName, outputPath, path, extension)
     }
   }
 
