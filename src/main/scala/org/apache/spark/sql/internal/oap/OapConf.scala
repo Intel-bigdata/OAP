@@ -239,7 +239,7 @@ object OapConf {
     SQLConfigBuilder("spark.sql.oap.index.directory")
       .internal()
       .doc("To specify the directory of index file, if the value " +
-        "is null, it will still store in the data file path")
+        "is empty, it will store in the data file path")
       .stringConf
       .createWithDefault("")
 }

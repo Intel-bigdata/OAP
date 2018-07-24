@@ -200,32 +200,4 @@ object OapUtils extends Logging {
     fileIndex.refresh()
     getPartitions(fileIndex, partitionSpec)
   }
-
-  /**
-   * Generate the outPutPath based on OapConf.OAP_INDEX_DIRECTORY and the data path,
-   * here the dataPath does not contain the partition path
-   * @param fileIndex [[FileIndex]] of a relation
-   * @param conf the configuration to get the value of OapConf.OAP_INDEX_DIRECTORY
-   * @return the outPutPath to save the job temporary data
-   */
-  def getOutputPathBasedConfiguration(fileIndex: FileIndex, conf: RuntimeConfig): Path = {
-    def getTableBaseDir(path: Path, times: Int): Path = {
-      if (times > 0) getTableBaseDir(path.getParent, times - 1)
-      else path
-    }
-    val paths = fileIndex.rootPaths
-    assert(paths.nonEmpty, "Expected at least one path of fileIndex.rootPaths, but no value")
-    val dataPath = paths.length match {
-      case 1 => paths.head
-      case _ => getTableBaseDir(paths.head, fileIndex.partitionSchema.length)
-    }
-
-    val indexDirectory = conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
-    if (indexDirectory != "") {
-      new Path (
-        indexDirectory + Path.getPathWithoutSchemeAndAuthority(dataPath).toString)
-    } else {
-      dataPath
-    }
-  }
 }

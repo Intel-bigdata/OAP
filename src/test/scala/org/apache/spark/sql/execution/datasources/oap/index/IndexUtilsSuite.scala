@@ -25,11 +25,12 @@ import org.junit.Assert._
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.{InMemoryFileIndex, OapException}
 import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.SharedOapContext
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.unsafe.Platform
 
 class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
@@ -58,7 +59,7 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
     assert(Platform.getLong(bytes, Platform.BYTE_ARRAY_OFFSET + 24) == -99128917321912L)
   }
 
-  test("getIndexFilePath: get index file path based on the configuration") {
+  test("getIndexFilePath: get index file path with the default configuration") {
     // test the default configuration of OapConf.OAP_INDEX_DIRECTORY
     val indexDirectory = spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
     val option = Map(
@@ -80,7 +81,9 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
     assertEquals(s"$indexDirectory/path/to/.t1.F91.index1.index",
       IndexUtils.getIndexFilePath(
         conf, new Path("/path/to/t1"), "index1", "F91").toString)
+  }
 
+  test("getIndexFilePath: get index file path with specific configuration") {
     // set the configuration of OapConf.OAP_INDEX_DIRECTORY
     withSQLConf(OapConf.OAP_INDEX_DIRECTORY.key -> "/tmp") {
       val indexDirectory = spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
@@ -103,7 +106,7 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
     }
   }
 
-  test("generateTempIndexFilePath: generating temp index file path based on the configuration") {
+  test("generateTempIndexFilePath: generating temp index file path with default configuration") {
     // test the default configuration of OapConf.OAP_INDEX_DIRECTORY
     val indexDirectory = spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
     val option = Map(
@@ -128,6 +131,9 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
         s"$indexDirectory/path/to/_temp/2/.index",
         ".ABC.index1.index").toString)
 
+  }
+
+  test("generateTempIndexFilePath: generating temp index file path with specific configuration") {
     // set the configuration of OapConf.OAP_INDEX_DIRECTORY
     withSQLConf(OapConf.OAP_INDEX_DIRECTORY.key -> "/tmp") {
       spark.conf.set(OapConf.OAP_INDEX_DIRECTORY.key, "/tmp")
@@ -154,7 +160,6 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
           s"$indexDirectory/path/to/_temp/2/.index",
           ".ABC.index1.index").toString)
     }
-
   }
 
   test("writeHead to write common and consistent index version to all the index file headers") {
@@ -245,5 +250,55 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
       IndexVersion.fromString("v-1")
     }
     assert(exception2.getMessage == "Unsupported index version. name: v-1")
+  }
+
+  test("test rootPaths empty") {
+    val fileIndex = new InMemoryFileIndex(spark, Seq.empty, Map.empty, None)
+    intercept[AssertionError] {
+      IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf)
+    }
+  }
+
+  test("test rootPaths length eq 1 no partitioned") {
+    val tablePath = new Path("/table")
+    val rootPaths = Seq(tablePath)
+    val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, None)
+    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf)
+    assert(ret.equals(tablePath))
+  }
+
+  test("test rootPaths length eq 1 partitioned") {
+    val tablePath = new Path("/table")
+    val partitionSchema = new StructType()
+      .add(StructField("a", StringType))
+      .add(StructField("b", StringType))
+    val rootPaths = Seq(tablePath)
+    val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
+    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf)
+    assert(ret.equals(tablePath))
+  }
+
+  test("test rootPaths length more than 1") {
+    val part1 = new Path("/table/a=1/b=1")
+    val part2 = new Path("/table/a=1/b=2")
+    val tablePath = new Path("/table")
+    val partitionSchema = new StructType()
+      .add(StructField("a", StringType))
+      .add(StructField("b", StringType))
+    val rootPaths = Seq(part1, part2)
+    val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
+    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf)
+    assert(ret.equals(tablePath))
+  }
+
+  test("test rootPaths length eq 1 but partitioned") {
+    val part1 = new Path("/table/a=1/b=1")
+    val partitionSchema = new StructType()
+      .add(StructField("a", StringType))
+      .add(StructField("b", StringType))
+    val rootPaths = Seq(part1)
+    val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
+    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf)
+    assert(ret.equals(part1))
   }
 }
