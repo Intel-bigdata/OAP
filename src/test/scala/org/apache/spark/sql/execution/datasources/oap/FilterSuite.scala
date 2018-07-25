@@ -41,12 +41,12 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   override def beforeAll(): Unit = {
     super.beforeAll()
     // In this suite we don't want to skip index even if the cost is higher.
-    defaultEis = sqlConf.getConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION)
-    sqlConf.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION, false)
+    defaultEis = sqlContext.conf.getConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION)
+    sqlContext.conf.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION, false)
   }
 
   override def afterAll(): Unit = {
-    sqlConf.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION, defaultEis)
+    sqlContext.conf.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION, defaultEis)
     super.afterAll()
   }
 
@@ -100,9 +100,9 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("test oap row group size change") {
-    val previousRowGroupSize = sqlConf.getConfString(OapConf.OAP_ROW_GROUP_SIZE.key)
+    val previousRowGroupSize = sqlContext.conf.getConfString(OapConf.OAP_ROW_GROUP_SIZE.key)
     // change default row group size
-    sqlConf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key, "1025")
+    sqlContext.conf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key, "1025")
     val data: Seq[(Int, String)] = (1 to 3000).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     checkAnswer(sql("SELECT * FROM oap_test"), Seq.empty[Row])
@@ -110,10 +110,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     checkAnswer(sql("SELECT * FROM oap_test"), data.map { row => Row(row._1, row._2) })
     // set back to default value
     if (previousRowGroupSize == null) {
-      sqlConf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key,
+      sqlContext.conf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key,
         OapConf.OAP_ROW_GROUP_SIZE.defaultValueString)
     } else {
-      sqlConf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key,
+      sqlContext.conf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key,
         previousRowGroupSize)
     }
   }
@@ -351,7 +351,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       sql("refresh oindex on t_refresh_parquet partition (b=2)")
 
       val fs = new Path(currentPath).getFileSystem(new Configuration())
-      val tablePath = sqlConf.warehousePath + "/t_refresh_parquet/"
+      val tablePath = sqlContext.conf.warehousePath + "/t_refresh_parquet/"
       assert(fs.globStatus(new Path(tablePath + "b=1/*.index")).length == 1)
       assert(fs.globStatus(new Path(tablePath + "b=2/*.index")).length == 2)
       assert(fs.globStatus(new Path(tablePath + "b=3/*.index")).length == 0)
@@ -470,7 +470,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       sql("refresh oindex on t_refresh partition (b=2)")
 
       val fs = new Path(currentPath).getFileSystem(new Configuration())
-      val tablePath = sqlConf.warehousePath + "/t_refresh/"
+      val tablePath = sqlContext.conf.warehousePath + "/t_refresh/"
       assert(fs.globStatus(new Path(tablePath + "b=1/*.index")).length == 1)
       assert(fs.globStatus(new Path(tablePath + "b=2/*.index")).length == 2)
       assert(fs.globStatus(new Path(tablePath + "b=3/*.index")).length == 0)

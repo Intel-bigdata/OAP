@@ -58,8 +58,6 @@ trait SharedOapContextBase extends SharedSQLContext {
 
   protected lazy val configuration: Configuration = spark.sessionState.newHadoopConf()
 
-  protected implicit def sqlConf: SQLConf = sqlContext.conf
-
   protected def getOapFileFormat(sparkPlan: SparkPlan): Set[Option[OapFileFormat]] = {
     def getOapFileFormatFromSource(node: SparkPlan): Option[OapFileFormat] = {
       node match {
