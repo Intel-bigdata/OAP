@@ -21,8 +21,9 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.Strategy
-import org.apache.spark.sql.catalyst.{expressions, InternalRow}
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog._
+import org.apache.spark.sql.catalyst.expressions
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
@@ -36,7 +37,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.utils.CaseInsensitiveMap
 import org.apache.spark.sql.execution.joins.BuildRight
 import org.apache.spark.sql.internal.oap.OapConf
-import org.apache.spark.sql.oap.adapter.{AggregateFunctionAdapter, FileSourceScanExecAdapter, LogicalPlanAdapter}
+import org.apache.spark.sql.oap.adapter.{AggregateFunctionAdapter, FileIndexAdapter, FileSourceScanExecAdapter, LogicalPlanAdapter}
 import org.apache.spark.util.Utils
 
 trait OapStrategies extends Logging {
@@ -335,7 +336,8 @@ trait OapStrategies extends Logging {
       ExpressionSet(normalizedFilters.filter(_.references.subsetOf(partitionSet)))
     logInfo(s"Pruning directories with: ${partitionKeyFilters.mkString(",")}")
 
-    val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq, Nil)
+    val selectedPartitions = FileIndexAdapter.listFiles(
+      _fsRelation.location, partitionKeyFilters.toSeq, Nil)
 
     _fsRelation.fileFormat match {
       case fileFormat: OapFileFormat =>

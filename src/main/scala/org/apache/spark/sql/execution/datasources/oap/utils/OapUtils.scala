@@ -33,6 +33,7 @@ import org.apache.spark.sql.catalyst.catalog.CatalogTypes._
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, EqualTo, Literal}
 import org.apache.spark.sql.execution.datasources.{FileIndex, PartitionDirectory, PartitioningUtils}
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, Key, OapFileFormat}
+import org.apache.spark.sql.oap.adapter.FileIndexAdapter
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
@@ -86,7 +87,7 @@ object OapUtils extends Logging {
     } else {
       Nil
     }
-    fileIndex.listFiles(filters, Nil)
+    FileIndexAdapter.listFiles(fileIndex, filters, Nil)
   }
 
   /**

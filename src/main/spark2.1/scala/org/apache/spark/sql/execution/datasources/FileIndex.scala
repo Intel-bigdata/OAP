@@ -54,13 +54,6 @@ trait FileIndex {
   def listFiles(filters: Seq[Expression]): Seq[PartitionDirectory]
 
   /**
-   * Parameter dataFilters is added in Spark 2.2 and later. In 2.1, we just ignore it.
-   */
-  def listFiles(
-      partitionFilters: Seq[Expression],
-      dataFilters: Seq[Expression]): Seq[PartitionDirectory] = listFiles(partitionFilters)
-
-  /**
    * Returns the list of files that will be read when scanning this relation. This call may be
    * very expensive for large tables.
    */
