@@ -428,45 +428,6 @@ private[oap] case class OapWriteResult(
     rowsWritten: Int,
     partitionString: String)
 
-private[oap] class OapOutputWriter(
-    path: String,
-    dataSchema: StructType,
-    context: TaskAttemptContext) extends OutputWriter {
-  private var rowCount = 0
-  private var partitionString: String = ""
-
-  override def setPartitionString(ps: String): Unit = {
-    partitionString = ps
-  }
-
-  private val writer: OapDataWriter = {
-    val isCompressed = FileOutputFormat.getCompressOutput(context)
-    val conf = context.getConfiguration
-    val file: Path = new Path(path)
-    val fs = file.getFileSystem(conf)
-    val fileOut = fs.create(file, false)
-
-    new OapDataWriter(isCompressed, fileOut, dataSchema, conf)
-  }
-
-  override def write(row: Row): Unit = throw new NotImplementedError("write(row: Row)")
-
-  override protected[sql] def writeInternal(row: InternalRow): Unit = {
-    rowCount += 1
-    writer.write(row)
-  }
-
-  override def close(): Unit = {
-    writer.close()
-  }
-
-  override def writeStatus(): WriteResult = {
-    OapWriteResult(dataFileName, rowCount, partitionString)
-  }
-
-  def dataFileName: String = new Path(path).getName
-}
-
 private[sql] object OapFileFormat {
   val OAP_DATA_EXTENSION = ".data"
   val OAP_INDEX_EXTENSION = ".index"
