@@ -103,7 +103,7 @@ private[oap] object IndexUtils {
     val indexDirectory = conf.get(
       OapConf.OAP_INDEX_DIRECTORY.key, OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
     val indexFileName = getIndexFileNameFromDatafile(dataFile)
-    if (indexDirectory != "") {
+    if (indexDirectory.trim != "") {
       new Path(
         indexDirectory + "/" + Path.getPathWithoutSchemeAndAuthority(dataFile.getParent),
         s"${"." + indexFileName + "." + time + "." + name + OAP_INDEX_EXTENSION}")
@@ -177,7 +177,7 @@ private[oap] object IndexUtils {
     val indexFileName = getIndexFileNameFromDatafile(inputFilePath)
     val indexDirectory = conf.get(OapConf.OAP_INDEX_DIRECTORY.key,
       OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
-    if (indexDirectory != "") {
+    if (indexDirectory.trim != "") {
       // here the outputPath = indexDirectory + tablePath
       val tablePath =
       Path.getPathWithoutSchemeAndAuthority(
@@ -214,7 +214,7 @@ private[oap] object IndexUtils {
     }
 
     val indexDirectory = conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
-    if (indexDirectory != "") {
+    if (indexDirectory.trim != "") {
       new Path (
         indexDirectory + Path.getPathWithoutSchemeAndAuthority(dataPath).toString)
     } else {
