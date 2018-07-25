@@ -398,7 +398,7 @@ class FileSourceStrategySuite extends QueryTest with SharedOapContext with Predi
 
         val fileCatalog = new InMemoryFileIndex(
           sparkSession = spark,
-          rootPaths = Seq(new Path(tempDir)),
+          Seq(new Path(tempDir)),
           parameters = Map.empty[String, String],
           partitionSchema = None)
         // This should not fail.

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package scala.org.apache.spark.sql.execution.datasources.oap
+package org.apache.spark.sql.execution.datasources.oap
 
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.TaskAttemptContext

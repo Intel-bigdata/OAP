@@ -24,6 +24,7 @@ import org.scalatest.{BeforeAndAfterEach, PrivateMethodTester}
 import org.apache.spark._
 import org.apache.spark.rpc.{RpcEndpointRef, RpcEnv}
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.adapter.RpcEndpointRefAdapter
 import org.apache.spark.sql.oap.rpc.OapMessages.{DummyHeartbeat, DummyMessage, Heartbeat, RegisterOapRpcManager}
 
 
@@ -112,7 +113,8 @@ class OapRpcManagerSuite extends SparkFunSuite with BeforeAndAfterEach with Priv
     val rpcManagerSlaveEndpoint = spy(new OapRpcManagerSlaveEndpoint(rpcEnv, null))
     val slaveEndpoint = rpcEnv.setupEndpoint(
       s"OapRpcManagerSlave_$executorId", rpcManagerSlaveEndpoint)
-    rpcDriverEndpoint.askWithRetry[Boolean](RegisterOapRpcManager(executorId, slaveEndpoint))
+    RpcEndpointRefAdapter.askSync[Boolean](
+      rpcDriverEndpoint, RegisterOapRpcManager(executorId, slaveEndpoint))
     rpcManagerSlaveEndpoint
   }
 
