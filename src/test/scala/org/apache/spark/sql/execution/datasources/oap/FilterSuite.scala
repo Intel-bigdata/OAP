@@ -579,7 +579,6 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       assert(check_path.getFileSystem(
         new Configuration()).globStatus(new Path(check_path, "*.index")).length == 4)
 
-
       checkAnswer(sql("SELECT * FROM oap_test WHERE a = 1"),
         Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
 
