@@ -219,7 +219,7 @@ trait OapStrategies extends Logging {
 
         val aggregateOperator =
           if (aggregateExpressions.map(_.aggregateFunction).exists(
-            AggregateFunctionAdapter.supportsPartial)) {
+            !AggregateFunctionAdapter.supportsPartial(_))) {
             if (functionsWithDistinct.nonEmpty) {
               sys.error("Distinct columns cannot exist in Aggregate operator containing " +
                 "aggregate functions which don't support partial aggregation.")
