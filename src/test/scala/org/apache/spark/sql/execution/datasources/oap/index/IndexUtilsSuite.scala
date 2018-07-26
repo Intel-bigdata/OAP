@@ -60,27 +60,45 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
   }
 
   test("getIndexFilePath: get index file path with the default configuration") {
-    // test the default configuration of OapConf.OAP_INDEX_DIRECTORY
-    val indexDirectory = spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
+    // In the default configuration of OapConf.OAP_INDEX_DIRECTORY
     val option = Map(
       OapConf.OAP_INDEX_DIRECTORY.key -> spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key))
     val conf = spark.sessionState.newHadoopConfWithOptions(option)
-
-    val tmp = IndexUtils.getIndexFilePath(
-      conf, new Path("/path/to/.t1.data"), "index1", "ABC")
-
-    assertEquals(s"$indexDirectory/path/to/.t1.ABC.index1.index",
+    // In default configuration, the index file path is the data file path.
+    assertEquals("/path/to/.t1.ABC.index1.index",
       IndexUtils.getIndexFilePath(
         conf, new Path("/path/to/t1.data"), "index1", "ABC").toString)
-    assertEquals(s"$indexDirectory/.t1.1F23.index1.index",
+    assertEquals("/.t1.1F23.index1.index",
       IndexUtils.getIndexFilePath(
         conf, new Path("/t1.data"), "index1", "1F23").toString)
-    assertEquals(s"$indexDirectory/path/to/.t1.0.index1.index",
+    assertEquals("/path/to/.t1.0.index1.index",
       IndexUtils.getIndexFilePath(
         conf, new Path("/path/to/t1.parquet"), "index1", "0").toString)
-    assertEquals(s"$indexDirectory/path/to/.t1.F91.index1.index",
+    assertEquals("/path/to/.t1.F91.index1.index",
       IndexUtils.getIndexFilePath(
         conf, new Path("/path/to/t1"), "index1", "F91").toString)
+  }
+
+  test("getIndexFilePath: get index file path with specific configuration of blank String") {
+    // set the configuration of OapConf.OAP_INDEX_DIRECTORY to blank String
+    withSQLConf(OapConf.OAP_INDEX_DIRECTORY.key -> "   ") {
+      val option = Map(
+        OapConf.OAP_INDEX_DIRECTORY.key -> spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key))
+      val conf = spark.sessionState.newHadoopConfWithOptions(option)
+      // because the indexDirectory is " ", so the index file path is the data file path
+      assertEquals("/path/to/.t1.ABC.index1.index",
+        IndexUtils.getIndexFilePath(
+          conf, new Path("/path/to/t1.data"), "index1", "ABC").toString)
+      assertEquals("/.t1.1F23.index1.index",
+        IndexUtils.getIndexFilePath(
+          conf, new Path("/t1.data"), "index1", "1F23").toString)
+      assertEquals("/path/to/.t1.0.index1.index",
+        IndexUtils.getIndexFilePath(
+          conf, new Path("/path/to/t1.parquet"), "index1", "0").toString)
+      assertEquals("/path/to/.t1.F91.index1.index",
+        IndexUtils.getIndexFilePath(
+          conf, new Path("/path/to/t1"), "index1", "F91").toString)
+    }
   }
 
   test("getIndexFilePath: get index file path with specific configuration") {
@@ -90,7 +108,7 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
       val option = Map(
         OapConf.OAP_INDEX_DIRECTORY.key -> spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key))
       val conf = spark.sessionState.newHadoopConfWithOptions(option)
-
+      // because the indexDirectory is "/tmp", so the index file path is "/tmp" +data file path
       assertEquals(s"$indexDirectory/path/to/.t1.ABC.index1.index",
         IndexUtils.getIndexFilePath(
           conf, new Path("/path/to/t1.data"), "index1", "ABC").toString)
@@ -108,30 +126,60 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
 
   test("generateTempIndexFilePath: generating temp index file path with default configuration") {
     // test the default configuration of OapConf.OAP_INDEX_DIRECTORY
-    val indexDirectory = spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
     val option = Map(
       OapConf.OAP_INDEX_DIRECTORY.key -> spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key))
     val conf = spark.sessionState.newHadoopConfWithOptions(option)
+    // In default configuration, the index file path is the data file path.
     assertEquals("/path/to/_temp/0/.t1.ABC.index1.index",
       IndexUtils.generateTempIndexFilePath(conf,
         "/path/to/t1.data",
-        new Path(s"$indexDirectory/path/to"),
-        s"$indexDirectory/path/to/_temp/0/.index",
+        new Path("/path/to"),
+        "/path/to/_temp/0/.index",
         ".ABC.index1.index").toString)
     assertEquals("hdfs:/path/to/_temp/1/a=3/b=4/.t1.ABC.index1.index",
       IndexUtils.generateTempIndexFilePath(conf,
         "hdfs:/path/to/a=3/b=4/t1.data",
-        new Path(s"$indexDirectory/path/to"),
-        s"$indexDirectory/path/to/_temp/1/.index",
+        new Path("/path/to"),
+        "/path/to/_temp/1/.index",
         ".ABC.index1.index").toString)
     assertEquals("hdfs://remote:8020/path/to/_temp/2/x=1/.t1.ABC.index1.index",
       IndexUtils.generateTempIndexFilePath(conf,
         "hdfs://remote:8020/path/to/x=1/t1.data",
-        new Path(s"$indexDirectory/path/to/"),
-        s"$indexDirectory/path/to/_temp/2/.index",
+        new Path("/path/to/"),
+        "/path/to/_temp/2/.index",
         ".ABC.index1.index").toString)
 
   }
+
+  test("generateTempIndexFilePath: generating temp index file path with" +
+    " specific configuration of blank String") {
+    // set the configuration of OapConf.OAP_INDEX_DIRECTORY to blank String
+    withSQLConf(OapConf.OAP_INDEX_DIRECTORY.key -> "   ") {
+      val option = Map(
+        OapConf.OAP_INDEX_DIRECTORY.key -> spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key))
+      val conf = spark.sessionState.newHadoopConfWithOptions(option)
+      // because the indexDirectory is " ", so the index file path is the data file path
+      assertEquals("/path/to/_temp/0/.t1.ABC.index1.index",
+        IndexUtils.generateTempIndexFilePath(conf,
+          "/path/to/t1.data",
+          new Path("/path/to"),
+          "/path/to/_temp/0/.index",
+          ".ABC.index1.index").toString)
+      assertEquals("hdfs:/path/to/_temp/1/a=3/b=4/.t1.ABC.index1.index",
+        IndexUtils.generateTempIndexFilePath(conf,
+          "hdfs:/path/to/a=3/b=4/t1.data",
+          new Path("/path/to"),
+          "/path/to/_temp/1/.index",
+          ".ABC.index1.index").toString)
+      assertEquals("hdfs://remote:8020/path/to/_temp/2/x=1/.t1.ABC.index1.index",
+        IndexUtils.generateTempIndexFilePath(conf,
+          "hdfs://remote:8020/path/to/x=1/t1.data",
+          new Path("/path/to/"),
+          "/path/to/_temp/2/.index",
+          ".ABC.index1.index").toString)
+    }
+  }
+
 
   test("generateTempIndexFilePath: generating temp index file path with specific configuration") {
     // set the configuration of OapConf.OAP_INDEX_DIRECTORY
@@ -140,6 +188,7 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
       val option = Map(
         OapConf.OAP_INDEX_DIRECTORY.key -> spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key))
       val conf = spark.sessionState.newHadoopConfWithOptions(option)
+      // because the indexDirectory is "/tmp", so the index file path is "/tmp" +data file path
       assertEquals(s"$indexDirectory/path/to/_temp/0/.t1.ABC.index1.index",
         IndexUtils.generateTempIndexFilePath(conf,
           "/path/to/t1.data",

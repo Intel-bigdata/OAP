@@ -178,7 +178,8 @@ private[oap] object IndexUtils {
     val indexDirectory = conf.get(OapConf.OAP_INDEX_DIRECTORY.key,
       OapConf.OAP_INDEX_DIRECTORY.defaultValueString)
     if (indexDirectory.trim != "") {
-      // here the outputPath = indexDirectory + tablePath
+      // here the outputPath = indexDirectory + tablePath or
+      // indexDirectory + tablePath+ partitionPath
       val tablePath =
       Path.getPathWithoutSchemeAndAuthority(
         outputPath).toString.replaceFirst(indexDirectory.toString, "")
@@ -196,7 +197,8 @@ private[oap] object IndexUtils {
 
   /**
    * Generate the outPutPath based on OapConf.OAP_INDEX_DIRECTORY and the data path,
-   * here the dataPath does not contain the partition path
+   * here the dataPath may be the table path + partition path if the fileIndex.rootPaths
+   * has 1 item, or the table path
    * @param fileIndex [[FileIndex]] of a relation
    * @param conf the configuration to get the value of OapConf.OAP_INDEX_DIRECTORY
    * @return the outPutPath to save the job temporary data
