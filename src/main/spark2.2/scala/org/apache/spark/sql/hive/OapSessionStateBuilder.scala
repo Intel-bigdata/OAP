@@ -41,8 +41,8 @@ class OapSessionStateBuilder(session: SparkSession, parentState: Option[SessionS
 
       override def strategies: Seq[Strategy] = {
         experimentalMethods.extraStrategies ++
-          oapStrategies ++
-          extraPlanningStrategies ++ Seq(
+          extraPlanningStrategies ++
+          oapStrategies ++ Seq(
           FileSourceStrategy,
           DataSourceStrategy(conf),
           SpecialLimits,
