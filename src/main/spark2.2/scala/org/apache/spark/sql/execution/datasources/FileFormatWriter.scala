@@ -317,6 +317,7 @@ object FileFormatWriter extends Logging {
     override def execute(iter: Iterator[InternalRow]): (Set[String], Seq[WriteResult]) = {
       var fileCounter = 0
       var recordsInFile: Long = 0L
+      var writeResults: Seq[WriteResult] = Nil
       newOutputWriter(fileCounter)
       while (iter.hasNext) {
         if (description.maxRecordsPerFile > 0 && recordsInFile >= description.maxRecordsPerFile) {
@@ -325,7 +326,7 @@ object FileFormatWriter extends Logging {
             s"File counter $fileCounter is beyond max value $MAX_FILE_COUNTER")
 
           recordsInFile = 0
-          releaseResources()
+          writeResults = writeResults ++ releaseResources()
           newOutputWriter(fileCounter)
         }
 
@@ -333,8 +334,8 @@ object FileFormatWriter extends Logging {
         currentWriter.write(internalRow)
         recordsInFile += 1
       }
-      releaseResources()
-      (Set.empty, Seq.empty)
+      writeResults = writeResults ++ releaseResources()
+      (Set.empty, writeResults)
     }
 
     override def releaseResources(): Seq[WriteResult] = {
@@ -458,7 +459,7 @@ object FileFormatWriter extends Logging {
           recordsInFile = 0
           fileCounter = 0
 
-          releaseResources()
+          writeResults = writeResults ++ releaseResources()
           newOutputWriter(currentPartColsAndBucketId, getPartPath, fileCounter, updatedPartitions)
         } else if (desc.maxRecordsPerFile > 0 &&
             recordsInFile >= desc.maxRecordsPerFile) {
@@ -469,15 +470,14 @@ object FileFormatWriter extends Logging {
           assert(fileCounter < MAX_FILE_COUNTER,
             s"File counter $fileCounter is beyond max value $MAX_FILE_COUNTER")
 
-          releaseResources()
+           writeResults = writeResults ++ releaseResources()
           newOutputWriter(currentPartColsAndBucketId, getPartPath, fileCounter, updatedPartitions)
         }
 
         currentWriter.write(getOutputRow(row))
-        writeResults = writeResults :+ currentWriter.writeStatus()
         recordsInFile += 1
       }
-      releaseResources()
+      writeResults = writeResults ++ releaseResources()
       (updatedPartitions.toSet, writeResults)
     }
 
