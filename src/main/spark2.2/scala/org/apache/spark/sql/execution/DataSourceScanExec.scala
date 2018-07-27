@@ -350,7 +350,6 @@ case class FileSourceScanExec(
 
   override protected def doProduce(ctx: CodegenContext): String = {
     if (supportsBatch) {
-      // TODO need update ColumnarBatchScan for OAP
       return super.doProduce(ctx)
     }
     val numOutputRows = metricTerm(ctx, "numOutputRows")
