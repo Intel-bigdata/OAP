@@ -106,7 +106,10 @@ object FileSourceStrategy extends Strategy with Logging {
                 SQLConf.PARQUET_INT96_AS_TIMESTAMP.key ->
                   _fsRelation.sparkSession.sessionState.conf.isParquetINT96AsTimestamp.toString,
                 SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key ->
-                  _fsRelation.sparkSession.sessionState.conf.writeLegacyParquetFormat.toString) ++
+                  _fsRelation.sparkSession.sessionState.conf.writeLegacyParquetFormat.toString,
+                SQLConf.PARQUET_INT64_AS_TIMESTAMP_MILLIS.key ->
+                  _fsRelation.sparkSession.sessionState.conf
+                    .isParquetINT64AsTimestampMillis.toString) ++
                 _fsRelation.options
 
             _fsRelation.copy(fileFormat = oapFileFormat,
