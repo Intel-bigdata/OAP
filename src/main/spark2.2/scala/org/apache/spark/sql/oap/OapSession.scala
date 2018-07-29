@@ -20,7 +20,9 @@ package org.apache.spark.sql.oap
 import java.util.concurrent.atomic.AtomicReference
 
 import scala.util.control.NonFatal
+
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.annotation.InterfaceStability
 import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationEnd}
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.execution.ui.SQLListener
@@ -28,7 +30,15 @@ import org.apache.spark.sql.internal.{BaseSessionStateBuilder, SessionState, Ses
 import org.apache.spark.sql.internal.StaticSQLConf.CATALOG_IMPLEMENTATION
 import org.apache.spark.util.Utils
 
-class OapSession(sparkContext: SparkContext) extends SparkSession(sparkContext) {}
+class OapSession(sparkContext: SparkContext) extends SparkSession(sparkContext) { self =>
+  @InterfaceStability.Unstable
+  @transient
+  override lazy val sessionState: SessionState = {
+    OapSession.instantiateSessionState(
+      OapSession.sessionStateClassName(sparkContext.conf),
+      self)
+  }
+}
 
 object OapSession {
   class OapSessionBuilder extends SparkSession.Builder {
@@ -155,7 +165,7 @@ object OapSession {
      *
      * @since 2.0.0
      */
-    override def getOrCreate(): SparkSession = synchronized {
+    override def getOrCreate(): OapSession = synchronized {
       // Get the session from current thread's active session.
       var session = activeThreadSession.get()
       if ((session ne null) && !session.sparkContext.isStopped) {
@@ -167,7 +177,7 @@ object OapSession {
       }
 
       // Global synchronization so we will only set the default session once.
-      SparkSession.synchronized {
+      OapSession.synchronized {
         // If the current thread does not have an active session, get it from the global session.
         session = defaultSession.get()
         if ((session ne null) && !session.sparkContext.isStopped) {
@@ -248,7 +258,7 @@ object OapSession {
    *
    * @since 2.0.0
    */
-  def setActiveSession(session: SparkSession): Unit = {
+  def setActiveSession(session: OapSession): Unit = {
     activeThreadSession.set(session)
   }
 
@@ -267,7 +277,7 @@ object OapSession {
    *
    * @since 2.0.0
    */
-  def setDefaultSession(session: SparkSession): Unit = {
+  def setDefaultSession(session: OapSession): Unit = {
     defaultSession.set(session)
   }
 
@@ -285,14 +295,14 @@ object OapSession {
    *
    * @since 2.2.0
    */
-  def getActiveSession: Option[SparkSession] = Option(activeThreadSession.get)
+  def getActiveSession: Option[OapSession] = Option(activeThreadSession.get)
 
   /**
    * Returns the default SparkSession that is returned by the builder.
    *
    * @since 2.2.0
    */
-  def getDefaultSession: Option[SparkSession] = Option(defaultSession.get)
+  def getDefaultSession: Option[OapSession] = Option(defaultSession.get)
 
   /** A global SQL listener used for the SQL UI. */
   private[sql] val sqlListener = new AtomicReference[SQLListener]()
@@ -302,10 +312,10 @@ object OapSession {
   ////////////////////////////////////////////////////////////////////////////////////////
 
   /** The active SparkSession for the current thread. */
-  private val activeThreadSession = new InheritableThreadLocal[SparkSession]
+  private val activeThreadSession = new InheritableThreadLocal[OapSession]
 
   /** Reference to the root SparkSession. */
-  private val defaultSession = new AtomicReference[SparkSession]
+  private val defaultSession = new AtomicReference[OapSession]
 
   private val HIVE_SESSION_STATE_BUILDER_CLASS_NAME =
     "org.apache.spark.sql.hive.OapSessionStateBuilder"
@@ -323,12 +333,12 @@ object OapSession {
    */
   private def instantiateSessionState(
       className: String,
-      sparkSession: SparkSession): SessionState = {
+      oapSession: OapSession): SessionState = {
     try {
       // invoke `new [Hive]SessionStateBuilder(SparkSession, Option[SessionState])`
       val clazz = Utils.classForName(className)
       val ctor = clazz.getConstructors.head
-      ctor.newInstance(sparkSession, None).asInstanceOf[BaseSessionStateBuilder].build()
+      ctor.newInstance(oapSession, None).asInstanceOf[BaseSessionStateBuilder].build()
     } catch {
       case NonFatal(e) =>
         throw new IllegalArgumentException(s"Error while instantiating '$className':", e)

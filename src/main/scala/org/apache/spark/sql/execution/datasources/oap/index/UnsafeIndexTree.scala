@@ -225,7 +225,7 @@ private[oap] class RangeInterval(
   var startInclude = includeStart
   var endInclude = includeEnd
   val isNullPredicate = isNull
-  val isPrefixMatch = ignoreTail
+  var isPrefixMatch = ignoreTail
 }
 
 private[oap] object RangeInterval{
