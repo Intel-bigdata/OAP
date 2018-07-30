@@ -23,7 +23,6 @@ import org.apache.spark.sql.execution.{SparkPlanner, SparkSqlParser}
 import org.apache.spark.sql.execution.datasources.{DataSourceStrategy, FileSourceStrategy}
 import org.apache.spark.sql.execution.datasources.oap.OapStrategies
 import org.apache.spark.sql.internal.{SQLConf, SessionState, VariableSubstitution}
-import org.apache.spark.sql.oap.OapSession
 
 class OapSessionStateBuilder(session: SparkSession, parentState: Option[SessionState] = None)
   extends HiveSessionStateBuilder(session, parentState) {

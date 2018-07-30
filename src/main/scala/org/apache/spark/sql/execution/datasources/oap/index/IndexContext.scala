@@ -494,8 +494,7 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
       interval1 <- intervalArray1
       interval2 <- intervalArray2
       // isNull & otherPredicate => empty
-      if (!(interval1.isNullPredicate ^ interval2.isNullPredicate)) &&
-        !interval1.isPrefixMatch && !interval2.isPrefixMatch
+      if (!(interval1.isNullPredicate ^ interval2.isNullPredicate))
     } yield {
       // isNull & isNull => isNull
       if (interval1.isNullPredicate && interval2.isNullPredicate) {
@@ -517,6 +516,7 @@ private[oap] class FilterOptimizer(keySchema: StructType) {
           interval1.endInclude, interval2.endInclude, isEndKey = true)
         interval.end = re2._1
         interval.endInclude = re2._2
+        interval.isPrefixMatch = interval1.isPrefixMatch || interval2.isPrefixMatch
         interval
       }
     }
