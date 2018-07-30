@@ -25,7 +25,7 @@ import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
-import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiber, FiberCache}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiberId, FiberCache}
 import org.apache.spark.sql.execution.datasources.oap.index.{BitmapIndexSectionId, IndexUtils}
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.oap.OapRuntime
@@ -83,7 +83,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
       conf: Configuration): (Int, FiberCache, FiberCache) = {
     val idxFileSize = idxPath.getFileSystem(conf).getFileStatus(idxPath).getLen
     val footerOffset = idxFileSize - BITMAP_FOOTER_SIZE
-    val footerFiber = BitmapFiber(
+    val footerFiber = BitmapFiberId(
       () => loadBmSection(fin, footerOffset, BITMAP_FOOTER_SIZE),
       idxPath.toString, BitmapIndexSectionId.footerSection, 0)
     val footerCache = fiberCacheManager.get(footerFiber)
@@ -94,7 +94,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
     val nullEntrySize = footerCache.getInt(IndexUtils.INT_SIZE * 6)
     val entryListOffset = IndexFile.VERSION_LENGTH + uniqueKeyListTotalSize
     val offsetListOffset = entryListOffset + entryListTotalSize + nullEntrySize
-    val offsetListFiber = BitmapFiber(
+    val offsetListFiber = BitmapFiberId(
       () => loadBmSection(fin, offsetListOffset.toLong, offsetListTotalSize),
       idxPath.toString, BitmapIndexSectionId.entryOffsetsSection, 0)
     val offsetListCache = fiberCacheManager.get(offsetListFiber)
@@ -119,7 +119,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
           (0 until keyCount).map(idx => {
             val curIdxOffset = getIdxOffset(offsetListCache, 0L, idx)
             val entrySize = getIdxOffset(offsetListCache, 0L, idx + 1) - curIdxOffset
-            val entryFiber = BitmapFiber(
+            val entryFiber = BitmapFiberId(
               () => loadBmSection(fin, curIdxOffset.toLong, entrySize), idxPath.toString,
             BitmapIndexSectionId.entryListSection, idx)
             val wrappedFiberCacheSeq =
@@ -161,7 +161,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
           val wrappedFiberCacheSeq = (0 until keyCount).map(idx => {
             val curIdxOffset = getIdxOffset(offsetListCache, 0L, idx)
             val entrySize = getIdxOffset(offsetListCache, 0L, idx + 1) - curIdxOffset
-            val entryFiber = BitmapFiber(
+            val entryFiber = BitmapFiberId(
               () => loadBmSection(fin, curIdxOffset.toLong, entrySize), idxPath.toString,
               BitmapIndexSectionId.entryListSection, idx)
             new OapBitmapWrappedFiberCache(fiberCacheManager.get(entryFiber))

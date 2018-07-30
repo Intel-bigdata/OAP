@@ -158,7 +158,7 @@ private[oap] case class OapDataFileV1(
       groupId =>
         val fiberCacheGroup = requiredIds.map { id =>
           val fiberCache = OapRuntime.getOrCreate.fiberCacheManager.get(
-            DataFiber(this, id, groupId))
+            DataFiberId(this, id, groupId))
           update(id, fiberCache)
           fiberCache
         }

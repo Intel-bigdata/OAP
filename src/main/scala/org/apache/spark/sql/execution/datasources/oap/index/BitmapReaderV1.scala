@@ -25,7 +25,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.hadoop.conf.Configuration
 import org.roaringbitmap.{FastAggregation, RoaringBitmap}
 
-import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiber, FiberCache}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiberId, FiberCache}
 import org.apache.spark.sql.execution.datasources.oap.index.impl.IndexFileReaderImpl
 import org.apache.spark.sql.types.StructType
 
@@ -72,7 +72,7 @@ private[oap] class BitmapReaderV1(
           (startIdx until (endIdx + 1)).map(idx => {
             val curIdxOffset = getIdxOffset(bmOffsetListCache, 0L, idx)
             val entrySize = getIdxOffset(bmOffsetListCache, 0L, idx + 1) - curIdxOffset
-            val entryFiber = BitmapFiber(() => fileReader.readFiberCache(curIdxOffset, entrySize),
+            val entryFiber = BitmapFiberId(() => fileReader.readFiberCache(curIdxOffset, entrySize),
               fileReader.getName, BitmapIndexSectionId.entryListSection, idx)
             val entryCache = fiberCacheManager.get(entryFiber)
             val entry = getDesiredBitmap(entryCache)

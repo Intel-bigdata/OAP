@@ -200,23 +200,4 @@ object OapUtils extends Logging {
     fileIndex.refresh()
     getPartitions(fileIndex, partitionSpec)
   }
-
-  /**
-   * If fileIndex.rootPaths has only one item, it will use as job temporary dir,
-   * else get table base dir use as job temporary dir.
-   * @param fileIndex [[FileIndex]] of a relation
-   * @return path use to save job temporary data
-   */
-  def getOutPutPath(fileIndex: FileIndex): Path = {
-    def getTableBaseDir(path: Path, times: Int): Path = {
-      if (times > 0) getTableBaseDir(path.getParent, times - 1)
-      else path
-    }
-    val paths = fileIndex.rootPaths
-    assert(paths.nonEmpty, "Expected at least one path of fileIndex.rootPaths, but no value")
-    paths.length match {
-      case 1 => paths.head
-      case _ => getTableBaseDir(paths.head, fileIndex.partitionSchema.length)
-    }
-  }
 }

@@ -38,8 +38,9 @@ private[oap] case class BitMapScanner(idxMeta: IndexMeta) extends IndexScanner(i
     assert(keySchema ne null)
     // Currently OAP index type supports the column with one single field.
     assert(keySchema.fields.length == 1)
-    val idxPath = IndexUtils.indexFileFromDataFile(dataPath, meta.name, meta.time)
-    val fileReader = IndexFileReaderImpl(conf, idxPath)
+    val indexPath = IndexUtils.getIndexFilePath(
+      conf, dataPath, meta.name, meta.time)
+    val fileReader = IndexFileReaderImpl(conf, indexPath)
 
     val bitmapReader = IndexUtils.readVersion(fileReader) match {
       case Some(version) =>

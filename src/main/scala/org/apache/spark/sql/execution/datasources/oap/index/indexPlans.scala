@@ -157,8 +157,9 @@ case class CreateIndexCommand(
     partitionSpec.getOrElse(Map.empty).foreach { case (k, v) =>
       ds = ds.filter(s"$k='$v'")
     }
-
-    val outPutPath = OapUtils.getOutPutPath(fileCatalog)
+    // Generate the outPutPath based on OapConf.OAP_INDEX_DIRECTORY and the data path,
+    // here the dataPath does not contain the partition path
+    val outPutPath = IndexUtils.getOutputPathBasedOnConf(fileCatalog, sparkSession.conf)
     assert(outPutPath != null, "Expected exactly one path to be specified, but no value")
 
     val qualifiedOutputPath = {
@@ -394,7 +395,9 @@ case class RefreshIndexCommand(
         ds = ds.filter(s"$k='$v'")
       }
 
-      val outPutPath = OapUtils.getOutPutPath(fileCatalog)
+      // Generate the outPutPath based on OapConf.OAP_INDEX_DIRECTORY and the data path,
+      // here the dataPath does not contain the partition path
+      val outPutPath = IndexUtils.getOutputPathBasedOnConf(fileCatalog, sparkSession.conf)
       assert(outPutPath != null, "Expected exactly one path to be specified, but no value")
 
       val qualifiedOutputPath = {
@@ -565,7 +568,7 @@ case class OapCheckIndexCommand(
     val fileMetas = m.get.fileMetas
     val indexMetas = m.get.indexMetas
     checkDataFileInEachPartition(fs, dataSchema, fileMetas, partitionDir) ++
-      checkIndexInEachPartition(fs, dataSchema, fileMetas, indexMetas, partitionDir)
+      checkIndexInEachPartition(fs, sparkSession, dataSchema, fileMetas, indexMetas, partitionDir)
   }
 
   private def checkDataFileInEachPartition(
@@ -581,6 +584,7 @@ case class OapCheckIndexCommand(
 
   private def checkIndexInEachPartition(
       fs: FileSystem,
+      sparkSession: SparkSession,
       dataSchema: StructType,
       fileMetas: Seq[FileMeta],
       indexMetas: Seq[IndexMeta],
@@ -597,8 +601,12 @@ case class OapCheckIndexCommand(
         case other => throw new OapException(s"We don't support this type of index: $other")
       }
       val dataFilesWithoutIndices = fileMetas.filter { file_meta =>
+        val option = Map(
+          OapConf.OAP_INDEX_DIRECTORY.key -> sparkSession.conf.get(OapConf.OAP_INDEX_DIRECTORY.key))
+        val conf = sparkSession.sessionState.newHadoopConfWithOptions(option)
         val indexFile =
-          IndexUtils.indexFileFromDataFile(new Path(partitionPath, file_meta.dataFileName),
+          IndexUtils.getIndexFilePath(
+            conf, new Path(partitionPath, file_meta.dataFileName),
             index_meta.name, index_meta.time)
         !fs.exists(indexFile)
       }

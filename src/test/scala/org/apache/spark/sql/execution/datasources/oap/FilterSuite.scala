@@ -574,6 +574,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       val check_path = new Path(currentPath)
       assert(check_path.getFileSystem(
         new Configuration()).globStatus(new Path(check_path, "*.index")).length == 2)
+
       sql("refresh oindex on oap_test")
       assert(check_path.getFileSystem(
         new Configuration()).globStatus(new Path(check_path, "*.index")).length == 4)

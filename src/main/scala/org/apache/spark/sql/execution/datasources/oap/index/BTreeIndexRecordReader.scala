@@ -29,7 +29,6 @@ import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.index.OapIndexProperties.IndexVersion
 import org.apache.spark.sql.execution.datasources.oap.index.impl.IndexFileReaderImpl
-import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.execution.datasources.oap.statistics.{StatisticsManager, StatsAnalysisResult}
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.types._
@@ -87,7 +86,7 @@ private[index] abstract class BTreeIndexRecordReader(
 
     val readFunc =
       () => OapRuntime.getOrCreate.memoryManager.toIndexFiberCache(readData(offset, length))
-    val fiber = BTreeFiber(readFunc, fileReader.getName, sectionId, idx)
+    val fiber = BTreeFiberId(readFunc, fileReader.getName, sectionId, idx)
     OapRuntime.getOrCreate.fiberCacheManager.get(fiber)
   }
 

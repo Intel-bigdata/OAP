@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap.index
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
+import org.apache.parquet.hadoop.util.ContextUtil
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.InternalRow
@@ -34,22 +35,10 @@ private[index] class OapIndexOutputWriter(
 
   private val outputFormat = new OapIndexOutputFormat() {
     override def getDefaultWorkFile(context: TaskAttemptContext, extension: String): Path = {
-
       val outputPath = FileOutputFormat.getOutputPath(context)
-      val inputFile = new Path(inputFileName)
-
-      val dataName = inputFile.getName
-      val pos = dataName.lastIndexOf(".")
-      val indexFileName = if (pos > 0) {
-        dataName.substring(0, pos)
-      } else {
-        dataName
-      }
-
-      // Workaround: FileFormatWriter passes a temp file name to us. But index file name is not
-      // a random name. So we only use the upper directory.
-      IndexUtils.getIndexWorkPath(
-        inputFile, outputPath, new Path(path).getParent, "." + indexFileName + extension)
+      val configuration = ContextUtil.getConfiguration(context)
+      IndexUtils.generateTempIndexFilePath(
+        configuration, inputFileName, outputPath, path, extension)
     }
   }
 

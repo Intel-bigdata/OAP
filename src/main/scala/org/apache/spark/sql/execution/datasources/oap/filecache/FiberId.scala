@@ -19,18 +19,15 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import org.apache.spark.sql.execution.datasources.oap.io.DataFile
 
-private[oap] trait Fiber {
-  def cache(): FiberCache
-}
+private[oap] abstract class FiberId {}
 
-private[oap] case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: Int) extends Fiber {
-  override def cache(): FiberCache =
-    file.cache(rowGroupId, columnIndex)
+private[oap] case class DataFiberId(file: DataFile, columnIndex: Int, rowGroupId: Int) extends
+    FiberId {
 
   override def hashCode(): Int = (file.path + columnIndex + rowGroupId).hashCode
 
   override def equals(obj: Any): Boolean = obj match {
-    case another: DataFiber =>
+    case another: DataFiberId =>
       another.columnIndex == columnIndex &&
         another.rowGroupId == rowGroupId &&
         another.file.path.equals(file.path)
@@ -42,17 +39,16 @@ private[oap] case class DataFiber(file: DataFile, columnIndex: Int, rowGroupId: 
   }
 }
 
-private[oap] case class BTreeFiber(
+private[oap] case class BTreeFiberId(
     getFiberData: () => FiberCache,
     file: String,
     section: Int,
-    idx: Int) extends Fiber {
-  override def cache(): FiberCache = getFiberData()
+    idx: Int) extends FiberId {
 
   override def hashCode(): Int = (file + section + idx).hashCode
 
   override def equals(obj: Any): Boolean = obj match {
-    case another: BTreeFiber =>
+    case another: BTreeFiberId =>
       another.section == section &&
         another.idx == idx &&
         another.file.equals(file)
@@ -64,19 +60,18 @@ private[oap] case class BTreeFiber(
   }
 }
 
-private[oap] case class BitmapFiber(
+private[oap] case class BitmapFiberId(
     getFiberData: () => FiberCache,
     file: String,
     // "0" means no split sections within file.
     sectionIdxOfFile: Int,
     // "0" means no smaller loading units.
-    loadUnitIdxOfSection: Int) extends Fiber {
-  override def cache(): FiberCache = getFiberData()
+    loadUnitIdxOfSection: Int) extends FiberId {
 
   override def hashCode(): Int = (file + sectionIdxOfFile + loadUnitIdxOfSection).hashCode
 
   override def equals(obj: Any): Boolean = obj match {
-    case another: BitmapFiber =>
+    case another: BitmapFiberId =>
       another.sectionIdxOfFile == sectionIdxOfFile &&
         another.loadUnitIdxOfSection == loadUnitIdxOfSection &&
         another.file.equals(file)
@@ -88,13 +83,12 @@ private[oap] case class BitmapFiber(
   }
 }
 
-private[oap] case class TestFiber(getData: () => FiberCache, name: String) extends Fiber {
-  override def cache(): FiberCache = getData()
+private[oap] case class TestFiberId(getData: () => FiberCache, name: String) extends FiberId {
 
   override def hashCode(): Int = name.hashCode()
 
   override def equals(obj: Any): Boolean = obj match {
-    case another: TestFiber => name.equals(another.name)
+    case another: TestFiberId => name.equals(another.name)
     case _ => false
   }
 

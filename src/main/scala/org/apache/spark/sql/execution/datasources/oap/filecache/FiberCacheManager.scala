@@ -36,7 +36,7 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
   private val _pendingFiberSize: AtomicLong = new AtomicLong(0)
 
-  private val removalPendingQueue = new LinkedBlockingQueue[(Fiber, FiberCache)]()
+  private val removalPendingQueue = new LinkedBlockingQueue[(FiberId, FiberCache)]()
 
   // Tell if guardian thread is trying to remove one Fiber.
   @volatile private var bRemoving: Boolean = false
@@ -49,7 +49,7 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
   def pendingFiberSize: Long = _pendingFiberSize.get()
 
-  def addRemovalFiber(fiber: Fiber, fiberCache: FiberCache): Unit = {
+  def addRemovalFiber(fiber: FiberId, fiberCache: FiberCache): Unit = {
     _pendingFiberSize.addAndGet(fiberCache.size())
     removalPendingQueue.offer((fiber, fiberCache))
     if (_pendingFiberSize.get() > maxMemory) {
@@ -60,27 +60,27 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
   override def run(): Unit = {
     while (true) {
-      val (fiber, fiberCache) = removalPendingQueue.take()
-      releaseFiberCache(fiber, fiberCache)
+      val fiberCache = removalPendingQueue.take()._2
+      releaseFiberCache(fiberCache)
     }
   }
 
-  private def releaseFiberCache(fiber: Fiber, fiberCache: FiberCache): Unit = {
+  private def releaseFiberCache(cache: FiberCache): Unit = {
     bRemoving = true
-    logDebug(s"Removing fiber: $fiber")
+    val fiberId = cache.fiberId
+    logDebug(s"Removing fiber: $fiberId")
     // Block if fiber is in use.
-    if (!fiberCache.tryDispose(fiber, 3000)) {
-      // Check memory usage every 3s while we are waiting fiber release.
-      logDebug(s"Waiting fiber to be released timeout. Fiber: $fiber")
-      removalPendingQueue.offer((fiber, fiberCache))
+    if (!cache.tryDispose()) {
+      logDebug(s"Waiting fiber to be released timeout. Fiber: $fiberId")
+      removalPendingQueue.offer((fiberId, cache))
       if (_pendingFiberSize.get() > maxMemory) {
         logWarning("Fibers pending on removal use too much memory, " +
             s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
       }
     } else {
-      _pendingFiberSize.addAndGet(-fiberCache.size())
+      _pendingFiberSize.addAndGet(-cache.size())
       // TODO: Make log more readable
-      logDebug(s"Fiber removed successfully. Fiber: $fiber")
+      logDebug(s"Fiber removed successfully. Fiber: $fiberId")
     }
     bRemoving = false
   }
@@ -111,7 +111,7 @@ private[sql] class FiberCacheManager(
   // NOTE: all members' init should be placed before this line.
   logDebug(s"Initialized FiberCacheManager")
 
-  def get(fiber: Fiber): FiberCache = {
+  def get(fiber: FiberId): FiberCache = {
     logDebug(s"Getting Fiber: $fiber")
     cacheBackend.get(fiber)
   }
@@ -119,8 +119,8 @@ private[sql] class FiberCacheManager(
   def releaseIndexCache(indexName: String): Unit = {
     logDebug(s"Going to remove all index cache of $indexName")
     val fiberToBeRemoved = cacheBackend.getFibers.filter {
-      case BTreeFiber(_, file, _, _) => file.contains(indexName)
-      case BitmapFiber(_, file, _, _) => file.contains(indexName)
+      case BTreeFiberId(_, file, _, _) => file.contains(indexName)
+      case BitmapFiberId(_, file, _, _) => file.contains(indexName)
       case _ => false
     }
     cacheBackend.invalidateAll(fiberToBeRemoved)
@@ -128,7 +128,7 @@ private[sql] class FiberCacheManager(
   }
 
   // Used by test suite
-  private[filecache] def releaseFiber(fiber: TestFiber): Unit = {
+  private[filecache] def releaseFiber(fiber: TestFiberId): Unit = {
     if (cacheBackend.getIfPresent(fiber) != null) {
       cacheBackend.invalidate(fiber)
     }
@@ -141,7 +141,7 @@ private[sql] class FiberCacheManager(
   private[sql] def status(): String = {
     logDebug(s"Reporting ${cacheBackend.cacheCount} fibers to the master")
     val dataFibers = cacheBackend.getFibers.collect {
-      case fiber: DataFiber => fiber
+      case fiber: DataFiberId => fiber
     }
 
     // Use a bit set to represent current cache status of one file.
@@ -220,8 +220,8 @@ private[sql] class DataFileMetaCacheManager extends Logging {
 }
 
 private[sql] class FiberLockManager {
-  private val lockMap = new ConcurrentHashMap[Fiber, ReentrantReadWriteLock]()
-  def getFiberLock(fiber: Fiber): ReentrantReadWriteLock = {
+  private val lockMap = new ConcurrentHashMap[FiberId, ReentrantReadWriteLock]()
+  def getFiberLock(fiber: FiberId): ReentrantReadWriteLock = {
     var lock = lockMap.get(fiber)
     if (lock == null) {
       val newLock = new ReentrantReadWriteLock()
@@ -231,7 +231,7 @@ private[sql] class FiberLockManager {
     lock
   }
 
-  def removeFiberLock(fiber: Fiber): Unit = {
+  def removeFiberLock(fiber: FiberId): Unit = {
     lockMap.remove(fiber)
   }
 }

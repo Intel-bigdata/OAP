@@ -25,7 +25,7 @@ import org.roaringbitmap.RoaringBitmap
 
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiber, FiberCache}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiberId, FiberCache}
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
@@ -64,7 +64,8 @@ class OapBitmapWrappedFiberCacheSuite
       val conf = new Configuration()
       val fin = rbPath.getFileSystem(conf).open(rbPath)
       val rbFileSize = rbPath.getFileSystem(conf).getFileStatus(rbPath).getLen
-      val rbFiber = BitmapFiber(() => loadRbFile(fin, 0L, rbFileSize.toInt), rbPath.toString, 0, 0)
+      val rbFiber = BitmapFiberId(
+        () => loadRbFile(fin, 0L, rbFileSize.toInt), rbPath.toString, 0, 0)
       val rbWfc = new OapBitmapWrappedFiberCache(
         OapRuntime.getOrCreate.fiberCacheManager.get(rbFiber))
       rbWfc.init
