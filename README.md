@@ -89,6 +89,10 @@ Compression Codec - Choose compression type for OAP data files.
 * Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, "SNAPPY")`
 * Usage2: `CREATE TABLE t USING oap OPTIONS ('compression' 'SNAPPY')`
 
+Index Directory Setting - Enable OAP support to separate the index file in specific directory. The index file is in the directory of data file in default.
+* Default: ""
+* Usage: `sqlContext.conf.setConfString(SQLConf.OAP_INDEX_DIRECTORY.key, "")`
+
 Refer to [OAP User guide](https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide) for more details.
 
 ## Query Example and Performance Data
