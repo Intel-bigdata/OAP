@@ -70,6 +70,11 @@ Parquet Support - Enable OAP support for parquet files
 * Default: true
 * Usage: `sqlContext.conf.setConfString(SQLConf.OAP_PARQUET_ENABLED.key, "false")`
 
+Index Directory Setting - Enable OAP support to separate the index file in specific directory. The index file is in the directory of data file in default.
+* Default: ""
+* Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_INDEX_DIRECTORY.key, "/tmp")`
+* Usage2: `SET spark.sql.oap.index.directory = "/tmp"`
+
 Fiber Cache Size - Total Memory size to cache Fiber, configured implicitly by 'spark.memory.offHeap.size'
 * Default Size: `spark.memory.offHeap.size * 0.7`
 * Usage: Fiber cache locates in off heap storage memory, basically this size is spark.memory.offHeap.size * 0.7. But as execution can borrow a few memory from storage in UnifiedMemoryManager mode, it may vary during execution.
@@ -88,10 +93,6 @@ Compression Codec - Choose compression type for OAP data files.
 * Values: UNCOMPRESSED, SNAPPY, GZIP, LZO
 * Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, "SNAPPY")`
 * Usage2: `CREATE TABLE t USING oap OPTIONS ('compression' 'SNAPPY')`
-
-Index Directory Setting - Enable OAP support to separate the index file in specific directory. The index file is in the directory of data file in default.
-* Default: ""
-* Usage: `sqlContext.conf.setConfString(SQLConf.OAP_INDEX_DIRECTORY.key, "")`
 
 Refer to [OAP User guide](https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide) for more details.
 
