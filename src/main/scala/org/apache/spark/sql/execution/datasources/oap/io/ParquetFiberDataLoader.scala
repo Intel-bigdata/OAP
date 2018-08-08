@@ -79,7 +79,7 @@ private[oap] case class ParquetFiberDataLoader(
         val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
         val columnReader =
           new VectorizedColumnReaderWrapper(
-            new VectorizedColumnReader(columnDescriptor, fiberData.getPageReader(columnDescriptor)))
+            columnDescriptor, fiberData.getPageReader(columnDescriptor));
         columnReader.readBatch(rowCount, vector)
       }
 

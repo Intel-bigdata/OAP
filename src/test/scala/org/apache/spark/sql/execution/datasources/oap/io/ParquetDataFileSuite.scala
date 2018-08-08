@@ -537,7 +537,7 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
     val columnReader =
       new VectorizedColumnReaderWrapper(
-        new VectorizedColumnReader(columnDescriptor, fiberData.getPageReader(columnDescriptor)))
+        columnDescriptor, fiberData.getPageReader(columnDescriptor))
     columnReader.readBatch(rowCount, vector)
     for (i <- 0 until rowCount) {
       assert(i * 2 == vector.getInt(i))

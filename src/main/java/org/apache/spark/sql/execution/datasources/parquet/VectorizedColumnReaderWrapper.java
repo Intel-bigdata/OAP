@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.parquet;
 
 import java.io.IOException;
 
+import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.column.page.PageReader;
 import org.apache.spark.sql.execution.vectorized.ColumnVector;
 
 /**
@@ -27,10 +29,11 @@ import org.apache.spark.sql.execution.vectorized.ColumnVector;
  */
 public class VectorizedColumnReaderWrapper {
 
-    private VectorizedColumnReader reader;
+    private VectorizedOapColumnReader reader;
 
-    public VectorizedColumnReaderWrapper(VectorizedColumnReader reader) {
-      this.reader = reader;
+    public VectorizedColumnReaderWrapper(
+        ColumnDescriptor descriptor, PageReader pageReader) throws IOException {
+      this.reader = new VectorizedOapColumnReader(descriptor, pageReader);
     }
 
     public void readBatch(int total, ColumnVector column) throws IOException {

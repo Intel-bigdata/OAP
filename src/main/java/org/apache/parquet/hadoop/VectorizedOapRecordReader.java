@@ -29,7 +29,6 @@ import org.apache.parquet.schema.Type;
 
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReader;
 import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReaderWrapper;
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.ColumnarBatch;
@@ -287,12 +286,20 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * From VectorizedParquetRecordReader, no change.
      */
     public boolean nextBatch() throws IOException {
-      columnarBatch.reset();
       if (rowsReturned >= totalRowCount) return false;
       checkEndOfRowGroup();
+      return nextBatchInternal();
+    }
+
+    /**
+     * Advances to the next batch of rows. Returns false if there are no more.
+     * From VectorizedParquetRecordReader, no change.
+     */
+    protected boolean nextBatchInternal() throws IOException {
+      columnarBatch.reset();
 
       int num = (int) Math.min((long) columnarBatch.capacity(),
-        totalCountLoadedSoFar - rowsReturned);
+              totalCountLoadedSoFar - rowsReturned);
       for (int i = 0; i < columnReaders.length; ++i) {
         if (columnReaders[i] == null) continue;
         columnReaders[i].readBatch(num, columnarBatch.column(i));
@@ -361,8 +368,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
       for (int i = 0; i < columns.size(); ++i) {
         if (missingColumns[i]) continue;
         columnReaders[i] = new VectorizedColumnReaderWrapper(
-          new VectorizedColumnReader(columns.get(i),
-          pages.getPageReader(columns.get(i))));
+          columns.get(i), pages.getPageReader(columns.get(i)));
       }
       totalCountLoadedSoFar += pages.getRowCount();
     }
