@@ -29,6 +29,7 @@ import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.PrimitiveType;
 
 import org.apache.spark.sql.execution.vectorized.ColumnVector;
+import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.DecimalType;
 
@@ -37,7 +38,7 @@ import static org.apache.parquet.column.ValuesType.REPETITION_LEVEL;
 /**
  * Decoder to return values from a single column.
  */
-public class VectorizedOapColumnReader {
+public class OapVectorizedColumnReader {
   /**
    * Total number of values read.
    */
@@ -71,7 +72,7 @@ public class VectorizedOapColumnReader {
 
   // Only set if vectorized decoding is true. This is used instead of the row by row decoding
   // with `definitionLevelColumn`.
-  private VectorizedRleValuesReader defColumn;
+  private OapVectorizedRleValuesReader defColumn;
 
   /**
    * Total number of values in this column (in this row group).
@@ -86,7 +87,7 @@ public class VectorizedOapColumnReader {
   private final PageReader pageReader;
   private final ColumnDescriptor descriptor;
 
-  public VectorizedOapColumnReader(ColumnDescriptor descriptor, PageReader pageReader)
+  public OapVectorizedColumnReader(ColumnDescriptor descriptor, PageReader pageReader)
       throws IOException {
     this.descriptor = descriptor;
     this.pageReader = pageReader;
@@ -194,14 +195,6 @@ public class VectorizedOapColumnReader {
    * Reads `total` values from this columnReader into column.
    */
   public void skipBatch(int total, ColumnVector column) throws IOException {
-    int rowId = 0;
-    ColumnVector dictionaryIds = null;
-    if (dictionary != null) {
-      // SPARK-16334: We only maintain a single dictionary per row batch, so that it can be used to
-      // decode all previous dictionary encoded pages if we ever encounter a non-dictionary encoded
-      // page.
-      dictionaryIds = column.reserveDictionaryIds(total);
-    }
     while (total > 0) {
       // Compute the number of values we want to read in this page.
       int leftInPage = (int) (endOfPageValueCount - valuesRead);
@@ -212,52 +205,32 @@ public class VectorizedOapColumnReader {
       int num = Math.min(total, leftInPage);
       if (isCurrentPageDictionaryEncoded) {
         // Read and decode dictionary ids.
-        defColumn.readIntegers(num, dictionaryIds, column, rowId, maxDefLevel,
-                (VectorizedValuesReader) dataColumn);
-        if (column.hasDictionary() || (rowId == 0 &&
-            (descriptor.getType() == PrimitiveType.PrimitiveTypeName.INT32 ||
-            descriptor.getType() == PrimitiveType.PrimitiveTypeName.INT64 ||
-            descriptor.getType() == PrimitiveType.PrimitiveTypeName.FLOAT ||
-            descriptor.getType() == PrimitiveType.PrimitiveTypeName.DOUBLE ||
-            descriptor.getType() == PrimitiveType.PrimitiveTypeName.BINARY))) {
-          // Column vector supports lazy decoding of dictionary values so just set the dictionary.
-          // We can't do this if rowId != 0 AND the column doesn't have a dictionary (i.e. some
-          // non-dictionary encoded values have already been added).
-          column.setDictionary(dictionary);
-        } else {
-          decodeDictionaryIds(rowId, num, column, dictionaryIds);
-        }
+        defColumn.skipIntegers(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
       } else {
-        if (column.hasDictionary() && rowId != 0) {
-          // This batch already has dictionary encoded values but this new page is not. The batch
-          // does not support a mix of dictionary and not so we will decode the dictionary.
-          decodeDictionaryIds(0, rowId, column, column.getDictionaryIds());
-        }
-        column.setDictionary(null);
         switch (descriptor.getType()) {
           case BOOLEAN:
-            readBooleanBatch(rowId, num, column);
+            skipBooleanBatch(num, column);
             break;
           case INT32:
-            readIntBatch(rowId, num, column);
+            skipIntBatch(num, column);
             break;
           case INT64:
-            readLongBatch(rowId, num, column);
+            skipLongBatch(num, column);
             break;
           case INT96:
-            readBinaryBatch(rowId, num, column);
+            skipBinaryBatch(num, column);
             break;
           case FLOAT:
-            readFloatBatch(rowId, num, column);
+            skipFloatBatch(num, column);
             break;
           case DOUBLE:
-            readDoubleBatch(rowId, num, column);
+            skipDoubleBatch(num, column);
             break;
           case BINARY:
-            readBinaryBatch(rowId, num, column);
+            skipBinaryBatch(num, column);
             break;
           case FIXED_LEN_BYTE_ARRAY:
-            readFixedLenByteArrayBatch(rowId, num, column, descriptor.getTypeLength());
+            skipFixedLenByteArrayBatch(num, column, descriptor.getTypeLength());
             break;
           default:
             throw new IOException("Unsupported type: " + descriptor.getType());
@@ -265,7 +238,6 @@ public class VectorizedOapColumnReader {
       }
 
       valuesRead += num;
-      rowId += num;
       total -= num;
     }
   }
@@ -398,21 +370,46 @@ public class VectorizedOapColumnReader {
         num, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
   }
 
+  private void skipBooleanBatch(int num, ColumnVector column) throws IOException {
+    assert(column.dataType() == DataTypes.BooleanType);
+    defColumn.skipBooleans(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+  }
+
+
   private void readIntBatch(int rowId, int num, ColumnVector column) throws IOException {
     // This is where we implement support for the valid type conversions.
     // TODO: implement remaining type conversions
     if (column.dataType() == DataTypes.IntegerType || column.dataType() == DataTypes.DateType ||
-        DecimalType.is32BitDecimalType(column.dataType())) {
+                DecimalType.is32BitDecimalType(column.dataType())) {
       defColumn.readIntegers(
-          num, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
+              num, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
     } else if (column.dataType() == DataTypes.ByteType) {
       defColumn.readBytes(
-          num, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
+              num, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
     } else if (column.dataType() == DataTypes.ShortType) {
       defColumn.readShorts(
-          num, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
+              num, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
     } else {
       throw new UnsupportedOperationException("Unimplemented type: " + column.dataType());
+    }
+  }
+
+  private void skipIntBatch(int num, ColumnVector column) throws IOException {
+    // This is where we implement support for the valid type conversions.
+    // TODO: implement remaining type conversions
+    DataType dataType = column.dataType();
+    if (dataType == DataTypes.IntegerType || dataType == DataTypes.DateType ||
+                DecimalType.is32BitDecimalType(dataType)) {
+      defColumn.skipIntegers(
+              num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+    } else if (dataType == DataTypes.ByteType) {
+      defColumn.skipBytes(
+              num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+    } else if (dataType == DataTypes.ShortType) {
+      defColumn.skipShorts(
+              num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+    } else {
+      throw new UnsupportedOperationException("Unimplemented type: " + dataType);
     }
   }
 
@@ -427,6 +424,17 @@ public class VectorizedOapColumnReader {
     }
   }
 
+  private void skipLongBatch(int num, ColumnVector column) throws IOException {
+    // This is where we implement support for the valid type conversions.
+    DataType dataType = column.dataType();
+    if (dataType == DataTypes.LongType ||
+                DecimalType.is64BitDecimalType(dataType)) {
+      defColumn.skipLongs(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+    } else {
+      throw new UnsupportedOperationException("Unsupported conversion to: " + dataType);
+    }
+  }
+
   private void readFloatBatch(int rowId, int num, ColumnVector column) throws IOException {
     // This is where we implement support for the valid type conversions.
     // TODO: support implicit cast to double?
@@ -438,12 +446,32 @@ public class VectorizedOapColumnReader {
     }
   }
 
+  private void skipFloatBatch(int num, ColumnVector column) throws IOException {
+    // This is where we implement support for the valid type conversions.
+    // TODO: support implicit cast to double?
+    if (column.dataType() == DataTypes.FloatType) {
+      defColumn.skipFloats(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+    } else {
+      throw new UnsupportedOperationException("Unsupported conversion to: " + column.dataType());
+    }
+  }
+
   private void readDoubleBatch(int rowId, int num, ColumnVector column) throws IOException {
     // This is where we implement support for the valid type conversions.
     // TODO: implement remaining type conversions
     if (column.dataType() == DataTypes.DoubleType) {
       defColumn.readDoubles(
           num, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
+    } else {
+      throw new UnsupportedOperationException("Unimplemented type: " + column.dataType());
+    }
+  }
+
+  private void skipDoubleBatch(int num, ColumnVector column) throws IOException {
+    // This is where we implement support for the valid type conversions.
+    // TODO: implement remaining type conversions
+    if (column.dataType() == DataTypes.DoubleType) {
+      defColumn.skipDoubles(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
     } else {
       throw new UnsupportedOperationException("Unimplemented type: " + column.dataType());
     }
@@ -463,6 +491,23 @@ public class VectorizedOapColumnReader {
               ParquetRowConverter.binaryToSQLTimestamp(data.readBinary(12)));
         } else {
           column.putNull(rowId + i);
+        }
+      }
+    } else {
+      throw new UnsupportedOperationException("Unimplemented type: " + column.dataType());
+    }
+  }
+
+  private void skipBinaryBatch(int num, ColumnVector column) throws IOException {
+    // This is where we implement support for the valid type conversions.
+    // TODO: implement remaining type conversions
+    VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
+    if (column.isArray()) {
+      defColumn.skipBytes(num, maxDefLevel, (OapVectorizedValuesReader) data);
+    } else if (column.dataType() == DataTypes.TimestampType) {
+      for (int i = 0; i < num; i++) {
+        if (defColumn.readInteger() == maxDefLevel) {
+          ((OapVectorizedValuesReader) data).skipBinaryByLen(12);
         }
       }
     } else {
@@ -506,6 +551,25 @@ public class VectorizedOapColumnReader {
     }
   }
 
+  private void skipFixedLenByteArrayBatch(int num,
+      ColumnVector column, int arrayLen) throws IOException {
+    VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
+    // This is where we implement support for the valid type conversions.
+    // TODO: implement remaining type conversions
+    DataType dataType = column.dataType();
+
+    if (DecimalType.is32BitDecimalType(dataType) || DecimalType.is64BitDecimalType(dataType)
+      || DecimalType.isByteArrayDecimalType(dataType)) {
+      for (int i = 0; i < num; i++) {
+        if (defColumn.readInteger() == maxDefLevel) {
+          ((OapVectorizedValuesReader)data).skipBinaryByLen(arrayLen);
+        }
+      }
+    } else {
+      throw new UnsupportedOperationException("Unimplemented type: " + dataType);
+    }
+  }
+
   private void readPage() throws IOException {
     DataPage page = pageReader.readPage();
     // TODO: Why is this a visitor?
@@ -546,13 +610,13 @@ public class VectorizedOapColumnReader {
       if (dataEncoding != plainDict && dataEncoding != Encoding.RLE_DICTIONARY) {
         throw new UnsupportedOperationException("Unsupported encoding: " + dataEncoding);
       }
-      this.dataColumn = new VectorizedRleValuesReader();
+      this.dataColumn = new OapVectorizedRleValuesReader();
       this.isCurrentPageDictionaryEncoded = true;
     } else {
       if (dataEncoding != Encoding.PLAIN) {
         throw new UnsupportedOperationException("Unsupported encoding: " + dataEncoding);
       }
-      this.dataColumn = new VectorizedPlainValuesReader();
+      this.dataColumn = new OapVectorizedPlainValuesReader();
       this.isCurrentPageDictionaryEncoded = false;
     }
 
@@ -573,7 +637,7 @@ public class VectorizedOapColumnReader {
       throw new UnsupportedOperationException("Unsupported encoding: " + page.getDlEncoding());
     }
     int bitWidth = BytesUtils.getWidthFromMaxInt(descriptor.getMaxDefinitionLevel());
-    this.defColumn = new VectorizedRleValuesReader(bitWidth);
+    this.defColumn = new OapVectorizedRleValuesReader(bitWidth);
     dlReader = this.defColumn;
 
     try {
@@ -592,7 +656,7 @@ public class VectorizedOapColumnReader {
     this.pageValueCount = page.getValueCount();
 
     int bitWidth = BytesUtils.getWidthFromMaxInt(descriptor.getMaxDefinitionLevel());
-    this.defColumn = new VectorizedRleValuesReader(bitWidth);
+    this.defColumn = new OapVectorizedRleValuesReader(bitWidth);
     this.defColumn.initFromBuffer(
         this.pageValueCount, page.getDefinitionLevels().toByteArray());
     try {

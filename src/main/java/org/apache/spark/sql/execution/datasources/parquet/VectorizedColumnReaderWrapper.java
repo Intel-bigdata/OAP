@@ -29,15 +29,19 @@ import org.apache.spark.sql.execution.vectorized.ColumnVector;
  */
 public class VectorizedColumnReaderWrapper {
 
-    private VectorizedOapColumnReader reader;
+    private OapVectorizedColumnReader reader;
 
     public VectorizedColumnReaderWrapper(
         ColumnDescriptor descriptor, PageReader pageReader) throws IOException {
-      this.reader = new VectorizedOapColumnReader(descriptor, pageReader);
+      this.reader = new OapVectorizedColumnReader(descriptor, pageReader);
     }
 
     public void readBatch(int total, ColumnVector column) throws IOException {
       reader.readBatch(total, column);
+    }
+
+    public void skipBatch(int total, ColumnVector column) throws IOException {
+      reader.skipBatch(total, column);
     }
 
 }

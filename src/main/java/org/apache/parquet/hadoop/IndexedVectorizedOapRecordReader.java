@@ -111,7 +111,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       currentPageNumber++;
       if (ids == null || ids.isEmpty()) {
         // TODO super.nextBatch() instead of this.skipBatch()
-        return nextBatchInternal() && this.nextBatch();
+        return skipBatchInternal() && this.nextBatch();
       }
 
       // TODO simply super.nextBatch() method.
@@ -179,18 +179,15 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     divideRowIdsIntoPages(rowGroupDataAndRowIds.getRowIds());
   }
 
-  protected boolean skipBatch() throws IOException {
-    // TODO need this line?
-    columnarBatch.reset();
+  protected boolean skipBatchInternal() throws IOException {
 
     int num = (int) Math.min((long) columnarBatch.capacity(),
             totalCountLoadedSoFar - rowsReturned);
     for (int i = 0; i < columnReaders.length; ++i) {
       if (columnReaders[i] == null) continue;
-      columnReaders[i].readBatch(num, columnarBatch.column(i));
+      columnReaders[i].skipBatch(num, columnarBatch.column(i));
     }
     rowsReturned += num;
-    columnarBatch.setNumRows(num);
     numBatched = num;
     batchIdx = 0;
     return true;
