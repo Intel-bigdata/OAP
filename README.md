@@ -73,7 +73,7 @@ Parquet Support - Enable OAP support for parquet files
 Index Directory Setting - Enable OAP support to separate the index file in specific directory. The index file is in the directory of data file in default.
 * Default: ""
 * Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_INDEX_DIRECTORY.key, "/tmp")`
-* Usage2: `SET spark.sql.oap.index.directory = "/tmp"`
+* Usage2: `SET spark.sql.oap.index.directory = /tmp`
 
 Fiber Cache Size - Total Memory size to cache Fiber, configured implicitly by 'spark.memory.offHeap.size'
 * Default Size: `spark.memory.offHeap.size * 0.7`
