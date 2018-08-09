@@ -675,20 +675,18 @@ class TimeTest extends SparkFunSuite with SharedOapContext
     var isInit = true
 
     (0 until loopTimes).foreach { _ =>
+      System.gc()
       val start = System.currentTimeMillis()
       val context = Some(VectorizedContext(null, null, returningBatch = true))
       val reader = ParquetDataFile(fileName, requestSchema, configuration)
       reader.setVectorizedContext(context)
       val requiredIds = Array(0, 1)
-      val rowIds = Array(317680, 637684, 962409, 1290012, 1448906)
-//      val rowIds = Array(317680)
-//      val iterator = reader.iterator(requiredIds)
+      val rowIds = Array(1, 317680, 637684, 962409, 1290012, 1448906)
       val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
       while (iterator.hasNext) {
         iterator.next
       }
       val end = System.currentTimeMillis()
-//      logWarning(s" readFileTime = ${end - start}")
       if (isInit) {
         logWarning(s" first time readFileTime = ${end - start}")
         isInit = false

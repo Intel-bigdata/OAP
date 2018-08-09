@@ -108,20 +108,20 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       checkEndOfRowGroup();
 
       IntList ids = idsMap.remove(currentPageNumber++);
-//      currentPageNumber++;
+      // currentPageNumber++;
 
       while (ids == null || ids.isEmpty()) {
         skipBatchInternal();
         ids = idsMap.remove(currentPageNumber++);
-//        currentPageNumber++;
+        // currentPageNumber++;
       }
 
-//      IntList ids = idsMap.remove(currentPageNumber);
-//      currentPageNumber++;
-//      if (ids == null || ids.isEmpty()) {
-//        // TODO super.nextBatch() instead of this.skipBatch()
-//        return skipBatchInternal() && this.nextBatch();
-//      }
+      //      IntList ids = idsMap.remove(currentPageNumber);
+      //      currentPageNumber++;
+      //      if (ids == null || ids.isEmpty()) {
+      //        // TODO super.nextBatch() instead of this.skipBatch()
+      //        return skipBatchInternal() && this.nextBatch();
+      //      }
 
       return nextBatchInternal() && filterRowsWithIndex(ids);
     }
