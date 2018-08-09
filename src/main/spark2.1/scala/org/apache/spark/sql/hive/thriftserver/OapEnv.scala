@@ -28,6 +28,10 @@ import org.apache.spark.sql.oap.listener.OapListener
 import org.apache.spark.sql.oap.ui.OapTab
 import org.apache.spark.util.Utils
 
+/**
+ * Most of the code in init() are copied from SparkSQLEnv. Please include code from the
+ * corresponding Spark version.
+ */
 private[hive] object OapEnv extends Logging {
   logDebug("Initializing Oap Env")
 

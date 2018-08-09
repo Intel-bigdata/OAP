@@ -3,11 +3,13 @@
 
 OAP - Optimized Analytics Package (previously known as Spinach) is designed to accelerate Ad-hoc query. OAP defines a new parquet-like columnar storage data format and offering a fine-grained hierarchical cache mechanism in the unit of “Fiber” in memory. What’s more, OAP has extended the Spark SQL DDL to allow user to define the customized indices based on relation.
 ## Building
+By defaut, it builds for Spark 2.1.0. To specify the Spark version, please use profile spark-2.1 or spark-2.2.
 ```
 mvn -DskipTests package
+mvn -DskipTests -Pspark-2.2 package
 ```
 ## Prerequisites
-You should have [Apache Spark](http://spark.apache.org/) of version 2.1.0 installed in your cluster. Refer to Apache Spark's [documents](http://spark.apache.org/docs/2.1.0/) for details.
+You should have [Apache Spark](http://spark.apache.org/) of version 2.1.0 or 2.2.0 installed in your cluster. Refer to Apache Spark's [documents](http://spark.apache.org/docs/2.1.0/) for details.
 ## Use OAP with Spark
 1. Build OAP, `mvn -DskipTests package` and find `oap-<version>.jar` in `target/`
 2. Deploy `oap-<version>.jar` to master machine.
