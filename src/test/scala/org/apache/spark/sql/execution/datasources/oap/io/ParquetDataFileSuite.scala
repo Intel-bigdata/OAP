@@ -642,3 +642,61 @@ class ParquetFiberDataLoaderSuite extends ParquetDataFileSuite {
   }
 }
 
+class TimeTest extends SparkFunSuite with SharedOapContext
+  with BeforeAndAfterEach with Logging {
+
+  protected val fileDir: File = new File("/Users/baidu/SourceCode/data")
+
+  protected val fileName: String = "/Users/baidu/SourceCode/data/part-02999.hiveFile"
+
+  override def beforeEach(): Unit = {
+    configuration.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING.key,
+      SQLConf.PARQUET_BINARY_AS_STRING.defaultValue.get)
+    configuration.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key,
+      SQLConf.PARQUET_INT96_AS_TIMESTAMP.defaultValue.get)
+    configuration.setBoolean(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key,
+      SQLConf.PARQUET_WRITE_LEGACY_FORMAT.defaultValue.get)
+  }
+
+  override def afterEach(): Unit = {
+    configuration.unset(SQLConf.PARQUET_BINARY_AS_STRING.key)
+    configuration.unset(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key)
+    configuration.unset(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key)
+  }
+
+  private val requestSchema: StructType = new StructType()
+    .add(StructField("uuid", StringType))
+    .add(StructField("url", StringType))
+
+  test("test contains") {
+
+    val loopTimes = 101
+    var time = 0L
+    var isInit = true
+
+    (0 until loopTimes).foreach { _ =>
+      val start = System.currentTimeMillis()
+      val context = Some(VectorizedContext(null, null, returningBatch = true))
+      val reader = ParquetDataFile(fileName, requestSchema, configuration)
+      reader.setVectorizedContext(context)
+      val requiredIds = Array(0, 1)
+      val rowIds = Array(317680, 637684, 962409, 1290012, 1448906)
+//      val rowIds = Array(317680)
+//      val iterator = reader.iterator(requiredIds)
+      val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+      while (iterator.hasNext) {
+        iterator.next
+      }
+      val end = System.currentTimeMillis()
+//      logWarning(s" readFileTime = ${end - start}")
+      if (isInit) {
+        logWarning(s" first time readFileTime = ${end - start}")
+        isInit = false
+      } else {
+        time = time + (end - start)
+      }
+    }
+    logWarning(s" no es readFileTime = ${time * 1.0 / (loopTimes - 1)}")
+  }
+}
+

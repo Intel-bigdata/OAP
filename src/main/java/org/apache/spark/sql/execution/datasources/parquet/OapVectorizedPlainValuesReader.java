@@ -124,11 +124,13 @@ public class OapVectorizedPlainValuesReader extends ValuesReader
       c.putByte(rowId + i, Platform.getByte(buffer, offset));
       offset += 4;
     }
+    System.out.println(offset);
   }
 
   @Override
   public void skipBytes(int total) {
     offset += 4 * total;
+    System.out.println(offset);
   }
 
   @Override
@@ -239,7 +241,8 @@ public class OapVectorizedPlainValuesReader extends ValuesReader
   @Override
   public void skipBinary(int total) {
     for (int i = 0; i < total; i++) {
-      offset += readInteger();
+      int len = readInteger();
+      offset += len;
     }
   }
 

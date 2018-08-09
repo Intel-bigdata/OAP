@@ -34,6 +34,8 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.DecimalType;
 
 import static org.apache.parquet.column.ValuesType.REPETITION_LEVEL;
+import static org.apache.spark.sql.execution.datasources.parquet.SpecificParquetRecordReaderBase.ValuesReaderIntIterator;
+import static org.apache.spark.sql.execution.datasources.parquet.SpecificParquetRecordReaderBase.createRLEIterator;
 
 /**
  * Decoder to return values from a single column.
@@ -66,8 +68,10 @@ public class OapVectorizedColumnReader {
   private final int maxDefLevel;
 
   /**
-   * Value readers.
+   * Repetition/Definition/Value readers.
    */
+//  private SpecificParquetRecordReaderBase.IntIterator repetitionLevelColumn;
+//  private SpecificParquetRecordReaderBase.IntIterator definitionLevelColumn;
   private ValuesReader dataColumn;
 
   // Only set if vectorized decoding is true. This is used instead of the row by row decoding
@@ -110,6 +114,23 @@ public class OapVectorizedColumnReader {
       throw new IOException("totalValueCount == 0");
     }
   }
+
+  /**
+   * Advances to the next value. Returns true if the value is non-null.
+   */
+//  private boolean next() throws IOException {
+//    if (valuesRead >= endOfPageValueCount) {
+//      if (valuesRead >= totalValueCount) {
+//        // How do we get here? Throw end of stream exception?
+//        return false;
+//      }
+//      readPage();
+//    }
+//    ++valuesRead;
+//    // TODO: Don't read for flat schemas
+//    //repetitionLevel = repetitionLevelColumn.nextInt();
+//    return definitionLevelColumn.nextInt() == maxDefLevel;
+//  }
 
   /**
    * Reads `total` values from this columnReader into column.
@@ -503,7 +524,7 @@ public class OapVectorizedColumnReader {
     // TODO: implement remaining type conversions
     VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
     if (column.isArray()) {
-      defColumn.skipBytes(num, maxDefLevel, (OapVectorizedValuesReader) data);
+      defColumn.skipBinarys(num, maxDefLevel, (OapVectorizedValuesReader) data);
     } else if (column.dataType() == DataTypes.TimestampType) {
       for (int i = 0; i < num; i++) {
         if (defColumn.readInteger() == maxDefLevel) {
@@ -639,7 +660,8 @@ public class OapVectorizedColumnReader {
     int bitWidth = BytesUtils.getWidthFromMaxInt(descriptor.getMaxDefinitionLevel());
     this.defColumn = new OapVectorizedRleValuesReader(bitWidth);
     dlReader = this.defColumn;
-
+//    this.repetitionLevelColumn = new SpecificParquetRecordReaderBase.ValuesReaderIntIterator(rlReader);
+//    this.definitionLevelColumn = new SpecificParquetRecordReaderBase.ValuesReaderIntIterator(dlReader);
     try {
       byte[] bytes = page.getBytes().toByteArray();
       rlReader.initFromPage(pageValueCount, bytes, 0);
@@ -654,11 +676,14 @@ public class OapVectorizedColumnReader {
 
   private void readPageV2(DataPageV2 page) throws IOException {
     this.pageValueCount = page.getValueCount();
+//    this.repetitionLevelColumn = createRLEIterator(descriptor.getMaxRepetitionLevel(),
+//            page.getRepetitionLevels(), descriptor);
 
     int bitWidth = BytesUtils.getWidthFromMaxInt(descriptor.getMaxDefinitionLevel());
     this.defColumn = new OapVectorizedRleValuesReader(bitWidth);
+//    this.definitionLevelColumn = new ValuesReaderIntIterator(this.defColumn);
     this.defColumn.initFromBuffer(
-        this.pageValueCount, page.getDefinitionLevels().toByteArray());
+            this.pageValueCount, page.getDefinitionLevels().toByteArray());
     try {
       initDataReader(page.getDataEncoding(), page.getData().toByteArray(), 0);
     } catch (IOException e) {
