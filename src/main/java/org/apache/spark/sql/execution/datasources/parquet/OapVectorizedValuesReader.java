@@ -17,6 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.parquet;
 
+/**
+ * OapVectorizedValuesReader extends from VectorizedValuesReader, add skip data capacity.
+ */
 public interface OapVectorizedValuesReader extends VectorizedValuesReader {
 
   void skipBoolean();
@@ -28,7 +31,7 @@ public interface OapVectorizedValuesReader extends VectorizedValuesReader {
   void skipBinaryByLen(int len);
 
   /*
-   * Reads `total` values into `c` start at `c[rowId]`
+   * Skip `total` values, not read into ColumnVector.
    */
   void skipBooleans(int total);
   void skipBytes(int total);
