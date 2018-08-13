@@ -299,7 +299,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
       columnarBatch.reset();
 
       int num = (int) Math.min((long) columnarBatch.capacity(),
-              totalCountLoadedSoFar - rowsReturned);
+        totalCountLoadedSoFar - rowsReturned);
       for (int i = 0; i < columnReaders.length; ++i) {
         if (columnReaders[i] == null) continue;
         columnReaders[i].readBatch(num, columnarBatch.column(i));
