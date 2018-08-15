@@ -63,10 +63,6 @@ public class IndexedMrOapRecordReader<T> implements RecordReader<T> {
     }
 
     @Override
-    public float getProgress() throws IOException, InterruptedException {
-      return internalReader.getProgress();
-    }
-
     public void initialize() throws IOException, InterruptedException {
 
       OapParquetFileReader reader = OapParquetFileReader.open(configuration, file,

@@ -193,17 +193,6 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
     }
 
     /**
-     * From VectorizedParquetRecordReader,no change.
-     * @return
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    @Override
-    public float getProgress() throws IOException, InterruptedException {
-      return (float) rowsReturned / totalRowCount;
-    }
-
-    /**
      * Returns the ColumnarBatch object that will be used for all rows returned by this reader.
      * This object is reused. Calling this enables the vectorized reader. This should be called
      * before any calls to nextKeyValue/nextBatch.
