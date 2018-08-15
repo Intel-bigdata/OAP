@@ -48,6 +48,7 @@ import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
 
@@ -613,7 +614,7 @@ class ParquetFiberDataLoaderSuite extends ParquetDataFileSuite {
     conf.set(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA, requestSchemaString)
   }
 
-  private def loadSingleColumn(requiredId: Array[Int]): FiberCache = {
+  private def loadSingleColumn(requiredId: Array[Int]): MemoryBlock = {
     val conf = new Configuration(configuration)
     addRequestSchemaToConf(conf, requiredId)
     ParquetFiberDataLoader(conf, reader, 0).loadSingleColumn
@@ -622,10 +623,10 @@ class ParquetFiberDataLoaderSuite extends ParquetDataFileSuite {
   test("test loadSingleColumn with reuse reader") {
     // fixed length data type
     val rowCount = reader.getFooter.getBlocks.get(0).getRowCount.toInt
-    val intFiberCache = loadSingleColumn(Array(0))
+    val intFiberCache = FiberCache(null, loadSingleColumn(Array(0)))
     (0 until rowCount).foreach(i => assert(intFiberCache.getInt(i * 4) == i))
     // variable length data type
-    val strFiberCache = loadSingleColumn(Array(4))
+    val strFiberCache = FiberCache(null, loadSingleColumn(Array(4)))
     (0 until rowCount).map { i =>
       val length = strFiberCache.getInt(i * 4)
       val offset = strFiberCache.getInt(rowCount * 4 + i * 4)

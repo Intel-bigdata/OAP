@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.Configuration
 import org.scalatest.BeforeAndAfterAll
 
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils, RangeInterval}
 import org.apache.spark.sql.types.{DoubleType, StructField, StructType}
 
@@ -51,7 +52,7 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
     val writtenBytes = test.write(out, null)
     assert(writtenBytes == 4)
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
     assert(fiber.getInt(0) == test.id)
     out.close()
   }
@@ -60,7 +61,7 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
     val test = new TestStatisticsReader(schema)
     IndexUtils.writeInt(out, test.id)
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
 
     val readBytes = test.read(fiber, 0)
     assert(readBytes == 4)
@@ -70,7 +71,7 @@ class StatisticsSuite extends StatisticsTest with BeforeAndAfterAll {
     val test = new TestStatisticsReader(schema)
     IndexUtils.writeInt(out, test.id)
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
 
     val readBytes = test.read(fiber, 0)
     assert(readBytes == 4)

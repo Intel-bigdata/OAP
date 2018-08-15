@@ -73,7 +73,7 @@ class NonNullKeySuite extends SparkFunSuite with Logging {
       val row = InternalRow.fromSeq(valueSeq)
       val buf = new ByteBufferOutputStream()
       nnkw.writeKey(buf, row)
-      val answerRow = nnkr.readKey(FiberCache(buf.toByteArray), 0)._1
+      val answerRow = nnkr.readKey(FiberCache(buf), 0)._1
       assert(row.equals(answerRow))
     }
   }

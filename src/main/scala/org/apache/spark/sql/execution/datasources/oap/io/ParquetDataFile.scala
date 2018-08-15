@@ -38,6 +38,7 @@ import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.util.CompletionIterator
 
 /**
@@ -96,7 +97,7 @@ private[oap] case class ParquetDataFile(
     inUseFiberCache.update(idx, fiberCache)
   }
 
-  def cache(groupId: Int, fiberId: Int): FiberCache = {
+  def cache(groupId: Int, fiberId: Int): MemoryBlock = {
     if (fiberDataReader == null) {
       // TODO Is there ParquetFooter enough?
       fiberDataReader =

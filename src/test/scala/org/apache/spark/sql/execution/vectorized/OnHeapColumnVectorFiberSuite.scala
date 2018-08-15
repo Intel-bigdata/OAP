@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.vectorized
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StringType}
 import org.apache.spark.unsafe.Platform
@@ -45,7 +46,7 @@ class OnHeapColumnVectorFiberSuite extends SparkFunSuite with SharedOapContext w
       vector.appendByteArray(utf8, 0, utf8.length)
     }
     val fiber = new OnHeapColumnVectorFiber(vector, count, StringType)
-    val fiberCache = fiber.dumpBytesToCache()
+    val fiberCache = FiberCache(null, fiber.dumpBytesToCache())
     (0 until count).map { i =>
       val length = fiberCache.getInt(i * 4)
       val offset = fiberCache.getInt(count * 4 + i * 4)

@@ -27,11 +27,11 @@ import org.apache.parquet.schema.{MessageType, Type}
 
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportWrapper, VectorizedColumnReader, VectorizedColumnReaderWrapper}
 import org.apache.spark.sql.execution.vectorized.{ColumnVector, OnHeapColumnVector, OnHeapColumnVectorFiber}
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.memory.MemoryBlock
 
 /**
  * The main purpose of this loader is help to obtain
@@ -47,7 +47,7 @@ private[oap] case class ParquetFiberDataLoader(
     blockId: Int) {
 
   @throws[IOException]
-  def loadSingleColumn: FiberCache = {
+  def loadSingleColumn: MemoryBlock = {
     val footer = reader.getFooter
     val fileSchema = footer.getFileMetaData.getSchema
     val fileMetadata = footer.getFileMetaData.getKeyValueMetaData
@@ -85,11 +85,11 @@ private[oap] case class ParquetFiberDataLoader(
 
       getDataTypeInfo(dataType) match {
         case (true, length) =>
-          val fiberCache = OapRuntime.getOrCreate.memoryManager.
-            getEmptyDataFiberCache(rowCount * length)
+          val memoryBlock = OapRuntime.getOrCreate.memoryManager.
+            getEmptyDataMemoryBlock(rowCount * length)
           // Fixed-length data type can be copied directly to FiberCache.
-          fiber.dumpBytesToCache(fiberCache.getBaseOffset)
-          fiberCache
+          fiber.dumpBytesToCache(memoryBlock.getBaseOffset)
+          memoryBlock
         case (false, _) =>
           fiber.dumpBytesToCache
       }

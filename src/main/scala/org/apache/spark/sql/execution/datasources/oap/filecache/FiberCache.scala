@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
@@ -27,13 +28,7 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.unsafe.types.UTF8String
 
-case class FiberCache(protected val fiberData: MemoryBlock) extends Logging {
-
-  // This is and only is set in `cache() of OapCache`
-  // TODO: make it immutable
-  var fiberId: FiberId = _
-
-  val DISPOSE_TIMEOUT = 3000
+case class FiberCache(val fiberId: FiberId, protected val fiberData: MemoryBlock) extends Logging {
 
   // We use readLock to lock occupy. _refCount need be atomic to make sure thread-safe
   protected val _refCount = new AtomicLong(0)
@@ -49,49 +44,19 @@ case class FiberCache(protected val fiberData: MemoryBlock) extends Logging {
   def release(): Unit = {
     assert(refCount > 0, "release a non-used fiber")
     _refCount.decrementAndGet()
-  }
-
-  def tryDispose(): Boolean = {
-    require(fiberId != null, "FiberId shouldn't be null for this FiberCache")
-    val startTime = System.currentTimeMillis()
-    val writeLockOp = OapRuntime.get.map(_.fiberLockManager.getFiberLock(fiberId).writeLock())
-    writeLockOp match {
-      case None => return true // already stopped OapRuntime
-      case Some(writeLock) =>
-        // Give caller a chance to deal with the long wait case.
-        while (System.currentTimeMillis() - startTime <= DISPOSE_TIMEOUT) {
-          if (refCount != 0) {
-            // LRU access (get and occupy) done, but fiber was still occupied by at least one
-            // reader, so it needs to sleep some time to see if the reader done.
-            // Otherwise, it becomes a polling loop.
-            // TODO: use lock/sync-obj to leverage the concurrency APIs instead of explicit sleep.
-            Thread.sleep(100)
-          } else {
-            if (writeLock.tryLock(200, TimeUnit.MILLISECONDS)) {
-              try {
-                if (refCount == 0) {
-                  realDispose()
-                  return true
-                }
-              } finally {
-                writeLock.unlock()
-              }
-            }
-          }
-        }
+    if (refCount == 0 && fiberData != null &&
+      OapRuntime.getOrCreate.fiberCacheManager.removeFromEvictedQueue(fiberId, this)) {
+      realDispose()
     }
-    logWarning(s"Fiber Cache Dispose waiting detected for $fiberId")
-    false
   }
 
-  protected var disposed = false
-  def isDisposed: Boolean = disposed
-  protected[filecache] def realDispose(): Unit = {
+  private var disposed: Boolean = false
+  def isDisposed(): Boolean = disposed
+  def realDispose(): Unit = {
     if (!disposed) {
+      disposed = true
       OapRuntime.get.foreach(_.memoryManager.free(fiberData))
-      OapRuntime.get.foreach(_.fiberLockManager.removeFiberLock(fiberId))
     }
-    disposed = true
   }
 
   // For debugging
@@ -106,7 +71,7 @@ case class FiberCache(protected val fiberData: MemoryBlock) extends Logging {
     // NOTE: A trick here. Since every function need to get memory data has to get here first.
     // So, here check the if the memory has been freed.
     if (disposed) {
-      throw new OapException("Try to access a freed memory")
+      throw new OapException("The memory is freed already.")
     }
     fiberData.getBaseObject
   }
@@ -144,9 +109,10 @@ case class FiberCache(protected val fiberData: MemoryBlock) extends Logging {
 }
 
 object FiberCache {
-  //  For test purpose :convert Array[Byte] to FiberCache
-  private[oap] def apply(data: Array[Byte]): FiberCache = {
-    val memoryBlock = new MemoryBlock(data, Platform.BYTE_ARRAY_OFFSET, data.length)
-    FiberCache(memoryBlock)
+  // For test purpose.
+  private[oap] def apply(out: ByteArrayOutputStream): FiberCache = {
+    val bytes = out.toByteArray
+    val memoryBlock = new MemoryBlock(bytes, Platform.BYTE_ARRAY_OFFSET, bytes.length)
+    FiberCache(null, memoryBlock)
   }
 }

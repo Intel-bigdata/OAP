@@ -25,6 +25,7 @@ import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
@@ -58,7 +59,7 @@ class PartByValueStatisticsSuite extends StatisticsTest {
     testPartByValueWriter.write(out, keys.to[ArrayBuffer])
 
     var offset = 0
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
     assert(fiber.getInt(offset) == StatisticsType.TYPE_PART_BY_VALUE)
     offset += 4
 
@@ -98,7 +99,7 @@ class PartByValueStatisticsSuite extends StatisticsTest {
     }
     out.write(tempWriter.toByteArray)
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
     val testPartByValueReader = new TestPartByValueReader(schema)
     testPartByValueReader.read(fiber, 0)
 
@@ -118,7 +119,7 @@ class PartByValueStatisticsSuite extends StatisticsTest {
     val partByValueWrite = new TestPartByValueWriter(schema)
     partByValueWrite.write(out, keys.to[ArrayBuffer])
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
 
     val partByValueRead = new TestPartByValueReader(schema)
     partByValueRead.read(fiber, 0)
@@ -145,7 +146,7 @@ class PartByValueStatisticsSuite extends StatisticsTest {
     val partByValueWrite = new TestPartByValueWriter(schema)
     partByValueWrite.write(out, keys.to[ArrayBuffer])
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
 
     val partByValueRead = new TestPartByValueReader(schema)
     partByValueRead.read(fiber, 0)

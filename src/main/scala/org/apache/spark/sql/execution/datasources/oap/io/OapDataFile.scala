@@ -31,6 +31,7 @@ import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.memory.MemoryBlock
 
 private[oap] abstract class OapDataFile extends DataFile {
   // Currently this is for a more clear class hierarchy, in the future there may be some common
@@ -92,7 +93,7 @@ private[oap] case class OapDataFileV1(
     }
   }
 
-  def cache(groupId: Int, fiberId: Int): FiberCache = {
+  def cache(groupId: Int, fiberId: Int): MemoryBlock = {
     val groupMeta = meta.rowGroupsMeta(groupId)
     val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
 
@@ -136,7 +137,7 @@ private[oap] case class OapDataFileV1(
     // We have to read Array[Byte] from file and decode/decompress it before putToFiberCache
     // TODO: Try to finish this in off-heap memory
     val data = fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
-    OapRuntime.getOrCreate.memoryManager.toDataFiberCache(data)
+    OapRuntime.getOrCreate.memoryManager.toDataMemoryBlock(data)
   }
 
   private def buildIterator(

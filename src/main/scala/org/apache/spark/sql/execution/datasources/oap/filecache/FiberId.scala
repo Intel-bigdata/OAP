@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import org.apache.spark.sql.execution.datasources.oap.io.DataFile
+import org.apache.spark.unsafe.memory.MemoryBlock
 
 private[oap] abstract class FiberId {}
 
@@ -40,7 +41,7 @@ private[oap] case class DataFiberId(file: DataFile, columnIndex: Int, rowGroupId
 }
 
 private[oap] case class BTreeFiberId(
-    getFiberData: () => FiberCache,
+    getFiberData: () => MemoryBlock,
     file: String,
     section: Int,
     idx: Int) extends FiberId {
@@ -61,7 +62,7 @@ private[oap] case class BTreeFiberId(
 }
 
 private[oap] case class BitmapFiberId(
-    getFiberData: () => FiberCache,
+    getFiberData: () => MemoryBlock,
     file: String,
     // "0" means no split sections within file.
     sectionIdxOfFile: Int,
@@ -83,7 +84,7 @@ private[oap] case class BitmapFiberId(
   }
 }
 
-private[oap] case class TestFiberId(getData: () => FiberCache, name: String) extends FiberId {
+private[oap] case class TestFiberId(getData: () => MemoryBlock, name: String) extends FiberId {
 
   override def hashCode(): Int = name.hashCode()
 

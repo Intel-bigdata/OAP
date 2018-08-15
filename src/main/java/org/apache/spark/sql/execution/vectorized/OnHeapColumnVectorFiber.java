@@ -19,7 +19,6 @@ package org.apache.spark.sql.execution.vectorized;
 import java.io.Closeable;
 import java.io.IOException;
 
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache;
 import org.apache.spark.sql.execution.datasources.oap.io.FiberCacheSerDe;
 import org.apache.spark.sql.oap.OapRuntime$;
 import org.apache.spark.sql.types.BinaryType;
@@ -33,6 +32,7 @@ import org.apache.spark.sql.types.IntegerType;
 import org.apache.spark.sql.types.LongType;
 import org.apache.spark.sql.types.ShortType;
 import org.apache.spark.sql.types.StringType;
+import org.apache.spark.unsafe.memory.MemoryBlock;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.UTF8String;
 
@@ -67,7 +67,7 @@ public class OnHeapColumnVectorFiber implements FiberCacheSerDe, Closeable {
   }
 
   @Override
-  public FiberCache dumpBytesToCache() {
+  public MemoryBlock dumpBytesToCache() {
     if(vector.hasDictionary()) {
       return dumpBytesToCacheWithDictionary();
     } else {
@@ -263,7 +263,7 @@ public class OnHeapColumnVectorFiber implements FiberCacheSerDe, Closeable {
     }
   }
 
-  private FiberCache dumpBytesToCacheWithoutDictionary() {
+  private MemoryBlock dumpBytesToCacheWithoutDictionary() {
     if (dataType instanceof BinaryType || dataType instanceof StringType) {
       // lengthData and offsetData will be set and data will be put in child if type is Array.
       // lengthData: 4 bytes, offsetData: 4 bytes, nulls: 1 byte,
@@ -279,13 +279,13 @@ public class OnHeapColumnVectorFiber implements FiberCacheSerDe, Closeable {
       Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
         Platform.BYTE_ARRAY_OFFSET + capacity * 9,
         getChildColumn0().elementsAppended);
-      return OapRuntime$.MODULE$.getOrCreate().memoryManager().toDataFiberCache(dataBytes);
+      return OapRuntime$.MODULE$.getOrCreate().memoryManager().toDataMemoryBlock(dataBytes);
     } else {
       throw new IllegalArgumentException("Unhandled " + dataType);
     }
   }
 
-  private FiberCache dumpBytesToCacheWithDictionary() {
+  private MemoryBlock dumpBytesToCacheWithDictionary() {
     if (dataType instanceof BinaryType) {
       // lengthData and offsetData will be set and data will be put in child if type is Array.
       // lengthData: 4 bytes, offsetData: 4 bytes, nulls: 1 byte,
@@ -311,7 +311,7 @@ public class OnHeapColumnVectorFiber implements FiberCacheSerDe, Closeable {
       Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
         Platform.BYTE_ARRAY_OFFSET + capacity * 9,
         getChildColumn0().elementsAppended);
-      return OapRuntime$.MODULE$.getOrCreate().memoryManager().toDataFiberCache(dataBytes);
+      return OapRuntime$.MODULE$.getOrCreate().memoryManager().toDataMemoryBlock(dataBytes);
     } else if (dataType instanceof StringType) {
       // lengthData: 4 bytes, offsetData: 4 bytes, nulls: 1 byte,
       // child.data: childColumns[0].elementsAppended bytes.
@@ -336,7 +336,7 @@ public class OnHeapColumnVectorFiber implements FiberCacheSerDe, Closeable {
       Platform.copyMemory(data, Platform.BYTE_ARRAY_OFFSET, dataBytes,
         Platform.BYTE_ARRAY_OFFSET + capacity * 9,
          getChildColumn0().elementsAppended);
-      return OapRuntime$.MODULE$.getOrCreate().memoryManager().toDataFiberCache(dataBytes);
+      return OapRuntime$.MODULE$.getOrCreate().memoryManager().toDataMemoryBlock(dataBytes);
     } else {
       throw new IllegalArgumentException("Unhandled " + dataType);
     }

@@ -30,6 +30,7 @@ import org.apache.spark.sql.execution.datasources.oap.index.{BitmapIndexSectionI
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
+import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.util.Utils
 
 class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
@@ -69,8 +70,8 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
     dir.delete()
   }
 
-  private def loadBmSection(fin: FSDataInputStream, offset: Long, size: Int): FiberCache =
-    OapRuntime.getOrCreate.memoryManager.toIndexFiberCache(fin, offset, size)
+  private def loadBmSection(fin: FSDataInputStream, offset: Long, size: Int): MemoryBlock =
+    OapRuntime.getOrCreate.memoryManager.toIndexMemoryBlock(fin, offset, size)
 
   private def getIdxOffset(fiberCache: FiberCache, baseOffset: Long, idx: Int): Int = {
     val idxOffset = baseOffset + idx * 4

@@ -25,17 +25,18 @@ import org.roaringbitmap.RoaringBitmap
 
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.{BitmapFiberId, FiberCache}
+import org.apache.spark.sql.execution.datasources.oap.filecache.BitmapFiberId
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
+import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.util.Utils
 
 // Below are used to test the functionality of OapBitmapWrappedFiberCache class.
 class OapBitmapWrappedFiberCacheSuite
   extends QueryTest with SharedOapContext {
 
-  private def loadRbFile(fin: FSDataInputStream, offset: Long, size: Int): FiberCache =
-    OapRuntime.getOrCreate.memoryManager.toIndexFiberCache(fin, offset, size)
+  private def loadRbFile(fin: FSDataInputStream, offset: Long, size: Int): MemoryBlock =
+    OapRuntime.getOrCreate.memoryManager.toIndexMemoryBlock(fin, offset, size)
 
   test("test the functionality of OapBitmapWrappedFiberCache class") {
     val CHUNK_SIZE = 1 << 16

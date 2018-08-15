@@ -22,6 +22,7 @@ import scala.util.Random
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.sql.catalyst.expressions.{BoundReference, UnsafeProjection}
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index.{BloomFilter, IndexUtils}
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
@@ -69,7 +70,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
     }
     testBloomFilter.write(out, null)
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
     var offset = 0L
 
     assert(fiber.getInt(offset) == StatisticsType.TYPE_BLOOM_FILTER)
@@ -111,7 +112,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
 
     for (l <- bfIndex.getBitMapLongArray) IndexUtils.writeLong(out, l)
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
 
     val testBloomFilter = new TestBloomFilterReader(schema)
     testBloomFilter.read(fiber, 0)
@@ -140,7 +141,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
     }
     bloomFilterWrite.write(out, null)
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
 
     val bloomFilterRead = new TestBloomFilterReader(schema)
     bloomFilterRead.read(fiber, 0)
@@ -173,7 +174,7 @@ class BloomFilterStatisticsSuite extends StatisticsTest {
     }
     bloomFilterWrite.write(out, null)
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
 
     val bloomFilterRead = new TestBloomFilterReader(schema)
     bloomFilterRead.read(fiber, 0)

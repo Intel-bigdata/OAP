@@ -65,7 +65,7 @@ private[oap] case class BitmapReader(
   private def getFooterCache(): Unit = {
     val footerOffset = fileReader.getLen.toInt - BITMAP_FOOTER_SIZE
     val footerFiber = BitmapFiberId(
-      () => fileReader.readFiberCache(footerOffset, BITMAP_FOOTER_SIZE),
+      () => fileReader.readMemoryBlock(footerOffset, BITMAP_FOOTER_SIZE),
       fileReader.getName, BitmapIndexSectionId.footerSection, 0)
     bmFooterCache = fiberCacheManager.get(footerFiber)
     // Calculate total rows right after footer cache is loaded.
@@ -154,17 +154,17 @@ private[oap] case class BitmapReader(
     val offsetListOffset = entryListOffset + entryListTotalSize + bmNullEntrySize
 
     val uniqueKeyListFiber = BitmapFiberId(
-      () => fileReader.readFiberCache(uniqueKeyListOffset, uniqueKeyListTotalSize),
+      () => fileReader.readMemoryBlock(uniqueKeyListOffset, uniqueKeyListTotalSize),
       fileReader.getName, BitmapIndexSectionId.keyListSection, 0)
     bmUniqueKeyListCache = fiberCacheManager.get(uniqueKeyListFiber)
 
     val offsetListFiber = BitmapFiberId(
-      () => fileReader.readFiberCache(offsetListOffset, offsetListTotalSize),
+      () => fileReader.readMemoryBlock(offsetListOffset, offsetListTotalSize),
       fileReader.getName, BitmapIndexSectionId.entryOffsetsSection, 0)
     bmOffsetListCache = fiberCacheManager.get(offsetListFiber)
 
     bmNullListFiber = BitmapFiberId(
-      () => fileReader.readFiberCache(bmNullEntryOffset, bmNullEntrySize),
+      () => fileReader.readMemoryBlock(bmNullEntryOffset, bmNullEntrySize),
       fileReader.getName, BitmapIndexSectionId.entryNullSection, 0)
   }
 
@@ -189,7 +189,7 @@ private[oap] case class BitmapReader(
     val statsOffset = bmFooterCache.getLong(BITMAP_FOOTER_SIZE - IndexUtils.LONG_SIZE * 2)
     val statsSize = bmFooterCache.getLong(BITMAP_FOOTER_SIZE - IndexUtils.LONG_SIZE)
     val bmStatsContentFiber = BitmapFiberId(
-      () => fileReader.readFiberCache(statsOffset.toInt, statsSize.toInt),
+      () => fileReader.readMemoryBlock(statsOffset.toInt, statsSize.toInt),
       fileReader.getName, BitmapIndexSectionId.statsContentSection, 0)
     val bmStatsContentCache = fiberCacheManager.get(bmStatsContentFiber)
     val stats = StatisticsManager.read(bmStatsContentCache, 0, keySchema)

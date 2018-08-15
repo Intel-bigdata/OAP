@@ -19,13 +19,13 @@ package org.apache.spark.sql.execution.datasources.oap.index
 
 import java.io.InputStream
 
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
+import org.apache.spark.unsafe.memory.MemoryBlock
 
 private[oap] trait IndexFileReader {
 
   protected def is: InputStream
 
-  def readFiberCache(position: Long, length: Int): FiberCache
+  def readMemoryBlock(position: Long, length: Int): MemoryBlock
 
   def read(position: Long, length: Int): Array[Byte]
 

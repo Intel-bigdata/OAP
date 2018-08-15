@@ -23,6 +23,7 @@ import scala.util.Random
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index.{IndexScanner, IndexUtils}
 import org.apache.spark.sql.types.StructType
 
@@ -53,7 +54,7 @@ class MinMaxStatisticsSuite extends StatisticsTest {
       assert(ordering.compare(key, max) <= 0)
     }
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
     var offset = 0
 
     assert(fiber.getInt(0) == StatisticsType.TYPE_MIN_MAX)
@@ -81,7 +82,7 @@ class MinMaxStatisticsSuite extends StatisticsTest {
     IndexUtils.writeInt(out, tempWriter.size)
     out.write(tempWriter.toByteArray)
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
 
     val testMinMax = new TestMinMaxReader(schema)
     testMinMax.read(fiber, 0)
@@ -105,7 +106,7 @@ class MinMaxStatisticsSuite extends StatisticsTest {
     for (key <- keys) minmaxWrite.addOapKey(key)
     minmaxWrite.write(out, null) // MinMax does not need sortKeys parameter
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
 
     val minmaxRead = new TestMinMaxReader(schema)
     minmaxRead.read(fiber, 0)
@@ -128,7 +129,7 @@ class MinMaxStatisticsSuite extends StatisticsTest {
     for (key <- keys) minmaxWrite.addOapKey(key)
     minmaxWrite.write(out, null) // MinMax does not need sortKeys parameter
 
-    val fiber = wrapToFiberCache(out)
+    val fiber = FiberCache(out)
 
     val minmaxRead = new TestMinMaxReader(schema)
     minmaxRead.read(fiber, 0)

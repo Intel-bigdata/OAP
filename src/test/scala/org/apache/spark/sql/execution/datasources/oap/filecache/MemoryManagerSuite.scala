@@ -82,7 +82,7 @@ class MemoryManagerSuite extends SharedOapContext {
       })
       val nnkw = new NonNullKeyWriter(schema)
       nnkw.writeKey(buf, InternalRow.fromSeq(values))
-      memoryManager.toDataFiberCache(buf.toByteArray)
+      FiberCache(null, memoryManager.toDataMemoryBlock(buf.toByteArray))
     }
   }
 
@@ -108,14 +108,14 @@ class MemoryManagerSuite extends SharedOapContext {
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
     val is = createInputStreamFromBytes(bytes)
-    val indexFiberCache = memoryManager.toIndexFiberCache(is, 0, 10240)
+    val indexFiberCache = FiberCache(null, memoryManager.toIndexMemoryBlock(is, 0, 10240))
     assert(bytes === indexFiberCache.toArray)
   }
 
   test("test data in DataFiberCache") {
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
-    val dataFiberCache = memoryManager.toDataFiberCache(bytes)
+    val dataFiberCache = FiberCache(null, memoryManager.toDataMemoryBlock(bytes))
     assert(bytes === dataFiberCache.toArray)
   }
 

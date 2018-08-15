@@ -72,7 +72,8 @@ private[oap] class BitmapReaderV1(
           (startIdx until (endIdx + 1)).map(idx => {
             val curIdxOffset = getIdxOffset(bmOffsetListCache, 0L, idx)
             val entrySize = getIdxOffset(bmOffsetListCache, 0L, idx + 1) - curIdxOffset
-            val entryFiber = BitmapFiberId(() => fileReader.readFiberCache(curIdxOffset, entrySize),
+            val entryFiber = BitmapFiberId(() =>
+              fileReader.readMemoryBlock(curIdxOffset, entrySize),
               fileReader.getName, BitmapIndexSectionId.entryListSection, idx)
             val entryCache = fiberCacheManager.get(entryFiber)
             val entry = getDesiredBitmap(entryCache)

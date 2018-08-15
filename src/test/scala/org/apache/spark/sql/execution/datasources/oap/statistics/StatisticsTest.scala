@@ -73,9 +73,4 @@ abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
     val res = row1 == row2 // it works..
     assert(res, s"row1: $row1 does not match $row2")
   }
-
-  protected def wrapToFiberCache(out: ByteArrayOutputStream): FiberCache = {
-    val bytes = out.toByteArray
-    new FiberCache(new MemoryBlock(bytes, Platform.BYTE_ARRAY_OFFSET, bytes.length))
-  }
 }
