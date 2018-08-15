@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
+import org.apache.orc.mapred.OrcStruct
 import org.apache.parquet.filter2.predicate.FilterPredicate
 import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.io.api.Binary
@@ -26,13 +27,14 @@ import org.apache.parquet.io.api.Binary
 import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Ascending, JoinedRow}
+import org.apache.spark.sql.catalyst.expressions.{Ascending, JoinedRow, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.execution.datasources.PartitionedFile
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, OapIndexInfoStatusSerDe}
+import org.apache.spark.sql.execution.datasources.orc.OrcDeserializer
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.listener.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.sql.sources.Filter
@@ -237,15 +239,19 @@ private[oap] class OapDataReaderV1(
     false
   }
 
-  def initialize(): OapCompletionIterator[InternalRow] = {
+  def initialize(): OapCompletionIterator[Any] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(pathStr, meta.schema, dataFileClassName, conf)
     if (meta.dataReaderClassName.contains("ParquetDataFile")) {
-      fileScanner.asInstanceOf[ParquetDataFile].setVectorizedContext(context)
+      fileScanner.asInstanceOf[ParquetDataFile].setVectorizedContext(
+        context.asInstanceOf[Option[ParquetVectorizedContext]])
+    } else if (meta.dataReaderClassName.contains("OrcDataFile")) {
+      fileScanner.asInstanceOf[OrcDataFile].setVectorizedContext(
+        context.asInstanceOf[Option[OrcVectorizedContext]])
     }
 
-    def fullScan: OapCompletionIterator[InternalRow] = {
+    def fullScan: OapCompletionIterator[Any] = {
       val start = if (log.isDebugEnabled) System.currentTimeMillis else 0
       val iter = fileScanner.iterator(requiredIds, filters)
       val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
@@ -322,13 +328,27 @@ private[oap] class OapDataReaderV1(
       // already filled by VectorizedReader, else use original branch.
       if (enableVectorizedReader) {
         iter
-      } else {
+      } else if (meta.dataReaderClassName.contains("ParquetDataFile")) {
         val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
         val joinedRow = new JoinedRow()
         val appendPartitionColumns =
           GenerateUnsafeProjection.generate(fullSchema, fullSchema)
 
-        iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+        iter.asInstanceOf[Iterator[UnsafeRow]]
+          .map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+      } else if (meta.dataReaderClassName.contains("OrcDataFile")) {
+        val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
+        val orcVectorizedContext = context.asInstanceOf[Option[OrcVectorizedContext]].get
+        val deserializer = new OrcDeserializer(orcVectorizedContext.dataSchema, requiredSchema,
+          orcVectorizedContext.requestedColIds)
+        val joinedRow = new JoinedRow()
+        val appendPartitionColumns =
+          GenerateUnsafeProjection.generate(fullSchema, fullSchema)
+
+        iter.asInstanceOf[Iterator[OrcStruct]]
+          .map(value => appendPartitionColumns(joinedRow(deserializer.deserialize(value),
+          file.partitionValues)))
       }
+      iter.asInstanceOf[Iterator[InternalRow]]
     }
 }
