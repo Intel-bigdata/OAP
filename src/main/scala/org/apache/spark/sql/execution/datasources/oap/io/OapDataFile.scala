@@ -188,16 +188,18 @@ private[oap] case class OapDataFileV1(
 
   // full file scan
   def iterator(requiredIds: Array[Int], filters: Seq[Filter] = Nil)
-    : OapCompletionIterator[InternalRow] = {
-    buildIterator(configuration, requiredIds, rowIds = None, filters)
+    : OapCompletionIterator[Any] = {
+    val iterator = buildIterator(configuration, requiredIds, rowIds = None, filters)
+    iterator.asInstanceOf[OapCompletionIterator[Any]]
   }
 
   // scan by given row ids, and we assume the rowIds are sorted
   def iteratorWithRowIds(
       requiredIds: Array[Int],
       rowIds: Array[Int],
-      filters: Seq[Filter] = Nil): OapCompletionIterator[InternalRow] = {
-    buildIterator(configuration, requiredIds, Some(rowIds), filters)
+      filters: Seq[Filter] = Nil): OapCompletionIterator[Any] = {
+    val iterator = buildIterator(configuration, requiredIds, Some(rowIds), filters)
+    iterator.asInstanceOf[OapCompletionIterator[Any]]
   }
 
   def close(): Unit = {

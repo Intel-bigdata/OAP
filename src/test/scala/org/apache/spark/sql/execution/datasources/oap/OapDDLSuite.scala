@@ -40,12 +40,16 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql(s"""CREATE TABLE oap_partition_table (a int, b int, c STRING)
             | USING parquet
             | PARTITIONED by (b, c)""".stripMargin)
+    sql(s"""CREATE TABLE oap_orc_table (a int, b int, c STRING)
+            | USING orc
+            | PARTITIONED by (b, c)""".stripMargin)
   }
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("oap_test_1")
     sqlContext.dropTempTable("oap_test_2")
     sqlContext.sql("drop table oap_partition_table")
+    sqlContext.sql("drop table oap_orc_table")
   }
 
   test("write index for table read in from DS api") {
@@ -97,6 +101,26 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
           Row("oap_test_2", "index1", 0, "a", "D", "BTREE", true) ::
           Row("oap_test_2", "index1", 1, "b", "D", "BTREE", true) :: Nil)
     }
+  }
+
+  test("create and drop index with orc file format") {
+    val data: Seq[(Int, Int)] = (1 to 10).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+
+    val path = new Path(sqlConf.warehousePath)
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE oap_orc_table
+        |partition (b=1, c='c1')
+        |SELECT key from t where value < 4
+      """.stripMargin)
+
+    sql("create oindex index1 on oap_orc_table (a) partition (b=1, c='c1')")
+    // TODO: Turned on after orc support is ready.
+    // checkAnswer(sql("select * from oap_orc_table where a < 4"),
+    //  Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Nil)
+
   }
 
   test("create and drop index with partition specify") {

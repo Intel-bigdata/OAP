@@ -38,14 +38,15 @@ abstract class DataFile {
   def schema: StructType
   def configuration: Configuration
 
-  def getDataFileMeta(): DataFileMeta
-  def cache(groupId: Int, fiberId: Int): FiberCache
   def iterator(requiredIds: Array[Int], filters: Seq[Filter] = Nil)
-    : OapCompletionIterator[InternalRow]
+    : OapCompletionIterator[Any]
   def iteratorWithRowIds(requiredIds: Array[Int], rowIds: Array[Int], filters: Seq[Filter] = Nil)
-    : OapCompletionIterator[InternalRow]
+    : OapCompletionIterator[Any]
 
   def totalRows(): Long
+
+  def getDataFileMeta(): DataFileMeta
+  def cache(groupId: Int, fiberId: Int): FiberCache
   override def hashCode(): Int = path.hashCode
   override def equals(other: Any): Boolean = other match {
     case df: DataFile => path.equals(df.path)
@@ -108,11 +109,23 @@ private[oap] object DataFile {
  * partitionColumns and partitionValues use by VectorizedOapRecordReader#initBatch
  * returningBatch use by VectorizedOapRecordReader#enableReturningBatches
  */
-private[oap] case class VectorizedContext(
+private[oap] abstract class VectorizedContext {}
+
+private[oap] case class ParquetVectorizedContext(
     partitionColumns: StructType,
     partitionValues: InternalRow,
-    returningBatch: Boolean)
+    returningBatch: Boolean) extends VectorizedContext
 
+private[oap] case class OrcVectorizedContext(
+    partitionColumns: StructType,
+    partitionValues: InternalRow,
+    returningBatch: Boolean,
+    requiredSchema: StructType,
+    dataSchema: StructType,
+    enableOffHeapColumnVector: Boolean,
+    copyToSpark: Boolean,
+    requestedColIds: Array[Int])
+    extends VectorizedContext
 /**
  * The data file meta, will be cached for performance purpose, as we don't want to open the
  * specified file again and again to get its data meta, the data file extension can have its own
