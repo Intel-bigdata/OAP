@@ -82,12 +82,16 @@ class MemoryManagerSuite extends SharedOapContext {
       })
       val nnkw = new NonNullKeyWriter(schema)
       nnkw.writeKey(buf, InternalRow.fromSeq(values))
-      memoryManager.toDataFiberCache(buf.toByteArray)
+      val fiberId = TestFiberId(null, "Test fiber for MemoryManagerSuite#0")
+      val cache = memoryManager.toDataFiberCache(buf.toByteArray)
+      cache.fiberId = fiberId
+      cache
     }
   }
 
   protected override def afterAll(): Unit = {
     super.afterAll()
+    fiberCache.realDispose()
   }
 
   // Override afterEach because we don't want to check open streams
@@ -109,14 +113,20 @@ class MemoryManagerSuite extends SharedOapContext {
     random.nextBytes(bytes)
     val is = createInputStreamFromBytes(bytes)
     val indexFiberCache = memoryManager.toIndexFiberCache(is, 0, 10240)
+    val fiberId = TestFiberId(null, "Test fiber for MemoryManagerSuite#1")
+    indexFiberCache.fiberId = fiberId
     assert(bytes === indexFiberCache.toArray)
+    indexFiberCache.realDispose()
   }
 
   test("test data in DataFiberCache") {
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
     val dataFiberCache = memoryManager.toDataFiberCache(bytes)
+    val fiberId = TestFiberId(null, "Test fiber for MemoryManagerSuite#2")
+    dataFiberCache.fiberId = fiberId
     assert(bytes === dataFiberCache.toArray)
+    dataFiberCache.realDispose()
   }
 
   test("test FiberCache readInt") {
