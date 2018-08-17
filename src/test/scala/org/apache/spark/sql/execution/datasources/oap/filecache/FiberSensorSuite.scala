@@ -71,7 +71,7 @@ class FiberSensorSuite extends QueryTest with SharedOapContext with BeforeAndAft
     // make each dataFile has 2 rowGroup.
     // 3000 columns in total, 2 data file by default, 1500 columns each file.
     // So, each file will have 2 rowGroup.
-    sqlConf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key, "1000")
+    sqlContext.conf.setConfString(OapConf.OAP_ROW_GROUP_SIZE.key, "1000")
 
     // Insert data, build index and query, expected hit-index, range ensure all
     // row groups are cached.

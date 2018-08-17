@@ -27,13 +27,13 @@ import org.apache.parquet.bytes.BytesUtils
 import org.apache.parquet.io.api.Binary
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{AnalysisException, RuntimeConfig}
+import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes._
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, EqualTo, Literal}
 import org.apache.spark.sql.execution.datasources.{FileIndex, PartitionDirectory, PartitioningUtils}
 import org.apache.spark.sql.execution.datasources.oap.{DataSourceMeta, Key, OapFileFormat}
-import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.adapter.FileIndexAdapter
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
@@ -87,7 +87,7 @@ object OapUtils extends Logging {
     } else {
       Nil
     }
-    fileIndex.listFiles(filters)
+    FileIndexAdapter.listFiles(fileIndex, filters, Nil)
   }
 
   /**

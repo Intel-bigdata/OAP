@@ -41,7 +41,7 @@ import org.apache.spark.util.Utils
 
 class FileSourceStrategySuite extends QueryTest with SharedOapContext with PredicateHelper {
   import testImplicits._
-  sparkConf.set("spark.default.parallelism", "1")
+  oapSparkConf.set("spark.default.parallelism", "1")
 
   // Override afterEach because we don't want to check open streams
   override def beforeEach(): Unit = {}
@@ -398,7 +398,7 @@ class FileSourceStrategySuite extends QueryTest with SharedOapContext with Predi
 
         val fileCatalog = new InMemoryFileIndex(
           sparkSession = spark,
-          rootPaths = Seq(new Path(tempDir)),
+          Seq(new Path(tempDir)),
           parameters = Map.empty[String, String],
           partitionSchema = None)
         // This should not fail.

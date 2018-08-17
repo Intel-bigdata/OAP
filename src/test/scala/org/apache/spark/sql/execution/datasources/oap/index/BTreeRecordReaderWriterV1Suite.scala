@@ -117,7 +117,7 @@ class BTreeRecordReaderWriterV1Suite extends SharedOapContext {
     nonNullKeyRecords.map(InternalRow(_)).foreach(writer.write(null, _))
     nullKeyRecords.map(InternalRow(_)).foreach(writer.write(null, _))
     writer.close(null)
-    TaskContext.get().asInstanceOf[TaskContextImpl].markTaskCompleted()
+    // TaskContext.get().asInstanceOf[TaskContextImpl].markTaskCompleted()
     TaskContext.unset()
     val indexData = fileWriter.toByteArray
 

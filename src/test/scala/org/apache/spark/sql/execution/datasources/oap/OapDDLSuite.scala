@@ -103,7 +103,7 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     val data: Seq[(Int, Int)] = (1 to 10).map { i => (i, i) }
     data.toDF("key", "value").createOrReplaceTempView("t")
 
-    val path = new Path(sqlConf.warehousePath)
+    val path = new Path(sqlContext.conf.warehousePath)
 
     sql(
       """

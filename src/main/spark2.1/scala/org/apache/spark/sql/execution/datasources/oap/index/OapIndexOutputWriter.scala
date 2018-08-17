@@ -22,10 +22,10 @@ import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.parquet.hadoop.util.ContextUtil
 
-import org.apache.spark.rdd.InputFileNameHolder
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OutputWriter
+import org.apache.spark.sql.oap.adapter.InputFileNameHolderAdapter
 
 // TODO: parameter name "path" is ambiguous
 private[index] class OapIndexOutputWriter(
@@ -67,7 +67,7 @@ private[index] class OapIndexOutputWriter(
   }
 
   private def initWriter(): Unit = {
-    inputFileName = InputFileNameHolder.getInputFileName().toString
+    inputFileName = InputFileNameHolderAdapter.getInputFileName().toString
     recordWriter = outputFormat.getRecordWriter(context)
     rowCount = 0
   }
@@ -82,7 +82,7 @@ private[index] class OapIndexOutputWriter(
   }
 
   private def checkStartOfNewFile(): Unit = {
-    if (inputFileName != InputFileNameHolder.getInputFileName().toString) {
+    if (inputFileName != InputFileNameHolderAdapter.getInputFileName().toString) {
       closeWriter()
       initWriter()
     }

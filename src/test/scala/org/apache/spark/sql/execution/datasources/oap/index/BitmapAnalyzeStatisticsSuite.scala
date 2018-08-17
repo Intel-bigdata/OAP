@@ -49,7 +49,7 @@ private[oap] class TestOapSessionWithRawLocalFileSystem(sc: SparkContext)
 
 trait SharedOapContextWithRawLocalFileSystem extends SharedOapContextBase {
   protected override def createSparkSession: TestSparkSession = {
-    new TestOapSessionWithRawLocalFileSystem(sparkConf)
+    new TestOapSessionWithRawLocalFileSystem(oapSparkConf)
   }
 }
 

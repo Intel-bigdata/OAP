@@ -22,12 +22,16 @@ import java.io.PrintStream
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.hive.{HiveUtils, OapSessionState}
+import org.apache.spark.sql.hive.{HiveExternalCatalog, HiveUtils}
 import org.apache.spark.sql.oap.OapSession
 import org.apache.spark.sql.oap.listener.OapListener
 import org.apache.spark.sql.oap.ui.OapTab
 import org.apache.spark.util.Utils
 
+/**
+ * Most of the code in init() are copied from SparkSQLEnv. Please include code from the
+ * corresponding Spark version.
+ */
 private[hive] object OapEnv extends Logging {
   logDebug("Initializing Oap Env")
 
@@ -42,6 +46,7 @@ private[hive] object OapEnv extends Logging {
       val maybeAppName = sparkConf
         .getOption("spark.app.name")
         .filterNot(_ == classOf[SparkSQLCLIDriver].getName)
+        .filterNot(_ == classOf[HiveThriftServer2].getName)
 
       sparkConf
         .setAppName(maybeAppName.getOrElse(s"SparkSQL::${Utils.localHostName()}"))
@@ -50,10 +55,12 @@ private[hive] object OapEnv extends Logging {
       sparkContext = sparkSession.sparkContext
       sqlContext = sparkSession.sqlContext
 
-      val sessionState = sparkSession.sessionState.asInstanceOf[OapSessionState]
-      sessionState.metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
-      sessionState.metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))
-      sessionState.metadataHive.setError(new PrintStream(System.err, true, "UTF-8"))
+      val metadataHive = sparkSession
+        .sharedState.externalCatalog.asInstanceOf[HiveExternalCatalog]
+        .client.newSession()
+      metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
+      metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))
+      metadataHive.setError(new PrintStream(System.err, true, "UTF-8"))
       sparkSession.conf.set("spark.sql.hive.version", HiveUtils.hiveExecutionVersion)
     }
 

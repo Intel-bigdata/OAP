@@ -515,6 +515,9 @@ object DataSourceStrategy {
       case expressions.Contains(a: Attribute, Literal(v: UTF8String, StringType)) =>
         Some(sources.StringContains(a.name, v.toString))
 
+      case expressions.Like(a: Attribute, Literal(v: UTF8String, StringType)) =>
+        Some(sources.StringLike(a.name, v.toString))
+
       case _ => None
     }
   }

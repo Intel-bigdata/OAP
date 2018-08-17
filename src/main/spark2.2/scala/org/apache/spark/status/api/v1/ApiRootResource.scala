@@ -227,6 +227,18 @@ private[v1] class ApiRootResource extends ApiRequestContext {
       new ApplicationEnvironmentResource(ui)
     }
   }
+
+  /**
+   * Added for OAP FiberCacheManager Metrics
+   * @param appId
+   * @return impl instance
+   */
+  @Path("applications/{appId}/fibercachemanagers")
+  def getCacheManagers(@PathParam("appId") appId: String): AllFiberCacheManagerListResource = {
+    withSparkUI(appId, None) { ui =>
+      new AllFiberCacheManagerListResource(ui)
+    }
+  }
 }
 
 private[spark] object ApiRootResource {

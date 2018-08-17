@@ -22,7 +22,7 @@ import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate}
 import org.apache.parquet.hadoop.ParquetInputFormat
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFilters
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFiltersWrapper
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 
@@ -44,7 +44,7 @@ object FilterHelper {
         // Collects all converted Parquet filter predicates. Notice that not all predicates can be
         // converted (`ParquetFilters.createFilter` returns an `Option`). That's why a `flatMap`
         // is used here.
-        .flatMap(ParquetFilters.createFilter(requiredSchema, _))
+        .flatMap(ParquetFiltersWrapper.createFilter(requiredSchema, _))
         .reduceOption(FilterApi.and)
     } else {
       None
