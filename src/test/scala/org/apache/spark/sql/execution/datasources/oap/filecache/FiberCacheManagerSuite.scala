@@ -44,7 +44,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
   private def fiberCacheManager = OapRuntime.getOrCreate.fiberCacheManager
 
   test("unit test") {
-    val memorySizeInMB = (memoryManager.cacheMemory / mbSize).toInt
+    val memorySizeInMB = (memoryManager.getCacheMemorySize / mbSize).toInt
     val origStats = fiberCacheManager.cacheStats
     newFiberGroup
     (1 to memorySizeInMB * 2).foreach { i =>
@@ -65,7 +65,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
   }
 
   test("remove a fiber is in use") {
-    val memorySizeInMB = (memoryManager.cacheMemory / mbSize).toInt
+    val memorySizeInMB = (memoryManager.getCacheMemorySize / mbSize).toInt
     val dataInUse = generateData(mbSize)
     val fiberInUse = TestFiberId(
         () => memoryManager.toDataFiberCache(dataInUse), s"test fiber #${newFiberGroup}.0")
@@ -86,7 +86,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
     newFiberGroup
     class FiberTestRunner(i: Int) extends Thread {
       override def run(): Unit = {
-        val memorySizeInMB = (memoryManager.cacheMemory / mbSize).toInt
+        val memorySizeInMB = (memoryManager.getCacheMemorySize / mbSize).toInt
         val data = generateData(memorySizeInMB / 4 * mbSize)
         val fiber = TestFiberId(
           () => memoryManager.toDataFiberCache(data), s"test fiber #$fiberGroupId.$i")
@@ -102,7 +102,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
   }
 
   test("add a very large fiber") {
-    val memorySizeInMB = (memoryManager.cacheMemory / mbSize).toInt
+    val memorySizeInMB = (memoryManager.getCacheMemorySize / mbSize).toInt
     val ASSERT_MESSAGE_REGEX =
       ("""assertion failed: Failed to cache fiber\(\d+\.\d [TGMK]?B\) """ +
         """with cache's MAX_WEIGHT\(\d+\.\d [TGMK]?B\) / 4""").r
@@ -139,7 +139,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
   test("cache guardian remove pending fibers") {
     newFiberGroup
     Thread.sleep(1000) // Wait some time for CacheGuardian to remove pending fibers
-    val memorySizeInMB = (memoryManager.cacheMemory / mbSize).toInt
+    val memorySizeInMB = (memoryManager.getCacheMemorySize / mbSize).toInt
     val fibers = (1 to memorySizeInMB * 2).map { i =>
       val data = generateData(mbSize)
       TestFiberId(() => memoryManager.toDataFiberCache(data), s"test fiber #$fiberGroupId.$i")
@@ -190,7 +190,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
 
   // request fibers exceed max memory at the same time
   test("get different fiber simultaneously") {
-    val memorySizeInMB = (memoryManager.cacheMemory / mbSize).toInt
+    val memorySizeInMB = (memoryManager.getCacheMemorySize / mbSize).toInt
     val pool = Executors.newCachedThreadPool()
     val runners = (1 to 6).map { i =>
       val data = generateData(memorySizeInMB / 5 * mbSize)
@@ -284,7 +284,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
   }
 
   test("LRU blocks memory free") {
-    val memorySizeInMB = (memoryManager.cacheMemory / mbSize).toInt
+    val memorySizeInMB = (memoryManager.getCacheMemorySize / mbSize).toInt
     val dataInUse = generateData(mbSize)
     val fiberInUse = TestFiberId(
       () => memoryManager.toDataFiberCache(dataInUse), s"test fiber #${newFiberGroup}.0")
