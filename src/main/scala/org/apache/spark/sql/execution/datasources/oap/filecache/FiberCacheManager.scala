@@ -50,7 +50,8 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
   def pendingFiberSize: Long = _pendingFiberSize.get()
 
   def addRemovalFiber(fiber: FiberId, fiberCache: FiberCache): Unit = {
-    _pendingFiberSize.addAndGet(fiberCache.size())
+    // Record the usable size
+    _pendingFiberSize.addAndGet(fiberCache.getUsableSize())
     removalPendingQueue.offer((fiber, fiberCache))
     if (_pendingFiberSize.get() > maxMemory) {
       logWarning("Fibers pending on removal use too much memory, " +
@@ -78,7 +79,7 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
             s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
       }
     } else {
-      _pendingFiberSize.addAndGet(-cache.size())
+      _pendingFiberSize.addAndGet(-cache.getUsableSize())
       // TODO: Make log more readable
       logDebug(s"Fiber removed successfully. Fiber: $fiberId")
     }
@@ -96,7 +97,7 @@ private[sql] class FiberCacheManager(
   private val cacheBackend: OapCache = {
     val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
     if (cacheName.equals(GUAVA_CACHE)) {
-      new GuavaOapCache(memoryManager.cacheMemory, memoryManager.cacheGuardianMemory)
+      new GuavaOapCache(memoryManager.getCacheMemorySize, memoryManager.getCacheGuardianMemorySize)
     } else if (cacheName.equals(SIMPLE_CACHE)) {
       new SimpleOapCache()
     } else {

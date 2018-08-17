@@ -76,6 +76,6 @@ abstract class StatisticsTest extends SparkFunSuite with BeforeAndAfterEach {
 
   protected def wrapToFiberCache(out: ByteArrayOutputStream): FiberCache = {
     val bytes = out.toByteArray
-    new FiberCache(new MemoryBlock(bytes, Platform.BYTE_ARRAY_OFFSET, bytes.length))
+    FiberCache(bytes)
   }
 }
