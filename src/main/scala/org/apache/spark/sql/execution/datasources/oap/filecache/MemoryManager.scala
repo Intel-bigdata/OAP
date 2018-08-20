@@ -64,23 +64,48 @@ private[sql] abstract class MemoryManager {
    */
   protected def getUsableSize(address: Long, requestedSize: Long): Long
 
+  @inline protected def toFiberCache(bytes: Array[Byte]): FiberCache = {
+    val memoryBlock = allocate(bytes.length)
+    Platform.copyMemory(
+      bytes,
+      Platform.BYTE_ARRAY_OFFSET,
+      memoryBlock.getBaseObject,
+      memoryBlock.getBaseOffset,
+      bytes.length)
+    val usableSize = getUsableSize(memoryBlock.getBaseOffset, bytes.length)
+    FiberCache(memoryBlock, usableSize)
+  }
+
   /**
    * Used by IndexFile
    */
-  def toIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): FiberCache
+  def toIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): FiberCache = {
+    val bytes = new Array[Byte](length)
+    in.readFully(position, bytes)
+    toFiberCache(bytes)
+  }
 
   /**
    * Used by IndexFile. For decompressed data
    */
-  def toIndexFiberCache(bytes: Array[Byte]): FiberCache
+  def toIndexFiberCache(bytes: Array[Byte]): FiberCache = {
+    toFiberCache(bytes)
+  }
 
   /**
    * Used by OapDataFile since we need to parse the raw data in on-heap memory before put it into
    * off-heap memory
    */
-  def toDataFiberCache(bytes: Array[Byte]): FiberCache
-  def getEmptyDataFiberCache(length: Long): FiberCache
-  def stop(): Unit
+  def toDataFiberCache(bytes: Array[Byte]): FiberCache = {
+    toFiberCache(bytes)
+  }
+
+  def getEmptyDataFiberCache(length: Long): FiberCache = {
+    val memoryBlock = allocate(length)
+    val usableSize = getUsableSize(memoryBlock.getBaseOffset, memoryBlock.size())
+    FiberCache(memoryBlock, usableSize)
+  }
+  def stop(): Unit = {}
 }
 
 private[sql] object MemoryManager {
@@ -166,40 +191,6 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 
   override protected def getUsableSize(address: Long, requestedSize: Long): Long = {
     requestedSize
-  }
-
-  override def toIndexFiberCache(
-      in: FSDataInputStream,
-      position: Long,
-      length: Int): FiberCache = {
-    val bytes = new Array[Byte](length)
-    in.readFully(position, bytes)
-    toFiberCache(bytes)
-  }
-
-  override def toIndexFiberCache(bytes: Array[Byte]): FiberCache = {
-    toFiberCache(bytes)
-  }
-
-  override def toDataFiberCache(bytes: Array[Byte]): FiberCache = {
-    toFiberCache(bytes)
-  }
-  override def getEmptyDataFiberCache(length: Long): FiberCache = {
-    val memoryBlock = allocate(length)
-    val usableSize = getUsableSize(memoryBlock.getBaseOffset, memoryBlock.size())
-    FiberCache(memoryBlock, usableSize)
-  }
-
-  @inline private def toFiberCache(bytes: Array[Byte]): FiberCache = {
-    val memoryBlock = allocate(bytes.length)
-    Platform.copyMemory(
-      bytes,
-      Platform.BYTE_ARRAY_OFFSET,
-      memoryBlock.getBaseObject,
-      memoryBlock.getBaseOffset,
-      bytes.length)
-    val usableSize = getUsableSize(memoryBlock.getBaseOffset, bytes.length)
-    FiberCache(memoryBlock, usableSize)
   }
 
   override def stop(): Unit = {
