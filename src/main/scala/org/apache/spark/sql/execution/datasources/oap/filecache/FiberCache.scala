@@ -27,7 +27,10 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.unsafe.types.UTF8String
 
-case class FiberCache(protected val fiberData: MemoryBlock) extends Logging {
+// TODO: Store usableSize in MemoryBlock would be better.
+case class FiberCache(
+    protected val fiberData: MemoryBlock,
+    private val usableSize: Long) extends Logging {
 
   // This is and only is set in `cache() of OapCache`
   // TODO: make it immutable
@@ -141,12 +144,17 @@ case class FiberCache(protected val fiberData: MemoryBlock) extends Logging {
   }
 
   def size(): Long = fiberData.size()
+
+  // Return the allocated size and it's typically larger than the required data size due to memory
+  // alignments from underlying allocator
+  def getUsableSize(): Long = usableSize
 }
 
 object FiberCache {
   //  For test purpose :convert Array[Byte] to FiberCache
   private[oap] def apply(data: Array[Byte]): FiberCache = {
     val memoryBlock = new MemoryBlock(data, Platform.BYTE_ARRAY_OFFSET, data.length)
-    FiberCache(memoryBlock)
+    // We store the length of the array as the usable size.
+    FiberCache(memoryBlock, data.length)
   }
 }
