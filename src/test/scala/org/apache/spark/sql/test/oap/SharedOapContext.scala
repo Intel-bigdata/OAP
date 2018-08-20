@@ -30,7 +30,7 @@ import org.apache.spark.sql.test.{SharedSQLContext, TestOapLocalClusterSession, 
 
 trait SharedOapContext extends SharedOapContextBase {
   protected override def createSparkSession: TestSparkSession = {
-    new TestOapSession(sparkConf)
+    new TestOapSession(oapSparkConf)
   }
 }
 
@@ -39,14 +39,17 @@ trait SharedOapContext extends SharedOapContextBase {
  */
 trait SharedOapLocalClusterContext extends SharedOapContextBase {
   protected override def createSparkSession: TestSparkSession = {
-    new TestOapLocalClusterSession(sparkConf)
+    new TestOapLocalClusterSession(oapSparkConf)
   }
 }
 
 trait SharedOapContextBase extends SharedSQLContext {
 
+  // In Spark 2.1, sparkConf is a val. However is Spark 2.2 sparkConf is a function that create
+  // a new SparkConf each time.
+  val oapSparkConf = sparkConf
   // avoid the overflow of offHeap memory
-  sparkConf.set("spark.memory.offHeap.size", "100m")
+  oapSparkConf.set("spark.memory.offHeap.size", "100m")
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -54,11 +57,9 @@ trait SharedOapContextBase extends SharedSQLContext {
   }
 
   // disable file based cbo for all test suite, as it always fails.
-  sparkConf.set(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "false")
+  oapSparkConf.set(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "false")
 
   protected lazy val configuration: Configuration = spark.sessionState.newHadoopConf()
-
-  protected implicit def sqlConf: SQLConf = sqlContext.conf
 
   protected def getOapFileFormat(sparkPlan: SparkPlan): Set[Option[OapFileFormat]] = {
     def getOapFileFormatFromSource(node: SparkPlan): Option[OapFileFormat] = {

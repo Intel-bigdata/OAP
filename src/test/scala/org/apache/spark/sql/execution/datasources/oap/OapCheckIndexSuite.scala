@@ -104,7 +104,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       checkAnswer(sql("check oindex on oap_partition_table"), Nil)
 
       val partitionPath =
-        new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
+        new Path(sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
       Utils.deleteRecursively(new File(partitionPath.toUri.getPath, OapFileFormat.OAP_META_FILE))
 
       checkAnswer(sql("check oindex on oap_partition_table"),
@@ -203,8 +203,8 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
         |SELECT key from t where value == 4
       """.stripMargin)
 
-    val path1 = new Path(sqlConf.warehousePath + "/oap_partition_table/b=1/c=c1")
-    val path2 = new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
+    val path1 = new Path(sqlContext.conf.warehousePath + "/oap_partition_table/b=1/c=c1")
+    val path2 = new Path(sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
 
     checkAnswer(sql("check oindex on oap_partition_table"),
       Seq(Row(s"Meta file not found in partition: ${path1.toUri.getPath}"),
@@ -240,7 +240,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       checkAnswer(sql("check oindex on oap_partition_table"), Nil)
 
       // Delete a data file
-      val partitionPath = new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
+      val partitionPath = new Path(sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
       val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, partitionPath)
       assert(metaOpt.nonEmpty)
       assert(metaOpt.get.fileMetas.nonEmpty)
@@ -278,7 +278,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       checkAnswer(sql("check oindex on oap_partition_table"), Nil)
 
       // Delete an index file
-      val partitionPath = new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
+      val partitionPath = new Path(sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
       val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, partitionPath)
       assert(metaOpt.nonEmpty)
       assert(metaOpt.get.fileMetas.nonEmpty)
@@ -322,8 +322,8 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
         |SELECT key from t where value == 104
       """.stripMargin)
 
-    val path1 = new Path(sqlConf.warehousePath + "/oap_partition_table/b=1/c=c1")
-    val path2 = new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
+    val path1 = new Path(sqlContext.conf.warehousePath + "/oap_partition_table/b=1/c=c1")
+    val path2 = new Path(sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
 
     checkAnswer(sql("check oindex on oap_partition_table"),
       Seq(Row(s"Meta file not found in partition: ${path1.toUri.getPath}"),
@@ -367,7 +367,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       """.stripMargin)
 
     val partitionPath =
-      new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
+      new Path(sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
     checkAnswer(
       sql("check oindex on oap_partition_table partition(b=2, c='c2')"),
       Row(s"Meta file not found in partition: ${partitionPath.toUri.getPath}"))
@@ -413,7 +413,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       checkAnswer(sql("check oindex on oap_partition_table partition(b=2, c='c2')"), Nil)
 
       val partitionPath =
-        new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
+        new Path(sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
       // Delete a data file
       val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, partitionPath)
       assert(metaOpt.nonEmpty)
@@ -453,7 +453,7 @@ class OapCheckIndexSuite extends QueryTest with SharedOapContext with BeforeAndA
       checkAnswer(sql("check oindex on oap_partition_table partition(b=2, c='c2')"), Nil)
 
       // Delete an index file
-      val partitionPath = new Path(sqlConf.warehousePath + "/oap_partition_table/b=2/c=c2")
+      val partitionPath = new Path(sqlContext.conf.warehousePath + "/oap_partition_table/b=2/c=c2")
       val metaOpt = OapUtils.getMeta(sparkContext.hadoopConfiguration, partitionPath)
       assert(metaOpt.nonEmpty)
       assert(metaOpt.get.fileMetas.nonEmpty)

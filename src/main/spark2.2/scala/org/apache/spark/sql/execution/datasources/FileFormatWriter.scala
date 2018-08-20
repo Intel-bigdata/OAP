@@ -81,7 +81,10 @@ object FileFormatWriter extends Logging {
   }
 
   /** The result of a successful write task. */
-  private case class WriteTaskResult(commitMsg: TaskCommitMessage, updatedPartitions: Set[String])
+  private case class WriteTaskResult(
+      commitMsg: TaskCommitMessage,
+      updatedPartitions: Set[String],
+      writeResults: Seq[WriteResult])
 
   /**
    * Basic work flow of this command is:
@@ -104,7 +107,7 @@ object FileFormatWriter extends Logging {
       partitionColumnNames: Seq[String],
       bucketSpec: Option[BucketSpec],
       refreshFunction: (Seq[TablePartitionSpec]) => Unit,
-      options: Map[String, String]): Unit = {
+      options: Map[String, String]): Seq[WriteResult] = {
 
     val job = Job.getInstance(hadoopConf)
     job.setOutputKeyClass(classOf[Void])
@@ -205,10 +208,13 @@ object FileFormatWriter extends Logging {
         val commitMsgs = ret.map(_.commitMsg)
         val updatedPartitions = ret.flatMap(_.updatedPartitions)
           .distinct.map(PartitioningUtils.parsePathFragment)
+        val writeResults = ret.flatMap(_.writeResults)
 
         committer.commitJob(job, commitMsgs)
+        outputWriterFactory.commitJob(writeResults)
         logInfo(s"Job ${job.getJobID} committed.")
         refreshFunction(updatedPartitions)
+        writeResults
       } catch { case cause: Throwable =>
         logError(s"Aborting job ${job.getJobID}.", cause)
         committer.abortJob(job)
@@ -255,9 +261,9 @@ object FileFormatWriter extends Logging {
     try {
       Utils.tryWithSafeFinallyAndFailureCallbacks(block = {
         // Execute the task to write rows out and commit the task.
-        val outputPartitions = writeTask.execute(iterator)
-        writeTask.releaseResources()
-        WriteTaskResult(committer.commitTask(taskAttemptContext), outputPartitions)
+        var (outputPartitions, writeResults) = writeTask.execute(iterator)
+        writeResults = writeResults ++ writeTask.releaseResources()
+        WriteTaskResult(committer.commitTask(taskAttemptContext), outputPartitions, writeResults)
       })(catchBlock = {
         // If there is an error, release resource and then abort the task
         try {
@@ -283,8 +289,8 @@ object FileFormatWriter extends Logging {
      * Writes data out to files, and then returns the list of partition strings written out.
      * The list of partitions is sent back to the driver and used to update the catalog.
      */
-    def execute(iterator: Iterator[InternalRow]): Set[String]
-    def releaseResources(): Unit
+    def execute(iterator: Iterator[InternalRow]): (Set[String], Seq[WriteResult])
+    def releaseResources(): Seq[WriteResult]
   }
 
   /** Writes data to a single directory (used for non-dynamic-partition writes). */
@@ -308,9 +314,10 @@ object FileFormatWriter extends Logging {
         context = taskAttemptContext)
     }
 
-    override def execute(iter: Iterator[InternalRow]): Set[String] = {
+    override def execute(iter: Iterator[InternalRow]): (Set[String], Seq[WriteResult]) = {
       var fileCounter = 0
       var recordsInFile: Long = 0L
+      var writeResults: Seq[WriteResult] = Nil
       newOutputWriter(fileCounter)
       while (iter.hasNext) {
         if (description.maxRecordsPerFile > 0 && recordsInFile >= description.maxRecordsPerFile) {
@@ -319,7 +326,7 @@ object FileFormatWriter extends Logging {
             s"File counter $fileCounter is beyond max value $MAX_FILE_COUNTER")
 
           recordsInFile = 0
-          releaseResources()
+          writeResults = writeResults ++ releaseResources()
           newOutputWriter(fileCounter)
         }
 
@@ -327,18 +334,21 @@ object FileFormatWriter extends Logging {
         currentWriter.write(internalRow)
         recordsInFile += 1
       }
-      releaseResources()
-      Set.empty
+      writeResults = writeResults ++ releaseResources()
+      (Set.empty, writeResults)
     }
 
-    override def releaseResources(): Unit = {
+    override def releaseResources(): Seq[WriteResult] = {
+      var writeResults: Seq[WriteResult] = Nil
       if (currentWriter != null) {
         try {
           currentWriter.close()
+          writeResults = writeResults :+ currentWriter.writeStatus()
         } finally {
           currentWriter = null
         }
       }
+      writeResults
     }
   }
 
@@ -403,11 +413,11 @@ object FileFormatWriter extends Logging {
       val ext = f"$bucketId.c$fileCounter%03d" +
         desc.outputWriterFactory.getFileExtension(taskAttemptContext)
 
-      val customPath = partDir match {
+      val (customPath, partitionString) = partDir match {
         case Some(dir) =>
-          desc.customPartitionLocations.get(PartitioningUtils.parsePathFragment(dir))
+          (desc.customPartitionLocations.get(PartitioningUtils.parsePathFragment(dir)), dir)
         case _ =>
-          None
+          (None, "")
       }
       val path = if (customPath.isDefined) {
         committer.newTaskTempFileAbsPath(taskAttemptContext, customPath.get, ext)
@@ -419,9 +429,10 @@ object FileFormatWriter extends Logging {
         path = path,
         dataSchema = desc.dataColumns.toStructType,
         context = taskAttemptContext)
+      currentWriter.setPartitionString(partitionString)
     }
 
-    override def execute(iter: Iterator[InternalRow]): Set[String] = {
+    override def execute(iter: Iterator[InternalRow]): (Set[String], Seq[WriteResult]) = {
       val getPartitionColsAndBucketId = UnsafeProjection.create(
         desc.partitionColumns ++ desc.bucketIdExpression, desc.allColumns)
 
@@ -433,6 +444,7 @@ object FileFormatWriter extends Logging {
       val getOutputRow = UnsafeProjection.create(desc.dataColumns, desc.allColumns)
 
       // If anything below fails, we should abort the task.
+      var writeResults: Seq[WriteResult] = Nil
       var recordsInFile: Long = 0L
       var fileCounter = 0
       var currentPartColsAndBucketId: UnsafeRow = null
@@ -447,7 +459,7 @@ object FileFormatWriter extends Logging {
           recordsInFile = 0
           fileCounter = 0
 
-          releaseResources()
+          writeResults = writeResults ++ releaseResources()
           newOutputWriter(currentPartColsAndBucketId, getPartPath, fileCounter, updatedPartitions)
         } else if (desc.maxRecordsPerFile > 0 &&
             recordsInFile >= desc.maxRecordsPerFile) {
@@ -458,25 +470,28 @@ object FileFormatWriter extends Logging {
           assert(fileCounter < MAX_FILE_COUNTER,
             s"File counter $fileCounter is beyond max value $MAX_FILE_COUNTER")
 
-          releaseResources()
+           writeResults = writeResults ++ releaseResources()
           newOutputWriter(currentPartColsAndBucketId, getPartPath, fileCounter, updatedPartitions)
         }
 
         currentWriter.write(getOutputRow(row))
         recordsInFile += 1
       }
-      releaseResources()
-      updatedPartitions.toSet
+      writeResults = writeResults ++ releaseResources()
+      (updatedPartitions.toSet, writeResults)
     }
 
-    override def releaseResources(): Unit = {
+    override def releaseResources(): Seq[WriteResult] = {
+      var writeResults: Seq[WriteResult] = Nil
       if (currentWriter != null) {
         try {
           currentWriter.close()
+          writeResults = writeResults :+ currentWriter.writeStatus()
         } finally {
           currentWriter = null
         }
       }
+      writeResults
     }
   }
 }

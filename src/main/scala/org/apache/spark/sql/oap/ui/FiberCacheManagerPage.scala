@@ -22,7 +22,8 @@ import javax.servlet.http.HttpServletRequest
 import scala.xml.Node
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.execution.datasources.oap.filecache.{CacheStats, FiberCacheManagerSensor}
+import org.apache.spark.sql.execution.datasources.oap.filecache.CacheStats
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.ui.{UIUtils, WebUIPage}
 import org.apache.spark.ui.exec.ExecutorsListener
 
@@ -53,11 +54,9 @@ private[spark] object FiberCacheManagerPage {
     val hostPort = status.blockManagerId.hostPort
     val memUsed = status.memUsed
     val maxMem = status.maxMem
-    val cacheStats = if (FiberCacheManagerSensor.executorToCacheManager.containsKey(execId)) {
-      FiberCacheManagerSensor.executorToCacheManager.get(execId)
-    } else {
-      CacheStats()
-    }
+    val cacheStats =
+      OapRuntime.getOrCreate.fiberSensor.executorToCacheManager.getOrDefault(execId, CacheStats())
+
 
     new FiberCacheManagerSummary(
       execId,

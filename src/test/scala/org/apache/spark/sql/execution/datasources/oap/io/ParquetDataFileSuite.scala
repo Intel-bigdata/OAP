@@ -71,6 +71,8 @@ abstract class ParquetDataFileSuite extends SparkFunSuite with SharedOapContext
       SQLConf.PARQUET_INT96_AS_TIMESTAMP.defaultValue.get)
     configuration.setBoolean(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key,
       SQLConf.PARQUET_WRITE_LEGACY_FORMAT.defaultValue.get)
+    // SQLConf.PARQUET_INT64_AS_TIMESTAMP_MILLIS is defined in Spark 2.2 and later
+    configuration.setBoolean("spark.sql.parquet.int64AsTimestampMillis", false)
     prepareData()
   }
 
@@ -78,6 +80,7 @@ abstract class ParquetDataFileSuite extends SparkFunSuite with SharedOapContext
     configuration.unset(SQLConf.PARQUET_BINARY_AS_STRING.key)
     configuration.unset(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key)
     configuration.unset(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key)
+    configuration.unset("spark.sql.parquet.int64AsTimestampMillis")
     cleanDir()
   }
 

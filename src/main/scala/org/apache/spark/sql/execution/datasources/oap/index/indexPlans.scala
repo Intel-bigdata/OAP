@@ -188,7 +188,7 @@ case class CreateIndexCommand(
       outputSpec = FileFormatWriter.OutputSpec(
         qualifiedOutputPath.toUri.getPath, Map.empty),
       hadoopConf = configuration,
-      partitionColumns = Seq.empty,
+      Seq.empty, // partitionColumns
       bucketSpec = Option.empty,
       refreshFunction = _ => Unit,
       options = options).asInstanceOf[Seq[Seq[IndexBuildResult]]]
@@ -426,7 +426,7 @@ case class RefreshIndexCommand(
         outputSpec = FileFormatWriter.OutputSpec(
           qualifiedOutputPath.toUri.getPath, Map.empty),
         hadoopConf = configuration,
-        partitionColumns = Seq.empty,
+        Seq.empty, // partitionColumns
         bucketSpec = Option.empty,
         refreshFunction = _ => Unit,
         options = options).asInstanceOf[Seq[Seq[IndexBuildResult]]]

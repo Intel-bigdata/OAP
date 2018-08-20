@@ -19,7 +19,6 @@ package org.apache.spark.sql.oap.listener
 
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent}
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCacheManagerSensor
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
 import org.apache.spark.sql.oap.OapRuntime
 
@@ -44,9 +43,9 @@ class OapListener extends SparkListener {
   override def onOtherEvent(event: SparkListenerEvent): Unit = event match {
     case customInfo: SparkListenerCustomInfoUpdate =>
       if (customInfo.clazzName.contains("OapFiberCacheHeartBeatMessager")) {
-        OapRuntime.getOrCreate.fiberSensor.update(customInfo)
+        OapRuntime.getOrCreate.fiberSensor.updateLocations(customInfo)
       } else if (customInfo.clazzName.contains("FiberCacheManagerMessager")) {
-        FiberCacheManagerSensor.update(customInfo)
+        OapRuntime.getOrCreate.fiberSensor.updateMetrics(customInfo)
       }
     case indexInfo: SparkListenerOapIndexInfoUpdate =>
       OapIndexInfo.update(indexInfo)

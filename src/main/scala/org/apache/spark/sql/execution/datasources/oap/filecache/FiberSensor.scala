@@ -19,12 +19,9 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.ConcurrentHashMap
 
-import scala.collection.JavaConverters._
-
 import com.google.common.base.Throwables
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.execution.datasources.oap.IndexMeta
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.sql.oap.listener.SparkListenerCustomInfoUpdate
 import org.apache.spark.util.collection.BitSet
@@ -37,26 +34,19 @@ private[oap] case class FiberCacheStatus(
 
   val cachedFiberCount = bitmask.cardinality()
 
-  def moreCacheThan(other: FiberCacheStatus): Boolean = {
-    if (cachedFiberCount >= other.cachedFiberCount) {
-      true
-    } else {
-      false
-    }
-  }
+  def moreCacheThan(other: FiberCacheStatus): Boolean = cachedFiberCount >= other.cachedFiberCount
 }
 
-private[oap] case class IndexFiberCacheStatus(file: String, meta: IndexMeta)
+// TODO: FiberSensor doesn't consider the fiber cache, but only the number of cached fiber count
+// FiberSensor is the FiberCache info recorder on Driver, it contains a file cache location mapping
+// (for cache locality) and metrics info
+private[sql] class FiberSensor extends Logging {
 
-
-// TODO FiberSensor doesn't consider the fiber cache, but only the number of cached
-// fiber count
-private[oap] trait AbstractFiberSensor extends Logging {
-  case class HostFiberCache(host: String, status: FiberCacheStatus)
+  private case class HostFiberCache(host: String, status: FiberCacheStatus)
 
   private val fileToHost = new ConcurrentHashMap[String, HostFiberCache]
 
-  def update(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
+  def updateLocations(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
     val updateExecId = fiberInfo.executorId
     val updateHostName = fiberInfo.hostName
     val host = FiberSensor.OAP_CACHE_HOST_PREFIX + updateHostName +
@@ -76,34 +66,10 @@ private[oap] trait AbstractFiberSensor extends Logging {
     }
   }
 
-  /**
-   * get hosts that has fiber cached for fiber file.
-   * Current implementation only returns one host, but still using API name with [[getHosts]]
-   * @param filePath fiber file's path
-   * @return
-   */
-  def getHosts(filePath: String): Option[String] = {
-    fileToHost.get(filePath) match {
-      case HostFiberCache(host, status) => Some(host)
-      case null => None
-    }
-  }
-}
+  // TODO: define a function to wrap this and make it private
+  private[sql] val executorToCacheManager = new ConcurrentHashMap[String, CacheStats]()
 
-private[oap] object FiberSensor {
-  val OAP_CACHE_HOST_PREFIX = "OAP_HOST_"
-  val OAP_CACHE_EXECUTOR_PREFIX = "_OAP_EXECUTOR_"
-}
-
-private[sql] class FiberSensor extends AbstractFiberSensor
-
-object FiberCacheManagerSensor extends AbstractFiberSensor {
-  val executorToCacheManager = new ConcurrentHashMap[String, CacheStats]()
-
-  def summary(): CacheStats = executorToCacheManager.asScala.toMap.values
-    .foldLeft(CacheStats())((sum, cache) => sum + cache)
-
-  override def update(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
+  def updateMetrics(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
     if (fiberInfo.customizedInfo.nonEmpty) {
       try {
         val cacheMetrics = CacheStats(fiberInfo.customizedInfo)
@@ -113,8 +79,26 @@ object FiberCacheManagerSensor extends AbstractFiberSensor {
       } catch {
         case t: Throwable =>
           val stack = Throwables.getStackTraceAsString(t)
-          logError(s"FiberCacheManagerSensor parse json failed, $stack")
+          logError(s"FiberSensor parse json failed, $stack")
       }
     }
   }
+
+  /**
+   * get hosts that has fiber cached for fiber file.
+   * Current implementation only returns one host, but still using API name with [[getHosts]]
+   * @param filePath fiber file's path
+   * @return
+   */
+  def getHosts(filePath: String): Seq[String] = {
+    fileToHost.get(filePath) match {
+      case HostFiberCache(host, status) => Seq(host)
+      case null => Seq.empty
+    }
+  }
+}
+
+private[oap] object FiberSensor {
+  val OAP_CACHE_HOST_PREFIX = "OAP_HOST_"
+  val OAP_CACHE_EXECUTOR_PREFIX = "_OAP_EXECUTOR_"
 }

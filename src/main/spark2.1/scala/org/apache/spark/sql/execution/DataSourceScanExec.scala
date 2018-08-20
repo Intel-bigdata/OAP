@@ -503,7 +503,7 @@ case class FileSourceScanExec(
           }
         } else {
           val cachedHosts = OapRuntime.getOrCreate.fiberSensor.getHosts(file.getPath.toString)
-          val hosts = cachedHosts.toBuffer ++ getBlockHosts(blockLocations, 0, file.getLen)
+          val hosts = cachedHosts ++ getBlockHosts(blockLocations, 0, file.getLen)
           Seq(PartitionedFile(
             partition.values, file.getPath.toUri.toString, 0, file.getLen, hosts.toArray))
         }

@@ -177,7 +177,7 @@ class OapMetricsSuite extends QueryTest with SharedOapContext with BeforeAndAfte
     sql("create oindex idx1 on parquet_test (a)")
 
     // satisfy indexFile / dataFile > 0.7
-    sqlConf.setConfString(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "true")
+    sqlContext.conf.setConfString(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "true")
 
     // SQL 4: ignore index => readBehavior return FULL_SCAN
     val df = sql("SELECT * FROM parquet_test WHERE a = 1")
@@ -190,7 +190,7 @@ class OapMetricsSuite extends QueryTest with SharedOapContext with BeforeAndAfte
       Some(TaskMetrics(3, 0, 0, 3, 0)))
 
     sql("drop oindex idx1 on parquet_test")
-    sqlConf.setConfString(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "false")
+    sqlContext.conf.setConfString(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "false")
   }
 
   test("test OAP accumulators on Oap when miss index") {

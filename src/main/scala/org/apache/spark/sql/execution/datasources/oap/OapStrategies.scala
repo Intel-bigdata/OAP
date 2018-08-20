@@ -19,21 +19,25 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{execution, SparkSession, Strategy}
-import org.apache.spark.sql.catalyst.{expressions, InternalRow}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.Strategy
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog._
+import org.apache.spark.sql.catalyst.expressions
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalAggregation, PhysicalOperation}
 import org.apache.spark.sql.catalyst.plans.{logical, LeftSemi}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
+import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.aggregate.OapAggUtils
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.oap.utils.CaseInsensitiveMap
 import org.apache.spark.sql.execution.joins.BuildRight
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.adapter.{AggregateFunctionAdapter, FileIndexAdapter, FileSourceScanExecAdapter, LogicalPlanAdapter}
 import org.apache.spark.util.Utils
 
 trait OapStrategies extends Logging {
@@ -104,7 +108,7 @@ trait OapStrategies extends Logging {
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
         if (orderAttributes.size == 1 && filterAttributes == orderAttributes) {
-          val oapOption = new CaseInsensitiveMap(file.options +
+          val oapOption = CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY -> limit.toString) +
             (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
           val indexRequirement = filters.map(_ => BTreeIndex())
@@ -147,8 +151,8 @@ trait OapStrategies extends Logging {
       // We can take a much larger threshold here since if this optimization
       // is applicable, only distinct item will be broadcasted, those data
       // should much less than the origin table.
-      plan.statistics.isBroadcastable ||
-        plan.statistics.sizeInBytes <= conf.autoBroadcastJoinThreshold
+      val stats = LogicalPlanAdapter.getStatistics(plan, conf)
+      stats.sizeInBytes <= conf.autoBroadcastJoinThreshold
     }
 
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
@@ -169,7 +173,7 @@ trait OapStrategies extends Logging {
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
         if (orderAttributes.size == 1 || filterAttributes == orderAttributes) {
-          val oapOption = new CaseInsensitiveMap(file.options +
+          val oapOption = CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY -> "1"))
           val indexRequirement = filters.map(_ => BitMapIndex())
 
@@ -214,7 +218,8 @@ trait OapStrategies extends Logging {
         }
 
         val aggregateOperator =
-          if (aggregateExpressions.map(_.aggregateFunction).exists(!_.supportsPartial)) {
+          if (aggregateExpressions.map(_.aggregateFunction).exists(
+            !AggregateFunctionAdapter.supportsPartial(_))) {
             if (functionsWithDistinct.nonEmpty) {
               sys.error("Distinct columns cannot exist in Aggregate operator containing " +
                 "aggregate functions which don't support partial aggregation.")
@@ -253,7 +258,7 @@ trait OapStrategies extends Logging {
         val indexRequirement = filters.map(_ => BTreeIndex())
 
         if (groupingAttributes.size == 1 && filterAttributes == groupingAttributes) {
-          val oapOption = new CaseInsensitiveMap(file.options +
+          val oapOption = CaseInsensitiveMap(file.options +
             (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
 
           createOapFileScanPlan(
@@ -331,7 +336,8 @@ trait OapStrategies extends Logging {
       ExpressionSet(normalizedFilters.filter(_.references.subsetOf(partitionSet)))
     logInfo(s"Pruning directories with: ${partitionKeyFilters.mkString(",")}")
 
-    val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq)
+    val selectedPartitions = FileIndexAdapter.listFiles(
+      _fsRelation.location, partitionKeyFilters.toSeq, Nil)
 
     _fsRelation.fileFormat match {
       case fileFormat: OapFileFormat =>
@@ -360,20 +366,16 @@ trait OapStrategies extends Logging {
           val outputSchema = readDataColumns.toStructType
           logInfo(s"Output Data Schema: ${outputSchema.simpleString(5)}")
 
-          val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
-          logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
-
           val outputAttributes = readDataColumns ++ partitionColumns
 
           val oapRelation = _fsRelation.copy(options = oapOption)(_fsRelation.sparkSession)
-          val scan =
-            new FileSourceScanExec(
-              oapRelation,
-              outputAttributes,
-              outputSchema,
-              partitionKeyFilters.toSeq,
-              pushedDownFilters,
-              table.map(_.identifier))
+          val scan = FileSourceScanExecAdapter.createFileSourceScanExec(
+            oapRelation,
+            outputAttributes,
+            outputSchema,
+            partitionKeyFilters.toSeq,
+            dataFilters,
+            table.map(_.identifier))
 
           val afterScanFilter = afterScanFilters.toSeq.reduceOption(expressions.And)
           val withFilter = afterScanFilter.map(execution.FilterExec(_, scan)).getOrElse(scan)

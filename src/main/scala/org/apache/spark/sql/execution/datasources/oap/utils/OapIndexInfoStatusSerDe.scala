@@ -34,6 +34,8 @@ import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfoStatus
 private[oap] object OapIndexInfoStatusSerDe extends SerDe[String, Seq[OapIndexInfoStatus]] {
   import org.json4s.jackson.JsonMethods._
 
+  private implicit val format = DefaultFormats
+
   override def serialize(indexStatusRawDataArray: Seq[OapIndexInfoStatus]): String = {
     val statusJArray = JArray(indexStatusRawDataArray.map(indexStatusRawDataToJson).toList)
     compact(render("oapIndexInfoStatusRawDataArray" -> statusJArray))
@@ -41,10 +43,8 @@ private[oap] object OapIndexInfoStatusSerDe extends SerDe[String, Seq[OapIndexIn
 
   override def deserialize(json: String): Seq[OapIndexInfoStatus] = {
     (parse(json) \ "oapIndexInfoStatusRawDataArray").extract[List[JValue]].map(
-      indexStatusRawDataFromJson)
+      indexStatusRawDataFromJson(_))
   }
-
-  private implicit val format = DefaultFormats
 
   private[oap] def indexStatusRawDataFromJson(json: JValue): OapIndexInfoStatus = {
     val path = (json \ "partitionFilePath").extract[String]

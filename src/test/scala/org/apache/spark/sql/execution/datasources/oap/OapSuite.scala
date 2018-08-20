@@ -74,15 +74,15 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
   test("No Lease Exception on Parquet File Format in Index Building (#243)") {
     val df = sqlContext.read.format("parquet").load(parquetPath.getAbsolutePath)
     df.createOrReplaceTempView("parquet_table")
-    val defaultMaxBytes = sqlConf.getConf(SQLConf.FILES_MAX_PARTITION_BYTES)
+    val defaultMaxBytes = sqlContext.conf.getConf(SQLConf.FILES_MAX_PARTITION_BYTES)
     val maxPartitionBytes = 100L
-    sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, maxPartitionBytes)
+    sqlContext.conf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, maxPartitionBytes)
     val numTasks = sql("select * from parquet_table").queryExecution.toRdd.partitions.length
     withIndex(TestIndex("parquet_table", "parquet_idx")) {
       sql("create oindex parquet_idx on parquet_table (a)")
       assert(numTasks == parquetPath.listFiles().filter(_.getName.endsWith(".parquet"))
         .map(f => Math.ceil(f.length().toDouble / maxPartitionBytes).toInt).sum)
-      sqlConf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, defaultMaxBytes)
+      sqlContext.conf.setConf(SQLConf.FILES_MAX_PARTITION_BYTES, defaultMaxBytes)
     }
   }
 
@@ -97,11 +97,11 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
       "lZo",
       "UNCOMPRESSED",
       "UnCompressed").foreach { codec =>
-      sqlConf.setConfString(OapConf.OAP_COMPRESSION.key, codec)
+      sqlContext.conf.setConfString(OapConf.OAP_COMPRESSION.key, codec)
       val df = sqlContext.read.format("oap").load(path.getAbsolutePath)
       df.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
       val compressionType =
-        sqlConf.getConfString(OapConf.OAP_COMPRESSION.key).toLowerCase
+        sqlContext.conf.getConfString(OapConf.OAP_COMPRESSION.key).toLowerCase
       val fileNameIterator = path.listFiles()
       for (fileName <- fileNameIterator) {
         if (fileName.toString.endsWith(OapFileFormat.OAP_DATA_EXTENSION)) {
@@ -115,7 +115,8 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
       }
     }
     // Restore compression type back to default.
-    sqlConf.setConfString(OapConf.OAP_COMPRESSION.key, OapConf.OAP_COMPRESSION.defaultValueString)
+    sqlContext.conf.setConfString(
+      OapConf.OAP_COMPRESSION.key, OapConf.OAP_COMPRESSION.defaultValueString)
   }
 
   test("Enable/disable using OAP index after the index is created already") {

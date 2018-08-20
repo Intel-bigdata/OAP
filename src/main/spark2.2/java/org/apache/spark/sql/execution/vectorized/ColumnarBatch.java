@@ -86,6 +86,11 @@ public final class ColumnarBatch {
     }
   }
 
+  // For DataSourceScanExec
+  public boolean isFiltered(int rowId) {
+    return filteredRows[rowId];
+  }
+
   /**
    * Adapter class to interop with existing components that expect internal row. A lot of
    * performance is lost with this translation.
@@ -145,7 +150,7 @@ public final class ColumnarBatch {
           } else if (dt instanceof LongType) {
             row.setLong(i, getLong(i));
           } else if (dt instanceof FloatType) {
-              row.setFloat(i, getFloat(i));
+            row.setFloat(i, getFloat(i));
           } else if (dt instanceof DoubleType) {
             row.setDouble(i, getDouble(i));
           } else if (dt instanceof StringType) {
@@ -169,7 +174,7 @@ public final class ColumnarBatch {
 
     @Override
     public boolean anyNull() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException("any null");
     }
 
     @Override
@@ -236,12 +241,12 @@ public final class ColumnarBatch {
 
     @Override
     public MapData getMap(int ordinal) {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException("get map");
     }
 
     @Override
     public Object get(int ordinal, DataType dataType) {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException("use specific get");
     }
 
     @Override
@@ -366,7 +371,7 @@ public final class ColumnarBatch {
 
       @Override
       public void remove() {
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException("remove");
       }
     };
   }
@@ -462,6 +467,25 @@ public final class ColumnarBatch {
     assert(!filteredRows[rowId]);
     filteredRows[rowId] = true;
     ++numRowsFiltered;
+  }
+
+  /**
+   * Marks this row not filtered out. This means a subsequent iteration over the rows
+   * in this batch will include this row.
+   * For IndexedVectorizedOapRecordReader.
+   */
+  public void markValid(int rowId) {
+    assert(filteredRows[rowId]);
+    filteredRows[rowId] = false;
+    --numRowsFiltered;
+  }
+
+  /**
+   * For IndexedVectorizedOapRecordReader.
+   */
+  public void markAllFiltered() {
+    Arrays.fill(filteredRows, true);
+    numRowsFiltered = numRows;
   }
 
   /**
