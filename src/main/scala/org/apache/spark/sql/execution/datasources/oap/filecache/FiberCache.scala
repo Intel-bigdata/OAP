@@ -145,7 +145,8 @@ case class FiberCache(
 
   def size(): Long = fiberData.size()
 
-  // Usable size maybe different the size, it should be the actual occupied size of memory.
+  // Return the allocated size and it's typically larger than the required data size due to memory
+  // alignments from underlying allocator
   def getUsableSize(): Long = usableSize
 }
 
