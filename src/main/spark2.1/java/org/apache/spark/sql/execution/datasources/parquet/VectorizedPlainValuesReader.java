@@ -31,8 +31,8 @@ import org.apache.parquet.io.api.Binary;
  */
 public class VectorizedPlainValuesReader extends ValuesReader implements VectorizedValuesReader {
   private byte[] buffer;
-  private int offset;
-  private int bitOffset; // Only used for booleans.
+  protected int offset;
+  protected int bitOffset; // Only used for booleans.
   private ByteBuffer byteBuffer; // used to wrap the byte array buffer
 
   private static final boolean bigEndianPlatform =
