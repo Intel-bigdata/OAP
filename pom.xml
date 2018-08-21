@@ -596,6 +596,7 @@
             <configuration>
               <excludes>
                 <exclude>src/main/spark2.2</exclude>
+                <exclude>src/main/spark2.3</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -654,6 +655,7 @@
             <configuration>
               <excludes>
                 <exclude>src/main/spark2.1</exclude>
+                <exclude>src/main/spark2.3</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -679,7 +681,7 @@
         </plugins>
       </build>
     </profile>
-	<profile>
+    <profile>
       <id>spark-2.3</id>
       <properties>
         <spark.version>2.3.0</spark.version>
