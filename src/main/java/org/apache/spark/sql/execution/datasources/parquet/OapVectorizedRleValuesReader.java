@@ -103,30 +103,7 @@ public class OapVectorizedRleValuesReader extends VectorizedRleValuesReader
   }
 
   public void skipShorts(int total, int level, OapVectorizedValuesReader data) {
-    int left = total;
-    while (left > 0) {
-      if (this.currentCount == 0) this.readNextGroup();
-      int n = Math.min(left, this.currentCount);
-      switch (mode) {
-        case RLE:
-          if (currentValue == level) {
-            for (int i = 0; i < n; i++) {
-              // TODO use skipIntegers?
-              data.readInteger();
-            }
-          }
-          break;
-        case PACKED:
-          for (int i = 0; i < n; ++i) {
-            if (currentBuffer[currentBufferIdx++] == level) {
-              data.skipInteger();
-            }
-          }
-          break;
-      }
-      left -= n;
-      currentCount -= n;
-    }
+    skipIntegers(total, level, data);
   }
 
   public void skipLongs(int total, int level, OapVectorizedValuesReader data) {
