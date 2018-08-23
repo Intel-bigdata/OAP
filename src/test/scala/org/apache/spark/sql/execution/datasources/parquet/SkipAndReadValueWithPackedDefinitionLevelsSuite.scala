@@ -42,7 +42,10 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipIntegers(8, 1, valueReader)
+    val reader = defReader
+    reader.skipIntegers(5, 1, valueReader)
+    reader.skipIntegers(3, 1, valueReader)
+    reader.skipIntegers(0, 1, valueReader)
 
     // assert read value
     assert(valueReader.readInteger() == 3)
@@ -64,7 +67,10 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipBooleans(8, 1, valueReader)
+    val reader = defReader
+    reader.skipBooleans(5, 1, valueReader)
+    reader.skipBooleans(3, 1, valueReader)
+    reader.skipBooleans(0, 1, valueReader)
 
     // assert read value
     assert(!valueReader.readBoolean())
@@ -87,7 +93,10 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipBytes(8, 1, valueReader)
+    val reader = defReader
+    reader.skipBytes(5, 1, valueReader)
+    reader.skipBytes(3, 1, valueReader)
+    reader.skipBytes(0, 1, valueReader)
 
     // assert read value
     assert(valueReader.readByte() == 'C'.toInt)
@@ -106,7 +115,10 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipShorts(8, 1, valueReader)
+    val reader = defReader
+    reader.skipShorts(5, 1, valueReader)
+    reader.skipShorts(3, 1, valueReader)
+    reader.skipShorts(0, 1, valueReader)
 
     // assert read value
     assert(valueReader.readInteger().toShort == 3.toShort)
@@ -125,7 +137,10 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipLongs(8, 1, valueReader)
+    val reader = defReader
+    reader.skipLongs(5, 1, valueReader)
+    reader.skipLongs(3, 1, valueReader)
+    reader.skipLongs(0, 1, valueReader)
 
     // assert read value
     assert(valueReader.readLong() == 3L)
@@ -144,7 +159,10 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipFloats(8, 1, valueReader)
+    val reader = defReader
+    reader.skipFloats(5, 1, valueReader)
+    reader.skipFloats(3, 1, valueReader)
+    reader.skipFloats(0, 1, valueReader)
 
     // assert read value
     assert(valueReader.readFloat() == 3.0F)
@@ -163,7 +181,10 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipDoubles(8, 1, valueReader)
+    val reader = defReader
+    reader.skipDoubles(5, 1, valueReader)
+    reader.skipDoubles(3, 1, valueReader)
+    reader.skipDoubles(0, 1, valueReader)
 
     // assert read value
     assert(valueReader.readDouble() == 3.0D)
@@ -185,7 +206,10 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipBinarys(8, 1, valueReader)
+    val reader = defReader
+    reader.skipBinarys(5, 1, valueReader)
+    reader.skipBinarys(3, 1, valueReader)
+    reader.skipBinarys(0, 1, valueReader)
 
     // read binary to a vector and assert read value
     val vector = ColumnVector.allocate(10, BinaryType, MemoryMode.ON_HEAP)
