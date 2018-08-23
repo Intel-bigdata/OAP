@@ -27,11 +27,11 @@ import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.vectorized.ColumnVector
 import org.apache.spark.sql.types.BinaryType
 
-class CombinedValuesReaderSuite extends SparkFunSuite with Logging {
+class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with Logging {
+
   test("read and skip Integers") {
 
     // prepare data: [null, null, 1, null, null, null, 2, null, 3, 4]
-    // def: [0, 0, 1, 0, 0, 0, 1, 0, 1, 1]
     // value: [1, 2, 3, 4]
     val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
     (1 until 5).foreach(valueWriter.writeInteger)
@@ -42,16 +42,15 @@ class CombinedValuesReaderSuite extends SparkFunSuite with Logging {
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipIntegers(9, 1, valueReader)
+    defReader.skipIntegers(8, 1, valueReader)
 
     // assert read value
-    assert(valueReader.readInteger() == 4)
+    assert(valueReader.readInteger() == 3)
   }
 
   test("read and skip Booleans") {
 
     // prepare data: [null, null, true, null, null, null, false, null, false, true]
-    // def: [0, 0, 1, 0, 0, 0, 1, 0, 1, 1]
     // value: [true, false, false, true]
     val valueWriter = new BooleanPlainValuesWriter()
     valueWriter.writeBoolean(true)
@@ -65,7 +64,7 @@ class CombinedValuesReaderSuite extends SparkFunSuite with Logging {
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipBooleans(6, 1, valueReader)
+    defReader.skipBooleans(8, 1, valueReader)
 
     // assert read value
     assert(!valueReader.readBoolean())
@@ -74,7 +73,6 @@ class CombinedValuesReaderSuite extends SparkFunSuite with Logging {
   test("read and skip skipBytes") {
 
     // prepare data: [null, null, A, null, null, null, B, null, C, D]
-    // def: [0, 0, 1, 0, 0, 0, 1, 0, 1, 1]
     // value: value: [A, B, C, D]
     val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
     "ABCD".getBytes.foreach { v =>
@@ -99,7 +97,6 @@ class CombinedValuesReaderSuite extends SparkFunSuite with Logging {
 
     // actually short store as int
     // prepare data: [null, null, 1, null, null, null, 2, null, 3, 4]
-    // def: [0, 0, 1, 0, 0, 0, 1, 0, 1, 1]
     // value: [1, 2, 3, 4]
     val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
     (1 until 5).foreach(valueWriter.writeInteger)
@@ -109,16 +106,15 @@ class CombinedValuesReaderSuite extends SparkFunSuite with Logging {
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipShorts(9, 1, valueReader)
+    defReader.skipShorts(8, 1, valueReader)
 
     // assert read value
-    assert(valueReader.readInteger().toShort == 4.toShort)
+    assert(valueReader.readInteger().toShort == 3.toShort)
   }
 
   test("read and skip Longs") {
 
     // prepare data: [null, null, 1L, null, null, null, 2L, null, 3L, 4L]
-    // def: [0, 0, 1, 0, 0, 0, 1, 0, 1, 1]
     // value: [1L, 2L, 3L, 4L]
     val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
     (1 until 5).foreach(v => valueWriter.writeLong(v.toLong))
@@ -129,16 +125,15 @@ class CombinedValuesReaderSuite extends SparkFunSuite with Logging {
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipLongs(2, 1, valueReader)
+    defReader.skipLongs(8, 1, valueReader)
 
     // assert read value
-    assert(valueReader.readLong() == 1L)
+    assert(valueReader.readLong() == 3L)
   }
 
   test("read and skip Floats") {
 
     // prepare data: [null, null, 1.0F, null, null, null, 2.0F, null, 3.0F, 4.0F]
-    // def: [0, 0, 1, 0, 0, 0, 1, 0, 1, 1]
     // value: [1.0F, 2.0F, 3.0F, 4.0F]
     val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
     (1 until 5).foreach(v => valueWriter.writeFloat(v.toFloat))
@@ -149,16 +144,15 @@ class CombinedValuesReaderSuite extends SparkFunSuite with Logging {
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipFloats(2, 1, valueReader)
+    defReader.skipFloats(8, 1, valueReader)
 
     // assert read value
-    assert(valueReader.readFloat() == 1.0F)
+    assert(valueReader.readFloat() == 3.0F)
   }
 
   test("read and skip Doubles") {
 
     // prepare data: [null, null, 1.0D, null, null, null, 2.0D, null, 3.0D, 4.0D]
-    // def: [0, 0, 1, 0, 0, 0, 1, 0, 1, 1]
     // value: [1.0D, 2.0D, 3.0D, 4.0D]
     val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
     (1 until 5).foreach(v => valueWriter.writeDouble(v.toDouble))
@@ -169,16 +163,15 @@ class CombinedValuesReaderSuite extends SparkFunSuite with Logging {
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipDoubles(9, 1, valueReader)
+    defReader.skipDoubles(8, 1, valueReader)
 
     // assert read value
-    assert(valueReader.readDouble() == 4.0D)
+    assert(valueReader.readDouble() == 3.0D)
   }
 
   test("read and skip Binarys") {
 
     // prepare data: [null, null, AB, null, null, null, CDE, null, F, GHI]
-    // def: [0, 0, 1, 0, 0, 0, 1, 0, 1, 1]
     // value: [AB, CDE, F, GHI]
     val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
     valueWriter.writeBytes(Binary.fromString("AB"))
@@ -192,16 +185,17 @@ class CombinedValuesReaderSuite extends SparkFunSuite with Logging {
     valueReader.initFromPage(4, valueData, 0)
 
     // skip data assisted by defReader
-    defReader.skipBinarys(9, 1, valueReader)
+    defReader.skipBinarys(8, 1, valueReader)
 
     // read binary to a vector and assert read value
     val vector = ColumnVector.allocate(10, BinaryType, MemoryMode.ON_HEAP)
     valueReader.readBinary(1, vector, 0)
-    assert(vector.getBinary(0).sameElements("GHI".getBytes))
+    assert(vector.getBinary(0).sameElements("F".getBytes))
   }
 
   /**
-   * For ut build a unified OapVectorizedRleValuesReader with data [0, 0, 1, 0, 0, 0, 1, 0, 1, 1]
+   * For ut build a unified OapVectorizedRleValuesReader with data [0, 0, 1, 0, 0, 0, 1, 0, 1, 1],
+   * reader will use packed mode
    * @return OapVectorizedRleValuesReader  represent definition level values
    */
   private def defReader: OapVectorizedRleValuesReader = {
