@@ -17,20 +17,20 @@
 
 package org.apache.spark.sql.execution.datasources.parquet;
 
-public class OapVectorizedRleValuesReader extends VectorizedRleValuesReader
-    implements OapVectorizedValuesReader {
+public class SkippableVectorizedRleValuesReader extends VectorizedRleValuesReader
+    implements SkippableVectorizedValuesReader {
 
   private static final String UNSUPPORTED_OP_MSG = "only skipIntegers is valid.";
 
-  public OapVectorizedRleValuesReader() {
+  public SkippableVectorizedRleValuesReader() {
     super();
   }
 
-  public OapVectorizedRleValuesReader(int bitWidth) {
+  public SkippableVectorizedRleValuesReader(int bitWidth) {
     super(bitWidth);
   }
 
-  public void skipIntegers(int total, int level, OapVectorizedValuesReader data) {
+  public void skipIntegers(int total, int level, SkippableVectorizedValuesReader data) {
     int left = total;
     while (left > 0) {
       if (this.currentCount == 0) this.readNextGroup();
@@ -54,7 +54,7 @@ public class OapVectorizedRleValuesReader extends VectorizedRleValuesReader
     }
   }
 
-  public void skipBooleans(int total, int level, OapVectorizedValuesReader data) {
+  public void skipBooleans(int total, int level, SkippableVectorizedValuesReader data) {
     int left = total;
     while (left > 0) {
       if (this.currentCount == 0) this.readNextGroup();
@@ -78,7 +78,7 @@ public class OapVectorizedRleValuesReader extends VectorizedRleValuesReader
     }
   }
 
-  public void skipBytes(int total, int level, OapVectorizedValuesReader data) {
+  public void skipBytes(int total, int level, SkippableVectorizedValuesReader data) {
     int left = total;
     while (left > 0) {
       if (this.currentCount == 0) this.readNextGroup();
@@ -102,11 +102,11 @@ public class OapVectorizedRleValuesReader extends VectorizedRleValuesReader
     }
   }
 
-  public void skipShorts(int total, int level, OapVectorizedValuesReader data) {
+  public void skipShorts(int total, int level, SkippableVectorizedValuesReader data) {
     skipIntegers(total, level, data);
   }
 
-  public void skipLongs(int total, int level, OapVectorizedValuesReader data) {
+  public void skipLongs(int total, int level, SkippableVectorizedValuesReader data) {
     int left = total;
     while (left > 0) {
       if (this.currentCount == 0) this.readNextGroup();
@@ -130,7 +130,7 @@ public class OapVectorizedRleValuesReader extends VectorizedRleValuesReader
     }
   }
 
-  public void skipFloats(int total, int level, OapVectorizedValuesReader data) {
+  public void skipFloats(int total, int level, SkippableVectorizedValuesReader data) {
     int left = total;
     while (left > 0) {
       if (this.currentCount == 0) this.readNextGroup();
@@ -154,7 +154,7 @@ public class OapVectorizedRleValuesReader extends VectorizedRleValuesReader
     }
   }
 
-  public void skipDoubles(int total, int level, OapVectorizedValuesReader data) {
+  public void skipDoubles(int total, int level, SkippableVectorizedValuesReader data) {
     int left = total;
     while (left > 0) {
       if (this.currentCount == 0) this.readNextGroup();
@@ -179,7 +179,7 @@ public class OapVectorizedRleValuesReader extends VectorizedRleValuesReader
   }
 
 
-  public void skipBinarys(int total, int level, OapVectorizedValuesReader data) {
+  public void skipBinarys(int total, int level, SkippableVectorizedValuesReader data) {
     int left = total;
     while (left > 0) {
       if (this.currentCount == 0) this.readNextGroup();

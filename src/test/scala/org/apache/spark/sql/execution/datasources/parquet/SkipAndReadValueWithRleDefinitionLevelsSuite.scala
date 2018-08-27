@@ -38,7 +38,7 @@ class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Lo
     (1 until 5).foreach(valueWriter.writeInteger)
 
     // init value reader
-    val valueReader = new OapVectorizedPlainValuesReader()
+    val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
     valueReader.initFromPage(4, valueData, 0)
 
@@ -64,7 +64,7 @@ class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Lo
     valueWriter.writeBoolean(true)
 
     // init value reader
-    val valueReader = new OapVectorizedPlainValuesReader()
+    val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
     valueReader.initFromPage(4, valueData, 0)
 
@@ -91,7 +91,7 @@ class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Lo
       valueWriter.writeByte(0)
     }
     // init value reader
-    val valueReader = new OapVectorizedPlainValuesReader()
+    val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
     valueReader.initFromPage(4, valueData, 0)
 
@@ -114,7 +114,7 @@ class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Lo
     val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
     (1 until 5).foreach(valueWriter.writeInteger)
     // init value reader
-    val valueReader = new OapVectorizedPlainValuesReader()
+    val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
     valueReader.initFromPage(4, valueData, 0)
 
@@ -136,7 +136,7 @@ class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Lo
     (1 until 5).foreach(v => valueWriter.writeLong(v.toLong))
 
     // init value reader
-    val valueReader = new OapVectorizedPlainValuesReader()
+    val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
     valueReader.initFromPage(4, valueData, 0)
 
@@ -159,7 +159,7 @@ class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Lo
     (1 until 5).foreach(v => valueWriter.writeFloat(v.toFloat))
 
     // init value reader
-    val valueReader = new OapVectorizedPlainValuesReader()
+    val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
     valueReader.initFromPage(4, valueData, 0)
 
@@ -182,7 +182,7 @@ class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Lo
     (1 until 5).foreach(v => valueWriter.writeDouble(v.toDouble))
 
     // init value reader
-    val valueReader = new OapVectorizedPlainValuesReader()
+    val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
     valueReader.initFromPage(4, valueData, 0)
 
@@ -208,7 +208,7 @@ class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Lo
     valueWriter.writeBytes(Binary.fromString("GHI"))
 
     // init value reader
-    val valueReader = new OapVectorizedPlainValuesReader()
+    val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
     valueReader.initFromPage(4, valueData, 0)
 
@@ -225,15 +225,15 @@ class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Lo
   }
 
   /**
-   * For ut build a unified OapVectorizedRleValuesReader with data
+   * For ut build a unified SkippableVectorizedRleValuesReader with data
    * [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1], reader will use RLE mode
-   * @return OapVectorizedRleValuesReader  represent definition level values
+   * @return SkippableVectorizedRleValuesReader  represent definition level values
    */
-  private def defReader: OapVectorizedRleValuesReader = {
+  private def defReader: SkippableVectorizedRleValuesReader = {
     val defWriter = new RunLengthBitPackingHybridValuesWriter(3, 5, 10)
     Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1).foreach(defWriter.writeInteger)
     val defData = defWriter.getBytes.toByteArray
-    val defReader = new OapVectorizedRleValuesReader(3)
+    val defReader = new SkippableVectorizedRleValuesReader(3)
     defReader.initFromPage(10, defData, 0)
     defReader
   }

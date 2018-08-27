@@ -16,8 +16,8 @@
  */
 package org.apache.spark.sql.execution.datasources.parquet;
 
-public class OapVectorizedPlainValuesReader extends VectorizedPlainValuesReader
-    implements OapVectorizedValuesReader {
+public class SkippableVectorizedPlainValuesReader extends VectorizedPlainValuesReader
+    implements SkippableVectorizedValuesReader {
 
   @Override
   public void skipBooleans(int total) {
