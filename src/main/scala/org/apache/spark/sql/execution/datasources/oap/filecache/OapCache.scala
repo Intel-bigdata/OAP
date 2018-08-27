@@ -137,8 +137,8 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long) extends OapCac
 
   private val weigher = new Weigher[FiberId, FiberCache] {
     override def weigh(key: FiberId, value: FiberCache): Int = {
-      // We should calculate the weigh with the usable size of the block.
-      math.ceil(value.getUsableSize() / KB).toInt
+      // We should calculate the weigh with the capacity of the block.
+      math.ceil(value.getCapacity() / KB).toInt
     }
   }
 

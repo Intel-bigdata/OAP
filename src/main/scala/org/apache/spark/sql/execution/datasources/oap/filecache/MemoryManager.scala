@@ -39,12 +39,12 @@ private[sql] abstract class MemoryManager {
   /**
    * The memory size used for cache.
    */
-  def getCacheMemorySize: Long
+  def cacheMemory: Long
 
   /**
    * The memory size used for cache guardian.
    */
-  def getCacheGuardianMemorySize: Long
+  def cacheGuardianMemory: Long
 
   /**
    * Allocate a block of memory with given size. The actual occupied size of memory maybe different
@@ -55,14 +55,14 @@ private[sql] abstract class MemoryManager {
   private[filecache] def free(block: MemoryBlock): Unit
 
   /**
-   * Get the actual occupied size of requested memory. The meaning should be equal with
+   * Get the actual capacity of requested memory. The meaning should be equal with
    * 'malloc.malloc_usable_size'. This method is valuable, because we may allocate memory based
    * on different implementation (eg: jemalloc).
    * @param address the address of the block.
    * @param requestedSize the requested size of the block.
-   * @return the actual occupied size.
+   * @return the actual capacity.
    */
-  protected def getUsableSize(address: Long, requestedSize: Long): Long
+  protected def getCapacity(address: Long, requestedSize: Long): Long
 
   @inline protected def toFiberCache(bytes: Array[Byte]): FiberCache = {
     val memoryBlock = allocate(bytes.length)
@@ -72,7 +72,7 @@ private[sql] abstract class MemoryManager {
       memoryBlock.getBaseObject,
       memoryBlock.getBaseOffset,
       bytes.length)
-    val usableSize = getUsableSize(memoryBlock.getBaseOffset, bytes.length)
+    val usableSize = getCapacity(memoryBlock.getBaseOffset, bytes.length)
     FiberCache(memoryBlock, usableSize)
   }
 
@@ -102,7 +102,7 @@ private[sql] abstract class MemoryManager {
 
   def getEmptyDataFiberCache(length: Long): FiberCache = {
     val memoryBlock = allocate(length)
-    val usableSize = getUsableSize(memoryBlock.getBaseOffset, memoryBlock.size())
+    val usableSize = getCapacity(memoryBlock.getBaseOffset, memoryBlock.size())
     FiberCache(memoryBlock, usableSize)
   }
   def stop(): Unit = {}
@@ -168,13 +168,13 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 
   override def memoryUsed: Long = _memoryUsed.get()
 
-  override def getCacheMemorySize: Long = _cacheMemory
+  override def cacheMemory: Long = _cacheMemory
 
-  override def getCacheGuardianMemorySize: Long = _cacheGuardianMemory
+  override def cacheGuardianMemory: Long = _cacheGuardianMemory
 
   override private[filecache] def allocate(size: Long): MemoryBlock = {
     val block = MemoryAllocator.UNSAFE.allocate(size)
-    val occupied = getUsableSize(block.getBaseOffset, block.size())
+    val occupied = getCapacity(block.getBaseOffset, block.size())
     _memoryUsed.getAndAdd(occupied)
     logDebug(s"request allocate $size memory, actual occupied size: " +
       s"${occupied}, used: $memoryUsed")
@@ -182,14 +182,13 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
   }
 
   override private[filecache] def free(block: MemoryBlock): Unit = {
-    // TODO: get the usable size from the parameter? However, it's a bit ugly.
-    val occupiedSize = getUsableSize(block.getBaseOffset, block.size())
+    val occupiedSize = getCapacity(block.getBaseOffset, block.size())
     MemoryAllocator.UNSAFE.free(block)
     _memoryUsed.getAndAdd(-occupiedSize)
     logDebug(s"freed ${block.size()} memory, used: $memoryUsed")
   }
 
-  override protected def getUsableSize(address: Long, requestedSize: Long): Long = {
+  override protected def getCapacity(address: Long, requestedSize: Long): Long = {
     requestedSize
   }
 

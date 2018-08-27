@@ -78,28 +78,20 @@ public class NativeLoader {
     } catch (UnsatisfiedLinkError e) {
       throw new RuntimeException(e);
     } finally {
-      if (input != null) {
-        try {
-          input.close();
-          input = null;
-        } catch (Exception e) {
-          // ignore it
-        }
-      }
-
-      if (output != null) {
-        try {
-          output.close();
-          output = null;
-        } catch (Exception e) {
-          // ignore it
-        }
-      }
+      closeQuietly(input);
+      closeQuietly(output);
 
       if (tmpFile != null && tmpFile.exists()) {
         tmpFile.delete();
-        tmpFile = null;
       }
+    }
+  }
+
+  private static void closeQuietly(Closeable stream) {
+    try {
+      stream.close();
+    } catch (Exception e) {
+      // ignore it
     }
   }
 
