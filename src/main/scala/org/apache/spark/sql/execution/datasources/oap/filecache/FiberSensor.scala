@@ -84,6 +84,10 @@ private[sql] class FiberSensor extends Logging {
     }
   }
 
+  def getExecutorToCacheManager(): ConcurrentHashMap[String, CacheStats] = {
+    return executorToCacheManager
+  }
+
   /**
    * get hosts that has fiber cached for fiber file.
    * Current implementation only returns one host, but still using API name with [[getHosts]]

@@ -36,7 +36,7 @@ public final class ColumnarBatch {
   private final MutableColumnarRow row;
 
   // True if the row is filtered.
-  private final boolean[] filteredRows = new boolean[4 *1024];
+  private final boolean[] filteredRows = new boolean[1 << 16];
 
   // Total number of rows that have been filtered.
   private int numRowsFiltered = 0;
@@ -67,11 +67,17 @@ public final class ColumnarBatch {
 
       @Override
       public boolean hasNext() {
+        while (rowId < maxRows && ColumnarBatch.this.filteredRows[rowId]) {
+          ++rowId;
+        }
         return rowId < maxRows;
       }
 
       @Override
       public InternalRow next() {
+        while (rowId < maxRows && ColumnarBatch.this.filteredRows[rowId]) {
+          ++rowId;
+        }
         if (rowId >= maxRows) {
           throw new NoSuchElementException();
         }
