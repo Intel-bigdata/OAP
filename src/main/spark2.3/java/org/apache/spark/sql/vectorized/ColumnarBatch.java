@@ -35,6 +35,12 @@ public final class ColumnarBatch {
   // Staging row returned from `getRow`.
   private final MutableColumnarRow row;
 
+  // True if the row is filtered.
+  private final boolean[] filteredRows = new boolean[1 << 16];
+
+  // Total number of rows that have been filtered.
+  private int numRowsFiltered = 0;
+
   /**
    * Called to close all the columns in this batch. It is not valid to access the data after
    * calling this. This must be called at the end to clean up memory allocations.
@@ -43,6 +49,11 @@ public final class ColumnarBatch {
     for (ColumnVector c: columns) {
       c.close();
     }
+  }
+
+  // For DataSourceScanExec
+  public boolean isFiltered(int rowId) {
+    return filteredRows[rowId];
   }
 
   /**
@@ -61,6 +72,42 @@ public final class ColumnarBatch {
 
       @Override
       public InternalRow next() {
+        if (rowId >= maxRows) {
+          throw new NoSuchElementException();
+        }
+        row.rowId = rowId++;
+        return row;
+      }
+
+      @Override
+      public void remove() {
+        throw new UnsupportedOperationException();
+      }
+    };
+  }
+
+  /**
+   * Returns an iterator over the rows in this batch. for OAP
+   */
+  public Iterator<InternalRow> rowOapIterator() {
+    final int maxRows = numRows;
+    final MutableColumnarRow row = new MutableColumnarRow(columns);
+    return new Iterator<InternalRow>() {
+      int rowId = 0;
+
+      @Override
+      public boolean hasNext() {
+        while (rowId < maxRows && ColumnarBatch.this.filteredRows[rowId]) {
+          ++rowId;
+        }
+        return rowId < maxRows;
+      }
+
+      @Override
+      public InternalRow next() {
+        while (rowId < maxRows && ColumnarBatch.this.filteredRows[rowId]) {
+          ++rowId;
+        }
         if (rowId >= maxRows) {
           throw new NoSuchElementException();
         }
@@ -104,6 +151,25 @@ public final class ColumnarBatch {
     assert(rowId >= 0 && rowId < numRows);
     row.rowId = rowId;
     return row;
+  }
+
+  /**
+   * Marks this row not filtered out. This means a subsequent iteration over the rows
+   * in this batch will include this row.
+   * For IndexedVectorizedOapRecordReader.
+   */
+  public void markValid(int rowId) {
+    assert(filteredRows[rowId]);
+    filteredRows[rowId] = false;
+    --numRowsFiltered;
+  }
+
+  /**
+   * For IndexedVectorizedOapRecordReader.
+   */
+  public void markAllFiltered() {
+    Arrays.fill(filteredRows, true);
+    numRowsFiltered = numRows;
   }
 
   public ColumnarBatch(ColumnVector[] columns) {
