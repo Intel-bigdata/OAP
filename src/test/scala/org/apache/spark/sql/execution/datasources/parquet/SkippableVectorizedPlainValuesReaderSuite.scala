@@ -23,7 +23,7 @@ import org.apache.parquet.io.api.Binary
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
-import org.apache.spark.sql.execution.vectorized.ColumnVector
+import org.apache.spark.sql.oap.adapter.ColumnVectorAdapter
 import org.apache.spark.sql.types.BinaryType
 
 class SkippableVectorizedPlainValuesReaderSuite extends SparkFunSuite with Logging {
@@ -178,7 +178,7 @@ class SkippableVectorizedPlainValuesReaderSuite extends SparkFunSuite with Loggi
 
     // test skip and read boolean data
     reader.skipBinary(2)
-    val vector = ColumnVector.allocate(10, BinaryType, MemoryMode.ON_HEAP)
+    val vector = ColumnVectorAdapter.allocate(10, BinaryType, MemoryMode.ON_HEAP)
     reader.readBinary(3, vector, 0)
     assert(vector.getBinary(0).sameElements("F".getBytes))
     assert(vector.getBinary(1).sameElements("GHI".getBytes))

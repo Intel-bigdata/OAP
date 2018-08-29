@@ -67,6 +67,36 @@ public final class ColumnarBatch {
 
       @Override
       public boolean hasNext() {
+        return rowId < maxRows;
+      }
+
+      @Override
+      public InternalRow next() {
+        if (rowId >= maxRows) {
+          throw new NoSuchElementException();
+        }
+        row.rowId = rowId++;
+        return row;
+      }
+
+      @Override
+      public void remove() {
+        throw new UnsupportedOperationException();
+      }
+    };
+  }
+
+  /**
+   * Returns an iterator over the rows in this batch. for OAP
+   */
+  public Iterator<InternalRow> rowOapIterator() {
+    final int maxRows = numRows;
+    final MutableColumnarRow row = new MutableColumnarRow(columns);
+    return new Iterator<InternalRow>() {
+      int rowId = 0;
+
+      @Override
+      public boolean hasNext() {
         while (rowId < maxRows && ColumnarBatch.this.filteredRows[rowId]) {
           ++rowId;
         }

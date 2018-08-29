@@ -236,7 +236,7 @@ private[oap] case class ParquetDataFile(
       if (context.returningBatch) {
         Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
       } else {
-        columnarBatch.rowIterator().asScala
+        columnarBatch.rowOapIterator().asScala
       }
     }
   }

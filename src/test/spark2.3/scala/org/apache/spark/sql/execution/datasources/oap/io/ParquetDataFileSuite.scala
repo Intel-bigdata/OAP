@@ -50,7 +50,7 @@ import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.adapter.ColumnVectorAdapter
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
+import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
 
@@ -348,7 +348,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val batch = iterator.next().asInstanceOf[ColumnarBatch]
-      val rowIterator = batch.rowIterator()
+      val rowIterator = batch.rowOapIterator()
       while (rowIterator.hasNext) {
         val row = rowIterator.next()
         assert(row.numFields == 2)
