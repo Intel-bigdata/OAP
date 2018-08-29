@@ -41,7 +41,7 @@ import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
-import org.apache.spark.sql.execution.datasources.parquet.{OapVectorizedColumnReader, ParquetReadSupportWrapper}
+import org.apache.spark.sql.execution.datasources.parquet.{SkippableVectorizedColumnReader, ParquetReadSupportWrapper}
 import org.apache.spark.sql.execution.vectorized.{ColumnarBatch, ColumnVector}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
@@ -539,7 +539,7 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
     val columnDescriptor = parquetSchema.getColumns.get(0)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
     val columnReader =
-      new OapVectorizedColumnReader(
+      new SkippableVectorizedColumnReader(
         columnDescriptor, fiberData.getPageReader(columnDescriptor))
     columnReader.readBatch(rowCount, vector)
     for (i <- 0 until rowCount) {

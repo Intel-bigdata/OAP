@@ -33,9 +33,9 @@ import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.DecimalType;
 
-public class OapVectorizedColumnReader extends VectorizedColumnReader {
+public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
 
-  public OapVectorizedColumnReader(ColumnDescriptor descriptor, PageReader pageReader)
+  public SkippableVectorizedColumnReader(ColumnDescriptor descriptor, PageReader pageReader)
       throws IOException {
     super(descriptor, pageReader);
   }
