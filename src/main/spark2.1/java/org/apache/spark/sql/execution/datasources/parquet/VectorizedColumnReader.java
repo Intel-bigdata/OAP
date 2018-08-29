@@ -134,7 +134,7 @@ public class VectorizedColumnReader {
   /**
    * Reads `total` values from this columnReader into column.
    */
-  void readBatch(int total, ColumnVector column) throws IOException {
+  public void readBatch(int total, ColumnVector column) throws IOException {
     int rowId = 0;
     ColumnVector dictionaryIds = null;
     if (dictionary != null) {
