@@ -32,44 +32,58 @@ import org.apache.spark.util.Utils
  * Most of the code in init() are copied from SparkSQLEnv. Please include code from the
  * corresponding Spark version.
  */
-private[hive] object OapEnv extends Logging {
+private[spark] object OapEnv extends Logging {
   logDebug("Initializing Oap Env")
 
   var sqlContext: SQLContext = _
   var sparkContext: SparkContext = _
 
-  def init() {
-    if (sqlContext == null) {
-      val sparkConf = new SparkConf(loadDefaults = true)
-      // If user doesn't specify the appName, we want to get [SparkSQL::localHostName] instead of
-      // the default appName [SparkSQLCLIDriver] in cli or beeline.
-      val maybeAppName = sparkConf
-        .getOption("spark.app.name")
-        .filterNot(_ == classOf[SparkSQLCLIDriver].getName)
-        .filterNot(_ == classOf[HiveThriftServer2].getName)
+  var initialized: Boolean = false
 
-      sparkConf
-        .setAppName(maybeAppName.getOrElse(s"SparkSQL::${Utils.localHostName()}"))
+  def init(): Unit = synchronized {
+    if (!initialized && !Utils.isTesting) {
+      if (sqlContext == null) {
+        val sparkConf = new SparkConf(loadDefaults = true)
+        // If user doesn't specify the appName, we want to get [SparkSQL::localHostName] instead of
+        // the default appName [SparkSQLCLIDriver] in cli or beeline.
+        val maybeAppName = sparkConf
+          .getOption("spark.app.name")
+          .filterNot(_ == classOf[SparkSQLCLIDriver].getName)
+          .filterNot(_ == classOf[HiveThriftServer2].getName)
 
-      val sparkSession = OapSession.builder.config(sparkConf).enableHiveSupport().getOrCreate()
-      sparkContext = sparkSession.sparkContext
-      sqlContext = sparkSession.sqlContext
+        sparkConf.setAppName(maybeAppName.getOrElse(s"SparkSQL::${Utils.localHostName()}"))
 
-      val metadataHive = sparkSession
-        .sharedState.externalCatalog.asInstanceOf[HiveExternalCatalog]
-        .client.newSession()
-      metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
-      metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))
-      metadataHive.setError(new PrintStream(System.err, true, "UTF-8"))
-      sparkSession.conf.set("spark.sql.hive.version", HiveUtils.hiveExecutionVersion)
+        val sparkSession = OapSession.builder.config(sparkConf).enableHiveSupport().getOrCreate()
+        sparkContext = sparkSession.sparkContext
+        sqlContext = sparkSession.sqlContext
+
+        val metadataHive = sparkSession
+          .sharedState.externalCatalog.asInstanceOf[HiveExternalCatalog]
+          .client.newSession()
+        metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
+        metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))
+        metadataHive.setError(new PrintStream(System.err, true, "UTF-8"))
+        sparkSession.conf.set("spark.sql.hive.version", HiveUtils.hiveExecutionVersion)
+      }
+
+      sparkContext.addSparkListener(new OapListener)
+
+      SparkSQLEnv.sparkContext = sparkContext
+      SparkSQLEnv.sqlContext = sqlContext
+
+      sparkContext.ui.foreach(new OapTab(_))
+      initialized = true
     }
+  }
 
-    sparkContext.addSparkListener(new OapListener)
-
-    SparkSQLEnv.sparkContext = sparkContext
-    SparkSQLEnv.sqlContext = sqlContext
-
-    sparkContext.ui.foreach(new OapTab(_))
+  // This is to enable certain OAP features, like UI, in non-Spark SQL CLI/ThriftServer conditions
+  def initWithoutCreatingOapSession(): Unit = synchronized {
+    if (!initialized && !Utils.isTesting) {
+      val sc = SparkContext.getOrCreate()
+      sc.addSparkListener(new OapListener)
+      sc.ui.foreach(new OapTab(_))
+      initialized = true
+    }
   }
 
   /** Cleans up and shuts down the Spark SQL environments. */

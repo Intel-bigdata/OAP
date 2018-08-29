@@ -596,6 +596,7 @@
             <configuration>
               <excludes>
                 <exclude>src/main/spark2.2</exclude>
+                <exclude>src/main/spark2.3</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -654,6 +655,7 @@
             <configuration>
               <excludes>
                 <exclude>src/main/spark2.1</exclude>
+                <exclude>src/main/spark2.3</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -671,6 +673,65 @@
                 <configuration>
                   <sources>
                     <source>src/main/spark2.2</source>
+                  </sources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>spark-2.3</id>
+      <properties>
+        <spark.version>2.3.0</spark.version>
+        <spark.internal.version>2.3.0</spark.internal.version>
+        <scala.version>2.11.8</scala.version>
+        <scala.binary.version>2.11</scala.binary.version>
+        <java.version>1.8</java.version>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-maven-plugin</artifactId>
+            <version>4.5.3</version>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>antlr4</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <visitor>true</visitor>
+              <sourceDirectory>src/main/spark2.3/antlr4</sourceDirectory>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <excludes>
+                <exclude>src/main/spark2.1</exclude>
+                <exclude>src/main/spark2.2</exclude>
+              </excludes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.0.0</version>
+            <executions>
+              <execution>
+                <id>add-source</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>add-source</goal>
+                </goals>
+                <configuration>
+                  <sources>
+                    <source>src/main/spark2.3</source>
                   </sources>
                 </configuration>
               </execution>

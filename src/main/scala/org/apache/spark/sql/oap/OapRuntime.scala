@@ -22,6 +22,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.OapMetricsManager
 import org.apache.spark.sql.execution.datasources.oap.filecache._
+import org.apache.spark.sql.hive.thriftserver.OapEnv
 import org.apache.spark.sql.oap.rpc._
 import org.apache.spark.util.{RpcUtils, Utils}
 
@@ -45,6 +46,13 @@ private[oap] trait OapRuntime extends Logging {
  * Initializing [[FiberSensor]] and executor managers if local
  */
 private[oap] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
+
+  // For non-Spark SQL CLI/ThriftServer conditions, OAP-specific features will be fully enabled by
+  // this, nevertheless not instantly when a Spark application is started, but when an OapRuntime
+  // is created. For example, OAP UI tab will show at the moment you read a Parquet file to OAP
+  // cache
+  OapEnv.initWithoutCreatingOapSession()
+
   override val memoryManager =
     if (OapRuntime.isLocal(sparkEnv.conf)) new MemoryManager(sparkEnv) else null
   override val fiberCacheManager =
@@ -113,6 +121,7 @@ private[oap] class OapExecutorRuntime(sparkEnv: SparkEnv) extends OapRuntime {
 }
 
 object OapRuntime {
+
   private var rt: OapRuntime = _
   /**
    * user transparent initialization
