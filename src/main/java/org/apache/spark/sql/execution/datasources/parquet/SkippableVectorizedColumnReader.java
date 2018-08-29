@@ -28,7 +28,6 @@ import org.apache.parquet.column.page.DataPageV1;
 import org.apache.parquet.column.page.DataPageV2;
 import org.apache.parquet.column.page.PageReader;
 import org.apache.parquet.column.values.ValuesReader;
-import org.apache.spark.sql.execution.vectorized.ColumnVector;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.DecimalType;
@@ -43,7 +42,7 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
   /**
    * Reads `total` values from this columnReader into column.
    */
-  public void skipBatch(int total, ColumnVector column) throws IOException {
+  public void skipBatch(int total, DataType dataType, boolean isArray) throws IOException {
     while (total > 0) {
       // Compute the number of values we want to read in this page.
       int leftInPage = (int) (endOfPageValueCount - valuesRead);
@@ -59,28 +58,28 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
       } else {
         switch (descriptor.getType()) {
           case BOOLEAN:
-            skipBooleanBatch(num, column);
+            skipBooleanBatch(num, dataType);
             break;
           case INT32:
-            skipIntBatch(num, column);
+            skipIntBatch(num, dataType);
             break;
           case INT64:
-            skipLongBatch(num, column);
+            skipLongBatch(num, dataType);
             break;
           case INT96:
-            skipBinaryBatch(num, column);
+            skipBinaryBatch(num, dataType, isArray);
             break;
           case FLOAT:
-            skipFloatBatch(num, column);
+            skipFloatBatch(num, dataType);
             break;
           case DOUBLE:
-            skipDoubleBatch(num, column);
+            skipDoubleBatch(num, dataType);
             break;
           case BINARY:
-            skipBinaryBatch(num, column);
+            skipBinaryBatch(num, dataType, isArray);
             break;
           case FIXED_LEN_BYTE_ARRAY:
-            skipFixedLenByteArrayBatch(num, column, descriptor.getTypeLength());
+            skipFixedLenByteArrayBatch(num, dataType, descriptor.getTypeLength());
             break;
           default:
             throw new IOException("Unsupported type: " + descriptor.getType());
@@ -92,14 +91,13 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
     }
   }
 
-  private void skipBooleanBatch(int num, ColumnVector column) {
-    assert(column.dataType() == DataTypes.BooleanType);
+  private void skipBooleanBatch(int num, DataType dataType) {
+    assert(dataType == DataTypes.BooleanType);
     ((SkippableVectorizedRleValuesReader)defColumn)
       .skipBooleans(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
   }
 
-  private void skipIntBatch(int num, ColumnVector column) {
-    DataType dataType = column.dataType();
+  private void skipIntBatch(int num, DataType dataType) {
     if (dataType == DataTypes.IntegerType || dataType == DataTypes.DateType ||
                 DecimalType.is32BitDecimalType(dataType)) {
       ((SkippableVectorizedRleValuesReader)defColumn)
@@ -115,8 +113,7 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
     }
   }
 
-  private void skipLongBatch(int num, ColumnVector column) {
-    DataType dataType = column.dataType();
+  private void skipLongBatch(int num, DataType dataType) {
     if (dataType == DataTypes.LongType ||
                 DecimalType.is64BitDecimalType(dataType)) {
       ((SkippableVectorizedRleValuesReader)defColumn)
@@ -126,44 +123,43 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
     }
   }
 
-  private void skipFloatBatch(int num, ColumnVector column) {
-    if (column.dataType() == DataTypes.FloatType) {
+  private void skipFloatBatch(int num, DataType dataType) {
+    if (dataType == DataTypes.FloatType) {
       ((SkippableVectorizedRleValuesReader)defColumn)
         .skipFloats(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
     } else {
-      throw new UnsupportedOperationException("Unsupported conversion to: " + column.dataType());
+      throw new UnsupportedOperationException("Unsupported conversion to: " + dataType);
     }
   }
 
-  private void skipDoubleBatch(int num, ColumnVector column) {
-    if (column.dataType() == DataTypes.DoubleType) {
+  private void skipDoubleBatch(int num, DataType dataType) {
+    if (dataType == DataTypes.DoubleType) {
       ((SkippableVectorizedRleValuesReader)defColumn)
         .skipDoubles(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
     } else {
-      throw new UnsupportedOperationException("Unimplemented type: " + column.dataType());
+      throw new UnsupportedOperationException("Unimplemented type: " + dataType);
     }
   }
 
 
-  private void skipBinaryBatch(int num, ColumnVector column) {
+  private void skipBinaryBatch(int num, DataType dataType, boolean isArray) {
     VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
-    if (column.isArray()) {
+    if (isArray) {
       ((SkippableVectorizedRleValuesReader)defColumn)
         .skipBinarys(num, maxDefLevel, (SkippableVectorizedValuesReader) data);
-    } else if (column.dataType() == DataTypes.TimestampType) {
+    } else if (dataType == DataTypes.TimestampType) {
       for (int i = 0; i < num; i++) {
         if (defColumn.readInteger() == maxDefLevel) {
           ((SkippableVectorizedValuesReader) data).skipBinaryByLen(12);
         }
       }
     } else {
-      throw new UnsupportedOperationException("Unimplemented type: " + column.dataType());
+      throw new UnsupportedOperationException("Unimplemented type: " + dataType);
     }
   }
 
-  private void skipFixedLenByteArrayBatch(int num, ColumnVector column, int arrayLen) {
+  private void skipFixedLenByteArrayBatch(int num, DataType dataType, int arrayLen) {
     VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
-    DataType dataType = column.dataType();
 
     if (DecimalType.is32BitDecimalType(dataType) || DecimalType.is64BitDecimalType(dataType)
       || DecimalType.isByteArrayDecimalType(dataType)) {

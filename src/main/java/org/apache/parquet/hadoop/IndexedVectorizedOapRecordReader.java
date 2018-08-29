@@ -27,6 +27,7 @@ import org.apache.parquet.hadoop.metadata.ParquetFooter;
 import org.apache.parquet.hadoop.OapParquetFileReader.RowGroupDataAndRowIds;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
+import org.apache.spark.sql.execution.vectorized.ColumnVector;
 
 public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader {
 
@@ -184,7 +185,8 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
             totalCountLoadedSoFar - rowsReturned);
     for (int i = 0; i < columnReaders.length; ++i) {
       if (columnReaders[i] == null) continue;
-      columnReaders[i].skipBatch(num, columnarBatch.column(i));
+      ColumnVector vector = columnarBatch.column(i);
+      columnReaders[i].skipBatch(num, vector.dataType(), vector.isArray());
     }
     rowsReturned += num;
     numBatched = num;
