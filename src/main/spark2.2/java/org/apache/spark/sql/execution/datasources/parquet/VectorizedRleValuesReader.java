@@ -37,13 +37,13 @@ import org.apache.spark.sql.execution.vectorized.ColumnVector;
  *  - Definition/Repetition levels
  *  - Dictionary ids.
  */
-public final class VectorizedRleValuesReader extends ValuesReader
+public class VectorizedRleValuesReader extends ValuesReader
     implements VectorizedValuesReader {
   // Current decoding mode. The encoded data contains groups of either run length encoded data
   // (RLE) or bit packed data. Each group contains a header that indicates which group it is and
   // the number of values in the group.
   // More details here: https://github.com/Parquet/parquet-format/blob/master/Encodings.md
-  private enum MODE {
+  protected enum MODE {
     RLE,
     PACKED
   }
@@ -59,13 +59,13 @@ public final class VectorizedRleValuesReader extends ValuesReader
   private BytePacker packer;
 
   // Current decoding mode and values
-  private MODE mode;
-  private int currentCount;
-  private int currentValue;
+  protected MODE mode;
+  protected int currentCount;
+  protected int currentValue;
 
   // Buffer of decoded values if the values are PACKED.
-  private int[] currentBuffer = new int[16];
-  private int currentBufferIdx = 0;
+  protected int[] currentBuffer = new int[16];
+  protected int currentBufferIdx = 0;
 
   // If true, the bit width is fixed. This decoder is used in different places and this also
   // controls if we need to read the bitwidth from the beginning of the data stream.
@@ -582,7 +582,7 @@ public final class VectorizedRleValuesReader extends ValuesReader
   /**
    * Reads the next group.
    */
-  private void readNextGroup()  {
+  protected void readNextGroup()  {
     int header = readUnsignedVarInt();
     this.mode = (header & 1) == 0 ? MODE.RLE : MODE.PACKED;
     switch (mode) {
