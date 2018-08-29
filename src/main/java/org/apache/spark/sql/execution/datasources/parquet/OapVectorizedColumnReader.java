@@ -54,8 +54,8 @@ public class OapVectorizedColumnReader extends VectorizedColumnReader {
       int num = Math.min(total, leftInPage);
       if (isCurrentPageDictionaryEncoded) {
         // Read and decode dictionary ids.
-        ((OapVectorizedRleValuesReader)defColumn)
-          .skipIntegers(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+        ((SkippableVectorizedRleValuesReader)defColumn)
+          .skipIntegers(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
       } else {
         switch (descriptor.getType()) {
           case BOOLEAN:
@@ -94,22 +94,22 @@ public class OapVectorizedColumnReader extends VectorizedColumnReader {
 
   private void skipBooleanBatch(int num, ColumnVector column) {
     assert(column.dataType() == DataTypes.BooleanType);
-    ((OapVectorizedRleValuesReader)defColumn)
-      .skipBooleans(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+    ((SkippableVectorizedRleValuesReader)defColumn)
+      .skipBooleans(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
   }
 
   private void skipIntBatch(int num, ColumnVector column) {
     DataType dataType = column.dataType();
     if (dataType == DataTypes.IntegerType || dataType == DataTypes.DateType ||
                 DecimalType.is32BitDecimalType(dataType)) {
-      ((OapVectorizedRleValuesReader)defColumn)
-        .skipIntegers(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+      ((SkippableVectorizedRleValuesReader)defColumn)
+        .skipIntegers(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
     } else if (dataType == DataTypes.ByteType) {
-      ((OapVectorizedRleValuesReader)defColumn)
-        .skipBytes(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+      ((SkippableVectorizedRleValuesReader)defColumn)
+        .skipBytes(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
     } else if (dataType == DataTypes.ShortType) {
-      ((OapVectorizedRleValuesReader)defColumn)
-        .skipShorts(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+      ((SkippableVectorizedRleValuesReader)defColumn)
+        .skipShorts(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
     } else {
       throw new UnsupportedOperationException("Unimplemented type: " + dataType);
     }
@@ -119,8 +119,8 @@ public class OapVectorizedColumnReader extends VectorizedColumnReader {
     DataType dataType = column.dataType();
     if (dataType == DataTypes.LongType ||
                 DecimalType.is64BitDecimalType(dataType)) {
-      ((OapVectorizedRleValuesReader)defColumn)
-        .skipLongs(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+      ((SkippableVectorizedRleValuesReader)defColumn)
+        .skipLongs(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
     } else {
       throw new UnsupportedOperationException("Unsupported conversion to: " + dataType);
     }
@@ -128,8 +128,8 @@ public class OapVectorizedColumnReader extends VectorizedColumnReader {
 
   private void skipFloatBatch(int num, ColumnVector column) {
     if (column.dataType() == DataTypes.FloatType) {
-      ((OapVectorizedRleValuesReader)defColumn)
-        .skipFloats(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+      ((SkippableVectorizedRleValuesReader)defColumn)
+        .skipFloats(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
     } else {
       throw new UnsupportedOperationException("Unsupported conversion to: " + column.dataType());
     }
@@ -137,8 +137,8 @@ public class OapVectorizedColumnReader extends VectorizedColumnReader {
 
   private void skipDoubleBatch(int num, ColumnVector column) {
     if (column.dataType() == DataTypes.DoubleType) {
-      ((OapVectorizedRleValuesReader)defColumn)
-        .skipDoubles(num, maxDefLevel, (OapVectorizedValuesReader) dataColumn);
+      ((SkippableVectorizedRleValuesReader)defColumn)
+        .skipDoubles(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
     } else {
       throw new UnsupportedOperationException("Unimplemented type: " + column.dataType());
     }
@@ -148,12 +148,12 @@ public class OapVectorizedColumnReader extends VectorizedColumnReader {
   private void skipBinaryBatch(int num, ColumnVector column) {
     VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
     if (column.isArray()) {
-      ((OapVectorizedRleValuesReader)defColumn)
-        .skipBinarys(num, maxDefLevel, (OapVectorizedValuesReader) data);
+      ((SkippableVectorizedRleValuesReader)defColumn)
+        .skipBinarys(num, maxDefLevel, (SkippableVectorizedValuesReader) data);
     } else if (column.dataType() == DataTypes.TimestampType) {
       for (int i = 0; i < num; i++) {
         if (defColumn.readInteger() == maxDefLevel) {
-          ((OapVectorizedValuesReader) data).skipBinaryByLen(12);
+          ((SkippableVectorizedValuesReader) data).skipBinaryByLen(12);
         }
       }
     } else {
@@ -169,7 +169,7 @@ public class OapVectorizedColumnReader extends VectorizedColumnReader {
       || DecimalType.isByteArrayDecimalType(dataType)) {
       for (int i = 0; i < num; i++) {
         if (defColumn.readInteger() == maxDefLevel) {
-          ((OapVectorizedValuesReader)data).skipBinaryByLen(arrayLen);
+          ((SkippableVectorizedValuesReader)data).skipBinaryByLen(arrayLen);
         }
       }
     } else {
@@ -193,13 +193,13 @@ public class OapVectorizedColumnReader extends VectorizedColumnReader {
       if (dataEncoding != plainDict && dataEncoding != Encoding.RLE_DICTIONARY) {
         throw new UnsupportedOperationException("Unsupported encoding: " + dataEncoding);
       }
-      this.dataColumn = new OapVectorizedRleValuesReader();
+      this.dataColumn = new SkippableVectorizedRleValuesReader();
       this.isCurrentPageDictionaryEncoded = true;
     } else {
       if (dataEncoding != Encoding.PLAIN) {
         throw new UnsupportedOperationException("Unsupported encoding: " + dataEncoding);
       }
-      this.dataColumn = new OapVectorizedPlainValuesReader();
+      this.dataColumn = new SkippableVectorizedPlainValuesReader();
       this.isCurrentPageDictionaryEncoded = false;
     }
 
@@ -221,7 +221,7 @@ public class OapVectorizedColumnReader extends VectorizedColumnReader {
       throw new UnsupportedOperationException("Unsupported encoding: " + page.getDlEncoding());
     }
     int bitWidth = BytesUtils.getWidthFromMaxInt(descriptor.getMaxDefinitionLevel());
-    this.defColumn = new OapVectorizedRleValuesReader(bitWidth);
+    this.defColumn = new SkippableVectorizedRleValuesReader(bitWidth);
     dlReader = this.defColumn;
     try {
       byte[] bytes = page.getBytes().toByteArray();
@@ -240,7 +240,7 @@ public class OapVectorizedColumnReader extends VectorizedColumnReader {
     this.pageValueCount = page.getValueCount();
 
     int bitWidth = BytesUtils.getWidthFromMaxInt(descriptor.getMaxDefinitionLevel());
-    this.defColumn = new OapVectorizedRleValuesReader(bitWidth);
+    this.defColumn = new SkippableVectorizedRleValuesReader(bitWidth);
     this.defColumn.initFromBuffer(
             this.pageValueCount, page.getDefinitionLevels().toByteArray());
     try {

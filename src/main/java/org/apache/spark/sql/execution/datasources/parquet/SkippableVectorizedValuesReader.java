@@ -18,9 +18,9 @@
 package org.apache.spark.sql.execution.datasources.parquet;
 
 /**
- * OapVectorizedValuesReader extends from VectorizedValuesReader, add skip data capacity.
+ * SkippableVectorizedValuesReader extends from VectorizedValuesReader, add skip data capacity.
  */
-public interface OapVectorizedValuesReader extends VectorizedValuesReader {
+public interface SkippableVectorizedValuesReader extends VectorizedValuesReader {
 
   void skipBoolean();
   void skipByte();
