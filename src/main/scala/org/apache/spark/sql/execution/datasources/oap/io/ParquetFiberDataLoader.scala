@@ -28,7 +28,7 @@ import org.apache.parquet.schema.{MessageType, Type}
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
-import org.apache.spark.sql.execution.datasources.parquet.{SkippableVectorizedColumnReader, ParquetReadSupportWrapper}
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportWrapper, SkippableVectorizedColumnReader}
 import org.apache.spark.sql.execution.vectorized.{ColumnVector, OnHeapColumnVector, OnHeapColumnVectorFiber}
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.types._
