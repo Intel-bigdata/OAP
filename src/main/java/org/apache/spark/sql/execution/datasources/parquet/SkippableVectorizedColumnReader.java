@@ -28,6 +28,7 @@ import org.apache.parquet.column.page.DataPageV1;
 import org.apache.parquet.column.page.DataPageV2;
 import org.apache.parquet.column.page.PageReader;
 import org.apache.parquet.column.values.ValuesReader;
+import org.apache.spark.sql.execution.vectorized.ColumnVector;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.DecimalType;
@@ -40,7 +41,16 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
   }
 
   /**
-   * Reads `total` values from this columnReader into column.
+   * Skip `total` values from this columnReader, ColumnVector used to
+   * provide dataType and whether it is stored as array.
+   */
+  public void skipBatch(int total, ColumnVector vector) throws IOException {
+    this.skipBatch(total, vector.dataType(), vector.isArray());
+  }
+
+  /**
+   * Skip `total` values from this columnReader by dataType, and for Binary Type we need know
+   * is it stored as array, when isArray is true, it's
    */
   public void skipBatch(int total, DataType dataType, boolean isArray) throws IOException {
     while (total > 0) {
