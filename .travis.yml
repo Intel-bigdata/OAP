@@ -2,5 +2,3 @@ sudo: required
 dist: trusty
 language: java
 script:
-- mvn clean -Pspark-2.1 -Dmaven.test.skip=true package
-- mvn clean -Pspark-2.2 -Dmaven.test.skip=true package
