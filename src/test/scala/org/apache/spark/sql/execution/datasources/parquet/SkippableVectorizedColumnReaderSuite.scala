@@ -37,7 +37,7 @@ import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.vectorized.ColumnVector
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.oap.SharedOapContext
-import org.apache.spark.sql.types.{BooleanType, StructField, StructType}
+import org.apache.spark.sql.types.{BooleanType, DataType, LongType, StructField, StructType}
 import org.apache.spark.util.Utils
 
 class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapContext
@@ -85,8 +85,10 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
     writeData(parquetSchema, data)
 
-    val columnVector = skipAndReadToVector(parquetSchema)
+    // skip and read data to ColumnVector
+    val columnVector = skipAndReadToVector(parquetSchema, BooleanType)
 
+    // assert result
     (0 until unitSize).foreach { i =>
       val actual = columnVector.getBoolean(i)
       val excepted = i % 2 == 0
@@ -94,7 +96,31 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
-  private def skipAndReadToVector(parquetSchema: MessageType): ColumnVector = {
+  test("skip And read longs") {
+    // write parquet data, type is long
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, INT64, "int64_field")
+    )
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      (0 until unitSize * 2).map(i => factory.newGroup()
+        .append("int64_field", i.toLong)
+      )
+    }
+    writeData(parquetSchema, data)
+
+    // skip and read data to ColumnVector
+    val columnVector = skipAndReadToVector(parquetSchema, LongType)
+
+    // assert result
+    (0 until unitSize).foreach { i =>
+      val actual = columnVector.getLong(i)
+      val excepted = (i + unitSize).toLong
+      assert(actual == excepted)
+    }
+  }
+
+  private def skipAndReadToVector(parquetSchema: MessageType, dataType: DataType): ColumnVector = {
     val footer = OapParquetFileReader
       .readParquetFooter(configuration, new Path(fileName)).toParquetMetadata
     val reader = OapParquetFileReader.open(configuration, new Path(fileName), footer)
@@ -103,7 +129,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     val columnDescriptor = parquetSchema.getColumns.get(0)
     val pageReader = rowGroup.getPageReader(columnDescriptor)
     val columnReader = new SkippableVectorizedColumnReader(columnDescriptor, pageReader)
-    val columnVector = ColumnVector.allocate(unitSize, BooleanType, MemoryMode.ON_HEAP)
+    val columnVector = ColumnVector.allocate(unitSize, dataType, MemoryMode.ON_HEAP)
     columnReader.skipBatch(unitSize, columnVector.dataType, columnVector.isArray)
     columnVector.reset()
     columnReader.readBatch(unitSize, columnVector)
