@@ -145,6 +145,25 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  test("skip longs and throw UnsupportedOperation") {
+    // write parquet data, type is long
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, INT64, "int64_field")
+    )
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      (0 until unitSize * 2).map(i => factory.newGroup()
+        .append("int64_field", i.toLong)
+      )
+    }
+    writeData(parquetSchema, data)
+
+    // skip with wrong type
+    intercept[UnsupportedOperationException] {
+      skipAndThrowUnsupportedOperation(parquetSchema, BooleanType)
+    }
+  }
+
   private def skipAndReadToVector(parquetSchema: MessageType, dataType: DataType): ColumnVector = {
     val footer = OapParquetFileReader
       .readParquetFooter(configuration, new Path(fileName)).toParquetMetadata
@@ -159,6 +178,20 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     columnVector.reset()
     columnReader.readBatch(unitSize, columnVector)
     columnVector
+  }
+
+  private def skipAndThrowUnsupportedOperation(
+      parquetSchema: MessageType,
+      dataType: DataType): Unit = {
+    val footer = OapParquetFileReader
+      .readParquetFooter(configuration, new Path(fileName)).toParquetMetadata
+    val reader = OapParquetFileReader.open(configuration, new Path(fileName), footer)
+    reader.setRequestedSchema(parquetSchema)
+    val rowGroup = reader.readNextRowGroup()
+    val columnDescriptor = parquetSchema.getColumns.get(0)
+    val pageReader = rowGroup.getPageReader(columnDescriptor)
+    val columnReader = new SkippableVectorizedColumnReader(columnDescriptor, pageReader)
+    columnReader.skipBatch(unitSize, dataType, false)
   }
 
   private def writeData(writeSchema: MessageType, data: Seq[Group]): Unit = {
