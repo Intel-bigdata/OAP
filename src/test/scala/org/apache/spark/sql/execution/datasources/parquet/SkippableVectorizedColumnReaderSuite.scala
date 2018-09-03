@@ -120,6 +120,31 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  test("skip And read longs with dic") {
+    // write parquet data, type is long and with dic
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, INT64, "int64_field")
+    )
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      (0 until unitSize * 2).map(i =>
+        if (i < unitSize) factory.newGroup().append("int64_field", 1L)
+        else factory.newGroup().append("int64_field", 2L)
+      )
+    }
+    writeData(parquetSchema, data)
+
+    // skip and read data to ColumnVector
+    val columnVector = skipAndReadToVector(parquetSchema, LongType)
+
+    // assert result
+    (0 until unitSize).foreach { i =>
+      val actual = columnVector.getLong(i)
+      val excepted = 2L
+      assert(actual == excepted)
+    }
+  }
+
   private def skipAndReadToVector(parquetSchema: MessageType, dataType: DataType): ColumnVector = {
     val footer = OapParquetFileReader
       .readParquetFooter(configuration, new Path(fileName)).toParquetMetadata
