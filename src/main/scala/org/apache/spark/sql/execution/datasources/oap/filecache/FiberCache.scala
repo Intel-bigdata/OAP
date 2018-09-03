@@ -20,6 +20,8 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
+import com.google.common.primitives.Ints
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.oap.OapRuntime
@@ -27,15 +29,7 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.unsafe.types.UTF8String
 
-/**
- * Basic unit of OAP cache.
- * TODO: Store capacity in MemoryBlock would be better.
- * @param fiberData the row memory block which store the data
- * @param capacity capacity is the actual space occupied
- */
-case class FiberCache(
-    protected val fiberData: MemoryBlock,
-    private val capacity: Long) extends Logging {
+case class FiberCache(protected val fiberData: MemoryBlockWithCapacity) extends Logging {
 
   // This is and only is set in `cache() of OapCache`
   // TODO: make it immutable
@@ -105,7 +99,8 @@ case class FiberCache(
   // For debugging
   def toArray: Array[Byte] = {
     // TODO: Handle overflow
-    val bytes = new Array[Byte](fiberData.size().toInt)
+    val intSize = Ints.checkedCast(size())
+    val bytes = new Array[Byte](intSize)
     copyMemoryToBytes(0, bytes)
     bytes
   }
@@ -116,9 +111,9 @@ case class FiberCache(
     if (disposed) {
       throw new OapException("Try to access a freed memory")
     }
-    fiberData.getBaseObject
+    fiberData.memoryBlock.getBaseObject
   }
-  def getBaseOffset: Long = fiberData.getBaseOffset
+  def getBaseOffset: Long = fiberData.memoryBlock.getBaseOffset
 
   def getBoolean(offset: Long): Boolean = Platform.getBoolean(getBaseObj, getBaseOffset + offset)
 
@@ -148,11 +143,11 @@ case class FiberCache(
       getBaseObj, getBaseOffset + offset, dst, Platform.BYTE_ARRAY_OFFSET, dst.length)
   }
 
-  def size(): Long = fiberData.size()
+  def size(): Long = fiberData.memoryBlock.size()
 
   // Return the allocated size and it's typically larger than the required data size due to memory
   // alignments from underlying allocator
-  def getCapacity(): Long = capacity
+  def getCapacity(): Long = fiberData.capacity
 }
 
 object FiberCache {
@@ -160,6 +155,7 @@ object FiberCache {
   private[oap] def apply(data: Array[Byte]): FiberCache = {
     val memoryBlock = new MemoryBlock(data, Platform.BYTE_ARRAY_OFFSET, data.length)
     // We store the length of the array as the capacity.
-    FiberCache(memoryBlock, data.length)
+    val memoryBlockWithCapacity = MemoryBlockWithCapacity(memoryBlock, data.length)
+    FiberCache(memoryBlockWithCapacity)
   }
 }

@@ -30,6 +30,13 @@ import org.apache.spark.storage.{BlockManager, TestBlockId}
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
 
+/**
+ * This just wrap the memory block with capacity field. The capacity used to get the actual
+ * capacity of the memoryBlock. For DRAM OFF_HEAP memory, this should be same as the block size.
+ * For other types of memory, that's depends on the implementation of memory allocation.
+ */
+private[filecache] case class MemoryBlockWithCapacity(memoryBlock: MemoryBlock, capacity: Long)
+
 private[sql] abstract class MemoryManager {
   /**
    * Return the total memory used until now.
@@ -51,29 +58,18 @@ private[sql] abstract class MemoryManager {
    * with the requested size, that's depends on the underlying implementation.
    * @param size requested size of memory block
    */
-  private[filecache] def allocate(size: Long): MemoryBlock
-  private[filecache] def free(block: MemoryBlock): Unit
-
-  /**
-   * Get the actual capacity of requested memory. The meaning should be equal with
-   * 'malloc.malloc_usable_size'. This method is valuable, because we may allocate memory based
-   * on different implementation (eg: jemalloc).
-   * @param address the address of the block.
-   * @param requestedSize the requested size of the block.
-   * @return the actual capacity.
-   */
-  protected def getCapacity(address: Long, requestedSize: Long): Long
+  private[filecache] def allocate(size: Long): MemoryBlockWithCapacity
+  private[filecache] def free(block: MemoryBlockWithCapacity): Unit
 
   @inline protected def toFiberCache(bytes: Array[Byte]): FiberCache = {
-    val memoryBlock = allocate(bytes.length)
+    val block = allocate(bytes.length)
     Platform.copyMemory(
       bytes,
       Platform.BYTE_ARRAY_OFFSET,
-      memoryBlock.getBaseObject,
-      memoryBlock.getBaseOffset,
+      block.memoryBlock.getBaseObject,
+      block.memoryBlock.getBaseOffset,
       bytes.length)
-    val usableSize = getCapacity(memoryBlock.getBaseOffset, bytes.length)
-    FiberCache(memoryBlock, usableSize)
+    FiberCache(block)
   }
 
   /**
@@ -101,9 +97,7 @@ private[sql] abstract class MemoryManager {
   }
 
   def getEmptyDataFiberCache(length: Long): FiberCache = {
-    val memoryBlock = allocate(length)
-    val usableSize = getCapacity(memoryBlock.getBaseOffset, memoryBlock.size())
-    FiberCache(memoryBlock, usableSize)
+    FiberCache(allocate(length))
   }
   def stop(): Unit = {}
 }
@@ -172,24 +166,19 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 
   override def cacheGuardianMemory: Long = _cacheGuardianMemory
 
-  override private[filecache] def allocate(size: Long): MemoryBlock = {
+  override private[filecache] def allocate(size: Long): MemoryBlockWithCapacity = {
     val block = MemoryAllocator.UNSAFE.allocate(size)
-    val occupied = getCapacity(block.getBaseOffset, block.size())
-    _memoryUsed.getAndAdd(occupied)
+    _memoryUsed.getAndAdd(size)
     logDebug(s"request allocate $size memory, actual occupied size: " +
-      s"${occupied}, used: $memoryUsed")
-    block
+      s"${size}, used: $memoryUsed")
+    // For OFF_HEAP, capacity also equal to size
+    MemoryBlockWithCapacity(block, size)
   }
 
-  override private[filecache] def free(block: MemoryBlock): Unit = {
-    val occupiedSize = getCapacity(block.getBaseOffset, block.size())
-    MemoryAllocator.UNSAFE.free(block)
-    _memoryUsed.getAndAdd(-occupiedSize)
-    logDebug(s"freed ${block.size()} memory, used: $memoryUsed")
-  }
-
-  override protected def getCapacity(address: Long, requestedSize: Long): Long = {
-    requestedSize
+  override private[filecache] def free(block: MemoryBlockWithCapacity): Unit = {
+    MemoryAllocator.UNSAFE.free(block.memoryBlock)
+    _memoryUsed.getAndAdd(-block.capacity)
+    logDebug(s"freed ${block.capacity} memory, used: $memoryUsed")
   }
 
   override def stop(): Unit = {
