@@ -31,8 +31,8 @@ import org.apache.parquet.schema.{MessageType, PrimitiveType}
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
 import org.apache.parquet.schema.Type.Repetition.REQUIRED
 import org.scalatest.BeforeAndAfterEach
-import org.apache.spark.SparkFunSuite
 
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.vectorized.ColumnVector
