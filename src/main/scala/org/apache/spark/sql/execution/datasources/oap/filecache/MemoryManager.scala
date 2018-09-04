@@ -31,11 +31,13 @@ import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
 
 /**
- * This just wrap the memory block with capacity field. The capacity used to get the actual
- * capacity of the memoryBlock. For DRAM OFF_HEAP memory, this should be same as the block size.
- * For other types of memory, that's depends on the implementation of memory allocation.
+ * This just wrap the memory block with a occupied size field. The field used to get the actual
+ * occupied size of the memoryBlock. For DRAM type of memory, the field should be same as the
+ * block size. For other types of memory, that's depends on the implementation of memory
+ * allocation.
  */
-private[filecache] case class MemoryBlockWithCapacity(memoryBlock: MemoryBlock, capacity: Long)
+private[filecache] case class MemoryBlockWithOccupiedSize(
+    memoryBlock: MemoryBlock, occupiedSize: Long)
 
 private[sql] abstract class MemoryManager {
   /**
@@ -58,8 +60,8 @@ private[sql] abstract class MemoryManager {
    * with the requested size, that's depends on the underlying implementation.
    * @param size requested size of memory block
    */
-  private[filecache] def allocate(size: Long): MemoryBlockWithCapacity
-  private[filecache] def free(block: MemoryBlockWithCapacity): Unit
+  private[filecache] def allocate(size: Long): MemoryBlockWithOccupiedSize
+  private[filecache] def free(block: MemoryBlockWithOccupiedSize): Unit
 
   @inline protected def toFiberCache(bytes: Array[Byte]): FiberCache = {
     val block = allocate(bytes.length)
@@ -166,19 +168,19 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 
   override def cacheGuardianMemory: Long = _cacheGuardianMemory
 
-  override private[filecache] def allocate(size: Long): MemoryBlockWithCapacity = {
+  override private[filecache] def allocate(size: Long): MemoryBlockWithOccupiedSize = {
     val block = MemoryAllocator.UNSAFE.allocate(size)
     _memoryUsed.getAndAdd(size)
     logDebug(s"request allocate $size memory, actual occupied size: " +
       s"${size}, used: $memoryUsed")
-    // For OFF_HEAP, capacity also equal to size
-    MemoryBlockWithCapacity(block, size)
+    // For OFF_HEAP, occupied size also equal to the size.
+    MemoryBlockWithOccupiedSize(block, size)
   }
 
-  override private[filecache] def free(block: MemoryBlockWithCapacity): Unit = {
+  override private[filecache] def free(block: MemoryBlockWithOccupiedSize): Unit = {
     MemoryAllocator.UNSAFE.free(block.memoryBlock)
-    _memoryUsed.getAndAdd(-block.capacity)
-    logDebug(s"freed ${block.capacity} memory, used: $memoryUsed")
+    _memoryUsed.getAndAdd(-block.occupiedSize)
+    logDebug(s"freed ${block.occupiedSize} memory, used: $memoryUsed")
   }
 
   override def stop(): Unit = {

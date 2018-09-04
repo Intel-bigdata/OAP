@@ -55,8 +55,8 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
   def addRemovalFiber(fiber: FiberId, fiberCache: FiberCache): Unit = {
     _pendingFiberSize.addAndGet(fiberCache.size())
-    // Record the capacity size
-    _pendingFiberCapacity.addAndGet(fiberCache.getCapacity())
+    // Record the occupied size
+    _pendingFiberCapacity.addAndGet(fiberCache.getOccupiedSize())
     removalPendingQueue.offer((fiber, fiberCache))
     if (_pendingFiberCapacity.get() > maxMemory) {
       logWarning("Fibers pending on removal use too much memory, " +
@@ -85,7 +85,7 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
       }
     } else {
       _pendingFiberSize.addAndGet(-cache.size())
-      _pendingFiberCapacity.addAndGet(-cache.getCapacity())
+      _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
       // TODO: Make log more readable
       logDebug(s"Fiber removed successfully. Fiber: $fiberId")
     }
