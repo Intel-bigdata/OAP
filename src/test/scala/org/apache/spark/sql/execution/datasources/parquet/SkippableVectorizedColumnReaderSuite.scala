@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution.datasources.parquet
 
 import java.io.File
+import java.util.Random
 
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_1_0
@@ -657,6 +658,212 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  test("skip And read fixed length byte array 8 bytes") {
+    // write parquet data, type is long
+    val length = 8
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
+    )
+    val binaryDataArray = new Array[Binary](unitSize * 2)
+    val dataGenerator = FixedLengthDataGenerator(length)
+    for(i <- binaryDataArray.indices) {
+      binaryDataArray(i) = dataGenerator.nextValue
+    }
+
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      binaryDataArray.map(v => factory.newGroup().append("binary_field", v))
+    }
+
+    writeData(parquetSchema, data)
+
+    // skip and read data to ColumnVector
+    val columnVector = skipAndReadToVector(parquetSchema, DecimalType(length, 0))
+
+    // assert result
+    (0 until unitSize).foreach { i =>
+      val actual = columnVector.getInt(i)
+      val excepted = ParquetRowConverter.binaryToUnscaledLong(binaryDataArray(i + unitSize)).toInt
+      assert(actual == excepted)
+    }
+  }
+
+  test("skip And read fixed length byte array 8 bytes with dic") {
+    // write parquet data, type is long
+    val length = 8
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
+    )
+    val dataGenerator = FixedLengthDataGenerator(length)
+    val v1 = dataGenerator.nextValue
+    val v2 = dataGenerator.nextValue
+
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      (0 until unitSize *2).map(i => {
+        if (i < unitSize) factory.newGroup().append("binary_field", v1)
+        else factory.newGroup().append("binary_field", v2)
+      })
+    }
+
+    writeData(parquetSchema, data)
+
+    // skip and read data to ColumnVector
+    val columnVector = skipAndReadToVector(parquetSchema, DecimalType(length, 0))
+
+    // assert result
+    (0 until unitSize).foreach { i =>
+      val actual = columnVector.getInt(i)
+      val excepted = ParquetRowConverter.binaryToUnscaledLong(v2).toInt
+      assert(actual == excepted)
+    }
+  }
+
+  test("skip And read fixed length byte array 16 bytes") {
+    // write parquet data, type is long
+    val length = 16
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
+    )
+    val binaryDataArray = new Array[Binary](unitSize * 2)
+    val dataGenerator = FixedLengthDataGenerator(length)
+    for(i <- binaryDataArray.indices) {
+      binaryDataArray(i) = dataGenerator.nextValue
+    }
+
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      binaryDataArray.map(v => factory.newGroup().append("binary_field", v))
+    }
+
+    writeData(parquetSchema, data)
+
+    // skip and read data to ColumnVector
+    val columnVector = skipAndReadToVector(parquetSchema, DecimalType(length, 0))
+
+    // assert result
+    (0 until unitSize).foreach { i =>
+      val actual = columnVector.getLong(i)
+      val excepted = ParquetRowConverter.binaryToUnscaledLong(binaryDataArray(i + unitSize))
+      assert(actual == excepted)
+    }
+  }
+
+  test("skip And read fixed length byte array 16 bytes with dic") {
+    // write parquet data, type is long
+    val length = 16
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
+    )
+    val dataGenerator = FixedLengthDataGenerator(length)
+    val v1 = dataGenerator.nextValue
+    val v2 = dataGenerator.nextValue
+
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      (0 until unitSize *2).map(i => {
+        if (i < unitSize) factory.newGroup().append("binary_field", v1)
+        else factory.newGroup().append("binary_field", v2)
+      })
+    }
+
+    writeData(parquetSchema, data)
+
+    // skip and read data to ColumnVector
+    val columnVector = skipAndReadToVector(parquetSchema, DecimalType(length, 0))
+
+    // assert result
+    (0 until unitSize).foreach { i =>
+      val actual = columnVector.getLong(i)
+      val excepted = ParquetRowConverter.binaryToUnscaledLong(v2)
+      assert(actual == excepted)
+    }
+  }
+
+  test("skip And read fixed length byte array 20 bytes") {
+    // write parquet data, type is long
+    val length = 20
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
+    )
+    val binaryDataArray = new Array[Binary](unitSize * 2)
+    val dataGenerator = FixedLengthDataGenerator(length)
+    for(i <- binaryDataArray.indices) {
+      binaryDataArray(i) = dataGenerator.nextValue
+    }
+
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      binaryDataArray.map(v => factory.newGroup().append("binary_field", v))
+    }
+
+    writeData(parquetSchema, data)
+
+    // skip and read data to ColumnVector
+    val columnVector = skipAndReadToVector(parquetSchema, DecimalType(length, 0))
+
+    // assert result
+    (0 until unitSize).foreach { i =>
+      val actual = columnVector.getBinary(i)
+      val excepted = binaryDataArray(i + unitSize).getBytes
+      assert(actual.sameElements(excepted))
+    }
+  }
+
+  test("skip And read fixed length byte array 20 bytes with dic") {
+    // write parquet data, type is long
+    val length = 20
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
+    )
+    val dataGenerator = FixedLengthDataGenerator(length)
+    val v1 = dataGenerator.nextValue
+    val v2 = dataGenerator.nextValue
+
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      (0 until unitSize *2).map(i => {
+        if (i < unitSize) factory.newGroup().append("binary_field", v1)
+        else factory.newGroup().append("binary_field", v2)
+      })
+    }
+
+    writeData(parquetSchema, data)
+
+    // skip and read data to ColumnVector
+    val columnVector = skipAndReadToVector(parquetSchema, DecimalType(length, 0))
+
+    // assert result
+    (0 until unitSize).foreach { i =>
+      assert(columnVector.getBinary(i).sameElements(v2.getBytes))
+    }
+  }
+
+  test("skip fixed length byte array 8 bytes throw UnsupportedOperation") {
+    // write parquet data, type is long
+    val length = 8
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
+    )
+    val binaryDataArray = new Array[Binary](unitSize * 2)
+    val dataGenerator = FixedLengthDataGenerator(length)
+    for(i <- binaryDataArray.indices) {
+      binaryDataArray(i) = dataGenerator.nextValue
+    }
+
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      binaryDataArray.map(v => factory.newGroup().append("binary_field", v))
+    }
+
+    writeData(parquetSchema, data)
+
+    // skip with wrong type
+    intercept[UnsupportedOperationException] {
+      skipAndThrowUnsupportedOperation(parquetSchema, BooleanType)
+    }
+  }
+
   private def skipAndReadToVector(parquetSchema: MessageType, dataType: DataType): ColumnVector = {
     val footer = OapParquetFileReader
       .readParquetFooter(configuration, new Path(fileName)).toParquetMetadata
@@ -711,5 +918,24 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     data.foreach(writer.write)
     writer.close()
+  }
+}
+
+case class FixedLengthDataGenerator(length: Int) {
+
+  private val random = new Random()
+
+  private def randomInt: Int = randomInt(Integer.MAX_VALUE - 1)
+
+  private def randomInt(maximum: Int): Int = {
+    random.nextInt(Math.abs(maximum) + 1)
+  }
+
+  def nextValue: Binary = {
+    val buffer = new Array[Byte](length)
+    for (i <- buffer.indices) {
+      buffer(i) = randomInt.toByte
+    }
+    Binary.fromReusedByteArray(buffer)
   }
 }
