@@ -73,7 +73,8 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
         ((SkippableVectorizedRleValuesReader)defColumn)
           .skipIntegers(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
       } else {
-        // isCurrentPageDictionaryEncoded is false, call skip by dataType.
+        // isCurrentPageDictionaryEncoded is false, call skip by descriptor.getType(), this type
+        // store in ColumnDescriptor of Parquet file.
         switch (descriptor.getType()) {
           case BOOLEAN:
             skipBooleanBatch(num, dataType);
@@ -114,12 +115,23 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    * is guaranteed that num is smaller than the number of values left in the current page.
    */
 
+  /**
+   * BooleanType store as boolean, use this method to skip records.
+   * @param num record count
+   * @param dataType dataType
+   */
   private void skipBooleanBatch(int num, DataType dataType) {
     assert(dataType == DataTypes.BooleanType);
     ((SkippableVectorizedRleValuesReader)defColumn)
       .skipBooleans(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
   }
 
+  /**
+   * IntegerType | DateType | DecimalType(precision <= Decimal.MAX_INT_DIGITS) | ByteType
+   * ShortType can store as int32, use this method to skip records.
+   * @param num record count
+   * @param dataType dataType
+   */
   private void skipIntBatch(int num, DataType dataType) {
     if (dataType == DataTypes.IntegerType || dataType == DataTypes.DateType ||
                 DecimalType.is32BitDecimalType(dataType)) {
@@ -136,6 +148,12 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
     }
   }
 
+  /**
+   * LongType | DecimalType(precision <= Decimal.MAX_LONG_DIGITS) can store as int64,
+   * use this method to skip records.
+   * @param num record count
+   * @param dataType dataType
+   */
   private void skipLongBatch(int num, DataType dataType) {
     if (dataType == DataTypes.LongType ||
                 DecimalType.is64BitDecimalType(dataType)) {
@@ -146,6 +164,11 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
     }
   }
 
+  /**
+   * FloatType store as float, use this method to skip records.
+   * @param num record count
+   * @param dataType dataType
+   */
   private void skipFloatBatch(int num, DataType dataType) {
     if (dataType == DataTypes.FloatType) {
       ((SkippableVectorizedRleValuesReader)defColumn)
@@ -155,6 +178,11 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
     }
   }
 
+  /**
+   * DoubleType store as double, use this method to skip records.
+   * @param num record count
+   * @param dataType dataType
+   */
   private void skipDoubleBatch(int num, DataType dataType) {
     if (dataType == DataTypes.DoubleType) {
       ((SkippableVectorizedRleValuesReader)defColumn)
@@ -164,7 +192,11 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
     }
   }
 
-
+  /**
+   * ByteArray | TimestampType store as binary, use this method to skip records.
+   * @param num record count
+   * @param dataType dataType
+   */
   private void skipBinaryBatch(int num, DataType dataType, boolean isArray) {
     VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
     if (isArray) {
@@ -181,6 +213,11 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
     }
   }
 
+  /**
+   * Fix length decimal can store as FIXED_LEN_BYTE_ARRAY, use this method to skip records.
+   * @param num record count
+   * @param dataType dataType
+   */
   private void skipFixedLenByteArrayBatch(int num, DataType dataType, int arrayLen) {
     VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
 

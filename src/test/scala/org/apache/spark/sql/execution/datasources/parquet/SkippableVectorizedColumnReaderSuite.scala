@@ -87,14 +87,12 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
     writeData(parquetSchema, data)
 
-    // skip and read data to ColumnVector
+    // skip and read data to ColumnVector by BooleanType
     val columnVector = skipAndReadToVector(parquetSchema, BooleanType)
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getBoolean(i)
-      val excepted = i % 2 == 0
-      assert(actual == excepted)
+      assert(columnVector.getBoolean(i) == (i % 2 == 0))
     }
   }
 
@@ -105,9 +103,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     )
     val data: Seq[Group] = {
       val factory = new SimpleGroupFactory(parquetSchema)
-      (0 until unitSize * 2).map(i => factory.newGroup()
-        .append("int32_field", i)
-      )
+      (0 until unitSize * 2).map(i => factory.newGroup().append("int32_field", i))
     }
     writeData(parquetSchema, data)
 
@@ -116,9 +112,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = integerTypeVector.getInt(i)
-      val excepted = i + unitSize
-      assert(actual == excepted)
+      assert(integerTypeVector.getInt(i) == i + unitSize)
     }
 
     // skip and read data to ColumnVector use DateType
@@ -126,9 +120,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result, DateType read as int32
     (0 until unitSize).foreach { i =>
-      val actual = dateTypeVector.getInt(i)
-      val excepted = i + unitSize
-      assert(actual == excepted)
+      assert(dateTypeVector.getInt(i) == i + unitSize)
     }
 
     // skip and read data to ColumnVector use ShortType
@@ -136,9 +128,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result, ShortType read as int32
     (0 until unitSize).foreach { i =>
-      val actual = shortTypeVector.getShort(i)
-      val excepted = (i + unitSize).toShort
-      assert(actual == excepted)
+      assert(shortTypeVector.getShort(i) == (i + unitSize).toShort)
     }
 
     // skip and read data to ColumnVector use ByteType
@@ -146,17 +136,15 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result, ByteType read as int32
     (0 until unitSize).foreach { i =>
-      val actual = byteTypeVector.getByte(i)
-      val excepted = (i + unitSize).toByte
-      assert(actual == excepted)
+      assert(byteTypeVector.getByte(i) == (i + unitSize).toByte)
     }
 
-    // skip and read data to ColumnVector use DecimalType.IntDecimal
+    // skip and read data to ColumnVector use DecimalType(8, 0)
     val precision = 8
     val scale = 0
     val intDecimalVector = skipAndReadToVector(parquetSchema, DecimalType(precision, scale))
 
-    // assert result, DecimalType.IntDecimal read as int32
+    // assert result, DecimalType read as int32
     (0 until unitSize).foreach { i =>
       val actual = intDecimalVector.getDecimal(i, precision, scale)
       val excepted = Decimal.createUnsafe(i + unitSize, precision, scale)
@@ -164,8 +152,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  /**
+   *  Similar to "skip And read int32" but data have dictionary.
+   */
   test("skip And read int32 with dic") {
-    // write parquet data, type is int and with dic
+    // write parquet data, type is int32 and with dic
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, INT32, "int32_field")
     )
@@ -193,9 +184,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result, DateType read as int32
     (0 until unitSize).foreach { i =>
-      val actual = dateTypeVector.getInt(i)
-      val excepted = 2
-      assert(actual == excepted)
+      assert(dateTypeVector.getInt(i) == 2)
     }
 
     // skip and read data to ColumnVector use ShortType
@@ -203,9 +192,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result, ShortType read as int32
     (0 until unitSize).foreach { i =>
-      val actual = shortTypeVector.getShort(i)
-      val excepted = 2.toShort
-      assert(actual == excepted)
+      assert(shortTypeVector.getShort(i) == 2.toShort)
     }
 
     // skip and read data to ColumnVector use ByteType
@@ -213,13 +200,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result, ByteType read as int32
     (0 until unitSize).foreach { i =>
-      val actual = byteTypeVector.getByte(i)
-      val excepted = 2.toByte
-      assert(actual == excepted)
+      assert(byteTypeVector.getByte(i) == 2.toByte)
     }
 
 
-    // skip and read data to ColumnVector use DecimalType
+    // skip and read data to ColumnVector use DecimalType(8, 0)
     val precision = 8
     val scale = 0
     val intDecimalVector = skipAndReadToVector(parquetSchema, DecimalType(precision, scale))
@@ -239,9 +224,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     )
     val data: Seq[Group] = {
       val factory = new SimpleGroupFactory(parquetSchema)
-      (0 until unitSize * 2).map(i => factory.newGroup()
-        .append("int32_field", i)
-      )
+      (0 until unitSize * 2).map(i => factory.newGroup().append("int32_field", i))
     }
     writeData(parquetSchema, data)
 
@@ -265,23 +248,22 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     )
     val data: Seq[Group] = {
       val factory = new SimpleGroupFactory(parquetSchema)
-      (0 until unitSize * 2).map(i => factory.newGroup()
-        .append("float_field", i.toFloat)
-      )
+      (0 until unitSize * 2).map(i => factory.newGroup().append("float_field", i.toFloat))
     }
     writeData(parquetSchema, data)
 
-    // skip and read data to ColumnVector
+    // skip and read data to ColumnVector by FloatType
     val columnVector = skipAndReadToVector(parquetSchema, FloatType)
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getFloat(i)
-      val excepted = (i + unitSize).toFloat
-      assert(actual == excepted)
+      assert(columnVector.getFloat(i) == (i + unitSize).toFloat)
     }
   }
 
+  /**
+   * Similar to "skip And read float" but data have dictionary.
+   */
   test("skip And read float with dic") {
     // write parquet data, type is float and with dic
     val parquetSchema: MessageType = new MessageType("test",
@@ -301,9 +283,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getFloat(i)
-      val excepted = 2F
-      assert(actual == excepted)
+      assert(columnVector.getFloat(i) == 2F)
     }
   }
 
@@ -339,17 +319,18 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
     writeData(parquetSchema, data)
 
-    // skip and read data to ColumnVector
+    // skip and read data to ColumnVector by DoubleType
     val columnVector = skipAndReadToVector(parquetSchema, DoubleType)
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getDouble(i)
-      val excepted = (i + unitSize).toDouble
-      assert(actual == excepted)
+      assert(columnVector.getDouble(i) == (i + unitSize).toDouble)
     }
   }
 
+  /**
+   * Similar to "skip And read double" but data have dictionary.
+   */
   test("skip And read double with dic") {
     // write parquet data, type is double and with dic
     val parquetSchema: MessageType = new MessageType("test",
@@ -369,9 +350,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getDouble(i)
-      val excepted = 2D
-      assert(actual == excepted)
+      assert(columnVector.getDouble(i) == 2D)
     }
   }
 
@@ -395,7 +374,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
   }
 
   test("skip And read int64") {
-    // write parquet data, type is long
+    // write parquet data, type is int64
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, INT64, "int64_field")
     )
@@ -412,9 +391,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = longTypeVector.getLong(i)
-      val excepted = (i + unitSize).toLong
-      assert(actual == excepted)
+      assert(longTypeVector.getLong(i) == (i + unitSize).toLong)
     }
 
     // skip and read data to ColumnVector by DecimalType
@@ -430,8 +407,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  /**
+   * Similar to "skip And read int64" but data have dictionary.
+   */
   test("skip And read int64 with dic") {
-    // write parquet data, type is long and with dic
+    // write parquet data, type is int64 and with dic
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, INT64, "int64_field")
     )
@@ -449,9 +429,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = longTypeVector.getLong(i)
-      val excepted = 2L
-      assert(actual == excepted)
+      assert(longTypeVector.getLong(i) == 2L)
     }
 
     // skip and read data to ColumnVector by DecimalType
@@ -468,7 +446,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
   }
 
   test("skip int64 and throw UnsupportedOperation") {
-    // write parquet data, type is long
+    // write parquet data, type is int64
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, INT64, "int64_field")
     )
@@ -493,6 +471,9 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  /**
+   * Similar to "skip And read int96" but data have dictionary.
+   */
   test("skip And read int96 with dic") {
     // write parquet data, type is int96, actually int96 always has dic ...
     val times = new Array[NanoTime](unitSize *2)
@@ -509,7 +490,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
     writeData(parquetSchema, data)
 
-    // skip and read data to ColumnVector
+    // skip and read data to ColumnVector by TimestampType
     val columnVector = skipAndReadToVector(parquetSchema, TimestampType)
 
     // assert result
@@ -521,7 +502,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
   }
 
   test("skip And read string") {
-    // write parquet data, type is long
+    // write parquet data, type is string
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, BINARY, "string_field")
     )
@@ -538,14 +519,15 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getUTF8String(i).toString
-      val excepted = String.valueOf(i + unitSize)
-      assert(actual == excepted)
+      assert(columnVector.getUTF8String(i).toString == String.valueOf(i + unitSize))
     }
   }
 
+  /**
+   * Similar to "skip And read string" but data have dictionary.
+   */
   test("skip And read string with dic") {
-    // write parquet data, type is long and with dic
+    // write parquet data, type is string and with dic
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, BINARY, "string_field")
     )
@@ -563,14 +545,12 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getUTF8String(i).toString
-      val excepted = String.valueOf(2)
-      assert(actual == excepted)
+      assert(columnVector.getUTF8String(i).toString == String.valueOf(2))
     }
   }
 
   test("skip string and throw UnsupportedOperation") {
-    // write parquet data, type is long
+    // write parquet data, type is string
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, BINARY, "string_field")
     )
@@ -589,7 +569,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
   }
 
   test("skip And read binary") {
-    // write parquet data, type is long
+    // write parquet data, type is binary
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, BINARY, "binary_field")
     )
@@ -612,8 +592,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  /**
+   * Similar to "skip And read binary" but data have dictionary.
+   */
   test("skip And read binary with dic") {
-    // write parquet data, type is long and with dic
+    // write parquet data, type is binary and with dic
     val v1 = Binary.fromCharSequence("1")
     val v2 = Binary.fromCharSequence("2")
     val parquetSchema: MessageType = new MessageType("test",
@@ -658,8 +641,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  /**
+   * length <= Decimal.MAX_INT_DIGITS, store in ColumnVector as int
+   */
   test("skip And read fixed length byte array 8 bytes") {
-    // write parquet data, type is long
+    // write parquet data, type is FIXED_LEN_BYTE_ARRAY
     val length = 8
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
@@ -688,8 +674,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  /**
+   * Similar to "skip And read fixed length byte array 8 bytes" but data have dictionary.
+   */
   test("skip And read fixed length byte array 8 bytes with dic") {
-    // write parquet data, type is long
+    // write parquet data, type is FIXED_LEN_BYTE_ARRAY
     val length = 8
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
@@ -719,8 +708,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  /**
+   * length <= Decimal.MAX_LONG_DIGITS, store in ColumnVector as long
+   */
   test("skip And read fixed length byte array 16 bytes") {
-    // write parquet data, type is long
+    // write parquet data, type is FIXED_LEN_BYTE_ARRAY
     val length = 16
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
@@ -749,8 +741,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  /**
+   * Similar to "skip And read fixed length byte array 16 bytes" but data have dictionary.
+   */
   test("skip And read fixed length byte array 16 bytes with dic") {
-    // write parquet data, type is long
+    // write parquet data, type is FIXED_LEN_BYTE_ARRAY
     val length = 16
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
@@ -780,8 +775,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  /**
+   * length > Decimal.MAX_LONG_DIGITS, store in ColumnVector as ByteArray
+   */
   test("skip And read fixed length byte array 20 bytes") {
-    // write parquet data, type is long
+    // write parquet data, type is FIXED_LEN_BYTE_ARRAY
     val length = 20
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
@@ -810,8 +808,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  /**
+   * Similar to "skip And read fixed length byte array 20 bytes" but data have dictionary.
+   */
   test("skip And read fixed length byte array 20 bytes with dic") {
-    // write parquet data, type is long
+    // write parquet data, type is FIXED_LEN_BYTE_ARRAY
     val length = 20
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
@@ -840,7 +841,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
   }
 
   test("skip fixed length byte array 8 bytes throw UnsupportedOperation") {
-    // write parquet data, type is long
+    // write parquet data, type is FIXED_LEN_BYTE_ARRAY
     val length = 8
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, FIXED_LEN_BYTE_ARRAY, length, "binary_field")
@@ -921,6 +922,10 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
   }
 }
 
+/**
+ * Use to generate fixed length binary type data.
+ * @param length fixed length
+ */
 case class FixedLengthDataGenerator(length: Int) {
 
   private val random = new Random()
