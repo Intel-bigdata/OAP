@@ -98,7 +98,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
   }
 
   test("skip And read int32") {
-    // write parquet data, type is int
+    // write parquet data, type is int32
     val parquetSchema: MessageType = new MessageType("test",
       new PrimitiveType(REQUIRED, INT32, "int32_field")
     )
@@ -110,15 +110,26 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
     writeData(parquetSchema, data)
 
-    // skip and read data to ColumnVector
-    val columnVector = skipAndReadToVector(parquetSchema, IntegerType)
+    // skip and read data to ColumnVector use IntegerType
+    val integerTypeVector = skipAndReadToVector(parquetSchema, IntegerType)
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getInt(i)
+      val actual = integerTypeVector.getInt(i)
       val excepted = i + unitSize
       assert(actual == excepted)
     }
+
+    // skip and read data to ColumnVector use DateType
+    val dateTypeVector = skipAndReadToVector(parquetSchema, DateType)
+
+    // assert result, DateType read as int
+    (0 until unitSize).foreach { i =>
+      val actual = dateTypeVector.getInt(i)
+      val excepted = i + unitSize
+      assert(actual == excepted)
+    }
+
   }
 
   test("skip And read int32 with dic") {
@@ -135,12 +146,22 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
     writeData(parquetSchema, data)
 
-    // skip and read data to ColumnVector
-    val columnVector = skipAndReadToVector(parquetSchema, IntegerType)
+    // skip and read data to ColumnVector use IntegerType
+    val integerTypeVector = skipAndReadToVector(parquetSchema, IntegerType)
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getInt(i)
+      val actual = integerTypeVector.getInt(i)
+      val excepted = 2
+      assert(actual == excepted)
+    }
+
+    // skip and read data to ColumnVector use DateType
+    val dateTypeVector = skipAndReadToVector(parquetSchema, DateType)
+
+    // assert result, DateType read as int
+    (0 until unitSize).foreach { i =>
+      val actual = dateTypeVector.getInt(i)
       val excepted = 2
       assert(actual == excepted)
     }
@@ -537,17 +558,23 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
   private def skipAndReadToVector(parquetSchema: MessageType, dataType: DataType): ColumnVector = {
     val footer = OapParquetFileReader
       .readParquetFooter(configuration, new Path(fileName)).toParquetMetadata
-    val reader = OapParquetFileReader.open(configuration, new Path(fileName), footer)
-    reader.setRequestedSchema(parquetSchema)
-    val rowGroup = reader.readNextRowGroup()
-    val columnDescriptor = parquetSchema.getColumns.get(0)
-    val pageReader = rowGroup.getPageReader(columnDescriptor)
-    val columnReader = new SkippableVectorizedColumnReader(columnDescriptor, pageReader)
-    val columnVector = ColumnVector.allocate(unitSize, dataType, MemoryMode.ON_HEAP)
-    columnReader.skipBatch(unitSize, columnVector.dataType, columnVector.isArray)
-    columnVector.reset()
-    columnReader.readBatch(unitSize, columnVector)
-    columnVector
+    var reader: OapParquetFileReader = null
+    try {
+      reader = OapParquetFileReader.open(configuration, new Path(fileName), footer)
+      reader.setRequestedSchema(parquetSchema)
+      val rowGroup = reader.readNextRowGroup()
+      val columnDescriptor = parquetSchema.getColumns.get(0)
+      val pageReader = rowGroup.getPageReader(columnDescriptor)
+      val columnReader = new SkippableVectorizedColumnReader(columnDescriptor, pageReader)
+      val columnVector = ColumnVector.allocate(unitSize, dataType, MemoryMode.ON_HEAP)
+      columnReader.skipBatch(unitSize, columnVector.dataType, columnVector.isArray)
+      columnVector.reset()
+      columnReader.readBatch(unitSize, columnVector)
+      columnVector
+    } finally {
+      if (reader != null) reader.close()
+    }
+
   }
 
   private def skipAndThrowUnsupportedOperation(
@@ -556,13 +583,18 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
       isArray: Boolean = false): Unit = {
     val footer = OapParquetFileReader
       .readParquetFooter(configuration, new Path(fileName)).toParquetMetadata
-    val reader = OapParquetFileReader.open(configuration, new Path(fileName), footer)
-    reader.setRequestedSchema(parquetSchema)
-    val rowGroup = reader.readNextRowGroup()
-    val columnDescriptor = parquetSchema.getColumns.get(0)
-    val pageReader = rowGroup.getPageReader(columnDescriptor)
-    val columnReader = new SkippableVectorizedColumnReader(columnDescriptor, pageReader)
-    columnReader.skipBatch(unitSize, dataType, isArray)
+    var reader: OapParquetFileReader = null
+    try {
+      reader = OapParquetFileReader.open(configuration, new Path(fileName), footer)
+      reader.setRequestedSchema(parquetSchema)
+      val rowGroup = reader.readNextRowGroup()
+      val columnDescriptor = parquetSchema.getColumns.get(0)
+      val pageReader = rowGroup.getPageReader(columnDescriptor)
+      val columnReader = new SkippableVectorizedColumnReader(columnDescriptor, pageReader)
+      columnReader.skipBatch(unitSize, dataType, isArray)
+    } finally {
+      if (reader != null) reader.close()
+    }
   }
 
   private def writeData(writeSchema: MessageType, data: Seq[Group]): Unit = {
