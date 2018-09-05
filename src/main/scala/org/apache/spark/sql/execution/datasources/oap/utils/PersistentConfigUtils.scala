@@ -23,6 +23,7 @@ import scala.collection.mutable
 import scala.xml.XML
 
 import org.apache.spark.SparkConf
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.util.Utils
 
@@ -30,7 +31,7 @@ import org.apache.spark.util.Utils
  * A xml parser used for parse persistent memory config.
  */
 @NotThreadSafe
-object XmlUtils {
+object PersistentConfigUtils extends Logging {
   type PMProperty = (String, Long, Long)
   private val DEFAULT_PERSISTENT_MEMORY_CONFIG_FILE = "persistent-memory.xml"
   private val NUMA_NODE_PROPERTY = "numanode"
@@ -45,10 +46,15 @@ object XmlUtils {
       DEFAULT_PERSISTENT_MEMORY_CONFIG_FILE)
     // If already parsed, just return it
     if (numaToPMProperty.size == 0) {
-      val xml = XML.load(
-        Utils.getSparkClassLoader.getResourceAsStream(configFile)
-      )
+      val is = Utils.getSparkClassLoader.getResourceAsStream(configFile)
+      if (is == null) {
+        throw new RuntimeException("Intel Optane DC persistent memory configuration file not " +
+          "found. Please provide it.")
+      } else {
+        logInfo(s"Parse Intel Optane DC persistent memory configuration file from ${configFile}.")
+      }
 
+      val xml = XML.load(is)
       for (numaNode <- (xml \\ NUMA_NODE_PROPERTY)) {
         val numaNodeId = (numaNode \ NUAM_NODE_ID_PROPERTY).text.trim.toInt
         val initialPath = (numaNode \ INITIAL_PATH_PROPERTY).text.trim
@@ -69,6 +75,7 @@ object XmlUtils {
   def totalNumaNode(conf: SparkConf): Int = {
     if (numaToPMProperty.isEmpty) {
       parseConfig(conf)
+      require(numaToPMProperty.nonEmpty, "never should arrive here.")
     }
 
     numaToPMProperty.size

@@ -42,10 +42,10 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_allocateMemory
 
 /*
  * Class:     org_apache_spark_unsafe_PMPlatform
- * Method:    getUsableSize
+ * Method:    getOccupiedSize
  * Signature: (J)J
  */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_getUsableSize
+JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_getOccupiedSize
   (JNIEnv *, jclass, jlong);
 
 /*

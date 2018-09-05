@@ -74,7 +74,7 @@ public class PMPlatform {
    * @param address the memory block address.
    * @return actual occupied size.
    */
-  public static native long getUsableSize(long address);
+  public static native long getOccupiedSize(long address);
 
   /**
    * Free the memory by address.

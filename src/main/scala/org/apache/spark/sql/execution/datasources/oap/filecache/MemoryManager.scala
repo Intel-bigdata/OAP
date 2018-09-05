@@ -26,7 +26,7 @@ import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.utils.XmlUtils
+import org.apache.spark.sql.execution.datasources.oap.utils.PersistentConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.storage.{BlockManager, TestBlockId}
 import org.apache.spark.unsafe.{Platform, PMPlatform}
@@ -215,12 +215,12 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     // support NUMA binding currently.
     var numaId = conf.getInt("spark.executor.numa.id", -1)
     val executorId = sparkEnv.executorId.toInt
-    val map = XmlUtils.parseConfig(conf)
+    val map = PersistentConfigUtils.parseConfig(conf)
     if (numaId == -1) {
       logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +
         s"executor with NUMA when cache data to Intel Optane DC persistent memory.")
       // Just round the executorId to the total NUMA number.
-      numaId = executorId % XmlUtils.totalNumaNode(conf)
+      numaId = executorId % PersistentConfigUtils.totalNumaNode(conf)
     }
 
     val (initialPath, initialSize, reservedSize) = map.get(numaId).get
@@ -242,7 +242,7 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
 
   override private[filecache] def allocate(size: Long): MemoryBlockHolder = {
     val address = PMPlatform.allocateMemory(size)
-    val occupiedSize = PMPlatform.getUsableSize(address)
+    val occupiedSize = PMPlatform.getOccupiedSize(address)
     _memoryUsed.getAndAdd(occupiedSize)
     logDebug(s"request allocate $size memory, actual occupied size: " +
       s"${size}, used: $memoryUsed")

@@ -26,8 +26,8 @@ import java.io.*;
  * A native library loader which used to load persistent memory native library.
  */
 public class NativeLibraryLoader {
-  private static final Logger logger = LoggerFactory.getLogger(NativeLibraryLoader.class);
-  private static final String libname = "pmplatform";
+  private static final Logger LOGGER = LoggerFactory.getLogger(NativeLibraryLoader.class);
+  private static final String LIBNAME = "pmplatform";
   private static boolean loaded = false;
 
   private static String osName() {
@@ -53,69 +53,68 @@ public class NativeLibraryLoader {
   }
 
   private static String resourceName() {
-    return osName() + "/" + osArch() + "/lib/" + System.mapLibraryName(libname);
+    return osName() + "/" + osArch() + "/lib/" + System.mapLibraryName(LIBNAME);
   }
 
   public static synchronized void load() {
-    load(null);
-  }
-
-  public static synchronized void load(final File tempFolder) {
     if (loaded) {
       return;
     }
 
     try {
-      System.loadLibrary(libname);
+      System.loadLibrary(LIBNAME);
     } catch (UnsatisfiedLinkError e) {
-      logger.warn("Loading library: {} from system libraries failed, trying to load it from " +
-        "jar", libname);
-      InputStream is = null;
-      OutputStream out = null;
-      File tmpLib = null;
-      try {
-        is = NativeLibraryLoader.class.getResourceAsStream(resourceName());
-        if (is == null) {
-          String errorMsg = "Unsupported OS/arch, cannot find " + resourceName() + " or load " +
-            libname + " from system libraries. Please try building from source the jar or " +
-            "providing " + libname + " in you system.";
-          logger.error(errorMsg);
-          throw new RuntimeException(errorMsg);
+      LOGGER.warn("Loading library: {} from system libraries failed, trying to load it from " +
+        "package", LIBNAME);
+      loadFromPackage();
+    }
+  }
+
+  private static void loadFromPackage() {
+    InputStream is = null;
+    OutputStream out = null;
+    File tmpLib = null;
+    try {
+      is = NativeLibraryLoader.class.getResourceAsStream(resourceName());
+      if (is == null) {
+        String errorMsg = "Unsupported OS/arch, cannot find " + resourceName() + " or load " +
+          LIBNAME + " from system libraries. Please try building from source the jar or " +
+          "providing " + LIBNAME + " in you system.";
+        throw new RuntimeException(errorMsg);
+      }
+
+      tmpLib = File.createTempFile(LIBNAME, ".tmp", null);
+
+      out = new FileOutputStream(tmpLib);
+      byte[] buf = new byte[4096];
+      while (true) {
+        int read = is.read(buf);
+        if (read == -1) {
+          break;
         }
+        out.write(buf, 0, read);
+      }
 
-        tmpLib = File.createTempFile(libname, ".tmp", tempFolder);
+      out.flush();
+      out.close();
+      out = null;
 
-        out = new FileOutputStream(tmpLib);
-        byte[] buf = new byte[4096];
-        while (true) {
-          int read = is.read(buf);
-          if (read == -1) {
-            break;
-          }
-          out.write(buf, 0, read);
-        }
+      System.load(tmpLib.getAbsolutePath());
+      loaded = true;
+    } catch (IOException | UnsatisfiedLinkError e) {
+      LOGGER.error("Can't load library: {} from jar.", LIBNAME);
+      throw new RuntimeException(e);
+    } finally {
+      if (is != null) {
+        safeClose(is, "Close resource input stream failed. Ignore it.");
+      }
 
-        out.flush();
-        out.close();
-        out = null;
+      if (out != null) {
+        safeClose(out, "Close tmp lib output stream failed. Ignore it.");
+      }
 
-        System.load(tmpLib.getAbsolutePath());
-        loaded = true;
-      } catch (IOException ioe) {
-        logger.error("Can't load library: {} from jar.", libname);
-        throw new RuntimeException(ioe);
-      } finally {
-        if (is != null) {
-          safeClose(is, "Close resource input stream failed. Ignore it.");
-        }
-
-        if (out != null) {
-          safeClose(out, "Close tmp lib output stream failed. Ignore it.");
-        }
-
-        if (tmpLib != null && !tmpLib.delete()) {
-          logger.warn("Delete tmp lib: {} failed, ignore it.", tmpLib.getAbsolutePath());
-        }
+      if (tmpLib != null && !tmpLib.delete()) {
+        LOGGER.warn("Delete tmp lib: {} failed, ignore it.", tmpLib.getAbsolutePath());
       }
     }
   }
@@ -124,7 +123,7 @@ public class NativeLibraryLoader {
     try {
       closeable.close();
     } catch (IOException e) {
-      logger.warn(warnMsg);
+      LOGGER.warn(warnMsg, e.fillInStackTrace());
     }
   }
 }

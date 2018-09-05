@@ -74,17 +74,16 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_allocateMemory
   if (p == NULL) {
     jclass errorCls = env->FindClass("java/lang/OutOfMemoryError");
     std::string errorMsg;
-    errorMsg.append("Don't have enough memory, please consider decrease the persistent");
-    errorMsg.append(" memory usable ratio. The requested size: ");
+    errorMsg.append("Don't have enough memory, please consider decrease the persistent ");
+    errorMsg.append("memory usable ratio. The requested size: ");
     errorMsg.append(std::to_string(sz));
-     =
-    env->ThrowNew(errorCls, errorMsg);
+    env->ThrowNew(errorCls, errorMsg.c_str());
   }
 
   return addr_to_java(p);
 }
 
-JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_getUsableSize
+JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_getOccupiedSize
   (JNIEnv *env, jclass clazz, jlong address) {
   check(env);
   void *p = addr_from_java(address);
