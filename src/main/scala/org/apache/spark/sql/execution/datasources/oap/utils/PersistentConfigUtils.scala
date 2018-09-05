@@ -21,6 +21,7 @@ import javax.annotation.concurrent.NotThreadSafe
 
 import scala.collection.mutable
 import scala.xml.XML
+
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException

@@ -122,7 +122,7 @@ object OapConf {
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.memory.manager")
       .internal()
       .doc("Sets the implement of memory manager, it only supports offheap(DRAM OFF_HEAP) and " +
-        "(pm) Intel Optane DC persistent memory currently.")
+        "(PM) Intel Optane DC persistent memory currently.")
       .stringConf
       .createWithDefault("offheap")
 
