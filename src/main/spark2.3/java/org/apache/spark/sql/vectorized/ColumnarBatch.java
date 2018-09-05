@@ -172,6 +172,14 @@ public final class ColumnarBatch {
     numRowsFiltered = numRows;
   }
 
+  /**
+   * Returns the number of valid rows.
+   */
+  public int numValidRows() {
+    assert(numRowsFiltered <= numRows);
+    return numRows - numRowsFiltered;
+  }
+
   public ColumnarBatch(ColumnVector[] columns) {
     this.columns = columns;
     this.row = new MutableColumnarRow(columns);
