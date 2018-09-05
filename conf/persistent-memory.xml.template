@@ -22,14 +22,8 @@
   <numanode id="0">
     <!--The initial path for Intel Optane DC persistent memory-->
     <initialPath>path to initial path</initialPath>
-    <!--The initial size for the given path-->
-    <initialSize>the initial size</initialSize>
-    <!--The reserved size of the total initial size which can't count into total available size.-->
-    <reservedSize>the reserved size</reservedSize>
   </numanode>
   <numanode id="1">
     <initialPath>path to initial path</initialPath>
-    <initialSize>the initial size</initialSize>
-    <reservedSize>the reserved size</reservedSize>
   </numanode>
 </persistentMemoryPool>

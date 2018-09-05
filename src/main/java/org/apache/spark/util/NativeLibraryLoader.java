@@ -102,8 +102,7 @@ public class NativeLibraryLoader {
       System.load(tmpLib.getAbsolutePath());
       loaded = true;
     } catch (IOException | UnsatisfiedLinkError e) {
-      LOGGER.error("Can't load library: {} from jar.", LIBNAME);
-      throw new RuntimeException(e);
+      throw new RuntimeException("Can't load library: " + LIBNAME + " from jar.", e);
     } finally {
       if (is != null) {
         safeClose(is, "Close resource input stream failed. Ignore it.");

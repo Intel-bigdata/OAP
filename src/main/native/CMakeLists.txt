@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+# TODO maybe need to check the version of Memkind
+
 CMAKE_MINIMUM_REQUIRED (VERSION 2.6)
 
 PROJECT(OAP)

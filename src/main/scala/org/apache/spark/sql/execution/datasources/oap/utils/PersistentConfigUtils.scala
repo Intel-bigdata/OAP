@@ -21,9 +21,9 @@ import javax.annotation.concurrent.NotThreadSafe
 
 import scala.collection.mutable
 import scala.xml.XML
-
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.util.Utils
 
@@ -32,24 +32,21 @@ import org.apache.spark.util.Utils
  */
 @NotThreadSafe
 object PersistentConfigUtils extends Logging {
-  type PMProperty = (String, Long, Long)
   private val DEFAULT_PERSISTENT_MEMORY_CONFIG_FILE = "persistent-memory.xml"
   private val NUMA_NODE_PROPERTY = "numanode"
   private val NUAM_NODE_ID_PROPERTY = "@id"
   private val INITIAL_PATH_PROPERTY = "initialPath"
-  private val INITIAL_SIZE_PROPERTY = "initialSize"
-  private val RESERVED_SIZE_PROPERTY = "reservedSize"
-  private val numaToPMProperty = new mutable.HashMap[Int, PMProperty]()
+  private val numaToPMProperty = new mutable.HashMap[Int, String]()
 
-  def parseConfig(conf: SparkConf): mutable.HashMap[Int, PMProperty] = {
+  def parseConfig(conf: SparkConf): mutable.HashMap[Int, String] = {
     val configFile = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE.key,
       DEFAULT_PERSISTENT_MEMORY_CONFIG_FILE)
     // If already parsed, just return it
     if (numaToPMProperty.size == 0) {
       val is = Utils.getSparkClassLoader.getResourceAsStream(configFile)
       if (is == null) {
-        throw new RuntimeException("Intel Optane DC persistent memory configuration file not " +
-          "found. Please provide it.")
+        throw new OapException("Intel Optane DC persistent memory configuration file not " +
+          "found.")
       } else {
         logInfo(s"Parse Intel Optane DC persistent memory configuration file from ${configFile}.")
       }
@@ -58,14 +55,12 @@ object PersistentConfigUtils extends Logging {
       for (numaNode <- (xml \\ NUMA_NODE_PROPERTY)) {
         val numaNodeId = (numaNode \ NUAM_NODE_ID_PROPERTY).text.trim.toInt
         val initialPath = (numaNode \ INITIAL_PATH_PROPERTY).text.trim
-        val initialSizeStr = (numaNode \ INITIAL_SIZE_PROPERTY).text.trim
-        val initialSize = Utils.byteStringAsBytes(initialSizeStr)
-        val reservedSizeStr = (numaNode \ RESERVED_SIZE_PROPERTY).text.trim
-        val reservedSize = Utils.byteStringAsBytes(reservedSizeStr)
-        numaToPMProperty += ((numaNodeId, (initialPath, initialSize, reservedSize)))
+        numaToPMProperty += ((numaNodeId, initialPath))
       }
     }
 
+    require(numaToPMProperty.nonEmpty, "The Intel Optane DC persistent memory configuration" +
+      "file must not be empty.")
     numaToPMProperty
   }
 
@@ -75,7 +70,6 @@ object PersistentConfigUtils extends Logging {
   def totalNumaNode(conf: SparkConf): Int = {
     if (numaToPMProperty.isEmpty) {
       parseConfig(conf)
-      require(numaToPMProperty.nonEmpty, "never should arrive here.")
     }
 
     numaToPMProperty.size

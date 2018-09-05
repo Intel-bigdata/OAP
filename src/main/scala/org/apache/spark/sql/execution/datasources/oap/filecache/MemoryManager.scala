@@ -220,16 +220,20 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
       logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +
         s"executor with NUMA when cache data to Intel Optane DC persistent memory.")
       // Just round the executorId to the total NUMA number.
+      // TODO: improve here
       numaId = executorId % PersistentConfigUtils.totalNumaNode(conf)
     }
 
-    val (initialPath, initialSize, reservedSize) = map.get(numaId).get
-    val fullPath = Utils.createTempDir(initialPath + File.separator + numaId)
+    val initialPath = map.get(numaId).get
+    val initialSize = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE)
+    val reservedSize = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE)
+    val fullPath = Utils.createTempDir(initialPath + File.separator + executorId)
     PMPlatform.initialize(fullPath.getCanonicalPath, initialSize)
     logInfo(s"Initialize Intel Optane DC persistent memory successfully, numaId: ${numaId}, " +
-      s"initial path: ${fullPath.getCanonicalPath}, initial size: ${initialSize}")
-    require(reservedSize < initialSize, s"Reserved size(${reservedSize}) should be small than " +
-      s"initial size(${initialSize})")
+      s"initial path: ${fullPath.getCanonicalPath}, initial size: ${initialSize}, reserved size: " +
+      s"${reservedSize}")
+    require(reservedSize >= 0 && reservedSize < initialSize, s"Reserved size(${reservedSize}) " +
+      s"should be larger than zero and smaller than initial size(${initialSize})")
     val totalUsableSize = initialSize - reservedSize
     ((totalUsableSize * 0.9).toLong, (totalUsableSize * 0.1).toLong)
   }

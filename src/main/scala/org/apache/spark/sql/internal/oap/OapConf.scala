@@ -129,10 +129,28 @@ object OapConf {
   val OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.config.file")
       .internal()
-      .doc("A config file used to config the Intel Optane DC persistent memory intial path," +
-        "initial size and reserved size.")
+      .doc("A config file used to config the Intel Optane DC persistent memory initial path," +
+        " and mapping with NUMA node.")
       .stringConf
       .createWithDefault("persistent-memory.xml")
+
+  val OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE =
+    SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.initial.size")
+      .internal()
+      .doc("Used to set the initial size of Intel Optane DC persistent memory.")
+      .longConf
+      .createWithDefault(0L)
+
+  val OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE =
+    SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.reserved.size")
+      .internal()
+      .doc("Used to set the reserved size of Intel Optane DC persistent memory. Because the " +
+        "heap management of Intel Optane DC persistent memory are based on jemalloc, so we " +
+        "can't full use the total initial size memory. The reserved size should smaller than" +
+        " initial size. Too small reserved size could result in OOM, too big size could reduce" +
+        " the memory utilization rate.")
+      .longConf
+      .createWithDefault(0L)
 
   val OAP_COMPRESSION = SqlConfAdapter.buildConf("spark.sql.oap.compression.codec")
     .internal()

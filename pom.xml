@@ -742,7 +742,7 @@
       </build>
     </profile>
     <profile>
-      <id>pm</id>
+      <id>persistent-memory</id>
       <build>
         <resources>
           <resource>
