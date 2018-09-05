@@ -17,18 +17,22 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import org.apache.parquet.bytes.BytesInput
+import org.apache.parquet.column.page.DictionaryPage
+import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.PlainBinaryDictionary
+import org.scalacheck._
 import org.scalacheck.{Gen, Properties}
-import org.scalacheck.Prop.forAll
+import org.scalacheck.Prop._
 import org.scalatest.prop.Checkers
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.oap.adapter.PropertiesAdapter
 import org.apache.spark.sql.execution.datasources.oap.filecache.StringFiberBuilder
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.unsafe.types.UTF8String
 
-class DeltaByteArrayEncoderCheck extends Properties("DeltaByteArrayEncoder") {
-
+class DictionaryBasedEncoderCheck extends Properties("DictionaryBasedEncoder") {
   private val rowCountInEachGroup = Gen.choose(1, 1024)
   private val rowCountInLastGroup = Gen.choose(1, 1024)
   private val groupCount = Gen.choose(1, 100)
@@ -45,39 +49,49 @@ class DeltaByteArrayEncoderCheck extends Properties("DeltaByteArrayEncoder") {
           // But ColumnValues only support read value form DataFile. So, we have to use another way
           // to validate.
           val referenceFiberBuilder = StringFiberBuilder(rowCount, 0)
-          val fiberBuilder = DeltaByteArrayFiberBuilder(rowCount, 0, StringType)
-          val fiberParser = DeltaByteArrayDataFiberParser(
-            new OapDataFileMetaV1(rowCountInEachGroup = rowCount), StringType)
+          val fiberBuilder = PlainBinaryDictionaryFiberBuilder(rowCount, 0, StringType)
           !(0 until groupCount).exists { group =>
             // If lastCount > rowCount, assume lastCount = rowCount
-            val count = if (group < groupCount - 1) {
-              rowCount
-            } else if (lastCount > rowCount) {
-              rowCount
-            } else {
-              lastCount
-            }
+            val count =
+              if (group < groupCount - 1) {
+                rowCount
+              } else if (lastCount > rowCount) {
+                rowCount
+              } else {
+                lastCount
+              }
             (0 until count).foreach { row =>
               fiberBuilder.append(InternalRow(UTF8String.fromString(values(row % values.length))))
               referenceFiberBuilder
                 .append(InternalRow(UTF8String.fromString(values(row % values.length))))
             }
             val bytes = fiberBuilder.build().fiberData
+            val dictionary = new PlainBinaryDictionary(
+              new DictionaryPage(
+                BytesInput.from(fiberBuilder.buildDictionary),
+                fiberBuilder.getDictionarySize,
+                org.apache.parquet.column.Encoding.PLAIN))
+            val fiberParser = PlainDictionaryFiberParser(
+              new OapDataFileMetaV1(rowCountInEachGroup = rowCount), dictionary, StringType)
             val parsedBytes = fiberParser.parse(bytes, count)
             val referenceBytes = referenceFiberBuilder.build().fiberData
             referenceFiberBuilder.clear()
+            referenceFiberBuilder.resetDictionary()
             fiberBuilder.clear()
+            fiberBuilder.resetDictionary()
             assert(parsedBytes.length == referenceBytes.length)
             parsedBytes.zip(referenceBytes).exists(byte => byte._1 != byte._2)
           }
-        } else true
+        } else {
+          true
+        }
     }
   }
 }
 
-class DeltaByteArrayEncoderSuite extends SparkFunSuite with Checkers {
+class DictionaryBasedEncoderSuite extends SparkFunSuite with Checkers {
 
   test("Check Encoding/Decoding") {
-    check(new DeltaByteArrayEncoderCheck)
+    check(PropertiesAdapter.getProp(new DictionaryBasedEncoderCheck()))
   }
 }

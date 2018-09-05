@@ -28,6 +28,7 @@ import org.scalacheck.Prop._
 import org.scalatest.prop.Checkers
 
 import org.apache.spark.SparkFunSuite
+import org.apache.spark.sql.execution.datasources.oap.adapter.PropertiesAdapter
 import org.apache.spark.util.Utils
 
 class OapDataFileMetaCheck extends Properties("OapDataFileMeta") {
@@ -216,6 +217,6 @@ class OapDataFileMetaCheck extends Properties("OapDataFileMeta") {
 class OapDataFileMetaV1Suite extends SparkFunSuite with Checkers {
 
   test("Check OapDataFileMeta Read/Write") {
-    check(Prop.all(new OapDataFileMetaCheck().properties.map(_._2): _*))
+    check(PropertiesAdapter.getProp(new OapDataFileMetaCheck()))
   }
 }

@@ -28,6 +28,7 @@ import org.apache.spark.sql.catalyst.catalog.CatalogTableType
 import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.catalyst.plans.logical.CatalystSerde
 import org.apache.spark.sql.execution.QueryExecution
+import org.apache.spark.sql.execution.datasources.oap.adapter.WholeStageCodeGenAdapter
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
@@ -246,11 +247,6 @@ class OapPlannerSuite
       val sqlString =
         "explain SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"
 
-      val sqlexplainString =
-        "SELECT a FROM oap_sort_opt_table WHERE a >= 0 AND a <= 10 ORDER BY a LIMIT 7"
-
-      sql(sqlexplainString).explain()
-
       // OapOrderLimitFileScanExec is applied.
       checkKeywordsExist(sql(sqlString), "OapOrderLimitFileScanExec")
       // OapOrderLimitFileScanExec WholeStageCodeGen is disabled.
@@ -258,11 +254,9 @@ class OapPlannerSuite
 
       spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "true")
 
-      sql(sqlexplainString).explain()
-//
       // OapOrderLimitFileScanExec WholeStageCodeGen is enabled.
-//      checkKeywordsExist(sql(sqlString), "*OapOrderLimitFileScanExec")
-      checkKeywordsExist(sql(sqlString), "*(1) OapOrderLimitFileScanExec")
+      checkKeywordsExist(sql(sqlString), WholeStageCodeGenAdapter.getKeywordPrefix +
+        "OapOrderLimitFileScanExec")
     } finally {
       sql("drop oindex index1 on oap_sort_opt_table")
     }
@@ -284,7 +278,8 @@ class OapPlannerSuite
           "where a < 30 " +
           "group by a"
 
-      checkKeywordsExist(sql("explain " + sqlString), "*(1) OapAggregationFileScanExec")
+      checkKeywordsExist(sql("explain " + sqlString), WholeStageCodeGenAdapter.getKeywordPrefix +
+        "OapAggregationFileScanExec")
       val oapDF = sql(sqlString).collect()
 
       spark.sqlContext.setConf(OapConf.OAP_ENABLE_EXECUTOR_INDEX_SELECTION.key, "true")

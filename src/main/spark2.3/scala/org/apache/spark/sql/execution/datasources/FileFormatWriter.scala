@@ -85,9 +85,10 @@ object FileFormatWriter extends Logging {
   }
 
   /** The result of a successful write task. */
-  private case class WriteTaskResult(commitMsg: TaskCommitMessage,
-                                     summary: ExecutedWriteSummary,
-                                     writeResults: Seq[WriteResult])
+  private case class WriteTaskResult(
+      commitMsg: TaskCommitMessage,
+      summary: ExecutedWriteSummary,
+      writeResults: Seq[WriteResult])
 
   /**
    * Basic work flow of this command is:

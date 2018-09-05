@@ -331,7 +331,6 @@ class DAGScheduler(
     Seq.empty
   }
 
-
   private def clearCacheLocs(): Unit = cacheLocs.synchronized {
     cacheLocs.clear()
   }

@@ -25,6 +25,7 @@ import org.scalacheck.Prop._
 import org.scalatest.prop.Checkers
 
 import org.apache.spark.SparkFunSuite
+import org.apache.spark.sql.execution.datasources.oap.adapter.PropertiesAdapter
 
 class CodecFactoryCheck extends Properties("CodecFactory") {
 
@@ -59,6 +60,6 @@ class CodecFactoryCheck extends Properties("CodecFactory") {
 class CodecFactorySuite extends SparkFunSuite with Checkers {
 
   test("Check CodecFactory Compress/Decompress") {
-    check(Prop.all(new CodecFactoryCheck().properties.map(_._2): _*))
+    check(PropertiesAdapter.getProp(new CodecFactoryCheck()))
   }
 }
