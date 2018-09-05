@@ -26,10 +26,9 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.unsafe.Platform
-import org.apache.spark.unsafe.memory.MemoryBlock
 import org.apache.spark.unsafe.types.UTF8String
 
-case class FiberCache(protected val fiberData: MemoryBlockWithOccupiedSize) extends Logging {
+case class FiberCache(protected val fiberData: MemoryBlockHolder) extends Logging {
 
   // This is and only is set in `cache() of OapCache`
   // TODO: make it immutable
@@ -111,9 +110,9 @@ case class FiberCache(protected val fiberData: MemoryBlockWithOccupiedSize) exte
     if (disposed) {
       throw new OapException("Try to access a freed memory")
     }
-    fiberData.memoryBlock.getBaseObject
+    fiberData.baseObject
   }
-  def getBaseOffset: Long = fiberData.memoryBlock.getBaseOffset
+  def getBaseOffset: Long = fiberData.baseOffset
 
   def getBoolean(offset: Long): Boolean = Platform.getBoolean(getBaseObj, getBaseOffset + offset)
 
@@ -143,7 +142,7 @@ case class FiberCache(protected val fiberData: MemoryBlockWithOccupiedSize) exte
       getBaseObj, getBaseOffset + offset, dst, Platform.BYTE_ARRAY_OFFSET, dst.length)
   }
 
-  def size(): Long = fiberData.memoryBlock.size()
+  def size(): Long = fiberData.length
 
   // Return the occupied size and it's typically larger than the required data size due to memory
   // alignments from underlying allocator
@@ -153,9 +152,8 @@ case class FiberCache(protected val fiberData: MemoryBlockWithOccupiedSize) exte
 object FiberCache {
   //  For test purpose :convert Array[Byte] to FiberCache
   private[oap] def apply(data: Array[Byte]): FiberCache = {
-    val memoryBlock = new MemoryBlock(data, Platform.BYTE_ARRAY_OFFSET, data.length)
-    // We store the length of the array as the occupied size.
-    val memoryBlockWithCapacity = MemoryBlockWithOccupiedSize(memoryBlock, data.length)
-    FiberCache(memoryBlockWithCapacity)
+    val memoryBlockHolder =
+      MemoryBlockHolder(data, Platform.BYTE_ARRAY_OFFSET, data.length, data.length)
+    FiberCache(memoryBlockHolder)
   }
 }

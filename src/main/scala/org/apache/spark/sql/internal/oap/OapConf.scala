@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.internal.oap
 
-import org.apache.spark.internal.config.ConfigBuilder
 import org.apache.spark.sql.oap.adapter.SqlConfAdapter
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -122,9 +121,18 @@ object OapConf {
   val OAP_FIBERCACHE_MEMORY_MANAGER =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.memory.manager")
       .internal()
-      .doc("Sets the implement of memory manager, it only supports off heap currently.")
+      .doc("Sets the implement of memory manager, it only supports offheap(DRAM OFF_HEAP) and " +
+        "(pm) Intel Optane DC persistent memory currently.")
       .stringConf
       .createWithDefault("offheap")
+
+  val OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE =
+    SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.config.file")
+      .internal()
+      .doc("A config file used to config the Intel Optane DC persistent memory intial path," +
+        "initial size and reserved size.")
+      .stringConf
+      .createWithDefault("persistent-memory.xml")
 
   val OAP_COMPRESSION = SqlConfAdapter.buildConf("spark.sql.oap.compression.codec")
     .internal()

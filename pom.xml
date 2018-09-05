@@ -309,6 +309,11 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>${basedir}/conf</directory>
+      </resource>
+    </resources>
     <plugins>
      <plugin>
        <inherited>true</inherited>
