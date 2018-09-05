@@ -32,21 +32,28 @@ public class NativeLibraryLoader {
 
   private static String osName() {
     String os = System.getProperty("os.name").toLowerCase().replace(' ', '_');
-    if (os.startsWith("win")){
-      return "win";
+    //TODO: improve this
+    if (os.startsWith("linux")){
+      return "linux";
     } else if (os.startsWith("mac")) {
-      return "darwin";
+      return "mac";
     } else {
-      return os;
+      throw new UnsupportedOperationException("The platform: " + os + "is not supported.");
     }
   }
 
   private static String osArch() {
-    return System.getProperty("os.arch");
+    String arch = System.getProperty("os.arch");
+    if (arch.contains("64")) {
+      arch = "64";
+    } else {
+      arch = "32";
+    }
+    return arch;
   }
 
   private static String resourceName() {
-    return "/" + osName() + "/" + osArch() + "/lib/" + System.mapLibraryName(libname);
+    return osName() + "/" + osArch() + "/lib/" + System.mapLibraryName(libname);
   }
 
   public static synchronized void load() {
@@ -91,17 +98,19 @@ public class NativeLibraryLoader {
         out.flush();
         out.close();
         out = null;
+
+        System.load(tmpLib.getAbsolutePath());
         loaded = true;
       } catch (IOException ioe) {
         logger.error("Can't load library: {} from jar.", libname);
         throw new RuntimeException(ioe);
       } finally {
         if (is != null) {
-          closeWithWarn(is, "Close resource input stream failed. Ignore it.");
+          safeClose(is, "Close resource input stream failed. Ignore it.");
         }
 
         if (out != null) {
-          closeWithWarn(out, "Close tmp lib output stream failed. Ignore it.");
+          safeClose(out, "Close tmp lib output stream failed. Ignore it.");
         }
 
         if (tmpLib != null && !tmpLib.delete()) {
@@ -111,7 +120,7 @@ public class NativeLibraryLoader {
     }
   }
 
-  private static void closeWithWarn(Closeable closeable, String warnMsg) {
+  private static void safeClose(Closeable closeable, String warnMsg) {
     try {
       closeable.close();
     } catch (IOException e) {

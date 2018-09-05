@@ -309,11 +309,6 @@
   </dependencies>
 
   <build>
-    <resources>
-      <resource>
-        <directory>${basedir}/conf</directory>
-      </resource>
-    </resources>
     <plugins>
      <plugin>
        <inherited>true</inherited>
@@ -738,6 +733,38 @@
                   <sources>
                     <source>src/main/spark2.3</source>
                   </sources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>pm</id>
+      <build>
+        <resources>
+          <resource>
+            <directory>src/main/resources</directory>
+          </resource>
+          <resource>
+            <directory>${basedir}/conf</directory>
+          </resource>
+        </resources>
+        <plugins>
+          <plugin>
+            <artifactId>exec-maven-plugin</artifactId>
+            <groupId>org.codehaus.mojo</groupId>
+            <version>1.6.0</version>
+            <executions>
+              <execution>
+                <id>Compile native code and produce share library</id>
+                <phase>generate-resources</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>${basedir}/src/main/native/compile.sh</executable>
                 </configuration>
               </execution>
             </executions>

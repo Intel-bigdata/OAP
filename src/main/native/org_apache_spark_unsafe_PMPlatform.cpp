@@ -16,7 +16,7 @@
  */
 
 #include <memkind.h>
-#include <cstring>
+#include <string>
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
@@ -71,10 +71,14 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_allocateMemory
 
   size_t sz = (size_t)size;
   void *p = memkind_malloc(pmemkind, sz);
-  if (p == null) {
+  if (p == NULL) {
     jclass errorCls = env->FindClass("java/lang/OutOfMemoryError");
-    env->ThrowNew(errorCls,
-      "Don't have enough memory, please consider decrease the persistent memory usable ratio.");
+    std::string errorMsg;
+    errorMsg.append("Don't have enough memory, please consider decrease the persistent");
+    errorMsg.append(" memory usable ratio. The requested size: ");
+    errorMsg.append(std::to_string(sz));
+     =
+    env->ThrowNew(errorCls, errorMsg);
   }
 
   return addr_to_java(p);
@@ -89,9 +93,6 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_getUsableSize
 
 JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PMPlatform_freeMemory
   (JNIEnv *env, jclass clazz, jlong address) {
-  if (NULL == memkind) {
-      jclass exceptionCls = env->FindClass("java/lang/RuntimeException");
-      env->ThrowNew(exceptionCls, "Persistent memory should be initialized first!");
-  }
+  check(env);
   memkind_free(pmemkind, addr_from_java(address));
 }

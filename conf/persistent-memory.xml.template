@@ -21,15 +21,15 @@
   <!--The numa id-->
   <numanode id="0">
     <!--The initial path for Intel Optane DC persistent memory-->
-    <initialPath>/mnt/pmem0/spark</initialPath>
+    <initialPath>path to initial path</initialPath>
     <!--The initial size for the given path-->
-    <initialSize>100g</initialSize>
+    <initialSize>the initial size</initialSize>
     <!--The reserved size of the total initial size which can't count into total available size.-->
-    <reservedSize>10g</reservedSize>
+    <reservedSize>the reserved size</reservedSize>
   </numanode>
   <numanode id="1">
-    <initialPath>/mnt/pmem1/spark</initialPath>
-    <initialSize>100g</initialSize>
-    <reservedSize>10g</reservedSize>
+    <initialPath>path to initial path</initialPath>
+    <initialSize>the initial size</initialSize>
+    <reservedSize>the reserved size</reservedSize>
   </numanode>
 </persistentMemoryPool>
