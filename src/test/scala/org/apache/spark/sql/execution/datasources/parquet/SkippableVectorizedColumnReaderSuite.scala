@@ -218,12 +218,12 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
 
 
-    // skip and read data to ColumnVector use DecimalType.IntDecimal
+    // skip and read data to ColumnVector use DecimalType
     val precision = 8
     val scale = 0
     val intDecimalVector = skipAndReadToVector(parquetSchema, DecimalType(precision, scale))
 
-    // assert result, DecimalType.IntDecimal read as int32
+    // assert result, DecimalType read as int32
     (0 until unitSize).foreach { i =>
       val actual = intDecimalVector.getDecimal(i, precision, scale)
       val excepted = Decimal.createUnsafe(2, precision, scale)
@@ -249,9 +249,11 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
       skipAndThrowUnsupportedOperation(parquetSchema, BooleanType)
     }
 
-    // skip with wrong type
+    // skip with wrong type, precision > Decimal.MAX_INT_DIGITS
+    val precision = 10
+    val scale = 0
     intercept[UnsupportedOperationException] {
-      skipAndThrowUnsupportedOperation(parquetSchema, DecimalType(10, 0))
+      skipAndThrowUnsupportedOperation(parquetSchema, DecimalType(precision, scale))
     }
   }
 
@@ -404,14 +406,26 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
     writeData(parquetSchema, data)
 
-    // skip and read data to ColumnVector
-    val columnVector = skipAndReadToVector(parquetSchema, LongType)
+    // skip and read data to ColumnVector by LongType
+    val longTypeVector = skipAndReadToVector(parquetSchema, LongType)
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getLong(i)
+      val actual = longTypeVector.getLong(i)
       val excepted = (i + unitSize).toLong
       assert(actual == excepted)
+    }
+
+    // skip and read data to ColumnVector by DecimalType
+    val precision = 18
+    val scale = 0
+    val decimalTypeVector = skipAndReadToVector(parquetSchema, DecimalType(precision, scale))
+
+    // assert result
+    (0 until unitSize).foreach { i =>
+      val actual = decimalTypeVector.getDecimal(i, precision, scale)
+      val excepted = Decimal.createUnsafe(i + unitSize, precision, scale)
+      assert(actual.equals(excepted))
     }
   }
 
@@ -429,14 +443,26 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
     writeData(parquetSchema, data)
 
-    // skip and read data to ColumnVector
-    val columnVector = skipAndReadToVector(parquetSchema, LongType)
+    // skip and read data to ColumnVector by LongType
+    val longTypeVector = skipAndReadToVector(parquetSchema, LongType)
 
     // assert result
     (0 until unitSize).foreach { i =>
-      val actual = columnVector.getLong(i)
+      val actual = longTypeVector.getLong(i)
       val excepted = 2L
       assert(actual == excepted)
+    }
+
+    // skip and read data to ColumnVector by DecimalType
+    val precision = 18
+    val scale = 0
+    val decimalTypeVector = skipAndReadToVector(parquetSchema, DecimalType(precision, scale))
+
+    // assert result
+    (0 until unitSize).foreach { i =>
+      val actual = decimalTypeVector.getDecimal(i, precision, scale)
+      val excepted = Decimal.createUnsafe(2, precision, scale)
+      assert(actual.equals(excepted))
     }
   }
 
@@ -456,6 +482,13 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     // skip with wrong type
     intercept[UnsupportedOperationException] {
       skipAndThrowUnsupportedOperation(parquetSchema, BooleanType)
+    }
+
+    // skip with wrong type, 20 > Decimal.MAX_LONG_DIGITS
+    val precision = 20
+    val scale = 0
+    intercept[UnsupportedOperationException] {
+      skipAndThrowUnsupportedOperation(parquetSchema, DecimalType(precision, scale))
     }
   }
 
