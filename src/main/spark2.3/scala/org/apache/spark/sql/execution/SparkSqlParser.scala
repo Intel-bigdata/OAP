@@ -1707,6 +1707,5 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder(conf) {
 
   override def visitOapEnableIndex(ctx: OapEnableIndexContext): LogicalPlan =
     OapEnableIndexCommand(ctx.IDENTIFIER.getText)
-
-
+  
 }

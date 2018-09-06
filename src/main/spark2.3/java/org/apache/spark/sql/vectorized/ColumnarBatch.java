@@ -29,6 +29,9 @@ import org.apache.spark.sql.execution.vectorized.MutableColumnarRow;
  */
 @InterfaceStability.Evolving
 public final class ColumnarBatch {
+  //filteredRows maximum capacity,from RowBasedKeyValueBatch.java,through the analysis
+  private static final int DEFAULT_CAPACITY = 1 << 16;
+
   private int numRows;
   private final ColumnVector[] columns;
 
@@ -36,7 +39,7 @@ public final class ColumnarBatch {
   private final MutableColumnarRow row;
 
   // True if the row is filtered.
-  private final boolean[] filteredRows = new boolean[1 << 16];
+  private final boolean[] filteredRows = new boolean[DEFAULT_CAPACITY];
 
   // Total number of rows that have been filtered.
   private int numRowsFiltered = 0;
