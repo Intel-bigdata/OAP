@@ -138,8 +138,8 @@ object OapConf {
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.initial.size")
       .internal()
       .doc("Used to set the initial size of Intel Optane DC persistent memory.")
-      .longConf
-      .createWithDefault(0L)
+      .stringConf
+      .createWithDefault("0b")
 
   val OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.reserved.size")
@@ -149,8 +149,8 @@ object OapConf {
         "can't full use the total initial size memory. The reserved size should smaller than" +
         " initial size. Too small reserved size could result in OOM, too big size could reduce" +
         " the memory utilization rate.")
-      .longConf
-      .createWithDefault(0L)
+      .stringConf
+      .createWithDefault("0b")
 
   val OAP_COMPRESSION = SqlConfAdapter.buildConf("spark.sql.oap.compression.codec")
     .internal()

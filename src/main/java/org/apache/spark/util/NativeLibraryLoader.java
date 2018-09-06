@@ -53,7 +53,7 @@ public class NativeLibraryLoader {
   }
 
   private static String resourceName() {
-    return osName() + "/" + osArch() + "/lib/" + System.mapLibraryName(LIBNAME);
+    return "/" + osName() + "/" + osArch() + "/lib/" + System.mapLibraryName(LIBNAME);
   }
 
   public static synchronized void load() {

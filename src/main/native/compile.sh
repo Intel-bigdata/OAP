@@ -30,7 +30,7 @@ case ${OS} in
   *)
     echo "The platform: ${OS} is not supported."
     exit -1
-  ;;
+    ;;
 esac
 
 # detect Arch

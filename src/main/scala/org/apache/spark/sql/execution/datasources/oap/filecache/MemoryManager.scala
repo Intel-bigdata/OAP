@@ -225,8 +225,10 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     }
 
     val initialPath = map.get(numaId).get
-    val initialSize = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE)
-    val reservedSize = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE)
+    val initialSizeStr = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim
+    val initialSize = Utils.byteStringAsBytes(initialSizeStr)
+    val reservedSizeStr = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE).trim
+    val reservedSize = Utils.byteStringAsBytes(reservedSizeStr)
     val fullPath = Utils.createTempDir(initialPath + File.separator + executorId)
     PMPlatform.initialize(fullPath.getCanonicalPath, initialSize)
     logInfo(s"Initialize Intel Optane DC persistent memory successfully, numaId: ${numaId}, " +
@@ -249,7 +251,7 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     val occupiedSize = PMPlatform.getOccupiedSize(address)
     _memoryUsed.getAndAdd(occupiedSize)
     logDebug(s"request allocate $size memory, actual occupied size: " +
-      s"${size}, used: $memoryUsed")
+      s"${occupiedSize}, used: $memoryUsed")
     MemoryBlockHolder(null, address, size, occupiedSize)
   }
 
