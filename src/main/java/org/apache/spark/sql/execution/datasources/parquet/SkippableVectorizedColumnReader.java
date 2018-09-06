@@ -40,6 +40,18 @@ import static org.apache.parquet.column.ValuesType.REPETITION_LEVEL;
  */
 public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
 
+  /**
+   * Reference dataColumn, but Type is SkippableVectorizedValuesReader, reduce manual cast
+   * times.
+   */
+  private SkippableVectorizedValuesReader dataColumnRef;
+
+  /**
+   * Reference defColumn, but Type is SkippableVectorizedRleValuesReader, reduce manual cast
+   * times.
+   */
+  private SkippableVectorizedRleValuesReader defColumnRef;
+
   public SkippableVectorizedColumnReader(ColumnDescriptor descriptor, PageReader pageReader)
       throws IOException {
     super(descriptor, pageReader);
@@ -121,9 +133,11 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    * @param dataType dataType
    */
   private void skipBooleanBatch(int num, DataType dataType) {
-    assert(dataType == DataTypes.BooleanType);
-    ((SkippableVectorizedRleValuesReader)defColumn)
-      .skipBooleans(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
+    if (dataType == DataTypes.BooleanType) {
+      defColumnRef.skipBooleans(num, maxDefLevel, dataColumnRef);
+    } else {
+      doThrowUnsupportedOperation(dataType);
+    }
   }
 
   /**
@@ -133,16 +147,13 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    * @param dataType dataType
    */
   private void skipIntBatch(int num, DataType dataType) {
-    if (dataType == DataTypes.IntegerType || dataType == DataTypes.DateType ||
-                DecimalType.is32BitDecimalType(dataType)) {
-      ((SkippableVectorizedRleValuesReader)defColumn)
-        .skipIntegers(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
+    if (dataType == DataTypes.IntegerType || dataType == DataTypes.DateType
+      || DecimalType.is32BitDecimalType(dataType)) {
+      defColumnRef.skipIntegers(num, maxDefLevel, dataColumnRef);
     } else if (dataType == DataTypes.ByteType) {
-      ((SkippableVectorizedRleValuesReader)defColumn)
-        .skipBytes(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
+      defColumnRef.skipBytes(num, maxDefLevel, dataColumnRef);
     } else if (dataType == DataTypes.ShortType) {
-      ((SkippableVectorizedRleValuesReader)defColumn)
-        .skipShorts(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
+      defColumnRef.skipShorts(num, maxDefLevel, dataColumnRef);
     } else {
       doThrowUnsupportedOperation(dataType);
     }
@@ -155,10 +166,9 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    * @param dataType dataType
    */
   private void skipLongBatch(int num, DataType dataType) {
-    if (dataType == DataTypes.LongType ||
-                DecimalType.is64BitDecimalType(dataType)) {
-      ((SkippableVectorizedRleValuesReader)defColumn)
-        .skipLongs(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
+    if (dataType == DataTypes.LongType
+      || DecimalType.is64BitDecimalType(dataType)) {
+      defColumnRef.skipLongs(num, maxDefLevel, dataColumnRef);
     } else {
       doThrowUnsupportedOperation(dataType);
     }
@@ -171,8 +181,7 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    */
   private void skipFloatBatch(int num, DataType dataType) {
     if (dataType == DataTypes.FloatType) {
-      ((SkippableVectorizedRleValuesReader)defColumn)
-        .skipFloats(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
+      defColumnRef.skipFloats(num, maxDefLevel, dataColumnRef);
     } else {
       doThrowUnsupportedOperation(dataType);
     }
@@ -185,8 +194,7 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    */
   private void skipDoubleBatch(int num, DataType dataType) {
     if (dataType == DataTypes.DoubleType) {
-      ((SkippableVectorizedRleValuesReader)defColumn)
-        .skipDoubles(num, maxDefLevel, (SkippableVectorizedValuesReader) dataColumn);
+      defColumnRef.skipDoubles(num, maxDefLevel, dataColumnRef);
     } else {
       doThrowUnsupportedOperation(dataType);
     }
@@ -198,14 +206,12 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    * @param dataType dataType
    */
   private void skipBinaryBatch(int num, DataType dataType, boolean isArray) {
-    VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
     if (isArray) {
-      ((SkippableVectorizedRleValuesReader)defColumn)
-        .skipBinarys(num, maxDefLevel, (SkippableVectorizedValuesReader) data);
+      defColumnRef.skipBinarys(num, maxDefLevel, dataColumnRef);
     } else if (dataType == DataTypes.TimestampType) {
       for (int i = 0; i < num; i++) {
-        if (defColumn.readInteger() == maxDefLevel) {
-          ((SkippableVectorizedValuesReader) data).skipBinaryByLen(12);
+        if (defColumnRef.readInteger() == maxDefLevel) {
+          dataColumnRef.skipBinaryByLen(12);
         }
       }
     } else {
@@ -219,13 +225,11 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    * @param dataType dataType
    */
   private void skipFixedLenByteArrayBatch(int num, DataType dataType, int arrayLen) {
-    VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
-
     if (DecimalType.is32BitDecimalType(dataType) || DecimalType.is64BitDecimalType(dataType)
       || DecimalType.isByteArrayDecimalType(dataType)) {
       for (int i = 0; i < num; i++) {
-        if (defColumn.readInteger() == maxDefLevel) {
-          ((SkippableVectorizedValuesReader)data).skipBinaryByLen(arrayLen);
+        if (defColumnRef.readInteger() == maxDefLevel) {
+          dataColumnRef.skipBinaryByLen(arrayLen);
         }
       }
     } else {
@@ -274,6 +278,8 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
 
     try {
       dataColumn.initFromPage(pageValueCount, bytes, offset);
+      // dataColumnRef reference dataColumn and type is SkippableVectorizedValuesReader
+      this.dataColumnRef = (SkippableVectorizedValuesReader)this.dataColumn;
     } catch (IOException e) {
       throw new IOException("could not read page in col " + descriptor, e);
     }
@@ -296,6 +302,8 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
     }
     int bitWidth = BytesUtils.getWidthFromMaxInt(descriptor.getMaxDefinitionLevel());
     this.defColumn = new SkippableVectorizedRleValuesReader(bitWidth);
+    // defColumnRef reference defColumn and type is SkippableVectorizedRleValuesReader
+    this.defColumnRef = (SkippableVectorizedRleValuesReader)this.defColumn;
     dlReader = this.defColumn;
     try {
       byte[] bytes = page.getBytes().toByteArray();
@@ -322,6 +330,8 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
     this.defColumn = new SkippableVectorizedRleValuesReader(bitWidth);
     this.defColumn.initFromBuffer(
             this.pageValueCount, page.getDefinitionLevels().toByteArray());
+    // defColumnRef reference defColumn and type is SkippableVectorizedRleValuesReader
+    this.defColumnRef = (SkippableVectorizedRleValuesReader) this.defColumn;
     try {
       initDataReader(page.getDataEncoding(), page.getData().toByteArray(), 0);
     } catch (IOException e) {

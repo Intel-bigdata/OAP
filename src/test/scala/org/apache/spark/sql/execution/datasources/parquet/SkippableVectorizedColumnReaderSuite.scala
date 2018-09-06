@@ -96,6 +96,25 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     }
   }
 
+  test("skip booleans and throw UnsupportedOperationException") {
+    // write parquet data, type is boolean
+    val parquetSchema: MessageType = new MessageType("test",
+      new PrimitiveType(REQUIRED, BOOLEAN, "boolean_field")
+    )
+    val data: Seq[Group] = {
+      val factory = new SimpleGroupFactory(parquetSchema)
+      (0 until unitSize * 2).map(i => factory.newGroup()
+        .append("boolean_field", i % 2 == 0)
+      )
+    }
+    writeData(parquetSchema, data)
+
+    // skip with wrong type
+    intercept[UnsupportedOperationException] {
+      skipAndThrowUnsupportedOperation(parquetSchema, IntegerType)
+    }
+  }
+
   test("skip And read int32") {
     // write parquet data, type is int32
     val parquetSchema: MessageType = new MessageType("test",
