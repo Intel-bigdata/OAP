@@ -342,7 +342,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
     val requiredIds = Array(0, 1)
     // RowGroup0 => page0: [0, 1, 7, 8, 120, 121, 381, 382]
     // RowGroup0 => page5: [23000]
-    // RowGroup2 => page0: [507
+    // RowGroup2 => page0: [50752]
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 23000, 50752)
     val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
     val result = ArrayBuffer[Int]()
