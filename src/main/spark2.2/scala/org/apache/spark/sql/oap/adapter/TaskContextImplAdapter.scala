@@ -25,7 +25,9 @@ import org.apache.spark.metrics.MetricsSystem
 
 
 object TaskContextImplAdapter {
-
+  /**
+    * The Construction of TaskContextImpl has changed in the spark2.3 version. Ignore it in the spark2.1, spark2.2 version
+    */
   def createTaskContextImpl(
       stageId: Int,
       partitionId: Int,

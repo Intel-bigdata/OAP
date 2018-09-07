@@ -18,7 +18,10 @@
 package org.apache.spark.sql.execution.datasources.oap.adapter
 
 object WholeStageCodeGenAdapter {
-
+  /**
+    * Enable WholeStageCodeGen, explains of Sql plans has changed in the spark2.3 version.
+    * Ignore it in the spark2.1, spark2.2 version
+    */
   def getKeywordPrefix(): String = {
     "*"
   }

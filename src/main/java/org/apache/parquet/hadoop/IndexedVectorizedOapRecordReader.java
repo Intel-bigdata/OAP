@@ -27,6 +27,7 @@ import org.apache.parquet.hadoop.metadata.ParquetFooter;
 import org.apache.parquet.hadoop.OapParquetFileReader.RowGroupDataAndRowIds;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
+import org.apache.spark.sql.oap.adapter.CapacityAdapter;
 
 public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader {
 
@@ -153,7 +154,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       Preconditions.checkState(idsMap.isEmpty(), IDS_MAP_STATE_ERROR_MSG);
       Preconditions.checkState(!currentIndexList.isEmpty(), IDS_ITER_STATE_ERROR_MSG);
       this.currentPageNumber = 0;
-      int pageSize = columnarBatch.capacity();
+      int pageSize = CapacityAdapter.getCapacity(columnarBatch);
       for (int rowId : currentIndexList) {
         int pageNumber = rowId / pageSize;
         if (idsMap.containsKey(pageNumber)) {

@@ -22,7 +22,9 @@ import org.apache.spark.sql.execution.vectorized.ColumnVector
 import org.apache.spark.sql.types.DataType
 
 object ColumnVectorAdapter {
-
+  /**
+   * The Construction of ColumnVector has changed in the spark2.3 version. Ignore it in the spark2.1, spark2.2 version
+   */
   def allocate(capacity: Int, dt: DataType, memMode: MemoryMode): ColumnVector = {
     ColumnVector.allocate(capacity, dt, memMode)
   }

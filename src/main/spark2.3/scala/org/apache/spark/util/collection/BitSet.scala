@@ -43,7 +43,6 @@ class BitSet(numBits: Int) extends Serializable {
     }
   }
 
-
   /**
    * Clear all set bits.
    */

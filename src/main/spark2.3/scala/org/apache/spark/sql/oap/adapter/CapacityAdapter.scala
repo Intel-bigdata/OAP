@@ -17,34 +17,14 @@
 
 package org.apache.spark.sql.oap.adapter
 
-import java.util.Properties
+import org.apache.parquet.hadoop.VectorizedOapRecordReader
+import org.apache.spark.sql.vectorized.ColumnarBatch
 
-import org.apache.spark.{TaskContext, TaskContextImpl}
-import org.apache.spark.memory.TaskMemoryManager
-import org.apache.spark.metrics.MetricsSystem
-
-
-object TaskContextImplAdapter {
+object CapacityAdapter {
   /**
-    * The Construction of TaskContextImpl has changed in the spark2.3 version.
-    * Ignore it in the spark2.1, spark2.2 version
+    * Returns batch CAPACITY
     */
-  def createTaskContextImpl(
-      stageId: Int,
-      partitionId: Int,
-      taskAttemptId: Long,
-      attemptNumber: Int,
-      taskMemoryManager: TaskMemoryManager,
-      localProperties: Properties,
-      metricsSystem: MetricsSystem): TaskContext = {
-    new TaskContextImpl(
-      stageId,
-      stageAttemptNumber = 0,
-      partitionId,
-      taskAttemptId,
-      attemptNumber,
-      taskMemoryManager,
-      localProperties,
-      metricsSystem)
+  def getCapacity(columnarBatch: ColumnarBatch): Int = {
+    VectorizedOapRecordReader.CAPACITY
   }
 }

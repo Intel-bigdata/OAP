@@ -23,7 +23,9 @@ import org.apache.spark.sql.types.DataType
 import org.apache.spark.sql.vectorized.ColumnVector
 
 object ColumnVectorAdapter {
-
+  /**
+   * The Construction of ColumnVector has changed in the spark2.3 version. Ignore it in the spark2.1, spark2.2 version
+   */
   def allocate(capacity: Int, dt: DataType, memMode: MemoryMode): WritableColumnVector = {
     if (memMode == MemoryMode.OFF_HEAP) {
       new OffHeapColumnVector(capacity, dt)
