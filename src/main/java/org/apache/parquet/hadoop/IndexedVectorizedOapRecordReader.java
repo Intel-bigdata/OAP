@@ -163,6 +163,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         // columnarBatch.markFiltered(current); current++; }
         // it a little complex and use current version,
         // we can revert use above code if need.
+        // TODO retest the necessity of this process.
         columnarBatch.markAllFiltered();
         for (Integer rowId : ids) {
           columnarBatch.markValid(rowId);
