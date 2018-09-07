@@ -293,8 +293,8 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
     }
 
     /**
-     * Advances to the next batch of rows. Returns false if there are no more.
-     * From VectorizedParquetRecordReader, no change.
+     * Extract part code from nextBatch() to a method and call by subclass, call this method we
+     * should ensure the backend has enough data.
      */
     protected void nextBatchInternal() throws IOException {
       columnarBatch.reset();
