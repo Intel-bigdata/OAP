@@ -23,8 +23,9 @@ import org.apache.spark.util.NativeLibraryLoader;
 import java.io.File;
 
 /**
- * A platform used to allocate/free volatile memory from Persistent Memory e.g. Intel Optane DC
- * persistent memory.
+ * A platform used to allocate/free volatile memory from
+ * <a href="https://en.wikipedia.org/wiki/Persistent_memory>Persistent Memory</a></a>
+ * e.g. Intel Optane DC persistent memory.
  */
 public class PMPlatform {
   private static volatile boolean initialized = false;
