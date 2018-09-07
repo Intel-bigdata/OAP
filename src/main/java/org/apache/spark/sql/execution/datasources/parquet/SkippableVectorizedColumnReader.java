@@ -147,8 +147,8 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    * @param dataType dataType
    */
   private void skipIntBatch(int num, DataType dataType) {
-    if (dataType == DataTypes.IntegerType || dataType == DataTypes.DateType
-      || DecimalType.is32BitDecimalType(dataType)) {
+    if (dataType == DataTypes.IntegerType || dataType == DataTypes.DateType ||
+      DecimalType.is32BitDecimalType(dataType)) {
       defColumnRef.skipIntegers(num, maxDefLevel, dataColumnRef);
     } else if (dataType == DataTypes.ByteType) {
       defColumnRef.skipBytes(num, maxDefLevel, dataColumnRef);
@@ -166,8 +166,8 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    * @param dataType dataType
    */
   private void skipLongBatch(int num, DataType dataType) {
-    if (dataType == DataTypes.LongType
-      || DecimalType.is64BitDecimalType(dataType)) {
+    if (dataType == DataTypes.LongType ||
+      DecimalType.is64BitDecimalType(dataType)) {
       defColumnRef.skipLongs(num, maxDefLevel, dataColumnRef);
     } else {
       doThrowUnsupportedOperation(dataType);
@@ -225,8 +225,8 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    * @param dataType dataType
    */
   private void skipFixedLenByteArrayBatch(int num, DataType dataType, int arrayLen) {
-    if (DecimalType.is32BitDecimalType(dataType) || DecimalType.is64BitDecimalType(dataType)
-      || DecimalType.isByteArrayDecimalType(dataType)) {
+    if (DecimalType.is32BitDecimalType(dataType) || DecimalType.is64BitDecimalType(dataType) ||
+      DecimalType.isByteArrayDecimalType(dataType)) {
       for (int i = 0; i < num; i++) {
         if (defColumnRef.readInteger() == maxDefLevel) {
           dataColumnRef.skipBinaryByLen(arrayLen);
