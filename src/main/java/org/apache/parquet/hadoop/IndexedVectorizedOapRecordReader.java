@@ -27,6 +27,7 @@ import org.apache.parquet.hadoop.metadata.ParquetFooter;
 import org.apache.parquet.hadoop.OapParquetFileReader.RowGroupDataAndRowIds;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
+import org.apache.spark.sql.execution.vectorized.ColumnVector;
 
 public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader {
 
@@ -102,7 +103,19 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       if (idsMap.isEmpty()) {
         rowsReturned = totalCountLoadedSoFar;
       }
-      return super.nextBatch() && filterRowsWithIndex();
+
+      if (rowsReturned >= totalRowCount) return false;
+
+      checkEndOfRowGroup();
+
+      IntList ids = idsMap.remove(currentPageNumber++);
+
+      while (ids == null || ids.isEmpty()) {
+        skipBatchInternal();
+        ids = idsMap.remove(currentPageNumber++);
+      }
+
+      return nextBatchInternal() && filterRowsWithIndex(ids);
     }
 
     @Override
@@ -115,38 +128,31 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       readNextRowGroup();
     }
 
-    private boolean filterRowsWithIndex() throws IOException {
-      IntList ids = idsMap.remove(currentPageNumber);
-      if (ids == null || ids.isEmpty()) {
-        currentPageNumber++;
-        return this.nextBatch();
+    private boolean filterRowsWithIndex(IntList ids) throws IOException {
+      // if returnColumnarBatch, mark columnarBatch filtered status.
+      // else assignment batchIdsIter.
+      if (returnColumnarBatch) {
+        // we can do same operation use markFiltered as follow code:
+        // int current = 0;
+        // for (Integer target : ids)
+        // { while (current < target){
+        // columnarBatch.markFiltered(current);
+        // current++; }
+        // current++; }
+        // current++;
+        // while (current < numBatched){
+        // columnarBatch.markFiltered(current); current++; }
+        // it a little complex and use current version,
+        // we can revert use above code if need.
+        columnarBatch.markAllFiltered();
+        for (Integer rowId : ids) {
+          columnarBatch.markValid(rowId);
+        }
       } else {
-        // if returnColumnarBatch, mark columnarBatch filtered status.
-        // else assignment batchIdsIter.
-        if (returnColumnarBatch) {
-          // we can do same operation use markFiltered as follow code:
-          // int current = 0;
-          // for (Integer target : ids)
-          // { while (current < target){
-          // columnarBatch.markFiltered(current);
-          // current++; }
-          // current++; }
-          // current++;
-          // while (current < numBatched){
-          // columnarBatch.markFiltered(current); current++; }
-          // it a little complex and use current version,
-          // we can revert use above code if need.
-          columnarBatch.markAllFiltered();
-            for (Integer rowId : ids) {
-              columnarBatch.markValid(rowId);
-            }
-          } else {
-            batchIds = ids;
-            numBatched = ids.size();
-          }
-          currentPageNumber++;
-          return true;
+        batchIds = ids;
+        numBatched = ids.size();
       }
+      return true;
     }
 
     private void divideRowIdsIntoPages(IntList currentIndexList) {
@@ -171,5 +177,20 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     RowGroupDataAndRowIds rowGroupDataAndRowIds = reader.readNextRowGroupAndRowIds();
     initColumnReaders(rowGroupDataAndRowIds.getPageReadStore());
     divideRowIdsIntoPages(rowGroupDataAndRowIds.getRowIds());
+  }
+
+  protected boolean skipBatchInternal() throws IOException {
+
+    int num = (int) Math.min((long) columnarBatch.capacity(),
+            totalCountLoadedSoFar - rowsReturned);
+    for (int i = 0; i < columnReaders.length; ++i) {
+      if (columnReaders[i] == null) continue;
+      ColumnVector vector = columnarBatch.column(i);
+      columnReaders[i].skipBatch(num, vector.dataType(), vector.isArray());
+    }
+    rowsReturned += num;
+    numBatched = num;
+    batchIdx = 0;
+    return true;
   }
 }
