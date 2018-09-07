@@ -21,7 +21,7 @@ import java.io.PrintStream
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.sql.hive.{HiveExternalCatalog, HiveUtils}
 import org.apache.spark.sql.oap.OapSession
 import org.apache.spark.sql.oap.listener.OapListener
@@ -37,6 +37,7 @@ private[spark] object OapEnv extends Logging {
 
   var sqlContext: SQLContext = _
   var sparkContext: SparkContext = _
+  var sparkSession: SparkSession = _
 
   var initialized: Boolean = false
 
@@ -70,6 +71,7 @@ private[spark] object OapEnv extends Logging {
 
       SparkSQLEnv.sparkContext = sparkContext
       SparkSQLEnv.sqlContext = sqlContext
+      this.sparkSession = sparkSession
 
       sparkContext.ui.foreach(new OapTab(_))
       initialized = true
@@ -80,6 +82,7 @@ private[spark] object OapEnv extends Logging {
   def initWithoutCreatingOapSession(): Unit = synchronized {
     if (!initialized && !Utils.isTesting) {
       val sc = SparkContext.getOrCreate()
+      this.sparkSession = SparkSession.getActiveSession.get
       sc.addSparkListener(new OapListener)
       sc.ui.foreach(new OapTab(_))
       initialized = true

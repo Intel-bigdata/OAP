@@ -538,9 +538,8 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
     val blockMetaData = footer.getBlocks.get(0)
     val columnDescriptor = parquetSchema.getColumns.get(0)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
-    val columnReader =
-      new SkippableVectorizedColumnReader(
-        columnDescriptor, fiberData.getPageReader(columnDescriptor))
+    val columnReader = new SkippableVectorizedColumnReader(
+      columnDescriptor, fiberData.getPageReader(columnDescriptor))
     columnReader.readBatch(rowCount, vector)
     for (i <- 0 until rowCount) {
       assert(i * 2 == vector.getInt(i))
@@ -553,6 +552,7 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
       new Path(fileName), meta.footer.toParquetMetadata)
     val footer = reader.getFooter
     val rowCount = footer.getBlocks.get(0).getRowCount.toInt
+    val vector = ColumnVector.allocate(rowCount, IntegerType, MemoryMode.ON_HEAP)
     val blockMetaData = footer.getBlocks.get(0)
     val columnDescriptor = new ColumnDescriptor(Array(s"${fileName}_temp"), INT32, 0, 0)
     val exception = intercept[IOException] {
@@ -643,3 +643,4 @@ class ParquetFiberDataLoaderSuite extends ParquetDataFileSuite {
     assert(exception.getMessage.contains("Only can get single column every time"))
   }
 }
+

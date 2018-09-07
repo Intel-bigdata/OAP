@@ -41,5 +41,9 @@ class OapRuntimeSuite extends QueryTest with SharedOapLocalClusterContext {
     }
     assert(oapruntime(0) == oapruntime(1))
   }
+
+  test("get sparkSession from OapRuntime") {
+    assert(OapRuntime.getOrCreate.sparkSession == spark)
+  }
 }
 

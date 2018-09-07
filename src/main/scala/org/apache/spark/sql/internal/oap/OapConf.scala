@@ -119,6 +119,13 @@ object OapConf {
       .doubleConf
       .createWithDefault(0.7)
 
+  val OAP_FIBERCACHE_MEMORY_MANAGER =
+    SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.memory.manager")
+      .internal()
+      .doc("Sets the implement of memory manager, it only supports off heap currently.")
+      .stringConf
+      .createWithDefault("offheap")
+
   val OAP_COMPRESSION = SqlConfAdapter.buildConf("spark.sql.oap.compression.codec")
     .internal()
     .doc("Sets the compression codec use when writing Parquet files. Acceptable values include: " +
