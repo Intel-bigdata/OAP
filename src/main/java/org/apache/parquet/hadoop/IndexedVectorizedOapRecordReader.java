@@ -132,7 +132,9 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         ids = idsMap.remove(currentPageNumber++);
       }
 
-      return nextBatchInternal() && filterRowsWithIndex(ids);
+      nextBatchInternal();
+      filterRowsWithIndex(ids);
+      return true;
     }
 
     @Override
@@ -145,7 +147,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       readNextRowGroup();
     }
 
-    private boolean filterRowsWithIndex(IntList ids) throws IOException {
+    private void filterRowsWithIndex(IntList ids) throws IOException {
       // if returnColumnarBatch, mark columnarBatch filtered status.
       // else assignment batchIdsIter.
       if (returnColumnarBatch) {
@@ -169,7 +171,6 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         batchIds = ids;
         numBatched = ids.size();
       }
-      return true;
     }
 
     private void divideRowIdsIntoPages(IntList currentIndexList) {
