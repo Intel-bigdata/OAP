@@ -95,6 +95,21 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
 
     /**
      * Advances to the next batch of rows. Returns false if there are no more.
+     * The RowGroup data divide into ColumnarBatch may as following:
+     * ----------------------
+     * | no index hit batch | --> call skipBatchInternal to skip
+     * ----------------------
+     * | index hit batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
+     * ----------------------
+     * | no index hit batch | --> call skipBatchInternal to skip
+     * ----------------------
+     * | index hit batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
+     * ----------------------
+     * | no index hit batch | --> discard directly because of idsMap.isEmpty()
+     * ----------------------
+     * The tail no index hit batch(s) discard directly because of idsMap.isEmpty(), assignment
+     * totalCountLoadedSoFar to rowsReturned, then will return false or do readNextRowGroup
+     * guarantee by rowsReturned value.
      */
     @Override
     public boolean nextBatch() throws IOException {
@@ -110,6 +125,8 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
 
       IntList ids = idsMap.remove(currentPageNumber++);
 
+      // when we do this while loop there must be remainder pageNumber->ids in idsMap，
+      // it guarantee by rowsReturned value and checkEndOfRowGroup method.
       while (ids == null || ids.isEmpty()) {
         skipBatchInternal();
         ids = idsMap.remove(currentPageNumber++);
@@ -179,18 +196,19 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     divideRowIdsIntoPages(rowGroupDataAndRowIds.getRowIds());
   }
 
-  protected boolean skipBatchInternal() throws IOException {
-
-    int num = (int) Math.min((long) columnarBatch.capacity(),
-            totalCountLoadedSoFar - rowsReturned);
+  /**
+   * Do skipBatch for every ColumnVector in ColumnarBatch, actually when we call this method, we
+   * will skip the whole columnarBatch, so this num is columnarBatch.capacity().
+   */
+  private void skipBatchInternal() throws IOException {
+    int num = columnarBatch.capacity();
     for (int i = 0; i < columnReaders.length; ++i) {
       if (columnReaders[i] == null) continue;
       ColumnVector vector = columnarBatch.column(i);
-      columnReaders[i].skipBatch(num, vector.dataType(), vector.isArray());
+      columnReaders[i].skipBatch(num, vector);
     }
     rowsReturned += num;
     numBatched = num;
     batchIdx = 0;
-    return true;
   }
 }
