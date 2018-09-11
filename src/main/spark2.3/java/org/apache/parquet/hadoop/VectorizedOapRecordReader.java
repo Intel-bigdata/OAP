@@ -43,7 +43,7 @@ import org.apache.spark.sql.types.StructType;
 public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Object> {
 
     // TODO: make this configurable.
-    public static final int CAPACITY = 4 * 1024;
+    protected static final int CAPACITY = 4 * 1024;
 
     /**
      * Batch of rows that we assemble and the current index we've returned. Every time this
