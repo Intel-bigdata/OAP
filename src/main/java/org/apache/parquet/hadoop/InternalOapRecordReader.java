@@ -183,13 +183,6 @@ public class InternalOapRecordReader<T> {
       return currentValue;
     }
 
-    public float getProgress() throws IOException, InterruptedException {
-      if (total == 0L) {
-        return 1F;
-      }
-      return (float) current / total;
-    }
-
     private void checkIOState(PageReadStore pages) throws IOException {
       if (pages == null) {
         throw new IOException(

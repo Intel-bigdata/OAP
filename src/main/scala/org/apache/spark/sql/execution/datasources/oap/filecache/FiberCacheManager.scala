@@ -34,7 +34,11 @@ import org.apache.spark.util.collection.BitSet
 
 private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logging {
 
+  // pendingFiberSize and pendingFiberCapacity are different. pendingFiberSize used to
+  // show the pending size to user, however pendingFiberCapacity is used to record the
+  // actual used memory and log warn when exceed the maxMemory.
   private val _pendingFiberSize: AtomicLong = new AtomicLong(0)
+  private val _pendingFiberCapacity: AtomicLong = new AtomicLong(0)
 
   private val removalPendingQueue = new LinkedBlockingQueue[(FiberId, FiberCache)]()
 
@@ -51,10 +55,12 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
   def addRemovalFiber(fiber: FiberId, fiberCache: FiberCache): Unit = {
     _pendingFiberSize.addAndGet(fiberCache.size())
+    // Record the occupied size
+    _pendingFiberCapacity.addAndGet(fiberCache.getOccupiedSize())
     removalPendingQueue.offer((fiber, fiberCache))
-    if (_pendingFiberSize.get() > maxMemory) {
+    if (_pendingFiberCapacity.get() > maxMemory) {
       logWarning("Fibers pending on removal use too much memory, " +
-          s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
+          s"current: ${_pendingFiberCapacity.get()}, max: $maxMemory")
     }
   }
 
@@ -73,12 +79,13 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
     if (!cache.tryDispose()) {
       logDebug(s"Waiting fiber to be released timeout. Fiber: $fiberId")
       removalPendingQueue.offer((fiberId, cache))
-      if (_pendingFiberSize.get() > maxMemory) {
+      if (_pendingFiberCapacity.get() > maxMemory) {
         logWarning("Fibers pending on removal use too much memory, " +
-            s"current: ${_pendingFiberSize.get()}, max: $maxMemory")
+            s"current: ${_pendingFiberCapacity.get()}, max: $maxMemory")
       }
     } else {
       _pendingFiberSize.addAndGet(-cache.size())
+      _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
       // TODO: Make log more readable
       logDebug(s"Fiber removed successfully. Fiber: $fiberId")
     }
