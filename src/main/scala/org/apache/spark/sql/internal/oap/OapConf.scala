@@ -119,6 +119,13 @@ object OapConf {
       .doubleConf
       .createWithDefault(0.7)
 
+  val OAP_FIBERCACHE_MEMORY_MANAGER =
+    SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.memory.manager")
+      .internal()
+      .doc("Sets the implement of memory manager, it only supports off heap currently.")
+      .stringConf
+      .createWithDefault("offheap")
+
   val OAP_COMPRESSION = SqlConfAdapter.buildConf("spark.sql.oap.compression.codec")
     .internal()
     .doc("Sets the compression codec use when writing Parquet files. Acceptable values include: " +
@@ -245,4 +252,25 @@ object OapConf {
         "is empty, it will store in the data file path")
       .stringConf
       .createWithDefault("")
+
+  val ORC_VECTORIZED_READER_ENABLED =
+    SqlConfAdapter.buildConf("spark.sql.orc.enableVectorizedReader")
+      .doc("Enables vectorized orc decoding.")
+      .booleanConf
+      .createWithDefault(true)
+
+  val COLUMN_VECTOR_OFFHEAP_ENABLED =
+    SqlConfAdapter.buildConf("spark.sql.columnVector.offheap.enabled")
+      .internal()
+      .doc("When true, use OffHeapColumnVector in ColumnarBatch.")
+      .booleanConf
+      .createWithDefault(false)
+
+  val ORC_COPY_BATCH_TO_SPARK =
+    SqlConfAdapter.buildConf("spark.sql.orc.copyBatchToSpark")
+      .doc("Whether or not to copy the ORC columnar batch to Spark columnar batch in the " +
+        "vectorized ORC reader.")
+      .internal()
+      .booleanConf
+      .createWithDefault(false)
 }

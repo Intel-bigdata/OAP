@@ -15,31 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.oap
+package org.apache.spark.sql.vectorized;
 
-import java.util.concurrent.{Executors, ExecutorService, TimeUnit}
+/**
+ * The interface for dictionary in ColumnVector to decode dictionary encoded values.
+ */
+public interface Dictionary {
 
-import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.test.oap.SharedOapLocalClusterContext
+  int decodeToInt(int id);
 
-class OapRuntimeSuite extends QueryTest with SharedOapLocalClusterContext {
+  long decodeToLong(int id);
 
-  test("OapRuntime is created once") {
-    val oapruntime = new Array[OapRuntime](2)
-    val threadPool: ExecutorService = Executors.newFixedThreadPool(2)
-    try {
-      for (i <- 0 to 1) {
-        threadPool.execute(new Runnable {
-          override def run(): Unit = {
-            oapruntime(i) = OapRuntime.getOrCreate
-          }
-        })
-      }
-      threadPool.awaitTermination(1000, TimeUnit.MILLISECONDS)
-    } finally {
-      threadPool.shutdown()
-    }
-    assert(oapruntime(0) == oapruntime(1))
-  }
+  float decodeToFloat(int id);
+
+  double decodeToDouble(int id);
+
+  byte[] decodeToBinary(int id);
 }
-

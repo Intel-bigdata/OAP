@@ -18,6 +18,8 @@
 package org.apache.spark.sql.execution.datasources.oap.io
 
 import java.io.{File, IOException}
+import java.util
+import java.util.TimeZone
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -32,7 +34,7 @@ import org.apache.parquet.example.data.simple.{SimpleGroup, SimpleGroupFactory}
 import org.apache.parquet.hadoop.ParquetFiberDataReader
 import org.apache.parquet.hadoop.example.{ExampleParquetWriter, GroupWriteSupport}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName.UNCOMPRESSED
-import org.apache.parquet.schema.{MessageType, PrimitiveType}
+import org.apache.parquet.schema.{MessageType, PrimitiveType, Type}
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
 import org.apache.parquet.schema.Type.Repetition.REQUIRED
 import org.scalatest.BeforeAndAfterEach
@@ -42,12 +44,13 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportWrapper, VectorizedColumnReader, VectorizedColumnReaderWrapper}
-import org.apache.spark.sql.execution.vectorized.{ColumnarBatch, ColumnVector}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
+import org.apache.spark.sql.oap.adapter.ColumnVectorAdapter
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
 
@@ -345,7 +348,7 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val batch = iterator.next().asInstanceOf[ColumnarBatch]
-      val rowIterator = batch.rowIterator()
+      val rowIterator = batch.rowOapIterator()
       while (rowIterator.hasNext) {
         val row = rowIterator.next()
         assert(row.numFields == 2)
@@ -534,13 +537,15 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
       new Path(fileName), meta.footer.toParquetMetadata)
     val footer = reader.getFooter
     val rowCount = footer.getBlocks.get(0).getRowCount.toInt
-    val vector = ColumnVector.allocate(rowCount, IntegerType, MemoryMode.ON_HEAP)
+    val vector = ColumnVectorAdapter.allocate(rowCount, IntegerType, MemoryMode.ON_HEAP)
     val blockMetaData = footer.getBlocks.get(0)
     val columnDescriptor = parquetSchema.getColumns.get(0)
+    val types: util.List[Type] = parquetSchema.asGroupType.getFields
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
     val columnReader =
       new VectorizedColumnReaderWrapper(
-        new VectorizedColumnReader(columnDescriptor, fiberData.getPageReader(columnDescriptor)))
+        new VectorizedColumnReader(columnDescriptor, types.get(0).getOriginalType,
+          fiberData.getPageReader(columnDescriptor), TimeZone.getDefault))
     columnReader.readBatch(rowCount, vector)
     for (i <- 0 until rowCount) {
       assert(i * 2 == vector.getInt(i))
@@ -553,7 +558,7 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
       new Path(fileName), meta.footer.toParquetMetadata)
     val footer = reader.getFooter
     val rowCount = footer.getBlocks.get(0).getRowCount.toInt
-    val vector = ColumnVector.allocate(rowCount, IntegerType, MemoryMode.ON_HEAP)
+    val vector = ColumnVectorAdapter.allocate(rowCount, IntegerType, MemoryMode.ON_HEAP)
     val blockMetaData = footer.getBlocks.get(0)
     val columnDescriptor = new ColumnDescriptor(Array(s"${fileName}_temp"), INT32, 0, 0)
     val exception = intercept[IOException] {

@@ -61,10 +61,6 @@ public class MrOapRecordReader<T> implements RecordReader<T> {
     }
 
     @Override
-    public float getProgress() throws IOException, InterruptedException {
-      return internalReader.getProgress();
-    }
-
     public void initialize() throws IOException, InterruptedException {
       ParquetFileReader parquetFileReader =
         ParquetFileReader.open(configuration, file, footer.toParquetMetadata());

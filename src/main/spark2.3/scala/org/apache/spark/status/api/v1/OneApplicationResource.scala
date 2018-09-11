@@ -19,12 +19,15 @@ package org.apache.spark.status.api.v1
 import java.io.OutputStream
 import java.util.{List => JList}
 import java.util.zip.ZipOutputStream
+
 import javax.ws.rs.{GET, Path, PathParam, Produces, QueryParam}
 import javax.ws.rs.core.{MediaType, Response, StreamingOutput}
 
 import scala.util.control.NonFatal
-
 import org.apache.spark.JobExecutionStatus
+import org.apache.spark.sql.execution.datasources.oap.filecache.CacheStats
+import org.apache.spark.sql.oap.OapRuntime
+import org.apache.spark.sql.oap.ui.{FiberCacheManagerPage, FiberCacheManagerSummary}
 import org.apache.spark.ui.SparkUI
 
 @Produces(Array(MediaType.APPLICATION_JSON))
@@ -50,6 +53,43 @@ private[v1] class AbstractApplicationResource extends BaseAppResource {
   @GET
   @Path("executors")
   def executorList(): Seq[ExecutorSummary] = withUI(_.store.executorList(true))
+
+  @GET
+  @Path("fibercachemanagers")
+  def fiberList(): Seq[FiberCacheManagerSummary] =
+  {
+    val seqExecutorSummary = withUI(_.store.executorList(true))
+    seqExecutorSummary.map(
+      executorSummary =>
+        {
+          val cacheStats =
+            OapRuntime.getOrCreate.fiberSensor.getExecutorToCacheManager.getOrDefault(executorSummary.id, CacheStats())
+
+          new FiberCacheManagerSummary(
+            executorSummary.id,
+            executorSummary.hostPort,
+            true,
+            executorSummary.memoryUsed,
+            executorSummary.maxMemory,
+            cacheStats.totalCacheSize,
+            cacheStats.totalCacheCount,
+            cacheStats.backendCacheSize,
+            cacheStats.backendCacheCount,
+            cacheStats.dataFiberSize,
+            cacheStats.dataFiberCount,
+            cacheStats.indexFiberSize,
+            cacheStats.indexFiberCount,
+            cacheStats.pendingFiberSize,
+            cacheStats.pendingFiberCount,
+            cacheStats.hitCount,
+            cacheStats.missCount,
+            cacheStats.loadCount,
+            cacheStats.totalLoadTime,
+            cacheStats.evictionCount
+          )
+        }
+    )
+  }
 
   @GET
   @Path("allexecutors")

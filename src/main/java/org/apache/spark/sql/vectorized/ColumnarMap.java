@@ -15,26 +15,39 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.parquet;
+package org.apache.spark.sql.vectorized;
 
-import java.io.IOException;
-
-import org.apache.spark.sql.execution.vectorized.ColumnVector;
+import org.apache.spark.sql.catalyst.util.MapData;
 
 /**
- * VectorizedColumnReaderWrapper let readBatch method can be used
- * outside "org.apache.spark.sql.execution.datasources.parquet" package
+ * Map abstraction in {@link ColumnVector}.
  */
-public class VectorizedColumnReaderWrapper {
+public final class ColumnarMap extends MapData {
+  private final ColumnarArray keys;
+  private final ColumnarArray values;
+  private final int length;
 
-    private VectorizedColumnReader reader;
+  public ColumnarMap(ColumnVector keys, ColumnVector values, int offset, int length) {
+    this.length = length;
+    this.keys = new ColumnarArray(keys, offset, length);
+    this.values = new ColumnarArray(values, offset, length);
+  }
 
-    public VectorizedColumnReaderWrapper(VectorizedColumnReader reader) {
-      this.reader = reader;
-    }
+  @Override
+  public int numElements() { return length; }
 
-    public void readBatch(int total, ColumnVector column) throws IOException {
-      reader.readBatch(total, column);
-    }
+  @Override
+  public ColumnarArray keyArray() {
+    return keys;
+  }
 
+  @Override
+  public ColumnarArray valueArray() {
+    return values;
+  }
+
+  @Override
+  public ColumnarMap copy() {
+    throw new UnsupportedOperationException();
+  }
 }

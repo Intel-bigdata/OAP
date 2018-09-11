@@ -123,8 +123,9 @@ private[hive] object SparkSQLCLIDriver extends Logging {
 
     SessionState.start(sessionState)
 
+    // for OAP
     // Clean up after we exit
-    ShutdownHookManager.addShutdownHook { () => SparkSQLEnv.stop() }
+    ShutdownHookManager.addShutdownHook { () => OapEnv.stop() }
 
     val remoteMode = isRemoteMode(sessionState)
     // "-h" option has been passed, so connect to Hive thrift server.
@@ -305,15 +306,16 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
   // Force initializing SparkSQLEnv. This is put here but not object SparkSQLCliDriver
   // because the Hive unit tests do not go through the main() code path.
   if (!isRemoteMode) {
-    SparkSQLEnv.init()
+    // for OAP
+    OapEnv.init()
   } else {
     // Hive 1.2 + not supported in CLI
     throw new RuntimeException("Remote operations not supported")
   }
-
-  override def setHiveVariables(hiveVariables: java.util.Map[String, String]): Unit = {
-    hiveVariables.asScala.foreach(kv => SparkSQLEnv.sqlContext.conf.setConfString(kv._1, kv._2))
-  }
+// Comment for OAP
+//  override def setHiveVariables(hiveVariables: java.util.Map[String, String]): Unit = {
+//    hiveVariables.asScala.foreach(kv => SparkSQLEnv.sqlContext.conf.setConfString(kv._1, kv._2))
+//  }
 
   override def processCmd(cmd: String): Int = {
     val cmd_trimmed: String = cmd.trim()
