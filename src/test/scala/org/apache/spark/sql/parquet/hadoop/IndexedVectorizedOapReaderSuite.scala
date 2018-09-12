@@ -36,11 +36,11 @@ class IndexedVectorizedOapReaderSuite extends QueryTest with ParquetTest with Sh
    * ----------------------
    * | no index hit batch | --> call skipBatchInternal to skip
    * ----------------------
-   * | index hit batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
+   * | hit 5000 batch     | --> call nextBatchInternal() && filterRowsWithIndex(ids)
    * ----------------------
    * | no index hit batch | --> call skipBatchInternal to skip
    * ----------------------
-   * | index hit batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
+   * | hit 16000 batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
    * ----------------------
    * | no index hit batch | --> discard directly because of idsMap.isEmpty()
    * ----------------------
