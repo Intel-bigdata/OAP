@@ -57,7 +57,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       this.globalRowIds = globalRowIds;
     }
 
-  public IndexedVectorizedOapRecordReader(
+    public IndexedVectorizedOapRecordReader(
         Path file,
         Configuration configuration,
         int[] globalRowIds) throws IOException{
