@@ -38,7 +38,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     // Record current PageNumber
     private int currentPageNumber;
     // Rowid list of file granularity
-    private int[] globalRowIds;
+    protected int[] globalRowIds;
     // for returnColumnarBatch is false branch,
     // secondary indexes to call columnarBatch.getRow
     private IntList batchIds;
@@ -57,7 +57,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       this.globalRowIds = globalRowIds;
     }
 
-    public IndexedVectorizedOapRecordReader(
+  public IndexedVectorizedOapRecordReader(
         Path file,
         Configuration configuration,
         int[] globalRowIds) throws IOException{
@@ -202,7 +202,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
    * Do skipBatch for every ColumnVector in ColumnarBatch, actually when we call this method, we
    * will skip the whole columnarBatch, so this num is columnarBatch.capacity().
    */
-  private void skipBatchInternal() throws IOException {
+  protected void skipBatchInternal() throws IOException {
     int num = columnarBatch.capacity();
     for (int i = 0; i < columnReaders.length; ++i) {
       if (columnReaders[i] == null) continue;
