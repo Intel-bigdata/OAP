@@ -32,21 +32,21 @@ import org.apache.spark.sql.test.oap.SharedOapContext
 class IndexedVectorizedOapReaderSuite extends QueryTest with ParquetTest with SharedOapContext {
 
   /**
-    * The Test data has one RowGroup and divide into ColumnarBatch may as following:
-    * ----------------------
-    * | no index hit batch | --> call skipBatchInternal to skip
-    * ----------------------
-    * | index hit batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
-    * ----------------------
-    * | no index hit batch | --> call skipBatchInternal to skip
-    * ----------------------
-    * | index hit batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
-    * ----------------------
-    * | no index hit batch | --> discard directly because of idsMap.isEmpty()
-    * ----------------------
-    * Now this case a little trick, we use spy model to mock IndexedVectorizedOapReader object,
-    * it will call real method and we only verify call times of Key methods.
-    */
+   * The Test data has one RowGroup and divide into ColumnarBatch may as following:
+   * ----------------------
+   * | no index hit batch | --> call skipBatchInternal to skip
+   * ----------------------
+   * | index hit batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
+   * ----------------------
+   * | no index hit batch | --> call skipBatchInternal to skip
+   * ----------------------
+   * | index hit batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
+   * ----------------------
+   * | no index hit batch | --> discard directly because of idsMap.isEmpty()
+   * ----------------------
+   * Now this case a little trick, we use spy model to mock IndexedVectorizedOapReader object,
+   * it will call real method and we only verify call times of Key methods.
+   */
   test("IndexedVectorizedOapRecordReader - readBatch") {
     val batchSize = 4096
     val data = (0 to batchSize * 5).map(i => (i, (i + 'a').toChar.toString))
