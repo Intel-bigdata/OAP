@@ -38,7 +38,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     // Record current PageNumber
     private int currentPageNumber;
     // Rowid list of file granularity
-    protected int[] globalRowIds;
+    private int[] globalRowIds;
     // for returnColumnarBatch is false branch,
     // secondary indexes to call columnarBatch.getRow
     private IntList batchIds;
