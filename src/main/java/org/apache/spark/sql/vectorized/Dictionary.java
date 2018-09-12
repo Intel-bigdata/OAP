@@ -15,26 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.parquet;
-
-import java.io.IOException;
-
-import org.apache.spark.sql.execution.vectorized.ColumnVector;
+package org.apache.spark.sql.vectorized;
 
 /**
- * VectorizedColumnReaderWrapper let readBatch method can be used
- * outside "org.apache.spark.sql.execution.datasources.parquet" package
+ * The interface for dictionary in ColumnVector to decode dictionary encoded values.
  */
-public class VectorizedColumnReaderWrapper {
+public interface Dictionary {
 
-    private VectorizedColumnReader reader;
+  int decodeToInt(int id);
 
-    public VectorizedColumnReaderWrapper(VectorizedColumnReader reader) {
-      this.reader = reader;
-    }
+  long decodeToLong(int id);
 
-    public void readBatch(int total, ColumnVector column) throws IOException {
-      reader.readBatch(total, column);
-    }
+  float decodeToFloat(int id);
 
+  double decodeToDouble(int id);
+
+  byte[] decodeToBinary(int id);
 }

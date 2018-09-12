@@ -254,23 +254,11 @@ object OapConf {
       .createWithDefault("")
 
   val ORC_VECTORIZED_READER_ENABLED =
-    SqlConfAdapter.buildConf("spark.sql.orc.enableVectorizedReader")
-      .doc("Enables vectorized orc decoding.")
-      .booleanConf
-      .createWithDefault(true)
+    SqlConfAdapter.ORC_VECTORIZED_READER_ENABLED
 
   val COLUMN_VECTOR_OFFHEAP_ENABLED =
-    SqlConfAdapter.buildConf("spark.sql.columnVector.offheap.enabled")
-      .internal()
-      .doc("When true, use OffHeapColumnVector in ColumnarBatch.")
-      .booleanConf
-      .createWithDefault(false)
+    SqlConfAdapter.COLUMN_VECTOR_OFFHEAP_ENABLED
 
   val ORC_COPY_BATCH_TO_SPARK =
-    SqlConfAdapter.buildConf("spark.sql.orc.copyBatchToSpark")
-      .doc("Whether or not to copy the ORC columnar batch to Spark columnar batch in the " +
-        "vectorized ORC reader.")
-      .internal()
-      .booleanConf
-      .createWithDefault(false)
+    SqlConfAdapter.ORC_COPY_BATCH_TO_SPARK
 }
