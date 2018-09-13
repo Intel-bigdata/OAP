@@ -333,42 +333,6 @@
            </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>3.1.0</version>
-        <configuration>
-          <shadedArtifactAttached>false</shadedArtifactAttached>
-          <artifactSet>
-            <includes>
-              <include>org.spark-project.spark:unused</include>
-              <include>com.google.guava:guava</include>
-              <include>org.apache.parquet:*</include>
-            </includes>
-          </artifactSet>
-          <relocations>
-            <relocation>
-              <pattern>org.eclipse.jetty</pattern>
-              <shadedPattern>org.spark_project.jetty</shadedPattern>
-              <includes>
-                <include>org.eclipse.jetty.**</include>
-              </includes>
-            </relocation>
-            <relocation>
-              <pattern>com.google.common</pattern>
-              <shadedPattern>org.spark_project.guava</shadedPattern>
-            </relocation>
-          </relocations>
-        </configuration>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
 
       <plugin>
         <groupId>org.scalastyle</groupId>
