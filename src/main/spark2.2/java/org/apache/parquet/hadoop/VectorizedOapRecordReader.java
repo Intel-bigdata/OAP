@@ -275,9 +275,18 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * From VectorizedParquetRecordReader, no change.
      */
     public boolean nextBatch() throws IOException {
-      columnarBatch.reset();
       if (rowsReturned >= totalRowCount) return false;
       checkEndOfRowGroup();
+      nextBatchInternal();
+      return true;
+    }
+
+    /**
+     * Extract part code from nextBatch() to a method and call by subclass, call this method we
+     * should ensure the backend has enough data.
+     */
+    protected void nextBatchInternal() throws IOException {
+      columnarBatch.reset();
 
       int num = (int) Math.min((long) columnarBatch.capacity(),
         totalCountLoadedSoFar - rowsReturned);
@@ -289,7 +298,6 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
       columnarBatch.setNumRows(num);
       numBatched = num;
       batchIdx = 0;
-      return true;
     }
 
     /**
