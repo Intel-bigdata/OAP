@@ -23,6 +23,7 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.sql.{QueryTest, Row, SaveMode}
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex, TestPartition}
 import org.apache.spark.util.Utils
+import org.apache.spark.sql.internal.oap.OapConf
 
 class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
@@ -40,6 +41,11 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql(s"""CREATE TABLE oap_partition_table (a int, b int, c STRING)
             | USING parquet
             | PARTITIONED by (b, c)""".stripMargin)
+    sql(s"""CREATE TABLE oap_partition_table_index_directory (a int, b int, c STRING)
+            | USING parquet
+            | PARTITIONED by (b, c)""".stripMargin)
+    sql(s"""CREATE TABLE oap_table_index_directory (a int)
+            | USING parquet""".stripMargin)
   }
 
   override def afterEach(): Unit = {
@@ -96,6 +102,53 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
           Row("oap_test_2", "index6", 0, "a", "A", "BITMAP", true) ::
           Row("oap_test_2", "index1", 0, "a", "D", "BTREE", true) ::
           Row("oap_test_2", "index1", 1, "b", "D", "BTREE", true) :: Nil)
+    }
+  }
+
+  test("verify the index path is indexDirectory + tablePath or indexFirectory" +
+    " + tablePath + partitionPath when the index directory contain the schema") {
+    val data: Seq[(Int, Int)] = (1 to 10).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+
+    val path = new Path(sqlConf.warehousePath)
+    sql(
+      """
+        |INSERT OVERWRITE TABLE oap_partition_table_index_directory
+        |partition (b=1, c='c1')
+        |SELECT key from t where value < 4
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE oap_table_index_directory
+        |SELECT key from t where value < 4
+      """.stripMargin)
+
+    withSQLConf(OapConf.OAP_INDEX_DIRECTORY.key -> "file:/tmp") {
+      val indexDirectory = Path.getPathWithoutSchemeAndAuthority(
+        new Path(spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key)))
+      val parentPath = new Path(
+        indexDirectory + Path.getPathWithoutSchemeAndAuthority(path).toString)
+
+      withIndex(
+        TestIndex("oap_partition_table_index_directory", "index1",
+          TestPartition("b", "1"), TestPartition("c", "c1"))) {
+        sql(
+          "create oindex index1 on oap_partition_table_index_directory (a) partition (b=1, c='c1')")
+
+        assert(path.getFileSystem(
+          configuration).globStatus(new Path(parentPath,
+          "oap_partition_table_index_directory/b=1/c=c1/*.index")).length != 0)
+      }
+
+      withIndex() {
+        sql(
+          "create oindex index1 on oap_table_index_directory (a)")
+
+        assert(path.getFileSystem(
+          configuration).globStatus(new Path(parentPath,
+          "oap_table_index_directory/*.index")).length != 0)
+      }
     }
   }
 
