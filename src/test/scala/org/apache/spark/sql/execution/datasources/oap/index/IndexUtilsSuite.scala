@@ -210,14 +210,15 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
     }
   }
 
-  test("generateTempIndexFilePath: generating temp index file path with specific configuration") {
+  test("generateTempIndexFilePath: generating temp index file path with specific" +
+    " configuration with schema") {
     // set the configuration of OapConf.OAP_INDEX_DIRECTORY with schema
     withSQLConf(OapConf.OAP_INDEX_DIRECTORY.key -> "file:/tmp") {
       val indexDirectory = spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key)
       val option = Map(
         OapConf.OAP_INDEX_DIRECTORY.key -> spark.conf.get(OapConf.OAP_INDEX_DIRECTORY.key))
       val conf = spark.sessionState.newHadoopConfWithOptions(option)
-      // because the indexDirectory is "/tmp", so the index file path is "/tmp" +data file path
+      // because the indexDirectory is "file:/tmp", so the index file path is "file:/tmp" +data file path
       assertEquals(s"$indexDirectory/path/to/_temp/0/.t1.ABC.index1.index",
         IndexUtils.generateTempIndexFilePath(conf,
           "/path/to/t1.data",
