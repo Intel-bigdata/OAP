@@ -21,9 +21,9 @@ import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row, SaveMode}
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex, TestPartition}
 import org.apache.spark.util.Utils
-import org.apache.spark.sql.internal.oap.OapConf
 
 class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
