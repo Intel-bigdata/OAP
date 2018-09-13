@@ -514,6 +514,15 @@
         <version>2.3</version>
         <executions>
           <execution>
+            <id>default-jar</id>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classifier>with-spark-${spark.internal.version}</classifier>
+            </configuration>
+          </execution>
+          <execution>
             <id>prepare-test-jar</id>
             <phase>prepare-package</phase>
             <goals>
@@ -741,5 +750,4 @@
       </build>
     </profile>
   </profiles>
-
 </project>
