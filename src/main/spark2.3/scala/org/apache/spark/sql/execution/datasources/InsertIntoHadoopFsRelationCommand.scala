@@ -150,7 +150,7 @@ case class InsertIntoHadoopFsRelationCommand(
         }
       }
 
-      val updatedPartitionPaths: Set[String] =
+      val updatedPartitionPaths =
         FileFormatWriter.write(
           sparkSession = sparkSession,
           plan = child,
@@ -162,7 +162,7 @@ case class InsertIntoHadoopFsRelationCommand(
           partitionColumns = partitionColumns,
           bucketSpec = bucketSpec,
           statsTrackers = Seq(basicWriteJobStatsTracker(hadoopConf)),
-          options = options)
+          options = options)._2
 
 
       // update metastore partition metadata
