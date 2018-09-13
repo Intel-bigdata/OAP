@@ -103,12 +103,12 @@ trait OapStrategies extends Logging {
         limit: Int,
         order: Seq[SortOrder]): SparkPlan = child match {
       case PhysicalOperation(projectList, filters,
-        relation @ LogicalRelation(
-          file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table, false)) =>
+        relation : LogicalRelation) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
         if (orderAttributes.size == 1 && filterAttributes == orderAttributes) {
-          val oapOption = CaseInsensitiveMap(file.options +
+          val oapOption = CaseInsensitiveMap(
+            relation.relation.asInstanceOf[HadoopFsRelation].options +
             (OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY -> limit.toString) +
             (OapFileFormat.OAP_QUERY_ORDER_OPTION_KEY -> order.head.isAscending.toString))
           val indexRequirement = filters.map(_ => BTreeIndex())
@@ -117,8 +117,8 @@ trait OapStrategies extends Logging {
             projectList,
             filters,
             relation,
-            file,
-            table,
+            relation.relation.asInstanceOf[HadoopFsRelation],
+            relation.catalogTable,
             oapOption,
             filters,
             indexRequirement) match {
@@ -168,12 +168,12 @@ trait OapStrategies extends Logging {
         child: LogicalPlan,
         order: Seq[SortOrder]): SparkPlan = child match {
       case PhysicalOperation(projectList, filters,
-        relation @ LogicalRelation(
-          file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table, false)) =>
+        relation : LogicalRelation) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
         if (orderAttributes.size == 1 || filterAttributes == orderAttributes) {
-          val oapOption = CaseInsensitiveMap(file.options +
+          val oapOption = CaseInsensitiveMap(
+            relation.relation.asInstanceOf[HadoopFsRelation].options +
             (OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY -> "1"))
           val indexRequirement = filters.map(_ => BitMapIndex())
 
@@ -181,8 +181,8 @@ trait OapStrategies extends Logging {
             projectList,
             filters,
             relation,
-            file,
-            table,
+            relation.relation.asInstanceOf[HadoopFsRelation],
+            relation.catalogTable,
             oapOption,
             filters,
             indexRequirement) match {
@@ -251,22 +251,22 @@ trait OapStrategies extends Logging {
         resultExpressions: Seq[NamedExpression],
         child : LogicalPlan) : SparkPlan = child match {
       case PhysicalOperation(projectList, filters,
-        relation @ LogicalRelation(
-          file @ HadoopFsRelation(_, _, _, _, _ : OapFileFormat, _), _, table, _)) =>
+        relation : LogicalRelation) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val groupingAttributes = AttributeSet(groupExpressions.map(_.toAttribute))
         val indexRequirement = filters.map(_ => BTreeIndex())
 
         if (groupingAttributes.size == 1 && filterAttributes == groupingAttributes) {
-          val oapOption = CaseInsensitiveMap(file.options +
+          val oapOption = CaseInsensitiveMap(
+            relation.relation.asInstanceOf[HadoopFsRelation].options +
             (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
 
           createOapFileScanPlan(
             projectList,
             filters,
             relation,
-            file,
-            table,
+            relation.relation.asInstanceOf[HadoopFsRelation],
+            relation.catalogTable,
             oapOption,
             filters,
             indexRequirement) match {
