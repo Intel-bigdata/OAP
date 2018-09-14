@@ -318,9 +318,10 @@ private[oap] class OapDataReaderV1(
       val tot = totalRows()
       metrics.updateTotalRows(tot)
       metrics.updateIndexAndRowRead(this, tot)
-      // if enableVectorizedReader == true , return iter directly because of partitionValues
-      // already filled by VectorizedReader, else use original branch.
-      if (enableVectorizedReader) {
+      // There are two scenarios that can directly return to iterator:
+      // 1. enableVectorizedReader == true,  partitionValues already filled by VectorizedReader
+      // 2. partitionSchema.length == 0, needn't appendPartitionColumns.
+      if (enableVectorizedReader || partitionSchema.length == 0) {
         iter
       } else {
         val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
