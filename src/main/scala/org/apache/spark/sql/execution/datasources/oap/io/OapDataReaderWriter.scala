@@ -322,6 +322,9 @@ private[oap] class OapDataReaderV1(
       // already filled by VectorizedReader, else use original branch.
       if (enableVectorizedReader) {
         iter
+      } else if (partitionSchema.length == 0) {
+        // There is no partition columns
+        iter.asInstanceOf[Iterator[InternalRow]]
       } else {
         val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
         val joinedRow = new JoinedRow()
