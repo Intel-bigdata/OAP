@@ -19,10 +19,16 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.ConcurrentHashMap
 
+import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
+
 import com.google.common.base.Throwables
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberSensor.HostFiberCache
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
+import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.listener.SparkListenerCustomInfoUpdate
 import org.apache.spark.util.collection.BitSet
 
@@ -34,36 +40,47 @@ private[oap] case class FiberCacheStatus(
 
   val cachedFiberCount = bitmask.cardinality()
 
-  def moreCacheThan(other: FiberCacheStatus): Boolean = cachedFiberCount >= other.cachedFiberCount
 }
 
-// TODO: FiberSensor doesn't consider the fiber cache, but only the number of cached fiber count
 // FiberSensor is the FiberCache info recorder on Driver, it contains a file cache location mapping
 // (for cache locality) and metrics info
 private[sql] class FiberSensor extends Logging {
 
-  private case class HostFiberCache(host: String, status: FiberCacheStatus)
+  private[filecache] val fileToHosts = new ConcurrentHashMap[String, ArrayBuffer[HostFiberCache]]
 
-  private val fileToHost = new ConcurrentHashMap[String, HostFiberCache]
+  private[filecache] def updateRecordingMap(fromHost: String, commingStatus: FiberCacheStatus) =
+    synchronized {
+    val currentHostsForFile = fileToHosts.getOrDefault(
+      commingStatus.file, new ArrayBuffer[HostFiberCache](0))
+    val (_, theRest) = currentHostsForFile.partition(_.host == fromHost)
+    val newHostsForFile = (HostFiberCache(fromHost, commingStatus) +: theRest)
+      .sorted.takeRight(FiberSensor.MAX_HOSTS_MAINTAINED)
+    fileToHosts.put(commingStatus.file, newHostsForFile)
+  }
+
+  private[filecache] def discardOutdatedInfo(host: String) = synchronized {
+    for ((k: String, v: ArrayBuffer[HostFiberCache]) <- fileToHosts.asScala) {
+      val(_, kept) = v.partition(_.host == host)
+      if (kept.size == 0) {
+        fileToHosts.remove(k)
+      } else {
+        fileToHosts.put(k, kept)
+      }
+    }
+  }
 
   def updateLocations(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
     val updateExecId = fiberInfo.executorId
     val updateHostName = fiberInfo.hostName
     val host = FiberSensor.OAP_CACHE_HOST_PREFIX + updateHostName +
       FiberSensor.OAP_CACHE_EXECUTOR_PREFIX + updateExecId
-    val fibersOnExecutor = CacheStatusSerDe.deserialize(fiberInfo.customizedInfo)
+    val fiberCacheStatus = CacheStatusSerDe.deserialize(fiberInfo.customizedInfo)
     logDebug(s"Got updated fiber info from host: $updateHostName, executorId: $updateExecId," +
-      s"host is $host, info array len is ${fibersOnExecutor.size}")
-    fibersOnExecutor.foreach { status =>
-      fileToHost.get(status.file) match {
-        case null => fileToHost.put(status.file, HostFiberCache(host, status))
-        case HostFiberCache(_, fcs) if status.moreCacheThan(fcs) =>
-          // only cache a single executor ID, TODO need to considered the fiber id required
-          // replace the old HostFiberCache as the new one has more data cached
-          fileToHost.put(status.file, HostFiberCache(host, status))
-        case _ =>
-      }
-    }
+      s"host is $host, info array len is ${fiberCacheStatus.size}")
+    // Coming information of a certain executor requires discarding previous records so as to
+    // reflect Fiber eviction
+    discardOutdatedInfo(host)
+    fiberCacheStatus.foreach(updateRecordingMap(host, _))
   }
 
   // TODO: define a function to wrap this and make it private
@@ -95,14 +112,28 @@ private[sql] class FiberSensor extends Logging {
    * @return
    */
   def getHosts(filePath: String): Seq[String] = {
-    fileToHost.get(filePath) match {
-      case HostFiberCache(host, status) => Seq(host)
-      case null => Seq.empty
-    }
+    fileToHosts.getOrDefault(filePath, new ArrayBuffer[HostFiberCache](0))
+      .sorted.takeRight(FiberSensor.NUM_GET_HOSTS).reverse.map(_.host)
   }
 }
 
-private[oap] object FiberSensor {
+private[sql] object FiberSensor {
+
+  case class HostFiberCache(host: String, status: FiberCacheStatus)
+      extends Ordered[HostFiberCache] {
+    override def compare(another: HostFiberCache): Int = {
+      status.cachedFiberCount - another.status.cachedFiberCount
+    }
+  }
+
+  private def conf = OapRuntime.getOrCreate.sparkSession.conf
+
+  val NUM_GET_HOSTS = conf.get(
+    OapConf.OAP_CACHE_FIBERSENSOR_GETHOSTS_NUM,
+    OapConf.OAP_CACHE_FIBERSENSOR_GETHOSTS_NUM.defaultValue.get)
+  val MAX_HOSTS_MAINTAINED = conf.get(
+    OapConf.OAP_CACHE_FIBERSENSOR_MAXHOSTSMAINTAINED_NUM,
+    OapConf.OAP_CACHE_FIBERSENSOR_MAXHOSTSMAINTAINED_NUM.defaultValue.get)
   val OAP_CACHE_HOST_PREFIX = "OAP_HOST_"
   val OAP_CACHE_EXECUTOR_PREFIX = "_OAP_EXECUTOR_"
 }

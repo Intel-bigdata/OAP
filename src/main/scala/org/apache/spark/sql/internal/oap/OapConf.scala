@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.internal.oap
 
-import org.apache.spark.internal.config.ConfigBuilder
 import org.apache.spark.sql.oap.adapter.SqlConfAdapter
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,6 +124,21 @@ object OapConf {
       .doc("Sets the implement of memory manager, it only supports off heap currently.")
       .stringConf
       .createWithDefault("offheap")
+
+  val OAP_CACHE_FIBERSENSOR_GETHOSTS_NUM =
+    SqlConfAdapter.buildConf("spark.sql.oap.cache.fiberSensor.getHostsNum")
+      .internal()
+      .doc("The length of getHosts function of FiberSensor's result Seq. The funcion returns " +
+        "getHostsNum of hosts with the maximum FiberCache for certain filePath")
+      .intConf
+      .createWithDefault(3)
+
+  val OAP_CACHE_FIBERSENSOR_MAXHOSTSMAINTAINED_NUM =
+    SqlConfAdapter.buildConf("spark.sql.oap.cache.fiberSensor.maxHostsMaintainedNum")
+      .internal()
+      .doc("The maximum maintained number of hosts number for a certain filePath in FiberSensor")
+      .intConf
+      .createWithDefault(10)
 
   val OAP_COMPRESSION = SqlConfAdapter.buildConf("spark.sql.oap.compression.codec")
     .internal()
