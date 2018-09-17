@@ -99,6 +99,7 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
       "UnCompressed").foreach { codec =>
       sqlContext.conf.setConfString(OapConf.OAP_COMPRESSION.key, codec)
       val df = sqlContext.read.format("oap").load(path.getAbsolutePath)
+      Utils.deleteRecursively(path)
       df.write.format("oap").mode(SaveMode.Overwrite).save(path.getAbsolutePath)
       val compressionType =
         sqlContext.conf.getConfString(OapConf.OAP_COMPRESSION.key).toLowerCase
