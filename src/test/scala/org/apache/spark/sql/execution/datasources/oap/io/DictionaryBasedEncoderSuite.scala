@@ -21,7 +21,6 @@ import org.apache.parquet.bytes.BytesInput
 import org.apache.parquet.column.page.DictionaryPage
 import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.PlainBinaryDictionary
 import org.scalacheck._
-import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop._
 import org.scalatest.prop.Checkers
 

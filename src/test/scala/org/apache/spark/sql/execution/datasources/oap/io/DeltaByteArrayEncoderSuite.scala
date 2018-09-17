@@ -18,7 +18,6 @@
 package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.scalacheck._
-import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop._
 import org.scalatest.prop.Checkers
 

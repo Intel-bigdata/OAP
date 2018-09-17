@@ -20,7 +20,6 @@ package org.apache.spark.sql.execution.datasources.oap.io
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.format.CompressionCodec
 import org.scalacheck._
-import org.scalacheck.{Arbitrary, Gen, Properties}
 import org.scalacheck.Prop._
 import org.scalatest.prop.Checkers
 

@@ -41,17 +41,17 @@ class BTreeIndexScannerSuite extends SharedOapContext {
     val conf = new SparkConf()
     TaskContext.setTaskContext(
       TaskContextImplAdapter.createTaskContextImpl(
-    0,
-    0,
-    0,
-    0,
-    new TaskMemoryManager(new TestMemoryManager(conf), 0),
-    null,
-    MetricsSystem.createMetricsSystem(
-      "BTreeRecordReaderWriterSuite",
-      conf,
-      new SecurityManager(conf))))
-}
+        0,
+        0,
+        0,
+        0,
+        new TaskMemoryManager(new TestMemoryManager(conf), 0),
+        null,
+        MetricsSystem.createMetricsSystem(
+          "BTreeRecordReaderWriterSuite",
+          conf,
+          new SecurityManager(conf))))
+  }
   override def afterEach(): Unit = {
     // TaskContext.get().asInstanceOf[TaskContextImpl].markTaskCompleted()
     TaskContext.unset()

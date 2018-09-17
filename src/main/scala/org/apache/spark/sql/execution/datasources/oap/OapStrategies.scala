@@ -106,7 +106,8 @@ trait OapStrategies extends Logging {
         relation : LogicalRelation) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
-        if (orderAttributes.size == 1 && filterAttributes == orderAttributes) {
+        if (orderAttributes.size == 1 && filterAttributes == orderAttributes
+          && relation.relation.isInstanceOf[HadoopFsRelation]) {
           val oapOption = CaseInsensitiveMap(
             relation.relation.asInstanceOf[HadoopFsRelation].options +
             (OapFileFormat.OAP_QUERY_LIMIT_OPTION_KEY -> limit.toString) +
@@ -171,7 +172,8 @@ trait OapStrategies extends Logging {
         relation : LogicalRelation) =>
         val filterAttributes = AttributeSet(ExpressionSet(filters))
         val orderAttributes = AttributeSet(ExpressionSet(order.map(_.child)))
-        if (orderAttributes.size == 1 || filterAttributes == orderAttributes) {
+        if ((orderAttributes.size == 1 || filterAttributes == orderAttributes)
+          && relation.relation.isInstanceOf[HadoopFsRelation]) {
           val oapOption = CaseInsensitiveMap(
             relation.relation.asInstanceOf[HadoopFsRelation].options +
             (OapFileFormat.OAP_INDEX_SCAN_NUM_OPTION_KEY -> "1"))
@@ -256,7 +258,8 @@ trait OapStrategies extends Logging {
         val groupingAttributes = AttributeSet(groupExpressions.map(_.toAttribute))
         val indexRequirement = filters.map(_ => BTreeIndex())
 
-        if (groupingAttributes.size == 1 && filterAttributes == groupingAttributes) {
+        if (groupingAttributes.size == 1 && filterAttributes == groupingAttributes
+          && relation.relation.isInstanceOf[HadoopFsRelation]) {
           val oapOption = CaseInsensitiveMap(
             relation.relation.asInstanceOf[HadoopFsRelation].options +
             (OapFileFormat.OAP_INDEX_GROUP_BY_OPTION_KEY -> "true"))
