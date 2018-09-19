@@ -616,16 +616,15 @@
   <profiles>
     <profile>
       <id>spark-2.1</id>
-      <!--<activation>-->
-      <!--<activeByDefault>true</activeByDefault>-->
-      <!--</activation>-->
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
       <properties>
         <spark.version>2.1.0</spark.version>
         <spark.internal.version>2.1.0</spark.internal.version>
         <scala.version>2.11.8</scala.version>
         <scala.binary.version>2.11</scala.binary.version>
         <java.version>1.7</java.version>
-        <java.version>1.8</java.version>
         <antlr.version>4.5.3</antlr.version>
         <scalatest.version>2.2.6</scalatest.version>
         <scalacheck.version>1.12.5</scalacheck.version>
@@ -773,11 +772,7 @@
 
     <profile>
       <id>spark-2.3</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
       <properties>
-        <log.level>WARN</log.level>
         <spark.version>2.3.0</spark.version>
         <spark.internal.version>2.3.0</spark.internal.version>
         <scala.version>2.11.8</scala.version>
