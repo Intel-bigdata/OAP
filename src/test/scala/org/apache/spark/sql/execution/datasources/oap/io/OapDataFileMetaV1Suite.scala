@@ -22,9 +22,9 @@ import java.io.{ByteArrayInputStream, DataInputStream, File}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.format.{CompressionCodec, Encoding}
-import org.scalacheck._
-import org.scalacheck.Arbitrary._
-import org.scalacheck.Prop._
+import org.scalacheck.{Arbitrary, Gen, Properties}
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Prop.forAll
 import org.scalatest.prop.Checkers
 
 import org.apache.spark.SparkFunSuite

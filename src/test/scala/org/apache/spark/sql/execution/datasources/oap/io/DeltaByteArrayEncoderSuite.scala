@@ -17,8 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import org.scalacheck._
-import org.scalacheck.Prop._
+import org.scalacheck.{Arbitrary, Gen, Properties}
+import org.scalacheck.Prop.forAll
 import org.scalatest.prop.Checkers
 
 import org.apache.spark.SparkFunSuite
@@ -79,7 +79,6 @@ class DeltaByteArrayEncoderCheck extends Properties("DeltaByteArrayEncoder") {
 class DeltaByteArrayEncoderSuite extends SparkFunSuite with Checkers {
 
   test("Check Encoding/Decoding") {
-    check(Prop.all(new DictionaryBasedEncoderCheck().properties.map(_._2): _*))
     check(PropertiesAdapter.getProp(new DictionaryBasedEncoderCheck()))
   }
 }

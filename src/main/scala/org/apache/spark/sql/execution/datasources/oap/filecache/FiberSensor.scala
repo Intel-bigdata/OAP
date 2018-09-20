@@ -102,7 +102,7 @@ private[sql] class FiberSensor extends Logging {
   }
 
   def getExecutorToCacheManager(): ConcurrentHashMap[String, CacheStats] = {
-    return executorToCacheManager
+    executorToCacheManager
   }
 
   /**

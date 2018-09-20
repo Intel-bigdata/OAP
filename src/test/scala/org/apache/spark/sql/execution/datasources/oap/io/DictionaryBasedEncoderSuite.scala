@@ -20,8 +20,8 @@ package org.apache.spark.sql.execution.datasources.oap.io
 import org.apache.parquet.bytes.BytesInput
 import org.apache.parquet.column.page.DictionaryPage
 import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.PlainBinaryDictionary
-import org.scalacheck._
-import org.scalacheck.Prop._
+import org.scalacheck.{Arbitrary, Gen, Properties}
+import org.scalacheck.Prop.forAll
 import org.scalatest.prop.Checkers
 
 import org.apache.spark.SparkFunSuite
