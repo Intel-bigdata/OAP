@@ -769,7 +769,6 @@
         </plugins>
       </build>
     </profile>
-
     <profile>
       <id>spark-2.3</id>
       <properties>
@@ -846,7 +845,6 @@
         </plugins>
       </build>
     </profile>
-
   </profiles>
 
 </project>

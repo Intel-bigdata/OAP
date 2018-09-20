@@ -53,6 +53,12 @@ mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite 
 ```
 To run test suites using `LocalClusterMode`, please refer to `SharedOapLocalClusterContext`
 
+### Warm tips
+In order to control the log size, under the resources directory under test, add "log4j.properties" and set the log level to "ERROR".
+If you want to see log information at other log levels when you run unit tests, you can modify this configuration file.
+
+
+
 ## Features
 
 * Index - BTREE, BITMAP
