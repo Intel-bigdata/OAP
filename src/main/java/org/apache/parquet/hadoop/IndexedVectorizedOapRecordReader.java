@@ -28,8 +28,8 @@ import org.apache.parquet.hadoop.OapParquetFileReader.RowGroupDataAndRowIds;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 
-import org.apache.spark.sql.oap.adapter.CapacityAdapter;
 import org.apache.spark.sql.execution.vectorized.ColumnVector;
+import org.apache.spark.sql.oap.adapter.CapacityAdapter;
 
 public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader {
 
