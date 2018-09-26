@@ -20,12 +20,13 @@ package org.apache.spark.sql.execution.datasources.oap.io
 import org.apache.parquet.bytes.BytesInput
 import org.apache.parquet.column.page.DictionaryPage
 import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.PlainBinaryDictionary
-import org.scalacheck.{Gen, Properties}
+import org.scalacheck.{Arbitrary, Gen, Properties}
 import org.scalacheck.Prop.forAll
 import org.scalatest.prop.Checkers
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.oap.adapter.PropertiesAdapter
 import org.apache.spark.sql.execution.datasources.oap.filecache.StringFiberBuilder
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.unsafe.types.UTF8String
@@ -90,6 +91,6 @@ class DictionaryBasedEncoderCheck extends Properties("DictionaryBasedEncoder") {
 class DictionaryBasedEncoderSuite extends SparkFunSuite with Checkers {
 
   test("Check Encoding/Decoding") {
-    check(new DictionaryBasedEncoderCheck)
+    check(PropertiesAdapter.getProp(new DictionaryBasedEncoderCheck()))
   }
 }

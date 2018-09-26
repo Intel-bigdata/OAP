@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.vectorized;
+package org.apache.spark.sql.vectorized.oap.orc;
 
 import org.apache.spark.sql.catalyst.util.MapData;
 

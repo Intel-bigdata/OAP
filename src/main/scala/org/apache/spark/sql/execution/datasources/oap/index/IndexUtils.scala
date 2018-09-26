@@ -180,9 +180,12 @@ private[oap] object IndexUtils {
     if (indexDirectory.trim != "") {
       // here the outputPath = indexDirectory + tablePath or
       // indexDirectory + tablePath+ partitionPath
+      // we should also remove the schema of indexDirectory when get the tablePath
+      // to avoid the wrong tablePath when the indexDirectory contain schema. file:/tmp
+      // For example: indexDirectory = file:/tmp outputPath = file:/tmp/tablePath
       val tablePath =
-      Path.getPathWithoutSchemeAndAuthority(
-        outputPath).toString.replaceFirst(indexDirectory.toString, "")
+      Path.getPathWithoutSchemeAndAuthority(outputPath).toString.replaceFirst(
+        Path.getPathWithoutSchemeAndAuthority(new Path(indexDirectory)).toString, "")
       val partitionPath =
         Path.getPathWithoutSchemeAndAuthority(
           inputFilePath.getParent).toString.replaceFirst(tablePath.toString, "")

@@ -2,5 +2,6 @@ sudo: required
 dist: trusty
 language: java
 script:
-- mvn clean -Pspark-2.1 test
-- mvn clean -Pspark-2.2 test
+- mvn clean -q -Pspark-2.1 test
+- mvn clean -q -Pspark-2.2 test
+- mvn clean -q -Pspark-2.3 test

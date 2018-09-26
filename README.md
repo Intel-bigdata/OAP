@@ -53,6 +53,8 @@ mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite 
 ```
 To run test suites using `LocalClusterMode`, please refer to `SharedOapLocalClusterContext`
 
+NOTE: Log level of OAP unit tests currently default to ERROR, please override src/test/resources/log4j.properties if needed.
+
 ## Features
 
 * Index - BTREE, BITMAP

@@ -168,7 +168,7 @@
     <dependency>
       <groupId>org.scalacheck</groupId>
       <artifactId>scalacheck_${scala.binary.version}</artifactId>
-      <version>1.12.5</version> <!-- 1.13.0 appears incompatible with scalatest 2.2.6 -->
+      <version>${scalacheck.version}</version> <!-- 1.13.0 appears incompatible with scalatest 2.2.6 -->
       <scope>test</scope>
     </dependency>
     <!-- dependencies are always listed in sorted order by groupId, artifectId -->
@@ -264,7 +264,7 @@
     <dependency>
       <groupId>org.antlr</groupId>
       <artifactId>antlr4-runtime</artifactId>
-      <version>4.5.3</version>
+      <version>${antlr.version}</version>
     </dependency>
     <dependency>
       <groupId>org.json4s</groupId>
@@ -280,7 +280,7 @@
     <dependency>
       <groupId>org.scalatest</groupId>
       <artifactId>scalatest_${scala.binary.version}</artifactId>
-      <version>2.2.6</version>
+      <version>${scalatest.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -625,13 +625,16 @@
         <scala.version>2.11.8</scala.version>
         <scala.binary.version>2.11</scala.binary.version>
         <java.version>1.7</java.version>
+        <antlr.version>4.5.3</antlr.version>
+        <scalatest.version>2.2.6</scalatest.version>
+        <scalacheck.version>1.12.5</scalacheck.version>
       </properties>
       <build>
         <plugins>
           <plugin>
             <groupId>org.antlr</groupId>
             <artifactId>antlr4-maven-plugin</artifactId>
-            <version>4.5.3</version>
+            <version>${antlr.version}</version>
             <executions>
               <execution>
                 <goals>
@@ -651,6 +654,8 @@
               <excludes>
                 <exclude>src/main/spark2.2</exclude>
                 <exclude>src/main/spark2.3</exclude>
+                <exclude>src/test/spark2.2</exclude>
+                <exclude>src/test/spark2.3</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -671,6 +676,18 @@
                   </sources>
                 </configuration>
               </execution>
+              <execution>
+                <id>add-test-source</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>add-test-source</goal>
+                </goals>
+                <configuration>
+                  <sources>
+                    <source>src/test/spark2.1</source>
+                  </sources>
+                </configuration>
+              </execution>
             </executions>
           </plugin>
         </plugins>
@@ -684,13 +701,16 @@
         <scala.version>2.11.8</scala.version>
         <scala.binary.version>2.11</scala.binary.version>
         <java.version>1.8</java.version>
+        <antlr.version>4.5.3</antlr.version>
+        <scalatest.version>2.2.6</scalatest.version>
+        <scalacheck.version>1.12.5</scalacheck.version>
       </properties>
       <build>
         <plugins>
           <plugin>
             <groupId>org.antlr</groupId>
             <artifactId>antlr4-maven-plugin</artifactId>
-            <version>4.5.3</version>
+            <version>${antlr.version}</version>
             <executions>
               <execution>
                 <goals>
@@ -710,6 +730,8 @@
               <excludes>
                 <exclude>src/main/spark2.1</exclude>
                 <exclude>src/main/spark2.3</exclude>
+                <exclude>src/test/spark2.1</exclude>
+                <exclude>src/test/spark2.3</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -730,6 +752,18 @@
                   </sources>
                 </configuration>
               </execution>
+              <execution>
+                <id>add-test-source</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>add-test-source</goal>
+                </goals>
+                <configuration>
+                  <sources>
+                    <source>src/test/spark2.2</source>
+                  </sources>
+                </configuration>
+              </execution>
             </executions>
           </plugin>
         </plugins>
@@ -743,13 +777,16 @@
         <scala.version>2.11.8</scala.version>
         <scala.binary.version>2.11</scala.binary.version>
         <java.version>1.8</java.version>
+        <antlr.version>4.7</antlr.version>
+        <scalatest.version>3.0.3</scalatest.version>
+        <scalacheck.version>1.13.5</scalacheck.version>
       </properties>
       <build>
         <plugins>
           <plugin>
             <groupId>org.antlr</groupId>
             <artifactId>antlr4-maven-plugin</artifactId>
-            <version>4.5.3</version>
+            <version>${antlr.version}</version>
             <executions>
               <execution>
                 <goals>
@@ -769,6 +806,8 @@
               <excludes>
                 <exclude>src/main/spark2.1</exclude>
                 <exclude>src/main/spark2.2</exclude>
+                <exclude>src/test/spark2.1</exclude>
+                <exclude>src/test/spark2.2</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -786,6 +825,18 @@
                 <configuration>
                   <sources>
                     <source>src/main/spark2.3</source>
+                  </sources>
+                </configuration>
+              </execution>
+              <execution>
+                <id>add-test-source</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>add-test-source</goal>
+                </goals>
+                <configuration>
+                  <sources>
+                    <source>src/test/spark2.3</source>
                   </sources>
                 </configuration>
               </execution>

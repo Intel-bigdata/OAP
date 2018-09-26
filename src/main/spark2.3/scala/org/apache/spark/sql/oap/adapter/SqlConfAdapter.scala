@@ -15,20 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.vectorized;
+package org.apache.spark.sql.oap.adapter
 
-/**
- * The interface for dictionary in ColumnVector to decode dictionary encoded values.
- */
-public interface Dictionary {
+import org.apache.spark.internal.config.ConfigBuilder
+import org.apache.spark.sql.internal.SQLConf
 
-  int decodeToInt(int id);
+object SqlConfAdapter {
+  def buildConf(key: String): ConfigBuilder = SQLConf.buildConf(key)
 
-  long decodeToLong(int id);
+  val ORC_VECTORIZED_READER_ENABLED = SQLConf.ORC_VECTORIZED_READER_ENABLED
 
-  float decodeToFloat(int id);
+  val COLUMN_VECTOR_OFFHEAP_ENABLED = SQLConf.COLUMN_VECTOR_OFFHEAP_ENABLED
 
-  double decodeToDouble(int id);
-
-  byte[] decodeToBinary(int id);
+  val ORC_COPY_BATCH_TO_SPARK = SQLConf.ORC_COPY_BATCH_TO_SPARK
 }

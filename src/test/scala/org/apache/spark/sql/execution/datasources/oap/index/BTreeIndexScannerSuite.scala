@@ -28,6 +28,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.JoinedRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.index.impl.IndexFileWriterImpl
+import org.apache.spark.sql.oap.adapter.TaskContextImplAdapter
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.apache.spark.util.Utils
@@ -39,7 +40,7 @@ class BTreeIndexScannerSuite extends SharedOapContext {
     // set TaskContext for external sorter
     val conf = new SparkConf()
     TaskContext.setTaskContext(
-      new TaskContextImpl(
+      TaskContextImplAdapter.createTaskContextImpl(
         0,
         0,
         0,

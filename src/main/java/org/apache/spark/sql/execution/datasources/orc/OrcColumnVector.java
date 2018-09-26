@@ -24,8 +24,8 @@ import org.apache.orc.storage.ql.exec.vector.*;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.Decimal;
 import org.apache.spark.sql.types.TimestampType;
-import org.apache.spark.sql.vectorized.ColumnarArray;
-import org.apache.spark.sql.vectorized.ColumnarMap;
+import org.apache.spark.sql.vectorized.oap.orc.ColumnarArray;
+import org.apache.spark.sql.vectorized.oap.orc.ColumnarMap;
 import org.apache.spark.unsafe.types.UTF8String;
 
 /**
@@ -33,7 +33,7 @@ import org.apache.spark.unsafe.types.UTF8String;
  * Spark's vectorized.ColumnVector, this column vector is used to adapt Hive ColumnVector with
  * Spark ColumnarVector.
  */
-public class OrcColumnVector extends org.apache.spark.sql.vectorized.ColumnVector {
+public class OrcColumnVector extends org.apache.spark.sql.vectorized.oap.orc.ColumnVector {
   private ColumnVector baseData;
   private LongColumnVector longData;
   private DoubleColumnVector doubleData;
@@ -44,7 +44,7 @@ public class OrcColumnVector extends org.apache.spark.sql.vectorized.ColumnVecto
 
   private int batchSize;
 
-  OrcColumnVector(DataType type, ColumnVector vector) {
+  public OrcColumnVector(DataType type, ColumnVector vector) {
     super(type);
 
     if (type instanceof TimestampType) {
@@ -187,7 +187,7 @@ public class OrcColumnVector extends org.apache.spark.sql.vectorized.ColumnVecto
   }
 
   @Override
-  public org.apache.spark.sql.vectorized.ColumnVector getChild(int ordinal) {
+  public org.apache.spark.sql.vectorized.oap.orc.ColumnVector getChild(int ordinal) {
     throw new UnsupportedOperationException();
   }
 }
