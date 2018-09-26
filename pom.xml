@@ -286,13 +286,13 @@
     <dependency>
         <groupId>org.apache.parquet</groupId>
         <artifactId>parquet-column</artifactId>
-        <version>1.8.2</version>
+        <version>${parquet.version}</version>
         <scope>compile</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.parquet</groupId>
         <artifactId>parquet-hadoop</artifactId>
-        <version>1.8.2</version>
+        <version>${parquet.version}</version>
         <scope>compile</scope>
       </dependency>
     <dependency>
@@ -628,6 +628,8 @@
         <antlr.version>4.5.3</antlr.version>
         <scalatest.version>2.2.6</scalatest.version>
         <scalacheck.version>1.12.5</scalacheck.version>
+        <!--for a bug fix, upgrade 1.8.1 to 1.8.2-->
+        <parquet.version>1.8.2</parquet.version>
       </properties>
       <build>
         <plugins>
@@ -704,6 +706,7 @@
         <antlr.version>4.5.3</antlr.version>
         <scalatest.version>2.2.6</scalatest.version>
         <scalacheck.version>1.12.5</scalacheck.version>
+        <parquet.version>1.8.2</parquet.version>
       </properties>
       <build>
         <plugins>
@@ -780,6 +783,7 @@
         <antlr.version>4.7</antlr.version>
         <scalatest.version>3.0.3</scalatest.version>
         <scalacheck.version>1.13.5</scalacheck.version>
+        <parquet.version>1.8.3</parquet.version>
       </properties>
       <build>
         <plugins>
