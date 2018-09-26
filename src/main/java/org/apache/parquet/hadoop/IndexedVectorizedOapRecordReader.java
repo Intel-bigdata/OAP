@@ -27,6 +27,7 @@ import org.apache.parquet.hadoop.metadata.ParquetFooter;
 import org.apache.parquet.hadoop.OapParquetFileReader.RowGroupDataAndRowIds;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
+
 import org.apache.spark.sql.execution.vectorized.ColumnVector;
 
 public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader {
@@ -96,20 +97,45 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     /**
      * Advances to the next batch of rows. Returns false if there are no more.
      * The RowGroup data divide into ColumnarBatch may as following:
-     * ----------------------
-     * | no index hit batch | --> call skipBatchInternal to skip
-     * ----------------------
-     * | index hit batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
-     * ----------------------
-     * | no index hit batch | --> call skipBatchInternal to skip
-     * ----------------------
-     * | index hit batch    | --> call nextBatchInternal() && filterRowsWithIndex(ids)
-     * ----------------------
-     * | no index hit batch | --> discard directly because of idsMap.isEmpty()
-     * ----------------------
-     * The tail no index hit batch(s) discard directly because of idsMap.isEmpty(), assignment
-     * totalCountLoadedSoFar to rowsReturned, then will return false or do readNextRowGroup
-     * guarantee by rowsReturned value.
+     * ---------------------------
+     * | no index hit   batch(0) |
+     * ---------------------------
+     * | index hit      batch(1) |
+     * ---------------------------
+     * | no index hit   batch(2) |
+     * ---------------------------
+     * | index hit      batch(3) |
+     * ---------------------------
+     * | no index hit   batch(4) |
+     * ---------------------------
+     *
+     * The sample data above will be read through call nextBatch() method 3 times:
+     *
+     * 1. The first time:
+     *    1.1 idsMap.isEmpty() is true, assignment totalCountLoadedSoFar to rowsReturned, now
+     *    rowsReturned and totalCountLoadedSoFar both 0.
+     *    1.2 rowsReturned < totalRowCount is false
+     *    1.3 Call checkEndOfRowGroup() method, it will readNextRowGroup data and divide
+     *    (pageNumber-> rowIds) pair into idsMap.
+     *    1.4 Do skipBatchInternal() because idsMap.remove(0) is null.
+     *    1.5 Do nextBatchInternal() and filterRowsWithIndex(ids) because idsMap.remove(1) not
+     *    empty.
+     *    1.6 return true, and now columnarBatch has been filled by batch(1)
+     *
+     * 2. The second time:
+     *    2.1 idsMap.isEmpty() is false
+     *    2.2 rowsReturned >= totalRowCount is false
+     *    2.3 checkEndOfRowGroup() will jump out because rowsReturned != totalCountLoadedSoFar
+     *    2.4 Do skipBatchInternal() because idsMap.remove(2) is null.
+     *    2.5 Do nextBatchInternal() and filterRowsWithIndex(ids) because idsMap.remove(3) not
+     *    empty.
+     *    2.6 return true, and now columnarBatch has been filled by batch(3)
+     *
+     * 3. The third time:
+     *    3.1 idsMap.isEmpty() is true, assignment totalCountLoadedSoFar to rowsReturned, now
+     *    rowsReturned and totalCountLoadedSoFar both eq totalRowCount
+     *    3.2 return false because rowsReturned >= totalRowCount is true, and the batch(4) will
+     *    discard directly.
      */
     @Override
     public boolean nextBatch() throws IOException {
@@ -151,18 +177,6 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       // if returnColumnarBatch, mark columnarBatch filtered status.
       // else assignment batchIdsIter.
       if (returnColumnarBatch) {
-        // we can do same operation use markFiltered as follow code:
-        // int current = 0;
-        // for (Integer target : ids)
-        // { while (current < target){
-        // columnarBatch.markFiltered(current);
-        // current++; }
-        // current++; }
-        // current++;
-        // while (current < numBatched){
-        // columnarBatch.markFiltered(current); current++; }
-        // it a little complex and use current version,
-        // we can revert use above code if need.
         // TODO retest the necessity of this process.
         columnarBatch.markAllFiltered();
         for (Integer rowId : ids) {
