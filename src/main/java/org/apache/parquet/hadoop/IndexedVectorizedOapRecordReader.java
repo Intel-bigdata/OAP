@@ -97,45 +97,48 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
 
     /**
      * Advances to the next batch of rows. Returns false if there are no more.
+     *
      * The RowGroup data divide into ColumnarBatch may as following:
      * ---------------------------
-     * | no index hit   batch(0) |
+     * | batch(0)   no index hit |
      * ---------------------------
-     * | index hit      batch(1) |
+     * | batch(1)   index hit    |
      * ---------------------------
-     * | no index hit   batch(2) |
+     * | batch(2)   no index hit |
      * ---------------------------
-     * | index hit      batch(3) |
+     * | batch(3)   index hit    |
      * ---------------------------
-     * | no index hit   batch(4) |
+     * | batch(4)   no index hit |
      * ---------------------------
      *
      * The sample data above will be read through call nextBatch() method 3 times:
      *
      * 1. The first time:
-     *    1.1 idsMap.isEmpty() is true, assignment totalCountLoadedSoFar to rowsReturned, now
-     *    rowsReturned and totalCountLoadedSoFar both 0.
-     *    1.2 rowsReturned < totalRowCount is false
-     *    1.3 Call checkEndOfRowGroup() method, it will readNextRowGroup data and divide
-     *    (pageNumber-> rowIds) pair into idsMap.
-     *    1.4 Do skipBatchInternal() because idsMap.remove(0) is null.
-     *    1.5 Do nextBatchInternal() and filterRowsWithIndex(ids) because idsMap.remove(1) not
-     *    empty.
+     *    1.1 `idsMap.isEmpty` is true, assignment `totalCountLoadedSoFar` to `rowsReturned`,
+     *    now `rowsReturned` and `totalCountLoadedSoFar` both 0.
+     *    1.2 `rowsReturned < totalRowCount` is false because totalRowCount init by footer, with
+     *    sample data totalRowCount may eq (4096 * 4 + n)
+     *    1.3 Call `checkEndOfRowGroup` method, it will read next row group data and divide
+     *    row group level rowIds into columnarBatch level (pageNumber-> rowIds) pairs and put
+     *    them into idsMap.
+     *    1.4 Call `skipBatchInternal` because `idsMap.remove(0)` is null.
+     *    1.5 Call `nextBatchInternal` and `filterRowsWithIndex(ids)` because `idsMap.remove(1)`
+     *    not empty.
      *    1.6 return true, and now columnarBatch has been filled by batch(1)
      *
      * 2. The second time:
-     *    2.1 idsMap.isEmpty() is false
-     *    2.2 rowsReturned >= totalRowCount is false
-     *    2.3 checkEndOfRowGroup() will jump out because rowsReturned != totalCountLoadedSoFar
-     *    2.4 Do skipBatchInternal() because idsMap.remove(2) is null.
-     *    2.5 Do nextBatchInternal() and filterRowsWithIndex(ids) because idsMap.remove(3) not
-     *    empty.
+     *    2.1 `idsMap.isEmpty` is false
+     *    2.2 `rowsReturned >= totalRowCount` is false
+     *    2.3 `checkEndOfRowGroup` will jump out because `rowsReturned != totalCountLoadedSoFar`
+     *    2.4 Call `skipBatchInternal` because `idsMap.remove(2)` is null.
+     *    2.5 Call `nextBatchInternal` and `filterRowsWithIndex(ids)` because `idsMap.remove(3)`
+     *    not empty.
      *    2.6 return true, and now columnarBatch has been filled by batch(3)
      *
      * 3. The third time:
-     *    3.1 idsMap.isEmpty() is true, assignment totalCountLoadedSoFar to rowsReturned, now
-     *    rowsReturned and totalCountLoadedSoFar both eq totalRowCount
-     *    3.2 return false because rowsReturned >= totalRowCount is true, and the batch(4) will
+     *    3.1 `idsMap.isEmpty` is true, assignment `totalCountLoadedSoFar` to `rowsReturned`,
+     *    now `rowsReturned` and `totalCountLoadedSoFar` both eq `totalRowCount`
+     *    3.2 return false because `rowsReturned >= totalRowCount` is true, and the batch(4) will
      *    discard directly.
      */
     @Override
