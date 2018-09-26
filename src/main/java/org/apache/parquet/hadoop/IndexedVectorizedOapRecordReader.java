@@ -117,7 +117,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
      *    1.1 `idsMap.isEmpty` is true, assignment `totalCountLoadedSoFar` to `rowsReturned`,
      *    now `rowsReturned` and `totalCountLoadedSoFar` both 0.
      *    1.2 `rowsReturned < totalRowCount` is false because totalRowCount init by footer, with
-     *    sample data totalRowCount may eq (4096 * 4 + n)
+     *    sample data totalRowCount may eq (columnarBatch capacity * 4 + n)
      *    1.3 Call `checkEndOfRowGroup` method, it will read next row group data and divide
      *    row group level rowIds into columnarBatch level (pageNumber-> rowIds) pairs and put
      *    them into idsMap.
