@@ -237,7 +237,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         } else {
             columnVectors = OnHeapColumnVector.allocateColumns(CAPACITY, batchSchema);
         }
-        columnarBatch = new ColumnarBatch(columnVectors);
+        columnarBatch = new ColumnarBatch(columnVectors, CAPACITY);
 
       if (partitionColumns != null) {
         int partitionIdx = sparkSchema.fields().length;

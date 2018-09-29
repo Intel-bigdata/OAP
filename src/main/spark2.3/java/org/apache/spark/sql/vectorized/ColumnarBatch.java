@@ -39,7 +39,7 @@ public final class ColumnarBatch {
   private final MutableColumnarRow row;
 
   // True if the row is filtered.
-  private final boolean[] filteredRows = new boolean[DEFAULT_CAPACITY];
+  private final boolean[] filteredRows;
 
   // Total number of rows that have been filtered.
   private int numRowsFiltered = 0;
@@ -186,5 +186,12 @@ public final class ColumnarBatch {
   public ColumnarBatch(ColumnVector[] columns) {
     this.columns = columns;
     this.row = new MutableColumnarRow(columns);
+    this.filteredRows = new boolean[DEFAULT_CAPACITY];
+  }
+
+  public ColumnarBatch(ColumnVector[] columns, int maxRows) {
+    this.columns = columns;
+    this.row = new MutableColumnarRow(columns);
+    this.filteredRows = new boolean[maxRows];
   }
 }
