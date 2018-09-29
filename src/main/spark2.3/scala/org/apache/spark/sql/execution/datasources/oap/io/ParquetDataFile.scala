@@ -75,7 +75,7 @@ private[oap] case class ParquetDataFile(
     schema: StructType,
     configuration: Configuration) extends DataFile {
 
-  private var context: Option[VectorizedContext] = None
+  private var context: Option[ParquetVectorizedContext] = None
   private lazy val meta =
     OapRuntime.getOrCreate.dataFileMetaCacheManager.get(this).asInstanceOf[ParquetDataFileMeta]
   private val file = new Path(StringUtils.unEscapeString(path))
@@ -116,7 +116,7 @@ private[oap] case class ParquetDataFile(
   private def buildIterator(
        conf: Configuration,
        requiredColumnIds: Array[Int],
-       context: VectorizedContext,
+       context: ParquetVectorizedContext,
        rowIds: Option[Array[Int]] = None): OapCompletionIterator[InternalRow] = {
     var requestSchema = new StructType
     for (index <- requiredColumnIds) {
@@ -148,8 +148,8 @@ private[oap] case class ParquetDataFile(
 
   def iterator(
     requiredIds: Array[Int],
-    filters: Seq[Filter] = Nil): OapCompletionIterator[InternalRow] = {
-    context match {
+    filters: Seq[Filter] = Nil): OapCompletionIterator[Any] = {
+    val iterator = context match {
       case Some(c) =>
         // Parquet RowGroupCount can more than Int.MaxValue,
         // in that sence we should not cache data in memory
@@ -168,16 +168,17 @@ private[oap] case class ParquetDataFile(
           new MrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
             file, configuration, meta.footer))
     }
+    iterator.asInstanceOf[OapCompletionIterator[Any]]
   }
 
   def iteratorWithRowIds(
       requiredIds: Array[Int],
       rowIds: Array[Int],
-      filters: Seq[Filter] = Nil): OapCompletionIterator[InternalRow] = {
+      filters: Seq[Filter] = Nil): OapCompletionIterator[Any] = {
     if (rowIds == null || rowIds.length == 0) {
       new OapCompletionIterator(Iterator.empty, {})
     } else {
-      context match {
+      val iterator = context match {
         case Some(c) =>
           // Parquet RowGroupCount can more than Int.MaxValue,
           // in that sence we should not cache data in memory
@@ -197,10 +198,11 @@ private[oap] case class ParquetDataFile(
             new IndexedMrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
               file, configuration, rowIds, meta.footer))
       }
+      iterator.asInstanceOf[OapCompletionIterator[Any]]
     }
   }
 
-  def setVectorizedContext(context: Option[VectorizedContext]): Unit =
+  def setParquetVectorizedContext(context: Option[ParquetVectorizedContext]): Unit =
     this.context = context
 
   private def initRecordReader(reader: RecordReader[UnsafeRow]) = {
@@ -211,7 +213,7 @@ private[oap] case class ParquetDataFile(
     }
   }
 
-  private def initVectorizedReader(c: VectorizedContext, reader: VectorizedOapRecordReader) = {
+  private def initVectorizedReader(c: ParquetVectorizedContext, reader: VectorizedOapRecordReader) = {
     reader.initialize()
     reader.initBatch(c.partitionColumns, c.partitionValues)
     if (c.returningBatch) {
@@ -227,7 +229,7 @@ private[oap] case class ParquetDataFile(
       conf: Configuration,
       requiredColumnIds: Array[Int],
       requestSchema: StructType,
-      context: VectorizedContext): Iterator[InternalRow] = {
+      context: ParquetVectorizedContext): Iterator[InternalRow] = {
     val footer = meta.footer.toParquetMetadata
     footer.getBlocks.asScala.iterator.flatMap { rowGroupMeta =>
       val orderedBlockMetaData = rowGroupMeta.asInstanceOf[OrderedBlockMetaData]
@@ -245,7 +247,7 @@ private[oap] case class ParquetDataFile(
       conf: Configuration,
       requiredColumnIds: Array[Int],
       requestSchema: StructType,
-      context: VectorizedContext,
+      context: ParquetVectorizedContext,
       rowIds: Array[Int]): Iterator[InternalRow] = {
     val footer = meta.footer.toParquetMetadata(rowIds)
     footer.getBlocks.asScala.iterator.flatMap { rowGroupMeta =>
@@ -269,7 +271,7 @@ private[oap] case class ParquetDataFile(
       conf: Configuration,
       requestSchema: StructType,
       requiredColumnIds: Array[Int],
-      context: VectorizedContext): ColumnarBatch = {
+      context: ParquetVectorizedContext): ColumnarBatch = {
     val groupId = blockMetaData.getRowGroupId
     val fiberCacheGroup = requiredColumnIds.map { id =>
       val fiberCache =
