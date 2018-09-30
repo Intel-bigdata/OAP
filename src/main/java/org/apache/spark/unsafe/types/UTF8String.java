@@ -1235,9 +1235,10 @@ public final class UTF8String implements Comparable<UTF8String>, Externalizable,
       long right = getLong(rbase, roffset + i);
       if (left != right) {
         if (IS_LITTLE_ENDIAN) {
-          return Long.compareUnsigned(Long.reverseBytes(left), Long.reverseBytes(right));
+          return Long.compare(Long.reverseBytes(left) + Long.MIN_VALUE,
+            Long.reverseBytes(right)+ Long.MIN_VALUE);
         } else {
-          return Long.compareUnsigned(left, right);
+          return Long.compare(left + Long.MIN_VALUE , right + Long.MIN_VALUE);
         }
       }
     }
