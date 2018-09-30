@@ -122,31 +122,13 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
         currentPageNumber++;
         return this.nextBatch();
       } else {
-        // if returnColumnarBatch, mark columnarBatch filtered status.
-        // else assignment batchIdsIter.
-        if (returnColumnarBatch) {
-          // we can do same operation use markFiltered as follow code:
-          // int current = 0;
-          // for (Integer target : ids)
-          // { while (current < target){
-          // columnarBatch.markFiltered(current);
-          // current++; }
-          // current++; }
-          // current++;
-          // while (current < numBatched){
-          // columnarBatch.markFiltered(current); current++; }
-          // it a little complex and use current version,
-          // we can revert use above code if need.
-          columnarBatch.markAllFiltered();
-            for (Integer rowId : ids) {
-              columnarBatch.markValid(rowId);
-            }
-          } else {
-            batchIds = ids;
-            numBatched = ids.size();
-          }
-          currentPageNumber++;
-          return true;
+        // TODO push ids to ColumnReader
+        if (!returnColumnarBatch) {
+          batchIds = ids;
+          numBatched = ids.size();
+        }
+        currentPageNumber++;
+        return true;
       }
     }
 
