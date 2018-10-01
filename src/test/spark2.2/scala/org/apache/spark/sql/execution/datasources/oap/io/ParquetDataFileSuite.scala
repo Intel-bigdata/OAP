@@ -360,9 +360,8 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
         result += row.getInt(0)
       }
     }
-    assert(rowIds.length == result.length)
     for (i <- rowIds.indices) {
-      assert(rowIds(i) == result(i))
+      assert(result.contains(i))
     }
   }
 
