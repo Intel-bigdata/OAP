@@ -86,11 +86,6 @@ public final class ColumnarBatch {
     }
   }
 
-  // For DataSourceScanExec
-  public boolean isFiltered(int rowId) {
-    return filteredRows[rowId];
-  }
-
   /**
    * Adapter class to interop with existing components that expect internal row. A lot of
    * performance is lost with this translation.
@@ -461,25 +456,6 @@ public final class ColumnarBatch {
     assert(!filteredRows[rowId]);
     filteredRows[rowId] = true;
     ++numRowsFiltered;
-  }
-
-  /**
-   * Marks this row not filtered out. This means a subsequent iteration over the rows
-   * in this batch will include this row.
-   * For IndexedVectorizedOapRecordReader.
-   */
-  public void markValid(int rowId) {
-    assert(filteredRows[rowId]);
-    filteredRows[rowId] = false;
-    --numRowsFiltered;
-  }
-
-  /**
-   * For IndexedVectorizedOapRecordReader.
-   */
-  public void markAllFiltered() {
-    Arrays.fill(filteredRows, true);
-    numRowsFiltered = numRows;
   }
 
   /**

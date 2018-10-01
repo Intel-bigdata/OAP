@@ -50,7 +50,6 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
         assert(batch.numRows() == n)
         var i = 0
         while (i < n) {
-          assert(!batch.isFiltered(i))
           assert(batch.column(0).getByte(i) == 1)
           assert(batch.column(1).getInt(i) == 2)
           assert(batch.column(2).getLong(i) == 3)
@@ -80,7 +79,6 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
         assert(batch.numRows() == n)
         var i = 0
         while (i < n) {
-          assert(!batch.isFiltered(i))
           assert(batch.column(0).isNullAt(i))
           assert(batch.column(1).isNullAt(i))
           assert(batch.column(2).isNullAt(i))
@@ -112,7 +110,6 @@ class VectorizedOapEncodingSuite extends ParquetCompatibilityTest with SharedOap
         assert(reader.nextBatch())
 
         (0 until 512).foreach { i =>
-          assert(!batch.isFiltered(i))
           assert(column.getUTF8String(3 * i).toString == i.toString)
           assert(column.getUTF8String(3 * i + 1).toString == i.toString)
           assert(column.getUTF8String(3 * i + 2).toString == i.toString)

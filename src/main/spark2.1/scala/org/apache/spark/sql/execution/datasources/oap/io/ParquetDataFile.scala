@@ -253,9 +253,6 @@ private[oap] case class ParquetDataFile(
       val columnarBatch = buildColumnarBatchFromCache(indexedBlockMetaData,
         conf, requestSchema, requiredColumnIds, context)
       if (context.returningBatch) {
-        columnarBatch.markAllFiltered()
-        indexedBlockMetaData.getNeedRowIds.iterator.
-          asScala.foreach(rowId => columnarBatch.markValid(rowId))
         Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
       } else {
         indexedBlockMetaData.getNeedRowIds.iterator.
