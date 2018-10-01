@@ -213,7 +213,8 @@ private[oap] case class ParquetDataFile(
     }
   }
 
-  private def initVectorizedReader(c: ParquetVectorizedContext, reader: VectorizedOapRecordReader) = {
+  private def initVectorizedReader(c: ParquetVectorizedContext,
+      reader: VectorizedOapRecordReader) = {
     reader.initialize()
     reader.initBatch(c.partitionColumns, c.partitionValues)
     if (c.returningBatch) {
@@ -238,7 +239,7 @@ private[oap] case class ParquetDataFile(
       if (context.returningBatch) {
         Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
       } else {
-        columnarBatch.rowOapIterator().asScala
+        columnarBatch.rowIterator().asScala
       }
     }
   }
@@ -255,9 +256,6 @@ private[oap] case class ParquetDataFile(
       val columnarBatch = buildColumnarBatchFromCache(indexedBlockMetaData,
         conf, requestSchema, requiredColumnIds, context)
       if (context.returningBatch) {
-        columnarBatch.markAllFiltered()
-        indexedBlockMetaData.getNeedRowIds.iterator.
-          asScala.foreach(rowId => columnarBatch.markValid(rowId))
         Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
       } else {
         indexedBlockMetaData.getNeedRowIds.iterator.

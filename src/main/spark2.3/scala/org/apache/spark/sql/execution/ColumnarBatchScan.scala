@@ -135,7 +135,6 @@ private[sql] trait ColumnarBatchScan extends CodegenSupport {
        |  int $localEnd = $numRows - $idx;
        |  for (int $localIdx = 0; $localIdx < $localEnd; $localIdx++) {
        |    int $rowidx = $idx + $localIdx;
-       |    if ($batch.isFiltered($rowidx)) continue;
        |    ${consume(ctx, columnsBatchInput).trim}
        |    $shouldStop
        |  }

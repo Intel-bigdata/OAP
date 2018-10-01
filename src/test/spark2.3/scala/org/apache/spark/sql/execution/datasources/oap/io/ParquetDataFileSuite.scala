@@ -356,16 +356,15 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val batch = iterator.next().asInstanceOf[ColumnarBatch]
-      val rowIterator = batch.rowOapIterator()
+      val rowIterator = batch.rowIterator()
       while (rowIterator.hasNext) {
         val row = rowIterator.next()
         assert(row.numFields == 2)
         result += row.getInt(0)
       }
     }
-    assert(rowIds.length == result.length)
     for (i <- rowIds.indices) {
-      assert(rowIds(i) == result(i))
+      assert(result.contains(i))
     }
   }
 
