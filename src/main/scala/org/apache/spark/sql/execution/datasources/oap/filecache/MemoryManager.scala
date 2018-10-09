@@ -205,12 +205,12 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
   extends MemoryManager with Logging {
 
-  private val conf = sparkEnv.conf
   private val (_cacheMemory, _cacheGuardianMemory) = init()
 
   private val _memoryUsed = new AtomicLong(0)
 
   private def init(): (Long, Long) = {
+    val conf = sparkEnv.conf
     // The NUMA id should be set when the executor process start up. However, Spark don't
     // support NUMA binding currently.
     var numaId = conf.getInt("spark.executor.numa.id", -1)
