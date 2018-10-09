@@ -17,18 +17,20 @@
 
 package org.apache.spark.util;
 
+import java.io.*;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
-
 /**
- * A native library loader which used to load persistent memory native library.
+ * A native library loader which used to load native library.
  */
 public class NativeLibraryLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(NativeLibraryLoader.class);
-  private static final String LIBNAME = "pmplatform";
-  private static boolean loaded = false;
+
+  private static Map<String, Boolean> loadRecord = new HashMap<>();
 
   private static String osName() {
     String os = System.getProperty("os.name").toLowerCase().replace(' ', '_');
@@ -52,38 +54,43 @@ public class NativeLibraryLoader {
     return arch;
   }
 
-  private static String resourceName() {
-    return "/" + osName() + "/" + osArch() + "/lib/" + System.mapLibraryName(LIBNAME);
+  private static String resourceName(final String libname) {
+    return "/" + osName() + "/" + osArch() + "/lib/" + System.mapLibraryName(libname);
   }
 
-  public static synchronized void load() {
-    if (loaded) {
+  /**
+   * Loading the native library with given name. The name should not include the prefix and suffix.
+   */
+  public static synchronized void load(final String libname) {
+    if (loadRecord.containsKey(libname) && loadRecord.get(libname)) {
       return;
     }
 
     try {
-      System.loadLibrary(LIBNAME);
+      System.loadLibrary(libname);
     } catch (UnsatisfiedLinkError e) {
       LOGGER.warn("Loading library: {} from system libraries failed, trying to load it from " +
-        "package", LIBNAME);
-      loadFromPackage();
+        "package", libname);
+      loadFromPackage(libname);
     }
+
+    loadRecord.put(libname, true);
   }
 
-  private static void loadFromPackage() {
+  private static void loadFromPackage(final String libname) {
     InputStream is = null;
     OutputStream out = null;
     File tmpLib = null;
     try {
-      is = NativeLibraryLoader.class.getResourceAsStream(resourceName());
+      is = NativeLibraryLoader.class.getResourceAsStream(resourceName(libname));
       if (is == null) {
-        String errorMsg = "Unsupported OS/arch, cannot find " + resourceName() + " or load " +
-          LIBNAME + " from system libraries. Please try building from source the jar or " +
-          "providing " + LIBNAME + " in you system.";
+        String errorMsg = "Unsupported OS/arch, cannot find " + resourceName(libname) + " or " +
+          "load " + libname + " from system libraries. Please try building from source the jar" +
+          " or providing " + libname + " in you system.";
         throw new RuntimeException(errorMsg);
       }
 
-      tmpLib = File.createTempFile(LIBNAME, ".tmp", null);
+      tmpLib = File.createTempFile(libname, ".tmp", null);
 
       out = new FileOutputStream(tmpLib);
       byte[] buf = new byte[4096];
@@ -100,17 +107,11 @@ public class NativeLibraryLoader {
       out = null;
 
       System.load(tmpLib.getAbsolutePath());
-      loaded = true;
     } catch (IOException | UnsatisfiedLinkError e) {
-      throw new RuntimeException("Can't load library: " + LIBNAME + " from jar.", e);
+      throw new RuntimeException("Can't load library: " + libname + " from jar.", e);
     } finally {
-      if (is != null) {
-        safeClose(is, "Close resource input stream failed. Ignore it.");
-      }
-
-      if (out != null) {
-        safeClose(out, "Close tmp lib output stream failed. Ignore it.");
-      }
+      safeClose(is, "Close resource input stream failed. Ignore it.");
+      safeClose(out, "Close tmp lib output stream failed. Ignore it.");
 
       if (tmpLib != null && !tmpLib.delete()) {
         LOGGER.warn("Delete tmp lib: {} failed, ignore it.", tmpLib.getAbsolutePath());
@@ -119,10 +120,12 @@ public class NativeLibraryLoader {
   }
 
   private static void safeClose(Closeable closeable, String warnMsg) {
-    try {
-      closeable.close();
-    } catch (IOException e) {
-      LOGGER.warn(warnMsg, e.fillInStackTrace());
+    if (closeable != null) {
+      try {
+        closeable.close();
+      } catch (IOException e) {
+        LOGGER.warn(warnMsg, e.fillInStackTrace());
+      }
     }
   }
 }

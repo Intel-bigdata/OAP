@@ -26,10 +26,10 @@ import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.utils.PersistentConfigUtils
+import org.apache.spark.sql.execution.datasources.oap.utils.PersistentMemoryConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.storage.{BlockManager, TestBlockId}
-import org.apache.spark.unsafe.{Platform, PMPlatform}
+import org.apache.spark.unsafe.{PersistentMemoryPlatform, Platform}
 import org.apache.spark.util.Utils
 
 /**
@@ -199,7 +199,7 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 }
 
 /**
- * A memory management which support allocate/free volatile memory from Intel Optane DC
+ * A memory manager which supports allocate/free volatile memory from Intel Optane DC
  * persistent memory.
  */
 private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
@@ -215,13 +215,13 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     // support NUMA binding currently.
     var numaId = conf.getInt("spark.executor.numa.id", -1)
     val executorId = sparkEnv.executorId.toInt
-    val map = PersistentConfigUtils.parseConfig(conf)
+    val map = PersistentMemoryConfigUtils.parseConfig(conf)
     if (numaId == -1) {
       logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +
         s"executor with NUMA when cache data to Intel Optane DC persistent memory.")
       // Just round the executorId to the total NUMA number.
       // TODO: improve here
-      numaId = executorId % PersistentConfigUtils.totalNumaNode(conf)
+      numaId = executorId % PersistentMemoryConfigUtils.totalNumaNode(conf)
     }
 
     val initialPath = map.get(numaId).get
@@ -230,7 +230,7 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     val reservedSizeStr = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE).trim
     val reservedSize = Utils.byteStringAsBytes(reservedSizeStr)
     val fullPath = Utils.createTempDir(initialPath + File.separator + executorId)
-    PMPlatform.initialize(fullPath.getCanonicalPath, initialSize)
+    PersistentMemoryPlatform.initialize(fullPath.getCanonicalPath, initialSize)
     logInfo(s"Initialize Intel Optane DC persistent memory successfully, numaId: ${numaId}, " +
       s"initial path: ${fullPath.getCanonicalPath}, initial size: ${initialSize}, reserved size: " +
       s"${reservedSize}")
@@ -247,8 +247,8 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
   override def cacheGuardianMemory: Long = _cacheGuardianMemory
 
   override private[filecache] def allocate(size: Long): MemoryBlockHolder = {
-    val address = PMPlatform.allocateMemory(size)
-    val occupiedSize = PMPlatform.getOccupiedSize(address)
+    val address = PersistentMemoryPlatform.allocateVolatileMemory(size)
+    val occupiedSize = PersistentMemoryPlatform.getOccupiedSize(address)
     _memoryUsed.getAndAdd(occupiedSize)
     logDebug(s"request allocate $size memory, actual occupied size: " +
       s"${occupiedSize}, used: $memoryUsed")
@@ -257,7 +257,7 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
 
   override private[filecache] def free(block: MemoryBlockHolder): Unit = {
     assert(block.baseObject == null)
-    PMPlatform.freeMemory(block.baseOffset)
+    PersistentMemoryPlatform.freeMemory(block.baseOffset)
     _memoryUsed.getAndAdd(-block.occupiedSize)
     logDebug(s"freed ${block.occupiedSize} memory, used: $memoryUsed")
   }

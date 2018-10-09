@@ -65,7 +65,7 @@ JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PMPlatform_initializeNative
   env->ReleaseStringUTFChars(path, str);
 }
 
-JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_allocateMemory
+JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_allocateVolatileMemory
   (JNIEnv *env, jclass clazz, jlong size) {
   check(env);
 

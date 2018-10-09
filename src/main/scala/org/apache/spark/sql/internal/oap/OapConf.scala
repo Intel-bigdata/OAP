@@ -137,7 +137,8 @@ object OapConf {
   val OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.initial.size")
       .internal()
-      .doc("Used to set the initial size of Intel Optane DC persistent memory.")
+      .doc("Used to set the initial size of Intel Optane DC persistent memory. The size is " +
+        "used to control the maximum available persistent memory size used for each executor.")
       .stringConf
       .createWithDefault("0b")
 

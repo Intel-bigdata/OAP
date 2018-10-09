@@ -37,7 +37,7 @@ JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PMPlatform_initializeNative
  * Method:    allocateMemory
  * Signature: (J)J
  */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_allocateMemory
+JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_allocateVolatileMemory
   (JNIEnv *, jclass, jlong);
 
 /*

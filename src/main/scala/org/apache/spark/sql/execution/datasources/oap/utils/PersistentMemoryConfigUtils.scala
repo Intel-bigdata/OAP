@@ -32,7 +32,7 @@ import org.apache.spark.util.Utils
  * A xml parser used for parse persistent memory config.
  */
 @NotThreadSafe
-object PersistentConfigUtils extends Logging {
+object PersistentMemoryConfigUtils extends Logging {
   private val DEFAULT_PERSISTENT_MEMORY_CONFIG_FILE = "persistent-memory.xml"
   private val NUMA_NODE_PROPERTY = "numanode"
   private val NUAM_NODE_ID_PROPERTY = "@id"

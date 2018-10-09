@@ -17,21 +17,22 @@
 
 package org.apache.spark.unsafe;
 
+import java.io.File;
+
 import com.google.common.base.Preconditions;
 import org.apache.spark.util.NativeLibraryLoader;
-
-import java.io.File;
 
 /**
  * A platform used to allocate/free volatile memory from
  * <a href="https://en.wikipedia.org/wiki/Persistent_memory>Persistent Memory</a></a>
  * e.g. Intel Optane DC persistent memory.
  */
-public class PMPlatform {
+public class PersistentMemoryPlatform {
   private static volatile boolean initialized = false;
+  private static final String LIBNAME = "pmplatform";
 
   static {
-    NativeLibraryLoader.load();
+    NativeLibraryLoader.load(LIBNAME);
   }
 
   /**
@@ -40,7 +41,7 @@ public class PMPlatform {
    * @param size The initial size
    */
   public static void initialize(String path, long size) {
-    synchronized (PMPlatform.class) {
+    synchronized (PersistentMemoryPlatform.class) {
       if (!initialized) {
         Preconditions.checkNotNull(path, "Persistent memory initial path can't be null");
         File dir = new File(path);
@@ -67,7 +68,7 @@ public class PMPlatform {
    * @return the address which same as Platform.allocateMemory, it can be operated by
    * Platform which same as OFF_HEAP memory.
    */
-  public static native long allocateMemory(long size);
+  public static native long allocateVolatileMemory(long size);
 
   /**
    * Get the actual occupied size of the given address. The occupied size should be different
