@@ -62,6 +62,7 @@ object OapDataReader extends Logging {
     = {
     dataReaderClassFromDataSourceMeta match {
       case c if c == OapFileFormat.PARQUET_DATA_FILE_CLASSNAME => c
+      case c if c == OapFileFormat.ORC_DATA_FILE_CLASSNAME => c
       case c if c == OapFileFormat.OAP_DATA_FILE_CLASSNAME =>
         reader match {
           case r: OapDataReaderV1 => OapFileFormat.OAP_DATA_FILE_V1_CLASSNAME

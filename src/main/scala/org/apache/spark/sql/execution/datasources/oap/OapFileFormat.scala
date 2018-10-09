@@ -22,6 +22,8 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.util.StringUtils
+import org.apache.orc.OrcFile
+import org.apache.orc.mapreduce.OrcInputFormat
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
@@ -32,6 +34,8 @@ import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, Scann
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileProperties.DataFileVersion
 import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, OapUtils}
+import org.apache.spark.sql.execution.datasources.orc.OrcFilters
+import org.apache.spark.sql.execution.datasources.orc.OrcUtils
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
@@ -143,8 +147,10 @@ private[sql] class OapFileFormat extends FileFormat
     }
     val conf = sparkSession.sessionState.conf
     // TODO modify conditions after oap support batch return
-    readerClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
-      conf.parquetVectorizedReaderEnabled &&
+    ((readerClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
+      conf.parquetVectorizedReaderEnabled) ||
+      (readerClassName.equals(OapFileFormat.ORC_DATA_FILE_CLASSNAME) &&
+      conf.getConf(OapConf.ORC_VECTORIZED_READER_ENABLED))) &&
       conf.wholeStageEnabled &&
       schema.length <= conf.wholeStageMaxNumFields &&
       schema.forall(_.dataType.isInstanceOf[AtomicType])
@@ -238,12 +244,22 @@ private[sql] class OapFileFormat extends FileFormat
         // Vectorized Read and returningBatch. Also it depends on WHOLE_STAGE_CODE_GEN,
         // as the essential unsafe projection is done by that.
         val isParquet = m.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME)
+        val isOrc = m.dataReaderClassName.equals(OapFileFormat.ORC_DATA_FILE_CLASSNAME)
+        val enableOffHeapColumnVector =
+          sparkSession.sessionState.conf.getConf(OapConf.COLUMN_VECTOR_OFFHEAP_ENABLED)
+        val copyToSpark =
+          sparkSession.sessionState.conf.getConf(OapConf.ORC_COPY_BATCH_TO_SPARK)
+        val isCaseSensitive = sparkSession.sessionState.conf.caseSensitiveAnalysis
+
+        // Push down the filters to the orc record reader.
+        if (isOrc && sparkSession.sessionState.conf.orcFilterPushDown) {
+          OrcFilters.createFilter(dataSchema,
+            filters).foreach { f =>
+            OrcInputFormat.setSearchArgument(hadoopConf, f, dataSchema.fieldNames)
+          }
+        }
+
         val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
-        val enableVectorizedReader: Boolean =
-          m.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
-          sparkSession.sessionState.conf.parquetVectorizedReaderEnabled &&
-          sparkSession.sessionState.conf.wholeStageEnabled &&
-          resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
         val returningBatch = supportBatch(sparkSession, resultSchema)
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
@@ -252,37 +268,68 @@ private[sql] class OapFileFormat extends FileFormat
           assert(file.partitionValues.numFields == partitionSchema.size)
           val conf = broadcastedHadoopConf.value.value
 
-          // if enableVectorizedReader == true, init VectorizedContext,
-          // else context is None.
-          val context = if (enableVectorizedReader) {
-            Some(VectorizedContext(partitionSchema, file.partitionValues, returningBatch))
-          } else {
-            None
-          }
-
           val path = new Path(StringUtils.unEscapeString(file.filePath))
           val fs = path.getFileSystem(broadcastedHadoopConf.value.value)
 
-          val version = if (isParquet) {
-            // Currently Parquet is using OapDataReaderV1
+          val version = if (isParquet || isOrc) {
+            // Currently both Parquet and Orc are using OapDataReaderV1.
             DataFileVersion.OAP_DATAFILE_V1
           } else {
+            // Below is for Oap format file.
             OapDataReader.readVersion(fs.open(path), fs.getFileStatus(path).getLen)
           }
 
-          version match {
-            case DataFileVersion.OAP_DATAFILE_V1 =>
-              val reader = new OapDataReaderV1(file.filePath, m, partitionSchema, requiredSchema,
-                filterScanners, requiredIds, pushed, oapMetrics, conf, enableVectorizedReader,
-                options, filters, context = context)
-              reader.read(file)
-            // Actually it shouldn't get to this line, because unsupported version will cause
-            // exception thrown in readVersion call
-            case _ =>
-              throw new OapException("Unexpected data file version")
-              Iterator.empty
+          var orcWithEmptyColIds = false
+          // For parquet, if enableVectorizedReader is true, init ParquetVectorizedContext.
+          // Otherwise context is none.
+          // For Orc, the context is used by both vectorized readers and map reduce readers.
+          // See the comments in DataFile.scala.
+          var context: Option[DataFileContext] = None
+          if (isParquet) {
+            returningBatch match {
+              case true =>
+                context = Some(ParquetVectorizedContext(partitionSchema,
+                  file.partitionValues, returningBatch))
+              case false =>
+                context = None
+            }
+          } else if (isOrc) {
+            val readerOptions = OrcFile.readerOptions(conf).filesystem(fs)
+            val reader = OrcFile.createReader(path, readerOptions)
+            val requestedColIdsOrEmptyFile = OrcUtils.requestedColumnIds(
+              isCaseSensitive, dataSchema, requiredSchema, reader, conf)
+            if (!requestedColIdsOrEmptyFile.isEmpty) {
+              val requestedColIds = requestedColIdsOrEmptyFile.get
+              assert(requestedColIds.length == requiredSchema.length,
+                "[BUG] requested column IDs do not match required schema")
+              context = Some(OrcDataFileContext(partitionSchema, file.partitionValues,
+                returningBatch, requiredSchema, dataSchema, enableOffHeapColumnVector,
+                  copyToSpark, requestedColIds))
+            } else {
+              orcWithEmptyColIds = true
+              context = None
+            }
+          } else {
+            context = None
           }
 
+          if (orcWithEmptyColIds) {
+            // For the case of Orc with empty required column Ids.
+            Iterator.empty
+          } else {
+            version match {
+              case DataFileVersion.OAP_DATAFILE_V1 =>
+                val reader = new OapDataReaderV1(file.filePath, m, partitionSchema, requiredSchema,
+                  filterScanners, requiredIds, pushed, oapMetrics, conf, returningBatch, options,
+                  filters, context)
+                reader.read(file)
+              // Actually it shouldn't get to this line, because unsupported version will cause
+              // exception thrown in readVersion call
+              case _ =>
+                throw new OapException("Unexpected data file version")
+                Iterator.empty
+            }
+          }
         }
       case None => (_: PartitionedFile) => {
         // TODO need to think about when there is no oap.meta file at all
@@ -441,6 +488,7 @@ private[sql] object OapFileFormat {
   val OAP_DATA_FILE_V1_CLASSNAME = classOf[OapDataFileV1].getCanonicalName
 
   val PARQUET_DATA_FILE_CLASSNAME = classOf[ParquetDataFile].getCanonicalName
+  val ORC_DATA_FILE_CLASSNAME = classOf[OrcDataFile].getCanonicalName
 
   val COMPRESSION = "oap.compression"
   val DEFAULT_COMPRESSION = OapConf.OAP_COMPRESSION.defaultValueString

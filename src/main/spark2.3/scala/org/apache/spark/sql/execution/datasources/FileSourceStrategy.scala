@@ -23,8 +23,11 @@ import org.apache.spark.sql.catalyst.expressions
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.FileSourceScanExec
-import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
+import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.oap.OapConf
 
 /**
  * A strategy for planning scans over collections of files that might be partitioned or bucketed
@@ -52,7 +55,7 @@ import org.apache.spark.sql.execution.SparkPlan
 object FileSourceStrategy extends Strategy with Logging {
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case PhysicalOperation(projects, filters,
-      l @ LogicalRelation(fsRelation: HadoopFsRelation, _, table, _)) =>
+      l @ LogicalRelation(_fsRelation: HadoopFsRelation, _, table, _)) =>
       // Filters on this relation fall into four categories based on where we can use them to avoid
       // reading unneeded data:
       //  - partition keys only - used to prune directories to read
@@ -73,11 +76,60 @@ object FileSourceStrategy extends Strategy with Logging {
 
       val partitionColumns =
         l.resolve(
-          fsRelation.partitionSchema, fsRelation.sparkSession.sessionState.analyzer.resolver)
+          _fsRelation.partitionSchema, _fsRelation.sparkSession.sessionState.analyzer.resolver)
       val partitionSet = AttributeSet(partitionColumns)
       val partitionKeyFilters =
         ExpressionSet(normalizedFilters.filter(_.references.subsetOf(partitionSet)))
       logInfo(s"Pruning directories with: ${partitionKeyFilters.mkString(",")}")
+
+      val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq, Nil)
+
+      val fsRelation: HadoopFsRelation = _fsRelation.fileFormat match {
+        // TODO a better rule to check if we need to substitute the ParquetFileFormat
+        // as OapFileFormat
+        // add spark.sql.oap.parquet.enable config
+        // if config true turn to OapFileFormat
+        // else turn to ParquetFileFormat
+        case a: ParquetFileFormat
+          if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
+          val oapFileFormat = new OapFileFormat
+          oapFileFormat
+            .init(_fsRelation.sparkSession,
+              _fsRelation.options,
+              selectedPartitions.flatMap(p => p.files))
+
+          if (oapFileFormat.hasAvailableIndex(normalizedFilters)) {
+            logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
+            val parquetOptions: Map[String, String] =
+              Map(SQLConf.PARQUET_BINARY_AS_STRING.key ->
+                _fsRelation.sparkSession.sessionState.conf.isParquetBinaryAsString.toString,
+                SQLConf.PARQUET_INT96_AS_TIMESTAMP.key ->
+                  _fsRelation.sparkSession.sessionState.conf.isParquetINT96AsTimestamp.toString,
+                SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key ->
+                  _fsRelation.sparkSession.sessionState.conf.writeLegacyParquetFormat.toString,
+                SQLConf.PARQUET_INT64_AS_TIMESTAMP_MILLIS.key ->
+                  _fsRelation.sparkSession.sessionState.conf
+                    .isParquetINT64AsTimestampMillis.toString) ++
+                _fsRelation.options
+
+            _fsRelation.copy(fileFormat = oapFileFormat,
+              options = parquetOptions)(_fsRelation.sparkSession)
+
+          } else {
+            logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
+            _fsRelation
+          }
+
+        case _: OapFileFormat =>
+          _fsRelation.fileFormat.asInstanceOf[OapFileFormat].init(
+            _fsRelation.sparkSession,
+            _fsRelation.options,
+            selectedPartitions.flatMap(p => p.files))
+          _fsRelation
+
+        case _: FileFormat =>
+          _fsRelation
+      }
 
       val dataColumns =
         l.resolve(fsRelation.dataSchema, fsRelation.sparkSession.sessionState.analyzer.resolver)

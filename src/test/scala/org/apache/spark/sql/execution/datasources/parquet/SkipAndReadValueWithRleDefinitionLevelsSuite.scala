@@ -24,7 +24,7 @@ import org.apache.parquet.io.api.Binary
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
-import org.apache.spark.sql.execution.vectorized.ColumnVector
+import org.apache.spark.sql.oap.adapter.ColumnVectorAdapter
 import org.apache.spark.sql.types.BinaryType
 
 class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Logging {
@@ -219,7 +219,7 @@ class SkipAndReadValueWithRleDefinitionLevelsSuite extends SparkFunSuite with Lo
     reader.skipBinarys(0, 1, valueReader)
 
     // read binary to a vector and assert read value
-    val vector = ColumnVector.allocate(10, BinaryType, MemoryMode.ON_HEAP)
+    val vector = ColumnVectorAdapter.allocate(10, BinaryType, MemoryMode.ON_HEAP)
     valueReader.readBinary(1, vector, 0)
     assert(vector.getBinary(0).sameElements("F".getBytes))
   }

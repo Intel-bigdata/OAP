@@ -19,6 +19,7 @@ package org.apache.spark.sql.oap
 
 import org.apache.spark.{SparkConf, SparkContext, SparkEnv}
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.OapMetricsManager
 import org.apache.spark.sql.execution.datasources.oap.filecache._
@@ -26,15 +27,17 @@ import org.apache.spark.sql.hive.thriftserver.OapEnv
 import org.apache.spark.sql.oap.rpc._
 import org.apache.spark.util.{RpcUtils, Utils}
 
-
 /**
  * Initializing [[FiberCacheManager]], [[MemoryManager]], [[FiberLockManager]]
  * [[FiberSensor]], [[OapMetricsManager]], [[OapRpcManager]], [[DataFileMetaCacheManager]]
  */
 private[oap] trait OapRuntime extends Logging {
+  // The following two will be override for Driver side, nevertheless calling it from Executor side
+  // will cause Exception due to it shouldn't be called there
+  def sparkSession: SparkSession = throw OapRuntime.newException
+  def fiberSensor: FiberSensor = throw OapRuntime.newException
   def memoryManager: MemoryManager
   def fiberCacheManager: FiberCacheManager
-  def fiberSensor: FiberSensor = null
   def oapRpcManager: OapRpcManager
   def oapMetricsManager: OapMetricsManager
   def dataFileMetaCacheManager: DataFileMetaCacheManager
@@ -45,7 +48,7 @@ private[oap] trait OapRuntime extends Logging {
 /**
  * Initializing [[FiberSensor]] and executor managers if local
  */
-private[oap] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
+private[sql] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
 
   // For non-Spark SQL CLI/ThriftServer conditions, OAP-specific features will be fully enabled by
   // this, nevertheless not instantly when a Spark application is started, but when an OapRuntime
@@ -53,11 +56,17 @@ private[oap] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
   // cache
   OapEnv.initWithoutCreatingOapSession()
 
+  private var _sparkSession = OapEnv.sparkSession
+  override def sparkSession: SparkSession = _sparkSession
+  // For Unit Test: setting TestOapSession
+  private[sql] def setTestSession(session: SparkSession): Unit = {
+    _sparkSession = session
+  }
+  override val fiberSensor = new FiberSensor
   override val memoryManager =
     if (OapRuntime.isLocal(sparkEnv.conf)) MemoryManager(sparkEnv) else null
   override val fiberCacheManager =
     if (OapRuntime.isLocal(sparkEnv.conf)) new FiberCacheManager(sparkEnv, memoryManager) else null
-  override val fiberSensor = new FiberSensor
   private val oapRpcManagerMasterEndpoint =
     new OapRpcManagerMasterEndpoint(sparkEnv.rpcEnv, SparkContext.getOrCreate().listenerBus)
   private val oapRpcDriverEndpoint = {
@@ -176,4 +185,7 @@ object OapRuntime {
       runtime.stop()
     }
   }
+
+  private def newException = new OapException("Not initialized! Probably tried to get a driver" +
+    " side only field from executor side")
 }

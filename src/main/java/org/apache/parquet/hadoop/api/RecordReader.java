@@ -48,15 +48,6 @@ public interface RecordReader<T> extends Closeable {
     T getCurrentValue() throws IOException, InterruptedException;
 
     /**
-     * The current progress of the record reader through its data.
-     *
-     * @return a number between 0.0 and 1.0 that is the fraction of the data read
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    float getProgress() throws IOException, InterruptedException;
-
-    /**
      * Close the record reader.
      */
     void close() throws IOException;

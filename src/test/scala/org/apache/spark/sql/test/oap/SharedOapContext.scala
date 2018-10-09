@@ -26,11 +26,14 @@ import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, SparkPlan
 import org.apache.spark.sql.execution.datasources.oap.{IndexType, OapFileFormat}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.{OapDriverRuntime, OapRuntime}
 import org.apache.spark.sql.test.{SharedSQLContext, TestOapLocalClusterSession, TestOapSession, TestSparkSession}
 
 trait SharedOapContext extends SharedOapContextBase {
   protected override def createSparkSession: TestSparkSession = {
-    new TestOapSession(oapSparkConf)
+    val testSession = new TestOapSession(oapSparkConf)
+    OapRuntime.getOrCreate.asInstanceOf[OapDriverRuntime].setTestSession(testSession)
+    testSession
   }
 }
 
@@ -39,7 +42,9 @@ trait SharedOapContext extends SharedOapContextBase {
  */
 trait SharedOapLocalClusterContext extends SharedOapContextBase {
   protected override def createSparkSession: TestSparkSession = {
-    new TestOapLocalClusterSession(oapSparkConf)
+    val testSession = new TestOapLocalClusterSession(oapSparkConf)
+    OapRuntime.getOrCreate.asInstanceOf[OapDriverRuntime].setTestSession(testSession)
+    testSession
   }
 }
 

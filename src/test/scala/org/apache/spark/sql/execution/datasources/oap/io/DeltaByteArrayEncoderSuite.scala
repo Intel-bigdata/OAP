@@ -17,12 +17,13 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import org.scalacheck.{Gen, Properties}
+import org.scalacheck.{Arbitrary, Gen, Properties}
 import org.scalacheck.Prop.forAll
 import org.scalatest.prop.Checkers
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.datasources.oap.adapter.PropertiesAdapter
 import org.apache.spark.sql.execution.datasources.oap.filecache.StringFiberBuilder
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.unsafe.types.UTF8String
@@ -78,6 +79,6 @@ class DeltaByteArrayEncoderCheck extends Properties("DeltaByteArrayEncoder") {
 class DeltaByteArrayEncoderSuite extends SparkFunSuite with Checkers {
 
   test("Check Encoding/Decoding") {
-    check(new DeltaByteArrayEncoderCheck)
+    check(PropertiesAdapter.getProp(new DictionaryBasedEncoderCheck()))
   }
 }

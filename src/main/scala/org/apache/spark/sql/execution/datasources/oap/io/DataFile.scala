@@ -38,14 +38,15 @@ abstract class DataFile {
   def schema: StructType
   def configuration: Configuration
 
-  def getDataFileMeta(): DataFileMeta
-  def cache(groupId: Int, fiberId: Int): FiberCache
   def iterator(requiredIds: Array[Int], filters: Seq[Filter] = Nil)
-    : OapCompletionIterator[InternalRow]
+    : OapCompletionIterator[Any]
   def iteratorWithRowIds(requiredIds: Array[Int], rowIds: Array[Int], filters: Seq[Filter] = Nil)
-    : OapCompletionIterator[InternalRow]
+    : OapCompletionIterator[Any]
 
   def totalRows(): Long
+
+  def getDataFileMeta(): DataFileMeta
+  def cache(groupId: Int, fiberId: Int): FiberCache
   override def hashCode(): Int = path.hashCode
   override def equals(other: Any): Boolean = other match {
     case df: DataFile => path.equals(df.path)
@@ -104,15 +105,36 @@ private[oap] object DataFile {
 }
 
 /**
- * VectorizedContext encapsulation infomation for Vectorized Read,
+ * The abstract DataFileContext is used by OapFileFormat and OapDataReaderWriter for
+ * both parquet and orc.
+ *
+ * ParquetVectorizedContext encapsulats information for parquet vectorization read,
  * partitionColumns and partitionValues use by VectorizedOapRecordReader#initBatch
  * returningBatch use by VectorizedOapRecordReader#enableReturningBatches
+ *
+ * OrcDataFileContext encapsulats information for orc readers.
  */
-private[oap] case class VectorizedContext(
+private[oap] abstract class DataFileContext {}
+
+// Below is only used by parquet vectorized reader with and without oap index.
+private[oap] case class ParquetVectorizedContext(
     partitionColumns: StructType,
     partitionValues: InternalRow,
-    returningBatch: Boolean)
+    returningBatch: Boolean) extends DataFileContext
 
+// Below is used by both orc vectorized readers and the orc map reduce readers.
+// The orc map reduce readers are using dataSchema and requestedColIds in read method
+// of OapDataReaderWriter.
+private[oap] case class OrcDataFileContext(
+    partitionColumns: StructType,
+    partitionValues: InternalRow,
+    returningBatch: Boolean,
+    requiredSchema: StructType,
+    dataSchema: StructType,
+    enableOffHeapColumnVector: Boolean,
+    copyToSpark: Boolean,
+    requestedColIds: Array[Int])
+    extends DataFileContext
 /**
  * The data file meta, will be cached for performance purpose, as we don't want to open the
  * specified file again and again to get its data meta, the data file extension can have its own

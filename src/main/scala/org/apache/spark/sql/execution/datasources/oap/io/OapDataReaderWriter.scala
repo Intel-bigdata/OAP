@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
+import org.apache.orc.mapred.OrcStruct
 import org.apache.parquet.filter2.predicate.FilterPredicate
 import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.io.api.Binary
@@ -26,13 +27,14 @@ import org.apache.parquet.io.api.Binary
 import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Ascending, JoinedRow}
+import org.apache.spark.sql.catalyst.expressions.{Ascending, JoinedRow, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.execution.datasources.PartitionedFile
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, OapIndexInfoStatusSerDe}
+import org.apache.spark.sql.execution.datasources.orc.OrcDeserializer
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.listener.SparkListenerOapIndexInfoUpdate
 import org.apache.spark.sql.sources.Filter
@@ -205,7 +207,7 @@ private[oap] class OapDataReaderV1(
     enableVectorizedReader: Boolean = false,
     options: Map[String, String] = Map.empty,
     filters: Seq[Filter] = Seq.empty,
-    context: Option[VectorizedContext] = None) extends OapDataReader with Logging {
+    context: Option[DataFileContext] = None) extends OapDataReader with Logging {
 
   import org.apache.spark.sql.execution.datasources.oap.INDEX_STAT._
 
@@ -237,15 +239,20 @@ private[oap] class OapDataReaderV1(
     false
   }
 
-  def initialize(): OapCompletionIterator[InternalRow] = {
+  def initialize(): OapCompletionIterator[Any] = {
     logDebug("Initializing OapDataReader...")
     // TODO how to save the additional FS operation to get the Split size
     val fileScanner = DataFile(pathStr, meta.schema, dataFileClassName, conf)
-    if (meta.dataReaderClassName.contains("ParquetDataFile")) {
-      fileScanner.asInstanceOf[ParquetDataFile].setVectorizedContext(context)
+    if (meta.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME)) {
+      fileScanner.asInstanceOf[ParquetDataFile].setParquetVectorizedContext(
+        context.asInstanceOf[Option[ParquetVectorizedContext]])
+    } else if (meta.dataReaderClassName.equals(OapFileFormat.ORC_DATA_FILE_CLASSNAME)) {
+      // For orc, the context will be used by both vectorization and non vectorization.
+      fileScanner.asInstanceOf[OrcDataFile].setOrcDataFileContext(
+        context.get.asInstanceOf[OrcDataFileContext])
     }
 
-    def fullScan: OapCompletionIterator[InternalRow] = {
+    def fullScan: OapCompletionIterator[Any] = {
       val start = if (log.isDebugEnabled) System.currentTimeMillis else 0
       val iter = fileScanner.iterator(requiredIds, filters)
       val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
@@ -281,7 +288,11 @@ private[oap] class OapDataReaderV1(
           }
 
           // Parquet reader does not support backward scan, so rowIds must be sorted.
-          if (meta.dataReaderClassName.contains("ParquetDataFile")) {
+          // Actually Orc readers support the backward scan, thus no need to sort row Ids.
+          // But with the sorted row Ids, the adjacment rows will be scanned in the same batch.
+          // This will reduce IO cost.
+          if (meta.dataReaderClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) ||
+            meta.dataReaderClassName.equals(OapFileFormat.ORC_DATA_FILE_CLASSNAME)) {
             rowIds.sorted
           } else {
             rowIds
@@ -319,16 +330,29 @@ private[oap] class OapDataReaderV1(
       metrics.updateTotalRows(tot)
       metrics.updateIndexAndRowRead(this, tot)
       // if enableVectorizedReader == true , return iter directly because of partitionValues
-      // already filled by VectorizedReader, else use original branch.
+      // already filled by VectorizedReader, else use original branch as Parquet or Orc.
       if (enableVectorizedReader) {
-        iter
+        iter.asInstanceOf[Iterator[InternalRow]]
       } else {
+        // Parquet and Oap are the same if the vectorization is off.
         val fullSchema = requiredSchema.toAttributes ++ partitionSchema.toAttributes
         val joinedRow = new JoinedRow()
         val appendPartitionColumns =
           GenerateUnsafeProjection.generate(fullSchema, fullSchema)
-
-        iter.map(d => appendPartitionColumns(joinedRow(d, file.partitionValues)))
+        meta.dataReaderClassName match {
+          case dataReader if (dataReader.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) ||
+            dataReader.equals(OapFileFormat.OAP_DATA_FILE_CLASSNAME)) =>
+            iter.asInstanceOf[Iterator[InternalRow]].map(d => {
+              appendPartitionColumns(joinedRow(d, file.partitionValues))
+            })
+          case dataReader if (dataReader.equals(OapFileFormat.ORC_DATA_FILE_CLASSNAME)) =>
+            val orcDataFileContext = context.get.asInstanceOf[OrcDataFileContext]
+            val deserializer = new OrcDeserializer(orcDataFileContext.dataSchema, requiredSchema,
+              orcDataFileContext.requestedColIds)
+            iter.asInstanceOf[Iterator[OrcStruct]].map(value => {
+              appendPartitionColumns(joinedRow(deserializer.deserialize(value),
+              file.partitionValues))})
+        }
       }
     }
 }

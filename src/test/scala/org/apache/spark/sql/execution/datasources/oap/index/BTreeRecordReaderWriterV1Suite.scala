@@ -30,6 +30,7 @@ import org.apache.spark.metrics.MetricsSystem
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.oap.OapRuntime
+import org.apache.spark.sql.oap.adapter.TaskContextImplAdapter
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
 
@@ -100,7 +101,7 @@ class BTreeRecordReaderWriterV1Suite extends SharedOapContext {
     val fileWriter = new TestIndexFileWriter()
     val conf = spark.sparkContext.conf
     TaskContext.setTaskContext(
-      new TaskContextImpl(
+      TaskContextImplAdapter.createTaskContextImpl(
         0,
         0,
         0,

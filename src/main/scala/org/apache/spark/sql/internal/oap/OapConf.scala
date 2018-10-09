@@ -152,6 +152,21 @@ object OapConf {
       .stringConf
       .createWithDefault("0b")
 
+  val OAP_CACHE_FIBERSENSOR_GETHOSTS_NUM =
+    SqlConfAdapter.buildConf("spark.sql.oap.cache.fiberSensor.getHostsNum")
+      .internal()
+      .doc("The length of getHosts function of FiberSensor's result Seq. The funcion returns " +
+        "getHostsNum of hosts with the maximum FiberCache for certain filePath")
+      .intConf
+      .createWithDefault(3)
+
+  val OAP_CACHE_FIBERSENSOR_MAXHOSTSMAINTAINED_NUM =
+    SqlConfAdapter.buildConf("spark.sql.oap.cache.fiberSensor.maxHostsMaintainedNum")
+      .internal()
+      .doc("The maximum maintained number of hosts number for a certain filePath in FiberSensor")
+      .intConf
+      .createWithDefault(10)
+
   val OAP_COMPRESSION = SqlConfAdapter.buildConf("spark.sql.oap.compression.codec")
     .internal()
     .doc("Sets the compression codec use when writing Parquet files. Acceptable values include: " +
@@ -278,4 +293,13 @@ object OapConf {
         "is empty, it will store in the data file path")
       .stringConf
       .createWithDefault("")
+
+  val ORC_VECTORIZED_READER_ENABLED =
+    SqlConfAdapter.ORC_VECTORIZED_READER_ENABLED
+
+  val COLUMN_VECTOR_OFFHEAP_ENABLED =
+    SqlConfAdapter.COLUMN_VECTOR_OFFHEAP_ENABLED
+
+  val ORC_COPY_BATCH_TO_SPARK =
+    SqlConfAdapter.ORC_COPY_BATCH_TO_SPARK
 }
