@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.oap.OapFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.hive.orc.OrcFileFormat
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 
@@ -112,6 +113,31 @@ object FileSourceStrategy extends Strategy with Logging {
 
             _fsRelation.copy(fileFormat = oapFileFormat,
               options = parquetOptions)(_fsRelation.sparkSession)
+
+          } else {
+            logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
+            _fsRelation
+          }
+
+        case a: OrcFileFormat
+          if _fsRelation.sparkSession.conf.get(OapConf.OAP_ORC_ENABLED) =>
+          val oapFileFormat = new OapFileFormat
+          oapFileFormat
+            .init(_fsRelation.sparkSession,
+              _fsRelation.options,
+              selectedPartitions.flatMap(p => p.files))
+
+          if (oapFileFormat.hasAvailableIndex(normalizedFilters)) {
+            logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
+            // isOapOrcFileFormat is used to indicate to read orc data with oap index accelerated.
+            val orcOptions: Map[String, String] =
+              Map(SQLConf.ORC_FILTER_PUSHDOWN_ENABLED.key ->
+                _fsRelation.sparkSession.sessionState.conf.orcFilterPushDown.toString) ++
+                Map("isOapOrcFileFormat" -> "true") ++
+                _fsRelation.options
+
+            _fsRelation.copy(fileFormat = oapFileFormat,
+              options = orcOptions)(_fsRelation.sparkSession)
 
           } else {
             logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")

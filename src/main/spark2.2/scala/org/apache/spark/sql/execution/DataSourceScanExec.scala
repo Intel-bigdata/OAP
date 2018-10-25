@@ -172,6 +172,15 @@ case class FileSourceScanExec(
     false
   }
 
+  // setForOapOrcColumnarBatch is defined in ColumnarBatchScan.scala.
+  // If it's true, use this to read orc data with oap index accelerated.
+  relation.options.getOrElse("isOapOrcFileFormat", "false") match {
+    case "false" =>
+      super.setForOapOrcColumnarBatch(false)
+    case "true" =>
+      super.setForOapOrcColumnarBatch(true)
+  }
+
   @transient private lazy val selectedPartitions: Seq[PartitionDirectory] = {
     val optimizerMetadataTimeNs = relation.location.metadataOpsTimeNs.getOrElse(0L)
     val startTime = System.nanoTime()

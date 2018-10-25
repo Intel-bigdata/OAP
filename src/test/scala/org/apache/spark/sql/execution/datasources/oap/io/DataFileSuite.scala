@@ -63,7 +63,20 @@ class DataFileSuite extends QueryTest with SharedOapContext {
       assert(datafile.configuration == config)
     }
 
-    assert(DataFile.cachedConstructorCount == 2)
+    withTempPath { dir =>
+      val df = spark.createDataFrame(data)
+      df.repartition(1).write.format("orc").save(dir.getAbsolutePath)
+      val file = SpecificParquetRecordReaderBase.listDirectory(dir).get(0)
+      val datafile =
+        DataFile(file, schema, OapFileFormat.ORC_DATA_FILE_CLASSNAME, config)
+      assert(datafile.path == file)
+      assert(datafile.schema == schema)
+      assert(datafile.configuration == config)
+    }
+
+    // DataFile object is global. After OrcDataFile is added, then need to change to 3 if
+    // we run the whole tests.
+    assert(DataFile.cachedConstructorCount == 3)
 
     intercept[OapException] {
       DataFile("nofile", schema, "NotExistClass", config)

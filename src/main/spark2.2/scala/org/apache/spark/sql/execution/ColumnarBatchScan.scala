@@ -32,6 +32,12 @@ import org.apache.spark.sql.types.DataType
 private[sql] trait ColumnarBatchScan extends CodegenSupport {
 
   val inMemoryTableScan: InMemoryTableScanExec = null
+ /**
+  * With oap index and orc format, forOapOrcColumnarBatch is true. Otherwise, it's false.
+  * If it's true, the code gen will use org.apache.spark.sql.vectorized.oap.orc.ColumnarBatch which
+  * is back ported from Spark 2.3 for OrcColumnarBatchReader.
+  */
+  private var forOapOrcColumnarBatch: Boolean = false
 
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
@@ -63,6 +69,9 @@ private[sql] trait ColumnarBatchScan extends CodegenSupport {
     ExprCode(code, isNullVar, valueVar)
   }
 
+  def setForOapOrcColumnarBatch(forOapOrcColumnarBatch: Boolean) =
+    this.forOapOrcColumnarBatch = forOapOrcColumnarBatch
+
   /**
    * Produce code to process the input iterator as [[ColumnarBatch]]es.
    * This produces an [[UnsafeRow]] for each row in each batch.
@@ -79,11 +88,21 @@ private[sql] trait ColumnarBatchScan extends CodegenSupport {
     val scanTimeTotalNs = ctx.freshName("scanTime")
     ctx.addMutableState("long", scanTimeTotalNs, s"$scanTimeTotalNs = 0;")
 
-    val columnarBatchClz = "org.apache.spark.sql.execution.vectorized.ColumnarBatch"
+    val columnarBatchClz =
+      if (!forOapOrcColumnarBatch) {
+        "org.apache.spark.sql.execution.vectorized.ColumnarBatch"
+      } else {
+        "org.apache.spark.sql.vectorized.oap.orc.ColumnarBatch"
+      }
     val batch = ctx.freshName("batch")
     ctx.addMutableState(columnarBatchClz, batch, s"$batch = null;")
 
-    val columnVectorClz = "org.apache.spark.sql.execution.vectorized.ColumnVector"
+    val columnVectorClz =
+      if (!forOapOrcColumnarBatch) {
+        "org.apache.spark.sql.execution.vectorized.ColumnVector"
+      } else {
+        "org.apache.spark.sql.vectorized.oap.orc.ColumnVector"
+      }
     val idx = ctx.freshName("batchIdx")
     ctx.addMutableState("int", idx, s"$idx = 0;")
     val colVars = output.indices.map(i => ctx.freshName("colInstance" + i))
@@ -128,7 +147,6 @@ private[sql] trait ColumnarBatchScan extends CodegenSupport {
        |  int $localEnd = $numRows - $idx;
        |  for (int $localIdx = 0; $localIdx < $localEnd; $localIdx++) {
        |    int $rowidx = $idx + $localIdx;
-       |    if ($batch.isFiltered($rowidx)) continue;
        |    ${consume(ctx, columnsBatchInput).trim}
        |    $shouldStop
        |  }

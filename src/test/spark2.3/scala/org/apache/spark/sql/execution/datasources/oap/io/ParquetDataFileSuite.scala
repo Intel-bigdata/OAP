@@ -42,6 +42,7 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportWrapper, VectorizedColumnReader, VectorizedColumnReaderWrapper}
 import org.apache.spark.sql.internal.SQLConf
@@ -149,6 +150,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
     val requiredIds = Array(0, 1)
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
     val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val row = iterator.next
@@ -167,6 +169,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
     val requiredIds = Array(0, 1)
     val rowIds = Array.emptyIntArray
     val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     assert(!iterator.hasNext)
     val e = intercept[java.util.NoSuchElementException] {
       iterator.next()
@@ -179,6 +182,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     val requiredIds = Array(0)
     val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     val result = ArrayBuffer[ Int ]()
     while (iterator.hasNext) {
       val row = iterator.next
@@ -262,6 +266,7 @@ class NestedDataSuite extends ParquetDataFileSuite {
     val requiredIds = Array(0, 1, 2)
     val rowIds = Array(1)
     val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     assert(iterator.hasNext)
     val row = iterator.next
     assert(row.numFields == 3)
@@ -274,6 +279,7 @@ class NestedDataSuite extends ParquetDataFileSuite {
     val reader = ParquetDataFile(fileName, requestStructType, configuration)
     val requiredIds = Array(0, 2)
     val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     assert(iterator.hasNext)
     val rowOne = iterator.next
     assert(rowOne.numFields == 2)
@@ -317,12 +323,13 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds and rowIds disable returningBatch") {
-    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setVectorizedContext(context)
+    reader.setParquetVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 1134, 1753, 2222, 3928, 4200, 4734)
     val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val row = iterator.next()
@@ -336,38 +343,39 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds and rowIds enable returningBatch") {
-    val context = Some(VectorizedContext(null, null, returningBatch = true))
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = true))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setVectorizedContext(context)
+    reader.setParquetVectorizedContext(context)
     val requiredIds = Array(0, 1)
     // RowGroup0 => page0: [0, 1, 7, 8, 120, 121, 381, 382]
     // RowGroup0 => page5: [23000]
     // RowGroup2 => page0: [50752]
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 23000, 50752)
     val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val batch = iterator.next().asInstanceOf[ColumnarBatch]
-      val rowIterator = batch.rowOapIterator()
+      val rowIterator = batch.rowIterator()
       while (rowIterator.hasNext) {
         val row = rowIterator.next()
         assert(row.numFields == 2)
         result += row.getInt(0)
       }
     }
-    assert(rowIds.length == result.length)
     for (i <- rowIds.indices) {
-      assert(rowIds(i) == result(i))
+      assert(result.contains(i))
     }
   }
 
   test("read by columnIds and empty rowIds array disable returningBatch") {
-    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setVectorizedContext(context)
+    reader.setParquetVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array.emptyIntArray
     val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     assert(!iterator.hasNext)
     val e = intercept[java.util.NoSuchElementException] {
       iterator.next()
@@ -376,12 +384,13 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds and empty rowIds array enable returningBatch") {
-    val context = Some(VectorizedContext(null, null, returningBatch = true))
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = true))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setVectorizedContext(context)
+    reader.setParquetVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array.emptyIntArray
     val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     assert(!iterator.hasNext)
     val e = intercept[java.util.NoSuchElementException] {
       iterator.next()
@@ -390,11 +399,12 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds disable returningBatch") {
-    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setVectorizedContext(context)
+    reader.setParquetVectorizedContext(context)
     val requiredIds = Array(0)
     val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     val result = ArrayBuffer[ Int ]()
     while (iterator.hasNext) {
       val row = iterator.next()
@@ -408,11 +418,12 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds enable returningBatch") {
-    val context = Some(VectorizedContext(null, null, returningBatch = true))
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = true))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setVectorizedContext(context)
+    reader.setParquetVectorizedContext(context)
     val requiredIds = Array(0)
     val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     val result = ArrayBuffer[ Int ]()
     while (iterator.hasNext) {
       val batch = iterator.next().asInstanceOf[ColumnarBatch]
@@ -470,12 +481,13 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds and rowIds in fiberCache") {
-    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setVectorizedContext(context)
+    reader.setParquetVectorizedContext(context)
     val requiredIds = Array(0, 1)
     val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 1134, 1753, 2222, 3928, 4200, 4734)
     val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val row = iterator.next()
@@ -490,11 +502,12 @@ class ParquetCacheDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds in fiberCache") {
-    val context = Some(VectorizedContext(null, null, returningBatch = false))
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setVectorizedContext(context)
+    reader.setParquetVectorizedContext(context)
     val requiredIds = Array(0)
     val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
       val row = iterator.next()

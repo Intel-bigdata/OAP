@@ -69,11 +69,17 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sql(s"""CREATE TEMPORARY VIEW parquet_test_date (a INT, b DATE)
            | USING parquet
            | OPTIONS (path '$path')""".stripMargin)
+    sql(s"""CREATE TEMPORARY VIEW orc_test (a INT, b STRING)
+           | USING orc
+           | OPTIONS (path '$path')""".stripMargin)
     sql(s"""CREATE TABLE t_refresh (a int, b int)
            | USING oap
            | PARTITIONED by (b)""".stripMargin)
     sql(s"""CREATE TABLE t_refresh_parquet (a int, b int)
             | USING parquet
+            | PARTITIONED by (b)""".stripMargin)
+    sql(s"""CREATE TABLE t_refresh_orc (a int, b int)
+            | USING orc
             | PARTITIONED by (b)""".stripMargin)
   }
 
@@ -83,8 +89,10 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     sqlContext.dropTempTable("oap_test_date")
     sqlContext.dropTempTable("parquet_test")
     sqlContext.dropTempTable("parquet_test_date")
+    sqlContext.dropTempTable("orc_test")
     sql("DROP TABLE IF EXISTS t_refresh")
     sql("DROP TABLE IF EXISTS t_refresh_parquet")
+    sql("DROP TABLE IF EXISTS t_refresh_orc")
   }
 
   test("empty table") {
@@ -242,6 +250,49 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     }
   }
 
+  test("filtering orc") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table orc_test select * from t")
+    withIndex(TestIndex("orc_test", "index1")) {
+      sql("create oindex index1 on orc_test (a)")
+
+      sql("SELECT * FROM orc_test WHERE b = '1'")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a = 1"),
+        Row(1, "this is test 1") :: Nil)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a > 1 AND a <= 3"),
+        Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a > 1 AND b = 'this is test 2'"),
+        Row(2, "this is test 2") :: Nil)
+    }
+  }
+
+  test("filtering orc2") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table orc_test select * from t where key = 1")
+    sql("insert into table orc_test select * from t where key = 2")
+    sql("insert into table orc_test select * from t where key = 3")
+    sql("insert into table orc_test select * from t where key = 4")
+    withIndex(TestIndex("orc_test", "index1")) {
+      sql("create oindex index1 on orc_test (a)")
+
+      val checkPath = new Path(currentPath)
+      val fs = checkPath.getFileSystem(new Configuration())
+      val indexFiles = fs.globStatus(new Path(checkPath, "*.index"))
+      assert(indexFiles.length == 4)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a = 1"),
+        Row(1, "this is test 1") :: Nil)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a > 1 AND a <= 3"),
+        Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+    }
+  }
+
   test("test refresh in parquet format on same partition") {
     val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
     data.toDF("key", "value").createOrReplaceTempView("t")
@@ -357,6 +408,125 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       assert(fs.globStatus(new Path(tablePath + "b=3/*.index")).length == 0)
 
       checkAnswer(sql("select * from t_refresh_parquet"),
+        Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Row(3, 2) :: Row(4, 3) :: Nil)
+    }
+  }
+
+  test("test refresh in orc format on the same partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    withIndex(TestIndex("t_refresh_orc", "index1")) {
+      sql(
+        """
+          |INSERT OVERWRITE TABLE t_refresh_orc
+          |partition (b=1)
+          |SELECT key from t where value < 4
+        """.stripMargin)
+
+      sql("create oindex index1 on t_refresh_orc (a)")
+
+      checkAnswer(sql("select * from t_refresh_orc"),
+        Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Nil)
+
+      sql(
+        """
+          |INSERT INTO TABLE t_refresh_orc
+          |partition (b=1)
+          |SELECT key from t where value == 4
+        """.stripMargin)
+
+      sql("refresh oindex on t_refresh_orc")
+
+      checkAnswer(sql("select * from t_refresh_orc"),
+        Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(4, 1) :: Nil)
+    }
+  }
+
+  test("test refresh in orc format on different partitions") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    withIndex(TestIndex("t_refresh_orc", "index1")) {
+      sql(
+        """
+          |INSERT OVERWRITE TABLE t_refresh_orc
+          |partition (b=1)
+          |SELECT key from t where value < 4
+        """.stripMargin)
+
+      sql("create oindex index1 on t_refresh_orc (a)")
+
+      checkAnswer(sql("select * from t_refresh_orc"),
+        Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Nil)
+
+      sql(
+        """
+          |INSERT INTO TABLE t_refresh_orc
+          |partition (b=2)
+          |SELECT key from t where value == 4
+        """.stripMargin)
+
+      sql(
+        """
+          |INSERT INTO TABLE t_refresh_orc
+          |partition (b=1)
+          |SELECT key from t where value == 5
+        """.stripMargin)
+
+      sql("refresh oindex on t_refresh_orc")
+
+      checkAnswer(sql("select * from t_refresh_orc"),
+        Row(1, 1) :: Row(2, 1) :: Row(3, 1) :: Row(5, 1) :: Row(4, 2) :: Nil)
+    }
+  }
+
+  test("test refresh in orc format on a partition") {
+    val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    withIndex(TestIndex("t_refresh_orc", "index1", TestPartition("b", "1")),
+      TestIndex("t_refresh_orc", "index1", TestPartition("b", "2"))) {
+      sql(
+        """
+          |INSERT OVERWRITE TABLE t_refresh_orc
+          |partition (b=1)
+          |SELECT key from t where value < 3
+        """.stripMargin)
+
+      sql(
+        """
+          |INSERT INTO TABLE t_refresh_orc
+          |partition (b=2)
+          |SELECT key from t where value == 2
+        """.stripMargin)
+
+
+      sql("create oindex index1 on t_refresh_orc (a)")
+
+      checkAnswer(sql("select * from t_refresh_orc"),
+        Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Nil)
+
+      sql(
+        """
+          |INSERT INTO TABLE t_refresh_orc
+          |partition (b=2)
+          |SELECT key from t where value == 3
+        """.stripMargin)
+
+      sql(
+        """
+          |INSERT INTO TABLE t_refresh_orc
+          |partition (b=3)
+          |SELECT key from t where value == 4
+        """.stripMargin)
+
+      sql("refresh oindex on t_refresh_orc partition (b=2)")
+
+      val fs = new Path(currentPath).getFileSystem(new Configuration())
+      val tablePath = sqlContext.conf.warehousePath + "/t_refresh_orc/"
+      assert(fs.globStatus(new Path(tablePath + "b=1/*.index")).length == 1)
+      assert(fs.globStatus(new Path(tablePath + "b=2/*.index")).length == 2)
+      assert(fs.globStatus(new Path(tablePath + "b=3/*.index")).length == 0)
+
+      checkAnswer(sql("select * from t_refresh_orc"),
         Row(1, 1) :: Row(2, 1) :: Row(2, 2) :: Row(3, 2) :: Row(4, 3) :: Nil)
     }
   }
@@ -517,6 +687,24 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       sql("refresh oindex on parquet_test")
 
       checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
+        Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
+    }
+  }
+
+  test("refresh table of orc format without partition") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    withIndex(TestIndex("orc_test", "index1")) {
+      sql("insert overwrite table orc_test select * from t")
+      sql("create oindex index1 on orc_test (a)")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a = 1"),
+        Row(1, "this is test 1") :: Nil)
+
+      sql("insert into table orc_test select * from t")
+      sql("refresh oindex on orc_test")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a = 1"),
         Row(1, "this is test 1") :: Row(1, "this is test 1") :: Nil)
     }
   }
@@ -705,6 +893,96 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     }
   }
 
+  test("test orc use in") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table orc_test select * from t")
+    withIndex(TestIndex("orc_test", "index1")) {
+      sql("create oindex index1 on orc_test (b)")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE " +
+        "b in('this is test 1','this is test 2','this is test 4')"),
+        Row(1, "this is test 1") :: Row(2, "this is test 2")
+          :: Row(4, "this is test 4") :: Nil)
+    }
+  }
+
+  test("test orc use in StringFieldNotCastDouble") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table orc_test select * from t")
+    withIndex(TestIndex("orc_test", "index1")) {
+      sql("create oindex index1 on orc_test (b)")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE " +
+        "b in(1,2,4)"),
+        Row(1, "1") :: Row(2, "2")
+          :: Row(4, "4") :: Nil)
+    }
+  }
+
+  test("test orc use in IntFieldNotCastDouble") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table orc_test select * from t")
+    withIndex(TestIndex("orc_test", "index1")) {
+      sql("create oindex index1 on orc_test (a)")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE " +
+        "a=10 AND a in (20,30,40)"), Nil)
+    }
+  }
+
+  test("test orc query include in") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table orc_test select * from t")
+    withIndex(TestIndex("orc_test", "index1"),
+      TestIndex("orc_test", "index2")) {
+      sql("create oindex index1 on orc_test (a)")
+      sql("create oindex index2 on orc_test (b)")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE " +
+        "a=10 or a in (20,30)"),
+        Row(10, "10") :: Row(20, "20")
+          :: Row(30, "30") :: Nil)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE " +
+        "b='10' or a in (20,30)"),
+        Row(10, "10") :: Row(20, "20")
+          :: Row(30, "30") :: Nil)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE " +
+        "b='10' or (b = '20' and a in (10,20,30))"),
+        Row(10, "10") :: Row(20, "20") :: Nil)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE " +
+        "b='10' and b in (10,20,30)"),
+        Row(10, "10") :: Nil)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE " +
+        "b='10' or b in (10,20,30)"),
+        Row(10, "10") :: Row(20, "20")
+          :: Row(30, "30")  :: Nil)
+    }
+  }
+
+
+  test("test orc use between") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table orc_test select * from t")
+    withIndex(TestIndex("orc_test", "index1")) {
+      sql("create oindex index1 on orc_test (a)")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE " +
+        "a BETWEEN 10 AND 12"),
+        Row(10, "10") :: Row(11, "11")
+          :: Row(12, "12") :: Nil)
+    }
+  }
+
+
   test("test oap use in") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
@@ -798,6 +1076,21 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     }
   }
 
+  test("test orc inner join") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i / 10, s"$i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table orc_test select * from t")
+    withIndex(TestIndex("orc_test", "index1")) {
+      sql("create oindex index1 on orc_test (a)")
+
+      checkAnswer(sql("select t2.a, sum(t2.b) " +
+        "from (select a from orc_test where a = 3 ) t1 " +
+        "inner join orc_test t2 on t1.a = t2.a " +
+        "group by t2.a"),
+        Row(3, 3450.0) :: Nil)
+    }
+  }
+
   test("filtering null key") {
     withIndex(TestIndex("oap_test", "idx1")) {
       val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
@@ -864,6 +1157,39 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     }
   }
 
+  test("filtering null key in orc format") {
+    withIndex(TestIndex("orc_test", "idx1")) {
+      val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
+        if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+      }.map(Row.fromSeq)
+      val schema =
+        StructType(
+          StructField("a", IntegerType) ::
+            StructField("c", StringType) :: Nil)
+      val df = spark.createDataFrame(rowRDD, schema)
+      df.createOrReplaceTempView("t")
+      val nullKeyRows = (1 to 5).map(i => Row(null, s"this is row $i"))
+
+      sql("insert overwrite table orc_test select * from t")
+
+      sql("create oindex idx1 on orc_test (a)")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a is null"), nullKeyRows)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a > 11 AND a <= 13"),
+        Row(12, "this is row 12") :: Row(13, "this is row 13") :: Nil)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a <= 2"), Nil)
+
+      sql("insert into table orc_test values(null, 'this is row 400')")
+      sql("insert into table orc_test values(null, 'this is row 500')")
+      sql("refresh oindex on orc_test")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a is null"),
+        nullKeyRows :+ Row(null, "this is row 400") :+ Row(null, "this is row 500"))
+    }
+  }
+
   test("filtering non-null key") {
     val rowRDD = spark.sparkContext.parallelize(1 to 10).map { i =>
       if (i <= 3) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
@@ -914,6 +1240,31 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     }
   }
 
+  test("filtering non-null key in orc format") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 10).map { i =>
+      if (i <= 3) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nonNullKeyRows = (4 to 10).map(i => Row(i, s"this is row $i"))
+
+    sql("insert overwrite table orc_test select * from t")
+    withIndex(TestIndex("orc_test", "idx1")) {
+      sql("create oindex idx1 on orc_test (a)")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a is not null"), nonNullKeyRows)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a > 7 AND a <= 9"),
+        Row(8, "this is row 8") :: Row(9, "this is row 9") :: Nil)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a <= 2"), Nil)
+    }
+  }
+
   test("filtering null key and normal key mixed") {
     val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
       if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
@@ -957,6 +1308,29 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
         Row(12, "this is row 12") :: Row(13, "this is row 13") :: Nil ++ nullKeyRows)
 
       checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 23 and a is null"), Nil)
+    }
+  }
+
+  test("filtering null key and normal key mixed in orc format") {
+    val rowRDD = spark.sparkContext.parallelize(1 to 100, 3).map { i =>
+      if (i <= 5) Seq(null, s"this is row $i") else Seq(i, s"this is row $i")
+    }.map(Row.fromSeq)
+    val schema =
+      StructType(
+        StructField("a", IntegerType) ::
+          StructField("c", StringType) :: Nil)
+    val df = spark.createDataFrame(rowRDD, schema)
+    df.createOrReplaceTempView("t")
+    val nullKeyRows = (1 to 5).map(i => Row(null, s"this is row $i"))
+
+    sql("insert overwrite table orc_test select * from t")
+    withIndex(TestIndex("orc_test", "idx1")) {
+      sql("create oindex idx1 on orc_test (a)")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a > 11 AND a <= 13 or a is null"),
+        Row(12, "this is row 12") :: Row(13, "this is row 13") :: Nil ++ nullKeyRows)
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE a > 23 and a is null"), Nil)
     }
   }
 
@@ -1042,6 +1416,22 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       }
     }
     spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "true")
+  }
+
+  test("filtering orc with off-heap column vector") {
+    spark.sqlContext.setConf(OapConf.COLUMN_VECTOR_OFFHEAP_ENABLED.key, "true")
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table orc_test select * from t")
+    withIndex(TestIndex("orc_test", "index1")) {
+      sql("create oindex index1 on orc_test (b)")
+
+      checkAnswer(sql("SELECT * FROM orc_test WHERE " +
+        "b in('this is test 1','this is test 2','this is test 4')"),
+        Row(1, "this is test 1") :: Row(2, "this is test 2")
+          :: Row(4, "this is test 4") :: Nil)
+    }
+    spark.sqlContext.setConf(OapConf.COLUMN_VECTOR_OFFHEAP_ENABLED.key, "false")
   }
 
   test("OAP-764 BloomFilterStatisticsReader#analyse unexpected return SkipFile") {

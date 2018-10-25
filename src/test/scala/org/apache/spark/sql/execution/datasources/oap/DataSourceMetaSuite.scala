@@ -216,63 +216,69 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
     }
   }
 
-  test("Oap Meta integration test for parquet") {
+  test("Oap Meta integration test for parquet and orc") {
     val df = sparkContext.parallelize(1 to 100, 3)
       .map(i => (i, i + 100, s"this is row $i"))
       .toDF("a", "b", "c")
-    df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
-    val oapDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
-    oapDf.createOrReplaceTempView("oapt1")
+    val fileFormats = Array("parquet", "orc")
+    fileFormats.foreach(fileFormat => {
+      df.write.format(s"${fileFormat}").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+      val oapDf = sqlContext.read.format(s"${fileFormat}").load(tmpDir.getAbsolutePath)
+      oapDf.createOrReplaceTempView("oapt1")
 
-    val path = new Path(
-      new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
+      val path = new Path(
+        new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
 
-    val fs = path.getFileSystem(new Configuration())
-    assert(!fs.exists(path))
-    withIndex(TestIndex("oapt1", "index1"),
-      TestIndex("oapt1", "index3")) {
-      withIndex(TestIndex("oapt1", "index2")) {
-        sql("create oindex index1 on oapt1 (a)")
-        sql("create oindex index2 on oapt1 (a asc)") // dup as index1, still creating
-        sql("create oindex index3 on oapt1 (a desc)")
-        sql("create oindex if not exists index3 on oapt1 (a desc)") // not creating
+      val fs = path.getFileSystem(new Configuration())
+      assert(!fs.exists(path))
+      withIndex(TestIndex("oapt1", "index1"),
+        TestIndex("oapt1", "index3")) {
+        withIndex(TestIndex("oapt1", "index2")) {
+          sql("create oindex index1 on oapt1 (a)")
+          sql("create oindex index2 on oapt1 (a asc)") // dup as index1, still creating
+          sql("create oindex index3 on oapt1 (a desc)")
+          sql("create oindex if not exists index3 on oapt1 (a desc)") // not creating
+        }
+        sql("drop oindex if exists index5 on oapt1") // not dropping
+        sql("drop oindex if exists index2 on oapt1") // not dropping
+
+        val oapMeta2 = DataSourceMeta.initialize(path, new Configuration())
+        val fileHeader2 = oapMeta2.fileHeader
+        assert(fileHeader2.recordCount === 100)
+        assert(fileHeader2.dataFileCount === 3)
+        assert(fileHeader2.indexCount === 2)
       }
-      sql("drop oindex if exists index5 on oapt1") // not dropping
-      sql("drop oindex if exists index2 on oapt1") // not dropping
-
-      val oapMeta2 = DataSourceMeta.initialize(path, new Configuration())
-      val fileHeader2 = oapMeta2.fileHeader
-      assert(fileHeader2.recordCount === 100)
-      assert(fileHeader2.dataFileCount === 3)
-      assert(fileHeader2.indexCount === 2)
-    }
+    })
   }
 
-  test("FileMeta's data file name test for parquet") {
+  test("FileMeta's data file name test for parquet and orc") {
     val df = sparkContext.parallelize(1 to 100, 3)
       .map(i => (i, i + 100, s"this is row $i"))
       .toDF("a", "b", "c")
-    df.write.format("parquet").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
-    val oapDf = sqlContext.read.format("parquet").load(tmpDir.getAbsolutePath)
-    oapDf.createOrReplaceTempView("t")
+    val fileFormats = Array("parquet", "orc")
+    fileFormats.foreach(fileFormat => {
+      df.write.format(s"${fileFormat}").mode(SaveMode.Overwrite).save(tmpDir.getAbsolutePath)
+      val oapDf = sqlContext.read.format(s"${fileFormat}").load(tmpDir.getAbsolutePath)
+      oapDf.createOrReplaceTempView("t")
 
-    val path = new Path(
-      new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
+      val path = new Path(
+        new File(tmpDir.getAbsolutePath, OapFileFormat.OAP_META_FILE).getAbsolutePath)
 
-    val fs = path.getFileSystem(new Configuration())
-    assert(!fs.exists(path))
+      val fs = path.getFileSystem(new Configuration())
+      assert(!fs.exists(path))
 
-    withIndex(TestIndex("t", "index1")) {
-      sql("create oindex index1 on t (a)") // this will create index files along with meta file
-      assert(fs.exists(path))
+      withIndex(TestIndex("t", "index1")) {
+        sql("create oindex index1 on t (a)") // this will create index files along with meta file
+        assert(fs.exists(path))
 
-      val oapMeta = DataSourceMeta.initialize(path, sparkContext.hadoopConfiguration)
-      val fileMetas = oapMeta.fileMetas
-      assert(fileMetas.length === 3)
-      assert(fileMetas.map(_.recordCount).sum === 100)
-      assert(fileMetas(0).dataFileName.endsWith(".parquet"))
-      assert(fileMetas(0).dataFileName.startsWith("part"))
-    }
+        val oapMeta = DataSourceMeta.initialize(path, sparkContext.hadoopConfiguration)
+        val fileMetas = oapMeta.fileMetas
+        assert(fileMetas.length === 3)
+        assert(fileMetas.map(_.recordCount).sum === 100)
+        assert(fileMetas(0).dataFileName.endsWith("." + s"${fileFormat}"))
+        assert(fileMetas(0).dataFileName.startsWith("part"))
+      }
+    })
   }
 
   test("Oap meta for partitioned table") {

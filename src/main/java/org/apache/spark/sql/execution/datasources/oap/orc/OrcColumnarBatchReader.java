@@ -36,7 +36,6 @@ import org.apache.orc.storage.serde2.io.HiveDecimalWritable;
 
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.execution.datasources.orc.OrcColumnVector;
 import org.apache.spark.sql.vectorized.oap.orc.ColumnVectorUtils;
 import org.apache.spark.sql.vectorized.oap.orc.OffHeapColumnVector;
 import org.apache.spark.sql.vectorized.oap.orc.OnHeapColumnVector;

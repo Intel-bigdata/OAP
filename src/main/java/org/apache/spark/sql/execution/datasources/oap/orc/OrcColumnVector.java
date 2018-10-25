@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.orc;
+package org.apache.spark.sql.execution.datasources.oap.orc;
 
 import java.math.BigDecimal;
 

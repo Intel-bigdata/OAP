@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 
 import org.apache.hadoop.fs.FSDataInputStream
@@ -25,19 +26,26 @@ import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.utils.PersistentMemoryConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.storage.{BlockManager, TestBlockId}
-import org.apache.spark.unsafe.Platform
-import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
+import org.apache.spark.unsafe.{PersistentMemoryPlatform, Platform}
+import org.apache.spark.util.Utils
 
 /**
- * This just wrap the memory block with a occupied size field. The field used to get the actual
- * occupied size of the memoryBlock. For DRAM type of memory, the field should be same as the
- * block size. For other types of memory, that's depends on the implementation of memory
- * allocation.
+ * A memory block holder which contains the base object, offset, length and occupiedSize. For DRAM
+ * type of memory, the field of occupiedSize should be same as the block length. For Intel Optane
+ * DC persistent memory, the occupied size is typically larger than length because the
+ * heap management is based on the jemalloc.
+ * @param baseObject null for OFF_HEAP or Intel Optane DC persistent memory
+ * @param length the requested size of the block
+ * @param occupiedSize the actual occupied size of the memory block
  */
-private[filecache] case class MemoryBlockWithOccupiedSize(
-    memoryBlock: MemoryBlock, occupiedSize: Long)
+private[filecache] case class MemoryBlockHolder(
+    baseObject: AnyRef,
+    baseOffset: Long,
+    length: Long,
+    occupiedSize: Long)
 
 private[sql] abstract class MemoryManager {
   /**
@@ -60,16 +68,16 @@ private[sql] abstract class MemoryManager {
    * with the requested size, that's depends on the underlying implementation.
    * @param size requested size of memory block
    */
-  private[filecache] def allocate(size: Long): MemoryBlockWithOccupiedSize
-  private[filecache] def free(block: MemoryBlockWithOccupiedSize): Unit
+  private[filecache] def allocate(size: Long): MemoryBlockHolder
+  private[filecache] def free(block: MemoryBlockHolder): Unit
 
   @inline protected def toFiberCache(bytes: Array[Byte]): FiberCache = {
     val block = allocate(bytes.length)
     Platform.copyMemory(
       bytes,
       Platform.BYTE_ARRAY_OFFSET,
-      block.memoryBlock.getBaseObject,
-      block.memoryBlock.getBaseOffset,
+      block.baseObject,
+      block.baseOffset,
       bytes.length)
     FiberCache(block)
   }
@@ -122,6 +130,7 @@ private[sql] object MemoryManager {
       conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
     memoryManagerOpt match {
       case "offheap" => new OffHeapMemoryManager(sparkEnv)
+      case "pm" => new PersistentMemoryManager(sparkEnv)
       case _ => throw new UnsupportedOperationException(
         s"The memory manager: ${memoryManagerOpt} is not supported now")
     }
@@ -168,22 +177,88 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 
   override def cacheGuardianMemory: Long = _cacheGuardianMemory
 
-  override private[filecache] def allocate(size: Long): MemoryBlockWithOccupiedSize = {
-    val block = MemoryAllocator.UNSAFE.allocate(size)
+  override private[filecache] def allocate(size: Long): MemoryBlockHolder = {
+    val address = Platform.allocateMemory(size)
     _memoryUsed.getAndAdd(size)
     logDebug(s"request allocate $size memory, actual occupied size: " +
       s"${size}, used: $memoryUsed")
     // For OFF_HEAP, occupied size also equal to the size.
-    MemoryBlockWithOccupiedSize(block, size)
+    MemoryBlockHolder(null, address, size, size)
   }
 
-  override private[filecache] def free(block: MemoryBlockWithOccupiedSize): Unit = {
-    MemoryAllocator.UNSAFE.free(block.memoryBlock)
+  override private[filecache] def free(block: MemoryBlockHolder): Unit = {
+    assert(block.baseObject == null)
+    Platform.freeMemory(block.baseOffset)
     _memoryUsed.getAndAdd(-block.occupiedSize)
     logDebug(s"freed ${block.occupiedSize} memory, used: $memoryUsed")
   }
 
   override def stop(): Unit = {
     memoryManager.releaseStorageMemory(oapMemory, MemoryMode.OFF_HEAP)
+  }
+}
+
+/**
+ * A memory manager which supports allocate/free volatile memory from Intel Optane DC
+ * persistent memory.
+ */
+private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
+  extends MemoryManager with Logging {
+
+  private val (_cacheMemory, _cacheGuardianMemory) = init()
+
+  private val _memoryUsed = new AtomicLong(0)
+
+  private def init(): (Long, Long) = {
+    val conf = sparkEnv.conf
+    // The NUMA id should be set when the executor process start up. However, Spark don't
+    // support NUMA binding currently.
+    var numaId = conf.getInt("spark.executor.numa.id", -1)
+    val executorId = sparkEnv.executorId.toInt
+    val map = PersistentMemoryConfigUtils.parseConfig(conf)
+    if (numaId == -1) {
+      logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +
+        s"executor with NUMA when cache data to Intel Optane DC persistent memory.")
+      // Just round the executorId to the total NUMA number.
+      // TODO: improve here
+      numaId = executorId % PersistentMemoryConfigUtils.totalNumaNode(conf)
+    }
+
+    val initialPath = map.get(numaId).get
+    val initialSizeStr = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim
+    val initialSize = Utils.byteStringAsBytes(initialSizeStr)
+    val reservedSizeStr = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE).trim
+    val reservedSize = Utils.byteStringAsBytes(reservedSizeStr)
+    val fullPath = Utils.createTempDir(initialPath + File.separator + executorId)
+    PersistentMemoryPlatform.initialize(fullPath.getCanonicalPath, initialSize)
+    logInfo(s"Initialize Intel Optane DC persistent memory successfully, numaId: ${numaId}, " +
+      s"initial path: ${fullPath.getCanonicalPath}, initial size: ${initialSize}, reserved size: " +
+      s"${reservedSize}")
+    require(reservedSize >= 0 && reservedSize < initialSize, s"Reserved size(${reservedSize}) " +
+      s"should be larger than zero and smaller than initial size(${initialSize})")
+    val totalUsableSize = initialSize - reservedSize
+    ((totalUsableSize * 0.9).toLong, (totalUsableSize * 0.1).toLong)
+  }
+
+  override def memoryUsed: Long = _memoryUsed.get()
+
+  override def cacheMemory: Long = _cacheMemory
+
+  override def cacheGuardianMemory: Long = _cacheGuardianMemory
+
+  override private[filecache] def allocate(size: Long): MemoryBlockHolder = {
+    val address = PersistentMemoryPlatform.allocateVolatileMemory(size)
+    val occupiedSize = PersistentMemoryPlatform.getOccupiedSize(address)
+    _memoryUsed.getAndAdd(occupiedSize)
+    logDebug(s"request allocate $size memory, actual occupied size: " +
+      s"${occupiedSize}, used: $memoryUsed")
+    MemoryBlockHolder(null, address, size, occupiedSize)
+  }
+
+  override private[filecache] def free(block: MemoryBlockHolder): Unit = {
+    assert(block.baseObject == null)
+    PersistentMemoryPlatform.freeMemory(block.baseOffset)
+    _memoryUsed.getAndAdd(-block.occupiedSize)
+    logDebug(s"freed ${block.occupiedSize} memory, used: $memoryUsed")
   }
 }

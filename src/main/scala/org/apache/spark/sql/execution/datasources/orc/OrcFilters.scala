@@ -54,7 +54,7 @@ import org.apache.spark.sql.types._
  * builder methods mentioned above can only be found in test code, where all tested filters are
  * known to be convertible.
  */
-private[orc] object OrcFilters {
+private[datasources] object OrcFilters {
 
   /**
    * Create ORC filter as a SearchArgument instance.

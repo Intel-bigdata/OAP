@@ -163,33 +163,11 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
       }
 
       nextBatchInternal();
-      filterRowsWithIndex(ids);
-      return true;
-    }
-
-    @Override
-    protected void checkEndOfRowGroup() throws IOException {
-      if (rowsReturned != totalCountLoadedSoFar) {
-        return;
-      }
-      // if rowsReturned == totalCountLoadedSoFar
-      // readNextRowGroup & divideRowIdsIntoPages
-      readNextRowGroup();
-    }
-
-    private void filterRowsWithIndex(IntList ids) throws IOException {
-      // if returnColumnarBatch, mark columnarBatch filtered status.
-      // else assignment batchIdsIter.
-      if (returnColumnarBatch) {
-        // TODO retest the necessity of this process.
-        columnarBatch.markAllFiltered();
-        for (Integer rowId : ids) {
-          columnarBatch.markValid(rowId);
-        }
-      } else {
+      if (!returnColumnarBatch) {
         batchIds = ids;
         numBatched = ids.size();
       }
+      return true;
     }
 
     private void divideRowIdsIntoPages(IntList currentIndexList) {

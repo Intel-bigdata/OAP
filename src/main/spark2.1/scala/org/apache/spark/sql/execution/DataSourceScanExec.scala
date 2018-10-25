@@ -160,6 +160,17 @@ case class FileSourceScanExec(
 
   @transient private lazy val selectedPartitions = relation.location.listFiles(partitionFilters)
 
+ /**
+  * With oap index and orc format, forOapOrcColumnarBatch is true. Otherwise, it's false.
+  * If it's true, the code gen will use org.apache.spark.sql.vectorized.oap.orc.ColumnarBatch which
+  * is back ported from Spark 2.3 for OrcColumnarBatchReader.
+  */
+  private val forOapOrcColumnarBatch =
+    relation.options.getOrElse("isOapOrcFileFormat", "false") match {
+      case "false" => false
+      case "true" => true
+    }
+
   override val (outputPartitioning, outputOrdering): (Partitioning, Seq[SortOrder]) = {
     val bucketSpec = if (relation.sparkSession.sessionState.conf.bucketingEnabled) {
       relation.bucketSpec
@@ -359,11 +370,21 @@ case class FileSourceScanExec(
     val scanTimeTotalNs = ctx.freshName("scanTime")
     ctx.addMutableState("long", scanTimeTotalNs, s"$scanTimeTotalNs = 0;")
 
-    val columnarBatchClz = "org.apache.spark.sql.execution.vectorized.ColumnarBatch"
+    val columnarBatchClz =
+      if (!forOapOrcColumnarBatch) {
+        "org.apache.spark.sql.execution.vectorized.ColumnarBatch"
+      } else {
+        "org.apache.spark.sql.vectorized.oap.orc.ColumnarBatch"
+      }
     val batch = ctx.freshName("batch")
     ctx.addMutableState(columnarBatchClz, batch, s"$batch = null;")
 
-    val columnVectorClz = "org.apache.spark.sql.execution.vectorized.ColumnVector"
+    val columnVectorClz =
+      if (!forOapOrcColumnarBatch) {
+        "org.apache.spark.sql.execution.vectorized.ColumnVector"
+      } else {
+        "org.apache.spark.sql.vectorized.oap.orc.ColumnVector"
+      }
     val idx = ctx.freshName("batchIdx")
     ctx.addMutableState("int", idx, s"$idx = 0;")
     val colVars = output.indices.map(i => ctx.freshName("colInstance" + i))
@@ -391,6 +412,7 @@ case class FileSourceScanExec(
     val columnsBatchInput = (output zip colVars).map { case (attr, colVar) =>
       genCodeColumnVector(ctx, colVar, rowidx, attr.dataType, attr.nullable)
     }
+
     s"""
        |if ($batch == null) {
        |  $nextBatch();
@@ -399,7 +421,6 @@ case class FileSourceScanExec(
        |  int numRows = $batch.numRows();
        |  while ($idx < numRows) {
        |    int $rowidx = $idx++;
-       |    if ($batch.isFiltered($rowidx)) continue;
        |    ${consume(ctx, columnsBatchInput).trim}
        |    if (shouldStop()) return;
        |  }

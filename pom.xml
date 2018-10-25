@@ -37,6 +37,7 @@
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <basedir>./</basedir>
     <jetty.version>9.2.16.v20160414</jetty.version>
+    <exec.maven.version>1.6.0</exec.maven.version>
   </properties>
 
   <repositories>
@@ -286,13 +287,13 @@
     <dependency>
         <groupId>org.apache.parquet</groupId>
         <artifactId>parquet-column</artifactId>
-        <version>1.8.2</version>
+        <version>${parquet.version}</version>
         <scope>compile</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.parquet</groupId>
         <artifactId>parquet-hadoop</artifactId>
-        <version>1.8.2</version>
+        <version>${parquet.version}</version>
         <scope>compile</scope>
       </dependency>
     <dependency>
@@ -385,42 +386,6 @@
                <fail>true</fail>
              </configuration>
            </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>3.1.0</version>
-        <configuration>
-          <shadedArtifactAttached>false</shadedArtifactAttached>
-          <artifactSet>
-            <includes>
-              <include>org.spark-project.spark:unused</include>
-              <include>com.google.guava:guava</include>
-              <include>org.apache.parquet:*</include>
-            </includes>
-          </artifactSet>
-          <relocations>
-            <relocation>
-              <pattern>org.eclipse.jetty</pattern>
-              <shadedPattern>org.spark_project.jetty</shadedPattern>
-              <includes>
-                <include>org.eclipse.jetty.**</include>
-              </includes>
-            </relocation>
-            <relocation>
-              <pattern>com.google.common</pattern>
-              <shadedPattern>org.spark_project.guava</shadedPattern>
-            </relocation>
-          </relocations>
-        </configuration>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-          </execution>
         </executions>
       </plugin>
 
@@ -568,6 +533,15 @@
         <version>2.3</version>
         <executions>
           <execution>
+            <id>default-jar</id>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classifier>with-spark-${spark.internal.version}</classifier>
+            </configuration>
+          </execution>
+          <execution>
             <id>prepare-test-jar</id>
             <phase>prepare-package</phase>
             <goals>
@@ -628,6 +602,8 @@
         <antlr.version>4.5.3</antlr.version>
         <scalatest.version>2.2.6</scalatest.version>
         <scalacheck.version>1.12.5</scalacheck.version>
+        <!--for a bug fix, upgrade 1.8.1 to 1.8.2-->
+        <parquet.version>1.8.2</parquet.version>
       </properties>
       <build>
         <plugins>
@@ -704,6 +680,7 @@
         <antlr.version>4.5.3</antlr.version>
         <scalatest.version>2.2.6</scalatest.version>
         <scalacheck.version>1.12.5</scalacheck.version>
+        <parquet.version>1.8.2</parquet.version>
       </properties>
       <build>
         <plugins>
@@ -780,6 +757,7 @@
         <antlr.version>4.7</antlr.version>
         <scalatest.version>3.0.3</scalatest.version>
         <scalacheck.version>1.13.5</scalacheck.version>
+        <parquet.version>1.8.3</parquet.version>
       </properties>
       <build>
         <plugins>
@@ -845,6 +823,37 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>persistent-memory</id>
+      <build>
+        <resources>
+          <resource>
+            <directory>src/main/resources</directory>
+          </resource>
+          <resource>
+            <directory>${basedir}/conf</directory>
+          </resource>
+        </resources>
+        <plugins>
+          <plugin>
+            <artifactId>exec-maven-plugin</artifactId>
+            <groupId>org.codehaus.mojo</groupId>
+            <version>${exec.maven.version}</version>
+            <executions>
+              <execution>
+                <id>Compile native code and produce share library</id>
+                <phase>generate-resources</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>${basedir}/src/main/native/compile.sh</executable>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
-
 </project>

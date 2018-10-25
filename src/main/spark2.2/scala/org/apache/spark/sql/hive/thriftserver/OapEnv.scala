@@ -71,7 +71,7 @@ private[spark] object OapEnv extends Logging {
 
       SparkSQLEnv.sparkContext = sparkContext
       SparkSQLEnv.sqlContext = sqlContext
-      this.sparkSession = sparkSession
+      this.sparkSession = sqlContext.sparkSession
 
       sparkContext.ui.foreach(new OapTab(_))
       initialized = true
