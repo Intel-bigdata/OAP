@@ -292,26 +292,34 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * From VectorizedParquetRecordReader, no change.
      */
     public boolean nextBatch() throws IOException {
-        for (WritableColumnVector vector : columnVectors) {
-            vector.reset();
-        }
-        columnarBatch.setNumRows(0);
 
       if (rowsReturned >= totalRowCount) return false;
       checkEndOfRowGroup();
-
-      int num = (int) Math.min((long) CAPACITY,
-        totalCountLoadedSoFar - rowsReturned);
-      for (int i = 0; i < columnReaders.length; ++i) {
-        if (columnReaders[i] == null) continue;
-        columnReaders[i].readBatch(num, columnVectors[i]);
-      }
-      rowsReturned += num;
-      columnarBatch.setNumRows(num);
-      numBatched = num;
-      batchIdx = 0;
+      nextBatchInternal();
       return true;
     }
+
+  /**
+   * Extract part code from nextBatch() to a method and call by subclass, call this method we
+   * should ensure the backend has enough data.
+   */
+  protected void nextBatchInternal() throws IOException {
+    for (WritableColumnVector vector : columnVectors) {
+      vector.reset();
+    }
+    columnarBatch.setNumRows(0);
+
+    int num = (int) Math.min((long) CAPACITY,
+            totalCountLoadedSoFar - rowsReturned);
+    for (int i = 0; i < columnReaders.length; ++i) {
+      if (columnReaders[i] == null) continue;
+      columnReaders[i].readBatch(num, columnVectors[i]);
+    }
+    rowsReturned += num;
+    columnarBatch.setNumRows(num);
+    numBatched = num;
+    batchIdx = 0;
+  }
 
     /**
      * From VectorizedParquetRecordReader, chanage private -> protected.
