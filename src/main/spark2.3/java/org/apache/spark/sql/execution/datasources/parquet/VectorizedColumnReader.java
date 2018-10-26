@@ -92,7 +92,7 @@ public class VectorizedColumnReader {
 
   private final PageReader pageReader;
   protected final ColumnDescriptor descriptor;
-  private final OriginalType originalType;
+  protected final OriginalType originalType;
   // The timezone conversion to apply to int96 timestamps. Null if no conversion.
   private final TimeZone convertTz;
   private static final TimeZone UTC = DateTimeUtils.TimeZoneUTC();
