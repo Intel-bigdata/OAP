@@ -27,18 +27,16 @@ import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.hadoop.metadata.ParquetFooter;
 import org.apache.parquet.schema.Type;
-
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReader;
-import org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReaderWrapper;
+import org.apache.spark.sql.execution.datasources.parquet.SkippableVectorizedColumnReader;
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
-import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.execution.vectorized.OffHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
-import org.apache.spark.sql.vectorized.ColumnarBatch;
+import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.vectorized.ColumnarBatch;
 
 public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Object> {
 
@@ -62,7 +60,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
      * From VectorizedParquetRecordReader, change private to protected,
      * wrapper VectorizedColumnReader.
      */
-    protected VectorizedColumnReaderWrapper[] columnReaders;
+    protected SkippableVectorizedColumnReader[] columnReaders;
 
     /**
      * The number of rows that have been returned.
@@ -369,12 +367,12 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
       }
       List<ColumnDescriptor> columns = requestedSchema.getColumns();
       List<Type> types = requestedSchema.asGroupType().getFields();
-      columnReaders = new VectorizedColumnReaderWrapper[columns.size()];
+      columnReaders = new SkippableVectorizedColumnReader[columns.size()];
       for (int i = 0; i < columns.size(); ++i) {
         if (missingColumns[i]) continue;
-        columnReaders[i] = new VectorizedColumnReaderWrapper(
-          new VectorizedColumnReader(columns.get(i), types.get(i).getOriginalType(),
-          pages.getPageReader(columns.get(i)), TimeZone.getDefault()));
+        columnReaders[i] = new SkippableVectorizedColumnReader(columns.get(i),
+          types.get(i).getOriginalType(), pages.getPageReader(columns.get(i)),
+          TimeZone.getDefault());
       }
       totalCountLoadedSoFar += pages.getRowCount();
     }
