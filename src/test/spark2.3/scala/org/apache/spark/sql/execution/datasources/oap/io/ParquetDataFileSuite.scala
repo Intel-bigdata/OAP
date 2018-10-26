@@ -18,11 +18,10 @@
 package org.apache.spark.sql.execution.datasources.oap.io
 
 import java.io.{File, IOException}
+import java.util
 import java.util.TimeZone
 
 import scala.collection.mutable.ArrayBuffer
-
-import java.util
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -557,8 +556,8 @@ class ParquetFiberDataReaderSuite extends ParquetDataFileSuite {
     val types: util.List[Type] = parquetSchema.asGroupType.getFields
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
     val columnReader =
-        new SkippableVectorizedColumnReader(columnDescriptor, types.get(0).getOriginalType,
-          fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(0).getOriginalType,
+        fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     columnReader.readBatch(rowCount, vector)
     for (i <- 0 until rowCount) {
       assert(i * 2 == vector.getInt(i))

@@ -80,8 +80,8 @@ private[oap] case class ParquetFiberDataLoader(
         val blockMetaData = footer.getBlocks.get(blockId)
         val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
         val columnReader =
-            new SkippableVectorizedColumnReader(columnDescriptor, OriginalType,
-              fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
+          new SkippableVectorizedColumnReader(columnDescriptor, OriginalType,
+            fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
         columnReader.readBatch(rowCount, vector(0))
       }
 
