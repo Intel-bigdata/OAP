@@ -22,10 +22,10 @@ import javax.servlet.http.HttpServletRequest
 import javax.ws.rs._
 import javax.ws.rs.core.{Context, Response}
 
-import org.eclipse.jetty.server.handler.ContextHandler
-import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.glassfish.jersey.server.ServerProperties
 import org.glassfish.jersey.servlet.ServletContainer
+import org.spark_project.jetty.server.handler.ContextHandler
+import org.spark_project.jetty.servlet.{ServletContextHandler, ServletHolder}
 
 import org.apache.spark.SecurityManager
 import org.apache.spark.ui.SparkUI
