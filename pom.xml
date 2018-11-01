@@ -36,7 +36,6 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <basedir>./</basedir>
-    <jetty.version>9.2.16.v20160414</jetty.version>
     <exec.maven.version>1.6.0</exec.maven.version>
   </properties>
 
@@ -604,6 +603,7 @@
         <scalacheck.version>1.12.5</scalacheck.version>
         <!--for a bug fix, upgrade 1.8.1 to 1.8.2-->
         <parquet.version>1.8.2</parquet.version>
+        <jetty.version>9.2.16.v20160414</jetty.version>
       </properties>
       <build>
         <plugins>
@@ -681,6 +681,7 @@
         <scalatest.version>2.2.6</scalatest.version>
         <scalacheck.version>1.12.5</scalacheck.version>
         <parquet.version>1.8.2</parquet.version>
+        <jetty.version>9.3.11.v20160721</jetty.version>
       </properties>
       <build>
         <plugins>
@@ -758,6 +759,7 @@
         <scalatest.version>3.0.3</scalatest.version>
         <scalacheck.version>1.13.5</scalacheck.version>
         <parquet.version>1.8.3</parquet.version>
+        <jetty.version>9.3.24.v20180605</jetty.version>
       </properties>
       <build>
         <plugins>
