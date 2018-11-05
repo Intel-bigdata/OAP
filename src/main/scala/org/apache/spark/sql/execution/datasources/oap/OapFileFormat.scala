@@ -281,6 +281,8 @@ private[sql] class OapFileFormat extends FileFormat
         }
       case None => (_: PartitionedFile) => {
         // TODO need to think about when there is no oap.meta file at all
+        // TODO Parquet should refer to ParquetFileFormat in OptimizedParquetFileFormat
+        // TODO Orc should refer to OrcFileFormat in OptimizedOrcFileFormat
         Iterator.empty
       }
     }
