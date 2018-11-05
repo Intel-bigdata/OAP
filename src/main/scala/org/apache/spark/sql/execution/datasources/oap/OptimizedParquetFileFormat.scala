@@ -90,7 +90,6 @@ private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
         (file: PartitionedFile) => {
           assert(file.partitionValues.numFields == partitionSchema.size)
           val conf = broadcastedHadoopConf.value.value
-
           // For parquet, if enableVectorizedReader is true, init ParquetVectorizedContext.
           // Otherwise context is none.
           val context: Option[DataFileContext] = if (enableVectorizedReader) {

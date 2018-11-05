@@ -82,10 +82,6 @@ private[sql] class OptimizedOrcFileFormat extends OapFileFormat {
 
         val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
 
-        // Refer to ParquetFileFormat, use resultSchema to decide if this query support
-        // Vectorized Read and returningBatch. Also it depends on WHOLE_STAGE_CODE_GEN,
-        // as the essential unsafe projection is done by that.
-
         val enableOffHeapColumnVector =
           sparkSession.sessionState.conf.getConf(OapConf.COLUMN_VECTOR_OFFHEAP_ENABLED)
         val copyToSpark =
@@ -113,8 +109,6 @@ private[sql] class OptimizedOrcFileFormat extends OapFileFormat {
           val fs = path.getFileSystem(broadcastedHadoopConf.value.value)
 
           var orcWithEmptyColIds = false
-          // For parquet, if enableVectorizedReader is true, init ParquetVectorizedContext.
-          // Otherwise context is none.
           // For Orc, the context is used by both vectorized readers and map reduce readers.
           // See the comments in DataFile.scala.
           val context: Option[DataFileContext] = {
