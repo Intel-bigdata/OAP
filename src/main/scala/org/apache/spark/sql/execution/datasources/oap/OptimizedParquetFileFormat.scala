@@ -78,6 +78,9 @@ class OptimizedParquetFileFormat extends OapFileFormat {
         val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
 
         val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
+        val enableVectorizedReader: Boolean =
+          sparkSession.sessionState.conf.parquetVectorizedReaderEnabled &&
+            resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
         val returningBatch = supportBatch(sparkSession, resultSchema)
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
@@ -88,7 +91,7 @@ class OptimizedParquetFileFormat extends OapFileFormat {
 
           // For parquet, if enableVectorizedReader is true, init ParquetVectorizedContext.
           // Otherwise context is none.
-          val context: Option[DataFileContext] = if (returningBatch) {
+          val context: Option[DataFileContext] = if (enableVectorizedReader) {
             Some(ParquetVectorizedContext(partitionSchema,
               file.partitionValues, returningBatch))
           } else {
@@ -96,7 +99,7 @@ class OptimizedParquetFileFormat extends OapFileFormat {
           }
 
           val reader = new OapDataReaderV1(file.filePath, m, partitionSchema, requiredSchema,
-            filterScanners, requiredIds, pushed, oapMetrics, conf, returningBatch, options,
+            filterScanners, requiredIds, pushed, oapMetrics, conf, enableVectorizedReader, options,
             filters, context)
           reader.read(file)
         }
