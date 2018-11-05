@@ -28,9 +28,9 @@ import org.apache.orc.mapreduce.OrcInputFormat
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Expression}
+import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, ScannerBuilder}
+import org.apache.spark.sql.execution.datasources.oap.index.{IndexContext, IndexScanners, ScannerBuilder}
 import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.io.OapDataFileProperties.DataFileVersion
 import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, OapUtils}
@@ -101,7 +101,7 @@ private[sql] class OapFileFormat extends FileFormat
   var inferSchema: Option[StructType] = _
   var meta: Option[DataSourceMeta] = _
   // map of columns->IndexType
-  private var hitIndexColumns: Map[String, IndexType] = _
+  protected var hitIndexColumns: Map[String, IndexType] = _
 
   def initMetrics(metrics: Map[String, SQLMetric]): Unit = oapMetrics.initMetrics(metrics)
 
@@ -176,59 +176,7 @@ private[sql] class OapFileFormat extends FileFormat
           + m.dataReaderClassName.substring(m.dataReaderClassName.lastIndexOf(".") + 1)
           + " ...")
 
-        // Check whether this filter conforms to certain patterns that could benefit from index
-        def canTriggerIndex(filter: Filter): Boolean = {
-          var attr: String = null
-          def checkAttribute(filter: Filter): Boolean = filter match {
-            case Or(left, right) =>
-              checkAttribute(left) && checkAttribute(right)
-            case And(left, right) =>
-              checkAttribute(left) && checkAttribute(right)
-            case EqualTo(attribute, _) =>
-              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-            case LessThan(attribute, _) =>
-              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-            case LessThanOrEqual(attribute, _) =>
-              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-            case GreaterThan(attribute, _) =>
-              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-            case GreaterThanOrEqual(attribute, _) =>
-              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-            case In(attribute, _) =>
-              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-            case IsNull(attribute) =>
-              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-            case IsNotNull(attribute) =>
-              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-            case StringStartsWith(attribute, _) =>
-              if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-            case _ => false
-          }
-
-          checkAttribute(filter)
-        }
-
-        val ic = new IndexContext(m)
-
-        if (m.indexMetas.nonEmpty) { // check and use index
-          logDebug("Supported Filters by Oap:")
-          // filter out the "filters" on which we can use index
-          val supportFilters = filters.toArray.filter(canTriggerIndex)
-          // After filtered, supportFilter only contains:
-          // 1. Or predicate that contains only one attribute internally;
-          // 2. Some atomic predicates, such as LessThan, EqualTo, etc.
-          if (supportFilters.nonEmpty) {
-            // determine whether we can use index
-            supportFilters.foreach(filter => logDebug("\t" + filter.toString))
-            // get index options such as limit, order, etc.
-            val indexOptions = options.filterKeys(OapFileFormat.oapOptimizationKeySeq.contains(_))
-            val maxChooseSize = sparkSession.conf.get(OapConf.OAP_INDEXER_CHOICE_MAX_SIZE)
-            val indexDisableList = sparkSession.conf.get(OapConf.OAP_INDEX_DISABLE_LIST)
-            ScannerBuilder.build(supportFilters, ic, indexOptions, maxChooseSize, indexDisableList)
-          }
-        }
-
-        val filterScanners = ic.getScanners
+        val filterScanners = indexScanners(m, filters)
         hitIndexColumns = filterScanners match {
           case Some(s) =>
             s.scanners.flatMap { scanner =>
@@ -363,6 +311,65 @@ private[sql] class OapFileFormat extends FileFormat
     } else {
       false
     }
+  }
+
+  /**
+   * Check whether this filter conforms to certain patterns that could benefit from index
+   * @param filter
+   * @return
+   */
+  protected def canTriggerIndex(filter: Filter): Boolean = {
+    var attr: String = null
+    def checkAttribute(filter: Filter): Boolean = filter match {
+      case Or(left, right) =>
+        checkAttribute(left) && checkAttribute(right)
+      case And(left, right) =>
+        checkAttribute(left) && checkAttribute(right)
+      case EqualTo(attribute, _) =>
+        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+      case LessThan(attribute, _) =>
+        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+      case LessThanOrEqual(attribute, _) =>
+        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+      case GreaterThan(attribute, _) =>
+        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+      case GreaterThanOrEqual(attribute, _) =>
+        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+      case In(attribute, _) =>
+        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+      case IsNull(attribute) =>
+        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+      case IsNotNull(attribute) =>
+        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+      case StringStartsWith(attribute, _) =>
+        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+      case _ => false
+    }
+
+    checkAttribute(filter)
+  }
+
+  protected def indexScanners(m: DataSourceMeta, filters: Seq[Filter]): Option[IndexScanners] = {
+    val ic = new IndexContext(m)
+
+    if (m.indexMetas.nonEmpty) { // check and use index
+      logDebug("Supported Filters by Oap:")
+      // filter out the "filters" on which we can use index
+      val supportFilters = filters.toArray.filter(canTriggerIndex)
+      // After filtered, supportFilter only contains:
+      // 1. Or predicate that contains only one attribute internally;
+      // 2. Some atomic predicates, such as LessThan, EqualTo, etc.
+      if (supportFilters.nonEmpty) {
+        // determine whether we can use index
+        supportFilters.foreach(filter => logDebug("\t" + filter.toString))
+        // get index options such as limit, order, etc.
+        val indexOptions = options.filterKeys(OapFileFormat.oapOptimizationKeySeq.contains(_))
+        val maxChooseSize = sparkSession.conf.get(OapConf.OAP_INDEXER_CHOICE_MAX_SIZE)
+        val indexDisableList = sparkSession.conf.get(OapConf.OAP_INDEX_DISABLE_LIST)
+        ScannerBuilder.build(supportFilters, ic, indexOptions, maxChooseSize, indexDisableList)
+      }
+    }
+    ic.getScanners
   }
 }
 
