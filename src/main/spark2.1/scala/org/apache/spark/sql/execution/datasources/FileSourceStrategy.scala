@@ -102,6 +102,7 @@ object FileSourceStrategy extends Strategy with Logging {
 
           if (optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)) {
             logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
+            // TODO move append options process to OptimizedParquetFileFormat
             val parquetOptions: Map[String, String] =
               Map(SQLConf.PARQUET_BINARY_AS_STRING.key ->
                 _fsRelation.sparkSession.sessionState.conf.isParquetBinaryAsString.toString,
