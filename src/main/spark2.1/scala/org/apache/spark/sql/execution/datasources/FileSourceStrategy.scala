@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
-import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OptimizedParquetFileFormat}
+import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OptimizedOrcFileFormat, OptimizedParquetFileFormat}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.hive.orc.OrcFileFormat
 import org.apache.spark.sql.internal.SQLConf
@@ -121,7 +121,7 @@ object FileSourceStrategy extends Strategy with Logging {
 
         case a: OrcFileFormat
           if _fsRelation.sparkSession.conf.get(OapConf.OAP_ORC_ENABLED) =>
-          val oapFileFormat = new OapFileFormat
+          val oapFileFormat = new OptimizedOrcFileFormat
           oapFileFormat
             .init(_fsRelation.sparkSession,
               _fsRelation.options,

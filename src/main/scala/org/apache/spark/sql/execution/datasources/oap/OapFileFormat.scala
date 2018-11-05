@@ -147,10 +147,8 @@ private[sql] class OapFileFormat extends FileFormat
     }
     val conf = sparkSession.sessionState.conf
     // TODO modify conditions after oap support batch return
-    ((readerClassName.equals(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME) &&
-      conf.parquetVectorizedReaderEnabled) ||
-      (readerClassName.equals(OapFileFormat.ORC_DATA_FILE_CLASSNAME) &&
-      conf.getConf(OapConf.ORC_VECTORIZED_READER_ENABLED))) &&
+    readerClassName.equals(OapFileFormat.ORC_DATA_FILE_CLASSNAME) &&
+      conf.getConf(OapConf.ORC_VECTORIZED_READER_ENABLED) &&
       conf.wholeStageEnabled &&
       schema.length <= conf.wholeStageMaxNumFields &&
       schema.forall(_.dataType.isInstanceOf[AtomicType])

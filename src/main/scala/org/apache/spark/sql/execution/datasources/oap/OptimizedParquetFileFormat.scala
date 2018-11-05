@@ -29,7 +29,7 @@ import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.{AtomicType, StructType}
 import org.apache.spark.util.SerializableConfiguration
 
-class OptimizedParquetFileFormat extends OapFileFormat {
+private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
 
   override def prepareWrite(
       sparkSession: SparkSession,
