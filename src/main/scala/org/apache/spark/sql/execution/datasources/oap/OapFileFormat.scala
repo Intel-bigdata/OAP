@@ -260,6 +260,14 @@ private[sql] class OapFileFormat extends FileFormat
         }
 
         val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
+        val enableVectorizedReader: Boolean = if (isParquet) {
+          sparkSession.sessionState.conf.parquetVectorizedReaderEnabled &&
+            sparkSession.sessionState.conf.wholeStageEnabled &&
+            resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
+        } else {
+          false
+        }
+
         val returningBatch = supportBatch(sparkSession, resultSchema)
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
@@ -286,12 +294,11 @@ private[sql] class OapFileFormat extends FileFormat
           // See the comments in DataFile.scala.
           var context: Option[DataFileContext] = None
           if (isParquet) {
-            returningBatch match {
-              case true =>
-                context = Some(ParquetVectorizedContext(partitionSchema,
-                  file.partitionValues, returningBatch))
-              case false =>
-                context = None
+            if (enableVectorizedReader) {
+              context = Some(ParquetVectorizedContext(partitionSchema,
+                file.partitionValues, returningBatch))
+            } else {
+              context = None
             }
           } else if (isOrc) {
             val readerOptions = OrcFile.readerOptions(conf).filesystem(fs)
@@ -320,8 +327,8 @@ private[sql] class OapFileFormat extends FileFormat
             version match {
               case DataFileVersion.OAP_DATAFILE_V1 =>
                 val reader = new OapDataReaderV1(file.filePath, m, partitionSchema, requiredSchema,
-                  filterScanners, requiredIds, pushed, oapMetrics, conf, returningBatch, options,
-                  filters, context)
+                  filterScanners, requiredIds, pushed, oapMetrics, conf, enableVectorizedReader,
+                  options, filters, context)
                 reader.read(file)
               // Actually it shouldn't get to this line, because unsupported version will cause
               // exception thrown in readVersion call
