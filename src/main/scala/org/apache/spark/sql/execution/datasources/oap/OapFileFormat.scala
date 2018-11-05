@@ -315,43 +315,39 @@ private[sql] class OapFileFormat extends FileFormat
     }
   }
 
-  /**
-   * Check whether this filter conforms to certain patterns that could benefit from index
-   * @param filter
-   * @return
-   */
-  protected def canTriggerIndex(filter: Filter): Boolean = {
-    var attr: String = null
-    def checkAttribute(filter: Filter): Boolean = filter match {
-      case Or(left, right) =>
-        checkAttribute(left) && checkAttribute(right)
-      case And(left, right) =>
-        checkAttribute(left) && checkAttribute(right)
-      case EqualTo(attribute, _) =>
-        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-      case LessThan(attribute, _) =>
-        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-      case LessThanOrEqual(attribute, _) =>
-        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-      case GreaterThan(attribute, _) =>
-        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-      case GreaterThanOrEqual(attribute, _) =>
-        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-      case In(attribute, _) =>
-        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-      case IsNull(attribute) =>
-        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-      case IsNotNull(attribute) =>
-        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-      case StringStartsWith(attribute, _) =>
-        if (attr ==  null || attr == attribute) {attr = attribute; true} else false
-      case _ => false
+  protected def indexScanners(m: DataSourceMeta, filters: Seq[Filter]): Option[IndexScanners] = {
+
+    def canTriggerIndex(filter: Filter): Boolean = {
+      var attr: String = null
+      def checkAttribute(filter: Filter): Boolean = filter match {
+        case Or(left, right) =>
+          checkAttribute(left) && checkAttribute(right)
+        case And(left, right) =>
+          checkAttribute(left) && checkAttribute(right)
+        case EqualTo(attribute, _) =>
+          if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+        case LessThan(attribute, _) =>
+          if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+        case LessThanOrEqual(attribute, _) =>
+          if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+        case GreaterThan(attribute, _) =>
+          if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+        case GreaterThanOrEqual(attribute, _) =>
+          if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+        case In(attribute, _) =>
+          if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+        case IsNull(attribute) =>
+          if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+        case IsNotNull(attribute) =>
+          if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+        case StringStartsWith(attribute, _) =>
+          if (attr ==  null || attr == attribute) {attr = attribute; true} else false
+        case _ => false
+      }
+
+      checkAttribute(filter)
     }
 
-    checkAttribute(filter)
-  }
-
-  protected def indexScanners(m: DataSourceMeta, filters: Seq[Filter]): Option[IndexScanners] = {
     val ic = new IndexContext(m)
 
     if (m.indexMetas.nonEmpty) { // check and use index
