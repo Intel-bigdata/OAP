@@ -105,7 +105,6 @@ private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
           reader.read(file)
         }
       case None => (_: PartitionedFile) => {
-        // TODO need to think about when there is no oap.meta file at all
         // TODO For parquet should refer to ParquetFileFormat
         Iterator.empty
       }

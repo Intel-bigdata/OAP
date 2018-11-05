@@ -94,13 +94,13 @@ object FileSourceStrategy extends Strategy with Logging {
         // else turn to ParquetFileFormat
         case a: ParquetFileFormat
           if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
-          val oapFileFormat = new OptimizedParquetFileFormat
-          oapFileFormat
+          val optimizedParquetFileFormat = new OptimizedParquetFileFormat
+          optimizedParquetFileFormat
             .init(_fsRelation.sparkSession,
               _fsRelation.options,
               selectedPartitions.flatMap(p => p.files))
 
-          if (oapFileFormat.hasAvailableIndex(normalizedFilters)) {
+          if (optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)) {
             logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
             val parquetOptions: Map[String, String] =
               Map(SQLConf.PARQUET_BINARY_AS_STRING.key ->
@@ -111,7 +111,7 @@ object FileSourceStrategy extends Strategy with Logging {
                   _fsRelation.sparkSession.sessionState.conf.writeLegacyParquetFormat.toString) ++
                 _fsRelation.options
 
-            _fsRelation.copy(fileFormat = oapFileFormat,
+            _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
               options = parquetOptions)(_fsRelation.sparkSession)
 
           } else {
@@ -121,13 +121,13 @@ object FileSourceStrategy extends Strategy with Logging {
 
         case a: OrcFileFormat
           if _fsRelation.sparkSession.conf.get(OapConf.OAP_ORC_ENABLED) =>
-          val oapFileFormat = new OptimizedOrcFileFormat
-          oapFileFormat
+          val optimizedOrcFileFormat = new OptimizedOrcFileFormat
+          optimizedOrcFileFormat
             .init(_fsRelation.sparkSession,
               _fsRelation.options,
               selectedPartitions.flatMap(p => p.files))
 
-          if (oapFileFormat.hasAvailableIndex(normalizedFilters)) {
+          if (optimizedOrcFileFormat.hasAvailableIndex(normalizedFilters)) {
             logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
             // isOapOrcFileFormat is used to indicate to read orc data with oap index accelerated.
             val orcOptions: Map[String, String] =
@@ -136,7 +136,7 @@ object FileSourceStrategy extends Strategy with Logging {
                 Map("isOapOrcFileFormat" -> "true") ++
                 _fsRelation.options
 
-            _fsRelation.copy(fileFormat = oapFileFormat,
+            _fsRelation.copy(fileFormat = optimizedOrcFileFormat,
               options = orcOptions)(_fsRelation.sparkSession)
 
           } else {
