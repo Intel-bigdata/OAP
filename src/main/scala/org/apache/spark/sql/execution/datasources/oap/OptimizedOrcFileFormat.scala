@@ -45,8 +45,8 @@ private[sql] class OptimizedOrcFileFormat extends OapFileFormat {
       "only support read operation")
 
   /**
-    * Returns whether the reader will return the rows as batch or not.
-    */
+   * Returns whether the reader will return the rows as batch or not.
+   */
   override def supportBatch(sparkSession: SparkSession, schema: StructType): Boolean = {
     val conf = sparkSession.sessionState.conf
     conf.getConf(OapConf.ORC_VECTORIZED_READER_ENABLED) &&
