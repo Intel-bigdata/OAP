@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.{OutputWriterFactory, PartitionedFile}
 import org.apache.spark.sql.execution.datasources.oap.io.{DataFileContext, OapDataReaderV1, ParquetVectorizedContext}
 import org.apache.spark.sql.execution.datasources.oap.utils.FilterHelper
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.{AtomicType, StructType}
 import org.apache.spark.util.SerializableConfiguration
@@ -84,6 +85,18 @@ private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
             sparkSession.sessionState.conf.wholeStageEnabled &&
             resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
         val returningBatch = supportBatch(sparkSession, resultSchema)
+
+        // Sets flags for `CatalystSchemaConverter`
+        hadoopConf.setBoolean(
+          SQLConf.PARQUET_BINARY_AS_STRING.key,
+          sparkSession.sessionState.conf.isParquetBinaryAsString)
+        hadoopConf.setBoolean(
+          SQLConf.PARQUET_INT96_AS_TIMESTAMP.key,
+          sparkSession.sessionState.conf.isParquetINT96AsTimestamp)
+        hadoopConf.setBoolean(
+          SQLConf.PARQUET_INT64_AS_TIMESTAMP_MILLIS.key,
+          sparkSession.sessionState.conf.isParquetINT64AsTimestampMillis)
+
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 

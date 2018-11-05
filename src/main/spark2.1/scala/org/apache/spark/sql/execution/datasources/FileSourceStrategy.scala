@@ -92,7 +92,7 @@ object FileSourceStrategy extends Strategy with Logging {
         // add spark.sql.oap.parquet.enable config
         // if config true turn to OapFileFormat
         // else turn to ParquetFileFormat
-        case a: ParquetFileFormat
+        case _: ParquetFileFormat
           if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
           val optimizedParquetFileFormat = new OptimizedParquetFileFormat
           optimizedParquetFileFormat
@@ -102,19 +102,8 @@ object FileSourceStrategy extends Strategy with Logging {
 
           if (optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)) {
             logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
-            // TODO move append options process to OptimizedParquetFileFormat
-            val parquetOptions: Map[String, String] =
-              Map(SQLConf.PARQUET_BINARY_AS_STRING.key ->
-                _fsRelation.sparkSession.sessionState.conf.isParquetBinaryAsString.toString,
-                SQLConf.PARQUET_INT96_AS_TIMESTAMP.key ->
-                  _fsRelation.sparkSession.sessionState.conf.isParquetINT96AsTimestamp.toString,
-                SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key ->
-                  _fsRelation.sparkSession.sessionState.conf.writeLegacyParquetFormat.toString) ++
-                _fsRelation.options
-
             _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
-              options = parquetOptions)(_fsRelation.sparkSession)
-
+              options = _fsRelation.options)(_fsRelation.sparkSession)
           } else {
             logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
             _fsRelation
