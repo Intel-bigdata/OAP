@@ -260,15 +260,17 @@ private[sql] class OapFileFormat extends FileFormat
         }
 
         val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
+        val returningBatch = supportBatch(sparkSession, resultSchema)
+
         val enableVectorizedReader: Boolean = if (isParquet) {
           sparkSession.sessionState.conf.parquetVectorizedReaderEnabled &&
             sparkSession.sessionState.conf.wholeStageEnabled &&
             resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
+        } else if (isOrc) {
+          returningBatch
         } else {
           false
         }
-
-        val returningBatch = supportBatch(sparkSession, resultSchema)
         val broadcastedHadoopConf =
           sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
