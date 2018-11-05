@@ -78,8 +78,10 @@ class OptimizedParquetFileFormat extends OapFileFormat {
         val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
 
         val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
+        // TODO why add `sparkSession.sessionState.conf.wholeStageEnabled` condition ?
         val enableVectorizedReader: Boolean =
           sparkSession.sessionState.conf.parquetVectorizedReaderEnabled &&
+            sparkSession.sessionState.conf.wholeStageEnabled &&
             resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
         val returningBatch = supportBatch(sparkSession, resultSchema)
         val broadcastedHadoopConf =
