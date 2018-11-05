@@ -317,6 +317,7 @@ private[sql] class OapFileFormat extends FileFormat
 
   protected def indexScanners(m: DataSourceMeta, filters: Seq[Filter]): Option[IndexScanners] = {
 
+    // Check whether this filter conforms to certain patterns that could benefit from index
     def canTriggerIndex(filter: Filter): Boolean = {
       var attr: String = null
       def checkAttribute(filter: Filter): Boolean = filter match {
