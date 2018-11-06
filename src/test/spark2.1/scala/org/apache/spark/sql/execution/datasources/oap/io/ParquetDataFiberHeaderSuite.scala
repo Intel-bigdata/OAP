@@ -30,7 +30,7 @@ import org.apache.spark.sql.types.IntegerType
 class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
   with BeforeAndAfterEach with Logging {
 
-  test("construct with cv and total no dic no nulls") {
+  test("construct no dic no nulls") {
     val total = 10
     val column = ColumnVector.allocate(12, IntegerType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
@@ -51,7 +51,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(headerLoadFromCache.dicLength == 0)
   }
 
-  test("construct with cv and total with dic no nulls") {
+  test("construct with dic no nulls") {
     val total = 10
     val column = ColumnVector.allocate(12, IntegerType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
@@ -78,7 +78,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(headerLoadFromCache.dicLength == 3)
   }
 
-  test("construct with cv and total no dic all nulls") {
+  test("construct no dic all nulls") {
     val total = 10
     val column = ColumnVector.allocate(12, IntegerType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
@@ -98,7 +98,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(headerLoadFromCache.dicLength == 0)
   }
 
-  test("construct with cv and total with dic all nulls") {
+  test("construct with dic all nulls") {
     val total = 10
     val column = ColumnVector.allocate(12, IntegerType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
@@ -122,7 +122,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(headerLoadFromCache.dicLength == 3)
   }
 
-  test("construct with cv and total no dic") {
+  test("construct no dic") {
     val total = 10
     val column = ColumnVector.allocate(12, IntegerType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
@@ -145,7 +145,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(headerLoadFromCache.dicLength == 0)
   }
 
-  test("construct with cv and total with dic") {
+  test("construct with dic") {
     val total = 10
     val column = ColumnVector.allocate(12, IntegerType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
