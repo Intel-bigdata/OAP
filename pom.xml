@@ -388,7 +388,43 @@
            </execution>
         </executions>
       </plugin>
-
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.1.0</version>
+        <configuration>
+          <shadedArtifactAttached>true</shadedArtifactAttached>
+          <shadedClassifierName>with-spark-${spark.internal.version}</shadedClassifierName>
+          <artifactSet>
+            <includes>
+              <include>org.spark-project.spark:unused</include>
+              <include>com.google.guava:guava</include>
+              <include>org.apache.parquet:*</include>
+            </includes>
+          </artifactSet>
+          <relocations>
+            <relocation>
+              <pattern>org.eclipse.jetty</pattern>
+              <shadedPattern>org.spark_project.jetty</shadedPattern>
+              <includes>
+                <include>org.eclipse.jetty.**</include>
+              </includes>
+            </relocation>
+            <relocation>
+              <pattern>com.google.common</pattern>
+              <shadedPattern>org.spark_project.guava</shadedPattern>
+            </relocation>
+          </relocations>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.scalastyle</groupId>
         <artifactId>scalastyle-maven-plugin</artifactId>
@@ -532,15 +568,6 @@
         <artifactId>maven-jar-plugin</artifactId>
         <version>2.3</version>
         <executions>
-          <execution>
-            <id>default-jar</id>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-            <configuration>
-              <classifier>with-spark-${spark.internal.version}</classifier>
-            </configuration>
-          </execution>
           <execution>
             <id>prepare-test-jar</id>
             <phase>prepare-package</phase>
