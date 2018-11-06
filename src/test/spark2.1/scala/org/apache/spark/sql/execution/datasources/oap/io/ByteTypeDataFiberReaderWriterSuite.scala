@@ -17,42 +17,41 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import org.apache.parquet.column.Dictionary
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
+import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, TestFiberCache}
 import org.apache.spark.sql.execution.vectorized.{ColumnVector, OnHeapColumnVector}
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.ByteType
 
-class ByteTypeDataFiberReaderWriterSuite extends SparkFunSuite with SharedOapContext
-  with BeforeAndAfterEach with Logging {
+class ByteTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
+
+  protected val dictionary: Dictionary = IntegerDictionary(Array(0, 1, 2))
 
   test("no dic no nulls") {
-    val total = 10000
+    // write data
     val column = ColumnVector.allocate(total, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     (0 until total).foreach(i => column.putByte(i, i.toByte))
-    val fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
+    fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
 
+    // init reader
     val address = fiberCache.getBaseOffset
-
-    // read use batch api
-    val start = 4096
-    val num = 4096
-    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
-      .asInstanceOf[OnHeapColumnVector]
     val reader = ParquetDataFiberReader(address, ByteType, total)
     reader.readRowGroupMetas()
+
+    // read use batch api
+    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
+      .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => assert(ret1.getByte(i) == (i + start).toByte))
 
     // read use random access api
-    val rowIdList = new IntArrayList(3)
-    val ints = Array(1, 667, 9999)
-    ints.foreach(rowIdList.add)
     val ret2 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(rowIdList, ret2)
@@ -60,34 +59,28 @@ class ByteTypeDataFiberReaderWriterSuite extends SparkFunSuite with SharedOapCon
   }
 
   test("with dic no nulls") {
-    val total = 10000
+    // write data
     val column = ColumnVector.allocate(total, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     column.reserveDictionaryIds(total)
     val dictionaryIds = column.getDictionaryIds.asInstanceOf[OnHeapColumnVector]
-    val dictionary = IntegerDictionary(Array(0, 1, 2))
     column.setDictionary(dictionary)
-
     (0 until total).foreach(i => dictionaryIds.putInt(i, i % column.dictionaryLength ))
-    val fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
+    fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
 
+    // init reader
     val address = fiberCache.getBaseOffset
-
-    // read use batch api
-    val start = 4096
-    val num = 4096
-    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
-      .asInstanceOf[OnHeapColumnVector]
     val reader = ParquetDataFiberReader(address, ByteType, total)
     reader.readRowGroupMetas()
+
+    // read use batch api
+    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
+      .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i =>
       assert(ret1.getByte(i) == ((i + start) % column.dictionaryLength).toByte))
 
     // read use random access api
-    val rowIdList = new IntArrayList(3)
-    val ints = Array(1, 667, 9999)
-    ints.foreach(rowIdList.add)
     val ret2 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(rowIdList, ret2)
@@ -96,28 +89,24 @@ class ByteTypeDataFiberReaderWriterSuite extends SparkFunSuite with SharedOapCon
   }
 
   test("no dic all nulls") {
-    val total = 10000
+    // write data
     val column = ColumnVector.allocate(total, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     column.putNulls(0, total)
-    val fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
+    fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
 
+    // init reader
     val address = fiberCache.getBaseOffset
-
-    // read use batch api
-    val start = 4096
-    val num = 4096
-    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
-      .asInstanceOf[OnHeapColumnVector]
     val reader = ParquetDataFiberReader(address, ByteType, total)
     reader.readRowGroupMetas()
+
+    // read use batch api
+    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
+      .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => assert(ret1.isNullAt(i)))
 
     // read use random access api
-    val rowIdList = new IntArrayList(3)
-    val ints = Array(1, 667, 9999)
-    ints.foreach(rowIdList.add)
     val ret2 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(rowIdList, ret2)
@@ -125,32 +114,26 @@ class ByteTypeDataFiberReaderWriterSuite extends SparkFunSuite with SharedOapCon
   }
 
   test("with dic all nulls") {
-    val total = 10000
+    // write data
     val column = ColumnVector.allocate(total, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     column.reserveDictionaryIds(total)
-    val dictionary = IntegerDictionary(Array(0, 1, 2))
     column.setDictionary(dictionary)
-
     column.putNulls(0, total)
-    val fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
+    fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
 
+    // init reader
     val address = fiberCache.getBaseOffset
-
-    // read use batch api
-    val start = 4096
-    val num = 4096
-    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
-      .asInstanceOf[OnHeapColumnVector]
     val reader = ParquetDataFiberReader(address, ByteType, total)
     reader.readRowGroupMetas()
+
+    // read use batch api
+    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
+      .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => assert(ret1.isNullAt(i)))
 
     // read use random access api
-    val rowIdList = new IntArrayList(3)
-    val ints = Array(1, 667, 9999)
-    ints.foreach(rowIdList.add)
     val ret2 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(rowIdList, ret2)
@@ -158,24 +141,23 @@ class ByteTypeDataFiberReaderWriterSuite extends SparkFunSuite with SharedOapCon
   }
 
   test("no dic") {
-    val total = 10000
+    // write data
     val column = ColumnVector.allocate(total, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     (0 until total).foreach(i => {
       if (i % 3 == 0) column.putNull(i)
       else column.putByte(i, i.toByte)
     })
-    val fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
+    fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
 
+    // init reader
     val address = fiberCache.getBaseOffset
-
-    // read use batch api
-    val start = 4096
-    val num = 4096
-    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
-      .asInstanceOf[OnHeapColumnVector]
     val reader = ParquetDataFiberReader(address, ByteType, total)
     reader.readRowGroupMetas()
+
+    // read use batch api
+    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
+      .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => {
       if ((i + start) % 3 == 0) assert(ret1.isNullAt(i))
@@ -183,9 +165,6 @@ class ByteTypeDataFiberReaderWriterSuite extends SparkFunSuite with SharedOapCon
     })
 
     // read use random access api
-    val rowIdList = new IntArrayList(3)
-    val ints = Array(1, 667, 9999)
-    ints.foreach(rowIdList.add)
     val ret2 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(rowIdList, ret2)
@@ -196,30 +175,26 @@ class ByteTypeDataFiberReaderWriterSuite extends SparkFunSuite with SharedOapCon
   }
 
   test("with dic") {
-    val total = 10000
+    // write data
     val column = ColumnVector.allocate(total, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     column.reserveDictionaryIds(total)
     val dictionaryIds = column.getDictionaryIds.asInstanceOf[OnHeapColumnVector]
-    val dictionary = IntegerDictionary(Array(0, 1, 2))
     column.setDictionary(dictionary)
-
     (0 until total).foreach(i => {
       if (i % 3 == 0) column.putNull(i)
       else dictionaryIds.putInt(i, i % column.dictionaryLength)
     })
+    fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
 
-    val fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
-
+    // init reader
     val address = fiberCache.getBaseOffset
-
-    // read use batch api
-    val start = 4096
-    val num = 4096
-    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
-      .asInstanceOf[OnHeapColumnVector]
     val reader = ParquetDataFiberReader(address, ByteType, total)
     reader.readRowGroupMetas()
+
+    // read use batch api
+    val ret1 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
+      .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => {
       if ((i + start) % 3 == 0) assert(ret1.isNullAt(i))
@@ -227,9 +202,6 @@ class ByteTypeDataFiberReaderWriterSuite extends SparkFunSuite with SharedOapCon
     })
 
     // read use random access api
-    val rowIdList = new IntArrayList(3)
-    val ints = Array(1, 667, 9999)
-    ints.foreach(rowIdList.add)
     val ret2 = ColumnVector.allocate(num, ByteType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     reader.readBatch(rowIdList, ret2)
