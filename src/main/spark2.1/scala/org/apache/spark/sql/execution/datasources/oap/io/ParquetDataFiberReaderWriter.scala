@@ -91,8 +91,9 @@ object ParquetDataFiberWriter extends Logging {
    * Write nulls data to data fiber.
    */
   private def dumpNullsToFiber(
-      nativeAddress: Long, vector: OnHeapColumnVector, total: Int): Long = {
-    Platform.copyMemory(vector.getNulls, Platform.BYTE_ARRAY_OFFSET, null, nativeAddress, total)
+      nativeAddress: Long, column: OnHeapColumnVector, total: Int): Long = {
+    Platform.copyMemory(column.getNulls,
+      Platform.BYTE_ARRAY_OFFSET, null, nativeAddress, total)
     nativeAddress + total
   }
 
@@ -101,47 +102,47 @@ object ParquetDataFiberWriter extends Logging {
    * allNulls is false, need dump to cache,
    * dicLength is 0, needn't calculate dictionary part.
    */
-  private def dumpDataToFiber(nativeAddress: Long, vector: OnHeapColumnVector, total: Int): Unit = {
-    vector.dataType match {
+  private def dumpDataToFiber(nativeAddress: Long, column: OnHeapColumnVector, total: Int): Unit = {
+    column.dataType match {
       case ByteType | BooleanType =>
-        Platform.copyMemory(vector.getByteData,
+        Platform.copyMemory(column.getByteData,
           Platform.BYTE_ARRAY_OFFSET, null, nativeAddress, total)
       case ShortType =>
-        Platform.copyMemory(vector.getShortData,
+        Platform.copyMemory(column.getShortData,
           Platform.SHORT_ARRAY_OFFSET, null, nativeAddress, total * 2)
       case IntegerType | DateType =>
-        Platform.copyMemory(vector.getIntData,
+        Platform.copyMemory(column.getIntData,
           Platform.INT_ARRAY_OFFSET, null, nativeAddress, total * 4)
       case FloatType =>
-        Platform.copyMemory(vector.getFloatData,
+        Platform.copyMemory(column.getFloatData,
           Platform.FLOAT_ARRAY_OFFSET, null, nativeAddress, total * 4)
       case LongType | TimestampType =>
-        Platform.copyMemory(vector.getLongData,
+        Platform.copyMemory(column.getLongData,
           Platform.LONG_ARRAY_OFFSET, null, nativeAddress, total * 8)
       case DoubleType =>
-        Platform.copyMemory(vector.getDoubleData,
+        Platform.copyMemory(column.getDoubleData,
           Platform.DOUBLE_ARRAY_OFFSET, null, nativeAddress, total * 8)
       case StringType | BinaryType =>
-        Platform.copyMemory(vector.getArrayLengths,
+        Platform.copyMemory(column.getArrayLengths,
           Platform.INT_ARRAY_OFFSET, null, nativeAddress, total * 4)
-        Platform.copyMemory(vector.getArrayOffsets,
+        Platform.copyMemory(column.getArrayOffsets,
           Platform.INT_ARRAY_OFFSET, null, nativeAddress + total * 4, total * 4)
-        val child = vector.getChildColumn(0).asInstanceOf[OnHeapColumnVector]
+        val child = column.getChildColumn(0).asInstanceOf[OnHeapColumnVector]
         Platform.copyMemory(child.getByteData,
           Platform.BYTE_ARRAY_OFFSET, null, nativeAddress + total * 8,
           child.getElementsAppended)
       case other if DecimalType.is32BitDecimalType(other) =>
-        Platform.copyMemory(vector.getIntData,
+        Platform.copyMemory(column.getIntData,
           Platform.INT_ARRAY_OFFSET, null, nativeAddress, total * 4)
       case other if DecimalType.is64BitDecimalType(other) =>
-        Platform.copyMemory(vector.getLongData,
+        Platform.copyMemory(column.getLongData,
           Platform.LONG_ARRAY_OFFSET, null, nativeAddress, total * 8)
       case other if DecimalType.isByteArrayDecimalType(other) =>
-        Platform.copyMemory(vector.getArrayLengths,
+        Platform.copyMemory(column.getArrayLengths,
           Platform.INT_ARRAY_OFFSET, null, nativeAddress, total * 4)
-        Platform.copyMemory(vector.getArrayOffsets,
+        Platform.copyMemory(column.getArrayOffsets,
           Platform.INT_ARRAY_OFFSET, null, nativeAddress + total * 4, total * 4)
-        val child = vector.getChildColumn(0).asInstanceOf[OnHeapColumnVector]
+        val child = column.getChildColumn(0).asInstanceOf[OnHeapColumnVector]
         Platform.copyMemory(child.getByteData,
           Platform.BYTE_ARRAY_OFFSET, null, nativeAddress + total * 8,
           child.getElementsAppended)
@@ -153,15 +154,15 @@ object ParquetDataFiberWriter extends Logging {
    * Write dictionaryIds(int array) and Dictionary data to data fiber.
    */
   private def dumpDataAndDicToFiber(
-      nativeAddress: Long, vector: OnHeapColumnVector, total: Int, dicLength: Int): Unit = {
+      nativeAddress: Long, column: OnHeapColumnVector, total: Int, dicLength: Int): Unit = {
     // dump dictionaryIds to data fiber, it's a int array.
-    val dictionaryIds = vector.getDictionaryIds.asInstanceOf[OnHeapColumnVector]
+    val dictionaryIds = column.getDictionaryIds.asInstanceOf[OnHeapColumnVector]
     Platform.copyMemory(dictionaryIds.getIntData,
       Platform.INT_ARRAY_OFFSET, null, nativeAddress, total * 4)
     var dicNativeAddress = nativeAddress + total * 4
-    val dictionary: Dictionary = vector.getDictionary
+    val dictionary: Dictionary = column.getDictionary
     // dump dictionary to data fiber case by dataType.
-    vector.dataType() match {
+    column.dataType() match {
       case ByteType | ShortType | IntegerType | DateType =>
         val intDictionaryContent = new Array[Int](dicLength)
         (0 until dicLength).foreach(id => intDictionaryContent(id) = dictionary.decodeToInt(id))
@@ -245,14 +246,14 @@ object ParquetDataFiberWriter extends Logging {
    * dicLength is not, need calculate dictionary part and dictionaryIds is a int array.
    */
   private def fiberLength(
-      vector: OnHeapColumnVector, total: Int, nullUnitLength: Int, dicLength: Int): Long = {
-    val dicPartSize = vector.dataType() match {
+      column: OnHeapColumnVector, total: Int, nullUnitLength: Int, dicLength: Int): Long = {
+    val dicPartSize = column.dataType() match {
       case ByteType | ShortType | IntegerType | DateType => dicLength * 4
       case FloatType => dicLength * 4
       case LongType | TimestampType => dicLength * 8
       case DoubleType => dicLength * 8
       case StringType | BinaryType =>
-        val dictionary: Dictionary = vector.getDictionary
+        val dictionary: Dictionary = column.getDictionary
         (0 until dicLength).map(id => dictionary.decodeToBinary(id).length() + 4).sum
       // if DecimalType.is32BitDecimalType(other) as int data type
       case other if DecimalType.is32BitDecimalType(other) => dicLength * 4
@@ -260,7 +261,7 @@ object ParquetDataFiberWriter extends Logging {
       case other if DecimalType.is64BitDecimalType(other) => dicLength * 8
       // if DecimalType.isByteArrayDecimalType(other) as binary data type
       case other if DecimalType.isByteArrayDecimalType(other) =>
-        val dictionary: Dictionary = vector.getDictionary
+        val dictionary: Dictionary = column.getDictionary
         (0 until dicLength).map(id => dictionary.decodeToBinary(id).length() + 4).sum
       case other => throw new OapException(s"$other data type is not support dictionary.")
     }
