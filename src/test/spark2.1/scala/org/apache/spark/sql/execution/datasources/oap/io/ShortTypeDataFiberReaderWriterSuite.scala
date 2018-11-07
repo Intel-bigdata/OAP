@@ -38,7 +38,6 @@ class ShortTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, ShortType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, ShortType, MemoryMode.ON_HEAP)
@@ -66,7 +65,6 @@ class ShortTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, ShortType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, ShortType, MemoryMode.ON_HEAP)
@@ -93,7 +91,6 @@ class ShortTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, ShortType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, ShortType, MemoryMode.ON_HEAP)
@@ -120,7 +117,6 @@ class ShortTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, ShortType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, ShortType, MemoryMode.ON_HEAP)
@@ -148,7 +144,6 @@ class ShortTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, ShortType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, ShortType, MemoryMode.ON_HEAP)
@@ -185,7 +180,6 @@ class ShortTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, ShortType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, ShortType, MemoryMode.ON_HEAP)

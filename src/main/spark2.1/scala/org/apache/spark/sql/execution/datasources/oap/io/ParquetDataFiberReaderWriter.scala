@@ -294,33 +294,12 @@ object ParquetDataFiberWriter extends Logging {
  * @param dataType data type of data fiber.
  * @param total total row count of data fiber.
  */
-case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int) extends Logging {
+class ParquetDataFiberReader private(address: Long, dataType: DataType, total: Int) extends
+  Logging {
 
   private var header: ParquetDataFiberHeader = _
 
   private var dictionary: Dictionary = _
-
-  /**
-   * Read ParquetDataFiberHeader and dictionary from data fiber.
-   */
-  def readRowGroupMetas(): Unit = {
-    header = ParquetDataFiberHeader(address)
-    header match {
-      case ParquetDataFiberHeader(_, _, 0) =>
-        dictionary = null
-      case ParquetDataFiberHeader(false, true, _) =>
-        dictionary = null
-      case ParquetDataFiberHeader(true, false, dicLength) =>
-        val dicNativeAddress = address + ParquetDataFiberHeader.defaultSize + 4 * total
-        dictionary = readDictionary(dataType, dicLength, dicNativeAddress)
-      case ParquetDataFiberHeader(false, false, dicLength) =>
-        val dicNativeAddress = address + ParquetDataFiberHeader.defaultSize + 1 * total + 4 * total
-        dictionary = readDictionary(dataType, dicLength, dicNativeAddress)
-      case ParquetDataFiberHeader(true, true, _) =>
-        throw new OapException("error header status (true, true, _)")
-      case other => throw new OapException(s"impossible header status $other.")
-    }
-  }
 
   /**
    * Read num values to OnHeapColumnVector from data fiber by start position.
@@ -430,6 +409,28 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
         readBatch(dataNativeAddress, rowIdList, column)
       case ParquetDataFiberHeader(false, true, _) =>
         column.putNulls(0, num)
+      case ParquetDataFiberHeader(true, true, _) =>
+        throw new OapException("error header status (true, true, _)")
+      case other => throw new OapException(s"impossible header status $other.")
+    }
+  }
+
+  /**
+   * Read ParquetDataFiberHeader and dictionary from data fiber.
+   */
+  private def readRowGroupMetas(): Unit = {
+    header = ParquetDataFiberHeader(address)
+    header match {
+      case ParquetDataFiberHeader(_, _, 0) =>
+        dictionary = null
+      case ParquetDataFiberHeader(false, true, _) =>
+        dictionary = null
+      case ParquetDataFiberHeader(true, false, dicLength) =>
+        val dicNativeAddress = address + ParquetDataFiberHeader.defaultSize + 4 * total
+        dictionary = readDictionary(dataType, dicLength, dicNativeAddress)
+      case ParquetDataFiberHeader(false, false, dicLength) =>
+        val dicNativeAddress = address + ParquetDataFiberHeader.defaultSize + 1 * total + 4 * total
+        dictionary = readDictionary(dataType, dicLength, dicNativeAddress)
       case ParquetDataFiberHeader(true, true, _) =>
         throw new OapException("error header status (true, true, _)")
       case other => throw new OapException(s"impossible header status $other.")
@@ -694,6 +695,14 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
       case other if DecimalType.isByteArrayDecimalType(other) => readBinaryDictionary
       case other => throw new OapException(s"$other data type is not support dictionary.")
     }
+  }
+}
+
+object ParquetDataFiberReader {
+  def apply(address: Long, dataType: DataType, total: Int): ParquetDataFiberReader = {
+    val reader = new ParquetDataFiberReader(address, dataType, total)
+    reader.readRowGroupMetas()
+    reader
   }
 }
 

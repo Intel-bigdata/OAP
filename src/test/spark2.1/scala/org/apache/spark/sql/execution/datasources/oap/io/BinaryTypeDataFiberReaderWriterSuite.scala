@@ -42,7 +42,6 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, BinaryType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, BinaryType, MemoryMode.ON_HEAP)
@@ -74,7 +73,6 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, BinaryType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, BinaryType, MemoryMode.ON_HEAP)
@@ -105,7 +103,6 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, BinaryType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, BinaryType, MemoryMode.ON_HEAP)
@@ -132,7 +129,6 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, BinaryType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, BinaryType, MemoryMode.ON_HEAP)
@@ -160,7 +156,6 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, BinaryType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, BinaryType, MemoryMode.ON_HEAP)
@@ -197,7 +192,6 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     // init reader
     val address = fiberCache.getBaseOffset
     val reader = ParquetDataFiberReader(address, BinaryType, total)
-    reader.readRowGroupMetas()
 
     // read use batch api
     val ret1 = ColumnVector.allocate(num, BinaryType, MemoryMode.ON_HEAP)

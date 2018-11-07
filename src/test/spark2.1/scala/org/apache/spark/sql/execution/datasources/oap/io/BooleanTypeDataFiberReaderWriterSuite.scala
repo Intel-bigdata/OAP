@@ -43,7 +43,6 @@ class BooleanTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val ret1 = ColumnVector.allocate(num, BooleanType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     val reader = ParquetDataFiberReader(address, BooleanType, total)
-    reader.readRowGroupMetas()
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => assert(ret1.getBoolean(i) == (((i + start) % 2) == 0)))
 
@@ -66,7 +65,6 @@ class BooleanTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val ret1 = ColumnVector.allocate(num, BooleanType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     val reader = ParquetDataFiberReader(address, BooleanType, total)
-    reader.readRowGroupMetas()
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => assert(ret1.isNullAt(i)))
 
@@ -92,7 +90,6 @@ class BooleanTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val ret1 = ColumnVector.allocate(num, BooleanType, MemoryMode.ON_HEAP)
       .asInstanceOf[OnHeapColumnVector]
     val reader = ParquetDataFiberReader(address, BooleanType, total)
-    reader.readRowGroupMetas()
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => {
       if ((i + start) % 3 == 0) assert(ret1.isNullAt(i))
