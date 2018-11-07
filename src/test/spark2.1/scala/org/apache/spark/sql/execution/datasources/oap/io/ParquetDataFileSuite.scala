@@ -150,7 +150,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
       .asInstanceOf[OapCompletionIterator[InternalRow]]
     val result = ArrayBuffer[Int]()
     while (iterator.hasNext) {
-      val row = iterator.next
+      val row = iterator.next()
       assert(row.numFields == 2)
       result += row.getInt(0)
     }
@@ -182,7 +182,7 @@ class SimpleDataSuite extends ParquetDataFileSuite {
       .asInstanceOf[OapCompletionIterator[InternalRow]]
     val result = ArrayBuffer[ Int ]()
     while (iterator.hasNext) {
-      val row = iterator.next
+      val row = iterator.next()
       result += row.getInt(0)
     }
     iterator.close()
@@ -265,7 +265,7 @@ class NestedDataSuite extends ParquetDataFileSuite {
     val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
       .asInstanceOf[OapCompletionIterator[InternalRow]]
     assert(iterator.hasNext)
-    val row = iterator.next
+    val row = iterator.next()
     assert(row.numFields == 3)
     val docId = row.getLong(0)
     assert(docId == 20L)
@@ -278,12 +278,12 @@ class NestedDataSuite extends ParquetDataFileSuite {
     val iterator = reader.iterator(requiredIds)
       .asInstanceOf[OapCompletionIterator[InternalRow]]
     assert(iterator.hasNext)
-    val rowOne = iterator.next
+    val rowOne = iterator.next()
     assert(rowOne.numFields == 2)
     val docIdOne = rowOne.getLong(0)
     assert(docIdOne == 10L)
     assert(iterator.hasNext)
-    val rowTwo = iterator.next
+    val rowTwo = iterator.next()
     assert(rowTwo.numFields == 2)
     val docIdTwo = rowTwo.getLong(0)
     assert(docIdTwo == 20L)
@@ -600,7 +600,7 @@ class ParquetFiberDataLoaderSuite extends ParquetDataFileSuite {
       .append("string_field", s"str$i"))
   }
 
-  var reader: ParquetFiberDataReader = null
+  var reader: ParquetFiberDataReader = _
 
   override def beforeEach(): Unit = {
     super.beforeEach()
@@ -634,19 +634,20 @@ class ParquetFiberDataLoaderSuite extends ParquetDataFileSuite {
     // fixed length data type
     val rowCount = reader.getFooter.getBlocks.get(0).getRowCount.toInt
     val intFiberCache = loadSingleColumn(Array(0))
-    (0 until rowCount).foreach(i => assert(intFiberCache.getInt(i * 4) == i))
+    val statusOffset = 6
+    (0 until rowCount).foreach(i => assert(intFiberCache.getInt(statusOffset + i * 4) == i))
     // variable length data type
     val strFiberCache = loadSingleColumn(Array(4))
-    (0 until rowCount).map { i =>
-      val length = strFiberCache.getInt(i * 4)
-      val offset = strFiberCache.getInt(rowCount * 4 + i * 4)
-      assert(strFiberCache.getUTF8String(rowCount * 9 + offset, length).
+    (0 until rowCount).foreach { i =>
+      val length = strFiberCache.getInt(statusOffset + i * 4)
+      val offset = strFiberCache.getInt(statusOffset + rowCount * 4 + i * 4)
+      assert(strFiberCache.getUTF8String(statusOffset + rowCount * 8 + offset, length).
         equals(UTF8String.fromString(s"str$i")))
     }
   }
 
   test("test load multi-columns every time") {
-    val exception = intercept[IllegalArgumentException] {
+    val exception = intercept[AssertionError] {
       loadSingleColumn(Array(0, 1))
     }
     assert(exception.getMessage.contains("Only can get single column every time"))
