@@ -40,36 +40,50 @@ import org.apache.spark.unsafe.Platform
  */
 object ParquetDataFiberWriter extends Logging {
 
-  def dumpToCache(vector: OnHeapColumnVector, total: Int): FiberCache = {
-    val header = ParquetDataFiberHeader(vector, total)
+  def dumpToCache(column: OnHeapColumnVector, total: Int): FiberCache = {
+    val header = ParquetDataFiberHeader(column, total)
+    logDebug(s"will dump column to data fiber dataType = ${column.dataType()}, " +
+      s"total = $total, header is $header")
     header match {
       case ParquetDataFiberHeader(true, false, 0) =>
-        val fiber = emptyDataFiber(fiberLength(vector, total, 0 ))
+        val length = fiberLength(column, total, 0 )
+        logDebug(s"will apply $length bytes off heap memory for data fiber.")
+        val fiber = emptyDataFiber(length)
         val nativeAddress = header.writeToCache(fiber.getBaseOffset)
-        dumpDataToFiber(nativeAddress, vector, total)
+        dumpDataToFiber(nativeAddress, column, total)
         fiber
       case ParquetDataFiberHeader(true, false, dicLength) =>
-        val fiber = emptyDataFiber(fiberLength(vector, total, 0, dicLength))
+        val length = fiberLength(column, total, 0, dicLength)
+        logDebug(s"will apply $length bytes off heap memory for data fiber.")
+        val fiber = emptyDataFiber(length)
         val nativeAddress = header.writeToCache(fiber.getBaseOffset)
-        dumpDataAndDicToFiber(nativeAddress, vector, total, dicLength)
+        dumpDataAndDicToFiber(nativeAddress, column, total, dicLength)
         fiber
       case ParquetDataFiberHeader(false, true, _) =>
+        logDebug(s"will apply ${ParquetDataFiberHeader.defaultSize} " +
+          s"bytes off heap memory for data fiber.")
         val fiber = emptyDataFiber(ParquetDataFiberHeader.defaultSize)
         header.writeToCache(fiber.getBaseOffset)
         fiber
       case ParquetDataFiberHeader(false, false, 0) =>
-        val fiber = emptyDataFiber(fiberLength(vector, total, 1))
+        val length = fiberLength(column, total, 1)
+        logDebug(s"will apply $length bytes off heap memory for data fiber.")
+        val fiber = emptyDataFiber(length)
         val nativeAddress =
-          dumpNullsToFiber(header.writeToCache(fiber.getBaseOffset), vector, total)
-        dumpDataToFiber(nativeAddress, vector, total)
+          dumpNullsToFiber(header.writeToCache(fiber.getBaseOffset), column, total)
+        dumpDataToFiber(nativeAddress, column, total)
         fiber
       case ParquetDataFiberHeader(false, false, dicLength) =>
-        val fiber = emptyDataFiber(fiberLength(vector, total, 1, dicLength))
+        val length = fiberLength(column, total, 1, dicLength)
+        logDebug(s"will apply $length bytes off heap memory for data fiber.")
+        val fiber = emptyDataFiber(length)
         val nativeAddress =
-          dumpNullsToFiber(header.writeToCache(fiber.getBaseOffset), vector, total)
-        dumpDataAndDicToFiber(nativeAddress, vector, total, dicLength)
+          dumpNullsToFiber(header.writeToCache(fiber.getBaseOffset), column, total)
+        dumpDataAndDicToFiber(nativeAddress, column, total, dicLength)
         fiber
-      case ParquetDataFiberHeader(true, true, _) => throw new OapException("error status.")
+      case ParquetDataFiberHeader(true, true, _) =>
+        throw new OapException("impossible header status (true, true, _).")
+      case other => throw new OapException(s"impossible header status $other.")
     }
   }
 
@@ -116,7 +130,7 @@ object ParquetDataFiberWriter extends Logging {
         Platform.copyMemory(child.getByteData,
           Platform.BYTE_ARRAY_OFFSET, null, nativeAddress + total * 8,
           child.getElementsAppended)
-      case other => throw new OapException(s"$other data type is not support dictionary.")
+      case other => throw new OapException(s"$other data type is not support data cache.")
     }
   }
 
@@ -125,11 +139,13 @@ object ParquetDataFiberWriter extends Logging {
    */
   private def dumpDataAndDicToFiber(
       nativeAddress: Long, vector: OnHeapColumnVector, total: Int, dicLength: Int): Unit = {
+    // dump dictionaryIds to data fiber, it's a int array.
     val dictionaryIds = vector.getDictionaryIds.asInstanceOf[OnHeapColumnVector]
     Platform.copyMemory(dictionaryIds.getIntData,
       Platform.INT_ARRAY_OFFSET, null, nativeAddress, total * 4)
     var dicNativeAddress = nativeAddress + total * 4
     val dictionary: Dictionary = vector.getDictionary
+    // dump dictionary to data fiber case by dataType.
     vector.dataType() match {
       case ByteType | ShortType | IntegerType | DateType |
            other if DecimalType.is32BitDecimalType(other) =>
@@ -173,42 +189,46 @@ object ParquetDataFiberWriter extends Logging {
    * allNulls is false, need dump to cache,
    * dicLength is 0, needn't calculate dictionary part.
    */
-  private def fiberLength(vector: OnHeapColumnVector, total: Int, nullUnitLength: Int): Long =
-    if (isFixedLengthDataType(vector.dataType())) {
+  private def fiberLength(column: OnHeapColumnVector, total: Int, nullUnitLength: Int): Long =
+    if (isFixedLengthDataType(column.dataType())) {
+      logDebug(s"dataType ${column.dataType()} is fixed length. ")
       // Fixed length data type fiber length.
       ParquetDataFiberHeader.defaultSize +
-        nullUnitLength * total + vector.dataType().defaultSize * total
+        nullUnitLength * total + column.dataType().defaultSize * total
     } else {
+      logDebug(s"dataType ${column.dataType()} is not fixed length. ")
       // lengthData and offsetData will be set and data will be put in child if type is Array.
       // lengthData: 4 bytes, offsetData: 4 bytes, nulls: 1 byte,
       // child.data: childColumns[0].elementsAppended bytes.
       ParquetDataFiberHeader.defaultSize + nullUnitLength * total + total * 8 +
-        vector.getChildColumn(0).getElementsAppended
+        column.getChildColumn(0).getElementsAppended
     }
 
   private def fiberLength(
       vector: OnHeapColumnVector, total: Int, nullUnitLength: Int, dicLength: Int): Long = {
     val dicPartSize = vector.dataType() match {
-      case ByteType | ShortType | IntegerType | DateType => dicLength * 4
+      case ByteType | ShortType | IntegerType | DateType |
+           other if DecimalType.is32BitDecimalType(other) => dicLength * 4
       case FloatType => dicLength * 4
-      case LongType => dicLength * 8
+      case LongType | TimestampType | other if DecimalType.is64BitDecimalType(other) =>
+        dicLength * 8
       case DoubleType => dicLength * 8
-      case StringType | BinaryType =>
+      case StringType | BinaryType | other if DecimalType.isByteArrayDecimalType(other) =>
         val dictionary: Dictionary = vector.getDictionary
         (0 until dicLength).map(id => dictionary.decodeToBinary(id).length() + 4).sum
-      case otherTypes: DataType => throw new OapException(s"${otherTypes.simpleString}" +
-        s" data type is not support dictionary.")
+      case other => throw new OapException(s"$other data type is not support dictionary.")
     }
     ParquetDataFiberHeader.defaultSize + nullUnitLength * total + 4 * total + dicPartSize
   }
 
   private def isFixedLengthDataType(dataType: DataType): Boolean = dataType match {
-    case StringType | BinaryType => false
+    case StringType | BinaryType | other if DecimalType.isByteArrayDecimalType(other) => false
     case ByteType | BooleanType | ShortType |
          IntegerType | DateType | FloatType |
-         LongType | DoubleType => true
-    case otherTypes: DataType => throw new OapException(s"${otherTypes.simpleString}" +
-      s" data type is not implemented for cache.")
+         LongType | DoubleType | TimestampType |
+         other if DecimalType.is32BitDecimalType(other) ||
+      DecimalType.is64BitDecimalType(other) => true
+    case other => throw new OapException(s"$other data type is not implemented for cache.")
   }
 
   private def emptyDataFiber(fiberLength: Long): FiberCache =
@@ -243,7 +263,9 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
       case ParquetDataFiberHeader(false, false, dicLength) =>
         val dicNativeAddress = address + ParquetDataFiberHeader.defaultSize + 1 * total + 4 * total
         dictionary = readDictionary(dataType, dicLength, dicNativeAddress)
-      case ParquetDataFiberHeader(true, true, _) => throw new OapException("error status.")
+      case ParquetDataFiberHeader(true, true, _) =>
+        throw new OapException("error header status (true, true, _)")
+      case other => throw new OapException(s"impossible header status $other.")
     }
   }
 
@@ -275,7 +297,9 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
       case ParquetDataFiberHeader(false, true, _) =>
         // can to this branch ?
         column.putNulls(0, num)
-      case ParquetDataFiberHeader(true, true, _) => throw new OapException("error status.")
+      case ParquetDataFiberHeader(true, true, _) =>
+        throw new OapException("error header status (true, true, _)")
+      case other => throw new OapException(s"impossible header status $other.")
     }
   } else {
     column.setDictionary(null)
@@ -291,7 +315,9 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
         readBatch(dataNativeAddress, start, num, column)
       case ParquetDataFiberHeader(false, true, _) =>
         column.putNulls(0, num)
-      case ParquetDataFiberHeader(true, true, _) => throw new OapException("error status.")
+      case ParquetDataFiberHeader(true, true, _) =>
+        throw new OapException("error header status (true, true, _)")
+      case other => throw new OapException(s"impossible header status $other.")
     }
   }
 
@@ -311,7 +337,8 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
         val dataNativeAddress = address + ParquetDataFiberHeader.defaultSize
         val intData = dictionaryIds.getIntData
         (0 until num).foreach(idx => {
-          intData(idx) = Platform.getInt(null, dataNativeAddress + rowIdList.getInt(idx) * 4)
+          intData(idx) = Platform.getInt(null,
+            dataNativeAddress + rowIdList.getInt(idx) * 4)
         })
       case ParquetDataFiberHeader(false, false, _) =>
         val nullsNativeAddress = address + ParquetDataFiberHeader.defaultSize
@@ -323,12 +350,15 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
         val dataNativeAddress = nullsNativeAddress + 1 * total
         (0 until num).foreach(idx => {
           if (!column.isNullAt(idx)) {
-            intData(idx) = Platform.getInt(null, dataNativeAddress + rowIdList.getInt(idx) * 4)
+            intData(idx) = Platform.getInt(null,
+              dataNativeAddress + rowIdList.getInt(idx) * 4)
           }
         })
       case ParquetDataFiberHeader(false, true, _) =>
         column.putNulls(0, num)
-      case ParquetDataFiberHeader(true, true, _) => throw new OapException("error status.")
+      case ParquetDataFiberHeader(true, true, _) =>
+        throw new OapException("error header status (true, true, _)")
+      case other => throw new OapException(s"impossible header status $other.")
     }
   } else {
     column.setDictionary(null)
@@ -347,7 +377,9 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
         readBatch(dataNativeAddress, rowIdList, column)
       case ParquetDataFiberHeader(false, true, _) =>
         column.putNulls(0, num)
-      case ParquetDataFiberHeader(true, true, _) => throw new OapException("error status.")
+      case ParquetDataFiberHeader(true, true, _) =>
+        throw new OapException("error header status (true, true, _)")
+      case other => throw new OapException(s"impossible header status $other.")
     }
   }
 
@@ -416,6 +448,7 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
             data, Platform.BYTE_ARRAY_OFFSET, data.length)
           column.getChildColumn(0).asInstanceOf[OnHeapColumnVector].setByteData(data)
         }
+      case other => throw new OapException(s"impossible data type $other.")
     }
   }
 
@@ -437,7 +470,8 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
         val shorts = column.getShortData
         (0 until rowIdList.size()).foreach(idx => {
           if (!column.isNullAt(idx)) {
-            shorts(idx) = Platform.getShort(null, dataNativeAddress + rowIdList.getInt(idx) * 2)
+            shorts(idx) = Platform.getShort(null,
+              dataNativeAddress + rowIdList.getInt(idx) * 2)
           }
         })
       case IntegerType | DateType | other if DecimalType.is32BitDecimalType(other) =>
@@ -451,21 +485,24 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
         val floats = column.getFloatData
         (0 until rowIdList.size()).foreach(idx => {
           if (!column.isNullAt(idx)) {
-            floats(idx) = Platform.getFloat(null, dataNativeAddress + rowIdList.getInt(idx) * 4)
+            floats(idx) = Platform.getFloat(null,
+              dataNativeAddress + rowIdList.getInt(idx) * 4)
           }
         })
       case LongType | TimestampType | other if DecimalType.is64BitDecimalType(other) =>
         val longs = column.getLongData
         (0 until rowIdList.size()).foreach(idx => {
           if (!column.isNullAt(idx)) {
-            longs(idx) = Platform.getLong(null, dataNativeAddress + rowIdList.getInt(idx) * 8)
+            longs(idx) = Platform.getLong(null,
+              dataNativeAddress + rowIdList.getInt(idx) * 8)
           }
         })
       case DoubleType =>
         val doubles = column.getDoubleData
         (0 until rowIdList.size()).foreach(idx => {
           if (!column.isNullAt(idx)) {
-            doubles(idx) = Platform.getDouble(null, dataNativeAddress + rowIdList.getInt(idx) * 8)
+            doubles(idx) = Platform.getDouble(null,
+              dataNativeAddress + rowIdList.getInt(idx) * 8)
           }
         })
       case BinaryType | StringType | other if DecimalType.isByteArrayDecimalType(other) =>
@@ -489,6 +526,7 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
             offset += length
           }
         })
+      case other => throw new OapException(s"impossible data type $other.")
     }
   }
 
@@ -544,8 +582,7 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
           offset += length
         }
         BinaryDictionary(binaryDictionaryContent)
-      case otherTypes: DataType => throw new OapException(s"${otherTypes.simpleString}" +
-        s" data type is not support dictionary.")
+      case other => throw new OapException(s"$other data type is not support dictionary.")
     }
   }
 }
