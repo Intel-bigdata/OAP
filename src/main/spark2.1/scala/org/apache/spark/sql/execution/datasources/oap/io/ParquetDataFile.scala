@@ -88,7 +88,7 @@ private[oap] case class ParquetDataFile(
     }
   }
 
-  private[sql] def update(idx: Int, fiberCache: FiberCache): Unit = {
+  private[oap] def update(idx: Int, fiberCache: FiberCache): Unit = {
     release(idx)
     inUseFiberCache.update(idx, fiberCache)
   }
