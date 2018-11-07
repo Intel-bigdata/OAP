@@ -204,6 +204,11 @@ object ParquetDataFiberWriter extends Logging {
         column.getChildColumn(0).getElementsAppended
     }
 
+  /**
+   * noNulls is true, nulls are all 0, not dump nulls to cache, nullsLength is 0,
+   * allNulls is false, need dump to cache,
+   * dicLength is not, need calculate dictionary part and dictionaryIds is a int array.
+   */
   private def fiberLength(
       vector: OnHeapColumnVector, total: Int, nullUnitLength: Int, dicLength: Int): Long = {
     val dicPartSize = vector.dataType() match {
