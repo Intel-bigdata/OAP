@@ -581,7 +581,7 @@ case class ParquetDataFiberReader(address: Long, dataType: DataType, total: Int)
               dataNativeAddress + rowIdList.getInt(idx) * 4)
           }
         })
-      case LongType | TimestampType | other if DecimalType.is64BitDecimalType(other) =>
+      case LongType | TimestampType =>
         val longs = column.getLongData
         (0 until rowIdList.size()).foreach(idx => {
           if (!column.isNullAt(idx)) {
