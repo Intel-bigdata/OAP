@@ -81,11 +81,9 @@ private[oap] case class ParquetDataFile(
 
   private val inUseFiberCache = new Array[FiberCache](schema.length)
 
-  private def release(idx: Int): Unit = synchronized {
-    Option(inUseFiberCache(idx)).foreach { fiberCache =>
-      fiberCache.release()
-      inUseFiberCache.update(idx, null)
-    }
+  private def release(idx: Int): Unit = Option(inUseFiberCache(idx)).foreach { fiberCache =>
+    fiberCache.release()
+    inUseFiberCache.update(idx, null)
   }
 
   private[oap] def update(idx: Int, fiberCache: FiberCache): Unit = {
