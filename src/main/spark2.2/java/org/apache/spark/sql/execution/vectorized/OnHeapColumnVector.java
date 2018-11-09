@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
+import org.apache.parquet.column.Dictionary;
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
@@ -401,6 +402,54 @@ public final class OnHeapColumnVector extends ColumnVector {
     arrayOffsets[rowId] = result;
     arrayLengths[rowId] = length;
     return result;
+  }
+
+  public byte[] getNulls() {
+    return nulls;
+  }
+
+  public byte[] getByteData() {
+    return byteData;
+  }
+
+  public short[] getShortData() {
+    return shortData;
+  }
+
+  public int[] getIntData() {
+    return intData;
+  }
+
+  public long[] getLongData() {
+    return longData;
+  }
+
+  public float[] getFloatData() {
+    return floatData;
+  }
+
+  public double[] getDoubleData() {
+    return doubleData;
+  }
+
+  public int[] getArrayLengths() {
+    return arrayLengths;
+  }
+
+  public int[] getArrayOffsets() {
+    return arrayOffsets;
+  }
+
+  public void setByteData(byte[] byteData) {
+    this.byteData = byteData;
+  }
+
+  public Dictionary getDictionary() {
+    return this.dictionary;
+  }
+
+  public int dictionaryLength() {
+    return dictionary == null ? 0 : dictionary.getMaxId() + 1;
   }
 
   // Spilt this function out since it is the slow path.
