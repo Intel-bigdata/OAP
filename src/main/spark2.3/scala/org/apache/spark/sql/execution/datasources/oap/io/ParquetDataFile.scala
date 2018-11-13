@@ -20,28 +20,21 @@ package org.apache.spark.sql.execution.datasources.oap.io
 import java.io.Closeable
 
 import scala.collection.JavaConverters._
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.util.StringUtils
 import org.apache.parquet.hadoop._
 import org.apache.parquet.hadoop.api.RecordReader
-import org.apache.parquet.hadoop.metadata.{IndexedBlockMetaData, OrderedBlockMetaData}
-import org.apache.spark.memory.MemoryMode
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper
-import org.apache.spark.sql.vectorized.ColumnarBatch
-import org.apache.spark.sql.vectorized.ColumnVector
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVectorFiber
-import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils
-import org.apache.spark.sql.execution.vectorized.WritableColumnVector
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types._
-import org.apache.spark.util.CompletionIterator
 
 /**
  * ParquetDataFile use xxRecordReader read Parquet Data File,
@@ -87,21 +80,18 @@ private[oap] case class ParquetDataFile(
 
   private val inUseFiberCache = new Array[FiberCache](schema.length)
 
-  private def release(idx: Int): Unit = synchronized {
-    Option(inUseFiberCache(idx)).foreach { fiberCache =>
+  private def release(idx: Int): Unit = Option(inUseFiberCache(idx)).foreach { fiberCache =>
       fiberCache.release()
       inUseFiberCache.update(idx, null)
     }
-  }
 
-  private def update(idx: Int, fiberCache: FiberCache): Unit = {
+  private[oap] def update(idx: Int, fiberCache: FiberCache): Unit = {
     release(idx)
     inUseFiberCache.update(idx, fiberCache)
   }
 
   def cache(groupId: Int, fiberId: Int): FiberCache = {
     if (fiberDataReader == null) {
-      // TODO Is there ParquetFooter enough?
       fiberDataReader =
         ParquetFiberDataReader.open(configuration, file, meta.footer.toParquetMetadata)
     }
@@ -111,39 +101,6 @@ private[oap] case class ParquetDataFile(
     // Vectorized read & cache certain(not all) columns
     addRequestSchemaToConf(conf, Array(fiberId))
     ParquetFiberDataLoader(conf, fiberDataReader, groupId).loadSingleColumn
-  }
-
-  private def buildIterator(
-       conf: Configuration,
-       requiredColumnIds: Array[Int],
-       context: ParquetVectorizedContext,
-       rowIds: Option[Array[Int]] = None): OapCompletionIterator[InternalRow] = {
-    var requestSchema = new StructType
-    for (index <- requiredColumnIds) {
-      requestSchema = requestSchema.add(schema(index))
-    }
-
-    if (context.partitionColumns != null) {
-      for (f <- context.partitionColumns.fields) {
-        requestSchema = requestSchema.add(f)
-      }
-    }
-
-    val iterator = rowIds match {
-      case Some(ids) => buildIndexedIterator(conf,
-        requiredColumnIds, requestSchema, context, ids)
-      case None => buildFullScanIterator(conf,
-        requiredColumnIds, requestSchema, context)
-    }
-    new OapCompletionIterator[InternalRow](iterator, requiredColumnIds.foreach(release)) {
-      override def close(): Unit = {
-        // To ensure if any exception happens, caches are still released after calling close()
-        inUseFiberCache.indices.foreach(release)
-        if (fiberDataReader != null) {
-          fiberDataReader.close()
-        }
-      }
-    }
   }
 
   def iterator(
@@ -156,7 +113,10 @@ private[oap] case class ParquetDataFile(
         // and rollback to read this rowgroup from file directly.
         if (parquetDataCacheEnable &&
           !meta.footer.getBlocks.asScala.exists(_.getRowCount > Int.MaxValue)) {
-          buildIterator(configuration, requiredIds, c)
+          addRequestSchemaToConf(configuration, requiredIds)
+          initCacheReader(requiredIds, c,
+            new VectorizedCacheReader(configuration,
+              meta.footer.toParquetMetadata(), this, requiredIds))
         } else {
           addRequestSchemaToConf(configuration, requiredIds)
           initVectorizedReader(c,
@@ -185,7 +145,10 @@ private[oap] case class ParquetDataFile(
           // and rollback to read this rowgroup from file directly.
           if (parquetDataCacheEnable &&
             !meta.footer.getBlocks.asScala.exists(_.getRowCount > Int.MaxValue)) {
-            buildIterator(configuration, requiredIds, c, Some(rowIds))
+            addRequestSchemaToConf(configuration, requiredIds)
+            initCacheReader(requiredIds, c,
+              new IndexedVectorizedCacheReader(configuration,
+                meta.footer.toParquetMetadata(rowIds), this, requiredIds))
           } else {
             addRequestSchemaToConf(configuration, requiredIds)
             initVectorizedReader(c,
@@ -226,78 +189,24 @@ private[oap] case class ParquetDataFile(
     }
   }
 
-  private def buildFullScanIterator(
-      conf: Configuration,
-      requiredColumnIds: Array[Int],
-      requestSchema: StructType,
-      context: ParquetVectorizedContext): Iterator[InternalRow] = {
-    val footer = meta.footer.toParquetMetadata
-    footer.getBlocks.asScala.iterator.flatMap { rowGroupMeta =>
-      val orderedBlockMetaData = rowGroupMeta.asInstanceOf[OrderedBlockMetaData]
-      val columnarBatch = buildColumnarBatchFromCache(orderedBlockMetaData,
-        conf, requestSchema, requiredColumnIds, context)
-      if (context.returningBatch) {
-        Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
-      } else {
-        columnarBatch.rowIterator().asScala
+  private def initCacheReader(requiredColumnIds: Array[Int],
+      c: ParquetVectorizedContext, reader: VectorizedCacheReader) = {
+    reader.initialize()
+    reader.initBatch(c.partitionColumns, c.partitionValues)
+    if (c.returningBatch) {
+      reader.enableReturningBatches()
+    }
+    val iterator = new FileRecordReaderIterator(reader)
+    new OapCompletionIterator[InternalRow](iterator.asInstanceOf[Iterator[InternalRow]],
+      requiredColumnIds.foreach(release)) {
+      override def close(): Unit = {
+        // To ensure if any exception happens, caches are still released after calling close()
+        inUseFiberCache.indices.foreach(release)
+        if (fiberDataReader != null) {
+          fiberDataReader.close()
+        }
       }
     }
-  }
-
-  private def buildIndexedIterator(
-      conf: Configuration,
-      requiredColumnIds: Array[Int],
-      requestSchema: StructType,
-      context: ParquetVectorizedContext,
-      rowIds: Array[Int]): Iterator[InternalRow] = {
-    val footer = meta.footer.toParquetMetadata(rowIds)
-    footer.getBlocks.asScala.iterator.flatMap { rowGroupMeta =>
-      val indexedBlockMetaData = rowGroupMeta.asInstanceOf[IndexedBlockMetaData]
-      val columnarBatch = buildColumnarBatchFromCache(indexedBlockMetaData,
-        conf, requestSchema, requiredColumnIds, context)
-      if (context.returningBatch) {
-        Array(columnarBatch).iterator.asInstanceOf[Iterator[InternalRow]]
-      } else {
-        indexedBlockMetaData.getNeedRowIds.iterator.
-          asScala.map(rowId => columnarBatch.getRow(rowId))
-      }
-    }
-  }
-
-  private def buildColumnarBatchFromCache(
-      blockMetaData: OrderedBlockMetaData,
-      conf: Configuration,
-      requestSchema: StructType,
-      requiredColumnIds: Array[Int],
-      context: ParquetVectorizedContext): ColumnarBatch = {
-    val groupId = blockMetaData.getRowGroupId
-    val fiberCacheGroup = requiredColumnIds.map { id =>
-      val fiberCache =
-        OapRuntime.getOrCreate.fiberCacheManager.get(DataFiberId(this, id, groupId))
-      update(id, fiberCache)
-      fiberCache
-    }
-    val rowCount = blockMetaData.getRowCount.toInt
-//    val columnarBatch = ColumnarBatch.allocate(requestSchema, MemoryMode.ON_HEAP, rowCount)
-    val columnVectors = OnHeapColumnVector.allocateColumns(rowCount, requestSchema)
-    val columnarBatch = new ColumnarBatch(columnVectors.asInstanceOf[Array[ColumnVector]])
-    columnarBatch.setNumRows(rowCount)
-    // populate partitionColumn values
-    if (context.partitionColumns != null) {
-      val partitionIdx = requiredColumnIds.length
-      for (i <- context.partitionColumns.fields.indices) {
-        ColumnVectorUtils.populate(columnVectors(i + partitionIdx),
-          context.partitionValues, i)
-        columnVectors(i + partitionIdx).setIsConstant()
-      }
-    }
-    fiberCacheGroup.zipWithIndex.foreach { case (fiberCache, id) =>
-      new OnHeapColumnVectorFiber(
-        columnarBatch.column(id).asInstanceOf[OnHeapColumnVector],
-        rowCount,
-        requestSchema(id).dataType).loadBytesFromCache(fiberCache.getBaseOffset)
-    }
-    columnarBatch
   }
 
   private def addRequestSchemaToConf(conf: Configuration, requiredIds: Array[Int]): Unit = {
