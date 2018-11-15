@@ -101,7 +101,7 @@ private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
     val broadcastedHadoopConf =
       sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
-    file: PartitionedFile => {
+    (file: PartitionedFile) => {
       assert(file.partitionValues.numFields == partitionSchema.size)
       val conf = broadcastedHadoopConf.value.value
       // For parquet, if enableVectorizedReader is true, init ParquetVectorizedContext.

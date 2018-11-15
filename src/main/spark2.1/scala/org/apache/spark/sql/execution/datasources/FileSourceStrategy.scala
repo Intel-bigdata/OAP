@@ -100,8 +100,8 @@ object FileSourceStrategy extends Strategy with Logging {
         // if config true turn to OapFileFormat
         // else turn to ParquetFileFormat
         case _: ParquetFileFormat
-          if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) ||
-            _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_FORCE_ENABLED) =>
+          if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_FORCE_ENABLED) ||
+            _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
 
           val optimizedParquetFileFormat = new OptimizedParquetFileFormat
           optimizedParquetFileFormat
