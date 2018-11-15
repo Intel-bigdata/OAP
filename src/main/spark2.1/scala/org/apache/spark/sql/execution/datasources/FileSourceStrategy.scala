@@ -25,7 +25,8 @@ import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OptimizedOrcFileFormat, OptimizedParquetFileFormat}
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.execution.datasources.orc.ReadOnlyOrcFileFormat
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ReadOnlyParquetFileFormat}
 import org.apache.spark.sql.hive.orc.OrcFileFormat
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
@@ -87,21 +88,33 @@ object FileSourceStrategy extends Strategy with Logging {
       val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq)
 
       val fsRelation: HadoopFsRelation = _fsRelation.fileFormat match {
+        case _: ReadOnlyParquetFileFormat =>
+          logInfo("index operation for parquet, retain ReadOnlyParquetFileFormat.")
+          _fsRelation
+        case _: ReadOnlyOrcFileFormat =>
+          logInfo("index operation for orc, retain ReadOnlyOrcFileFormat.")
+          _fsRelation
         // TODO a better rule to check if we need to substitute the ParquetFileFormat
         // as OapFileFormat
         // add spark.sql.oap.parquet.enable config
         // if config true turn to OapFileFormat
         // else turn to ParquetFileFormat
         case _: ParquetFileFormat
-          if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
+          if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) ||
+            _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_FORCE_ENABLED) =>
+
           val optimizedParquetFileFormat = new OptimizedParquetFileFormat
           optimizedParquetFileFormat
             .init(_fsRelation.sparkSession,
               _fsRelation.options,
               selectedPartitions.flatMap(p => p.files))
 
-          if (optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)) {
-            logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
+          if (_fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_FORCE_ENABLED)) {
+            logInfo("force use OptimizedParquetFileFormat.")
+            _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
+              options = _fsRelation.options)(_fsRelation.sparkSession)
+          } else if (optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)) {
+            logInfo("hasAvailableIndex = true, will replace with OptimizedParquetFileFormat.")
             _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
               options = _fsRelation.options)(_fsRelation.sparkSession)
           } else {
@@ -109,7 +122,7 @@ object FileSourceStrategy extends Strategy with Logging {
             _fsRelation
           }
 
-        case a: OrcFileFormat
+        case _: OrcFileFormat
           if _fsRelation.sparkSession.conf.get(OapConf.OAP_ORC_ENABLED) =>
           val optimizedOrcFileFormat = new OptimizedOrcFileFormat
           optimizedOrcFileFormat
@@ -172,7 +185,7 @@ object FileSourceStrategy extends Strategy with Logging {
       val outputAttributes = readDataColumns ++ partitionColumns
 
       val scan =
-        new FileSourceScanExec(
+        FileSourceScanExec(
           fsRelation,
           outputAttributes,
           outputSchema,
