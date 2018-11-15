@@ -19,16 +19,12 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import java.sql.Date
 
-import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
-import org.apache.spark.sql.execution.{DataSourceScanExec, SparkPlan}
-import org.apache.spark.sql.execution.datasources.HadoopFsRelation
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex, TestPartition}
@@ -228,28 +224,6 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
       checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND b = 'this is test 2'"),
         Row(2, "this is test 2") :: Nil)
-    }
-  }
-
-  test("parquet force use OptimizedParquetFileFormat without index") {
-    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-    data.toDF("key", "value").createOrReplaceTempView("t")
-    sql("insert overwrite table parquet_test select * from t")
-
-    withSQLConf(OapConf.OAP_PARQUET_FORCE_ENABLED.key -> "true") {
-      val df = sql("SELECT b FROM parquet_test WHERE b = 'this is test 1'")
-      checkAnswer(df, Row("this is test 1") :: Nil)
-      val plans = new ArrayBuffer[SparkPlan]
-      df.queryExecution.executedPlan.foreach(node => plans.append(node))
-      val dataSources = plans.filter(p => p.isInstanceOf[DataSourceScanExec])
-      assert(dataSources.nonEmpty)
-      dataSources.foreach(p =>
-        p.asInstanceOf[DataSourceScanExec].relation match {
-          case h: HadoopFsRelation =>
-            assert(h.fileFormat.isInstanceOf[OapFileFormat])
-          case _ => assert(false)
-        }
-      )
     }
   }
 
