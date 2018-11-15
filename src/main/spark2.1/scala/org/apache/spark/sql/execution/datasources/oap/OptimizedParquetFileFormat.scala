@@ -61,10 +61,16 @@ private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
     // TODO we need to pass the extra data source meta information via the func parameter
     val (filterScanners, m) = meta match {
       case Some(o) => (indexScanners(o, filters), o)
-      case _ => (None, OptimizedParquetFileFormat.mockMeta)
+      case _ =>
+        // TODO Now we need use a meta with PARQUET_DATA_FILE_CLASSNAME & dataSchema to init
+        // ParquetDataFile, try to remove this condition.
+        val emptyMeta = new DataSourceMetaBuilder()
+          .withNewDataReaderClassName(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME)
+          .withNewSchema(dataSchema).build()
+        (None, emptyMeta)
     }
 
-    // TODO refactor this.
+    // TODO Not very easy to use, refactor this.
     hitIndexColumns = filterScanners match {
       case Some(s) =>
         s.scanners.flatMap { scanner =>
@@ -113,9 +119,4 @@ private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
       reader.read(file)
     }
   }
-}
-
-private[sql] object OptimizedParquetFileFormat {
-  val mockMeta: DataSourceMeta = new DataSourceMetaBuilder()
-    .withNewDataReaderClassName(OapFileFormat.PARQUET_DATA_FILE_CLASSNAME).build()
 }
