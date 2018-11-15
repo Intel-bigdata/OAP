@@ -95,10 +95,12 @@ object FileSourceStrategy extends Strategy with Logging {
           logInfo("index operation for orc, retain ReadOnlyOrcFileFormat.")
           _fsRelation
         // TODO a better rule to check if we need to substitute the ParquetFileFormat
-        // as OapFileFormat
-        // add spark.sql.oap.parquet.enable config
-        // if config true turn to OapFileFormat
-        // else turn to ParquetFileFormat
+        // OAP_PARQUET_FORCE_ENABLED priority is higher than OAP_PARQUET_ENABLED,
+        // if OAP_PARQUET_FORCE_ENABLED is true, always use OptimizedParquetFileFormat replace
+        // ParquetFileFormat except index ddl operation.
+        // OAP_PARQUET_ENABLED keep the original meaning, if OAP_PARQUET_ENABLED is true, use
+        // OptimizedParquetFileFormat replace ParquetFileFormat only hasAvailableIndex condition
+        // is true.
         case _: ParquetFileFormat
           if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_FORCE_ENABLED) ||
             _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>

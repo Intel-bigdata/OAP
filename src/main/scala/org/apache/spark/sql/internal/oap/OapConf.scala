@@ -43,7 +43,8 @@ object OapConf {
   val OAP_PARQUET_FORCE_ENABLED =
     SqlConfAdapter.buildConf("spark.sql.oap.parquet.force.enable")
       .internal()
-      .doc("Whether force enable optimized parquet file format when encountering parquet files")
+      .doc("Whether force enable optimized parquet file format when encountering parquet files," +
+        "this config priority is higher than OAP_PARQUET_ENABLED")
       .booleanConf
       .createWithDefault(false)
 

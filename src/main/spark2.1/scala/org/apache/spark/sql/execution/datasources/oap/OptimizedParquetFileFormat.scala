@@ -60,7 +60,7 @@ private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
       hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
     val (filterScanners, m) = meta match {
-      case Some(o) => (indexScanners(o, filters), o)
+      case Some(x) => (indexScanners(x, filters), x)
       case _ =>
         // TODO Now we need use a meta with PARQUET_DATA_FILE_CLASSNAME & dataSchema to init
         // ParquetDataFile, try to remove this condition.
