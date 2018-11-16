@@ -36,17 +36,9 @@ object OapConf {
   val OAP_PARQUET_ENABLED =
     SqlConfAdapter.buildConf("spark.sql.oap.parquet.enable")
       .internal()
-      .doc("Whether enable optimized parquet file format when encountering parquet files")
+      .doc("Whether enable oap file format when encountering parquet files")
       .booleanConf
       .createWithDefault(true)
-
-  val OAP_PARQUET_FORCE_ENABLED =
-    SqlConfAdapter.buildConf("spark.sql.oap.parquet.force.enable")
-      .internal()
-      .doc("Whether force enable optimized parquet file format when encountering parquet files," +
-        "this config priority is higher than OAP_PARQUET_ENABLED")
-      .booleanConf
-      .createWithDefault(false)
 
   val OAP_FULL_SCAN_THRESHOLD =
     SqlConfAdapter.buildConf("spark.sql.oap.statistics.fullScanThreshold")

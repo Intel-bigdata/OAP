@@ -95,15 +95,13 @@ object FileSourceStrategy extends Strategy with Logging {
           logInfo("index operation for orc, retain ReadOnlyOrcFileFormat.")
           _fsRelation
         // TODO a better rule to check if we need to substitute the ParquetFileFormat
-        // OAP_PARQUET_FORCE_ENABLED priority is higher than OAP_PARQUET_ENABLED,
-        // if OAP_PARQUET_FORCE_ENABLED is true, always use OptimizedParquetFileFormat replace
-        // ParquetFileFormat except index ddl operation.
-        // OAP_PARQUET_ENABLED keep the original meaning, if OAP_PARQUET_ENABLED is true, use
-        // OptimizedParquetFileFormat replace ParquetFileFormat only hasAvailableIndex condition
-        // is true.
+        // TODO try to move produce `outputSchema` code part before replace FileFormat code part,
+        // TODO then we can know whether outputSchema suit to use data cache or not.
+        // if OAP_PARQUET_ENABLED and (OAP_PARQUET_DATA_CACHE_ENABLED or hasAvailableIndex),
+        // turn to OptimizedParquetFileFormat
+        // else turn to ParquetFileFormat
         case _: ParquetFileFormat
-          if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_FORCE_ENABLED) ||
-            _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
+          if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
 
           val optimizedParquetFileFormat = new OptimizedParquetFileFormat
           optimizedParquetFileFormat
@@ -111,8 +109,8 @@ object FileSourceStrategy extends Strategy with Logging {
               _fsRelation.options,
               selectedPartitions.flatMap(p => p.files))
 
-          if (_fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_FORCE_ENABLED)) {
-            logInfo("force use OptimizedParquetFileFormat.")
+          if (_fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)) {
+            logInfo("data cache enable, use OptimizedParquetFileFormat.")
             _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
               options = _fsRelation.options)(_fsRelation.sparkSession)
           } else if (optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)) {
@@ -120,7 +118,8 @@ object FileSourceStrategy extends Strategy with Logging {
             _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
               options = _fsRelation.options)(_fsRelation.sparkSession)
           } else {
-            logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
+            logInfo("hasAvailableIndex = false and data cache disable, will retain " +
+              "ParquetFileFormat.")
             _fsRelation
           }
 

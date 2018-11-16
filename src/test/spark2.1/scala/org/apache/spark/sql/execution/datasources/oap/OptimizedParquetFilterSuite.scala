@@ -59,12 +59,12 @@ class OptimizedParquetFilterSuite extends QueryTest with SharedOapContext with B
     sqlContext.dropTempTable("parquet_test")
   }
 
-  test("parquet force use OptimizedParquetFileFormat without index") {
+  test("enable data cache but no .oap.meta file") {
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
 
-    withSQLConf(OapConf.OAP_PARQUET_FORCE_ENABLED.key -> "true") {
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true") {
       val df = sql("SELECT b FROM parquet_test WHERE b = 'this is test 1'")
       checkAnswer(df, Row("this is test 1") :: Nil)
       val plans = new ArrayBuffer[SparkPlan]
