@@ -116,14 +116,12 @@ object FileSourceStrategy extends Strategy with Logging {
         case _: ReadOnlyOrcFileFormat =>
           logInfo("index operation for orc, retain ReadOnlyOrcFileFormat.")
           _fsRelation
-        // TODO a better rule to check if we need to substitute the ParquetFileFormat
-        // if OAP_PARQUET_ENABLED and OAP_PARQUET_DATA_CACHE_ENABLED and suitable for use data
-        // cache, turn to OptimizedParquetFileFormat, this suitable condition is
-        // PARQUET_VECTORIZED_READER_ENABLED and outputSchema all AtomicType.
-        // if OAP_PARQUET_ENABLED and hasAvailableIndex
-        // hasAvailableIndex),
-        // turn to OptimizedParquetFileFormat
-        // else turn to ParquetFileFormat
+        // There are two scenarios will use OptimizedParquetFileFormat:
+        // 1. canUseCache: OAP_PARQUET_ENABLED is true and OAP_PARQUET_DATA_CACHE_ENABLED is true
+        //    and PARQUET_VECTORIZED_READER_ENABLED is true and WHOLESTAGE_CODEGEN_ENABLED is
+        //    true and all fields in outputSchema are AtomicType.
+        // 2. canUseIndex: OAP_PARQUET_ENABLED is true and hasAvailableIndex.
+        // Other scenarios still use ParquetFileFormat.
         case _: ParquetFileFormat
           if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
 
@@ -134,15 +132,19 @@ object FileSourceStrategy extends Strategy with Logging {
               selectedPartitions.flatMap(p => p.files))
           val runtimeConf = _fsRelation.sparkSession.conf
 
-          if (runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED) &&
-            runtimeConf.get(SQLConf.PARQUET_VECTORIZED_READER_ENABLED) &&
-            runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
-            outputSchema.forall(_.dataType.isInstanceOf[AtomicType])) {
+          def canUseCache: Boolean = runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED) &&
+              runtimeConf.get(SQLConf.PARQUET_VECTORIZED_READER_ENABLED) &&
+              runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
+              outputSchema.forall(_.dataType.isInstanceOf[AtomicType])
+
+          def canUseIndex: Boolean = optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)
+
+          if (canUseCache) {
             logInfo("data cache enable and suitable for use , " +
               "will replace with OptimizedParquetFileFormat.")
             _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
               options = _fsRelation.options)(_fsRelation.sparkSession)
-          } else if (optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)) {
+          } else if (canUseIndex) {
             logInfo("hasAvailableIndex = true, will replace with OptimizedParquetFileFormat.")
             _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
               options = _fsRelation.options)(_fsRelation.sparkSession)
