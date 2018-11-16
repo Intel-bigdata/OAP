@@ -30,6 +30,7 @@ import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, Re
 import org.apache.spark.sql.hive.orc.OrcFileFormat
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.types.AtomicType
 
 
 /**
@@ -87,6 +88,27 @@ object FileSourceStrategy extends Strategy with Logging {
 
       val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq)
 
+      val dataColumns =
+        l.resolve(_fsRelation.dataSchema, _fsRelation.sparkSession.sessionState.analyzer.resolver)
+
+      // Partition keys are not available in the statistics of the files.
+      val dataFilters = normalizedFilters.filter(_.references.intersect(partitionSet).isEmpty)
+
+      // Predicates with both partition keys and attributes need to be evaluated after the scan.
+      val afterScanFilters = filterSet -- partitionKeyFilters.filter(_.references.nonEmpty)
+      logInfo(s"Post-Scan Filters: ${afterScanFilters.mkString(",")}")
+
+      val filterAttributes = AttributeSet(afterScanFilters)
+      val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
+      val requiredAttributes = AttributeSet(requiredExpressions)
+
+      val readDataColumns =
+        dataColumns
+          .filter(requiredAttributes.contains)
+          .filterNot(partitionColumns.contains)
+      val outputSchema = readDataColumns.toStructType
+      logInfo(s"Output Data Schema: ${outputSchema.simpleString(5)}")
+
       val fsRelation: HadoopFsRelation = _fsRelation.fileFormat match {
         case _: ReadOnlyParquetFileFormat =>
           logInfo("index operation for parquet, retain ReadOnlyParquetFileFormat.")
@@ -95,9 +117,11 @@ object FileSourceStrategy extends Strategy with Logging {
           logInfo("index operation for orc, retain ReadOnlyOrcFileFormat.")
           _fsRelation
         // TODO a better rule to check if we need to substitute the ParquetFileFormat
-        // TODO try to move produce `outputSchema` code part before replace FileFormat code part,
-        // TODO then we can know whether outputSchema suit to use data cache or not.
-        // if OAP_PARQUET_ENABLED and (OAP_PARQUET_DATA_CACHE_ENABLED or hasAvailableIndex),
+        // if OAP_PARQUET_ENABLED and OAP_PARQUET_DATA_CACHE_ENABLED and suitable for use data
+        // cache, turn to OptimizedParquetFileFormat, this suitable condition is
+        // PARQUET_VECTORIZED_READER_ENABLED and outputSchema all AtomicType.
+        // if OAP_PARQUET_ENABLED and hasAvailableIndex
+        // hasAvailableIndex),
         // turn to OptimizedParquetFileFormat
         // else turn to ParquetFileFormat
         case _: ParquetFileFormat
@@ -108,9 +132,14 @@ object FileSourceStrategy extends Strategy with Logging {
             .init(_fsRelation.sparkSession,
               _fsRelation.options,
               selectedPartitions.flatMap(p => p.files))
+          val runtimeConf = _fsRelation.sparkSession.conf
 
-          if (_fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)) {
-            logInfo("data cache enable, use OptimizedParquetFileFormat.")
+          if (runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED) &&
+            runtimeConf.get(SQLConf.PARQUET_VECTORIZED_READER_ENABLED) &&
+            runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
+            outputSchema.forall(_.dataType.isInstanceOf[AtomicType])) {
+            logInfo("data cache enable and suitable for use , " +
+              "will replace with OptimizedParquetFileFormat.")
             _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
               options = _fsRelation.options)(_fsRelation.sparkSession)
           } else if (optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)) {
@@ -158,27 +187,6 @@ object FileSourceStrategy extends Strategy with Logging {
         case _: FileFormat =>
           _fsRelation
       }
-
-      val dataColumns =
-        l.resolve(fsRelation.dataSchema, fsRelation.sparkSession.sessionState.analyzer.resolver)
-
-      // Partition keys are not available in the statistics of the files.
-      val dataFilters = normalizedFilters.filter(_.references.intersect(partitionSet).isEmpty)
-
-      // Predicates with both partition keys and attributes need to be evaluated after the scan.
-      val afterScanFilters = filterSet -- partitionKeyFilters.filter(_.references.nonEmpty)
-      logInfo(s"Post-Scan Filters: ${afterScanFilters.mkString(",")}")
-
-      val filterAttributes = AttributeSet(afterScanFilters)
-      val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
-      val requiredAttributes = AttributeSet(requiredExpressions)
-
-      val readDataColumns =
-        dataColumns
-          .filter(requiredAttributes.contains)
-          .filterNot(partitionColumns.contains)
-      val outputSchema = readDataColumns.toStructType
-      logInfo(s"Output Data Schema: ${outputSchema.simpleString(5)}")
 
       val pushedDownFilters = dataFilters.flatMap(DataSourceStrategy.translateFilter)
       logInfo(s"Pushed Filters: ${pushedDownFilters.mkString(",")}")
