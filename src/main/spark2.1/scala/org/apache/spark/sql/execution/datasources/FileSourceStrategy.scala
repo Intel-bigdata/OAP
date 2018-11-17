@@ -132,22 +132,29 @@ object FileSourceStrategy extends Strategy with Logging {
               selectedPartitions.flatMap(p => p.files))
           val runtimeConf = _fsRelation.sparkSession.conf
 
-          def canUseCache: Boolean = runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED) &&
+          def canUseCache: Boolean = {
+            val ret = runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED) &&
               runtimeConf.get(SQLConf.PARQUET_VECTORIZED_READER_ENABLED) &&
               runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
               outputSchema.forall(_.dataType.isInstanceOf[AtomicType])
+            if (ret) {
+              logInfo("data cache enable and suitable for use , " +
+                "will replace with OptimizedParquetFileFormat.")
+            }
+            ret
+          }
 
-          def canUseIndex: Boolean = optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)
+          def canUseIndex: Boolean = {
+            val ret = optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)
+            if (ret) {
+              logInfo("hasAvailableIndex = true, " +
+                "will replace with OptimizedParquetFileFormat.")
+            }
+            ret
+          }
 
-          if (canUseCache) {
-            logInfo("data cache enable and suitable for use , " +
-              "will replace with OptimizedParquetFileFormat.")
-            _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
-              options = _fsRelation.options)(_fsRelation.sparkSession)
-          } else if (canUseIndex) {
-            logInfo("hasAvailableIndex = true, will replace with OptimizedParquetFileFormat.")
-            _fsRelation.copy(fileFormat = optimizedParquetFileFormat,
-              options = _fsRelation.options)(_fsRelation.sparkSession)
+          if (canUseCache || canUseIndex) {
+            _fsRelation.copy(fileFormat = optimizedParquetFileFormat)(_fsRelation.sparkSession)
           } else {
             logInfo("hasAvailableIndex = false and data cache disable, will retain " +
               "ParquetFileFormat.")
