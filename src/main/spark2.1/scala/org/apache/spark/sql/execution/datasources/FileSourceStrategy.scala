@@ -130,9 +130,9 @@ object FileSourceStrategy extends Strategy with Logging {
             .init(_fsRelation.sparkSession,
               _fsRelation.options,
               selectedPartitions.flatMap(p => p.files))
-          val runtimeConf = _fsRelation.sparkSession.conf
 
           def canUseCache: Boolean = {
+            val runtimeConf = _fsRelation.sparkSession.conf
             val ret = runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED) &&
               runtimeConf.get(SQLConf.PARQUET_VECTORIZED_READER_ENABLED) &&
               runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
