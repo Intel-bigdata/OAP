@@ -5,8 +5,9 @@ OAP - Optimized Analytics Package (previously known as Spinach) is designed to a
 ## Building
 By defaut, it builds for Spark 2.1.0. To specify the Spark version, please use profile spark-2.1 or spark-2.2.
 ```
-mvn -DskipTests package
-mvn -DskipTests -Pspark-2.2 package
+mvn clean -q -Ppersistent-memory -DskipTests package
+mvn clean -q -Pspark-2.2 -Ppersistent-memory -DskipTests package
+mvn clean -q -Pspark-2.2 -Ppersistent-memory -DskipTests package
 ```
 ## Prerequisites
 You should have [Apache Spark](http://spark.apache.org/) of version 2.1.0 or 2.2.0 installed in your cluster. Refer to Apache Spark's [documents](http://spark.apache.org/docs/2.1.0/) for details.
@@ -45,7 +46,7 @@ For a more detailed examples with performance compare, you can refer to [this pa
 
 To run all the tests, use
 ```
-mvn test
+mvn clean -q -Pspark-2.3 -Ppersistent-memory test
 ```
 To run any specific test suite, for example `OapDDLSuite`, use
 ```
