@@ -3,28 +3,28 @@
 
 OAP - Optimized Analytics Package (previously known as Spinach) is designed to accelerate Ad-hoc query. OAP defines a new parquet-like columnar storage data format and offering a fine-grained hierarchical cache mechanism in the unit of “Fiber” in memory. What’s more, OAP has extended the Spark SQL DDL to allow user to define the customized indices based on relation.
 ## Building
-By defaut, it builds for Spark 2.1.0. To specify the Spark version, please use profile spark-2.1 or spark-2.2.
+By defaut, it builds for Spark 2.1.0. To specify the Spark version, please use profile spark-2.1 , spark-2.2 or spark-2.3.
 ```
 mvn clean -q -Ppersistent-memory -DskipTests package
 mvn clean -q -Pspark-2.2 -Ppersistent-memory -DskipTests package
-mvn clean -q -Pspark-2.2 -Ppersistent-memory -DskipTests package
+mvn clean -q -Pspark-2.3 -Ppersistent-memory -DskipTests package
 ```
 ## Prerequisites
-You should have [Apache Spark](http://spark.apache.org/) of version 2.1.0 or 2.2.0 installed in your cluster. Refer to Apache Spark's [documents](http://spark.apache.org/docs/2.1.0/) for details.
+You should have [Apache Spark](http://spark.apache.org/) of version 2.1.0, 2.2.0 or 2.3.0 installed in your cluster. Refer to Apache Spark's [documents](http://spark.apache.org/docs/2.1.0/) for details.
 ## Use OAP with Spark
-1. Build OAP, `mvn -DskipTests package` and find `oap-<version>.jar` in `target/`
-2. Deploy `oap-<version>.jar` to master machine.
+1. Build OAP find `oap-<version>-with-<spark-version>.jar` in `target/`
+2. Deploy `oap-<version>-with-<spark-version>.jar` to master machine.
 3. Put below configurations to _$SPARK_HOME/conf/spark-defaults.conf_
 ```
-spark.files                         file:///path/to/oap-dir/oap-<version>.jar
-spark.executor.extraClassPath       ./oap-<version>.jar
-spark.driver.extraClassPath         /path/to/oap-dir/oap-<version>.jar
+spark.files                         file:///path/to/oap-dir/oap-<version>-with-<spark-version>.jar
+spark.executor.extraClassPath       ./oap-<version>-with-<spark-version>.jar
+spark.driver.extraClassPath         /path/to/oap-dir/oap-<version>-with-<spark-version>.jar
 spark.memory.offHeap.enabled        true
 spark.memory.offHeap.size           20g
 ```
 4. Run spark by `bin/spark-sql`, `bin/spark-shell`, `sbin/start-thriftserver` or `bin/pyspark` and try our examples
 
-**NOTE**: 1. For spark standalone mode, you have to put `oap-<version>.jar` to both driver and executor since `spark.files` is not working. Also don't forget to update `extraClassPath`.
+**NOTE**: 1. For spark standalone mode, you have to put `oap-<version>-with-<spark-version>.jar` to both driver and executor since `spark.files` is not working. Also don't forget to update `extraClassPath`.
           2. For yarn mode, we need to config all spark.driver.memory, spark.memory.offHeap.size and spark.yarn.executor.memoryOverhead (should be close to offHeap.size) to enable fiber cache.
           3. The comprehensive guidence and example of OAP configuration can be referred @https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide. Briefly speaking, the recommanded configuration is one executor per one node with fully memory/computation capability.
 
@@ -68,6 +68,10 @@ Sometimes, reading index could bring extra cost for some queries, for example if
 OAP format data file consists of several row groups. For each row group, we have many different columns according to user defined table schema. Each column data in one row is called a "Fiber", we are using this as the minimum cache unit.
 * Parquet Data Adaptor
 Parquet is the most popular and recommended data format in Spark open-source community. Since a lot of potential users are now using Parquet storing their data, it would be expensive for them to shift their existing data to OAP. So we designed the compatible layer to allow user to create index directly on top of parquet data. With the Parquet reader we implemented, query over indexed Parquet data is also accelerated, though not as much as OAP.
+* Orc Data Adaptor
+Orc is another popular data format. We also designed the compatible layer to allow user to create index directly on top of Orc data. With the Orc reader we implemented, query over indexed Orc data is also accelerated.
+* Compatible with multiple versions of spark
+OAP is currently compatible with spark2.1, spark2.2 or spark 2.3.
 
 ## Configurations and Performance Tuning
 
@@ -95,7 +99,7 @@ Row Group Size - Row count for each row group
 
 Compression Codec - Choose compression type for OAP data files.
 * Default: GZIP
-* Values: UNCOMPRESSED, SNAPPY, GZIP, LZO
+* Values: UNCOMPRESSED, SNAPPY, GZIP, LZO(Note that ORC does not support GZIP)
 * Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, "SNAPPY")`
 * Usage2: `CREATE TABLE t USING oap OPTIONS ('compression' 'SNAPPY')`
 
