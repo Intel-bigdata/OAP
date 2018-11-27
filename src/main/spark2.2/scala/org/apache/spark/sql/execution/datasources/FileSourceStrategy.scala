@@ -176,8 +176,8 @@ object FileSourceStrategy extends Strategy with Logging {
             val orcOptions: Map[String, String] =
               Map(SQLConf.ORC_FILTER_PUSHDOWN_ENABLED.key ->
                 _fsRelation.sparkSession.sessionState.conf.orcFilterPushDown.toString) ++
-                Map("isOapOrcFileFormat" -> "true")
-            _fsRelation.options
+               Map("isOapOrcFileFormat" -> "true")
+                _fsRelation.options
 
             _fsRelation.copy(fileFormat = optimizedOrcFileFormat,
               options = orcOptions)(_fsRelation.sparkSession)
