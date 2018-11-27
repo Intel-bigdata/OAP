@@ -25,9 +25,11 @@ import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OptimizedOrcFileFormat, OptimizedParquetFileFormat}
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.execution.datasources.orc.ReadOnlyOrcFileFormat
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ReadOnlyParquetFileFormat}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.types.AtomicType
 
 /**
  * A strategy for planning scans over collections of files that might be partitioned or bucketed
@@ -82,27 +84,80 @@ object FileSourceStrategy extends Strategy with Logging {
         ExpressionSet(normalizedFilters.filter(_.references.subsetOf(partitionSet)))
       logInfo(s"Pruning directories with: ${partitionKeyFilters.mkString(",")}")
 
+      val dataColumns =
+        l.resolve(_fsRelation.dataSchema, _fsRelation.sparkSession.sessionState.analyzer.resolver)
+
+      // Partition keys are not available in the statistics of the files.
+      val dataFilters = normalizedFilters.filter(_.references.intersect(partitionSet).isEmpty)
+
+      // Predicates with both partition keys and attributes need to be evaluated after the scan.
+      val afterScanFilters = filterSet -- partitionKeyFilters.filter(_.references.nonEmpty)
+      logInfo(s"Post-Scan Filters: ${afterScanFilters.mkString(",")}")
+
+      val filterAttributes = AttributeSet(afterScanFilters)
+      val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
+      val requiredAttributes = AttributeSet(requiredExpressions)
+
+      val readDataColumns =
+        dataColumns
+          .filter(requiredAttributes.contains)
+          .filterNot(partitionColumns.contains)
+      val outputSchema = readDataColumns.toStructType
+      logInfo(s"Output Data Schema: ${outputSchema.simpleString(5)}")
+
+      val outputAttributes = readDataColumns ++ partitionColumns
+
       val selectedPartitions = _fsRelation.location.listFiles(partitionKeyFilters.toSeq, Nil)
 
       val fsRelation: HadoopFsRelation = _fsRelation.fileFormat match {
-        // TODO a better rule to check if we need to substitute the ParquetFileFormat
-        // as OapFileFormat
-        // add spark.sql.oap.parquet.enable config
-        // if config true turn to OapFileFormat
-        // else turn to ParquetFileFormat
-        case a: ParquetFileFormat
+        case _: ReadOnlyParquetFileFormat =>
+          logInfo("index operation for parquet, retain ReadOnlyParquetFileFormat.")
+          _fsRelation
+        case _: ReadOnlyOrcFileFormat =>
+          logInfo("index operation for orc, retain ReadOnlyOrcFileFormat.")
+          _fsRelation
+        // There are two scenarios will use OptimizedParquetFileFormat:
+        // 1. canUseCache: OAP_PARQUET_ENABLED is true and OAP_PARQUET_DATA_CACHE_ENABLED is true
+        //    and PARQUET_VECTORIZED_READER_ENABLED is true and WHOLESTAGE_CODEGEN_ENABLED is
+        //    true and all fields in outputSchema are AtomicType.
+        // 2. canUseIndex: OAP_PARQUET_ENABLED is true and hasAvailableIndex.
+        // Other scenarios still use ParquetFileFormat.
+        case _: ParquetFileFormat
           if _fsRelation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
+
           val optimizedParquetFileFormat = new OptimizedParquetFileFormat
           optimizedParquetFileFormat
             .init(_fsRelation.sparkSession,
               _fsRelation.options,
               selectedPartitions.flatMap(p => p.files))
 
-          if (optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)) {
-            logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
+          def canUseCache: Boolean = {
+            val runtimeConf = _fsRelation.sparkSession.conf
+            val ret = runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED) &&
+              runtimeConf.get(SQLConf.PARQUET_VECTORIZED_READER_ENABLED) &&
+              runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
+              outputSchema.forall(_.dataType.isInstanceOf[AtomicType])
+            if (ret) {
+              logInfo("data cache enable and suitable for use , " +
+                "will replace with OptimizedParquetFileFormat.")
+            }
+            ret
+          }
+
+          def canUseIndex: Boolean = {
+            val ret = optimizedParquetFileFormat.hasAvailableIndex(normalizedFilters)
+            if (ret) {
+              logInfo("hasAvailableIndex = true, " +
+                "will replace with OptimizedParquetFileFormat.")
+            }
+            ret
+          }
+
+          if (canUseCache || canUseIndex) {
             _fsRelation.copy(fileFormat = optimizedParquetFileFormat)(_fsRelation.sparkSession)
           } else {
-            logInfo("hasAvailableIndex = false, will retain ParquetFileFormat.")
+            logInfo("hasAvailableIndex = false and data cache disable, will retain " +
+              "ParquetFileFormat.")
             _fsRelation
           }
 
@@ -142,29 +197,6 @@ object FileSourceStrategy extends Strategy with Logging {
         case _: FileFormat =>
           _fsRelation
       }
-
-      val dataColumns =
-        l.resolve(fsRelation.dataSchema, fsRelation.sparkSession.sessionState.analyzer.resolver)
-
-      // Partition keys are not available in the statistics of the files.
-      val dataFilters = normalizedFilters.filter(_.references.intersect(partitionSet).isEmpty)
-
-      // Predicates with both partition keys and attributes need to be evaluated after the scan.
-      val afterScanFilters = filterSet -- partitionKeyFilters.filter(_.references.nonEmpty)
-      logInfo(s"Post-Scan Filters: ${afterScanFilters.mkString(",")}")
-
-      val filterAttributes = AttributeSet(afterScanFilters)
-      val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
-      val requiredAttributes = AttributeSet(requiredExpressions)
-
-      val readDataColumns =
-        dataColumns
-          .filter(requiredAttributes.contains)
-          .filterNot(partitionColumns.contains)
-      val outputSchema = readDataColumns.toStructType
-      logInfo(s"Output Data Schema: ${outputSchema.simpleString(5)}")
-
-      val outputAttributes = readDataColumns ++ partitionColumns
 
       val scan =
         FileSourceScanExec(
