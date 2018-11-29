@@ -99,7 +99,7 @@ Row Group Size - Row count for each row group
 
 Compression Codec - Choose compression type for OAP data files.
 * Default: GZIP
-* Values: UNCOMPRESSED, SNAPPY, GZIP, LZO(Note that ORC does not support GZIP)
+* Values: UNCOMPRESSED, SNAPPY, GZIP, LZO (Note that ORC does not support GZIP)
 * Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, "SNAPPY")`
 * Usage2: `CREATE TABLE t USING oap OPTIONS ('compression' 'SNAPPY')`
 
