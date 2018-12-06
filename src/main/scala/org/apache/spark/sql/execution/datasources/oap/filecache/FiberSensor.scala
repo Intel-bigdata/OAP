@@ -50,8 +50,11 @@ private[sql] class FiberSensor extends Logging {
 
   private[filecache] def updateRecordingMap(fromHost: String, commingStatus: FiberCacheStatus) =
     synchronized {
-    val currentHostsForFile = fileToHosts.getOrDefault(
-      commingStatus.file, new ArrayBuffer[HostFiberCache](0))
+    val currentHostsForFile = if (fileToHosts.containsKey(commingStatus.file)) {
+      fileToHosts.get(commingStatus.file)
+    } else {
+      new ArrayBuffer[HostFiberCache](0)
+    }
     val (_, theRest) = currentHostsForFile.partition(_.host == fromHost)
     val newHostsForFile = (HostFiberCache(fromHost, commingStatus) +: theRest)
       .sorted.takeRight(FiberSensor.MAX_HOSTS_MAINTAINED)
@@ -112,8 +115,12 @@ private[sql] class FiberSensor extends Logging {
    * @return
    */
   def getHosts(filePath: String): Seq[String] = {
-    fileToHosts.getOrDefault(filePath, new ArrayBuffer[HostFiberCache](0))
-      .sorted.takeRight(FiberSensor.NUM_GET_HOSTS).reverse.map(_.host)
+    val hosts = if (fileToHosts.containsKey(filePath)) {
+      fileToHosts.get(filePath)
+    } else {
+      new ArrayBuffer[HostFiberCache](0)
+    }
+    hosts.sorted.takeRight(FiberSensor.NUM_GET_HOSTS).reverse.map(_.host)
   }
 }
 

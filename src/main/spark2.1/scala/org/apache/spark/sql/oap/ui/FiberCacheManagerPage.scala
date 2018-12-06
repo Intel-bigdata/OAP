@@ -55,7 +55,11 @@ private[spark] object FiberCacheManagerPage {
     val memUsed = status.memUsed
     val maxMem = status.maxMem
     val cacheStats =
-      OapRuntime.getOrCreate.fiberSensor.executorToCacheManager.getOrDefault(execId, CacheStats())
+      if (OapRuntime.getOrCreate.fiberSensor.executorToCacheManager.containsKey(execId)) {
+      OapRuntime.getOrCreate.fiberSensor.executorToCacheManager.get(execId)
+    } else {
+      CacheStats()
+    }
 
 
     new FiberCacheManagerSummary(
