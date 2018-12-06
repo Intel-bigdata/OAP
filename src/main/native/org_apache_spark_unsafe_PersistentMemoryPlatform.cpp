@@ -22,7 +22,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <stdexcept>
-#include "org_apache_spark_unsafe_PMPlatform.h"
+#include "org_apache_spark_unsafe_PersistentMemoryPlatform.h"
 
 using memkind = struct memkind;
 memkind *pmemkind = NULL;
@@ -49,7 +49,7 @@ inline void check(JNIEnv *env) {
   }
 }
 
-JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PMPlatform_initializeNative
+JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_initializeNative
   (JNIEnv *env, jclass clazz, jstring path, jlong size) {
   // str should not be null, we should checked in java code
   const char* str = env->GetStringUTFChars(path, NULL);
@@ -65,7 +65,7 @@ JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PMPlatform_initializeNative
   env->ReleaseStringUTFChars(path, str);
 }
 
-JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_allocateVolatileMemory
+JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_allocateVolatileMemory
   (JNIEnv *env, jclass clazz, jlong size) {
   check(env);
 
@@ -83,14 +83,14 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_allocateVolatile
   return addr_to_java(p);
 }
 
-JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PMPlatform_getOccupiedSize
+JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_getOccupiedSize
   (JNIEnv *env, jclass clazz, jlong address) {
   check(env);
   void *p = addr_from_java(address);
   return memkind_malloc_usable_size(pmemkind, p);
 }
 
-JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PMPlatform_freeMemory
+JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_freeMemory
   (JNIEnv *env, jclass clazz, jlong address) {
   check(env);
   memkind_free(pmemkind, addr_from_java(address));
