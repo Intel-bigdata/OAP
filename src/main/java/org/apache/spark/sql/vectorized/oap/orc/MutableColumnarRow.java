@@ -73,7 +73,7 @@ public final class MutableColumnarRow extends InternalRow {
         } else if (dt instanceof DoubleType) {
           row.setDouble(i, getDouble(i));
         } else if (dt instanceof StringType) {
-          row.update(i, getUTF8String(i).copy());
+          row.update(i, OapOrcUtils.copy(getUTF8String(i)));
         } else if (dt instanceof BinaryType) {
           row.update(i, getBinary(i));
         } else if (dt instanceof DecimalType) {
