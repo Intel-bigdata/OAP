@@ -26,12 +26,11 @@ import static org.apache.spark.unsafe.Platform.*;
  */
 public class OapOrcUtils {
 
-    public static UTF8String copy(UTF8String utf8String)
-    {
-        byte[] bytes = new byte[utf8String.numBytes()];
-        copyMemory(utf8String.getBaseObject(), utf8String.getBaseOffset(),
+    public static UTF8String copy(UTF8String utf8String) {
+      byte[] bytes = new byte[utf8String.numBytes()];
+      copyMemory(utf8String.getBaseObject(), utf8String.getBaseOffset(),
                 bytes, BYTE_ARRAY_OFFSET, utf8String.numBytes());
-        return UTF8String.fromBytes(bytes);
+      return UTF8String.fromBytes(bytes);
     }
 
 }
