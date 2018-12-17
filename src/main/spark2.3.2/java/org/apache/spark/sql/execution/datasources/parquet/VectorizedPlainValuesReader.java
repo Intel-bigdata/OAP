@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import org.apache.spark.sql.execution.datasources.parquet.VectorizedValuesReader;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.unsafe.Platform;
 
@@ -31,8 +32,8 @@ import org.apache.parquet.io.api.Binary;
  */
 public class VectorizedPlainValuesReader extends ValuesReader implements VectorizedValuesReader {
   private byte[] buffer;
-  private int offset;
-  private int bitOffset; // Only used for booleans.
+  protected int offset;
+  protected int bitOffset; // Only used for booleans.
   private ByteBuffer byteBuffer; // used to wrap the byte array buffer
 
   private static final boolean bigEndianPlatform =
@@ -113,7 +114,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public final int readInteger() {
     int v = Platform.getInt(buffer, offset);
     if (bigEndianPlatform) {
-      v = java.lang.Integer.reverseBytes(v);
+      v = Integer.reverseBytes(v);
     }
     offset += 4;
     return v;
@@ -123,7 +124,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public final long readLong() {
     long v = Platform.getLong(buffer, offset);
     if (bigEndianPlatform) {
-      v = java.lang.Long.reverseBytes(v);
+      v = Long.reverseBytes(v);
     }
     offset += 8;
     return v;

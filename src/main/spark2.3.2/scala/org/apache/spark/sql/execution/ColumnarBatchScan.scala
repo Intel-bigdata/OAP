@@ -31,9 +31,18 @@ private[sql] trait ColumnarBatchScan extends CodegenSupport {
 
   def vectorTypes: Option[Seq[String]] = None
 
+  /**
+    * With oap index and orc format, forOapOrcColumnarBatch is true. Otherwise, it's false.
+    * If it's true, the code gen will use org.apache.spark.sql.vectorized.oap.orc.ColumnarBatch which
+    * is back ported from Spark 2.3 for OrcColumnarBatchReader.
+    */
+  private var forOapOrcColumnarBatch: Boolean = false
   protected def supportsBatch: Boolean = true
 
   protected def needsUnsafeRowConversion: Boolean = true
+
+  def setForOapOrcColumnarBatch(forOapOrcColumnarBatch: Boolean): Unit =
+    this.forOapOrcColumnarBatch = forOapOrcColumnarBatch
 
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
@@ -87,12 +96,23 @@ private[sql] trait ColumnarBatchScan extends CodegenSupport {
     val scanTimeMetric = metricTerm(ctx, "scanTime")
     val scanTimeTotalNs = ctx.addMutableState(ctx.JAVA_LONG, "scanTime") // init as scanTime = 0
 
-    val columnarBatchClz = classOf[ColumnarBatch].getName
+    val columnarBatchClz =
+      if (!forOapOrcColumnarBatch) {
+        classOf[ColumnarBatch].getName
+      } else {
+        classOf[org.apache.spark.sql.vectorized.oap.orc.ColumnarBatch].getName
+      }
     val batch = ctx.addMutableState(columnarBatchClz, "batch")
 
     val idx = ctx.addMutableState(ctx.JAVA_INT, "batchIdx") // init as batchIdx = 0
-    val columnVectorClzs = vectorTypes.getOrElse(
-      Seq.fill(output.indices.size)(classOf[ColumnVector].getName))
+    val columnVectorClzs =
+      if (!forOapOrcColumnarBatch) {
+        vectorTypes.getOrElse(Seq.fill(output.indices.size)(classOf[ColumnVector].getName))
+      } else {
+        vectorTypes.getOrElse(
+          Seq.fill(output.indices.size)(
+            classOf[org.apache.spark.sql.vectorized.oap.orc.ColumnVector].getName))
+      }
     val (colVars, columnAssigns) = columnVectorClzs.zipWithIndex.map {
       case (columnVectorClz, i) =>
         val name = ctx.addMutableState(columnVectorClz, s"colInstance$i")

@@ -96,6 +96,11 @@ private[spark] case class TestBlockId(id: String) extends BlockId {
   override def name: String = "test_" + id
 }
 
+// for OAP
+private[spark] case class FiberBlockId(id: String) extends BlockId {
+  override def name: String = "fiber_" + id
+}
+
 @DeveloperApi
 class UnrecognizedBlockId(name: String)
     extends SparkException(s"Failed to parse $name into a block ID")
@@ -112,6 +117,8 @@ object BlockId {
   val TEMP_LOCAL = "temp_local_([-A-Fa-f0-9]+)".r
   val TEMP_SHUFFLE = "temp_shuffle_([-A-Fa-f0-9]+)".r
   val TEST = "test_(.*)".r
+  // for OAP
+  val FIBER = "fiber_(.*)".r
 
   def apply(name: String): BlockId = name match {
     case RDD(rddId, splitIndex) =>
@@ -134,6 +141,9 @@ object BlockId {
       TempShuffleBlockId(UUID.fromString(uuid))
     case TEST(value) =>
       TestBlockId(value)
+    // for OAP
+    case FIBER(value) =>
+      FiberBlockId(value)
     case _ =>
       throw new UnrecognizedBlockId(name)
   }

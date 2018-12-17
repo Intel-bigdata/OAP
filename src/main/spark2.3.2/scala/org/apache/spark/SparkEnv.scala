@@ -84,6 +84,7 @@ class SparkEnv (
     if (!isStopped) {
       isStopped = true
       pythonWorkers.values.foreach(_.stop())
+      OapRuntime.stop()
       mapOutputTracker.stop()
       shuffleManager.stop()
       broadcastManager.stop()

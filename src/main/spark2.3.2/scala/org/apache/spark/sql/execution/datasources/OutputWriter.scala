@@ -47,6 +47,13 @@ abstract class OutputWriterFactory extends Serializable {
       path: String,
       dataSchema: StructType,
       context: TaskAttemptContext): OutputWriter
+
+  /**
+    * This API called from the driver when all of the write task finished, and give the data
+    * source extensions to pass back the data writing task status, etc. writing the global
+    * meta information.
+    */
+  def commitJob(taskResults: Array[WriteResult]): Unit = { }
 }
 
 
@@ -68,4 +75,14 @@ abstract class OutputWriter {
    * the task output is committed.
    */
   def close(): Unit
+
+  /**
+    * This is to collect data for meta when OAP writing or index writing.
+    * Can be replaced with datasource v2 api from Spark 2.3
+    */
+  def writeStatus(): WriteResult = { }
+
+  protected[sql] def setPartitionString(ps: String): Unit = {
+    // do nothing
+  }
 }

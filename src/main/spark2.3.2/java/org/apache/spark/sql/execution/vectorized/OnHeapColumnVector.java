@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
+import org.apache.spark.sql.execution.datasources.parquet.ParquetDictionaryWrapper;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.UTF8String;
@@ -231,7 +232,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   @Override
   public void putShorts(int rowId, int count, byte[] src, int srcIndex) {
     Platform.copyMemory(src, Platform.BYTE_ARRAY_OFFSET + srcIndex, shortData,
-      Platform.SHORT_ARRAY_OFFSET + rowId * 2L, count * 2L);
+      Platform.SHORT_ARRAY_OFFSET + rowId * 2, count * 2);
   }
 
   @Override
@@ -276,7 +277,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   @Override
   public void putInts(int rowId, int count, byte[] src, int srcIndex) {
     Platform.copyMemory(src, Platform.BYTE_ARRAY_OFFSET + srcIndex, intData,
-      Platform.INT_ARRAY_OFFSET + rowId * 4L, count * 4L);
+      Platform.INT_ARRAY_OFFSET + rowId * 4, count * 4);
   }
 
   @Override
@@ -285,7 +286,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     for (int i = 0; i < count; ++i, srcOffset += 4) {
       intData[i + rowId] = Platform.getInt(src, srcOffset);
       if (bigEndianPlatform) {
-        intData[i + rowId] = java.lang.Integer.reverseBytes(intData[i + rowId]);
+        intData[i + rowId] = Integer.reverseBytes(intData[i + rowId]);
       }
     }
   }
@@ -342,7 +343,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   @Override
   public void putLongs(int rowId, int count, byte[] src, int srcIndex) {
     Platform.copyMemory(src, Platform.BYTE_ARRAY_OFFSET + srcIndex, longData,
-      Platform.LONG_ARRAY_OFFSET + rowId * 8L, count * 8L);
+      Platform.LONG_ARRAY_OFFSET + rowId * 8, count * 8);
   }
 
   @Override
@@ -351,7 +352,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     for (int i = 0; i < count; ++i, srcOffset += 8) {
       longData[i + rowId] = Platform.getLong(src, srcOffset);
       if (bigEndianPlatform) {
-        longData[i + rowId] = java.lang.Long.reverseBytes(longData[i + rowId]);
+        longData[i + rowId] = Long.reverseBytes(longData[i + rowId]);
       }
     }
   }
@@ -394,7 +395,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   public void putFloats(int rowId, int count, byte[] src, int srcIndex) {
     if (!bigEndianPlatform) {
       Platform.copyMemory(src, Platform.BYTE_ARRAY_OFFSET + srcIndex, floatData,
-          Platform.DOUBLE_ARRAY_OFFSET + rowId * 4L, count * 4L);
+          Platform.DOUBLE_ARRAY_OFFSET + rowId * 4, count * 4);
     } else {
       ByteBuffer bb = ByteBuffer.wrap(src).order(ByteOrder.LITTLE_ENDIAN);
       for (int i = 0; i < count; ++i) {
@@ -443,7 +444,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   public void putDoubles(int rowId, int count, byte[] src, int srcIndex) {
     if (!bigEndianPlatform) {
       Platform.copyMemory(src, Platform.BYTE_ARRAY_OFFSET + srcIndex, doubleData,
-          Platform.DOUBLE_ARRAY_OFFSET + rowId * 8L, count * 8L);
+          Platform.DOUBLE_ARRAY_OFFSET + rowId * 8, count * 8);
     } else {
       ByteBuffer bb = ByteBuffer.wrap(src).order(ByteOrder.LITTLE_ENDIAN);
       for (int i = 0; i < count; ++i) {
@@ -498,6 +499,60 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     arrayOffsets[rowId] = result;
     arrayLengths[rowId] = length;
     return result;
+  }
+
+  public byte[] getNulls() {
+    return nulls;
+  }
+
+  public byte[] getByteData() {
+    return byteData;
+  }
+
+  public short[] getShortData() {
+    return shortData;
+  }
+
+  public int[] getIntData() {
+    return intData;
+  }
+
+  public long[] getLongData() {
+    return longData;
+  }
+
+  public float[] getFloatData() {
+    return floatData;
+  }
+
+  public double[] getDoubleData() {
+    return doubleData;
+  }
+
+  public int[] getArrayLengths() {
+    return arrayLengths;
+  }
+
+  public int[] getArrayOffsets() {
+    return arrayOffsets;
+  }
+
+  public void setByteData(byte[] byteData) {
+    this.byteData = byteData;
+  }
+
+  public Dictionary getDictionary() {
+    return this.dictionary;
+  }
+
+  public int dictionaryLength() {
+    if(dictionary ==  null) {
+      return 0;
+    } else if (dictionary instanceof  ParquetDictionaryWrapper) {
+      return ((ParquetDictionaryWrapper)dictionary).getMaxId() + 1;
+    } else {
+      throw new UnsupportedOperationException("this api only use by oap");
+    }
   }
 
   // Spilt this function out since it is the slow path.
