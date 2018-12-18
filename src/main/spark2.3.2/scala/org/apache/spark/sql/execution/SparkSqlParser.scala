@@ -33,10 +33,9 @@ import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.oap.index.{BitMapIndexType, BTreeIndexType, CreateIndexCommand, DropIndexCommand, IndexColumn, OapCheckIndexCommand, OapDisableIndexCommand, OapEnableIndexCommand, OapIndexType, OapShowIndexCommand, RefreshIndexCommand}
+import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.internal.{HiveSerDe, SQLConf, VariableSubstitution}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.execution.datasources.oap.index._
 
 /**
  * Concrete parser for Spark SQL statements.
