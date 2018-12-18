@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import org.apache.spark.sql.execution.datasources.parquet.VectorizedValuesReader;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.unsafe.Platform;
 
@@ -114,7 +113,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public final int readInteger() {
     int v = Platform.getInt(buffer, offset);
     if (bigEndianPlatform) {
-      v = Integer.reverseBytes(v);
+      v = java.lang.Integer.reverseBytes(v);
     }
     offset += 4;
     return v;
@@ -124,7 +123,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public final long readLong() {
     long v = Platform.getLong(buffer, offset);
     if (bigEndianPlatform) {
-      v = Long.reverseBytes(v);
+      v = java.lang.Long.reverseBytes(v);
     }
     offset += 8;
     return v;

@@ -402,7 +402,9 @@ object FileFormatWriter extends Logging {
         recordsInFile += 1
       }
       writeResults = writeResults ++ releaseResources()
-      (ExecutedWriteSummary(updatedPartitions = Set.empty, stats = statsTrackers.map(_.getFinalStats())), writeResults)
+      (ExecutedWriteSummary(
+        updatedPartitions = Set.empty,
+        stats = statsTrackers.map(_.getFinalStats())), writeResults)
     }
 
     override def releaseResources(): Seq[WriteResult] = {

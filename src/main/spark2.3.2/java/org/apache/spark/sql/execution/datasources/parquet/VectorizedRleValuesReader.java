@@ -25,7 +25,6 @@ import org.apache.parquet.column.values.bitpacking.Packer;
 import org.apache.parquet.io.ParquetDecodingException;
 import org.apache.parquet.io.api.Binary;
 
-import org.apache.spark.sql.execution.datasources.parquet.VectorizedValuesReader;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 
 /**

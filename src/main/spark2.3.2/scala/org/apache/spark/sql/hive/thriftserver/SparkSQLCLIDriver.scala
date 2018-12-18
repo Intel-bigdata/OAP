@@ -321,10 +321,11 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
     // Hive 1.2 + not supported in CLI
     throw new RuntimeException("Remote operations not supported")
   }
-// Comment for OAP
-//  override def setHiveVariables(hiveVariables: java.util.Map[String, String]): Unit = {
-//    hiveVariables.asScala.foreach(kv => SparkSQLEnv.sqlContext.conf.setConfString(kv._1, kv._2))
-//  }
+
+  // Comment for OAP
+  // override def setHiveVariables(hiveVariables: java.util.Map[String, String]): Unit = {
+  //   hiveVariables.asScala.foreach(kv => SparkSQLEnv.sqlContext.conf.setConfString(kv._1, kv._2))
+  // }
 
   override def processCmd(cmd: String): Int = {
     val cmd_trimmed: String = cmd.trim()

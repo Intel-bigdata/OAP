@@ -81,7 +81,10 @@ object FileSourceStrategy extends Strategy with Logging {
           _fsRelation.partitionSchema, _fsRelation.sparkSession.sessionState.analyzer.resolver)
       val partitionSet = AttributeSet(partitionColumns)
       val partitionKeyFilters =
-        ExpressionSet(normalizedFilters.filter(_.references.subsetOf(partitionSet)))
+        ExpressionSet(normalizedFilters
+          .filterNot(SubqueryExpression.hasSubquery(_))
+          .filter(_.references.subsetOf(partitionSet)))
+
       logInfo(s"Pruning directories with: ${partitionKeyFilters.mkString(",")}")
 
       val dataColumns =
