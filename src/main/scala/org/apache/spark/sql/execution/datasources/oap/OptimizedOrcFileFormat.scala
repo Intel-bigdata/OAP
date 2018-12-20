@@ -28,7 +28,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.{OutputWriterFactory, PartitionedFile}
 import org.apache.spark.sql.execution.datasources.oap.io.{DataFileContext, OapDataReaderV1, OrcDataFileContext}
-import org.apache.spark.sql.execution.datasources.orc.{OrcFilters, OrcUtils}
+import org.apache.spark.sql.execution.datasources.orc.{OrcFilters, OrcFiltersAdapter, OrcUtils}
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.{AtomicType, StructType}
@@ -90,7 +90,7 @@ private[sql] class OptimizedOrcFileFormat extends OapFileFormat {
 
         // Push down the filters to the orc record reader.
         if (sparkSession.sessionState.conf.orcFilterPushDown) {
-          OrcFilters.createFilter(dataSchema,
+          OrcFiltersAdapter.createFilter(dataSchema,
             filters).foreach { f =>
             OrcInputFormat.setSearchArgument(hadoopConf, f, dataSchema.fieldNames)
           }
