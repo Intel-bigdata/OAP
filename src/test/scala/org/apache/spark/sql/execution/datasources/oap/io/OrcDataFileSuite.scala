@@ -18,7 +18,6 @@
 package org.apache.spark.sql.execution.datasources.oap.io
 
 import java.io.File
-import java.lang.String
 
 import org.apache.orc.mapred.OrcStruct
 import org.scalatest.BeforeAndAfter
@@ -28,7 +27,7 @@ import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.vectorized.oap.orc.ColumnarBatch
+import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.Utils
 
