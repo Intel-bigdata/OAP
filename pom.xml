@@ -652,7 +652,7 @@
             </goals>
             <configuration>
               <sources>
-                <source>src/test/spark2.3/scala</source>
+                <source>src/test/spark2.3.2/scala</source>
               </sources>
             </configuration>
           </execution>
