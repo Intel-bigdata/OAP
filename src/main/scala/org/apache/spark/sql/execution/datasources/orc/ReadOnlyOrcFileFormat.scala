@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.StructType
  * `ReadOnlyOrcFileFormat` only support read orc operation and not support write,
  * in oap we use it to create and refresh index because of isSplitable method always return false.
  */
-class ReadOnlyOrcFileFormat extends OrcFileFormat {
+class ReadOnlyOrcFileFormat extends org.apache.spark.sql.hive.orc.OrcFileFormat {
   override def isSplitable(
       sparkSession: SparkSession,
       options: Map[String, String],
