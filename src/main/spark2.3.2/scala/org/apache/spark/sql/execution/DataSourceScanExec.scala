@@ -179,15 +179,6 @@ case class FileSourceScanExec(
     }
   }
 
-  // setForOrcColumnarBatch is defined in ColumnarBatchScan.scala.
-  // If it's true, use this to read orc data with oap index accelerated.
-  relation.options.getOrElse("isOapOrcFileFormat", "false") match {
-    case "false" =>
-      super.setForOapOrcColumnarBatch(false)
-    case "true" =>
-      super.setForOapOrcColumnarBatch(true)
-  }
-
   override def vectorTypes: Option[Seq[String]] =
     relation.fileFormat.vectorTypes(
       requiredSchema = requiredSchema,

@@ -15,22 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.vectorized.oap.orc;
+package org.apache.spark.sql.execution.datasources.orc;
 
-import org.apache.spark.unsafe.types.UTF8String;
+import org.apache.orc.storage.ql.exec.vector.ColumnVector;
+import org.apache.spark.sql.types.DataType;
 
-import static org.apache.spark.unsafe.Platform.*;
+public final class OrcColumnVectorAllocator {
 
-/**
- * Utilities to help manipulate classes for orc
- */
-public class OapOrcUtils {
-
-    public static UTF8String copy(UTF8String utf8String) {
-      byte[] bytes = new byte[utf8String.numBytes()];
-      copyMemory(utf8String.getBaseObject(), utf8String.getBaseOffset(),
-                bytes, BYTE_ARRAY_OFFSET, utf8String.numBytes());
-      return UTF8String.fromBytes(bytes);
-    }
-
+  public static OrcColumnVector allocate(DataType type, ColumnVector vector) {
+    return new OrcColumnVector(type, vector);
+  }
 }

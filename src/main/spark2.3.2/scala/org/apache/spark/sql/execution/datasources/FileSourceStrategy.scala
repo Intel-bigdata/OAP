@@ -176,11 +176,9 @@ object FileSourceStrategy extends Strategy with Logging {
 
           if (optimizedOrcFileFormat.hasAvailableIndex(normalizedFilters)) {
             logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
-            // isOapOrcFileFormat is used to indicate to read orc data with oap index accelerated.
             val orcOptions: Map[String, String] =
               Map(SQLConf.ORC_FILTER_PUSHDOWN_ENABLED.key ->
                 _fsRelation.sparkSession.sessionState.conf.orcFilterPushDown.toString) ++
-                Map("isOapOrcFileFormat" -> "true") ++
                 _fsRelation.options
 
             _fsRelation.copy(fileFormat = optimizedOrcFileFormat,
