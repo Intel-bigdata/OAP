@@ -36,6 +36,17 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <basedir>./</basedir>
+    <spark.internal.version>2.3.2</spark.internal.version>
+    <scala.version>2.11.8</scala.version>
+    <scala.binary.version>2.11</scala.binary.version>
+    <java.version>1.8</java.version>
+    <antlr.version>4.7</antlr.version>
+    <scalatest.version>3.0.3</scalatest.version>
+    <scalacheck.version>1.13.5</scalacheck.version>
+    <parquet.version>1.8.3</parquet.version>
+    <jetty.version>9.3.24.v20180605</jetty.version>
+    <!--diff: Spark-2.3.2 use orc 1.4.4 -->
+    <orc.version>1.5.2</orc.version>
     <exec.maven.version>1.6.0</exec.maven.version>
   </properties>
 
@@ -175,19 +186,17 @@
     <dependency>
       <groupId>com.fasterxml.jackson.module</groupId>
       <artifactId>jackson-module-scala_${scala.binary.version}</artifactId>
-      <version>2.6.5</version>
+      <version>2.6.7.1</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
@@ -195,19 +204,16 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-mllib_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
@@ -215,13 +221,11 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
@@ -229,13 +233,11 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-hive_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-hive_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
@@ -243,19 +245,16 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-hive-thriftserver_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-unsafe_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-unsafe_${scala.binary.version}</artifactId>
-      <!--<version>${spark.version}</version>-->
       <version>${spark.internal.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
@@ -497,8 +496,7 @@
             <jvmArgs>
               <jvmArg>-Xms1024m</jvmArg>
               <jvmArg>-Xmx1024m</jvmArg>
-              <jvmArg>-XX:PermSize=2g</jvmArg>
-              <jvmArg>-XX:MaxPermSize=5g</jvmArg>
+              <jvmArg>-XX:ReservedCodeCacheSize=512m</jvmArg>
             </jvmArgs>
             <javacArgs>
               <javacArg>-source</javacArg>
@@ -612,90 +610,58 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.antlr</groupId>
+        <artifactId>antlr4-maven-plugin</artifactId>
+        <version>${antlr.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>antlr4</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <visitor>true</visitor>
+          <sourceDirectory>src/main/spark2.3.2/antlr4</sourceDirectory>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <id>add-source</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>src/main/spark2.3.2/java</source>
+                <source>src/main/spark2.3.2/scala</source>
+              </sources>
+            </configuration>
+          </execution>
+          <execution>
+            <id>add-test-source</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-test-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>src/test/spark2.3/scala</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
   <profiles>
-    <profile>
-      <id>spark-2.3</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <properties>
-        <spark.version>2.3.2</spark.version>
-        <spark.internal.version>2.3.2</spark.internal.version>
-        <scala.version>2.11.8</scala.version>
-        <scala.binary.version>2.11</scala.binary.version>
-        <java.version>1.8</java.version>
-        <antlr.version>4.7</antlr.version>
-        <scalatest.version>3.0.3</scalatest.version>
-        <scalacheck.version>1.13.5</scalacheck.version>
-        <parquet.version>1.8.3</parquet.version>
-        <jetty.version>9.3.24.v20180605</jetty.version>
-        <orc.version>1.5.2</orc.version>
-      </properties>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.antlr</groupId>
-            <artifactId>antlr4-maven-plugin</artifactId>
-            <version>${antlr.version}</version>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>antlr4</goal>
-                </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <visitor>true</visitor>
-              <sourceDirectory>src/main/spark2.3.2/antlr4</sourceDirectory>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <configuration>
-              <excludes>
-                <exclude>src/main/spark2.3.2</exclude>
-              </excludes>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>build-helper-maven-plugin</artifactId>
-            <version>3.0.0</version>
-            <executions>
-              <execution>
-                <id>add-source</id>
-                <phase>generate-sources</phase>
-                <goals>
-                  <goal>add-source</goal>
-                </goals>
-                <configuration>
-                  <sources>
-                    <source>src/main/spark2.3.2/java</source>
-                    <source>src/main/spark2.3.2/scala</source>
-                  </sources>
-                </configuration>
-              </execution>
-              <execution>
-                <id>add-test-source</id>
-                <phase>generate-sources</phase>
-                <goals>
-                  <goal>add-test-source</goal>
-                </goals>
-                <configuration>
-                  <sources>
-                    <source>src/test/spark2.3/scala</source>
-                  </sources>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <profile>
       <id>persistent-memory</id>
       <build>

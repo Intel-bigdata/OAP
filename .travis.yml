@@ -13,4 +13,4 @@ before_script:
 - sudo make install
 - cd ${TRAVIS_BUILD_DIR}
 script:
-- mvn clean -q -Pspark-2.3 -Ppersistent-memory test
+- mvn clean -q -Ppersistent-memory test
