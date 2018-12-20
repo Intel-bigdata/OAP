@@ -21,14 +21,13 @@ import org.apache.hadoop.mapreduce.Job
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.OutputWriterFactory
-import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
 import org.apache.spark.sql.types.StructType
 
 /**
  * `ReadOnlyNativeOrcFileFormat` only supports read native orc operation and not support write.
  * In oap we use it to create and refresh index because isSplitable method always returns false.
  */
-class ReadOnlyNativeOrcFileFormat extends OrcFileFormat{
+class ReadOnlyNativeOrcFileFormat extends OrcFileFormat {
   override def isSplitable(
       sparkSession: SparkSession,
       options: Map[String, String],
