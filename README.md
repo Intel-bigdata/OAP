@@ -26,7 +26,7 @@ spark.memory.offHeap.size           20g
 
 **NOTE**: 1. For spark standalone mode, you have to put `oap-<version>-with-<spark-version>.jar` to both driver and executor since `spark.files` is not working. Also don't forget to update `extraClassPath`.
           2. For yarn mode, we need to config all spark.driver.memory, spark.memory.offHeap.size and spark.yarn.executor.memoryOverhead (should be close to offHeap.size) to enable fiber cache.
-          3. The comprehensive guidence and example of OAP configuration can be referred @https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide. Briefly speaking, the recommanded configuration is one executor per one node with fully memory/computation capability.
+          3. The comprehensive guidance and example of OAP configuration can be referred @https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide. Briefly speaking, the recommended configuration is one executor per one node with fully memory/computation capability.
 
 ## Example
 ```
