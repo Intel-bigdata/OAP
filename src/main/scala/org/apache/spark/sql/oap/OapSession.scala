@@ -48,8 +48,8 @@ object OapSession {
 
     private[this] var userSuppliedContext: Option[SparkContext] = None
 
-    override private[spark] def sparkContext(sparkContext: SparkContext): OapSessionBuilder
-    = synchronized {
+    override private[spark] def sparkContext(sparkContext: SparkContext): OapSessionBuilder =
+    synchronized {
       userSuppliedContext = Option(sparkContext)
       this
     }
