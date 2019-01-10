@@ -110,7 +110,7 @@ Take 1 simple ad-hoc query as instance, the store_sales table comes from TPCDS w
 
 #### First, create index:
 
-"create oindex store_sales_ss_customer_sk_index on oap_test (store_sales) using btree"
+"create oindex store_sales_ss_customer_sk_index on store_sales (ss_customer_sk) using btree"
 #### query
 
 1. "SELECT * FROM store_sales WHERE ss_customer_sk < 10000 AND ss_list_price < 100.0 AND ss_net_paid > 500.0"
