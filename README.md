@@ -5,7 +5,7 @@ OAP - Optimized Analytics Package (previously known as Spinach) is designed to a
 ## Building
 By defaut, it builds for Spark 2.1.0. To specify the Spark version, please use profile spark-2.1 , spark-2.2 or spark-2.3.
 ```
-mvn clean -q -Ppersistent-memory -DskipTests package
+mvn clean -q -Pspark-2.1 -Ppersistent-memory -DskipTests package
 mvn clean -q -Pspark-2.2 -Ppersistent-memory -DskipTests package
 mvn clean -q -Pspark-2.3 -Ppersistent-memory -DskipTests package
 ```
@@ -106,23 +106,45 @@ Compression Codec - Choose compression type for OAP data files.
 Refer to [OAP User guide](https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide) for more details.
 
 ## Query Example and Performance Data
-Take 2 simple ad-hoc queries as instances, the store_sales table comes from TPCDS with data scale 200G. Generally we can see 5x boost in performance.
-1. "SELECT * FROM store_sales WHERE ss_ticket_number BETWEEN 100 AND 200"
+Take 1 simple ad-hoc query as instance, the store_sales table comes from TPCDS with data scale 200G. Generally we can see over 10x boost in performance.
 
-Q6:                   | T1/ms | T2/ms | T3/ms | Median/ms 
---------------------- | ----- | ----- | ----- | ---------
-oap-with-index        |   542 |   295 |   370 |      370  
-parquet-with-index    |  1161 |   682 |   680 |      682  
-parquet-without-index |  2010 |  1922 |  1915 |     1922  
+#### First, create index:
 
-2. "SELECT * FROM store_sales WHERE ss_ticket_number < 10000 AND ss_net_paid BETWEEN 100.0 AND 110.0")
+"create oindex store_sales_ss_customer_sk_index on oap_test (store_sales) using btree"
+#### query
 
-Q12:                  | T1/ms | T2/ms | T3/ms | Median/ms 
---------------------- | ----- | ----- | ----- | ---------
-oap-with-index        |    509|   431 |   437 |      437
-parquet-with-index    |    944|   930 |  1318 |      944
-parquet-without-index |   2084|  1895 |  2007 |     2007
+1. "SELECT * FROM store_sales WHERE ss_customer_sk < 10000 AND ss_list_price < 100.0 AND ss_net_paid > 500.0"
 
+Cases:                   | T1/ms | T2/ms | T3/ms | Median/ms 
+---------------------    | ----- | ----- | ----- | ---------
+oap                      |  4241 |  2074 |  2014 |     2074
+oap-with-index,cache     |  1141 |   922 |   503 |      922  
+Orc                      | 20121 | 22455 | 20701 |    20701 
+Orc-with-index           | 18089 | 19127 | 18500 |    18500 
+parquet                  | 18116 | 16929 | 19551 |    18116  
+parquet-with-index       | 18104 | 18984 | 17966 |    18104  
+parquet-with-cache       |  3234 |  1586 |  1628 |     1628  
+parquet-with-cache,index |  3244 |  1229 |   858 |     1229  
+
+
+## Contributors
+@adrian-wang (Daoyuan Wang, Intel)
+@carsonwang (Carson Wang, Intel)
+@chenghao-intel (Hao Cheng, Intel)
+@ConeyLiu (Xianyang Liu, Intel)
+@gczsjdy (Chenzhao Guo, Intel)
+@jerrychenhf (Chen Haifeng, Intel)
+@JkSelf (Ke Jia, Intel)
+@lee-lei (Lei Li, Intel)
+@linhong-intel (Linhong Liu, Baidu)
+@LuciferYang (Jie Yang, Baidu)
+@Moonlit-Sailor (Yi Cui, Alibaba Group)
+@songzhan01 (Zhan Song, Baidu)
+@TigerSong (XianZheng Song, Baidu)
+@zhangweilst (Wei Zhang, Shanghai Jiaotong University)
+@xuanyuanking (Yuanjian Li, Baidu)
+@yueawang (Yue Wang, Intel)
+@zhixingheyi-tian (Shen Xiangxiang, Intel)
 ## How to Contribute
 If you are looking for some ideas on what to contribute, check out GitHub issues for this project labeled ["Pick me up!"](https://github.com/Intel-bigdata/OAP/issues?labels=pick+me+up%21&state=open).
 Comment on the issue with your questions and ideas.
