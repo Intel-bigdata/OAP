@@ -128,23 +128,19 @@ parquet-with-cache,index |  3244 |  1229 |   858 |     1229
 
 
 ## Contributors
-@adrian-wang (Daoyuan Wang, Intel)
-@carsonwang (Carson Wang, Intel)
-@chenghao-intel (Hao Cheng, Intel)
 @ConeyLiu (Xianyang Liu, Intel)
+@carsonwang (Carson Wang, Intel)
 @gczsjdy (Chenzhao Guo, Intel)
-@jerrychenhf (Chen Haifeng, Intel)
 @JkSelf (Ke Jia, Intel)
+@jerrychenhf (Chen Haifeng, Intel)
+@LinhongLiu (Linhong Liu, Baidu)
 @lee-lei (Lei Li, Intel)
-@linhong-intel (Linhong Liu, Baidu)
 @LuciferYang (Jie Yang, Baidu)
-@Moonlit-Sailor (Yi Cui, Alibaba Group)
-@songzhan01 (Zhan Song, Baidu)
-@TigerSong (XianZheng Song, Baidu)
-@zhangweilst (Wei Zhang, Shanghai Jiaotong University)
-@xuanyuanking (Yuanjian Li, Baidu)
-@yueawang (Yue Wang, Intel)
+@pizzaz93
+@songzhan01 (zhan Song, Baidu)
+@WinkerDu (Ripeng Du, Baidu)
 @zhixingheyi-tian (Shen Xiangxiang, Intel)
+
 ## How to Contribute
 If you are looking for some ideas on what to contribute, check out GitHub issues for this project labeled ["Pick me up!"](https://github.com/Intel-bigdata/OAP/issues?labels=pick+me+up%21&state=open).
 Comment on the issue with your questions and ideas.
