@@ -17,10 +17,12 @@
 
 package org.apache.spark.sql
 
+import org.apache.spark.sql.execution.OapSparkSqlParser
 import org.apache.spark.sql.execution.datasources.OapFileSourceStrategy
 
 class OapExtensions extends (SparkSessionExtensions => Unit) {
   override def apply(extensions: SparkSessionExtensions): Unit = {
     extensions.injectPlannerStrategy(_ => OapFileSourceStrategy)
+    extensions.injectParser((_, _) => OapSparkSqlParser)
   }
 }

@@ -35,6 +35,7 @@ trait SharedOapContext extends SharedOapContextBase {
     val session = SparkSession.builder()
       .master("local[2]")
       .appName("test-oap-context")
+      .config("spark.sql.extensions", classOf[OapExtensions].getCanonicalName)
       .config(oapSparkConf).getOrCreate()
     OapRuntime.getOrCreate.asInstanceOf[OapDriverRuntime].setTestSession(session)
     session
