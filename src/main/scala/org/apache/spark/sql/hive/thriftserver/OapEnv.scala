@@ -23,7 +23,6 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SQLContext}
 import org.apache.spark.sql.hive.{HiveExternalCatalog, HiveUtils}
-import org.apache.spark.sql.oap.OapSession
 import org.apache.spark.sql.oap.listener.OapListener
 import org.apache.spark.sql.oap.ui.OapTab
 import org.apache.spark.util.Utils
@@ -54,7 +53,7 @@ private[spark] object OapEnv extends Logging {
 
         sparkConf.setAppName(maybeAppName.getOrElse(s"SparkSQL::${Utils.localHostName()}"))
 
-        val sparkSession = OapSession.builder.config(sparkConf).enableHiveSupport().getOrCreate()
+        val sparkSession = SparkSession.builder.config(sparkConf).enableHiveSupport().getOrCreate()
         sparkContext = sparkSession.sparkContext
         sqlContext = sparkSession.sqlContext
 

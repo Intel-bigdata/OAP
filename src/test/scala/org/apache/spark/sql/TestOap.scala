@@ -18,14 +18,14 @@ package org.apache.spark.sql
 
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.internal.oap.OapConf
-import org.apache.spark.sql.oap.OapSession
 
 object TestOap extends TestOapContext(
-  OapSession.builder.config(
+  SparkSession.builder.config(
     (new SparkConf).set("spark.master", "local[2]")
       .set("spark.app.name", "test-oap-context")
       .set("spark.sql.testkey", "true")
       .set("spark.memory.offHeap.size", "100m")
+      .set("spark.sql.extensions", classOf[OapExtensions].getCanonicalName)
   ).enableHiveSupport().getOrCreate()) {
 }
 

@@ -19,9 +19,14 @@ package org.apache.spark.sql
 
 import org.apache.spark.sql.execution.OapSparkSqlParser
 import org.apache.spark.sql.execution.datasources.OapFileSourceStrategy
+import org.apache.spark.sql.execution.datasources.oap.{OapGroupAggregateStrategy, OapSemiJoinStrategy, OapSortLimitStrategy}
 
 class OapExtensions extends (SparkSessionExtensions => Unit) {
   override def apply(extensions: SparkSessionExtensions): Unit = {
+    // Oap Custom Strategy.
+    extensions.injectPlannerStrategy(_ => OapSortLimitStrategy)
+    extensions.injectPlannerStrategy(_ => OapSemiJoinStrategy)
+    extensions.injectPlannerStrategy(_ => OapGroupAggregateStrategy)
     extensions.injectPlannerStrategy(_ => OapFileSourceStrategy)
     extensions.injectParser((_, _) => OapSparkSqlParser)
   }

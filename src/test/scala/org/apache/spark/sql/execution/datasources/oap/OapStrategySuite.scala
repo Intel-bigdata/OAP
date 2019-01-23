@@ -49,7 +49,7 @@ import org.apache.spark.util.Utils
  * TODO: Another way to avoid Hive error is making different warehouse Dirs for
  * each hive related cases, do it in future if hive cases grow rapidly.
  */
-class OapPlannerSuite
+class OapStrategySuite
   extends QueryTest
   with SQLTestUtils
   with BeforeAndAfterEach
