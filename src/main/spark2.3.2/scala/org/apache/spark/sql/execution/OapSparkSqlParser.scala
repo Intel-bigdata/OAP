@@ -17,16 +17,30 @@
 
 package org.apache.spark.sql.execution
 
-import org.apache.spark.sql.SparkSession
+import java.util.Locale
+
+import scala.collection.JavaConverters._
+
+import org.antlr.v4.runtime.{ParserRuleContext, Token}
+import org.antlr.v4.runtime.tree.TerminalNode
+
+import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
+import org.apache.spark.sql.catalyst.catalog._
+import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.parser._
+import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.execution.command._
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.internal.{SQLConf, VariableSubstitution}
+import org.apache.spark.sql.internal.{HiveSerDe, SQLConf, VariableSubstitution}
+import org.apache.spark.sql.types.StructType
 
 /**
  * Concrete parser for Spark SQL statements.
  */
-class OapSparkSqlParser(conf: SQLConf) extends AbstractSqlParser {
+ class OapSparkSqlParser(conf: SQLConf) extends AbstractSqlParser {
   val astBuilder = new OapSparkSqlAstBuilder(conf)
 
   private val substitutor = new VariableSubstitution(conf)
@@ -34,7 +48,7 @@ class OapSparkSqlParser(conf: SQLConf) extends AbstractSqlParser {
   protected override def parse[T](command: String)(toResult: SqlBaseParser => T): T = {
     super.parse(substitutor.substitute(command))(toResult)
   }
-}
+ }
 
 /**
  * Concrete parser for SparkSessionExtensions.
