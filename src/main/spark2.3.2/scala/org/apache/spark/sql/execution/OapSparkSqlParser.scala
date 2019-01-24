@@ -40,29 +40,16 @@ import org.apache.spark.sql.types.StructType
 /**
  * Concrete parser for Spark SQL statements.
  */
- class OapSparkSqlParser(conf: SQLConf) extends AbstractSqlParser {
-  val astBuilder = new OapSparkSqlAstBuilder(conf)
+ class OapSparkSqlParser extends AbstractSqlParser {
+  lazy val conf = SparkSession.getActiveSession.get.sessionState.conf
+  lazy val astBuilder = new OapSparkSqlAstBuilder(conf)
 
-  private val substitutor = new VariableSubstitution(conf)
+  private lazy val substitutor = new VariableSubstitution(conf)
 
   protected override def parse[T](command: String)(toResult: SqlBaseParser => T): T = {
     super.parse(substitutor.substitute(command))(toResult)
   }
  }
-
-/**
- * Concrete parser for SparkSessionExtensions.
- */
-object OapSparkSqlParser extends AbstractSqlParser {
-  val conf = SparkSession.getActiveSession.get.sessionState.conf
-  val astBuilder = new OapSparkSqlAstBuilder(conf)
-
-  private val substitutor = new VariableSubstitution(conf)
-
-  protected override def parse[T](command: String)(toResult: SqlBaseParser => T): T = {
-    super.parse(substitutor.substitute(command))(toResult)
-  }
-}
 
 /**
  * Builder that converts an ANTLR ParseTree into a LogicalPlan/Expression/TableIdentifier.

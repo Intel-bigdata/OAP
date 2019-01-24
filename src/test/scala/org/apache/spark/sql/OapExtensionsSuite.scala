@@ -43,7 +43,7 @@ class OapExtensionsSuite extends SparkFunSuite {
       assert(oapStrategies.length == 4)
       assert(oapStrategies.equals(expected))
       val sqlParser = withOapExtensionsSession.sessionState.sqlParser
-      assert(sqlParser.equals(OapSparkSqlParser))
+      assert(sqlParser.isInstanceOf[OapSparkSqlParser])
     } finally {
       stop(withOapExtensionsSession)
     }
