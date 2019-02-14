@@ -82,11 +82,13 @@ private[oap] case class OapDataFileV1(
       }
       val dictionaryPage = new DictionaryPage(BytesInput.from(bytes), dictSize,
         org.apache.parquet.column.Encoding.PLAIN)
-      schema(fiberId).dataType match {
+      val dict = schema(fiberId).dataType match {
         case StringType | BinaryType => new PlainBinaryDictionary(dictionaryPage)
         case IntegerType => new PlainIntegerDictionary(dictionaryPage)
         case other => sys.error(s"not support data type: $other")
       }
+      dictionaries(fiberId) = dict
+      dict
     } else {
       dictionaries(fiberId)
     }
