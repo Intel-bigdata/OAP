@@ -106,7 +106,9 @@ object HadoopFsRelationOptimizer extends Logging {
             relation.options,
             selectedPartitions.flatMap(p => p.files))
 
-        if (optimizedOrcFileFormat.hasAvailableIndex(dataFilters)) {
+        val booleanCache = relation.sparkSession.conf.get(OapConf.OAP_ORC_DATA_CACHE_ENABLED)
+        if (optimizedOrcFileFormat.hasAvailableIndex(dataFilters) ||
+          relation.sparkSession.conf.get(OapConf.OAP_ORC_DATA_CACHE_ENABLED)) {
           logInfo("hasAvailableIndex = true, will replace with OapFileFormat.")
           val orcOptions: Map[String, String] =
             Map(SQLConf.ORC_FILTER_PUSHDOWN_ENABLED.key ->

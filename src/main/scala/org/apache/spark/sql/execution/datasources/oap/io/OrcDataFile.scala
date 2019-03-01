@@ -25,13 +25,18 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.RecordReader
 import org.apache.orc._
-import org.apache.orc.mapred.OrcStruct
+import org.apache.orc.impl.{ReaderImpl, RecordReaderCacheImpl}
+import org.apache.orc.mapred.{OrcInputFormat, OrcStruct}
 import org.apache.orc.mapreduce._
+import org.apache.orc.storage.ql.exec.vector.{ColumnVector, VectorizedRowBatch}
+import org.apache.parquet.hadoop.{ParquetFiberDataReader, VectorizedOapRecordReader}
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache._
-import org.apache.spark.sql.execution.datasources.oap.orc.{IndexedOrcColumnarBatchReader, IndexedOrcMapreduceRecordReader, OrcColumnarBatchReader, OrcMapreduceRecordReader}
+import org.apache.spark.sql.execution.datasources.oap.orc.{OrcMapreduceRecordReader, _}
+import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types._
@@ -63,11 +68,33 @@ private[oap] case class OrcDataFile(
 
   private var context: OrcDataFileContext = _
   private val filePath: Path = new Path(path)
+  private val orcDataCacheEnable =
+    configuration.getBoolean(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key,
+      OapConf.OAP_ORC_DATA_CACHE_ENABLED.defaultValue.get)
+  val meta =
+    OapRuntime.getOrCreate.dataFileMetaCacheManager.get(this).asInstanceOf[OrcDataFileMeta]
+//  meta.getOrcFileReader()
   private val fileReader: Reader = {
     import scala.collection.JavaConverters._
-    val meta =
-      OapRuntime.getOrCreate.dataFileMetaCacheManager.get(this).asInstanceOf[OrcDataFileMeta]
+//    val meta =
+//      OapRuntime.getOrCreate.dataFileMetaCacheManager.get(this).asInstanceOf[OrcDataFileMeta]
     meta.getOrcFileReader()
+  }
+
+//  recordReader = reader.rows(options)
+
+  var recordReader: RecordReaderCacheImpl = _
+
+  private val inUseFiberCache = new Array[FiberCache](schema.length)
+
+  private def release(idx: Int): Unit = Option(inUseFiberCache(idx)).foreach { fiberCache =>
+    fiberCache.release()
+    inUseFiberCache.update(idx, null)
+  }
+
+  private[oap] def update(idx: Int, fiberCache: FiberCache): Unit = {
+    release(idx)
+    inUseFiberCache.update(idx, fiberCache)
   }
 
   def iterator(
@@ -75,8 +102,22 @@ private[oap] case class OrcDataFile(
     filters: Seq[Filter] = Nil): OapCompletionIterator[Any] = {
     val iterator = context.returningBatch match {
       case true =>
-        initVectorizedReader(context,
-          new OrcColumnarBatchReader(context.enableOffHeapColumnVector, context.copyToSpark))
+        // Parquet RowGroupCount can more than Int.MaxValue,
+        // in that sence we should not cache data in memory
+        // and rollback to read this rowgroup from file directly.
+        // TODO support cache without copyToSpark
+        if (orcDataCacheEnable &&
+          !meta.listStripeInformation.asScala.exists(_.getNumberOfRows > Int.MaxValue &&
+          context.copyToSpark)) {
+//          addRequestSchemaToConf(configuration, requiredIds)
+          initCacheReader(context,
+            new OrcCacheReader(configuration,
+              meta, this, requiredIds,
+              context.enableOffHeapColumnVector, context.copyToSpark))
+        } else {
+          initVectorizedReader(context,
+            new OrcColumnarBatchReader(context.enableOffHeapColumnVector, context.copyToSpark))
+        }
       case false =>
         initRecordReader(
           new OrcMapreduceRecordReader[OrcStruct](filePath, configuration))
@@ -115,6 +156,25 @@ private[oap] case class OrcDataFile(
     val iterator = new FileRecordReaderIterator(reader)
     new OapCompletionIterator[InternalRow](iterator.asInstanceOf[Iterator[InternalRow]], {}) {
       override def close(): Unit = iterator.close()
+    }
+  }
+
+  private def initCacheReader(c: OrcDataFileContext,
+                                   reader: OrcCacheReader) = {
+    reader.initialize(filePath, configuration)
+    reader.initBatch(fileReader.getSchema, c.requestedColIds, c.requiredSchema.fields,
+      c.partitionColumns, c.partitionValues)
+    val iterator = new FileRecordReaderIterator(reader)
+    // TODO need to release
+    new OapCompletionIterator[InternalRow](iterator.asInstanceOf[Iterator[InternalRow]],
+      c.requestedColIds.foreach(release)) {
+      override def close(): Unit = {
+        // To ensure if any exception happens, caches are still released after calling close()
+        inUseFiberCache.indices.foreach(release)
+        if (recordReader != null) {
+          recordReader.close()
+        }
+      }
     }
   }
 
@@ -168,9 +228,35 @@ private[oap] case class OrcDataFile(
   override def getDataFileMeta(): DataFileMeta =
     new OrcDataFileMeta(filePath, configuration)
 
-  // Data cache is not supported, since the performance with cache
-  // is worse than without cache for Parquet.
   override def cache(groupId: Int, fiberId: Int): FiberCache = {
-    throw new OapException("Data cache is not supported for Orc.\n")
+    if (recordReader == null) {
+      val reader: Reader = OrcFile.createReader(meta.path, OrcFile.readerOptions(meta.configuration)
+        .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(meta.configuration)).filesystem(meta.fs))
+      val options: Reader.Options = OrcInputFormat.buildOptions(meta.configuration,
+        reader, 0, meta.length)
+      recordReader = new RecordReaderCacheImpl(reader.asInstanceOf[ReaderImpl], options)
+    }
+
+    // scalastyle:off println
+    println("meta.listStripeInformation:" + meta.listStripeInformation.size())
+    val rowCount = meta.listStripeInformation.get(groupId).getNumberOfRows.toInt
+    // scalastyle:off println
+    println("groupId:" + groupId + ",rowCount:" + rowCount)
+    val vectorizedRowBatch = fileReader.getSchema.createRowBatch(rowCount)
+    recordReader.readStripeByOap(groupId)
+    recordReader.readBatch(vectorizedRowBatch)
+    val fromColumn = vectorizedRowBatch.cols(fiberId)
+    val field = schema.fields(fiberId)
+    val toColumn = new OnHeapColumnVector(rowCount, field.dataType)
+    if (fromColumn.isRepeating) {
+      OrcCacheReader.putRepeatingValues(rowCount, field, fromColumn, toColumn)
+    }
+    else if (fromColumn.noNulls) {
+      OrcCacheReader.putNonNullValues(rowCount, field, fromColumn, toColumn)
+    }
+    else {
+      OrcCacheReader.putValues(rowCount, field, fromColumn, toColumn)
+    }
+    ParquetDataFiberWriter.dumpToCache(toColumn, rowCount)
   }
 }

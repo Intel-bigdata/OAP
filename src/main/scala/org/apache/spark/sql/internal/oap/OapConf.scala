@@ -294,6 +294,13 @@ object OapConf {
       .booleanConf
       .createWithDefault(false)
 
+  val OAP_ORC_DATA_CACHE_ENABLED =
+    SqlConfAdapter.buildConf("spark.sql.oap.orc.data.cache.enable")
+      .internal()
+      .doc("To indicate if enable orc data cache, default false")
+      .booleanConf
+      .createWithDefault(false)
+
   val OAP_PARQUET_INDEX_ENABLED =
     SqlConfAdapter.buildConf("spark.sql.oap.parquet.index.enable")
       .internal()

@@ -25,6 +25,8 @@ import org.scalatest.BeforeAndAfter
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.ColumnarBatch
@@ -94,6 +96,38 @@ class OrcDataFileSuite extends QueryTest with SharedOapContext with BeforeAndAft
     iterator.close()
     assert(totalRows == 5000)
     assert(totalBatches == (5000 / 4096 + 1))
+    // scalastyle:off println
+    println("this ut is over")
+  }
+
+  test("read by columnIds with columnar batch when cache") {
+    configuration.setBoolean(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key, true)
+    OapRuntime.getOrCreate.fiberCacheManager.clearAllFibers()
+    val reader = OrcDataFile(fileName, partitionSchema, configuration)
+    val requiredIds = Array(0, 2)
+    val context = OrcDataFileContext(partitionSchema, partitionValues, true, requestSchema,
+      partitionSchema, false, true, requiredIds)
+    reader.setOrcDataFileContext(context)
+    val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[ColumnarBatch]]
+    var totalRows = 0
+    var totalBatches = 0
+    // By default, the columnar batch has 4096 rows.
+    while (iterator.hasNext) {
+      val columnarBatch = iterator.next
+      assert(columnarBatch.isInstanceOf[ColumnarBatch])
+      totalRows += columnarBatch.numRows
+      // scalastyle:off println
+      println("columnarBatch.numRows:" + columnarBatch.numRows)
+      totalBatches += 1
+    }
+    iterator.close()
+    // scalastyle:off println
+    println("totalRows:" + totalRows)
+    assert(totalRows == 5000)
+    assert(totalBatches == (5000 / 4096 + 1))
+    // scalastyle:off println
+    println("this ut is over")
   }
 
   test("read by columnIds and rowIds with columnar batch") {

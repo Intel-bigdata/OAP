@@ -22,16 +22,23 @@ import org.apache.hadoop.fs.FSDataInputStream
 import org.apache.hadoop.fs.Path
 import org.apache.orc.OrcFile
 import org.apache.orc.Reader
+import org.apache.orc.mapred.OrcInputFormat
 
 private[oap] class OrcDataFileMeta(val path: Path, val configuration: Configuration)
     extends DataFileMeta {
 
-  private val fs = path.getFileSystem(configuration)
+  val fs = path.getFileSystem(configuration)
   private val readerOptions = OrcFile.readerOptions(configuration).filesystem(fs)
   private val fileReader = OrcFile.createReader(path, readerOptions)
+  val length = fs.getFileStatus(path).getLen
+//  val options: Reader.Options = OrcInputFormat.buildOptions(configuration, fileReader, 0, length)
+  // Record reader from ORC row batch.
+//  val recordReader = fileReader.rows(options)
 
   def getOrcFileReader(): Reader = fileReader
+  val listStripeInformation = fileReader.getStripes()
 
+  def numberOfRows: Long = fileReader.getNumberOfRows()
   override def len: Long = fileReader.getContentLength()
   override def getGroupCount: Int = fileReader.getStripes().size()
   override def getFieldCount: Int = fileReader.getSchema().getFieldNames().size()
