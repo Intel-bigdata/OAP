@@ -54,10 +54,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 public class OrcCacheReader extends RecordReader<Void, ColumnarBatch> {
-  private static final Logger LOG = LoggerFactory.getLogger(ParquetFiberDataReader.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OrcCacheReader.class);
 
   // TODO: make this configurable.
-  private static final int CAPACITY = 4 * 1024;
+  protected static final int CAPACITY = 4 * 1024;
 
   // Vectorized ORC Row Batch
   protected VectorizedRowBatch batch;
@@ -96,11 +96,11 @@ public class OrcCacheReader extends RecordReader<Void, ColumnarBatch> {
 
   public int[] requiredColumnIds;
 
-  protected long rowsReturned = 0L;
+  protected long rowsReturned = 0;
 
-  protected int totalCountLoadedSoFar = 0;
+  protected long totalCountLoadedSoFar = 0;
 
-  protected long totalRowCount = 0L;
+  protected long totalRowCount = 0;
 
   // Equivalent to Parquet's current rowgroup
   protected int currentStripe = -1;
@@ -109,10 +109,10 @@ public class OrcCacheReader extends RecordReader<Void, ColumnarBatch> {
 
   protected ParquetDataFiberReader[] fiberReaders;
 
-  public OrcCacheReader(boolean useOffHeap, boolean copyToSpark) {
-    MEMORY_MODE = useOffHeap ? MemoryMode.OFF_HEAP : MemoryMode.ON_HEAP;
-    this.copyToSpark = copyToSpark;
-  }
+//  public OrcCacheReader(boolean useOffHeap, boolean copyToSpark) {
+//    MEMORY_MODE = useOffHeap ? MemoryMode.OFF_HEAP : MemoryMode.ON_HEAP;
+//    this.copyToSpark = copyToSpark;
+//  }
 
   public OrcCacheReader(Configuration configuration,
                         OrcDataFileMeta meta,
@@ -340,13 +340,13 @@ public class OrcCacheReader extends RecordReader<Void, ColumnarBatch> {
 
 
     int rowCount = (int)stripeInformation.getNumberOfRows();
-    for (int i = 0; i < requestedColIds.length; ++i) {
+    for (int i = 0; i < requiredColumnIds.length; ++i) {
       long start = System.nanoTime();
       FiberCache fiberCache =
-              OapRuntime$.MODULE$.getOrCreate().fiberCacheManager().get(new DataFiberId(dataFile, requestedColIds[i], currentStripe));
+              OapRuntime$.MODULE$.getOrCreate().fiberCacheManager().get(new DataFiberId(dataFile, requiredColumnIds[i], currentStripe));
       long end = System.nanoTime();
       loadFiberTime += (end - start);
-      dataFile.update(requestedColIds[i], fiberCache);
+      dataFile.update(requiredColumnIds[i], fiberCache);
       long start2 = System.nanoTime();
       fiberReaders[i] = ParquetDataFiberReader$.MODULE$.apply(fiberCache.getBaseOffset(),
               columnarBatch.column(i).dataType(), rowCount);
@@ -368,7 +368,7 @@ public class OrcCacheReader extends RecordReader<Void, ColumnarBatch> {
     }
     columnarBatch.setNumRows(0);
 
-    int num = (int) Math.min((long) CAPACITY, totalCountLoadedSoFar - rowsReturned);
+    int num = (int) Math.min((long)CAPACITY, totalCountLoadedSoFar - rowsReturned);
     long start = System.nanoTime();
 
     for (int i = 0; i < fiberReaders.length; ++i) {
@@ -416,7 +416,7 @@ public class OrcCacheReader extends RecordReader<Void, ColumnarBatch> {
         BytesColumnVector data = (BytesColumnVector)fromColumn;
         int size = data.vector[0].length;
         toColumn.arrayData().reserve(size);
-        toColumn.arrayData().putBytes(0, size, data.vector[0], 0);
+        toColumn.arrayData().appendBytes(size, data.vector[0], 0);
         for (int index = 0; index < batchSize; index++) {
           toColumn.putArray(index, 0, size);
         }
@@ -483,7 +483,7 @@ public class OrcCacheReader extends RecordReader<Void, ColumnarBatch> {
       }
       arrayData.reserve(totalNumBytes);
       for (int index = 0, pos = 0; index < batchSize; pos += data.length[index], index++) {
-        arrayData.putBytes(pos, data.length[index], data.vector[index], data.start[index]);
+        arrayData.appendBytes(data.length[index], data.vector[index], data.start[index]);
         toColumn.putArray(index, pos, data.length[index]);
       }
     } else if (type instanceof DecimalType) {
@@ -595,7 +595,7 @@ public class OrcCacheReader extends RecordReader<Void, ColumnarBatch> {
         if (fromColumn.isNull[index]) {
           toColumn.putNull(index);
         } else {
-          arrayData.putBytes(pos, vector.length[index], vector.vector[index], vector.start[index]);
+          arrayData.appendBytes(vector.length[index], vector.vector[index], vector.start[index]);
           toColumn.putArray(index, pos, vector.length[index]);
         }
       }

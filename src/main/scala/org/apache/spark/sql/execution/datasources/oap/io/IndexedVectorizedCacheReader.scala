@@ -72,7 +72,7 @@ class IndexedVectorizedCacheReader(
 
     checkEndOfRowGroup()
 
-    var ids = idsMap.remove(currentPageNumber)
+    var ids: IntList = idsMap.remove(currentPageNumber)
     currentPageNumber += 1
 
     while (ids == null || ids.isEmpty) {
@@ -91,7 +91,7 @@ class IndexedVectorizedCacheReader(
 
   override protected def readNextRowGroup(): Unit = {
     super.readNextRowGroup()
-    val rowIds = currentRowGroup.asInstanceOf[IndexedBlockMetaData].getNeedRowIds
+    val rowIds: IntList = currentRowGroup.asInstanceOf[IndexedBlockMetaData].getNeedRowIds
     // TODO add fine-grained fetch
     divideRowIdsIntoPages(rowIds)
   }
@@ -109,7 +109,7 @@ class IndexedVectorizedCacheReader(
         idsMap.get(pageNumber).add(rowId - pageNumber * pageSize)
       }
       else {
-        val ids = new IntArrayList(pageSize / 2)
+        val ids: IntArrayList = new IntArrayList(pageSize / 2)
         ids.add(rowId - pageNumber * pageSize)
         idsMap.put(pageNumber, ids)
       }

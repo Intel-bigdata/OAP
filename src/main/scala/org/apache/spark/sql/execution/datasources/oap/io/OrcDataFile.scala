@@ -102,9 +102,9 @@ private[oap] case class OrcDataFile(
     filters: Seq[Filter] = Nil): OapCompletionIterator[Any] = {
     val iterator = context.returningBatch match {
       case true =>
-        // Parquet RowGroupCount can more than Int.MaxValue,
+        // Orc Stripe size can more than Int.MaxValue,
         // in that sence we should not cache data in memory
-        // and rollback to read this rowgroup from file directly.
+        // and rollback to read this stripe from file directly.
         // TODO support cache without copyToSpark
         if (orcDataCacheEnable &&
           !meta.listStripeInformation.asScala.exists(_.getNumberOfRows > Int.MaxValue &&
@@ -134,9 +134,20 @@ private[oap] case class OrcDataFile(
     } else {
       val iterator = context.returningBatch match {
         case true =>
-          initVectorizedReader(context,
-            new IndexedOrcColumnarBatchReader(context.enableOffHeapColumnVector,
-              context.copyToSpark, rowIds))
+          // TODO support cache without copyToSpark
+          if (orcDataCacheEnable &&
+            !meta.listStripeInformation.asScala.exists(_.getNumberOfRows > Int.MaxValue &&
+              context.copyToSpark)) {
+            //          addRequestSchemaToConf(configuration, requiredIds)
+            initCacheReader(context,
+              new IndexedOrcCacheReader(configuration,
+                meta, this, requiredIds,
+                context.enableOffHeapColumnVector, context.copyToSpark, rowIds))
+          } else {
+            initVectorizedReader(context,
+              new IndexedOrcColumnarBatchReader(context.enableOffHeapColumnVector,
+                context.copyToSpark, rowIds))
+          }
         case false =>
           initRecordReader(
             new IndexedOrcMapreduceRecordReader[OrcStruct](filePath, configuration, rowIds))
@@ -237,11 +248,7 @@ private[oap] case class OrcDataFile(
       recordReader = new RecordReaderCacheImpl(reader.asInstanceOf[ReaderImpl], options)
     }
 
-    // scalastyle:off println
-    println("meta.listStripeInformation:" + meta.listStripeInformation.size())
     val rowCount = meta.listStripeInformation.get(groupId).getNumberOfRows.toInt
-    // scalastyle:off println
-    println("groupId:" + groupId + ",rowCount:" + rowCount)
     val vectorizedRowBatch = fileReader.getSchema.createRowBatch(rowCount)
     recordReader.readStripeByOap(groupId)
     recordReader.readBatch(vectorizedRowBatch)

@@ -21,10 +21,8 @@ import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row, SaveMode}
-import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex, TestPartition}
 import org.apache.spark.util.Utils
-
 
 class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEach {
   import testImplicits._
@@ -142,50 +140,6 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     checkAnswer(sql("select * from orc_table_2 where a == 4"),
       Row(4, 4) :: Nil)
     sql("drop oindex index2 on orc_table_2")
-  }
-
-  test("check cache with orc file format") {
-//    configuration.setBoolean(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key, true)
-//    configuration.setBoolean(OapConf.ORC_COPY_BATCH_TO_SPARK.key, true)
-    val data: Seq[(Int, Int)] = (1 to 10).map { i => (i, i) }
-    data.toDF("key", "value").createOrReplaceTempView("t")
-
-    sql(
-      """
-        |INSERT OVERWRITE TABLE orc_table_1
-        |partition (b=1, c='c1')
-        |SELECT key from t
-      """.stripMargin)
-
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      OapConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
-      val df = sql("select * from orc_table_1")
-      df.show()
-      val dffilter = sql("select * from orc_table_1 where a < 4")
-      dffilter.show()
-      checkAnswer(sql("select * from orc_table_1 where a < 4"),
-        Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Nil)
-    }
-//    sql("create oindex index1 on orc_table_1 (a) partition (b=1, c='c1')")
-//    checkAnswer(sql("select * from orc_table_1 where a < 4"),
-//      Row(1, 1, "c1") :: Row(2, 1, "c1") :: Row(3, 1, "c1") :: Nil)
-//    sql("drop oindex index1 on orc_table_1")
-
-    // Test without index.
-//    sql("insert overwrite table orc_table_2 select * from t")
-//    checkAnswer(sql("select * from orc_table_2 where a < 4"),
-//      Row(1, 1) :: Row(2, 2) :: Row(3, 3) :: Nil)
-//    // Test btree index.
-//    sql("create oindex index2 on orc_table_2 (a)")
-//    checkAnswer(sql("select * from orc_table_2 where a < 4"),
-//      Row(1, 1) :: Row(2, 2) :: Row(3, 3) :: Nil)
-//    sql("drop oindex index2 on orc_table_2")
-//
-//    // Test bitmap index.
-//    sql("create oindex index2 on orc_table_2 (a) using BITMAP")
-//    checkAnswer(sql("select * from orc_table_2 where a == 4"),
-//      Row(4, 4) :: Nil)
-//    sql("drop oindex index2 on orc_table_2")
   }
 
   test("create and drop index with partition specify") {
