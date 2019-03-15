@@ -71,6 +71,7 @@ public class MrOapRecordReader<T> implements RecordReader<T> {
         this.internalReader.initialize(parquetFileReader, configuration);
       }catch (IOException e) {
         if(null != parquetFileReader) parquetFileReader.close();
+        throw e;
       }
     }
 
