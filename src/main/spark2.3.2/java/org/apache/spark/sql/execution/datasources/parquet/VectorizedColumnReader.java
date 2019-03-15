@@ -74,7 +74,7 @@ public class VectorizedColumnReader {
   /**
    * Repetition/Definition/Value readers.
    */
-  private SpecificParquetRecordReaderBase.IntIterator repetitionLevelColumn;
+//  private SpecificParquetRecordReaderBase.IntIterator repetitionLevelColumn;
   private SpecificParquetRecordReaderBase.IntIterator definitionLevelColumn;
   protected ValuesReader dataColumn;
 
@@ -165,7 +165,7 @@ public class VectorizedColumnReader {
         leftInPage = (int) (endOfPageValueCount - valuesRead);
       }
       int num = Math.min(total, leftInPage);
-      if (isCurrentPageDictionaryEncoded) {
+      if (isCurrentPageDictionaryEncoded && (dictionaryIds != null)) {
         // Read and decode dictionary ids.
         defColumn.readIntegers(
             num, dictionaryIds, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
@@ -532,6 +532,7 @@ public class VectorizedColumnReader {
 
   protected void readPage() {
     DataPage page = pageReader.readPage();
+    if(null == page) return;
     // TODO: Why is this a visitor?
     page.accept(new DataPage.Visitor<Void>() {
       @Override
@@ -599,7 +600,7 @@ public class VectorizedColumnReader {
     int bitWidth = BytesUtils.getWidthFromMaxInt(descriptor.getMaxDefinitionLevel());
     this.defColumn = new VectorizedRleValuesReader(bitWidth);
     dlReader = this.defColumn;
-    this.repetitionLevelColumn = new ValuesReaderIntIterator(rlReader);
+//    this.repetitionLevelColumn = new ValuesReaderIntIterator(rlReader);
     this.definitionLevelColumn = new ValuesReaderIntIterator(dlReader);
     try {
       byte[] bytes = page.getBytes().toByteArray();
@@ -615,8 +616,8 @@ public class VectorizedColumnReader {
 
   protected void readPageV2(DataPageV2 page) throws IOException {
     this.pageValueCount = page.getValueCount();
-    this.repetitionLevelColumn = createRLEIterator(descriptor.getMaxRepetitionLevel(),
-        page.getRepetitionLevels(), descriptor);
+//    this.repetitionLevelColumn = createRLEIterator(descriptor.getMaxRepetitionLevel(),
+//        page.getRepetitionLevels(), descriptor);
 
     int bitWidth = BytesUtils.getWidthFromMaxInt(descriptor.getMaxDefinitionLevel());
     this.defColumn = new VectorizedRleValuesReader(bitWidth);
