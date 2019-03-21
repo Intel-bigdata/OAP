@@ -290,7 +290,7 @@ public class ParquetFiberDataReader implements Closeable {
             LOG.debug("skipping page of type {} of size {}",
               pageHeader.getType(), compressedPageSize);
             long k = this.skip(compressedPageSize);
-            if(k <= 0) LOG.warn("invalid skip,k =" + k);
+            if(k <= 0) LOG.warn("invalid skip,k {}", k);
             break;
         }
       }
