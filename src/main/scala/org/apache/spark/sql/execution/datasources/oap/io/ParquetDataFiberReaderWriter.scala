@@ -295,7 +295,7 @@ object ParquetDataFiberWriter extends Logging {
  * @param dataType data type of data fiber.
  * @param total total row count of data fiber.
  */
-class ParquetDataFiberReader private(address: Long, dataType: DataType, total: Int) extends
+class ParquetDataFiberReader (address: Long, dataType: DataType, total: Int) extends
   Logging {
 
   private var header: ParquetDataFiberHeader = _

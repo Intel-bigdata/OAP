@@ -46,7 +46,7 @@ object CacheEnum extends Enumeration {
  * @param length the requested size of the block
  * @param occupiedSize the actual occupied size of the memory block
  */
-private[filecache] case class MemoryBlockHolder(
+case class MemoryBlockHolder(
     var cacheType: CacheEnum.CacheEnum,
     baseObject: AnyRef,
     baseOffset: Long,
