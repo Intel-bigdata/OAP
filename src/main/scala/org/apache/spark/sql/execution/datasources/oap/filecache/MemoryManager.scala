@@ -41,7 +41,7 @@ import org.apache.spark.util.Utils
  * @param length the requested size of the block
  * @param occupiedSize the actual occupied size of the memory block
  */
-private[filecache] case class MemoryBlockHolder(
+case class MemoryBlockHolder(
     baseObject: AnyRef,
     baseOffset: Long,
     length: Long,

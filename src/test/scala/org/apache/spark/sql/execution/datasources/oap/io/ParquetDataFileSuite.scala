@@ -441,6 +441,190 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
   }
 }
 
+class ParquetCacheDataCompressedSuite extends ParquetDataFileSuite {
+  // this class only test the no dictionary
+  private val requestSchema: StructType = new StructType()
+    .add(StructField("int32_field", IntegerType))
+    .add(StructField("int64_field", LongType))
+    .add(StructField("boolean_field", BooleanType))
+    .add(StructField("float_field", FloatType))
+    .add(StructField("double_field", DoubleType))
+    .add(StructField("string_field", StringType))
+
+  override def parquetSchema: MessageType = new MessageType("test",
+    new PrimitiveType(REQUIRED, INT32, "int32_field"),
+    new PrimitiveType(REQUIRED, INT64, "int64_field"),
+    new PrimitiveType(REQUIRED, BOOLEAN, "boolean_field"),
+    new PrimitiveType(REQUIRED, FLOAT, "float_field"),
+    new PrimitiveType(REQUIRED, DOUBLE, "double_field"),
+    new PrimitiveType(REQUIRED, BINARY, "string_field")
+  )
+
+  override def dataVersion: WriterVersion = PARQUET_1_0
+
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    configuration.setBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key, true)
+    OapRuntime.getOrCreate.fiberCacheManager.clearAllFibers()
+  }
+
+  override def afterEach(): Unit = {
+    super.afterEach()
+    configuration.unset(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key)
+  }
+
+  override def data: Seq[Group] = {
+    val factory = new SimpleGroupFactory(parquetSchema)
+    (0 until 100000).map(i => factory.newGroup()
+      .append("int32_field", i)
+      .append("int64_field", i.toLong)
+      .append("boolean_field", i % 2 == 0)
+      .append("float_field", i.toFloat)
+      .append("double_field", i.toDouble)
+      .append("string_field", s"str$i"))
+  }
+  test("compressed int type read by columnIds in fiberCache") {
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setParquetVectorizedContext(context)
+    val requiredIds = Array(0)
+    val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
+    val result = ArrayBuffer[Int]()
+    while (iterator.hasNext) {
+      val row = iterator.next()
+      result += row.getInt(0)
+    }
+    val length = data.length
+    assert(length == result.length, "Expected result length does not match.")
+    for (i <- 0 until length) {
+      assert(i == result(i))
+    }
+    // assert(OapRuntime.getOrCreate.fiberCacheManager.cacheCount == 4,
+    // "Cache count does not match.")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(false, "")
+  }
+
+  test("compressed long type read by columnIds in fiberCache") {
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setParquetVectorizedContext(context)
+    val requiredIds = Array(1)
+    val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
+    val result = ArrayBuffer[Long]()
+    while (iterator.hasNext) {
+      val row = iterator.next()
+      result += row.getLong(0)
+    }
+    val length = data.length
+    assert(length == result.length, "Expected result length does not match.")
+    for (i <- 0 until length) {
+      assert(i == result(i))
+    }
+    // assert(OapRuntime.getOrCreate.fiberCacheManager.cacheCount == 4,
+    // "Cache count does not match.")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(false, "")
+  }
+
+  test("compressed Byte/Boolean type read by columnIds in fiberCache") {
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setParquetVectorizedContext(context)
+    val requiredIds = Array(2)
+    val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
+    val result = ArrayBuffer[Boolean]()
+    while (iterator.hasNext) {
+      val row = iterator.next()
+      result += row.getBoolean(0)
+    }
+    val length = data.length
+    assert(length == result.length, "Expected result length does not match.")
+    for (i <- 0 until length) {
+      assert((i % 2 == 0) == result(i))
+    }
+    // assert(OapRuntime.getOrCreate.fiberCacheManager.cacheCount == 4,
+    // "Cache count does not match.")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(false, "")
+  }
+
+  test("compressed float type read by columnIds in fiberCache") {
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setParquetVectorizedContext(context)
+    val requiredIds = Array(3)
+    val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
+    val result = ArrayBuffer[Float]()
+    while (iterator.hasNext) {
+      val row = iterator.next()
+      result += row.getFloat(0)
+    }
+    val length = data.length
+    assert(length == result.length, "Expected result length does not match.")
+    for (i <- 0 until length) {
+      assert(i == result(i))
+    }
+    // assert(OapRuntime.getOrCreate.fiberCacheManager.cacheCount == 4,
+    // "Cache count does not match.")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(false, "")
+  }
+
+  test("compressed double type read by columnIds in fiberCache") {
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setParquetVectorizedContext(context)
+    val requiredIds = Array(4)
+    val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
+    val result = ArrayBuffer[Double]()
+    while (iterator.hasNext) {
+      val row = iterator.next()
+      result += row.getDouble(0)
+    }
+    val length = data.length
+    assert(length == result.length, "Expected result length does not match.")
+    for (i <- 0 until length) {
+      assert(i == result(i))
+    }
+    // assert(OapRuntime.getOrCreate.fiberCacheManager.cacheCount == 4,
+    // "Cache count does not match.")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(false, "")
+  }
+
+  test("compressed binary type read by columnIds in fiberCache") {
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
+    val reader = ParquetDataFile(fileName, requestSchema, configuration)
+    reader.setParquetVectorizedContext(context)
+    val requiredIds = Array(5)
+    val iterator = reader.iterator(requiredIds)
+      .asInstanceOf[OapCompletionIterator[InternalRow]]
+    val result = new Array[Array[Byte]](data.length)
+    var count = 0
+    while (iterator.hasNext) {
+      val row = iterator.next()
+      result(count) = row.getBinary(0)
+      count += 1
+    }
+    val length = data.length
+    assert(length == result.length, "Expected result length does not match.")
+    for (i <- 0 until length) {
+      assert(UTF8String.fromBytes(result(i)).equals(UTF8String.fromString(s"str$i")))
+    }
+    // assert(OapRuntime.getOrCreate.fiberCacheManager.cacheCount == 14,
+    // "Cache count does not match.")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(false, "")
+  }
+}
+
+
 class ParquetCacheDataSuite extends ParquetDataFileSuite {
 
   private val requestSchema: StructType = new StructType()

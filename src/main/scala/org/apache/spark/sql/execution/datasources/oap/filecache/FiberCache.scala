@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.primitives.Ints
+import scala.collection.mutable
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
@@ -28,13 +29,18 @@ import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
 
-case class FiberCache(protected val fiberData: MemoryBlockHolder) extends Logging {
+case class FiberCache(val fiberData: MemoryBlockHolder, var nullSize: Int = 0) extends Logging {
 
   // This is and only is set in `cache() of OapCache`
   // TODO: make it immutable
   var fiberId: FiberId = _
 
   val DISPOSE_TIMEOUT = 3000
+
+  // record every batch startAddress, endAddress and the boolean of whether compressed
+  var fiberBatchedInfo: mutable.HashMap[Int, (Long, Long, Boolean)] = _
+  // for StringType, we need use the child columns length when decompress
+  var childColumnvectorLength: Int = _
 
   // We use readLock to lock occupy. _refCount need be atomic to make sure thread-safe
   protected val _refCount = new AtomicLong(0)
@@ -147,6 +153,14 @@ case class FiberCache(protected val fiberData: MemoryBlockHolder) extends Loggin
   // Return the occupied size and it's typically larger than the required data size due to memory
   // alignments from underlying allocator
   def getOccupiedSize(): Long = fiberData.occupiedSize
+}
+
+class DecompressBatchedFiberCache (
+     override val fiberData: MemoryBlockHolder, var batchedCompressed: Boolean = false,
+     fiberCache: FiberCache) extends FiberCache (fiberData = fiberData) {
+  override  def release(): Unit = if (fiberCache !=  null) {
+      fiberCache.release()
+    }
 }
 
 object FiberCache {

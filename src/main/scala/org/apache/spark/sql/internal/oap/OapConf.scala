@@ -309,6 +309,30 @@ object OapConf {
       .stringConf
       .createWithDefault("")
 
+  val OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION =
+    SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compress.enable")
+      .internal()
+      .doc("To indicate if enable/disable data fiber cache compression")
+      .booleanConf
+      .createWithDefault(false)
+
+  val OAP_DATA_FIBER_CACHE_COMPRESSION_Codec =
+    SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compression.codec")
+      .internal()
+      .doc("Sets the compression codec use when writing data fiber cache." +
+        " Acceptable values include: uncompressed, snappy, gzip, lzo.")
+      .stringConf
+      .transform(_.toUpperCase())
+      .checkValues(Set("UNCOMPRESSED", "SNAPPY", "GZIP", "LZO"))
+      .createWithDefault("UNCOMPRESSED")
+
+  val OAP_DATA_FIBER_CACHE_COMPRESSION_SIZE =
+    SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compression.size")
+      .internal()
+      .doc("The oap data fiber compression unit length")
+      .intConf
+      .createWithDefault(4096)
+
   val ORC_VECTORIZED_READER_ENABLED =
     SqlConfAdapter.ORC_VECTORIZED_READER_ENABLED
 

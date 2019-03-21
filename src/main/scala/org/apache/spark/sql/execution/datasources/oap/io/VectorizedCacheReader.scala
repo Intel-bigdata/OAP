@@ -22,6 +22,7 @@ import java.io.IOException
 import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.hadoop.api.{InitContext, RecordReader}
 import org.apache.parquet.hadoop.metadata._
 import org.apache.parquet.hadoop.utils.Collections3
@@ -30,12 +31,14 @@ import org.apache.parquet.schema.{MessageType, Type}
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberId
+import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper
 import org.apache.spark.sql.execution.vectorized._
 import org.apache.spark.sql.oap.OapRuntime
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
+import org.apache.spark.unsafe.Platform
 
 class VectorizedCacheReader(
     configuration: Configuration,
@@ -44,7 +47,8 @@ class VectorizedCacheReader(
     requiredColumnIds: Array[Int])
   extends RecordReader[AnyRef] with Logging {
 
-  protected val defaultCapacity: Int = 4096
+  protected val defaultCapacity: Int =
+    OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
 
   protected var batchIdx = 0
 
@@ -157,14 +161,20 @@ class VectorizedCacheReader(
           null
         } else {
           val start = System.nanoTime()
-          val fiberCache =
+          val fiberCache: FiberCache =
             OapRuntime.getOrCreate.fiberCacheManager.get(DataFiberId(dataFile, id, groupId))
           val end = System.nanoTime()
           loadFiberTime += (end - start)
           dataFile.update(id, fiberCache)
           val start2 = System.nanoTime()
-          val reader = ParquetDataFiberReader(fiberCache.getBaseOffset,
-            columnarBatch.column(order).dataType(), rowCount)
+          val reader: ParquetDataFiberReader = if (OapRuntime
+            .getOrCreate.fiberCacheManager.dataCacheCompressEnable) {
+            ParquetDataFiberCompressedReader(fiberCache.getBaseOffset,
+              columnarBatch.column(order).dataType(), rowCount, fiberCache)
+          } else {
+            ParquetDataFiberReader(fiberCache.getBaseOffset,
+              columnarBatch.column(order).dataType(), rowCount)
+          }
           val end2 = System.nanoTime()
           loadDicTime += (end2 - start2)
           reader
@@ -262,8 +272,88 @@ class VectorizedCacheReader(
 
     for (i <- fiberReaders.indices) {
       if (fiberReaders(i) != null) {
-        fiberReaders(i).readBatch(currentRowGroupRowsReturned, num, columnVectors(i)
-          .asInstanceOf[OnHeapColumnVector])
+        if (fiberReaders(i).isInstanceOf[ParquetDataFiberCompressedReader]) {
+          val fiberCacheManager = OapRuntime.getOrCreate.fiberCacheManager
+          val fiberCache = fiberReaders(i).asInstanceOf[ParquetDataFiberCompressedReader].fiberCache
+
+          val fiberBatchedInfo = fiberCache.fiberBatchedInfo.get(
+            (currentRowGroupRowsReturned / defaultCapacity))
+
+          val decompress = fiberCacheManager.getCodecFactory.getDecompressor(
+            CompressionCodec.valueOf(fiberCacheManager.dataCacheCompressionCodec))
+
+          val startAddress = fiberBatchedInfo.get._1
+          val endAddress = fiberBatchedInfo.get._2
+          val length = endAddress - startAddress
+          val compressedBytes = new Array[Byte](length.toInt)
+
+          Platform.copyMemory(null,
+            startAddress,
+            compressedBytes, Platform.BYTE_ARRAY_OFFSET, length)
+
+          val decompressedBytesLength = if (fiberReaders(i).
+            asInstanceOf[ParquetDataFiberCompressedReader].dictionary != null) {
+            // if the dictionary is not null, the stored data id is int type
+            num * 4
+          } else {
+            columnVectors(i).dataType() match {
+              case ByteType | BooleanType =>
+                num
+              case ShortType =>
+                num * 2
+              case IntegerType | DateType | FloatType =>
+                num * 4
+              case LongType | TimestampType | DoubleType =>
+                num * 8
+              case BinaryType | StringType =>
+                num * 8 + fiberCache.childColumnvectorLength
+              // if DecimalType.is32BitDecimalType(other) as int data type.
+              case other if DecimalType.is32BitDecimalType(other) =>
+                num * 4
+              // if DecimalType.is64BitDecimalType(other) as long data type.
+              case other if DecimalType.is64BitDecimalType(other) =>
+                num * 8
+              // if DecimalType.isByteArrayDecimalType(other) as binary data type.
+              case other if DecimalType.isByteArrayDecimalType(other) =>
+                num * 8
+              case other => throw new OapException(s"impossible data type $other.")
+            }
+          }
+
+          var decompressedBytes = decompress.decompress(compressedBytes,
+            decompressedBytesLength)
+
+          var nullsBytes: Array[Byte] = null
+          if (columnVectors(i).numNulls != 0) {
+            nullsBytes = new Array[Byte](fiberCache.nullSize)
+            Platform.copyMemory(null, fiberCache.getBaseOffset + 6,
+              nullsBytes, Platform.BYTE_ARRAY_OFFSET, fiberCache.nullSize)
+          }
+
+          if (nullsBytes != null) {
+            decompressedBytes = nullsBytes ++ decompressedBytes
+          }
+          val memoryBlockHolder = MemoryBlockHolder(
+            decompressedBytes, Platform.BYTE_ARRAY_OFFSET,
+            decompressedBytes.length, decompressedBytes.length)
+
+          val fiberCacheReturned = if (num < defaultCapacity) {
+            new DecompressBatchedFiberCache(memoryBlockHolder, fiberBatchedInfo.get._3, fiberCache)
+          } else {
+            new DecompressBatchedFiberCache(memoryBlockHolder, fiberBatchedInfo.get._3, null)
+          }
+          fiberCacheReturned.batchedCompressed = fiberBatchedInfo.get._3
+          val offheapFiberCache = fiberCache
+          fiberReaders(i).asInstanceOf[ParquetDataFiberCompressedReader].fiberCache =
+            fiberCacheReturned
+          fiberReaders(i).readBatch(0, num, columnVectors(i)
+            .asInstanceOf[OnHeapColumnVector])
+          fiberReaders(i).asInstanceOf[ParquetDataFiberCompressedReader].fiberCache =
+            offheapFiberCache
+        } else {
+          fiberReaders(i).readBatch(currentRowGroupRowsReturned, num, columnVectors(i)
+            .asInstanceOf[OnHeapColumnVector])
+        }
       }
     }
 

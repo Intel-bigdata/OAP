@@ -27,6 +27,7 @@ import org.apache.parquet.hadoop.utils.Collections3
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportWrapper, VectorizedColumnReader}
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.types._
 
 /**
@@ -68,6 +69,12 @@ private[oap] case class ParquetFiberDataLoader(
       new VectorizedColumnReader(columnDescriptor, originalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     columnReader.readBatch(rowCount, column)
-    ParquetDataFiberWriter.dumpToCache(column.asInstanceOf[OnHeapColumnVector], rowCount)
+    if (OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressEnable) {
+      ParquetDataFiberCompressedWriter.dumpToCache(
+        column.asInstanceOf[OnHeapColumnVector], rowCount)
+    } else {
+      ParquetDataFiberWriter.dumpToCache(
+        column.asInstanceOf[OnHeapColumnVector], rowCount)
+    }
   }
 }
