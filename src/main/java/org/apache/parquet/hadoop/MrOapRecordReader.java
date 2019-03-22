@@ -69,7 +69,7 @@ public class MrOapRecordReader<T> implements RecordReader<T> {
         parquetFileReader.filterRowGroups(getFilter(configuration));
         this.internalReader = new InternalParquetRecordReader<>(readSupport);
         this.internalReader.initialize(parquetFileReader, configuration);
-      }catch (IOException e) {
+      } catch (IOException e) {
         if(null != parquetFileReader) parquetFileReader.close();
         throw e;
       }
