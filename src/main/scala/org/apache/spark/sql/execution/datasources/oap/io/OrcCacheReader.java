@@ -177,17 +177,6 @@ public class OrcCacheReader extends RecordReader<Void, ColumnarBatch> {
    */
   public void initialize(
       Path file, Configuration conf) throws IOException {
-    FileSystem fileSystem = file.getFileSystem(conf);
-    long length = fileSystem.getFileStatus(file).getLen();
-//    Reader reader = OrcFile.createReader(
-//      file,
-//      OrcFile.readerOptions(conf)
-//        .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(conf))
-//        .filesystem(fileSystem));
-//    Reader.Options options =
-//      OrcInputFormat.buildOptions(conf, reader, 0, length);
-//    recordReader = new RecordReaderCacheImpl((ReaderImpl)reader, options);
-
     totalRowCount = meta.numberOfRows();
   }
 

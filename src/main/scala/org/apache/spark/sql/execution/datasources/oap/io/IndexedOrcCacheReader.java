@@ -71,9 +71,9 @@ public class IndexedOrcCacheReader extends OrcCacheReader {
   private Map<Integer, IntList> mapBatchIds = new HashMap<Integer, IntList>();
 
   private static final String IDS_MAP_STATE_ERROR_MSG =
-          "The divideRowIdsIntoPages method should not be called when mapBatchIds is not empty.";
+    "The divideRowIdsIntoPages method should not be called when mapBatchIds is not empty.";
   private static final String IDS_ITER_STATE_ERROR_MSG =
-          "The divideRowIdsIntoPages method should not be called when currentIndexList is Empty.";
+    "The divideRowIdsIntoPages method should not be called when currentIndexList is Empty.";
 
   public IndexedOrcCacheReader(Configuration configuration,
                                OrcDataFileMeta meta,

@@ -83,6 +83,11 @@ private[oap] case class OrcDataFile(
 
 //  recordReader = reader.rows(options)
 
+  val reader: Reader = OrcFile.createReader(meta.path, OrcFile.readerOptions(meta.configuration)
+    .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(meta.configuration)).filesystem(meta.fs))
+  val options: Reader.Options = OrcInputFormat.buildOptions(meta.configuration,
+    reader, 0, meta.length)
+
   var recordReader: RecordReaderCacheImpl = _
 
   private val inUseFiberCache = new Array[FiberCache](schema.length)
@@ -240,19 +245,19 @@ private[oap] case class OrcDataFile(
     new OrcDataFileMeta(filePath, configuration)
 
   override def cache(groupId: Int, fiberId: Int): FiberCache = {
-    if (recordReader == null) {
-      val reader: Reader = OrcFile.createReader(meta.path, OrcFile.readerOptions(meta.configuration)
-        .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(meta.configuration)).filesystem(meta.fs))
-      val options: Reader.Options = OrcInputFormat.buildOptions(meta.configuration,
-        reader, 0, meta.length)
-      recordReader = new RecordReaderCacheImpl(reader.asInstanceOf[ReaderImpl], options)
-    }
+    val fileSchema = fileReader.getSchema
+    val columnTypeDesc = TypeDescription.createStruct()
+      .addField(fileSchema.getFieldNames.get(fiberId), fileSchema.getChildren.get(fiberId))
+    options.schema(columnTypeDesc)
+    recordReader = new RecordReaderCacheImpl(reader.asInstanceOf[ReaderImpl], options)
 
     val rowCount = meta.listStripeInformation.get(groupId).getNumberOfRows.toInt
-    val vectorizedRowBatch = fileReader.getSchema.createRowBatch(rowCount)
+    val vectorizedRowBatch = columnTypeDesc.createRowBatch(rowCount)
     recordReader.readStripeByOap(groupId)
     recordReader.readBatch(vectorizedRowBatch)
-    val fromColumn = vectorizedRowBatch.cols(fiberId)
+    recordReader.close()
+
+    val fromColumn = vectorizedRowBatch.cols(0)
     val field = schema.fields(fiberId)
     val toColumn = new OnHeapColumnVector(rowCount, field.dataType)
     if (fromColumn.isRepeating) {
