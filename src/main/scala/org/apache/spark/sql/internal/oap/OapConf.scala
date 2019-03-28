@@ -331,7 +331,7 @@ object OapConf {
       .internal()
       .doc("The oap data fiber compression unit length")
       .intConf
-      .createWithDefault(4096)
+      .createWithDefault(2048)
 
   val ORC_VECTORIZED_READER_ENABLED =
     SqlConfAdapter.ORC_VECTORIZED_READER_ENABLED

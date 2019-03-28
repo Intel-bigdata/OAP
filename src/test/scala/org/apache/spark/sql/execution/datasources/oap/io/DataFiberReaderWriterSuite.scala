@@ -40,14 +40,12 @@ abstract class DataFiberReaderWriterSuite extends SparkFunSuite with SharedOapCo
   }
 
   protected var fiberCache: FiberCache = _
-
   protected override def afterEach(): Unit = {
     if (fiberCache !== null) {
       new TestFiberCache(fiberCache).free()
       fiberCache = null
     }
   }
-
   protected def dictionary: Dictionary
 
 }
