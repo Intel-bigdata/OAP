@@ -29,7 +29,7 @@ import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
 
-case class FiberCache(val fiberData: MemoryBlockHolder, var nullSize: Int = 0) extends Logging {
+case class FiberCache(fiberData: MemoryBlockHolder, var nullSize: Int = 0) extends Logging {
 
   // This is and only is set in `cache() of OapCache`
   // TODO: make it immutable
@@ -38,9 +38,8 @@ case class FiberCache(val fiberData: MemoryBlockHolder, var nullSize: Int = 0) e
   val DISPOSE_TIMEOUT = 3000
 
   // record every batch startAddress, endAddress and the boolean of whether compressed
-  var fiberBatchedInfo: mutable.HashMap[Int, (Long, Long, Boolean)] = _
-  // for StringType, we need use the child columns length when decompress
-  var childColumnvectorLength: Int = _
+  // and the child column vector length
+  var fiberBatchedInfo: mutable.HashMap[Int, (Long, Long, Boolean, Long)] = _
 
   // We use readLock to lock occupy. _refCount need be atomic to make sure thread-safe
   protected val _refCount = new AtomicLong(0)

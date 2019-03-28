@@ -272,88 +272,8 @@ class VectorizedCacheReader(
 
     for (i <- fiberReaders.indices) {
       if (fiberReaders(i) != null) {
-        if (fiberReaders(i).isInstanceOf[ParquetDataFiberCompressedReader]) {
-          val fiberCacheManager = OapRuntime.getOrCreate.fiberCacheManager
-          val fiberCache = fiberReaders(i).asInstanceOf[ParquetDataFiberCompressedReader].fiberCache
-
-          val fiberBatchedInfo = fiberCache.fiberBatchedInfo.get(
-            (currentRowGroupRowsReturned / defaultCapacity))
-
-          val decompress = fiberCacheManager.getCodecFactory.getDecompressor(
-            CompressionCodec.valueOf(fiberCacheManager.dataCacheCompressionCodec))
-
-          val startAddress = fiberBatchedInfo.get._1
-          val endAddress = fiberBatchedInfo.get._2
-          val length = endAddress - startAddress
-          val compressedBytes = new Array[Byte](length.toInt)
-
-          Platform.copyMemory(null,
-            startAddress,
-            compressedBytes, Platform.BYTE_ARRAY_OFFSET, length)
-
-          val decompressedBytesLength = if (fiberReaders(i).
-            asInstanceOf[ParquetDataFiberCompressedReader].dictionary != null) {
-            // if the dictionary is not null, the stored data id is int type
-            num * 4
-          } else {
-            columnVectors(i).dataType() match {
-              case ByteType | BooleanType =>
-                num
-              case ShortType =>
-                num * 2
-              case IntegerType | DateType | FloatType =>
-                num * 4
-              case LongType | TimestampType | DoubleType =>
-                num * 8
-              case BinaryType | StringType =>
-                num * 8 + fiberCache.childColumnvectorLength
-              // if DecimalType.is32BitDecimalType(other) as int data type.
-              case other if DecimalType.is32BitDecimalType(other) =>
-                num * 4
-              // if DecimalType.is64BitDecimalType(other) as long data type.
-              case other if DecimalType.is64BitDecimalType(other) =>
-                num * 8
-              // if DecimalType.isByteArrayDecimalType(other) as binary data type.
-              case other if DecimalType.isByteArrayDecimalType(other) =>
-                num * 8
-              case other => throw new OapException(s"impossible data type $other.")
-            }
-          }
-
-          var decompressedBytes = decompress.decompress(compressedBytes,
-            decompressedBytesLength)
-
-          var nullsBytes: Array[Byte] = null
-          if (columnVectors(i).numNulls != 0) {
-            nullsBytes = new Array[Byte](fiberCache.nullSize)
-            Platform.copyMemory(null, fiberCache.getBaseOffset + 6,
-              nullsBytes, Platform.BYTE_ARRAY_OFFSET, fiberCache.nullSize)
-          }
-
-          if (nullsBytes != null) {
-            decompressedBytes = nullsBytes ++ decompressedBytes
-          }
-          val memoryBlockHolder = MemoryBlockHolder(
-            decompressedBytes, Platform.BYTE_ARRAY_OFFSET,
-            decompressedBytes.length, decompressedBytes.length)
-
-          val fiberCacheReturned = if (num < defaultCapacity) {
-            new DecompressBatchedFiberCache(memoryBlockHolder, fiberBatchedInfo.get._3, fiberCache)
-          } else {
-            new DecompressBatchedFiberCache(memoryBlockHolder, fiberBatchedInfo.get._3, null)
-          }
-          fiberCacheReturned.batchedCompressed = fiberBatchedInfo.get._3
-          val offheapFiberCache = fiberCache
-          fiberReaders(i).asInstanceOf[ParquetDataFiberCompressedReader].fiberCache =
-            fiberCacheReturned
-          fiberReaders(i).readBatch(0, num, columnVectors(i)
-            .asInstanceOf[OnHeapColumnVector])
-          fiberReaders(i).asInstanceOf[ParquetDataFiberCompressedReader].fiberCache =
-            offheapFiberCache
-        } else {
           fiberReaders(i).readBatch(currentRowGroupRowsReturned, num, columnVectors(i)
             .asInstanceOf[OnHeapColumnVector])
-        }
       }
     }
 

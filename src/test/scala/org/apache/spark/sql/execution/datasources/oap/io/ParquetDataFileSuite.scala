@@ -94,6 +94,7 @@ abstract class ParquetDataFileSuite extends SparkFunSuite with SharedOapContext
     val pageSize = 1024
     GroupWriteSupport.setSchema(parquetSchema, configuration)
     val writer = ExampleParquetWriter.builder(new Path(fileName))
+      .enableDictionaryEncoding()
       .withCompressionCodec(UNCOMPRESSED)
       .withRowGroupSize(blockSize)
       .withPageSize(pageSize)

@@ -128,6 +128,10 @@ public class VectorizedColumnReader {
     }
   }
 
+  public PageReader getPageReader() {
+    return pageReader;
+  }
+
   /**
    * Advances to the next value. Returns true if the value is non-null.
    */

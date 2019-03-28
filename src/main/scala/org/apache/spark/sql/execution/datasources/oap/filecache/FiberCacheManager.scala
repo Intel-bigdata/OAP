@@ -23,6 +23,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
@@ -108,15 +109,19 @@ private[sql] class FiberCacheManager(
     OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_Codec)
   private val _dataCacheCompressionSize = sparkEnv.conf.get(
     OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_SIZE)
+  private val _codecFactory = new CodecFactory(new Configuration())
 
   def dataCacheCompressEnable: Boolean = _dataCacheCompressEnable
   def dataCacheCompressionCodec: String = _dataCacheCompressionCodec
   def dataCacheCompressionSize: Int = _dataCacheCompressionSize
+  def codecFactory: CodecFactory = _codecFactory
 
-  private lazy val codecFactory = new CodecFactory(new Configuration())
+  def compressor: BytesCompressor = {
+    _codecFactory.getCompressor(CompressionCodec.valueOf(dataCacheCompressionCodec))
+  }
 
-  def getCodecFactory: CodecFactory = {
-    codecFactory
+  def decompressor: BytesDecompressor = {
+    _codecFactory.getDecompressor(CompressionCodec.valueOf(dataCacheCompressionCodec))
   }
 
   private val cacheBackend: OapCache = {
