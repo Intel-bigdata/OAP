@@ -29,7 +29,7 @@ import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
 
-case class FiberCache(fiberData: MemoryBlockHolder, var nullSize: Int = 0) extends Logging {
+case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
 
   // This is and only is set in `cache() of OapCache`
   // TODO: make it immutable
