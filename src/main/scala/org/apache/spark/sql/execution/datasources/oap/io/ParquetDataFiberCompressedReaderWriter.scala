@@ -17,7 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.column.Dictionary
+import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.io.api.Binary
 import scala.collection.mutable
 
@@ -41,9 +43,11 @@ import org.apache.spark.unsafe.Platform
  * Dic encode data store as int array.
  * Dictionary: if dicLength > 0 will store dic data by dataType.
  */
-object ParquetDataFiberCompressedWriter extends Logging {
+class ParquetDataFiberCompressedWriter() extends Logging {
+  private val codecFactory: CodecFactory = new CodecFactory(new Configuration())
 
-  def dumpToCache(reader: VectorizedColumnReader, total: Int, dataType: DataType): FiberCache = {
+  def dumpToCache(reader: VectorizedColumnReader,
+      total: Int, dataType: DataType): FiberCache = {
     val dictionary = reader.getPageReader.readDictionaryPage
     if (dictionary == null) {
       dumpDataToFiber(reader, total, dataType)
@@ -82,8 +86,11 @@ object ParquetDataFiberCompressedWriter extends Logging {
     val compressedUnitSize = math.ceil(total * 1.0 / compressedLength).toInt
     val arrayBytes: Array[Array[Byte]] = new Array[Array[Byte]](compressedUnitSize)
 
+    val codecName = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionCodec
+    val codec = CompressionCodec.valueOf(codecName)
+    val compressor = codecFactory.getCompressor(codec)
+
     val batchCompressed = new Array[Boolean](compressedUnitSize)
-    val compressor = OapRuntime.getOrCreate.fiberCacheManager.compressor
     var childColumnVectorLengths: Array[Int] = null
     var numNulls = 0
     var compressedSize = 0
@@ -266,7 +273,11 @@ object ParquetDataFiberCompressedWriter extends Logging {
     var count = 0
     var loadedRowCount = 0
     val batchCompressed = new Array[Boolean](compressedUnitSize)
-    val compressor = OapRuntime.getOrCreate.fiberCacheManager.compressor
+
+    val codecName = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionCodec
+    val codec = CompressionCodec.valueOf(codecName)
+    val compressor = codecFactory.getCompressor(codec)
+
     var column: OnHeapColumnVector = null
     var numNulls = 0
     val nulls: Array[Array[Byte]] = new Array[Array[Byte]](compressedUnitSize)
@@ -446,6 +457,7 @@ class ParquetDataFiberCompressedReader (
   private var header: ParquetDataFiberCompressedHeader = _
 
   var dictionary: org.apache.spark.sql.execution.vectorized.Dictionary = _
+  private val codecFactory: CodecFactory = new CodecFactory(new Configuration())
 
   /**
    * Read num values to OnHeapColumnVector from data fiber by start position.
@@ -667,8 +679,13 @@ class ParquetDataFiberCompressedReader (
       start: Int, num: Int): FiberCache = {
     val defaultCapacity = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
     val fiberBatchedInfo = compressedFiberCache.fiberBatchedInfo(start / defaultCapacity)
-    val decompress = OapRuntime.getOrCreate.fiberCacheManager.decompressor
-    if (fiberBatchedInfo._3 && decompress != null) {
+
+    val codecName = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionCodec
+    val codec = CompressionCodec.valueOf(codecName)
+    val decompressor = codecFactory.getDecompressor(codec)
+
+   // val decompress = OapRuntime.getOrCreate.fiberCacheManager.decompressor
+    if (fiberBatchedInfo._3 && decompressor != null) {
       val fiberCache = compressedFiberCache
       val startAddress = fiberBatchedInfo._1
       val endAddress = fiberBatchedInfo._2
@@ -703,14 +720,9 @@ class ParquetDataFiberCompressedReader (
           case other => throw new OapException(s"impossible data type $other.")
         }
       }
-      logInfo(s"decompressFiberCache The total size is $total and" +
-        s" the start is $start and the num is $num and the compressedBytes" +
-        s" is ${compressedBytes.length} the decompressed size is" +
-        s" ${decompressedBytesLength}")
 
-      var decompressedBytes = decompress.decompress(compressedBytes,
+      var decompressedBytes = decompressor.decompress(compressedBytes,
         decompressedBytesLength)
-      logInfo("Success decompress the bytes")
       var nulls: Array[Byte] = null
       if (!header.noNulls) {
         nulls = new Array[Byte](num)
@@ -812,7 +824,8 @@ class ParquetDataFiberCompressedReader (
 object ParquetDataFiberCompressedReader {
   def apply(address: Long, dataType: DataType, total: Int,
       fiberCache: FiberCache): ParquetDataFiberCompressedReader = {
-    val reader = new ParquetDataFiberCompressedReader(address, dataType, total, fiberCache)
+    val reader = new ParquetDataFiberCompressedReader(
+      address, dataType, total, fiberCache)
     reader.readRowGroupMetas()
     reader
   }

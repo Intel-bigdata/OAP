@@ -20,6 +20,7 @@ import java.io.IOException
 import java.util.TimeZone
 
 import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.format.CompressionCodec
 import org.apache.parquet.hadoop.ParquetFiberDataReader
 import org.apache.parquet.hadoop.api.InitContext
 import org.apache.parquet.hadoop.utils.Collections3
@@ -70,7 +71,8 @@ private[oap] case class ParquetFiberDataLoader(
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
 
     if (OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressEnable) {
-      ParquetDataFiberCompressedWriter.dumpToCache(
+
+      new ParquetDataFiberCompressedWriter().dumpToCache(
         columnReader, rowCount, dataType)
     } else {
       val column = new OnHeapColumnVector(rowCount, dataType)
