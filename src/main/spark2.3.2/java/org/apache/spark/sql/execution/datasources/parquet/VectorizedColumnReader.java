@@ -59,7 +59,7 @@ public class VectorizedColumnReader {
   /**
    * The dictionary, if this column has dictionary encoding.
    */
-  protected final Dictionary dictionary;
+  public final Dictionary dictionary;
 
   /**
    * If true, the current page is dictionary encoded.

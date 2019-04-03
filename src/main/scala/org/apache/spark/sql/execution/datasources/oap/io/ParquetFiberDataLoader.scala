@@ -70,9 +70,10 @@ private[oap] case class ParquetFiberDataLoader(
       new VectorizedColumnReader(columnDescriptor, originalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
 
-    if (OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressEnable) {
+    if (OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressEnable
+      && columnReader.dictionary == null) {
 
-      new ParquetDataFiberCompressedWriter().dumpToCache(
+      new ParquetDataFiberCompressedWriter().dumpDataToFiber(
         columnReader, rowCount, dataType)
     } else {
       val column = new OnHeapColumnVector(rowCount, dataType)

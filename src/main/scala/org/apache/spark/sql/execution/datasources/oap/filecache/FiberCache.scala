@@ -40,6 +40,7 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   // record every batch startAddress, endAddress and the boolean of whether compressed
   // and the child column vector length
   var fiberBatchedInfo: mutable.HashMap[Int, (Long, Long, Boolean, Long)] = _
+  var containBatchCompressed: Boolean = false
 
   // We use readLock to lock occupy. _refCount need be atomic to make sure thread-safe
   protected val _refCount = new AtomicLong(0)
