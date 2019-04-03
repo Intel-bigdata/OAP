@@ -116,14 +116,6 @@ private[sql] class FiberCacheManager(
   def dataCacheCompressionSize: Int = _dataCacheCompressionSize
   def codecFactory: CodecFactory = _codecFactory
 
-  def compressor: BytesCompressor = {
-    _codecFactory.getCompressor(CompressionCodec.valueOf(dataCacheCompressionCodec))
-  }
-
-  def decompressor: BytesDecompressor = {
-    _codecFactory.getDecompressor(CompressionCodec.valueOf(dataCacheCompressionCodec))
-  }
-
   private val cacheBackend: OapCache = {
     val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
     if (cacheName.equals(GUAVA_CACHE)) {
