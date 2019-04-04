@@ -158,37 +158,39 @@ class ParquetDataFiberCompressedWriter() extends Logging {
         while (firstIndex < num && column.isNullAt(firstIndex)) {
           firstIndex += 1
         }
-        val startOffsets = arrayOffsets(firstIndex)
-        val lastOffsets = arrayOffsets(lastIndex)
-        childColumnVectorLengths(count) = lastOffsets - startOffsets + arrayLengths(lastIndex)
-        val rawBytes = new Array[Byte](num * 8 + childColumnVectorLengths(count))
-        Platform.copyMemory(arrayLengths,
-          Platform.INT_ARRAY_OFFSET,
-          rawBytes, Platform.BYTE_ARRAY_OFFSET, num * 4)
-        Platform.copyMemory(arrayOffsets,
-          Platform.INT_ARRAY_OFFSET,
-          rawBytes, Platform.BYTE_ARRAY_OFFSET + num * 4, num * 4)
-        Platform.copyMemory(childBytes, Platform.BYTE_ARRAY_OFFSET + startOffsets,
-          rawBytes, Platform.BYTE_ARRAY_OFFSET + num * 8, childColumnVectorLengths(count))
-        // store the nulls info
-        numNulls += column.numNulls()
-        nulls(count) = column.getNulls
-        val startTime = System.currentTimeMillis()
+        if (firstIndex < num && lastIndex >= 0) {
+          val startOffsets = arrayOffsets(firstIndex)
+          val lastOffsets = arrayOffsets(lastIndex)
+          childColumnVectorLengths(count) = lastOffsets - startOffsets + arrayLengths(lastIndex)
+          val rawBytes = new Array[Byte](num * 8 + childColumnVectorLengths(count))
+          Platform.copyMemory(arrayLengths,
+            Platform.INT_ARRAY_OFFSET,
+            rawBytes, Platform.BYTE_ARRAY_OFFSET, num * 4)
+          Platform.copyMemory(arrayOffsets,
+            Platform.INT_ARRAY_OFFSET,
+            rawBytes, Platform.BYTE_ARRAY_OFFSET + num * 4, num * 4)
+          Platform.copyMemory(childBytes, Platform.BYTE_ARRAY_OFFSET + startOffsets,
+            rawBytes, Platform.BYTE_ARRAY_OFFSET + num * 8, childColumnVectorLengths(count))
+          // store the nulls info
+          numNulls += column.numNulls()
+          nulls(count) = column.getNulls
+          val startTime = System.currentTimeMillis()
 
-        val compressedBytes = compressor.compress(rawBytes)
-        totalCompressedTime += System.currentTimeMillis() - startTime
-        totalCompressedSize += compressedBytes.length
-        totalUncompressedSize += rawBytes.length
-        // if the compressed size is large than the decompressed size, skip the compress operator
-        arrayBytes(count) = if (compressedBytes.length > rawBytes.length) {
-          rawBytes
-        } else {
-          batchCompressed(count) = true
-          compressedBytes
+          val compressedBytes = compressor.compress(rawBytes)
+          totalCompressedTime += System.currentTimeMillis() - startTime
+          totalCompressedSize += compressedBytes.length
+          totalUncompressedSize += rawBytes.length
+          // if the compressed size is large than the decompressed size, skip the compress operator
+          arrayBytes(count) = if (compressedBytes.length > rawBytes.length) {
+            rawBytes
+          } else {
+            batchCompressed(count) = true
+            compressedBytes
+          }
+          compressedSize += arrayBytes(count).length
+          loadedRowCount += num
+          count += 1
         }
-        compressedSize += arrayBytes(count).length
-        loadedRowCount += num
-        count += 1
       }
     }
 
