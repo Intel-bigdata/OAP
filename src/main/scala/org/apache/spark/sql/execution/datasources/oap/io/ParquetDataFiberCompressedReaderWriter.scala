@@ -86,6 +86,11 @@ class ParquetDataFiberCompressedWriter() extends Logging {
     var loadedRowCount = 0
     val nulls: Array[Array[Byte]] = new Array[Array[Byte]](compressedUnitSize)
 
+    // used for collect the compressed info
+    var totalCompressedTime: Long = 0
+    var totalCompressedSize: Int = 0
+    var totalUncompressedSize: Int = 0
+
     def splitColumnVectorNoBinaryType(byteLength: Int, offset: Int): Unit = {
       while (count < compressedUnitSize) {
         val num = Math.min(compressedLength, total - loadedRowCount)
@@ -113,8 +118,14 @@ class ParquetDataFiberCompressedWriter() extends Logging {
         // store the nulls info
         numNulls += column.numNulls()
         nulls(count) = column.getNulls
+        val startTime = System.currentTimeMillis()
 
         val compressedBytes = compressor.compress(rawBytes)
+
+        totalCompressedTime += System.currentTimeMillis() - startTime
+        totalCompressedSize += compressedBytes.length
+        totalUncompressedSize += rawBytes.length
+
         // if the compressed size is large than the decompressed size, skip the compress operator
         arrayBytes(count) = if (compressedBytes.length > rawBytes.length) {
           rawBytes
@@ -162,8 +173,12 @@ class ParquetDataFiberCompressedWriter() extends Logging {
         // store the nulls info
         numNulls += column.numNulls()
         nulls(count) = column.getNulls
+        val startTime = System.currentTimeMillis()
 
         val compressedBytes = compressor.compress(rawBytes)
+        totalCompressedTime += System.currentTimeMillis() - startTime
+        totalCompressedSize += compressedBytes.length
+        totalUncompressedSize += rawBytes.length
         // if the compressed size is large than the decompressed size, skip the compress operator
         arrayBytes(count) = if (compressedBytes.length > rawBytes.length) {
           rawBytes
@@ -200,6 +215,11 @@ class ParquetDataFiberCompressedWriter() extends Logging {
         splitColumnVectorBinaryType()
       case other => throw new OapException(s"$other data type is not support data cache.")
     }
+
+    logInfo(s"dumpDataToFiber with compressed: the totalCompressedTime is #$totalCompressedTime#;" +
+      s" the totalCompressedSize is #$totalCompressedSize#;" +
+      s" the totalUncompressedSize is #$totalUncompressedSize#" +
+      s" and the total is #${total}# and the data type is #${dataType}#")
 
     val header = ParquetDataFiberCompressedHeader(numNulls == 0, numNulls == total, 0)
     var fiber: FiberCache = null
@@ -245,9 +265,6 @@ class ParquetDataFiberCompressedWriter() extends Logging {
       logDebug(s"will apply $fiberLength bytes off heap memory for data fiber.")
       fiber = emptyDataFiber(fiberLength)
     }
-    if (fiber == null) {
-      logInfo("The fiber cache is null in dumpDataToFiber")
-    }
     fiber
   }
 
@@ -279,9 +296,6 @@ class ParquetDataFiberCompressedReader (
    */
   override def readBatch(
       start: Int, num: Int, column: OnHeapColumnVector): Unit = {
-    if (fiberCache ==  null) {
-      logInfo("The fiber cache is null in readBatch")
-    }
     // decompress the compressed fiber cache
     val decompressedFiberCache = decompressFiberCache(fiberCache, column, start, num)
     val defaultCapacity = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
