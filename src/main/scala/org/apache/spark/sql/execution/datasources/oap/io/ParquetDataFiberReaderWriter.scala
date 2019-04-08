@@ -49,7 +49,6 @@ object ParquetDataFiberWriter extends Logging {
       case ParquetDataFiberHeader(true, false, 0) =>
         val length = fiberLength(column, total, 0 )
         logDebug(s"will apply $length bytes off heap memory for data fiber.")
-        logInfo(s"dumpDataToFiber without compressed no dic: the length is #$length#")
         val fiber = emptyDataFiber(length)
         val nativeAddress = header.writeToCache(fiber.getBaseOffset)
         dumpDataToFiber(nativeAddress, column, total)
@@ -57,7 +56,6 @@ object ParquetDataFiberWriter extends Logging {
       case ParquetDataFiberHeader(true, false, dicLength) =>
         val length = fiberLength(column, total, 0, dicLength)
         logDebug(s"will apply $length bytes off heap memory for data fiber.")
-        logInfo(s"dumpDataToFiber without compressed with dic: the length is #$length#")
         val fiber = emptyDataFiber(length)
         val nativeAddress = header.writeToCache(fiber.getBaseOffset)
         dumpDataAndDicToFiber(nativeAddress, column, total, dicLength)
@@ -65,15 +63,12 @@ object ParquetDataFiberWriter extends Logging {
       case ParquetDataFiberHeader(false, true, _) =>
         logDebug(s"will apply ${ParquetDataFiberHeader.defaultSize} " +
           s"bytes off heap memory for data fiber.")
-        logInfo(s"dumpDataToFiber without compressed: the length" +
-          s" is #${ParquetDataFiberHeader.defaultSize}#")
         val fiber = emptyDataFiber(ParquetDataFiberHeader.defaultSize)
         header.writeToCache(fiber.getBaseOffset)
         fiber
       case ParquetDataFiberHeader(false, false, 0) =>
         val length = fiberLength(column, total, 1)
         logDebug(s"will apply $length bytes off heap memory for data fiber.")
-        logInfo(s"dumpDataToFiber without compressed no dic: the length is #$length#")
         val fiber = emptyDataFiber(length)
         val nativeAddress =
           dumpNullsToFiber(header.writeToCache(fiber.getBaseOffset), column, total)
@@ -82,7 +77,6 @@ object ParquetDataFiberWriter extends Logging {
       case ParquetDataFiberHeader(false, false, dicLength) =>
         val length = fiberLength(column, total, 1, dicLength)
         logDebug(s"will apply $length bytes off heap memory for data fiber.")
-        logInfo(s"dumpDataToFiber without compressed with dic: the length is #$length#")
         val fiber = emptyDataFiber(length)
         val nativeAddress =
           dumpNullsToFiber(header.writeToCache(fiber.getBaseOffset), column, total)
