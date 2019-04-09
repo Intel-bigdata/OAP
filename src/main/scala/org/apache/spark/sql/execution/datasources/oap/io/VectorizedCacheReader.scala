@@ -167,8 +167,8 @@ class VectorizedCacheReader(
           loadFiberTime += (end - start)
           dataFile.update(id, fiberCache)
           val start2 = System.nanoTime()
-          val reader: ParquetDataFiberReader = if (OapRuntime
-            .getOrCreate.fiberCacheManager.dataCacheCompressEnable) {
+
+          val reader: ParquetDataFiberReader = if (fiberCache.fiberCompressed) {
             ParquetDataFiberCompressedReader(fiberCache.getBaseOffset,
               columnarBatch.column(order).dataType(), rowCount, fiberCache)
           } else {

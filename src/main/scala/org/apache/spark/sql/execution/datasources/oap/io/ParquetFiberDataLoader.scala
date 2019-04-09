@@ -71,7 +71,6 @@ private[oap] case class ParquetFiberDataLoader(
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
 
     if (OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressEnable) {
-
       new ParquetDataFiberCompressedWriter().dumpToCache(
         columnReader, rowCount, dataType)
     } else {
