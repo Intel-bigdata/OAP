@@ -147,15 +147,18 @@ class ParquetDataFiberCompressedWriter() extends Logging {
         Platform.copyMemory(arrayOffsets,
           Platform.INT_ARRAY_OFFSET + loadedRowCount * 4,
           batchArrayOffsets, Platform.INT_ARRAY_OFFSET, num * 4)
-        var lastIndex = num - 1
-        while (lastIndex >= 0 && column.isNullAt(lastIndex)) {
+        // check whether the batch column vector is null
+        var lastIndex = num + loadedRowCount - 1
+        while (lastIndex >= loadedRowCount && column.isNullAt(lastIndex)) {
           lastIndex -= 1
         }
-        var firstIndex = 0
-        while (firstIndex < num && column.isNullAt(firstIndex)) {
+        var firstIndex = loadedRowCount
+        while (firstIndex < num + loadedRowCount && column.isNullAt(firstIndex)) {
           firstIndex += 1
         }
-        if (firstIndex >= 0 && lastIndex < num) {
+        firstIndex = firstIndex - loadedRowCount
+        lastIndex = lastIndex - loadedRowCount
+        if (firstIndex >= 0 && firstIndex < num && lastIndex >= 0 && lastIndex < num) {
           val startOffsets = batchArrayOffsets(firstIndex)
           val lastOffsets = batchArrayOffsets(lastIndex)
           for (idx <- firstIndex to lastIndex) {
