@@ -499,10 +499,11 @@ class ParquetDataFiberCompressedReader (
         case ParquetDataFiberCompressedHeader(false, false, _) =>
           if (baseObject != null) {
             // the batch is compressed
-            val nullsNativeAddress = decompressedFiberCache.fiberData.baseOffset
-            Platform.copyMemory(baseObject,
-              nullsNativeAddress, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
-            val dataNativeAddress = nullsNativeAddress + 1 * num
+            val nullsNativeAddress = fiberCache.fiberData.baseOffset +
+              ParquetDataFiberCompressedHeader.defaultSize
+            Platform.copyMemory(fiberCache.fiberData.baseObject,
+              nullsNativeAddress + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
+            val dataNativeAddress = decompressedFiberCache.fiberData.baseOffset
             Platform.copyMemory(baseObject,
               dataNativeAddress,
               dictionaryIds.getIntData, Platform.INT_ARRAY_OFFSET, num * 4)
@@ -551,11 +552,11 @@ class ParquetDataFiberCompressedReader (
         case ParquetDataFiberCompressedHeader(false, false, _) =>
           if (baseObject != null) {
             // the batch is compressed
-            val nullsNativeAddress = decompressedFiberCache.fiberData.baseOffset
-            Platform.copyMemory(baseObject,
-              nullsNativeAddress, column.getNulls,
-              Platform.BYTE_ARRAY_OFFSET, num)
-            val dataNativeAddress = nullsNativeAddress + 1 * num
+            val nullsNativeAddress = fiberCache.fiberData.baseOffset +
+              ParquetDataFiberCompressedHeader.defaultSize
+            Platform.copyMemory(fiberCache.fiberData.baseObject,
+              nullsNativeAddress + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
+            val dataNativeAddress = decompressedFiberCache.fiberData.baseOffset
             readBatch(decompressedFiberCache, dataNativeAddress, num, column)
           } else {
             // the batch is not compressed
@@ -720,7 +721,6 @@ class ParquetDataFiberCompressedReader (
       start: Int, num: Int): FiberCache = {
     val defaultCapacity = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
     val fiberBatchedInfo = compressedFiberCache.fiberBatchedInfo(start / defaultCapacity)
-
     val codecName = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionCodec
     val codec = CompressionCodec.valueOf(codecName)
     val decompressor = codecFactory.getDecompressor(codec)
@@ -739,17 +739,8 @@ class ParquetDataFiberCompressedReader (
       } else {
         decompressedLength(columnVector.dataType(), num, fiberBatchedInfo._4.toInt)
       }
-
-      var decompressedBytes = decompressor.decompress(compressedBytes,
+      val decompressedBytes = decompressor.decompress(compressedBytes,
         decompressedBytesLength)
-      var nulls: Array[Byte] = null
-      if (!header.noNulls) {
-        nulls = new Array[Byte](num)
-        Platform.copyMemory(null, fiberCache.fiberData.baseOffset +
-          ParquetDataFiberCompressedHeader.defaultSize + start, nulls,
-          Platform.BYTE_ARRAY_OFFSET, num)
-        decompressedBytes = nulls ++ decompressedBytes
-      }
       val memoryBlockHolder = new MemoryBlockHolder(
         decompressedBytes, Platform.BYTE_ARRAY_OFFSET,
         decompressedBytes.length, decompressedBytes.length)
