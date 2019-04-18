@@ -35,7 +35,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   // Only used for booleans.
   protected int bitOffset;
-  private byte currentByte = 0;
+  protected byte currentByte = 0;
 
   public VectorizedPlainValuesReader() {
   }
