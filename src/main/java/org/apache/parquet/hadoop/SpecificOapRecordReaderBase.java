@@ -29,8 +29,6 @@ import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.utils.Collections3;
 import org.apache.parquet.schema.MessageType;
 
-import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
-
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructType$;
@@ -56,14 +54,12 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
      *
      * @param footer parquet file footer
      * @param configuration haddoop configuration
-     * @param isFilterRowGroups is do filterRowGroups
      * @throws IOException
      * @throws InterruptedException
      */
     protected void initialize(
         ParquetMetadata footer,
-        Configuration configuration,
-        boolean isFilterRowGroups) throws IOException, InterruptedException {
+        Configuration configuration) throws IOException, InterruptedException {
       this.fileSchema = footer.getFileMetaData().getSchema();
       Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
       ReadSupport.ReadContext readContext = new ParquetReadSupportWrapper().init(new InitContext(
@@ -73,9 +69,6 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
         configuration.get(ParquetReadSupportWrapper.SPARK_ROW_REQUESTED_SCHEMA());
       this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
       this.reader = OapParquetFileReader.open(configuration, file, footer);
-      if (isFilterRowGroups) {
-        this.reader.filterRowGroups(getFilter(configuration));
-      }
       this.reader.setRequestedSchema(requestedSchema);
       for (BlockMetaData block : this.reader.getRowGroups()) {
         this.totalRowCount += block.getRowCount();
