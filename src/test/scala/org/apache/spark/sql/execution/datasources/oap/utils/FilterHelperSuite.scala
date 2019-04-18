@@ -21,10 +21,12 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.ParquetInputFormat
 
 import org.apache.spark.SparkFunSuite
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 
 class FilterHelperSuite extends SparkFunSuite {
+  val conf = SQLConf.get
 
   test("Pushed And Set") {
     val requiredSchema = new StructType()
@@ -32,7 +34,8 @@ class FilterHelperSuite extends SparkFunSuite {
       .add(StructField("b", StringType))
     val filters = Seq(GreaterThan("a", 1), EqualTo("b", "2"))
     val expected = s"""and(gt(a, 1), eq(b, Binary{"2"}))"""
-    val pushed = FilterHelper.tryToPushFilters(filterPushDown = true, requiredSchema, filters)
+    conf.setConf(SQLConf.PARQUET_FILTER_PUSHDOWN_ENABLED, true)
+    val pushed = FilterHelper.tryToPushFilters(conf, requiredSchema, filters)
     assert(pushed.isDefined)
     assert(pushed.get.toString.equals(expected))
     val config = new Configuration()
@@ -47,7 +50,8 @@ class FilterHelperSuite extends SparkFunSuite {
       .add(StructField("a", IntegerType))
       .add(StructField("b", StringType))
     val filters = Seq(GreaterThan("a", 1), EqualTo("b", "2"))
-    val pushed = FilterHelper.tryToPushFilters(filterPushDown = false, requiredSchema, filters)
+    conf.setConf(SQLConf.PARQUET_FILTER_PUSHDOWN_ENABLED, false)
+    val pushed = FilterHelper.tryToPushFilters(conf, requiredSchema, filters)
     assert(pushed.isEmpty)
     val config = new Configuration()
     FilterHelper.setFilterIfExist(config, pushed)
