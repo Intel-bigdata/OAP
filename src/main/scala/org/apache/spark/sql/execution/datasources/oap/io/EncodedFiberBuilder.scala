@@ -34,7 +34,8 @@ private[oap] case class DeltaByteArrayFiberBuilder (
     dataType: DataType) extends DataFiberBuilder {
 
   // TODO: [linhong] hard-coded variables need to remove
-  private val valuesWriter = new DeltaByteArrayWriter(32, 1048576, HeapByteBufferAllocator.getInstance())
+  private val valuesWriter = new DeltaByteArrayWriter(
+    32, 1048576, HeapByteBufferAllocator.getInstance())
   private var dataLengthInBytes: Int = _
 
   override def getEncoding: Encoding = Encoding.DELTA_BYTE_ARRAY

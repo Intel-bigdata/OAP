@@ -35,7 +35,7 @@ private[ui] class FiberCacheManagerPage(parent: OapTab) extends WebUIPage("") wi
         <div id="active-cms"></div> ++
           <script src={UIUtils.prependBaseUri(request, parent.basePath,
             "/static/utils.js")}></script> ++
-          <script src={UIUtils.prependBaseUri(request, , parent.basePath,
+          <script src={UIUtils.prependBaseUri(request, parent.basePath,
             "/static/oap/oap.js")}></script>
         }
       </div>

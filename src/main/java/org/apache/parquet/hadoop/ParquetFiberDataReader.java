@@ -303,8 +303,8 @@ public class ParquetFiberDataReader implements Closeable {
           pagesInChunk.size(),
           pos);
       }
-      CompressionCodecFactory.BytesInputDecompressor decompressor = options.getCodecFactory().getDecompressor(
-        descriptor.metadata.getCodec());
+      CompressionCodecFactory.BytesInputDecompressor decompressor = options.getCodecFactory()
+        .getDecompressor(descriptor.metadata.getCodec());
       return new ColumnChunkPageReadStore
         .ColumnChunkPageReader(decompressor, pagesInChunk, dictionaryPage);
     }
