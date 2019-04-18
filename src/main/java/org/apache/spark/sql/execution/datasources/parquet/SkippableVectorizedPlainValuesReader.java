@@ -77,14 +77,16 @@ public class SkippableVectorizedPlainValuesReader extends VectorizedPlainValuesR
 
   @Override
   public void skipBoolean() {
+    if (bitOffset == 0) {
+      try {
+        currentByte = (byte) in.read();
+      } catch (IOException e) {
+        throw new ParquetDecodingException("Failed to read a byte", e);
+      }
+    }
     bitOffset += 1;
     if (bitOffset == 8) {
       bitOffset = 0;
-      try {
-        in.skipFully(1);
-      } catch (IOException e) {
-        throw new ParquetDecodingException("Failed to skip 1 bytes", e);
-      }
     }
   }
 
