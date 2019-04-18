@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.utils
 
-import org.json4s.DefaultFormats
+import org.json4s.{DefaultFormats, StringInput}
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 
@@ -42,7 +42,7 @@ private[oap] object OapIndexInfoStatusSerDe extends SerDe[String, Seq[OapIndexIn
   }
 
   override def deserialize(json: String): Seq[OapIndexInfoStatus] = {
-    (parse(json) \ "oapIndexInfoStatusRawDataArray").extract[List[JValue]].map(
+    (parse(StringInput(json), false) \ "oapIndexInfoStatusRawDataArray").extract[List[JValue]].map(
       indexStatusRawDataFromJson(_))
   }
 
