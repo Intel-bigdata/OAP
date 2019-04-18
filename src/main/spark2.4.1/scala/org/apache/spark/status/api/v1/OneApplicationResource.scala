@@ -25,7 +25,9 @@ import javax.ws.rs.core.{MediaType, Response, StreamingOutput}
 import scala.util.control.NonFatal
 
 import org.apache.spark.{JobExecutionStatus, SparkContext}
-import org.apache.spark.ui.UIUtils
+import org.apache.spark.sql.execution.datasources.oap.filecache.CacheStats
+import org.apache.spark.sql.oap.OapRuntime
+import org.apache.spark.sql.oap.ui.FiberCacheManagerSummary
 
 @Produces(Array(MediaType.APPLICATION_JSON))
 private[v1] class AbstractApplicationResource extends BaseAppResource {
@@ -72,6 +74,44 @@ private[v1] class AbstractApplicationResource extends BaseAppResource {
       case Some(_) => throw new BadParameterException("Executor is not active.")
       case _ => throw new NotFoundException("Executor does not exist.")
     }
+  }
+
+  @GET
+  @Path("fibercachemanagers")
+  def fiberList(): Seq[FiberCacheManagerSummary] =
+  {
+    val seqExecutorSummary = withUI(_.store.executorList(true))
+    seqExecutorSummary.map(
+      executorSummary =>
+      {
+        val cacheStats =
+          OapRuntime.getOrCreate.fiberSensor.getExecutorToCacheManager.getOrDefault(
+            executorSummary.id, CacheStats())
+
+        new FiberCacheManagerSummary(
+          executorSummary.id,
+          executorSummary.hostPort,
+          true,
+          executorSummary.memoryUsed,
+          executorSummary.maxMemory,
+          cacheStats.totalCacheSize,
+          cacheStats.totalCacheCount,
+          cacheStats.backendCacheSize,
+          cacheStats.backendCacheCount,
+          cacheStats.dataFiberSize,
+          cacheStats.dataFiberCount,
+          cacheStats.indexFiberSize,
+          cacheStats.indexFiberCount,
+          cacheStats.pendingFiberSize,
+          cacheStats.pendingFiberCount,
+          cacheStats.hitCount,
+          cacheStats.missCount,
+          cacheStats.loadCount,
+          cacheStats.totalLoadTime,
+          cacheStats.evictionCount
+        )
+      }
+    )
   }
 
   @GET
