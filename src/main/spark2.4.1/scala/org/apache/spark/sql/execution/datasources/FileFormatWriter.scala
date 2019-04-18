@@ -73,7 +73,7 @@ object FileFormatWriter extends Logging {
       bucketSpec: Option[BucketSpec],
       statsTrackers: Seq[WriteJobStatsTracker],
       options: Map[String, String])
-    : Set[String] = {
+    : (Seq[WriteResult], Set[String]) = {
 
     val job = Job.getInstance(hadoopConf)
     job.setOutputKeyClass(classOf[Void])
@@ -189,9 +189,11 @@ object FileFormatWriter extends Logging {
 
       processStats(description.statsTrackers, ret.map(_.summary.stats))
       logInfo(s"Finished processing stats for write job ${description.uuid}.")
+      val writeResults = ret.flatMap(_.writeResults)
+      outputWriterFactory.commitJob(writeResults)
 
       // return a set of all the partition paths that were updated during this job
-      ret.map(_.summary.updatedPartitions).reduceOption(_ ++ _).getOrElse(Set.empty)
+      (writeResults, ret.map(_.summary.updatedPartitions).reduceOption(_ ++ _).getOrElse(Set.empty))
     } catch { case cause: Throwable =>
       logError(s"Aborting job ${description.uuid}.", cause)
       committer.abortJob(job)
@@ -241,10 +243,11 @@ object FileFormatWriter extends Logging {
     try {
       Utils.tryWithSafeFinallyAndFailureCallbacks(block = {
         // Execute the task to write rows out and commit the task.
+        var writeResults: Seq[WriteResult] = Nil
         while (iterator.hasNext) {
-          dataWriter.write(iterator.next())
+          writeResults = writeResults ++ dataWriter.write(iterator.next())
         }
-        dataWriter.commit()
+        dataWriter.commit(writeResults)
       })(catchBlock = {
         // If there is an error, abort the task
         dataWriter.abort()
