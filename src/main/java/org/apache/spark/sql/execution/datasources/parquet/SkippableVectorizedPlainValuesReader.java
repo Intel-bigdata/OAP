@@ -16,6 +16,10 @@
  */
 package org.apache.spark.sql.execution.datasources.parquet;
 
+import java.io.IOException;
+
+import org.apache.parquet.io.ParquetDecodingException;
+
 public class SkippableVectorizedPlainValuesReader extends VectorizedPlainValuesReader
     implements SkippableVectorizedValuesReader {
 
@@ -28,27 +32,47 @@ public class SkippableVectorizedPlainValuesReader extends VectorizedPlainValuesR
 
   @Override
   public void skipIntegers(int total) {
-    offset += 4 * total;
+    try {
+      in.skipFully(4 * total);
+    } catch (IOException e) {
+      throw  new ParquetDecodingException("Failed to skip" + 4 * total + "bytes", e);
+    }
   }
 
   @Override
   public void skipLongs(int total) {
-    offset += 8 * total;
+    try {
+      in.skipFully(8 * total);
+    } catch (IOException e) {
+      throw  new ParquetDecodingException("Failed to skip" + 4 * total + "bytes", e);
+    }
   }
 
   @Override
   public void skipFloats(int total) {
-    offset += 4 * total;
+    try {
+      in.skipFully(4 * total);
+    } catch (IOException e) {
+      throw  new ParquetDecodingException("Failed to skip" + 4 * total + "bytes", e);
+    }
   }
 
   @Override
   public void skipDoubles(int total) {
-    offset += 8 * total;
+    try {
+      in.skipFully(8 * total);
+    } catch (IOException e) {
+      throw  new ParquetDecodingException("Failed to skip" + 4 * total + "bytes", e);
+    }
   }
 
   @Override
   public void skipBytes(int total) {
-    offset += 4 * total;
+    try {
+      in.skipFully(4 * total);
+    } catch (IOException e) {
+      throw  new ParquetDecodingException("Failed to skip" + 4 * total + "bytes", e);
+    }
   }
 
   @Override
@@ -56,18 +80,30 @@ public class SkippableVectorizedPlainValuesReader extends VectorizedPlainValuesR
     bitOffset += 1;
     if (bitOffset == 8) {
       bitOffset = 0;
-      offset++;
+      try {
+        in.skipFully(1);
+      } catch (IOException e) {
+        throw new ParquetDecodingException("Failed to skip 1 bytes", e);
+      }
     }
   }
 
   @Override
   public void skipInteger() {
-    offset += 4;
+    try {
+      in.skipFully(4);
+    } catch (IOException e) {
+      throw  new ParquetDecodingException("Failed to skip" + 4 + "bytes", e);
+    }
   }
 
   @Override
   public void skipLong() {
-    offset += 8;
+    try {
+      in.skipFully(8);
+    } catch (IOException e) {
+      throw  new ParquetDecodingException("Failed to skip" + 8 + "bytes", e);
+    }
   }
 
   @Override
@@ -77,24 +113,40 @@ public class SkippableVectorizedPlainValuesReader extends VectorizedPlainValuesR
 
   @Override
   public void skipFloat() {
-    offset += 4;
+    try {
+      in.skipFully(4);
+    } catch (IOException e) {
+      throw  new ParquetDecodingException("Failed to skip" + 4 + "bytes", e);
+    }
   }
 
   @Override
   public void skipDouble() {
-    offset += 8;
+    try {
+      in.skipFully(8);
+    } catch (IOException e) {
+      throw  new ParquetDecodingException("Failed to skip" + 8 + "bytes", e);
+    }
   }
 
   @Override
   public void skipBinary(int total) {
     for (int i = 0; i < total; i++) {
-      int len = readInteger();
-      offset += len;
+      int length = readInteger();
+      try {
+        in.skipFully(length);
+      } catch (IOException e) {
+        throw new ParquetDecodingException("Failed to skip " + length + " bytes", e);
+      }
     }
   }
 
   @Override
   public void skipBinaryByLen(int len) {
-    offset += len;
+    try {
+      in.skipFully(len);
+    } catch (IOException e) {
+      throw new ParquetDecodingException("Failed to skip " + len + " bytes", e);
+    }
   }
 }
