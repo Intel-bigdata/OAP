@@ -73,7 +73,7 @@ object FileFormatWriter extends Logging {
       bucketSpec: Option[BucketSpec],
       statsTrackers: Seq[WriteJobStatsTracker],
       options: Map[String, String])
-    : (Seq[WriteResult], Set[String]) = {
+    : Set[String] = {
 
     val job = Job.getInstance(hadoopConf)
     job.setOutputKeyClass(classOf[Void])
@@ -193,7 +193,7 @@ object FileFormatWriter extends Logging {
       outputWriterFactory.commitJob(writeResults)
 
       // return a set of all the partition paths that were updated during this job
-      (writeResults, ret.map(_.summary.updatedPartitions).reduceOption(_ ++ _).getOrElse(Set.empty))
+      ret.map(_.summary.updatedPartitions).reduceOption(_ ++ _).getOrElse(Set.empty)
     } catch { case cause: Throwable =>
       logError(s"Aborting job ${description.uuid}.", cause)
       committer.abortJob(job)
