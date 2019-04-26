@@ -111,9 +111,9 @@ class SingleDirectoryDataWriter(
   newOutputWriter()
 
   private def newOutputWriter(): Seq[WriteResult] = {
-    val writeResults: Seq[WriteResult] = Nil
+    var writeResults: Seq[WriteResult] = Nil
     recordsInFile = 0
-    writeResults ++ releaseResources()
+    writeResults = writeResults ++ releaseResources()
 
     val ext = description.outputWriterFactory.getFileExtension(taskAttemptContext)
     val currentPath = committer.newTaskTempFile(
@@ -220,9 +220,9 @@ class DynamicPartitionDataWriter(
    */
   private def newOutputWriter(partitionValues: Option[InternalRow],
        bucketId: Option[Int]): Seq[WriteResult] = {
-    val writeResults: Seq[WriteResult] = Nil
+    var writeResults: Seq[WriteResult] = Nil
     recordsInFile = 0
-    writeResults ++ releaseResources()
+    writeResults = writeResults ++ releaseResources()
 
     val partDir: Option[String] = partitionValues.map(getPartitionPath(_))
     partDir.foreach(updatedPartitions.add)
