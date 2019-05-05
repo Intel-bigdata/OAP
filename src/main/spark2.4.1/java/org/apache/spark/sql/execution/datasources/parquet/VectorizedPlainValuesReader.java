@@ -31,11 +31,11 @@ import org.apache.parquet.io.api.Binary;
  * An implementation of the Parquet PLAIN decoder that supports the vectorized interface.
  */
 public class VectorizedPlainValuesReader extends ValuesReader implements VectorizedValuesReader {
-  private ByteBufferInputStream in = null;
+  protected ByteBufferInputStream in = null;
 
   // Only used for booleans.
-  private int bitOffset;
-  private byte currentByte = 0;
+  protected int bitOffset;
+  protected byte currentByte = 0;
 
   public VectorizedPlainValuesReader() {
   }

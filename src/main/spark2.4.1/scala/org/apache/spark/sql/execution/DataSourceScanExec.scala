@@ -31,8 +31,10 @@ import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OapMetricsManager}
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.SQLMetrics
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources.{BaseRelation, Filter}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
@@ -303,6 +305,13 @@ case class FileSourceScanExec(
   }
 
   private lazy val inputRDD: RDD[InternalRow] = {
+    // for OAP
+    // init accumulator before buildReader
+    relation.fileFormat match {
+      case format: OapFileFormat =>
+        format.initMetrics(metrics)
+      case _ => Unit
+    }
     // Update metrics for taking effect in both code generation node and normal node.
     updateDriverMetrics()
     val readFile: (PartitionedFile) => Iterator[InternalRow] =
@@ -331,7 +340,8 @@ case class FileSourceScanExec(
     Map("numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
       "numFiles" -> SQLMetrics.createMetric(sparkContext, "number of files"),
       "metadataTime" -> SQLMetrics.createMetric(sparkContext, "metadata time (ms)"),
-      "scanTime" -> SQLMetrics.createTimingMetric(sparkContext, "scan time"))
+      "scanTime" -> SQLMetrics.createTimingMetric(sparkContext, "scan time")) ++
+      OapMetricsManager.metrics(sparkContext)
 
   protected override def doExecute(): RDD[InternalRow] = {
     if (supportsBatch) {
@@ -444,9 +454,10 @@ case class FileSourceScanExec(
               partition.values, file.getPath.toUri.toString, offset, size, hosts)
           }
         } else {
-          val hosts = getBlockHosts(blockLocations, 0, file.getLen)
+          val cachedHosts = OapRuntime.getOrCreate.fiberSensor.getHosts(file.getPath.toString)
+          val hosts = cachedHosts.toBuffer ++ getBlockHosts(blockLocations, 0, file.getLen)
           Seq(PartitionedFile(
-            partition.values, file.getPath.toUri.toString, 0, file.getLen, hosts))
+            partition.values, file.getPath.toUri.toString, 0, file.getLen, hosts.toArray))
         }
       }
     }.toArray.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
