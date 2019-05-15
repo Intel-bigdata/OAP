@@ -388,8 +388,8 @@ object OapConf {
         " Acceptable values include: uncompressed, snappy, gzip, lzo.")
       .stringConf
       .transform(_.toUpperCase())
-      .checkValues(Set("UNCOMPRESSED", "SNAPPY", "GZIP", "LZO"))
-      .createWithDefault("UNCOMPRESSED")
+      .checkValues(Set("LZ4", "LZF", "SNAPPY", "ZSTD"))
+      .createWithDefault("LZ4")
 
   val OAP_DATA_FIBER_CACHE_COMPRESSION_SIZE =
     SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compression.size")
