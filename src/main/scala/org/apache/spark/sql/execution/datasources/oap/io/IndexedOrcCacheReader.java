@@ -30,10 +30,10 @@ import org.apache.parquet.hadoop.metadata.IndexedStripeMeta;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntListIterator;
+import org.apache.spark.sql.execution.datasources.oap.filecache.VectorDataFiberId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberId;
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache;
 import org.apache.spark.sql.oap.OapRuntime$;
 
@@ -153,7 +153,8 @@ public class IndexedOrcCacheReader extends OrcCacheReader {
     for (int i = 0; i < requiredColumnIds.length; ++i) {
       long start = System.nanoTime();
       FiberCache fiberCache =
-              OapRuntime$.MODULE$.getOrCreate().fiberCacheManager().get(new DataFiberId(dataFile, requiredColumnIds[i], validStripes.get(curStripeIndex).stripeId));
+              OapRuntime$.MODULE$.getOrCreate().fiberCacheManager().get(
+                  new VectorDataFiberId(dataFile, requiredColumnIds[i], validStripes.get(curStripeIndex).stripeId));
       long end = System.nanoTime();
       loadFiberTime += (end - start);
       dataFile.update(requiredColumnIds[i], fiberCache);

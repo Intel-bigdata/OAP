@@ -17,14 +17,12 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue, TimeUnit}
+import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.{ReentrantReadWriteLock}
 
 import com.google.common.cache._
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FSDataInputStream
-import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
@@ -99,6 +97,11 @@ private[sql] class FiberCacheManager(
     logDebug(s"Getting Fiber: $fiber")
     cacheBackend.get(fiber)
   }
+
+  def exists(fiber: FiberId): Boolean = {
+    cacheBackend.exists(fiber)
+  }
+
   // only for unit test
   def setCompressionConf(dataEnable: Boolean = false,
       dataCompressCodec: String = "SNAPPY"): Unit = {

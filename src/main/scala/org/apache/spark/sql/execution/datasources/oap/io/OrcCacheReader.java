@@ -25,8 +25,8 @@ import org.apache.orc.storage.ql.exec.vector.*;
 import org.apache.orc.storage.serde2.io.HiveDecimalWritable;
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberId;
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache;
+import org.apache.spark.sql.execution.datasources.oap.filecache.VectorDataFiberId;
 import org.apache.spark.sql.execution.datasources.orc.OrcColumnVector;
 import org.apache.spark.sql.execution.datasources.orc.OrcColumnVectorAllocator;
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
@@ -309,7 +309,8 @@ public class OrcCacheReader
     for (int i = 0; i < requiredColumnIds.length; ++i) {
       long start = System.nanoTime();
       FiberCache fiberCache =
-              OapRuntime$.MODULE$.getOrCreate().fiberCacheManager().get(new DataFiberId(dataFile, requiredColumnIds[i], currentStripe));
+              OapRuntime$.MODULE$.getOrCreate().fiberCacheManager().get(
+                  new VectorDataFiberId(dataFile, requiredColumnIds[i], currentStripe));
       long end = System.nanoTime();
       loadFiberTime += (end - start);
       dataFile.update(requiredColumnIds[i], fiberCache);

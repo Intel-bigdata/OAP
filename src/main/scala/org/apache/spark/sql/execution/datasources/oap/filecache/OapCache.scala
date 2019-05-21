@@ -128,6 +128,7 @@ trait OapCache {
   val indexFiberCount: AtomicLong = new AtomicLong(0)
 
   def get(fiber: FiberId): FiberCache
+  def exists(fiber: FiberId): Boolean
   def getIfPresent(fiber: FiberId): FiberCache
   def getFibers: Set[FiberId]
   def invalidate(fiber: FiberId): Unit
@@ -165,7 +166,8 @@ trait OapCache {
 
   protected def cache(fiber: FiberId): FiberCache = {
     val cache = fiber match {
-      case DataFiberId(file, columnIndex, rowGroupId) => file.cache(rowGroupId, columnIndex)
+      case binary: BinaryDataFiberId => binary.doCache()
+      case VectorDataFiberId(file, columnIndex, rowGroupId) => file.cache(rowGroupId, columnIndex)
       case BTreeFiberId(getFiberData, _, _, _) => getFiberData.apply()
       case BitmapFiberId(getFiberData, _, _, _) => getFiberData.apply()
       case TestDataFiberId(getFiberData, _) => getFiberData.apply()
@@ -193,6 +195,8 @@ class SimpleOapCache extends OapCache with Logging {
     decFiberCountAndSize(fiberId, 1, fiberCache.size())
     fiberCache
   }
+
+  override def exists(fiber: FiberId): Boolean = false
 
   override def getIfPresent(fiber: FiberId): FiberCache = null
 
@@ -337,6 +341,16 @@ class GuavaOapCache(
     } finally {
       readLock.unlock()
     }
+  }
+
+  override def exists(fiber: FiberId): Boolean = {
+    var exist: Boolean = false
+    if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId]) {
+      exist = cacheInstance.asMap().containsKey(fiber)
+    } else if (fiber.isInstanceOf[BTreeFiberId] || fiber.isInstanceOf[BitmapFiberId]) {
+      exist = indexCacheInstance.asMap().containsKey(fiber)
+    }
+    exist
   }
 
   override def getIfPresent(fiber: FiberId): FiberCache =
