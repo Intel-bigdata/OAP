@@ -148,21 +148,38 @@ class SimpleDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds and rowIds") {
-    val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    val requiredIds = Array(0, 1)
-    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
-    val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
-      .asInstanceOf[OapCompletionIterator[InternalRow]]
-    val result = ArrayBuffer[Int]()
-    while (iterator.hasNext) {
-      val row = iterator.next()
-      assert(row.numFields == 2)
-      result += row.getInt(0)
-    }
-    iterator.close()
-    assert(rowIds.length == result.length)
-    for (i <- rowIds.indices) {
-      assert(rowIds(i) == result(i))
+    Seq((false, 0), (true, 2)).foreach { condition =>
+      try {
+        val binaryCacheEnabled = condition._1
+        val exceptedFibers = condition._2
+        configuration.setBoolean(
+          OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key, binaryCacheEnabled)
+        val cacheManager = OapRuntime.getOrCreate.fiberCacheManager
+        val before = cacheManager.cacheCount
+        val reader = ParquetDataFile(fileName, requestSchema, configuration)
+        val requiredIds = Array(0, 1)
+        val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382)
+        val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+          .asInstanceOf[OapCompletionIterator[InternalRow]]
+        val result = ArrayBuffer[Int]()
+        while (iterator.hasNext) {
+          val row = iterator.next()
+          assert(row.numFields == 2)
+          result += row.getInt(0)
+        }
+        iterator.close()
+        assert(rowIds.length == result.length)
+        for (i <- rowIds.indices) {
+          assert(rowIds(i) == result(i))
+        }
+        val after = cacheManager.cacheCount
+        assert(after - before == exceptedFibers)
+        cacheManager.clearAllFibers()
+        Thread.sleep(1000)
+        assert(cacheManager.cacheCount == 0)
+      } finally {
+        configuration.unset(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key)
+      }
     }
   }
 
@@ -181,20 +198,37 @@ class SimpleDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds ") {
-    val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    val requiredIds = Array(0)
-    val iterator = reader.iterator(requiredIds)
-      .asInstanceOf[OapCompletionIterator[InternalRow]]
-    val result = ArrayBuffer[ Int ]()
-    while (iterator.hasNext) {
-      val row = iterator.next()
-      result += row.getInt(0)
-    }
-    iterator.close()
-    val length = data.length
-    assert(length == result.length)
-    for (i <- 0 until length) {
-      assert(i == result(i))
+    Seq((false, 0), (true, 1)).foreach { condition =>
+      try {
+        val binaryCacheEnabled = condition._1
+        val exceptedFibers = condition._2
+        configuration.setBoolean(
+          OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key, binaryCacheEnabled)
+        val cacheManager = OapRuntime.getOrCreate.fiberCacheManager
+        val before = cacheManager.cacheCount
+        val reader = ParquetDataFile(fileName, requestSchema, configuration)
+        val requiredIds = Array(0)
+        val iterator = reader.iterator(requiredIds)
+          .asInstanceOf[OapCompletionIterator[InternalRow]]
+        val result = ArrayBuffer[ Int ]()
+        while (iterator.hasNext) {
+          val row = iterator.next()
+          result += row.getInt(0)
+        }
+        iterator.close()
+        val length = data.length
+        assert(length == result.length)
+        for (i <- 0 until length) {
+          assert(i == result(i))
+        }
+        val after = cacheManager.cacheCount
+        assert(after - before == exceptedFibers)
+        cacheManager.clearAllFibers()
+        Thread.sleep(1000)
+        assert(cacheManager.cacheCount == 0)
+      } finally {
+        configuration.unset(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key)
+      }
     }
   }
 
@@ -264,35 +298,69 @@ class NestedDataSuite extends ParquetDataFileSuite {
   }
 
   test("skip read record 1") {
-    val reader = ParquetDataFile(fileName, requestStructType, configuration)
-    val requiredIds = Array(0, 1, 2)
-    val rowIds = Array(1)
-    val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
-      .asInstanceOf[OapCompletionIterator[InternalRow]]
-    assert(iterator.hasNext)
-    val row = iterator.next()
-    assert(row.numFields == 3)
-    val docId = row.getLong(0)
-    assert(docId == 20L)
-    iterator.close()
+    Seq((false, 0), (true, 6)).foreach { condition =>
+      try {
+        val binaryCacheEnabled = condition._1
+        val exceptedFibers = condition._2
+        configuration.setBoolean(
+          OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key, binaryCacheEnabled)
+        val cacheManager = OapRuntime.getOrCreate.fiberCacheManager
+        val before = cacheManager.cacheCount
+        val reader = ParquetDataFile(fileName, requestStructType, configuration)
+        val requiredIds = Array(0, 1, 2)
+        val rowIds = Array(1)
+        val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+          .asInstanceOf[OapCompletionIterator[InternalRow]]
+        assert(iterator.hasNext)
+        val row = iterator.next()
+        assert(row.numFields == 3)
+        val docId = row.getLong(0)
+        assert(docId == 20L)
+        iterator.close()
+        val after = cacheManager.cacheCount
+        assert(after - before == exceptedFibers)
+        cacheManager.clearAllFibers()
+        Thread.sleep(1000)
+        assert(cacheManager.cacheCount == 0)
+      } finally {
+        configuration.unset(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key)
+      }
+    }
   }
 
-  test("read all ") {
-    val reader = ParquetDataFile(fileName, requestStructType, configuration)
-    val requiredIds = Array(0, 2)
-    val iterator = reader.iterator(requiredIds)
-      .asInstanceOf[OapCompletionIterator[InternalRow]]
-    assert(iterator.hasNext)
-    val rowOne = iterator.next()
-    assert(rowOne.numFields == 2)
-    val docIdOne = rowOne.getLong(0)
-    assert(docIdOne == 10L)
-    assert(iterator.hasNext)
-    val rowTwo = iterator.next()
-    assert(rowTwo.numFields == 2)
-    val docIdTwo = rowTwo.getLong(0)
-    assert(docIdTwo == 20L)
-    iterator.close()
+  test("read all") {
+    Seq((false, 0), (true, 4)).foreach { condition =>
+      try {
+        val binaryCacheEnabled = condition._1
+        val exceptedFibers = condition._2
+        configuration.setBoolean(
+          OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key, binaryCacheEnabled)
+        val cacheManager = OapRuntime.getOrCreate.fiberCacheManager
+        val before = cacheManager.cacheCount
+        val reader = ParquetDataFile(fileName, requestStructType, configuration)
+        val requiredIds = Array(0, 2)
+        val iterator = reader.iterator(requiredIds)
+          .asInstanceOf[OapCompletionIterator[InternalRow]]
+        assert(iterator.hasNext)
+        val rowOne = iterator.next()
+        assert(rowOne.numFields == 2)
+        val docIdOne = rowOne.getLong(0)
+        assert(docIdOne == 10L)
+        assert(iterator.hasNext)
+        val rowTwo = iterator.next()
+        assert(rowTwo.numFields == 2)
+        val docIdTwo = rowTwo.getLong(0)
+        assert(docIdTwo == 20L)
+        iterator.close()
+        val after = cacheManager.cacheCount
+        assert(after - before == exceptedFibers)
+        cacheManager.clearAllFibers()
+        Thread.sleep(1000)
+        assert(cacheManager.cacheCount == 0)
+      } finally {
+        configuration.unset(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key)
+      }
+    }
   }
 }
 
@@ -325,48 +393,82 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds and rowIds disable returningBatch") {
-    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
-    val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setParquetVectorizedContext(context)
-    val requiredIds = Array(0, 1)
-    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 1134, 1753, 2222, 3928, 4200, 4734)
-    val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
-      .asInstanceOf[OapCompletionIterator[InternalRow]]
-    val result = ArrayBuffer[Int]()
-    while (iterator.hasNext) {
-      val row = iterator.next()
-      assert(row.numFields == 2)
-      result += row.getInt(0)
-    }
-    assert(rowIds.length == result.length)
-    for (i <- rowIds.indices) {
-      assert(rowIds(i) == result(i))
+    Seq((false, 0), (true, 2)).foreach { condition =>
+      try {
+        val binaryCacheEnabled = condition._1
+        val exceptedFibers = condition._2
+        configuration.setBoolean(
+          OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key, binaryCacheEnabled)
+        val cacheManager = OapRuntime.getOrCreate.fiberCacheManager
+        val before = cacheManager.cacheCount
+        val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
+        val reader = ParquetDataFile(fileName, requestSchema, configuration)
+        reader.setParquetVectorizedContext(context)
+        val requiredIds = Array(0, 1)
+        val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 1134, 1753, 2222, 3928, 4200, 4734)
+        val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+          .asInstanceOf[OapCompletionIterator[InternalRow]]
+        val result = ArrayBuffer[Int]()
+        while (iterator.hasNext) {
+          val row = iterator.next()
+          assert(row.numFields == 2)
+          result += row.getInt(0)
+        }
+        assert(rowIds.length == result.length)
+        for (i <- rowIds.indices) {
+          assert(rowIds(i) == result(i))
+        }
+        val after = cacheManager.cacheCount
+        assert(after - before == exceptedFibers)
+        cacheManager.clearAllFibers()
+        Thread.sleep(1000)
+        assert(cacheManager.cacheCount == 0)
+      } finally {
+        configuration.unset(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key)
+      }
     }
   }
 
   test("read by columnIds and rowIds enable returningBatch") {
-    val context = Some(ParquetVectorizedContext(null, null, returningBatch = true))
-    val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setParquetVectorizedContext(context)
-    val requiredIds = Array(0, 1)
-    // RowGroup0 => page0: [0, 1, 7, 8, 120, 121, 381, 382]
-    // RowGroup0 => page5: [23000]
-    // RowGroup2 => page0: [50752]
-    val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 23000, 50752)
-    val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
-      .asInstanceOf[OapCompletionIterator[InternalRow]]
-    val result = ArrayBuffer[Int]()
-    while (iterator.hasNext) {
-      val batch = iterator.next().asInstanceOf[ColumnarBatch]
-      val rowIterator = batch.rowIterator()
-      while (rowIterator.hasNext) {
-        val row = rowIterator.next()
-        assert(row.numFields == 2)
-        result += row.getInt(0)
+    Seq((false, 0), (true, 4)).foreach { condition =>
+      try {
+        val binaryCacheEnabled = condition._1
+        val exceptedFibers = condition._2
+        configuration.setBoolean(
+          OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key, binaryCacheEnabled)
+        val cacheManager = OapRuntime.getOrCreate.fiberCacheManager
+        val before = cacheManager.cacheCount
+        val context = Some(ParquetVectorizedContext(null, null, returningBatch = true))
+        val reader = ParquetDataFile(fileName, requestSchema, configuration)
+        reader.setParquetVectorizedContext(context)
+        val requiredIds = Array(0, 1)
+        // RowGroup0 => page0: [0, 1, 7, 8, 120, 121, 381, 382]
+        // RowGroup0 => page5: [23000]
+        // RowGroup2 => page0: [50752]
+        val rowIds = Array(0, 1, 7, 8, 120, 121, 381, 382, 23000, 50752)
+        val iterator = reader.iteratorWithRowIds(requiredIds, rowIds)
+          .asInstanceOf[OapCompletionIterator[InternalRow]]
+        val result = ArrayBuffer[Int]()
+        while (iterator.hasNext) {
+          val batch = iterator.next().asInstanceOf[ColumnarBatch]
+          val rowIterator = batch.rowIterator()
+          while (rowIterator.hasNext) {
+            val row = rowIterator.next()
+            assert(row.numFields == 2)
+            result += row.getInt(0)
+          }
+        }
+        for (i <- rowIds.indices) {
+          assert(result.contains(i))
+        }
+        val after = cacheManager.cacheCount
+        assert(after - before == exceptedFibers)
+        cacheManager.clearAllFibers()
+        Thread.sleep(1000)
+        assert(cacheManager.cacheCount == 0)
+      } finally {
+        configuration.unset(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key)
       }
-    }
-    for (i <- rowIds.indices) {
-      assert(result.contains(i))
     }
   }
 
@@ -401,44 +503,78 @@ class VectorizedDataSuite extends ParquetDataFileSuite {
   }
 
   test("read by columnIds disable returningBatch") {
-    val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
-    val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setParquetVectorizedContext(context)
-    val requiredIds = Array(0)
-    val iterator = reader.iterator(requiredIds)
-      .asInstanceOf[OapCompletionIterator[InternalRow]]
-    val result = ArrayBuffer[ Int ]()
-    while (iterator.hasNext) {
-      val row = iterator.next()
-      result += row.getInt(0)
-    }
-    val length = data.length
-    assert(length == result.length)
-    for (i <- 0 until length) {
-      assert(i == result(i))
+    Seq((false, 0), (true, 5)).foreach { condition =>
+      try {
+        val binaryCacheEnabled = condition._1
+        val exceptedFibers = condition._2
+        configuration.setBoolean(
+          OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key, binaryCacheEnabled)
+        val cacheManager = OapRuntime.getOrCreate.fiberCacheManager
+        val before = cacheManager.cacheCount
+        val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
+        val reader = ParquetDataFile(fileName, requestSchema, configuration)
+        reader.setParquetVectorizedContext(context)
+        val requiredIds = Array(0)
+        val iterator = reader.iterator(requiredIds)
+          .asInstanceOf[OapCompletionIterator[InternalRow]]
+        val result = ArrayBuffer[ Int ]()
+        while (iterator.hasNext) {
+          val row = iterator.next()
+          result += row.getInt(0)
+        }
+        val length = data.length
+        assert(length == result.length)
+        for (i <- 0 until length) {
+          assert(i == result(i))
+        }
+        val after = cacheManager.cacheCount
+        assert(after - before == exceptedFibers)
+        cacheManager.clearAllFibers()
+        Thread.sleep(1000)
+        assert(cacheManager.cacheCount == 0)
+      } finally {
+        configuration.unset(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key)
+      }
     }
   }
 
   test("read by columnIds enable returningBatch") {
-    val context = Some(ParquetVectorizedContext(null, null, returningBatch = true))
-    val reader = ParquetDataFile(fileName, requestSchema, configuration)
-    reader.setParquetVectorizedContext(context)
-    val requiredIds = Array(0)
-    val iterator = reader.iterator(requiredIds)
-      .asInstanceOf[OapCompletionIterator[InternalRow]]
-    val result = ArrayBuffer[ Int ]()
-    while (iterator.hasNext) {
-      val batch = iterator.next().asInstanceOf[ColumnarBatch]
-      val batchIter = batch.rowIterator()
-      while (batchIter.hasNext) {
-        val row = batchIter.next
-        result += row.getInt(0)
+    Seq((false, 0), (true, 5)).foreach { condition =>
+      try {
+        val binaryCacheEnabled = condition._1
+        val exceptedFibers = condition._2
+        configuration.setBoolean(
+          OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key, binaryCacheEnabled)
+        val cacheManager = OapRuntime.getOrCreate.fiberCacheManager
+        val before = cacheManager.cacheCount
+        val context = Some(ParquetVectorizedContext(null, null, returningBatch = true))
+        val reader = ParquetDataFile(fileName, requestSchema, configuration)
+        reader.setParquetVectorizedContext(context)
+        val requiredIds = Array(0)
+        val iterator = reader.iterator(requiredIds)
+          .asInstanceOf[OapCompletionIterator[InternalRow]]
+        val result = ArrayBuffer[ Int ]()
+        while (iterator.hasNext) {
+          val batch = iterator.next().asInstanceOf[ColumnarBatch]
+          val batchIter = batch.rowIterator()
+          while (batchIter.hasNext) {
+            val row = batchIter.next
+            result += row.getInt(0)
+          }
+        }
+        val length = data.length
+        assert(length == result.length)
+        for (i <- 0 until length) {
+          assert(i == result(i))
+        }
+        val after = cacheManager.cacheCount
+        assert(after - before == exceptedFibers)
+        cacheManager.clearAllFibers()
+        Thread.sleep(1000)
+        assert(cacheManager.cacheCount == 0)
+      } finally {
+        configuration.unset(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key)
       }
-    }
-    val length = data.length
-    assert(length == result.length)
-    for (i <- 0 until length) {
-      assert(i == result(i))
     }
   }
 }

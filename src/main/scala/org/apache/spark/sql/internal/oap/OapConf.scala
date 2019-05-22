@@ -431,4 +431,11 @@ object OapConf {
       .doc("To enable memkind conservative pattern")
       .booleanConf
       .createWithDefault(true)
+
+  val OAP_PARQUET_BINARY_DATA_CACHE_ENABLED =
+    SqlConfAdapter.buildConf("spark.sql.oap.parquet.binary.cache.enabled")
+      .internal()
+      .doc("To indicate if enable parquet binary data cache, defalt false")
+      .booleanConf
+      .createWithDefault(false)
 }

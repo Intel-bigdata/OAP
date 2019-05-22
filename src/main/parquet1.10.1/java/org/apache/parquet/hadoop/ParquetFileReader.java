@@ -596,18 +596,18 @@ public class ParquetFileReader implements Closeable {
   }
 
   private final InputFile file;
-  private final SeekableInputStream f;
+  protected final SeekableInputStream f;
   private final ParquetReadOptions options;
-  private final Map<ColumnPath, ColumnDescriptor> paths = new HashMap<>();
+  protected final Map<ColumnPath, ColumnDescriptor> paths = new HashMap<>();
   private final FileMetaData fileMetaData; // may be null
-  private final List<BlockMetaData> blocks;
+  protected final List<BlockMetaData> blocks;
 
   // not final. in some cases, this may be lazily loaded for backward-compat.
   private ParquetMetadata footer;
 
-  private int currentBlock = 0;
-  private ColumnChunkPageReadStore currentRowGroup = null;
-  private DictionaryPageReader nextDictionaryReader = null;
+  protected int currentBlock = 0;
+  protected ColumnChunkPageReadStore currentRowGroup = null;
+  protected DictionaryPageReader nextDictionaryReader = null;
 
   /**
    * @param configuration the Hadoop conf
@@ -822,7 +822,7 @@ public class ParquetFileReader implements Closeable {
     return advanceToNextBlock();
   }
 
-  private boolean advanceToNextBlock() {
+  protected boolean advanceToNextBlock() {
     if (currentBlock == blocks.size()) {
       return false;
     }
@@ -917,7 +917,7 @@ public class ParquetFileReader implements Closeable {
   /**
    * The data for a column chunk
    */
-  private class Chunk {
+  class Chunk {
 
     protected final ChunkDescriptor descriptor;
     protected final ByteBufferInputStream stream;
@@ -1035,7 +1035,7 @@ public class ParquetFileReader implements Closeable {
   /**
    * deals with a now fixed bug where compressedLength was missing a few bytes.
    */
-  private class WorkaroundChunk extends Chunk {
+  protected class WorkaroundChunk extends Chunk {
 
     private final SeekableInputStream f;
 
@@ -1043,7 +1043,7 @@ public class ParquetFileReader implements Closeable {
      * @param descriptor the descriptor of the chunk
      * @param f the file stream positioned at the end of this chunk
      */
-    private WorkaroundChunk(ChunkDescriptor descriptor, List<ByteBuffer> buffers, SeekableInputStream f) {
+    WorkaroundChunk(ChunkDescriptor descriptor, List<ByteBuffer> buffers, SeekableInputStream f) {
       super(descriptor, buffers);
       this.f = f;
     }
@@ -1095,9 +1095,9 @@ public class ParquetFileReader implements Closeable {
   /**
    * information needed to read a column chunk
    */
-  private static class ChunkDescriptor {
+  static class ChunkDescriptor {
 
-    private final ColumnDescriptor col;
+    protected final ColumnDescriptor col;
     private final ColumnChunkMetaData metadata;
     private final long fileOffset;
     private final int size;
@@ -1108,7 +1108,7 @@ public class ParquetFileReader implements Closeable {
      * @param fileOffset offset in the file where this chunk starts
      * @param size size of the chunk
      */
-    private ChunkDescriptor(
+    ChunkDescriptor(
         ColumnDescriptor col,
         ColumnChunkMetaData metadata,
         long fileOffset,
