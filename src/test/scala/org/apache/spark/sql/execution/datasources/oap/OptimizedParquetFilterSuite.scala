@@ -178,4 +178,64 @@ class OptimizedParquetFilterSuite extends QueryTest with SharedOapContext with B
       }
     }
   }
+
+  test("binary cache enabled with idx") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    val cacheManager = OapRuntime.getOrCreate.fiberCacheManager
+    withIndex(TestIndex("parquet_test", "index1")) {
+      sql("create oindex index1 on parquet_test (a)")
+      withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true") {
+        val beforeQuery = cacheManager.dataCacheCount
+        checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
+          Row(1, "this is test 1") :: Nil)
+        assert(cacheManager.dataCacheCount - beforeQuery == 2)
+        checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
+          Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+        assert(cacheManager.dataCacheCount - beforeQuery == 2)
+        checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND b = 'this is test 2'"),
+          Row(2, "this is test 2") :: Nil)
+        assert(cacheManager.dataCacheCount - beforeQuery == 4)
+        cacheManager.clearAllFibers()
+        Thread.sleep(1000L)
+        assert(cacheManager.dataCacheCount == 0)
+      }
+    }
+  }
+
+  test("binary cache enabled without idx") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    val cacheManager = OapRuntime.getOrCreate.fiberCacheManager
+    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true") {
+      val beforeQuery = cacheManager.dataCacheCount
+      checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"),
+        Row(1, "this is test 1") :: Nil)
+      assert(cacheManager.dataCacheCount - beforeQuery == 2)
+      checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND a <= 3"),
+        Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+      assert(cacheManager.dataCacheCount - beforeQuery == 2)
+      checkAnswer(sql("SELECT * FROM parquet_test WHERE a > 1 AND b = 'this is test 2'"),
+        Row(2, "this is test 2") :: Nil)
+      assert(cacheManager.dataCacheCount - beforeQuery == 4)
+      cacheManager.clearAllFibers()
+      Thread.sleep(1000L)
+      assert(cacheManager.dataCacheCount == 0)
+    }
+  }
+
+  test("test binary cache enabled and vector cache both enabled") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true",
+      OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true") {
+      val error = intercept[AssertionError](
+        checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"), Row(1, "this is test 1") :: Nil))
+      assert(error.getMessage
+        .contains("Current version cannot enabled both binary Cache and vector Cache"))
+    }
+  }
 }

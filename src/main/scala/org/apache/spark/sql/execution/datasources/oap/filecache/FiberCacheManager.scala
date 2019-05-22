@@ -268,6 +268,9 @@ private[sql] class FiberCacheManager(
 
   def cacheCount: Long = cacheBackend.cacheCount
 
+  // Get count of data cache, used by test suite
+  private[oap] def dataCacheCount: Long = cacheBackend.dataCacheCount
+
   // Used by test suite
   private[filecache] def pendingCount: Int = cacheBackend.pendingFiberCount
 
