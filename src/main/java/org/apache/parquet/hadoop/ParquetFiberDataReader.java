@@ -20,6 +20,7 @@ import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.SequenceInputStream;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -288,7 +289,8 @@ public class ParquetFiberDataReader implements Closeable {
           default:
             LOG.debug("skipping page of type {} of size {}",
               pageHeader.getType(), compressedPageSize);
-            this.skip(compressedPageSize);
+            long k = this.skip(compressedPageSize);
+            if(k <= 0) LOG.warn("invalid skip,k {}", k);
             break;
         }
       }
@@ -371,7 +373,7 @@ public class ParquetFiberDataReader implements Closeable {
         long valuesCountReadSoFar,
         int pagesInChunkSize,
         int position) {
-      super(String.format(ERR_MESSAGE, descriptor.metadata.getValueCount(), path,
+      super(MessageFormat.format(ERR_MESSAGE, descriptor.metadata.getValueCount(), path,
         descriptor.metadata.getFirstDataPageOffset(), valuesCountReadSoFar,
         pagesInChunkSize, descriptor.fileOffset + position));
     }

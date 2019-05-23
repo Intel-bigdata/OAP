@@ -22,10 +22,4 @@ import org.apache.spark.sql.internal.SQLConf
 
 object SqlConfAdapter {
   def buildConf(key: String): ConfigBuilder = SQLConf.buildConf(key)
-
-  val ORC_VECTORIZED_READER_ENABLED = SQLConf.ORC_VECTORIZED_READER_ENABLED
-
-  val COLUMN_VECTOR_OFFHEAP_ENABLED = SQLConf.COLUMN_VECTOR_OFFHEAP_ENABLED
-
-  val ORC_COPY_BATCH_TO_SPARK = SQLConf.ORC_COPY_BATCH_TO_SPARK
 }

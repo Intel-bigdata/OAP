@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.function
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
@@ -44,9 +45,9 @@ private[oap] case class FiberCacheStatus(
 
 // FiberSensor is the FiberCache info recorder on Driver, it contains a file cache location mapping
 // (for cache locality) and metrics info
-private[sql] class FiberSensor extends Logging {
-
-  private[filecache] val fileToHosts = new ConcurrentHashMap[String, ArrayBuffer[HostFiberCache]]
+private[sql] class FiberSensor(
+    private[filecache] val fileToHosts: ConcurrentHashMap[String, ArrayBuffer[HostFiberCache]]
+  ) extends Logging {
 
   private[filecache] def updateRecordingMap(fromHost: String, commingStatus: FiberCacheStatus) =
     synchronized {
@@ -115,11 +116,12 @@ private[sql] class FiberSensor extends Logging {
    * @return
    */
   def getHosts(filePath: String): Seq[String] = {
-    val hosts = if (fileToHosts.containsKey(filePath)) {
-      fileToHosts.get(filePath)
-    } else {
-      new ArrayBuffer[HostFiberCache](0)
+    lazy val newHostFiberArray = new function.Function[String, ArrayBuffer[HostFiberCache]]() {
+      override def apply(t: String): ArrayBuffer[HostFiberCache] = {
+        new ArrayBuffer[HostFiberCache](0)
+      }
     }
+    val hosts = fileToHosts.computeIfAbsent(filePath, newHostFiberArray)
     hosts.sorted.takeRight(FiberSensor.NUM_GET_HOSTS).reverse.map(_.host)
   }
 }

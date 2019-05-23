@@ -216,4 +216,30 @@ class BitMapIndexSuite extends QueryTest with SharedOapContext with BeforeAndAft
     }.getMessage
     assert(message.contains("BitMapIndexType only supports one single column"))
   }
+
+  test("OAP#1037: BitMap index for full null value on parquet data file") {
+    val data: Seq[(Int, String)] = (0 to 200).map {i => (i, null)}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    sql("create oindex index_bf on parquet_test (b) USING BITMAP")
+
+    val nullResult: Seq[(Int, String)] = Nil
+    checkAnswer(sql("SELECT * FROM parquet_test WHERE b = 'hello'"),
+      nullResult.toDF("key", "value"))
+
+    sql("drop oindex index_bf on parquet_test")
+  }
+
+  test("OAP#1037: BitMap index for full null value on oap data file") {
+    val data: Seq[(Int, String)] = (0 to 200).map {i => (i, null)}
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table oap_test select * from t")
+    sql("create oindex index_bf on oap_test (b) USING BITMAP")
+
+    val nullResult: Seq[(Int, String)] = Nil
+    checkAnswer(sql("SELECT * FROM oap_test WHERE b = 'hello'"),
+      nullResult.toDF("key", "value"))
+
+    sql("drop oindex index_bf on oap_test")
+  }
 }

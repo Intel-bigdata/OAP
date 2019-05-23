@@ -83,6 +83,9 @@ private[oap] case class BitmapReader(
 
   protected def getKeyIdx(keySeq: Seq[InternalRow], range: RangeInterval): (Int, Int) = {
     val keyLength = keySeq.length
+    if (keyLength == 0) {
+      return (-1, -1)
+    }
     val startIdx = if (range.start == IndexScanner.DUMMY_KEY_START) {
       // If no starting key, assume to start from the first key.
       0

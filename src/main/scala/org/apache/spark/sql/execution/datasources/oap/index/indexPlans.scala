@@ -108,7 +108,11 @@ case class CreateIndexCommand(
     // TODO currently we ignore empty partitions, so each partition may have different indexes,
     // this may impact index updating. It may also fail index existence check. Should put index
     // info at table level also.
-    val time = System.currentTimeMillis().toHexString
+    val time = if (sparkSession.conf.get(OapConf.OAP_INDEXER_USE_CONSTANT_TIMESTAMPS_ENABLED)) {
+      sparkSession.conf.get(OapConf.OAP_INDEXER_TIMESTAMPS_CONSTANT).toHexString
+    } else {
+      System.currentTimeMillis().toHexString
+    }
     val bAndP = partitions.filter(_.files.nonEmpty).map(p => {
       val metaBuilder = new DataSourceMetaBuilder()
       val parent = p.files.head.getPath.getParent

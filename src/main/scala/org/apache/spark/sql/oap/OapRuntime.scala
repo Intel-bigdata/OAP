@@ -17,15 +17,21 @@
 
 package org.apache.spark.sql.oap
 
+import java.util.concurrent.ConcurrentHashMap
+
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.spark.{SparkConf, SparkContext, SparkEnv}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.OapMetricsManager
 import org.apache.spark.sql.execution.datasources.oap.filecache._
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberSensor.HostFiberCache
 import org.apache.spark.sql.hive.thriftserver.OapEnv
 import org.apache.spark.sql.oap.rpc._
 import org.apache.spark.util.{RpcUtils, Utils}
+
 
 /**
  * Initializing [[FiberCacheManager]], [[MemoryManager]], [[FiberLockManager]]
@@ -62,7 +68,8 @@ private[sql] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
   private[sql] def setTestSession(session: SparkSession): Unit = {
     _sparkSession = session
   }
-  override val fiberSensor = new FiberSensor
+  override val fiberSensor = new FiberSensor(
+    new ConcurrentHashMap[String, ArrayBuffer[HostFiberCache]])
   override val memoryManager =
     if (OapRuntime.isLocal(sparkEnv.conf)) MemoryManager(sparkEnv) else null
   override val fiberCacheManager =

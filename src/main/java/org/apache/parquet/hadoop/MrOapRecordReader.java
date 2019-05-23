@@ -62,11 +62,17 @@ public class MrOapRecordReader<T> implements RecordReader<T> {
 
     @Override
     public void initialize() throws IOException, InterruptedException {
-      ParquetFileReader parquetFileReader =
-        ParquetFileReader.open(configuration, file, footer.toParquetMetadata());
-      parquetFileReader.filterRowGroups(getFilter(configuration));
-      this.internalReader = new InternalParquetRecordReader<>(readSupport);
-      this.internalReader.initialize(parquetFileReader, configuration);
+      ParquetFileReader parquetFileReader = null;
+      try {
+        parquetFileReader =
+                ParquetFileReader.open(configuration, file, footer.toParquetMetadata());
+        parquetFileReader.filterRowGroups(getFilter(configuration));
+        this.internalReader = new InternalParquetRecordReader<>(readSupport);
+        this.internalReader.initialize(parquetFileReader, configuration);
+      } catch (IOException e) {
+        if(null != parquetFileReader) parquetFileReader.close();
+        throw e;
+      }
     }
 
     @Override

@@ -25,6 +25,7 @@ import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.execution.{DataSourceScanExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.HadoopFsRelation
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex}
 import org.apache.spark.util.Utils
 
@@ -53,10 +54,15 @@ class OptimizedParquetFilterSuite extends QueryTest with SharedOapContext with B
     sql(s"""CREATE TEMPORARY VIEW parquet_test (a INT, b STRING)
            | USING parquet
            | OPTIONS (path '$path')""".stripMargin)
+
+    sql(s"""CREATE TABLE partitioned_parquet (a int, b STRING, c int)
+           | USING parquet
+           | PARTITIONED by (c)""".stripMargin)
   }
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable("parquet_test")
+    sql("DROP TABLE IF EXISTS partitioned_parquet")
   }
 
   test("enable data cache but no .oap.meta file") {
@@ -105,6 +111,70 @@ class OptimizedParquetFilterSuite extends QueryTest with SharedOapContext with B
             case _ => assert(false)
           }
         )
+      }
+    }
+  }
+
+  test("OAP#1031- query failed when Some index file not exists") {
+    val data: Seq[(Int, String, Int)] = (1 to 300).map { i => (i, s"this is test $i", i % 2) }
+    data.toDF("key", "value1", "value2").createOrReplaceTempView("t")
+    sql(
+      """
+        |INSERT OVERWRITE TABLE partitioned_parquet
+        |partition (c=0)
+        |SELECT key, value1 from t where value2 = 0
+      """.stripMargin)
+
+    sql(
+      """
+        |INSERT OVERWRITE TABLE partitioned_parquet
+        |partition (c=1)
+        |SELECT key, value1 from t where value2 = 1
+      """.stripMargin)
+
+    withIndex(TestIndex("partitioned_parquet", "index1"),
+      TestIndex("partitioned_parquet", "index2")) {
+      withSQLConf(OapConf.OAP_INDEXER_CHOICE_MAX_SIZE.key -> "2") {
+        // create index
+        sql("create oindex index1 on partitioned_parquet (b)")
+        sql("create oindex index2 on partitioned_parquet (a) partition(c = 0)")
+
+        // push down indexScanners a and b , but b not exists.
+        val df = sql("SELECT b FROM partitioned_parquet WHERE b = 'this is test 1' and a = 1")
+        checkAnswer(df, Row("this is test 1") :: Nil)
+      }
+    }
+  }
+
+  test("OAP#1038 Index can be used when timestamps is constant on partitioned table") {
+    val data: Seq[(Int, String, Int)] = (1 to 300).map { i => (i, s"this is test $i", i % 2) }
+    data.toDF("key", "value1", "value2").createOrReplaceTempView("t")
+    sql(
+      """
+        |INSERT OVERWRITE TABLE partitioned_parquet
+        |partition (c=0)
+        |SELECT key, value1 from t where value2 = 0
+      """.stripMargin)
+    sql(
+      """
+        |INSERT OVERWRITE TABLE partitioned_parquet
+        |partition (c=1)
+        |SELECT key, value1 from t where value2 = 1
+      """.stripMargin)
+    withIndex(TestIndex("partitioned_parquet", "indexA")) {
+      withSQLConf(OapConf.OAP_INDEXER_USE_CONSTANT_TIMESTAMPS_ENABLED.key -> "true") {
+        // create index
+        sql("create oindex indexA on partitioned_parquet (a) partition(c = 0)")
+        sql("create oindex indexA on partitioned_parquet (a) partition(c = 1)")
+        val beforeQuery = OapRuntime.getOrCreate.fiberCacheManager.cacheStats.indexFiberCount
+        val df = sql("SELECT b FROM partitioned_parquet WHERE a = 1 or a = 2")
+        checkAnswer(df, Row("this is test 1") :: Row("this is test 2") :: Nil)
+        // After `INSERT TABLE` there are 4 files, there are 4 footer fiber need load,
+        // 2 files need load node pos fiber and rowIdList fiber, so after query increment is 8.
+        // If `OAP_INDEXER_USE_CONSTANT_TIMESTAMPS_ENABLED` if false, the indexFiberCount only 4
+        // because one of partition not use index.
+        val afterQuery = OapRuntime.getOrCreate.fiberCacheManager.cacheStats.indexFiberCount
+        assert(afterQuery == beforeQuery + 8)
       }
     }
   }

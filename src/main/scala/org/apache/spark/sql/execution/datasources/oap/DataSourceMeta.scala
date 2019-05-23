@@ -288,7 +288,34 @@ private[oap] object IndexMeta {
   }
 }
 
-private[oap] case class Version(major: Byte, minor: Byte, revision: Byte)
+private[oap] case class Version(major: Byte, minor: Byte, revision: Byte) {
+  def -(that: Version) : Integer = {
+    val thisVer = this.major << 16 + this.minor << 8 + this.revision
+    val thatVer = that.major << 16 + that.minor << 8 + that.revision
+    thisVer - thatVer
+  }
+}
+
+private[oap] object  Version {
+  val versionSet = Set(Version(1, 0, 0), Version(1, 0, 1))
+
+  def isCompatible(version: Version): Boolean = {
+    versionSet.contains(version)
+  }
+
+  def latestVersion(): Version = {
+    Version(1, 0, 1)
+  }
+
+  def largeSchemaVersion(): Version = {
+    Version(1, 0, 1)
+  }
+
+  def allVersions(): Set[Version] = {
+    versionSet
+  }
+}
+
 
 private[oap] class FileHeader {
   import DataSourceMeta._
@@ -296,7 +323,7 @@ private[oap] class FileHeader {
   var recordCount: Long = _
   var dataFileCount: Long = _
   var indexCount: Long = _
-
+  var version: Version = _
   def write(out: FSDataOutputStream): Unit = {
     out.writeLong(recordCount)
     out.writeLong(dataFileCount)
@@ -311,14 +338,14 @@ private[oap] class FileHeader {
     recordCount = in.readLong()
     dataFileCount = in.readLong()
     indexCount = in.readLong()
-    val version = Version(in.readByte(), in.readByte(), in.readByte())
+    version = Version(in.readByte(), in.readByte(), in.readByte())
     val buffer = new Array[Byte](MAGIC_NUMBER.length)
     in.readFully(buffer)
     val magicNumber = new String(buffer, StandardCharsets.UTF_8)
     if (magicNumber != MAGIC_NUMBER) {
       throw new IOException("Not a valid Oap meta file.")
     }
-    if (version != VERSION) {
+    if (!Version.isCompatible(version)) {
       throw new IOException("The Oap meta file version is not compatible.")
     }
   }
@@ -326,11 +353,13 @@ private[oap] class FileHeader {
 
 private[oap] object FileHeader {
   def apply(): FileHeader = new FileHeader()
-  def apply(recordCount: Long, dataFileCount: Long, indexCount: Long): FileHeader = {
+  def apply(recordCount: Long, dataFileCount: Long,
+    indexCount: Long, version: Version): FileHeader = {
     val fileHeader = new FileHeader()
     fileHeader.recordCount = recordCount
     fileHeader.dataFileCount = dataFileCount
     fileHeader.indexCount = indexCount
+    fileHeader.version = version
     fileHeader
   }
 }
@@ -406,6 +435,7 @@ private[oap] class DataSourceMetaBuilder {
   val fileMetas = ArrayBuffer.empty[FileMeta]
   val indexMetas = ArrayBuffer.empty[IndexMeta]
   var schema: StructType = new StructType()
+  var version: Version = Version.latestVersion()
   // This won't contain version info, refer to [[DataSourceMeta]]
   var dataReaderClassName: String = OapFileFormat.OAP_DATA_FILE_CLASSNAME
 
@@ -436,20 +466,26 @@ private[oap] class DataSourceMetaBuilder {
     this
   }
 
+  def withNewVersion(version: Version): this.type = {
+    this.version = version
+    this
+  }
+
   def withNewDataReaderClassName(clsName: String): this.type = {
     this.dataReaderClassName = clsName
     this
   }
 
   def build(): DataSourceMeta = {
-    val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum, fileMetas.size, indexMetas.size)
+    val fileHeader = FileHeader(fileMetas.map(_.recordCount).sum,
+      fileMetas.size, indexMetas.size, version)
     DataSourceMeta(fileMetas.toArray, indexMetas.toArray, schema, dataReaderClassName, fileHeader)
   }
 }
 
 private[oap] object DataSourceMeta extends Logging {
   final val MAGIC_NUMBER = "FIBER"
-  final val VERSION = Version(1, 0, 0)
+  final val VERSION = Version.latestVersion()
   final val FILE_HEAD_LEN = 32
 
   final val FILE_META_START_OFFSET = 0
@@ -503,11 +539,22 @@ private[oap] object DataSourceMeta extends Logging {
   private def readSchema(fileHeader: FileHeader, in: FSDataInputStream): StructType = {
     in.seek(FILE_META_START_OFFSET + FILE_META_LENGTH * fileHeader.dataFileCount +
       INDEX_META_LENGTH * fileHeader.indexCount)
-    StructType.fromString(in.readUTF())
+    val largeSchemaVersion = Version.largeSchemaVersion()
+    if (fileHeader.version - largeSchemaVersion < 0) {
+      StructType.fromString(in.readUTF())
+    } else {
+      val schemaLen = in.readInt()
+      val schemaBytes = new Array[Byte](schemaLen)
+      in.readFully(schemaBytes)
+      StructType.fromString(new String(schemaBytes, StandardCharsets.UTF_8))
+    }
   }
 
   private def writeSchema(schema: StructType, out: FSDataOutputStream): Unit = {
-    out.writeUTF(schema.json)
+    val bytes = schema.json.getBytes(StandardCharsets.UTF_8)
+    val length = bytes.length
+    out.writeInt(length)
+    out.write(bytes)
   }
 
   def writeString(value: String, totalSizeToWrite: Int, out: FSDataOutputStream): Unit = {
@@ -563,7 +610,7 @@ private[oap] object DataSourceMeta extends Logging {
       throw new FileAlreadyExistsException(s"File $path already exists.")
     }
 
-    val rn_path = new Path(path.getName + "_bk")
+    val rn_path = new Path(path.getParent, path.getName + "_bk")
 
     val out = fs.create(rn_path)
     meta.fileMetas.foreach(_.write(out))

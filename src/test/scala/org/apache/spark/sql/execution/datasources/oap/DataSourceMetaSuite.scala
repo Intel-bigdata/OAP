@@ -18,8 +18,13 @@
 package org.apache.spark.sql.execution.datasources.oap
 
 import java.io.File
+import java.io.FileNotFoundException
+import java.io.IOException
+import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.forkjoin.ForkJoinPool
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -28,7 +33,7 @@ import org.scalatest.BeforeAndAfter
 import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex}
-import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.util.Utils
 
 class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
@@ -53,6 +58,12 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
   override def afterEach(): Unit = {}
 
   private def writeMetaFile(path: Path): Unit = {
+    val schema = new StructType()
+      .add("a", IntegerType).add("b", IntegerType).add("c", StringType)
+    writeMetaFile(path: Path, schema, Version.latestVersion())
+  }
+
+  private def writeMetaFile(path: Path, schema: StructType, version: Version): Unit = {
     val oapMeta = DataSourceMeta.newBuilder()
       .addFileMeta(FileMeta("OapFile1", 60, "file1"))
       .addFileMeta(FileMeta("OapFile2", 40, "file2"))
@@ -65,8 +76,8 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
       .addIndexMeta(IndexMeta("index3", "15cc47fb3e0", BTreeIndex()
         .appendEntry(BTreeIndexEntry(1, Descending))
         .appendEntry(BTreeIndexEntry(0, Ascending))))
-      .withNewSchema(new StructType()
-        .add("a", IntegerType).add("b", IntegerType).add("c", StringType))
+      .withNewSchema(schema)
+      .withNewVersion(version)
       .withNewDataReaderClassName("NotExistedDataFileClassName")
       .build()
 
@@ -573,6 +584,63 @@ class DataSourceMetaSuite extends SharedOapContext with BeforeAndAfter {
       assert(
         multi_column6.zip(multiRequirements)
           .map(x => meta.isSupportedByIndex(x._1, Some(x._2))).reduce(_ && _))
+    }
+  }
+
+  test("OAP should create .oap.meta_bk file in data file dir #1030 ") {
+    var testSchema = new StructType()
+    for(a <- 0 to 120) {
+      testSchema = testSchema.add(s"test_schema_column_$a", IntegerType)
+    }
+
+    val partitions = new Array[Path](100)
+    for(p <- 0 to 99) {
+      val file = new File(tmpDir.getAbsolutePath, s"partition=$p")
+      file.mkdirs()
+      val path = new Path(
+        new File(file.getAbsolutePath, "testOap.meta").getAbsolutePath)
+      partitions(p) = path
+
+    }
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(10))
+    val parPartition = partitions.toSeq.par
+    parPartition.tasksupport = taskSupport
+
+    // If we revert this patch, this UT will throw one of following exceptions:
+    // 1.java.io.FileNotFoundException: File testOap.meta_bk does not exist
+    // 2.java.io.IOException: Could not create testOap.meta_bk
+    // and this UT will fail
+    try {
+      parPartition.map(writeMetaFile(_))
+    } catch {
+      case e: FileNotFoundException => fail(e.getMessage)
+      case e: IOException => fail(e.getMessage)
+    }
+  }
+
+  test("test schema size larger than 65535") {
+    val fields = new Array[StructField](65536)
+    for (a <- 0 to 65535) {
+      fields(a) = new StructField(s"large_schema_column_$a", IntegerType)
+    }
+    val largeSchema = StructType(fields)
+    assert(largeSchema.json.getBytes(StandardCharsets.UTF_8).length > 65535)
+    val path = new Path(new File(tmpDir.getAbsolutePath, "testOap.meta").getAbsolutePath)
+    writeMetaFile(path, largeSchema, Version.latestVersion())
+    val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+    assert(oapMeta.schema == largeSchema)
+  }
+
+  test("test meta version compatibility") {
+    var testSchema = new StructType()
+    for (a <- 0 to 10) {
+      testSchema = testSchema.add(s"test_schema_column_$a", IntegerType)
+    }
+    for (version <- Version.allVersions()) {
+      val path = new Path(new File(tmpDir.getAbsolutePath, s"test_$version.meta").getAbsolutePath)
+      writeMetaFile(path, testSchema, version)
+      val oapMeta = DataSourceMeta.initialize(path, new Configuration())
+      assert(oapMeta.schema == testSchema)
     }
   }
 }

@@ -250,6 +250,21 @@ object OapConf {
       .intConf
       .createWithDefault(1)
 
+  val OAP_INDEXER_USE_CONSTANT_TIMESTAMPS_ENABLED =
+    SqlConfAdapter.buildConf("spark.sql.oap.oindex.use.constant.timestamps")
+      .internal()
+      .doc("To indicate if enable/disable use constant timestamps when create oindex")
+      .booleanConf
+      .createWithDefault(false)
+
+  val OAP_INDEXER_TIMESTAMPS_CONSTANT =
+    SqlConfAdapter.buildConf("spark.sql.oap.oindex.timestamps.constant")
+      .internal()
+      .doc("If 'spark.sql.oap.oindex.use.constant.timestamps' is true, use this value to fill " +
+        "index meta timestamps")
+      .longConf
+      .createWithDefault(1555299314969L)
+
   val OAP_BTREE_ROW_LIST_PART_SIZE =
     SqlConfAdapter.buildConf("spark.sql.oap.btree.rowList.part.size")
       .internal()
@@ -315,13 +330,4 @@ object OapConf {
         "is empty, it will store in the data file path")
       .stringConf
       .createWithDefault("")
-
-  val ORC_VECTORIZED_READER_ENABLED =
-    SqlConfAdapter.ORC_VECTORIZED_READER_ENABLED
-
-  val COLUMN_VECTOR_OFFHEAP_ENABLED =
-    SqlConfAdapter.COLUMN_VECTOR_OFFHEAP_ENABLED
-
-  val ORC_COPY_BATCH_TO_SPARK =
-    SqlConfAdapter.ORC_COPY_BATCH_TO_SPARK
 }

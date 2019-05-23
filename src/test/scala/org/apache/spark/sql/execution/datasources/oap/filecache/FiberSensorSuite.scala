@@ -17,11 +17,16 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.util.concurrent.ConcurrentHashMap
+import java.util.function
+
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkConf
@@ -265,5 +270,20 @@ class FiberSensorSuite extends QueryTest with SharedOapContext with BeforeAndAft
 
     fiberSensor.discardOutdatedInfo(host)
     assert(fiberSensor.fileToHosts.get(host) == null)
+  }
+
+  test("OAP-1023 test getHosts threadsafe case") {
+    val testHostName = "test_host"
+    val mockFileToHosts =
+      Mockito.mock(classOf[ConcurrentHashMap[String, ArrayBuffer[HostFiberCache]]])
+    val tmpHosts = ArrayBuffer(HostFiberCache(testHostName, null))
+
+    Mockito.when(mockFileToHosts.contains(any(classOf[String]))).thenReturn(true)
+    Mockito.when(mockFileToHosts.get(any(classOf[String]))).thenReturn(null)
+    Mockito.when(mockFileToHosts.computeIfAbsent(any(classOf[String]),
+      any(classOf[function.Function[String, ArrayBuffer[HostFiberCache]]]))).thenReturn(tmpHosts)
+    val tmpFiberSensor = new FiberSensor(mockFileToHosts)
+    val retHosts = tmpFiberSensor.getHosts("test_file")
+    assert(retHosts.size == 1 && retHosts.head.equals(testHostName))
   }
 }
