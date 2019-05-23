@@ -64,84 +64,83 @@ private[sql] class OptimizedOrcFileFormat extends OapFileFormat {
      options: Map[String, String],
      hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
-    meta match {
-      case Some(m) =>
-        logDebug(s"Building OapDataReader with "
-          + m.dataReaderClassName.substring(m.dataReaderClassName.lastIndexOf(".") + 1)
-          + " ...")
+    val (filterScanners, m) = meta match {
+      case Some(x) =>
+        (indexScanners(x, filters), x)
+      case _ =>
+        // TODO Now we need use a meta with ORC_DATA_FILE_CLASSNAME & dataSchema to init
+        // OrcDataFile, try to remove this condition.
+        val emptyMeta = new DataSourceMetaBuilder()
+          .withNewDataReaderClassName(OapFileFormat.ORC_DATA_FILE_CLASSNAME)
+          .withNewSchema(dataSchema).build()
+        (None, emptyMeta)
+    }
+    // TODO refactor this.
+    hitIndexColumns = filterScanners match {
+      case Some(s) =>
+        s.scanners.flatMap { scanner =>
+          scanner.keyNames.map(n => n -> scanner.meta.indexType)
+        }.toMap
+      case _ => Map.empty
+    }
 
-        val filterScanners = indexScanners(m, filters)
-        // TODO refactor this.
-        hitIndexColumns = filterScanners match {
-          case Some(s) =>
-            s.scanners.flatMap { scanner =>
-              scanner.keyNames.map(n => n -> scanner.meta.indexType)
-            }.toMap
-          case _ => Map.empty
+    val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
+
+    val enableOffHeapColumnVector =
+      sparkSession.sessionState.conf.getConf(SQLConf.COLUMN_VECTOR_OFFHEAP_ENABLED)
+    val copyToSpark =
+      sparkSession.sessionState.conf.getConf(SQLConf.ORC_COPY_BATCH_TO_SPARK)
+    val isCaseSensitive = sparkSession.sessionState.conf.caseSensitiveAnalysis
+
+    // Push down the filters to the orc record reader.
+    if (sparkSession.sessionState.conf.orcFilterPushDown) {
+      OrcFiltersAdapter.createFilter(dataSchema,
+        filters).foreach { f =>
+        OrcInputFormat.setSearchArgument(hadoopConf, f, dataSchema.fieldNames)
+      }
+    }
+
+    val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
+    val returningBatch = supportBatch(sparkSession, resultSchema)
+    val broadcastedHadoopConf =
+      sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
+
+    (file: PartitionedFile) => {
+      assert(file.partitionValues.numFields == partitionSchema.size)
+      val conf = broadcastedHadoopConf.value.value
+
+      val path = new Path(StringUtils.unEscapeString(file.filePath))
+      val fs = path.getFileSystem(broadcastedHadoopConf.value.value)
+
+      var orcWithEmptyColIds = false
+      // For Orc, the context is used by both vectorized readers and map reduce readers.
+      // See the comments in DataFile.scala.
+      val context: Option[DataFileContext] = {
+        val readerOptions = OrcFile.readerOptions(conf).filesystem(fs)
+        val reader = OrcFile.createReader(path, readerOptions)
+        val requestedColIdsOrEmptyFile = OrcUtils.requestedColumnIds(
+          isCaseSensitive, dataSchema, requiredSchema, reader, conf)
+        if (requestedColIdsOrEmptyFile.isDefined) {
+          val requestedColIds = requestedColIdsOrEmptyFile.get
+          assert(requestedColIds.length == requiredSchema.length,
+            "[BUG] requested column IDs do not match required schema")
+          Some(OrcDataFileContext(partitionSchema, file.partitionValues,
+            returningBatch, requiredSchema, dataSchema, enableOffHeapColumnVector,
+            copyToSpark, requestedColIds))
+        } else {
+          orcWithEmptyColIds = true
+          None
         }
+      }
 
-        val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
-
-        val enableOffHeapColumnVector =
-          sparkSession.sessionState.conf.getConf(SQLConf.COLUMN_VECTOR_OFFHEAP_ENABLED)
-        val copyToSpark =
-          sparkSession.sessionState.conf.getConf(SQLConf.ORC_COPY_BATCH_TO_SPARK)
-        val isCaseSensitive = sparkSession.sessionState.conf.caseSensitiveAnalysis
-
-        // Push down the filters to the orc record reader.
-        if (sparkSession.sessionState.conf.orcFilterPushDown) {
-          OrcFiltersAdapter.createFilter(dataSchema,
-            filters).foreach { f =>
-            OrcInputFormat.setSearchArgument(hadoopConf, f, dataSchema.fieldNames)
-          }
-        }
-
-        val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
-        val returningBatch = supportBatch(sparkSession, resultSchema)
-        val broadcastedHadoopConf =
-          sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
-
-        (file: PartitionedFile) => {
-          assert(file.partitionValues.numFields == partitionSchema.size)
-          val conf = broadcastedHadoopConf.value.value
-
-          val path = new Path(StringUtils.unEscapeString(file.filePath))
-          val fs = path.getFileSystem(broadcastedHadoopConf.value.value)
-
-          var orcWithEmptyColIds = false
-          // For Orc, the context is used by both vectorized readers and map reduce readers.
-          // See the comments in DataFile.scala.
-          val context: Option[DataFileContext] = {
-            val readerOptions = OrcFile.readerOptions(conf).filesystem(fs)
-            val reader = OrcFile.createReader(path, readerOptions)
-            val requestedColIdsOrEmptyFile = OrcUtils.requestedColumnIds(
-              isCaseSensitive, dataSchema, requiredSchema, reader, conf)
-            if (requestedColIdsOrEmptyFile.isDefined) {
-              val requestedColIds = requestedColIdsOrEmptyFile.get
-              assert(requestedColIds.length == requiredSchema.length,
-                "[BUG] requested column IDs do not match required schema")
-              Some(OrcDataFileContext(partitionSchema, file.partitionValues,
-                returningBatch, requiredSchema, dataSchema, enableOffHeapColumnVector,
-                copyToSpark, requestedColIds))
-            } else {
-              orcWithEmptyColIds = true
-              None
-            }
-          }
-
-          if (orcWithEmptyColIds) {
-            // For the case of Orc with empty required column Ids.
-            Iterator.empty
-          } else {
-            val reader = new OapDataReaderV1(file.filePath, m, partitionSchema, requiredSchema,
-              filterScanners, requiredIds, None, oapMetrics, conf, returningBatch, options,
-              filters, context)
-            reader.read(file)
-          }
-        }
-      case None => (_: PartitionedFile) => {
-        // TODO Orc should refer to OrcFileFormat in OptimizedOrcFileFormat
+      if (orcWithEmptyColIds) {
+        // For the case of Orc with empty required column Ids.
         Iterator.empty
+      } else {
+        val reader = new OapDataReaderV1(file.filePath, m, partitionSchema, requiredSchema,
+          filterScanners, requiredIds, None, oapMetrics, conf, returningBatch, options,
+          filters, context)
+        reader.read(file)
       }
     }
   }
