@@ -106,8 +106,6 @@ object HadoopFsRelationOptimizer extends Logging {
             relation.options,
             selectedPartitions.flatMap(p => p.files))
 
-        val booleanCache = relation.sparkSession.conf.get(OapConf.OAP_ORC_DATA_CACHE_ENABLED)
-
         def canUseCache: Boolean = {
           val runtimeConf = relation.sparkSession.conf
           val cacheEnabled = runtimeConf.get(OapConf.OAP_ORC_DATA_CACHE_ENABLED)
