@@ -1401,7 +1401,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
   test("filtering orc in FiberCache") {
     withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      OapConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
+      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
       val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
       data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table orc_test select * from t")
@@ -1453,7 +1453,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering orc with off-heap column vector") {
-    spark.sqlContext.setConf(OapConf.COLUMN_VECTOR_OFFHEAP_ENABLED.key, "true")
+    spark.sqlContext.setConf(SQLConf.COLUMN_VECTOR_OFFHEAP_ENABLED.key, "true")
     val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table orc_test select * from t")
@@ -1465,7 +1465,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
         Row(1, "this is test 1") :: Row(2, "this is test 2")
           :: Row(4, "this is test 4") :: Nil)
     }
-    spark.sqlContext.setConf(OapConf.COLUMN_VECTOR_OFFHEAP_ENABLED.key, "false")
+    spark.sqlContext.setConf(SQLConf.COLUMN_VECTOR_OFFHEAP_ENABLED.key, "false")
   }
 
   test("OAP-764 BloomFilterStatisticsReader#analyse unexpected return SkipFile") {

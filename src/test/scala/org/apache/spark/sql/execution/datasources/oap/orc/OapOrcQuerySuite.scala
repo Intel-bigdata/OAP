@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap.orc
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.{QueryTest, Row}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex, TestPartition}
 import org.apache.spark.util.Utils
@@ -61,7 +62,7 @@ class OapOrcQuerySuite extends QueryTest with SharedOapContext with BeforeAndAft
 
   test("Query orc Format in FiberCache") {
     withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      OapConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
+      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
       val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
       data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table orc_test select * from t")
