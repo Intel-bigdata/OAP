@@ -176,7 +176,7 @@ private[oap] case class OrcDataFile(
   }
 
   private def initCacheReader(c: OrcDataFileContext,
-                                   reader: OrcCacheReader) = {
+      reader: OrcCacheReader) = {
     reader.initialize(filePath, configuration)
     reader.initBatch(fileReader.getSchema, c.requestedColIds, c.requiredSchema.fields,
       c.partitionColumns, c.partitionValues)
