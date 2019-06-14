@@ -148,7 +148,7 @@ private[sql] class FiberCacheManager(
   }
   // only for unit test
   def setCompressionConf(dataEnable: Boolean = false,
-      dataCompressCodec: String = "GZIP"): Unit = {
+      dataCompressCodec: String = "SNAPPY"): Unit = {
     _dataCacheCompressEnable = dataEnable
     _dataCacheCompressionCodec = dataCompressCodec
   }

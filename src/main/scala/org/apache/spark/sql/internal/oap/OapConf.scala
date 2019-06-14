@@ -385,7 +385,7 @@ object OapConf {
     SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compression.codec")
       .internal()
       .doc("Sets the compression codec use when writing data fiber cache." +
-        " Acceptable values include: uncompressed, snappy, gzip, lzo.")
+        " Acceptable values include: LZ4, LZF, SNAPPY, ZSTD.")
       .stringConf
       .transform(_.toUpperCase())
       .checkValues(Set("LZ4", "LZF", "SNAPPY", "ZSTD"))

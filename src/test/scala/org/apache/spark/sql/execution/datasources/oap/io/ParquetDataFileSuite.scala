@@ -487,7 +487,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
   val start = 2048
 
   test("compressed int type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -518,7 +518,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
   }
 
   test("compressed long type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -550,7 +550,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
   }
 
   test("compressed boolean type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -583,7 +583,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
   }
 
   test("compressed float type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -616,7 +616,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
   }
 
   test("compressed double type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -649,7 +649,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
   }
 
   test("compressed binary type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -719,7 +719,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
   val start = 2048
 
   test("compressed int type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -748,7 +748,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
   }
 
   test("compressed long type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -778,7 +778,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
   }
 
   test("compressed boolean type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -809,7 +809,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
   }
 
   test("compressed float type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -840,7 +840,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
   }
 
   test("compressed double type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -871,7 +871,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
   }
 
   test("compressed binary type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val meta = ParquetDataFileMeta(configuration, fileName)
     val reader = ParquetFiberDataReader.open(configuration,
       new Path(fileName), meta.footer.toParquetMetadata)
@@ -950,7 +950,7 @@ class ParquetCacheDataWithoutDictionaryWithNullsCompressedSuite extends ParquetD
   }
 
   test("compressed int type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -975,7 +975,7 @@ class ParquetCacheDataWithoutDictionaryWithNullsCompressedSuite extends ParquetD
   }
 
   test("compressed long type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -1000,7 +1000,7 @@ class ParquetCacheDataWithoutDictionaryWithNullsCompressedSuite extends ParquetD
   }
 
   test("compressed Byte/Boolean type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -1025,7 +1025,7 @@ class ParquetCacheDataWithoutDictionaryWithNullsCompressedSuite extends ParquetD
   }
 
   test("compressed float type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -1050,7 +1050,7 @@ class ParquetCacheDataWithoutDictionaryWithNullsCompressedSuite extends ParquetD
   }
 
   test("compressed double type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -1075,7 +1075,7 @@ class ParquetCacheDataWithoutDictionaryWithNullsCompressedSuite extends ParquetD
   }
 
   test("compressed binary type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -1145,7 +1145,7 @@ class ParquetCacheDataWithoutDictionaryWithoutNullsCompressedSuite extends Parqu
   }
 
   test("compressed int type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -1168,7 +1168,7 @@ class ParquetCacheDataWithoutDictionaryWithoutNullsCompressedSuite extends Parqu
   }
 
   test("compressed long type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -1191,7 +1191,7 @@ class ParquetCacheDataWithoutDictionaryWithoutNullsCompressedSuite extends Parqu
   }
 
   test("compressed Byte/Boolean type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -1214,7 +1214,7 @@ class ParquetCacheDataWithoutDictionaryWithoutNullsCompressedSuite extends Parqu
   }
 
   test("compressed float type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -1237,7 +1237,7 @@ class ParquetCacheDataWithoutDictionaryWithoutNullsCompressedSuite extends Parqu
   }
 
   test("compressed double type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
@@ -1260,7 +1260,7 @@ class ParquetCacheDataWithoutDictionaryWithoutNullsCompressedSuite extends Parqu
   }
 
   test("compressed binary type read by columnIds in fiberCache") {
-    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "GZIP")
+    OapRuntime.getOrCreate.fiberCacheManager.setCompressionConf(true, "SNAPPY")
     val context = Some(ParquetVectorizedContext(null, null, returningBatch = false))
     val reader = ParquetDataFile(fileName, requestSchema, configuration)
     reader.setParquetVectorizedContext(context)
