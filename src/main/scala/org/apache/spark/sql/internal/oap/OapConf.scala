@@ -381,7 +381,7 @@ object OapConf {
       .booleanConf
       .createWithDefault(false)
 
-  val OAP_DATA_FIBER_CACHE_COMPRESSION_Codec =
+  val OAP_DATA_FIBER_CACHE_COMPRESSION_CODEC =
     SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compression.codec")
       .internal()
       .doc("Sets the compression codec use when writing data fiber cache." +

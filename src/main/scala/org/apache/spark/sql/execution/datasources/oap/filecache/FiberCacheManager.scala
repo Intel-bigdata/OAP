@@ -106,15 +106,13 @@ private[sql] class FiberCacheManager(
   private var _dataCacheCompressEnable = sparkEnv.conf.get(
     OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION)
   private var _dataCacheCompressionCodec = sparkEnv.conf.get(
-    OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_Codec)
+    OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_CODEC)
   private val _dataCacheCompressionSize = sparkEnv.conf.get(
     OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_SIZE)
-  private val _codecFactory = new CodecFactory(new Configuration())
 
   def dataCacheCompressEnable: Boolean = _dataCacheCompressEnable
   def dataCacheCompressionCodec: String = _dataCacheCompressionCodec
   def dataCacheCompressionSize: Int = _dataCacheCompressionSize
-  def codecFactory: CodecFactory = _codecFactory
 
   private val cacheBackend: OapCache = {
     val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)

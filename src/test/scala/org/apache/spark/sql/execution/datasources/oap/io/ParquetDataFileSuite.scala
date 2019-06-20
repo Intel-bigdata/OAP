@@ -500,7 +500,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(0).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, IntegerType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -531,7 +531,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(1).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, LongType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -563,7 +563,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(2).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, BooleanType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -596,7 +596,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(3).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, FloatType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -629,7 +629,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(4).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, DoubleType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -662,7 +662,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(5).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, BinaryType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -732,7 +732,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(0).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, IntegerType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -761,7 +761,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(1).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, LongType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -791,7 +791,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(2).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, BooleanType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -822,7 +822,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(3).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, FloatType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -853,7 +853,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(4).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, DoubleType)
     // init reader
     val address = fiberCache.getBaseOffset
@@ -884,7 +884,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, types.get(5).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
-    val fiberCache = new ParquetDataFiberCompressedWriter().
+    val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, BinaryType)
     // init reader
     val address = fiberCache.getBaseOffset

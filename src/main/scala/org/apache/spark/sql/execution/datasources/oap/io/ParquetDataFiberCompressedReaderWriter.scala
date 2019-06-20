@@ -45,7 +45,7 @@ import org.apache.spark.unsafe.Platform
  * Dic encode data store as int array.
  * Dictionary: if dicLength > 0 will store dic data by dataType.
  */
-class ParquetDataFiberCompressedWriter() extends Logging {
+object ParquetDataFiberCompressedWriter extends Logging {
 
   val compressedLength =
     OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
@@ -54,6 +54,9 @@ class ParquetDataFiberCompressedWriter() extends Logging {
 
   def dumpToCache(reader: VectorizedColumnReader,
       total: Int, dataType: DataType): FiberCache = {
+    // For the dictionary case, the column vector occurs some batch has dictionary
+    // and some no dictionary. Therefore we still read the total value to cv instead of batch.
+    // TODO: Next can split the read to column vector from total to batch?
     val column: OnHeapColumnVector = new OnHeapColumnVector(total, dataType)
     reader.readBatch(total, column)
     val dicLength = column.dictionaryLength()
@@ -107,6 +110,7 @@ class ParquetDataFiberCompressedWriter() extends Logging {
             column.getDoubleData
         }
 
+      val compressedOutBuffer = new ByteArrayOutputStream()
       while (count < compressedUnitSize) {
         val num = Math.min(compressedLength, total - loadedRowCount)
         val rawBytes: Array[Byte] = new Array[Byte](num * byteLength)
@@ -115,7 +119,7 @@ class ParquetDataFiberCompressedWriter() extends Logging {
           rawBytes, Platform.BYTE_ARRAY_OFFSET, num * byteLength)
 
         // convert the byte to the stream
-        val compressedOutBuffer = new ByteArrayOutputStream()
+        compressedOutBuffer.reset()
         val cos = compressionCodec.compressedOutputStream(compressedOutBuffer)
         cos.write(rawBytes)
         cos.close()
@@ -292,6 +296,7 @@ class ParquetDataFiberCompressedWriter() extends Logging {
     val batchCompressed = new Array[Boolean](compressedUnitSize)
 
     val dictionaryIds = column.getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData
+    val compressedOutBuffer = new ByteArrayOutputStream()
     while (count < compressedUnitSize) {
       val num = Math.min(compressedLength, total - loadedRowCount)
       val rawBytes = new Array[Byte](num * 4)
@@ -300,7 +305,7 @@ class ParquetDataFiberCompressedWriter() extends Logging {
         rawBytes, Platform.BYTE_ARRAY_OFFSET, num * 4)
 
       // convert the byte to the stream
-      val compressedOutBuffer = new ByteArrayOutputStream()
+      compressedOutBuffer.reset()
       val cos = compressionCodec.compressedOutputStream(compressedOutBuffer)
       cos.write(rawBytes)
       cos.close()
@@ -459,7 +464,7 @@ class ParquetDataFiberCompressedWriter() extends Logging {
 class ParquetDataFiberCompressedReader (
      address: Long, dataType: DataType, total: Int,
      var fiberCache: FiberCache) extends ParquetDataFiberReader(
-     address = address, dataType = dataType, total = total) with Logging {
+     address = address, dataType = dataType, total = total) {
 
   private var header: ParquetDataFiberCompressedHeader = _
 
