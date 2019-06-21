@@ -68,6 +68,13 @@ class OapSuite extends QueryTest with SharedOapContext with BeforeAndAfter {
   override def afterEach(): Unit = {}
 
   test("reading oap file") {
+    sqlContext.conf.setConf(OapConf.OAP_OAPFILEFORMAT_DATA_CACHE_ENABLED, true)
+    verifyFrame(sqlContext.read.format("oap").load(path.getAbsolutePath))
+  }
+
+  test("reading oap file without cache") {
+    // scalastyle:off println
+    println("without cache")
     verifyFrame(sqlContext.read.format("oap").load(path.getAbsolutePath))
   }
 
