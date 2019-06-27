@@ -110,7 +110,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
             column.getDoubleData
         }
 
-      val compressedOutBuffer = new ByteArrayOutputStream(4096 * compressedUnitSize)
+      val compressedOutBuffer = new ByteArrayOutputStream()
       while (count < compressedUnitSize) {
         val num = Math.min(compressedLength, total - loadedRowCount)
         val rawBytes: Array[Byte] = new Array[Byte](num * byteLength)
@@ -144,7 +144,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
       val arrayOffsets = column.getArrayOffsets
       val childBytes = column.getChild(0)
         .asInstanceOf[OnHeapColumnVector].getByteData
-      val compressedOutBuffer = new ByteArrayOutputStream(4096 * compressedUnitSize)
+      val compressedOutBuffer = new ByteArrayOutputStream()
       while (count < compressedUnitSize) {
         val num = Math.min(compressedLength, total - loadedRowCount)
         val batchArrayLengths: Array[Int] = new Array[Int](num)
@@ -298,7 +298,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
     val batchCompressed = new Array[Boolean](compressedUnitSize)
 
     val dictionaryIds = column.getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData
-    val compressedOutBuffer = new ByteArrayOutputStream(4096 * compressedUnitSize)
+    val compressedOutBuffer = new ByteArrayOutputStream()
     while (count < compressedUnitSize) {
       val num = Math.min(compressedLength, total - loadedRowCount)
       val rawBytes = new Array[Byte](num * 4)
