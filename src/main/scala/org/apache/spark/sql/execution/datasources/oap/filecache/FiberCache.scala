@@ -170,8 +170,8 @@ class DecompressBatchedFiberCache (
 }
 
 case class CompressedBatchedFiberInfo(
-     startAddress: Long, endAddress: Long,
-     compressed: Boolean, length: Long)
+    startAddress: Long, endAddress: Long,
+    compressed: Boolean, length: Long)
 
 object FiberCache {
   //  For test purpose :convert Array[Byte] to FiberCache
