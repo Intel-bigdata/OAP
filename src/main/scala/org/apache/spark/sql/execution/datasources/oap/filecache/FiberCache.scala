@@ -38,8 +38,8 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   val DISPOSE_TIMEOUT = 3000
 
   // record every batch startAddress, endAddress and the boolean of whether compressed
-  // and the child column vector length
-  var fiberBatchedInfo: mutable.HashMap[Int, (Long, Long, Boolean, Long)] = _
+  // and the child column vector length in CompressedBatchFiberInfo
+  var fiberBatchedInfo: mutable.HashMap[Int, CompressedBatchedFiberInfo] = _
   // record whether the fiber is compressed
   var fiberCompressed: Boolean = false
 
@@ -168,6 +168,10 @@ class DecompressBatchedFiberCache (
       fiberCache.release()
     }
 }
+
+case class CompressedBatchedFiberInfo(
+     startAddress: Long, endAddress: Long,
+     compressed: Boolean, length: Long)
 
 object FiberCache {
   //  For test purpose :convert Array[Byte] to FiberCache

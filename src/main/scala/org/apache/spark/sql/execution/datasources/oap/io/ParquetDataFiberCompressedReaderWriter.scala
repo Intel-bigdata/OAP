@@ -27,7 +27,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.io.{CompressionCodec => SparkCompressionCodec}
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.{DecompressBatchedFiberCache, FiberCache, MemoryBlockHolder}
+import org.apache.spark.sql.execution.datasources.oap.filecache.{CompressedBatchedFiberInfo, DecompressBatchedFiberCache, FiberCache, MemoryBlockHolder}
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetDictionaryWrapper, VectorizedColumnReader}
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
 import org.apache.spark.sql.oap.OapRuntime
@@ -110,7 +110,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
             column.getDoubleData
         }
 
-      val compressedOutBuffer = new ByteArrayOutputStream()
+      val compressedOutBuffer = new ByteArrayOutputStream(4096 * compressedUnitSize)
       while (count < compressedUnitSize) {
         val num = Math.min(compressedLength, total - loadedRowCount)
         val rawBytes: Array[Byte] = new Array[Byte](num * byteLength)
@@ -144,6 +144,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
       val arrayOffsets = column.getArrayOffsets
       val childBytes = column.getChild(0)
         .asInstanceOf[OnHeapColumnVector].getByteData
+      val compressedOutBuffer = new ByteArrayOutputStream(4096 * compressedUnitSize)
       while (count < compressedUnitSize) {
         val num = Math.min(compressedLength, total - loadedRowCount)
         val batchArrayLengths: Array[Int] = new Array[Int](num)
@@ -186,7 +187,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
             rawBytes, Platform.BYTE_ARRAY_OFFSET + num * 8, childColumnVectorLengths(count))
 
           // convert the byte to the stream
-          val compressedOutBuffer = new ByteArrayOutputStream()
+          compressedOutBuffer.reset()
           val cos = compressionCodec.compressedOutputStream(compressedOutBuffer)
           cos.write(rawBytes)
           cos.close()
@@ -232,7 +233,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
     val header = ParquetDataFiberCompressedHeader(
       column.numNulls() == 0, column.numNulls() == total, 0)
     var fiber: FiberCache = null
-    val fiberBatchedInfo = new mutable.HashMap[Int, (Long, Long, Boolean, Long)]()
+    val fiberBatchedInfo = new mutable.HashMap[Int, CompressedBatchedFiberInfo]()
     if (!header.allNulls) {
       // handle the column vector is not all nulls
       val nativeAddress = if (header.noNulls) {
@@ -259,12 +260,13 @@ object ParquetDataFiberCompressedWriter extends Logging {
           null, startAddress, length)
         if (dataType == StringType || dataType == BinaryType) {
           fiberBatchedInfo.put(batchCount,
-            (startAddress, startAddress + length,
-              batchCompressed(batchCount), childColumnVectorLengths(batchCount)))
+            (CompressedBatchedFiberInfo(startAddress, startAddress + length,
+              batchCompressed(batchCount), childColumnVectorLengths(batchCount))))
+
         } else {
           fiberBatchedInfo.put(batchCount,
-            (startAddress, startAddress + length,
-              batchCompressed(batchCount), 0))
+            (CompressedBatchedFiberInfo(startAddress, startAddress + length,
+              batchCompressed(batchCount), 0)))
         }
         startAddress = startAddress + length
         batchCount += 1
@@ -296,7 +298,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
     val batchCompressed = new Array[Boolean](compressedUnitSize)
 
     val dictionaryIds = column.getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData
-    val compressedOutBuffer = new ByteArrayOutputStream()
+    val compressedOutBuffer = new ByteArrayOutputStream(4096 * compressedUnitSize)
     while (count < compressedUnitSize) {
       val num = Math.min(compressedLength, total - loadedRowCount)
       val rawBytes = new Array[Byte](num * 4)
@@ -423,19 +425,19 @@ object ParquetDataFiberCompressedWriter extends Logging {
         dumpNullsToFiber(header.writeToCache(fiber.getBaseOffset), column, total)
       }
 
-      val fiberBatchedInfo = new mutable.HashMap[Int, (Long, Long, Boolean, Long)]()
+      val fiberBatchedInfo = new mutable.HashMap[Int, CompressedBatchedFiberInfo]()
       var startAddress = nativeAddress
       var batchCount = 0
       while (batchCount < compressedUnitSize) {
         Platform.copyMemory(arrayBytes(batchCount), Platform.BYTE_ARRAY_OFFSET,
           null, startAddress, arrayBytes(batchCount).length)
         fiberBatchedInfo.put(batchCount,
-          (startAddress, startAddress + arrayBytes(batchCount).length,
-            batchCompressed(batchCount), 0))
+          CompressedBatchedFiberInfo(startAddress, startAddress + arrayBytes(batchCount).length,
+          batchCompressed(batchCount), 0))
         startAddress = startAddress + arrayBytes(batchCount).length
         batchCount += 1
       }
-      val address = fiberBatchedInfo(compressedUnitSize - 1)._2
+      val address = fiberBatchedInfo(compressedUnitSize - 1).endAddress
       Platform.copyMemory(dictionaryBytes, Platform.BYTE_ARRAY_OFFSET,
         null, address, dictionaryBytes.length)
       // record the compressed parameter to fiber
@@ -469,6 +471,7 @@ class ParquetDataFiberCompressedReader (
   private var header: ParquetDataFiberCompressedHeader = _
 
   var dictionary: org.apache.spark.sql.execution.vectorized.Dictionary = _
+
   /**
    * Read num values to OnHeapColumnVector from data fiber by start position.
    * @param start data fiber start rowId position.
@@ -496,8 +499,8 @@ class ParquetDataFiberCompressedReader (
           } else {
             // the batch is not compressed
             val fiberBatchedInfo = fiberCache.fiberBatchedInfo(start / defaultCapacity)
-            val startAddress = fiberBatchedInfo._1
-            val endAddress = fiberBatchedInfo._2
+            val startAddress = fiberBatchedInfo.startAddress
+            val endAddress = fiberBatchedInfo.endAddress
             val length = endAddress - startAddress
             if (length == num * 4) {
               Platform.copyMemory(baseObject,
@@ -523,8 +526,8 @@ class ParquetDataFiberCompressedReader (
             Platform.copyMemory(baseObject,
               nullsNativeAddress + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
             val fiberBatchedInfo = fiberCache.fiberBatchedInfo(start / defaultCapacity)
-            val startAddress = fiberBatchedInfo._1
-            val endAddress = fiberBatchedInfo._2
+            val startAddress = fiberBatchedInfo.startAddress
+            val endAddress = fiberBatchedInfo.endAddress
             val length = endAddress - startAddress
             if (length == num * 4) {
               Platform.copyMemory(baseObject,
@@ -550,10 +553,11 @@ class ParquetDataFiberCompressedReader (
           } else {
             // the batch is not compressed
             val fiberBatchedInfo = fiberCache.fiberBatchedInfo(start / defaultCapacity)
-            val startAddress = fiberBatchedInfo._1
-            val endAddress = fiberBatchedInfo._2
+            val startAddress = fiberBatchedInfo.startAddress
+            val endAddress = fiberBatchedInfo.endAddress
             val length = endAddress - startAddress
-            val expectLength = decompressedLength(column.dataType(), num, fiberBatchedInfo._4.toInt)
+            val expectLength = decompressedLength(column.dataType(),
+              num, fiberBatchedInfo.length.toInt)
             if (length == expectLength) {
               readBatch(fiberCache, startAddress, num, column)
             }
@@ -574,10 +578,11 @@ class ParquetDataFiberCompressedReader (
             Platform.copyMemory(baseObject,
               nullsNativeAddress + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
             val fiberBatchedInfo = fiberCache.fiberBatchedInfo(start / defaultCapacity)
-            val startAddress = fiberBatchedInfo._1
-            val endAddress = fiberBatchedInfo._2
+            val startAddress = fiberBatchedInfo.startAddress
+            val endAddress = fiberBatchedInfo.endAddress
             val length = endAddress - startAddress
-            val expectLength = decompressedLength(column.dataType(), num, fiberBatchedInfo._4.toInt)
+            val expectLength = decompressedLength(
+              column.dataType(), num, fiberBatchedInfo.length.toInt)
             if (length == expectLength) {
               readBatch(fiberCache, startAddress, num, column)
             }
@@ -605,8 +610,8 @@ class ParquetDataFiberCompressedReader (
         val fiberBatchedInfo = fiberCache.fiberBatchedInfo
         val compressedSize = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
         val lastIndex = math.ceil(total * 1.0 / compressedSize).toInt - 1
-        val lastEndAddress = fiberBatchedInfo(lastIndex)._2
-        val firstStartAddress = fiberBatchedInfo(0)._1
+        val lastEndAddress = fiberBatchedInfo(lastIndex).endAddress
+        val firstStartAddress = fiberBatchedInfo(0).startAddress
         val length = lastEndAddress - firstStartAddress
         val dicNativeAddress =
           address + ParquetDataFiberCompressedHeader.defaultSize + length
@@ -616,8 +621,8 @@ class ParquetDataFiberCompressedReader (
         val fiberBatchedInfo = fiberCache.fiberBatchedInfo
         val compressedSize = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
         val lastIndex = math.ceil(total * 1.0 / compressedSize).toInt - 1
-        val lastEndAddress = fiberBatchedInfo(lastIndex)._2
-        val firstStartAddress = fiberBatchedInfo(0)._1
+        val lastEndAddress = fiberBatchedInfo(lastIndex).endAddress
+        val firstStartAddress = fiberBatchedInfo(0).startAddress
         val length = lastEndAddress - firstStartAddress
         val dicNativeAddress = address +
           ParquetDataFiberCompressedHeader.defaultSize + length + total
@@ -733,10 +738,10 @@ class ParquetDataFiberCompressedReader (
     val codecName = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionCodec
     val decompressionCodec = SparkCompressionCodec.createCodec(new SparkConf(), codecName)
 
-    if (fiberBatchedInfo._3 && decompressionCodec != null) {
+    if (fiberBatchedInfo.compressed && decompressionCodec != null) {
       val fiberCache = compressedFiberCache
-      val startAddress = fiberBatchedInfo._1
-      val endAddress = fiberBatchedInfo._2
+      val startAddress = fiberBatchedInfo.startAddress
+      val endAddress = fiberBatchedInfo.endAddress
       val length = endAddress - startAddress
       val compressedBytes = new Array[Byte](length.toInt)
       Platform.copyMemory(null,
@@ -745,7 +750,7 @@ class ParquetDataFiberCompressedReader (
       val decompressedBytesLength: Int = if (dictionary != null) {
         num * 4
       } else {
-        decompressedLength(columnVector.dataType(), num, fiberBatchedInfo._4.toInt)
+        decompressedLength(columnVector.dataType(), num, fiberBatchedInfo.length.toInt)
       }
       val cis = decompressionCodec.compressedInputStream(new ByteArrayInputStream(compressedBytes))
       val decompressedBytes = new Array[Byte](decompressedBytesLength)
@@ -755,11 +760,11 @@ class ParquetDataFiberCompressedReader (
         decompressedBytes.length, decompressedBytes.length)
 
       val fiberCacheReturned = if (num < defaultCapacity) {
-        new DecompressBatchedFiberCache(memoryBlockHolder, fiberBatchedInfo._3, fiberCache)
+        new DecompressBatchedFiberCache(memoryBlockHolder, fiberBatchedInfo.compressed, fiberCache)
       } else {
-        new DecompressBatchedFiberCache(memoryBlockHolder, fiberBatchedInfo._3, null)
+        new DecompressBatchedFiberCache(memoryBlockHolder, fiberBatchedInfo.compressed, null)
       }
-      fiberCacheReturned.batchedCompressed = fiberBatchedInfo._3
+      fiberCacheReturned.batchedCompressed = fiberBatchedInfo.compressed
       fiberCacheReturned
     } else {
       compressedFiberCache
