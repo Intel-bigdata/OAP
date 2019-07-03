@@ -27,7 +27,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.io.{CompressionCodec => SparkCompressionCodec}
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.{CompressedBatchedFiberInfo, DecompressBatchedFiberCache, FiberCache, MemoryBlockHolder}
+import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetDictionaryWrapper, VectorizedColumnReader}
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
 import org.apache.spark.sql.oap.OapRuntime
@@ -756,6 +756,7 @@ class ParquetDataFiberCompressedReader (
       val decompressedBytes = new Array[Byte](decompressedBytesLength)
       new DataInputStream(cis).readFully(decompressedBytes)
       val memoryBlockHolder = new MemoryBlockHolder(
+        CacheEnum.GENERAL,
         decompressedBytes, Platform.BYTE_ARRAY_OFFSET,
         decompressedBytes.length, decompressedBytes.length)
 
