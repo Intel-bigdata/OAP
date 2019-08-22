@@ -142,6 +142,20 @@ object OapConf {
       .booleanConf
       .createWithDefault(false)
 
+  val OAP_CACHE_TABLE_LISTS_ENABLE =
+    SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.table.list.enable")
+      .internal()
+      .doc("This is to enable table lists fiberCache")
+      .booleanConf
+      .createWithDefault(false)
+
+  val OAP_CACHE_TABLE_LISTS =
+    SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.table.list")
+      .internal()
+      .doc("Table lists using fiberCache actively")
+      .stringConf
+      .createWithDefault("default.orc_table_1")
+
   val OAP_FIBERCACHE_MEMORY_MANAGER =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.memory.manager")
       .internal()

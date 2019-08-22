@@ -22,6 +22,7 @@ import org.apache.spark.sql.{execution, Strategy}
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, ProjectExec, SparkPlan}
+import org.apache.spark.sql.internal.oap.OapConf
 
 /**
  * OapFileSourceStrategy use to intercept [[FileSourceStrategy]]
@@ -43,9 +44,31 @@ object OapFileSourceStrategy extends Strategy with Logging {
         case ProjectExec(projectList, FilterExec(condition,
           FileSourceScanExec(relation, output, outputSchema, partitionFilters,
           dataFilters, tableIdentifier))) =>
+
+          val tableEnbale =
+            relation.sparkSession.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
+          val cacheTablelists: String =
+            relation.sparkSession.conf.get(OapConf.OAP_CACHE_TABLE_LISTS)
+          // scalastyle:off println
+          logInfo("tableIdentifier:" + tableIdentifier)
+          logInfo("tableEnbale:" + tableEnbale)
+          var canCache = true
+          if(tableEnbale) {
+            canCache = false
+            tableIdentifier match {
+              case Some(table) => logInfo("tableIdentifier.unquotedString:" + table.unquotedString)
+                if (cacheTablelists.contains(table.unquotedString)) {
+                  logInfo(" contains")
+                  canCache = true
+                }
+                else logInfo("cacheTablelists no contains")
+              case None => logInfo("Relation has no table")
+            }
+          }
+
           val (hadoopFsRelation, isOptimized) = HadoopFsRelationOptimizer.tryOptimize(
             relation, partitionFilters, dataFilters, outputSchema)
-          if (isOptimized) {
+          if (isOptimized && canCache) {
             val scan = FileSourceScanExec(hadoopFsRelation, output, outputSchema,
               partitionFilters, dataFilters, tableIdentifier)
             execution.ProjectExec(projectList, execution.FilterExec(condition, scan))
@@ -57,9 +80,30 @@ object OapFileSourceStrategy extends Strategy with Logging {
           FileSourceScanExec(relation, output, outputSchema, partitionFilters,
           dataFilters, tableIdentifier)) =>
 
+          val tableEnbale =
+            relation.sparkSession.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
+          val cacheTablelists: String =
+            relation.sparkSession.conf.get(OapConf.OAP_CACHE_TABLE_LISTS)
+          // scalastyle:off println
+          logInfo("tableIdentifier:" + tableIdentifier)
+          logInfo("tableEnbale:" + tableEnbale)
+          var canCache = true
+          if(tableEnbale) {
+            canCache = false
+            tableIdentifier match {
+              case Some(table) => logInfo("tableIdentifier.unquotedString:" + table.unquotedString)
+                if (cacheTablelists.contains(table.unquotedString)) {
+                  logInfo(" contains")
+                  canCache = true
+                }
+                else logInfo("cacheTablelists no contains")
+              case None => logInfo("Relation has no table")
+            }
+          }
+
           val (hadoopFsRelation, isOptimized) = HadoopFsRelationOptimizer.tryOptimize(
             relation, partitionFilters, dataFilters, outputSchema)
-          if (isOptimized) {
+          if (isOptimized && canCache) {
             val scan = FileSourceScanExec(hadoopFsRelation, output, outputSchema,
               partitionFilters, dataFilters, tableIdentifier)
             execution.ProjectExec(projectList, scan)
@@ -69,9 +113,31 @@ object OapFileSourceStrategy extends Strategy with Logging {
         // FilterExec -> FileSourceScanExec
         case FilterExec(condition, FileSourceScanExec(relation, output, outputSchema,
           partitionFilters, dataFilters, tableIdentifier)) =>
+
+          val tableEnbale =
+            relation.sparkSession.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
+          val cacheTablelists: String =
+            relation.sparkSession.conf.get(OapConf.OAP_CACHE_TABLE_LISTS)
+          // scalastyle:off println
+          logInfo("tableIdentifier:" + tableIdentifier)
+          logInfo("tableEnbale:" + tableEnbale)
+          var canCache = true
+          if(tableEnbale) {
+            canCache = false
+            tableIdentifier match {
+              case Some(table) => logInfo("tableIdentifier.unquotedString:" + table.unquotedString)
+                if (cacheTablelists.contains(table.unquotedString)) {
+                  logInfo(" contains")
+                  canCache = true
+                }
+                else logInfo("cacheTablelists no contains")
+              case None => logInfo("Relation has no table")
+            }
+          }
+
           val (hadoopFsRelation, isOptimized) = HadoopFsRelationOptimizer.tryOptimize(
             relation, partitionFilters, dataFilters, outputSchema)
-          if (isOptimized) {
+          if (isOptimized && canCache) {
             val scan = FileSourceScanExec(hadoopFsRelation, output, outputSchema,
               partitionFilters, dataFilters, tableIdentifier)
             execution.FilterExec(condition, scan)
@@ -81,9 +147,31 @@ object OapFileSourceStrategy extends Strategy with Logging {
         // FileSourceScanExec
         case FileSourceScanExec(relation, output, outputSchema, partitionFilters,
           dataFilters, tableIdentifier) =>
+
+          val tableEnbale =
+            relation.sparkSession.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
+          val cacheTablelists: String =
+            relation.sparkSession.conf.get(OapConf.OAP_CACHE_TABLE_LISTS)
+          // scalastyle:off println
+          logInfo("tableIdentifier:" + tableIdentifier)
+          logInfo("tableEnbale:" + tableEnbale)
+          var canCache = true
+          if(tableEnbale) {
+            canCache = false
+            tableIdentifier match {
+              case Some(table) => logInfo("tableIdentifier.unquotedString:" + table.unquotedString)
+                if (cacheTablelists.contains(table.unquotedString)) {
+                  logInfo(" contains")
+                  canCache = true
+                }
+                else logInfo("cacheTablelists no contains")
+              case None => logInfo("Relation has no table")
+            }
+          }
+
           val (hadoopFsRelation, isOptimized) = HadoopFsRelationOptimizer.tryOptimize(
             relation, partitionFilters, dataFilters, outputSchema)
-          if (isOptimized) {
+          if (isOptimized && canCache) {
             FileSourceScanExec(hadoopFsRelation, output, outputSchema,
               partitionFilters, dataFilters, tableIdentifier)
           } else {
