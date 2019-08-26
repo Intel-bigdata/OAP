@@ -37,14 +37,14 @@
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <basedir>./</basedir>
     <spark.internal.version>2.3.2</spark.internal.version>
-    <scala.version>2.11.8</scala.version>
+    <scala.version>2.11.12</scala.version>
     <scala.binary.version>2.11</scala.binary.version>
     <java.version>1.8</java.version>
     <antlr.version>4.7</antlr.version>
     <scalatest.version>3.0.3</scalatest.version>
     <scalacheck.version>1.13.5</scalacheck.version>
     <parquet.version>1.8.3</parquet.version>
-    <jetty.version>9.3.24.v20180605</jetty.version>
+    <jetty.version>9.3.27.v20190418</jetty.version>
     <!--diff: Spark-2.3.2 use orc 1.4.4 -->
     <orc.version>1.5.2</orc.version>
     <exec.maven.version>1.6.0</exec.maven.version>
