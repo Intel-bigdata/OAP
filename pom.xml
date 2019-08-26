@@ -37,7 +37,7 @@
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <basedir>./</basedir>
     <spark.internal.version>2.3.2</spark.internal.version>
-    <scala.version>2.11.12</scala.version>
+    <scala.version>2.13.0</scala.version>
     <scala.binary.version>2.11</scala.binary.version>
     <java.version>1.8</java.version>
     <antlr.version>4.7</antlr.version>
