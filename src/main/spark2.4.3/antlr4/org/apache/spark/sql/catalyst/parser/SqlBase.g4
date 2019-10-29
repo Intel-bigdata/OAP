@@ -161,7 +161,7 @@ statement
     | (DESC | DESCRIBE) TABLE? option=(EXTENDED | FORMATTED)?
         tableIdentifier partitionSpec? describeColName?                #describeTable
     | REFRESH TABLE tableIdentifier                                    #refreshTable
-    | REFRESH SINDEX ON tableIdentifier partitionSpec?
+    | REFRESH SINDEX ON tableIdentifier partitionSpec?                 #oapRefreshIndices
     | REFRESH (STRING | .*?)                                           #refreshResource
     | CACHE LAZY? TABLE tableIdentifier (AS? query)?                   #cacheTable
     | UNCACHE TABLE (IF EXISTS)? tableIdentifier                       #uncacheTable
@@ -176,9 +176,9 @@ statement
     | RESET                                                            #resetConfiguration
     | CREATE SINDEX (IF NOT EXISTS)? IDENTIFIER ON
             tableIdentifier indexCols (USING indexType)?
-            partitionSpec?                                                 #oapCreateIndex
+            partitionSpec?                                             #oapCreateIndex
     | DROP SINDEX (IF EXISTS)? IDENTIFIER ON tableIdentifier
-            partitionSpec?                                                 #oapDropIndex
+            partitionSpec?                                             #oapDropIndex
     | DISABLE SINDEX IDENTIFIER                                        #oapDisableIndex
     | ENABLE SINDEX IDENTIFIER                                         #oapEnableIndex
     | SHOW SINDEX (FROM | IN) tableIdentifier                          #oapShowIndex
