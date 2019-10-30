@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
+import org.apache.spark.sql.execution.datasources.parquet.ParquetDictionaryWrapper;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.UTF8String;
@@ -498,6 +499,60 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     arrayOffsets[rowId] = result;
     arrayLengths[rowId] = length;
     return result;
+  }
+
+  public byte[] getNulls() {
+    return nulls;
+  }
+
+  public byte[] getByteData() {
+    return byteData;
+  }
+
+  public short[] getShortData() {
+    return shortData;
+  }
+
+  public int[] getIntData() {
+    return intData;
+  }
+
+  public long[] getLongData() {
+    return longData;
+  }
+
+  public float[] getFloatData() {
+    return floatData;
+  }
+
+  public double[] getDoubleData() {
+    return doubleData;
+  }
+
+  public int[] getArrayLengths() {
+    return arrayLengths;
+  }
+
+  public int[] getArrayOffsets() {
+    return arrayOffsets;
+  }
+
+  public void setByteData(byte[] byteData) {
+    this.byteData = byteData;
+  }
+
+  public Dictionary getDictionary() {
+    return this.dictionary;
+  }
+
+  public int dictionaryLength() {
+    if(dictionary ==  null) {
+      return 0;
+    } else if (dictionary instanceof  ParquetDictionaryWrapper) {
+      return ((ParquetDictionaryWrapper)dictionary).getMaxId() + 1;
+    } else {
+      throw new UnsupportedOperationException("this api only use by oap");
+    }
   }
 
   // Spilt this function out since it is the slow path.

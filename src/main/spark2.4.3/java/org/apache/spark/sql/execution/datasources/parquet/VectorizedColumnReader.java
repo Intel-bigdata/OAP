@@ -50,39 +50,39 @@ public class VectorizedColumnReader {
   /**
    * Total number of values read.
    */
-  private long valuesRead;
+  protected long valuesRead;
 
   /**
    * value that indicates the end of the current page. That is,
    * if valuesRead == endOfPageValueCount, we are at the end of the page.
    */
-  private long endOfPageValueCount;
+  protected long endOfPageValueCount;
 
   /**
    * The dictionary, if this column has dictionary encoding.
    */
-  private final Dictionary dictionary;
+  protected final Dictionary dictionary;
 
   /**
    * If true, the current page is dictionary encoded.
    */
-  private boolean isCurrentPageDictionaryEncoded;
+  protected boolean isCurrentPageDictionaryEncoded;
 
   /**
    * Maximum definition level for this column.
    */
-  private final int maxDefLevel;
+  protected final int maxDefLevel;
 
   /**
    * Repetition/Definition/Value readers.
    */
   private SpecificParquetRecordReaderBase.IntIterator repetitionLevelColumn;
   private SpecificParquetRecordReaderBase.IntIterator definitionLevelColumn;
-  private ValuesReader dataColumn;
+  protected ValuesReader dataColumn;
 
   // Only set if vectorized decoding is true. This is used instead of the row by row decoding
   // with `definitionLevelColumn`.
-  private VectorizedRleValuesReader defColumn;
+  protected VectorizedRleValuesReader defColumn;
 
   /**
    * Total number of values in this column (in this row group).
@@ -92,11 +92,11 @@ public class VectorizedColumnReader {
   /**
    * Total values in the current page.
    */
-  private int pageValueCount;
+  protected int pageValueCount;
 
   private final PageReader pageReader;
-  private final ColumnDescriptor descriptor;
-  private final OriginalType originalType;
+  protected final ColumnDescriptor descriptor;
+  protected final OriginalType originalType;
   // The timezone conversion to apply to int96 timestamps. Null if no conversion.
   private final TimeZone convertTz;
   private static final TimeZone UTC = DateTimeUtils.TimeZoneUTC();
@@ -150,7 +150,7 @@ public class VectorizedColumnReader {
   /**
    * Reads `total` values from this columnReader into column.
    */
-  void readBatch(int total, WritableColumnVector column) throws IOException {
+  public void readBatch(int total, WritableColumnVector column) throws IOException {
     int rowId = 0;
     WritableColumnVector dictionaryIds = null;
     if (dictionary != null) {
@@ -186,7 +186,7 @@ public class VectorizedColumnReader {
           // Column vector supports lazy decoding of dictionary values so just set the dictionary.
           // We can't do this if rowId != 0 AND the column doesn't have a dictionary (i.e. some
           // non-dictionary encoded values have already been added).
-          column.setDictionary(new ParquetDictionary(dictionary));
+          column.setDictionary(new ParquetDictionaryWrapper(dictionary));
         } else {
           decodeDictionaryIds(rowId, num, column, dictionaryIds);
         }
@@ -537,7 +537,7 @@ public class VectorizedColumnReader {
     }
   }
 
-  private void readPage() {
+  protected void readPage() {
     DataPage page = pageReader.readPage();
     // TODO: Why is this a visitor?
     page.accept(new DataPage.Visitor<Void>() {
@@ -563,7 +563,7 @@ public class VectorizedColumnReader {
     });
   }
 
-  private void initDataReader(Encoding dataEncoding, ByteBufferInputStream in) throws IOException {
+  protected void initDataReader(Encoding dataEncoding, ByteBufferInputStream in) throws IOException {
     this.endOfPageValueCount = valuesRead + pageValueCount;
     if (dataEncoding.usesDictionary()) {
       this.dataColumn = null;
@@ -594,7 +594,7 @@ public class VectorizedColumnReader {
     }
   }
 
-  private void readPageV1(DataPageV1 page) throws IOException {
+  protected void readPageV1(DataPageV1 page) throws IOException {
     this.pageValueCount = page.getValueCount();
     ValuesReader rlReader = page.getRlEncoding().getValuesReader(descriptor, REPETITION_LEVEL);
     ValuesReader dlReader;
@@ -619,7 +619,7 @@ public class VectorizedColumnReader {
     }
   }
 
-  private void readPageV2(DataPageV2 page) throws IOException {
+  protected void readPageV2(DataPageV2 page) throws IOException {
     this.pageValueCount = page.getValueCount();
     this.repetitionLevelColumn = createRLEIterator(descriptor.getMaxRepetitionLevel(),
         page.getRepetitionLevels(), descriptor);

@@ -1998,8 +1998,9 @@ private[spark] class DAGScheduler(
     }
     // If the partition is cached, return the cache locations
     val cached = getCacheLocs(rdd)(partition)
-    if (cached.nonEmpty) {
-      return cached
+    val oapCached = OapCacheLocations.getOapCacheLocs(rdd, partition)
+    if (cached.nonEmpty || oapCached.nonEmpty) {
+      return cached ++ oapCached
     }
     // If the RDD has some placement preferences (as is the case for input RDDs), get those
     val rddPrefs = rdd.preferredLocations(rdd.partitions(partition)).toList
