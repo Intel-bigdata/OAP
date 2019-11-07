@@ -113,7 +113,8 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
       if (waitNotifyActive) {
         this.getGuardianLock().lock()
         _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
-        if (_pendingFiberCapacity.get() == 0) {
+        if (_pendingFiberCapacity.get() <
+          OapRuntime.getOrCreate.fiberCacheManager.dcpmmWaitingThreshold) {
           guardianLockCond.signalAll()
         }
         this.getGuardianLock().unlock()
