@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import org.json4s.DefaultFormats
+import org.json4s.{DefaultFormats, StringInput}
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
@@ -181,7 +181,7 @@ object CacheStats extends Logging {
 
   def apply(): CacheStats = CacheStats(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
-  def apply(json: String): CacheStats = CacheStats(parse(json))
+  def apply(json: String): CacheStats = CacheStats(parse(StringInput(json), false))
 
   def apply(json: JValue): CacheStats = CacheStats(
     (json \ "dataFiberCount").extract[Long],

@@ -219,12 +219,12 @@ class DynamicPartitionDataWriter(
    * @param bucketId the bucket which all tuples being written by this `OutputWriter` belong to
    */
   private def newOutputWriter(partitionValues: Option[InternalRow],
-                              bucketId: Option[Int]): Seq[WriteResult] = {
+      bucketId: Option[Int]): Seq[WriteResult] = {
     var writeResults: Seq[WriteResult] = Nil
     recordsInFile = 0
     writeResults = writeResults ++ releaseResources()
 
-    val partDir : Option[String] = partitionValues.map(getPartitionPath(_))
+    val partDir: Option[String] = partitionValues.map(getPartitionPath(_))
     partDir.foreach(updatedPartitions.add)
 
     val bucketIdStr = bucketId.map(BucketingUtils.bucketIdToString).getOrElse("")
@@ -317,9 +317,9 @@ class WriteJobDescription(
 
 /** The result of a successful write task. */
 case class WriteTaskResult(
-                            commitMsg: TaskCommitMessage,
-                            summary: ExecutedWriteSummary,
-                            writeResults: Seq[WriteResult])
+    commitMsg: TaskCommitMessage,
+    summary: ExecutedWriteSummary,
+    writeResults: Seq[WriteResult])
 
 
 /**

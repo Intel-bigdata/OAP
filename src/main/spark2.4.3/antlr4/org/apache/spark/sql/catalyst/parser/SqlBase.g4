@@ -175,10 +175,10 @@ statement
     | SET .*?                                                          #setConfiguration
     | RESET                                                            #resetConfiguration
     | CREATE SINDEX (IF NOT EXISTS)? IDENTIFIER ON
-            tableIdentifier indexCols (USING indexType)?
-            partitionSpec?                                             #oapCreateIndex
+        tableIdentifier indexCols (USING indexType)?
+        partitionSpec?                                                 #oapCreateIndex
     | DROP SINDEX (IF EXISTS)? IDENTIFIER ON tableIdentifier
-            partitionSpec?                                             #oapDropIndex
+        partitionSpec?                                                 #oapDropIndex
     | DISABLE SINDEX IDENTIFIER                                        #oapDisableIndex
     | ENABLE SINDEX IDENTIFIER                                         #oapEnableIndex
     | SHOW SINDEX (FROM | IN) tableIdentifier                          #oapShowIndex

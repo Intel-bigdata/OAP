@@ -23,7 +23,6 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.column.page.PageReadStore;
-import org.apache.parquet.filter2.compat.FilterCompat;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.IndexedBlockMetaData;
@@ -60,10 +59,6 @@ public class OapParquetFileReader implements Closeable {
     PageReadStore pageReadStore = this.reader.readNextRowGroup();
     currentBlock ++;
     return pageReadStore;
-  }
-
-  public void filterRowGroups(FilterCompat.Filter filter) throws IOException {
-    this.reader.filterRowGroups(filter);
   }
 
   public void setRequestedSchema(MessageType projection) {
