@@ -325,7 +325,7 @@ private[spark] class DAGScheduler(
     cacheLocs(rdd.id)
   }
 
-    private def clearCacheLocs(): Unit = cacheLocs.synchronized {
+  private def clearCacheLocs(): Unit = cacheLocs.synchronized {
     cacheLocs.clear()
   }
 
@@ -1998,7 +1998,7 @@ private[spark] class DAGScheduler(
     }
     // If the partition is cached, return the cache locations
     val cached = getCacheLocs(rdd)(partition)
-    val oapCached = getOapCacheLocs(rdd, partition)
+    val oapCached = OapCacheLocations.getOapCacheLocs(rdd, partition)
     if (cached.nonEmpty || oapCached.nonEmpty) {
       return cached ++ oapCached
     }

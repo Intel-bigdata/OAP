@@ -29,7 +29,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.CacheStats
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.ui.FiberCacheManagerSummary
 
-
 @Produces(Array(MediaType.APPLICATION_JSON))
 private[v1] class AbstractApplicationResource extends BaseAppResource {
 
@@ -76,6 +75,7 @@ private[v1] class AbstractApplicationResource extends BaseAppResource {
       case _ => throw new NotFoundException("Executor does not exist.")
     }
   }
+
   @GET
   @Path("fibercachemanagers")
   def fiberList(): Seq[FiberCacheManagerSummary] =
