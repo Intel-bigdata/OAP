@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.parquet
 
+import org.apache.parquet.bytes.{BytesInput, HeapByteBufferAllocator}
 import org.apache.parquet.column.values.plain.{BooleanPlainValuesWriter, PlainValuesWriter}
 import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridValuesWriter
 import org.apache.parquet.io.api.Binary
@@ -33,13 +34,14 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
 
     // prepare data: [null, null, 1, null, null, null, 2, null, 3, 4]
     // value: [1, 2, 3, 4]
-    val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
+    val valueWriter = new PlainValuesWriter(
+      64 * 1024, 64 * 1024, HeapByteBufferAllocator.getInstance())
     (1 until 5).foreach(valueWriter.writeInteger)
 
     // init value reader
     val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
-    valueReader.initFromPage(4, valueData, 0)
+    valueReader.initFromPage(4, BytesInput.from(valueData).toInputStream)
 
     // skip data assisted by defReader
     val reader = defReader
@@ -64,7 +66,7 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     // init value reader
     val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
-    valueReader.initFromPage(4, valueData, 0)
+    valueReader.initFromPage(4, BytesInput.from(valueData).toInputStream)
 
     // skip data assisted by defReader
     val reader = defReader
@@ -80,7 +82,8 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
 
     // prepare data: [null, null, A, null, null, null, B, null, C, D]
     // value: value: [A, B, C, D]
-    val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
+    val valueWriter = new PlainValuesWriter(
+      64 * 1024, 64 * 1024, HeapByteBufferAllocator.getInstance())
     "ABCD".getBytes.foreach { v =>
       valueWriter.writeByte(v)
       valueWriter.writeByte(0)
@@ -90,7 +93,7 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     // init value reader
     val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
-    valueReader.initFromPage(4, valueData, 0)
+    valueReader.initFromPage(4, BytesInput.from(valueData).toInputStream)
 
     // skip data assisted by defReader
     val reader = defReader
@@ -107,12 +110,13 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     // actually short store as int
     // prepare data: [null, null, 1, null, null, null, 2, null, 3, 4]
     // value: [1, 2, 3, 4]
-    val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
+    val valueWriter = new PlainValuesWriter(
+      64 * 1024, 64 * 1024, HeapByteBufferAllocator.getInstance())
     (1 until 5).foreach(valueWriter.writeInteger)
     // init value reader
     val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
-    valueReader.initFromPage(4, valueData, 0)
+    valueReader.initFromPage(4, BytesInput.from(valueData).toInputStream)
 
     // skip data assisted by defReader
     val reader = defReader
@@ -128,13 +132,14 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
 
     // prepare data: [null, null, 1L, null, null, null, 2L, null, 3L, 4L]
     // value: [1L, 2L, 3L, 4L]
-    val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
+    val valueWriter = new PlainValuesWriter(
+      64 * 1024, 64 * 1024, HeapByteBufferAllocator.getInstance())
     (1 until 5).foreach(v => valueWriter.writeLong(v.toLong))
 
     // init value reader
     val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
-    valueReader.initFromPage(4, valueData, 0)
+    valueReader.initFromPage(4, BytesInput.from(valueData).toInputStream)
 
     // skip data assisted by defReader
     val reader = defReader
@@ -150,13 +155,14 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
 
     // prepare data: [null, null, 1.0F, null, null, null, 2.0F, null, 3.0F, 4.0F]
     // value: [1.0F, 2.0F, 3.0F, 4.0F]
-    val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
+    val valueWriter = new PlainValuesWriter(
+      64 * 1024, 64 * 1024, HeapByteBufferAllocator.getInstance())
     (1 until 5).foreach(v => valueWriter.writeFloat(v.toFloat))
 
     // init value reader
     val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
-    valueReader.initFromPage(4, valueData, 0)
+    valueReader.initFromPage(4, BytesInput.from(valueData).toInputStream)
 
     // skip data assisted by defReader
     val reader = defReader
@@ -172,13 +178,14 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
 
     // prepare data: [null, null, 1.0D, null, null, null, 2.0D, null, 3.0D, 4.0D]
     // value: [1.0D, 2.0D, 3.0D, 4.0D]
-    val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
+    val valueWriter = new PlainValuesWriter(
+      64 * 1024, 64 * 1024, HeapByteBufferAllocator.getInstance())
     (1 until 5).foreach(v => valueWriter.writeDouble(v.toDouble))
 
     // init value reader
     val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
-    valueReader.initFromPage(4, valueData, 0)
+    valueReader.initFromPage(4, BytesInput.from(valueData).toInputStream)
 
     // skip data assisted by defReader
     val reader = defReader
@@ -194,7 +201,8 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
 
     // prepare data: [null, null, AB, null, null, null, CDE, null, F, GHI]
     // value: [AB, CDE, F, GHI]
-    val valueWriter = new PlainValuesWriter(64 * 1024, 64 * 1024)
+    val valueWriter = new PlainValuesWriter(
+      64 * 1024, 64 * 1024, HeapByteBufferAllocator.getInstance())
     valueWriter.writeBytes(Binary.fromString("AB"))
     valueWriter.writeBytes(Binary.fromString("CDE"))
     valueWriter.writeBytes(Binary.fromString("F"))
@@ -203,7 +211,7 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
     // init value reader
     val valueReader = new SkippableVectorizedPlainValuesReader()
     val valueData = valueWriter.getBytes.toByteArray
-    valueReader.initFromPage(4, valueData, 0)
+    valueReader.initFromPage(4, BytesInput.from(valueData).toInputStream)
 
     // skip data assisted by defReader
     val reader = defReader
@@ -223,11 +231,12 @@ class SkipAndReadValueWithPackedDefinitionLevelsSuite extends SparkFunSuite with
    * @return SkippableVectorizedRleValuesReader  represent definition level values
    */
   private def defReader: SkippableVectorizedRleValuesReader = {
-    val defWriter = new RunLengthBitPackingHybridValuesWriter(3, 5, 10)
+    val defWriter = new RunLengthBitPackingHybridValuesWriter(
+      3, 5, 10, HeapByteBufferAllocator.getInstance())
     Array(0, 0, 1, 0, 0, 0, 1, 0, 1, 1).foreach(defWriter.writeInteger)
     val defData = defWriter.getBytes.toByteArray
     val defReader = new SkippableVectorizedRleValuesReader(3)
-    defReader.initFromPage(10, defData, 0)
+    defReader.initFromPage(10, BytesInput.from(defData).toInputStream)
     defReader
   }
 }

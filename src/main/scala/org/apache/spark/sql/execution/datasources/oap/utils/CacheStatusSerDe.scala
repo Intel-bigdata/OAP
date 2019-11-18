@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.utils
 
-import org.json4s.DefaultFormats
+import org.json4s.{DefaultFormats, StringInput}
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 
@@ -54,7 +54,8 @@ private[oap] object CacheStatusSerDe extends SerDe[String, Seq[FiberCacheStatus]
   private implicit val format = DefaultFormats
 
   override def deserialize(json: String): Seq[FiberCacheStatus] = {
-    (parse(json) \ "statusRawDataArray").extract[List[JValue]].map(statusRawDataFromJson)
+    (parse(StringInput(json), false) \ "statusRawDataArray")
+      .extract[List[JValue]].map(statusRawDataFromJson)
   }
 
   private[oap] def bitSetToJson(bitSet: OapBitSet): JValue = {

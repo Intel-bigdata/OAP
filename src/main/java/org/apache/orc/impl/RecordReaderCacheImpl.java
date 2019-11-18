@@ -1047,7 +1047,7 @@ public class RecordReaderCacheImpl implements RecordReader {
    */
   private void readStripe() throws IOException {
     StripeInformation stripe = beginReadStripe();
-    includedRowGroups = pickRowGroups();
+    //includedRowGroups = pickRowGroups();
 
     // move forward to the first unskipped row
     if (includedRowGroups != null) {

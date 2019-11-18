@@ -47,7 +47,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
       head match {
         // ProjectExec -> FilterExec -> FileSourceScanExec
         case ProjectExec(projectList, FilterExec(condition,
-          FileSourceScanExec(relation, output, outputSchema, partitionFilters,
+          FileSourceScanExec(relation, output, outputSchema, partitionFilters, optionalBucketSet,
           dataFilters, tableIdentifier))) =>
 
           var canCache = true
@@ -71,7 +71,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
               relation, partitionFilters, dataFilters, outputSchema)
             if (isOptimized) {
               val scan = FileSourceScanExec(hadoopFsRelation, output, outputSchema,
-                partitionFilters, dataFilters, tableIdentifier)
+                partitionFilters, optionalBucketSet, dataFilters, tableIdentifier)
               execution.ProjectExec(projectList, execution.FilterExec(condition, scan))
             } else {
               head
@@ -79,7 +79,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
           }
         // ProjectExec -> FileSourceScanExec
         case ProjectExec(projectList,
-          FileSourceScanExec(relation, output, outputSchema, partitionFilters,
+          FileSourceScanExec(relation, output, outputSchema, partitionFilters, optionalBucketSet,
           dataFilters, tableIdentifier)) =>
 
           var canCache = true
@@ -103,7 +103,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
               relation, partitionFilters, dataFilters, outputSchema)
             if (isOptimized) {
               val scan = FileSourceScanExec(hadoopFsRelation, output, outputSchema,
-                partitionFilters, dataFilters, tableIdentifier)
+                partitionFilters, optionalBucketSet, dataFilters, tableIdentifier)
               execution.ProjectExec(projectList, scan)
             } else {
               head
@@ -111,7 +111,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
           }
         // FilterExec -> FileSourceScanExec
         case FilterExec(condition, FileSourceScanExec(relation, output, outputSchema,
-          partitionFilters, dataFilters, tableIdentifier)) =>
+          partitionFilters, optionalBucketSet, dataFilters, tableIdentifier)) =>
 
           var canCache = true
           if(tableEnbale) {
@@ -134,14 +134,14 @@ object OapFileSourceStrategy extends Strategy with Logging {
               relation, partitionFilters, dataFilters, outputSchema)
             if (isOptimized) {
               val scan = FileSourceScanExec(hadoopFsRelation, output, outputSchema,
-                partitionFilters, dataFilters, tableIdentifier)
+                partitionFilters, optionalBucketSet, dataFilters, tableIdentifier)
               execution.FilterExec(condition, scan)
             } else {
               head
             }
           }
         // FileSourceScanExec
-        case FileSourceScanExec(relation, output, outputSchema, partitionFilters,
+        case FileSourceScanExec(relation, output, outputSchema, partitionFilters, optionalBucketSet,
           dataFilters, tableIdentifier) =>
 
           var canCache = true
@@ -165,7 +165,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
               relation, partitionFilters, dataFilters, outputSchema)
             if (isOptimized) {
               FileSourceScanExec(hadoopFsRelation, output, outputSchema,
-                partitionFilters, dataFilters, tableIdentifier)
+                partitionFilters, optionalBucketSet, dataFilters, tableIdentifier)
             } else {
               head
             }
