@@ -218,7 +218,7 @@ class DynamicPartitionDataWriter(
    *                        belong to
    * @param bucketId the bucket which all tuples being written by this `OutputWriter` belong to
    */
-  private def newOutputWriter(partitionValues: Option[InternalRow]
+  private def newOutputWriter(partitionValues: Option[InternalRow],
       bucketId: Option[Int]): Seq[WriteResult] = {
     var writeResults: Seq[WriteResult] = Nil
     recordsInFile = 0
