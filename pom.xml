@@ -45,7 +45,7 @@
     <scalacheck.version>1.13.5</scalacheck.version>
     <parquet.version>1.10.1</parquet.version>
     <jetty.version>9.3.24.v20180605</jetty.version>
-    <!--diff: Spark-2.4.1 use orc 1.5.5 -->
+    <!--diff: Spark-2.4.3 use orc 1.5.5 -->
     <orc.version>1.5.5</orc.version>
     <exec.maven.version>1.6.0</exec.maven.version>
   </properties>
