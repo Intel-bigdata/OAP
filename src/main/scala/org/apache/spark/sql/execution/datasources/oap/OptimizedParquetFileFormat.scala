@@ -82,6 +82,7 @@ private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
     }
 
     val requiredIds = requiredSchema.map(dataSchema.fields.indexOf(_)).toArray
+    // TODO we may need futher optimization here, refer to SPARK-24002
     val pushed = FilterHelper.tryToPushFilters(sparkSession, requiredSchema, filters)
 
     val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
@@ -117,7 +118,6 @@ private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
       } else {
         None
       }
-
       val reader = new OapDataReaderV1(file.filePath, m, partitionSchema, requiredSchema,
         filterScanners, requiredIds, pushed, oapMetrics, conf, enableVectorizedReader, options,
         filters, context)

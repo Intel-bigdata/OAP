@@ -36,17 +36,17 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <basedir>./</basedir>
-    <spark.internal.version>2.3.2</spark.internal.version>
+    <spark.internal.version>2.4.3</spark.internal.version>
     <scala.version>2.11.8</scala.version>
     <scala.binary.version>2.11</scala.binary.version>
     <java.version>1.8</java.version>
     <antlr.version>4.7</antlr.version>
     <scalatest.version>3.0.3</scalatest.version>
     <scalacheck.version>1.13.5</scalacheck.version>
-    <parquet.version>1.8.3</parquet.version>
+    <parquet.version>1.10.1</parquet.version>
     <jetty.version>9.3.24.v20180605</jetty.version>
-    <!--diff: Spark-2.3.2 use orc 1.4.4 -->
-    <orc.version>1.5.2</orc.version>
+    <!--diff: Spark-2.4.1 use orc 1.5.5 -->
+    <orc.version>1.5.5</orc.version>
     <exec.maven.version>1.6.0</exec.maven.version>
   </properties>
 
@@ -268,7 +268,7 @@
     <dependency>
       <groupId>org.json4s</groupId>
       <artifactId>json4s-core_${scala.binary.version}</artifactId>
-      <version>3.2.11</version>
+      <version>3.5.3</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -436,7 +436,7 @@
           <includeTestSourceDirectory>true</includeTestSourceDirectory>
           <sourceDirectories>
             <directory>src/main/scala</directory>
-            <directory>src/main/spark2.3.2/scala</directory>
+            <directory>src/main/spark2.4.3/scala</directory>
           </sourceDirectories>
           <testSourceDirectories>
             <directory>src/test/scala</directory>
@@ -595,11 +595,11 @@
           <includeTestSourceDirectory>true</includeTestSourceDirectory>
           <sourceDirectories>
             <directory>src/main/java</directory>
-            <directory>src/spark2.3.2/scala</directory>
+            <directory>src/spark2.4.3/scala</directory>
           </sourceDirectories>
           <testSourceDirectories>
             <directory>src/test/java</directory>
-            <directory>src/test/spark2.3.2/java</directory>
+            <directory>src/test/spark2.4.3/java</directory>
           </testSourceDirectories>
           <configLocation>checkstyle.xml</configLocation>
           <outputFile>${basedir}/target/checkstyle-output.xml</outputFile>
@@ -628,7 +628,7 @@
         </executions>
         <configuration>
           <visitor>true</visitor>
-          <sourceDirectory>src/main/spark2.3.2/antlr4</sourceDirectory>
+          <sourceDirectory>src/main/spark2.4.3/antlr4</sourceDirectory>
         </configuration>
       </plugin>
       <plugin>
@@ -644,8 +644,8 @@
             </goals>
             <configuration>
               <sources>
-                <source>src/main/spark2.3.2/java</source>
-                <source>src/main/spark2.3.2/scala</source>
+                <source>src/main/spark2.4.3/java</source>
+                <source>src/main/spark2.4.3/scala</source>
               </sources>
             </configuration>
           </execution>

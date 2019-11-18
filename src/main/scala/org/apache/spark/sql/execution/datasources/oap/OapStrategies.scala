@@ -136,6 +136,7 @@ trait OapStrategy extends Strategy with Logging {
             outputAttributes,
             outputSchema,
             partitionKeyFilters.toSeq,
+            None, // TODO in the future we need to consider the bucketSet parameter
             dataFilters,
             table.map(_.identifier))
 
@@ -317,9 +318,11 @@ object OapSemiJoinStrategy extends OapStrategy {
 object OapGroupAggregateStrategy extends OapStrategy {
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case PhysicalAggregation(
-    groupingExpressions, aggregateExpressions, resultExpressions, child) =>
+    groupingExpressions, aggregateExpressions, resultExpressions, child) if aggregateExpressions
+      .forall(_.isInstanceOf[AggregateExpression]) =>
+      val aggExpressions = aggregateExpressions.map(_.asInstanceOf[AggregateExpression])
       val (functionsWithDistinct, _) =
-        aggregateExpressions.partition(_.isDistinct)
+        aggExpressions.partition(_.isDistinct)
       if (functionsWithDistinct.map(_.aggregateFunction.children).distinct.length > 1) {
         // This is a sanity check. We should not reach here when we have multiple distinct
         // column sets. Our MultipleDistinctRewriter should take care this case.
@@ -328,7 +331,7 @@ object OapGroupAggregateStrategy extends OapStrategy {
       }
 
       val aggregateOperator =
-        if (aggregateExpressions.map(_.aggregateFunction).exists(
+        if (aggExpressions.map(_.aggregateFunction).exists(
           !AggregateFunctionAdapter.supportsPartial(_))) {
           if (functionsWithDistinct.nonEmpty) {
             sys.error("Distinct columns cannot exist in Aggregate operator containing " +
@@ -342,10 +345,10 @@ object OapGroupAggregateStrategy extends OapStrategy {
           if (groupingExpressions.size == 1) {
             OapAggUtils.planAggregateWithoutDistinct(
               groupingExpressions,
-              aggregateExpressions,
+              aggExpressions,
               resultExpressions,
               calcChildPlan(
-                groupingExpressions, aggregateExpressions, resultExpressions, child))
+                groupingExpressions, aggExpressions, resultExpressions, child))
           } else Nil
         } else {
           // TODO: support distinct in future.

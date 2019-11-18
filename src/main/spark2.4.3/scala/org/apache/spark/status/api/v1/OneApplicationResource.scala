@@ -24,8 +24,10 @@ import javax.ws.rs.core.{MediaType, Response, StreamingOutput}
 
 import scala.util.control.NonFatal
 
+import org.apache.spark.{JobExecutionStatus, SparkEnv}
 import org.apache.spark.{JobExecutionStatus, SparkContext}
 import org.apache.spark.sql.execution.datasources.oap.filecache.CacheStats
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.ui.FiberCacheManagerSummary
 
@@ -84,14 +86,17 @@ private[v1] class AbstractApplicationResource extends BaseAppResource {
     seqExecutorSummary.map(
       executorSummary =>
       {
-        val cacheStats =
-          OapRuntime.getOrCreate.fiberSensor.getExecutorToCacheManager.getOrDefault(
-            executorSummary.id, CacheStats())
+        val cacheStats = OapRuntime.getOrCreate.fiberSensor.getExecutorToCacheManager.
+            getOrDefault(executorSummary.id, CacheStats())
+          val indexDataCacheSeparationEnable = SparkEnv.get.conf.getBoolean(
+            OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
+            OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get)
 
         new FiberCacheManagerSummary(
           executorSummary.id,
           executorSummary.hostPort,
           true,
+          indexDataCacheSeparationEnable,
           executorSummary.memoryUsed,
           executorSummary.maxMemory,
           cacheStats.totalCacheSize,
@@ -104,11 +109,16 @@ private[v1] class AbstractApplicationResource extends BaseAppResource {
           cacheStats.indexFiberCount,
           cacheStats.pendingFiberSize,
           cacheStats.pendingFiberCount,
-          cacheStats.hitCount,
-          cacheStats.missCount,
-          cacheStats.loadCount,
-          cacheStats.totalLoadTime,
-          cacheStats.evictionCount
+          cacheStats.dataFiberHitCount,
+          cacheStats.dataFiberMissCount,
+          cacheStats.dataFiberLoadCount,
+          cacheStats.dataTotalLoadTime,
+          cacheStats.dataEvictionCount,
+          cacheStats.indexFiberHitCount,
+          cacheStats.indexFiberMissCount,
+          cacheStats.indexFiberLoadCount,
+          cacheStats.indexTotalLoadTime,
+          cacheStats.indexEvictionCount
         )
       }
     )

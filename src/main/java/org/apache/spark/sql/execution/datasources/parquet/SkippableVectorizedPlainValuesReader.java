@@ -16,6 +16,11 @@
  */
 package org.apache.spark.sql.execution.datasources.parquet;
 
+import java.io.IOException;
+import java.text.MessageFormat;
+
+import org.apache.parquet.io.ParquetDecodingException;
+
 public class SkippableVectorizedPlainValuesReader extends VectorizedPlainValuesReader
     implements SkippableVectorizedValuesReader {
 
@@ -28,46 +33,52 @@ public class SkippableVectorizedPlainValuesReader extends VectorizedPlainValuesR
 
   @Override
   public void skipIntegers(int total) {
-    offset += 4 * total;
+    skipFully(4L * total);
   }
 
   @Override
   public void skipLongs(int total) {
-    offset += 8 * total;
+    skipFully(8L * total);
   }
 
   @Override
   public void skipFloats(int total) {
-    offset += 4 * total;
+    skipFully(4L * total);
   }
 
   @Override
   public void skipDoubles(int total) {
-    offset += 8 * total;
+    skipFully(8L * total);
   }
 
   @Override
   public void skipBytes(int total) {
-    offset += 4 * total;
+    skipFully(4L * total);
   }
 
   @Override
   public void skipBoolean() {
+    if (bitOffset == 0) {
+      try {
+        currentByte = (byte) in.read();
+      } catch (IOException e) {
+        throw new ParquetDecodingException("Failed to read a byte", e);
+      }
+    }
     bitOffset += 1;
     if (bitOffset == 8) {
       bitOffset = 0;
-      offset++;
     }
   }
 
   @Override
   public void skipInteger() {
-    offset += 4;
+    skipFully(4L);
   }
 
   @Override
   public void skipLong() {
-    offset += 8;
+    skipFully(8L);
   }
 
   @Override
@@ -77,24 +88,33 @@ public class SkippableVectorizedPlainValuesReader extends VectorizedPlainValuesR
 
   @Override
   public void skipFloat() {
-    offset += 4;
+    skipFully(4L);
   }
 
   @Override
   public void skipDouble() {
-    offset += 8;
+    skipFully(8L);
   }
 
   @Override
   public void skipBinary(int total) {
     for (int i = 0; i < total; i++) {
-      int len = readInteger();
-      offset += len;
+      int length = readInteger();
+      skipFully(length);
     }
   }
 
   @Override
   public void skipBinaryByLen(int len) {
-    offset += len;
+    skipFully(len);
+  }
+  private static final String ERR_MESSAGE = "Failed to skip {0} bytes";
+
+  private void skipFully(long length) {
+    try {
+      in.skipFully(length);
+    } catch (IOException e) {
+      throw  new ParquetDecodingException(MessageFormat.format(ERR_MESSAGE, length), e);
+    }
   }
 }
