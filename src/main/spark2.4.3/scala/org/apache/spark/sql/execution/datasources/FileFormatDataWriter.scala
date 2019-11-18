@@ -321,7 +321,6 @@ case class WriteTaskResult(
     summary: ExecutedWriteSummary,
     writeResults: Seq[WriteResult])
 
-
 /**
  * Wrapper class for the metrics of writing data out.
  *
