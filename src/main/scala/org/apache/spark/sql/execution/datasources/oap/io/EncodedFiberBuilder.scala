@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import org.apache.parquet.bytes.BytesInput
+import org.apache.parquet.bytes.{BytesInput, HeapByteBufferAllocator}
 import org.apache.parquet.column.values.deltastrings.DeltaByteArrayWriter
 import org.apache.parquet.column.values.dictionary.DictionaryValuesWriter.{PlainBinaryDictionaryValuesWriter, PlainIntegerDictionaryValuesWriter}
 import org.apache.parquet.format.Encoding
@@ -34,7 +34,8 @@ private[oap] case class DeltaByteArrayFiberBuilder (
     dataType: DataType) extends DataFiberBuilder {
 
   // TODO: [linhong] hard-coded variables need to remove
-  private val valuesWriter = new DeltaByteArrayWriter(32, 1048576)
+  private val valuesWriter = new DeltaByteArrayWriter(
+    32, 1048576, HeapByteBufferAllocator.getInstance())
   private var dataLengthInBytes: Int = _
 
   override def getEncoding: Encoding = Encoding.DELTA_BYTE_ARRAY
@@ -80,7 +81,7 @@ private[oap] case class PlainBinaryDictionaryFiberBuilder(
 
   private val valuesWriter = new PlainBinaryDictionaryValuesWriter(1048576,
     org.apache.parquet.column.Encoding.RLE_DICTIONARY,
-    org.apache.parquet.column.Encoding.PLAIN)
+    org.apache.parquet.column.Encoding.PLAIN, HeapByteBufferAllocator.getInstance())
 
   private var dataLengthInBytes: Int = _
 
@@ -113,7 +114,7 @@ private[oap] case class PlainBinaryDictionaryFiberBuilder(
   }
 
   override def buildDictionary: Array[Byte] = {
-    val dictionary = valuesWriter.createDictionaryPage()
+    val dictionary = valuesWriter.toDictPageAndClose
     if (dictionary != null) {
       dictionary.getBytes.toByteArray
     } else {
@@ -137,7 +138,7 @@ private[oap] case class PlainIntegerDictionaryFiberBuilder(
 
   private val valuesWriter = new PlainIntegerDictionaryValuesWriter(1048576,
     org.apache.parquet.column.Encoding.RLE_DICTIONARY,
-    org.apache.parquet.column.Encoding.PLAIN)
+    org.apache.parquet.column.Encoding.PLAIN, HeapByteBufferAllocator.getInstance())
 
   private var dataLengthInBytes: Int = _
 
@@ -167,7 +168,7 @@ private[oap] case class PlainIntegerDictionaryFiberBuilder(
   }
 
   override def buildDictionary: Array[Byte] = {
-    val dictionary = valuesWriter.createDictionaryPage()
+    val dictionary = valuesWriter.toDictPageAndClose
     if (dictionary != null) {
       dictionary.getBytes.toByteArray
     } else {
