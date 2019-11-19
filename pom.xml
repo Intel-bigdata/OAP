@@ -37,7 +37,7 @@
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <basedir>./</basedir>
     <spark.internal.version>2.4.3</spark.internal.version>
-    <scala.version>2.11.8</scala.version>
+    <scala.version>2.11.12</scala.version>
     <scala.binary.version>2.11</scala.binary.version>
     <java.version>1.8</java.version>
     <antlr.version>4.7</antlr.version>
@@ -297,7 +297,7 @@
     <dependency>
       <groupId>org.roaringbitmap</groupId>
       <artifactId>RoaringBitmap</artifactId>
-      <version>0.6.51</version>
+      <version>0.7.45</version>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
