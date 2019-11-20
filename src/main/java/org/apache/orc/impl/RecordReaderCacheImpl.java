@@ -1047,7 +1047,7 @@ public class RecordReaderCacheImpl implements RecordReader {
    */
   private void readStripe() throws IOException {
     StripeInformation stripe = beginReadStripe();
-    includedRowGroups = pickRowGroups();
+    // includedRowGroups = pickRowGroups();
 
     // move forward to the first unskipped row
     if (includedRowGroups != null) {
@@ -1081,7 +1081,11 @@ public class RecordReaderCacheImpl implements RecordReader {
   public void readStripeByOap(int currentStripe) throws IOException {
     this.currentStripe = currentStripe;
     StripeInformation stripe = beginReadStripe();
-    readAllDataStreams(stripe);
+    if (isFullRead()) {
+      readAllDataStreams(stripe);
+    } else {
+      readPartialDataStreams(stripe);
+    }
     reader.startStripe(streams, stripeFooter);
   }
 
