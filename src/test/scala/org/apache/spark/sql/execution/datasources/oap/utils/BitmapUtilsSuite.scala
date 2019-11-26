@@ -70,7 +70,7 @@ class BitmapUtilsSuite extends QueryTest with SharedOapContext with BeforeAndAft
   }
 
   private def loadBmSection(fin: FSDataInputStream, offset: Long, size: Int): FiberCache =
-    OapRuntime.getOrCreate.memoryManager.toIndexFiberCache(fin, offset, size)
+    OapRuntime.getOrCreate.fiberCacheManager.toIndexFiberCache(fin, offset, size)
 
   private def getIdxOffset(fiberCache: FiberCache, baseOffset: Long, idx: Int): Int = {
     val idxOffset = baseOffset + idx * 4

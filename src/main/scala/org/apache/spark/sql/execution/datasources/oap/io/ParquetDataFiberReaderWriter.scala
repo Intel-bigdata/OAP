@@ -286,7 +286,7 @@ object ParquetDataFiberWriter extends Logging {
   }
 
   private def emptyDataFiber(fiberLength: Long): FiberCache =
-    OapRuntime.getOrCreate.memoryManager.getEmptyDataFiberCache(fiberLength)
+    OapRuntime.getOrCreate.fiberCacheManager.getEmptyDataFiberCache(fiberLength)
 }
 
 /**

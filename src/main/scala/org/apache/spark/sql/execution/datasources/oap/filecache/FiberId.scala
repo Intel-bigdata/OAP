@@ -68,7 +68,7 @@ case class BinaryDataFiberId(file: DataFile, columnIndex: Int, rowGroupId: Int) 
     val data = new Array[Byte](length)
     input.seek(offset)
     input.readFully(data)
-    val fiber = OapRuntime.getOrCreate.memoryManager.getEmptyDataFiberCache(length)
+    val fiber = OapRuntime.getOrCreate.fiberCacheManager.getEmptyDataFiberCache(length)
     Platform.copyMemory(data,
       Platform.BYTE_ARRAY_OFFSET, null, fiber.getBaseOffset, length)
     fiber
