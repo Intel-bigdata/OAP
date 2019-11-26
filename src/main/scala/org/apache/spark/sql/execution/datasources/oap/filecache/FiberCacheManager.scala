@@ -52,7 +52,7 @@ private[sql] class FiberCacheManager(
 
   private val _dcpmmWaitingThreshold = sparkEnv.conf.get(OapConf.DCPMM_FREE_WAIT_THRESHOLD)
 
-  def cacheAllocator: CacheMemoryAllocator = CacheMemoryAllocator(sparkEnv)
+  private val cacheAllocator: CacheMemoryAllocator = CacheMemoryAllocator(sparkEnv)
 
   def dataCacheMemory: Long = cacheAllocator.dataCacheMemory
   def indexCacheMemory: Long = cacheAllocator.indexCacheMemory
