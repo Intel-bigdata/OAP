@@ -34,7 +34,7 @@ import org.apache.spark.util.{RpcUtils, Utils}
 
 
 /**
- * Initializing [[FiberCacheManager]], [[MemoryManager]], [[FiberLockManager]]
+ * Initializing [[FiberCacheManager]], [[FiberLockManager]]
  * [[FiberSensor]], [[OapMetricsManager]], [[OapRpcManager]], [[DataFileMetaCacheManager]]
  */
 private[oap] trait OapRuntime extends Logging {
@@ -42,7 +42,6 @@ private[oap] trait OapRuntime extends Logging {
   // will cause Exception due to it shouldn't be called there
   def sparkSession: SparkSession = throw OapRuntime.newException
   def fiberSensor: FiberSensor = throw OapRuntime.newException
-  def memoryManager: MemoryManager
   def fiberCacheManager: FiberCacheManager
   def oapRpcManager: OapRpcManager
   def oapMetricsManager: OapMetricsManager
@@ -70,10 +69,8 @@ private[sql] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
   }
   override val fiberSensor = new FiberSensor(
     new ConcurrentHashMap[String, ArrayBuffer[HostFiberCache]])
-  override val memoryManager =
-    if (OapRuntime.isLocal(sparkEnv.conf)) MemoryManager(sparkEnv) else null
   override val fiberCacheManager =
-    if (OapRuntime.isLocal(sparkEnv.conf)) new FiberCacheManager(sparkEnv, memoryManager) else null
+    if (OapRuntime.isLocal(sparkEnv.conf)) new FiberCacheManager(sparkEnv) else null
   private val oapRpcManagerMasterEndpoint =
     new OapRpcManagerMasterEndpoint(sparkEnv.rpcEnv, SparkContext.getOrCreate().listenerBus)
   private val oapRpcDriverEndpoint = {
@@ -99,9 +96,6 @@ private[sql] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
 
   override def stop(): Unit = {
     if (OapRuntime.isLocal(sparkEnv.conf)) {
-      memoryManager.stop()
-    }
-    if (OapRuntime.isLocal(sparkEnv.conf)) {
       fiberCacheManager.stop()
     }
     oapRpcManager.stop()
@@ -113,8 +107,7 @@ private[sql] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
  * Initializing [[FiberCacheManager]], [[MemoryManager]]
  */
 private[oap] class OapExecutorRuntime(sparkEnv: SparkEnv) extends OapRuntime {
-  override val memoryManager = MemoryManager(sparkEnv)
-  override val fiberCacheManager = new FiberCacheManager(sparkEnv, memoryManager)
+  override val fiberCacheManager = new FiberCacheManager(sparkEnv)
   private val oapRpcDriverEndpoint = RpcUtils.makeDriverRef(
     OapRpcManagerMaster.DRIVER_ENDPOINT_NAME, sparkEnv.conf, sparkEnv.rpcEnv)
   override val oapRpcManager = new OapRpcManagerSlave(
@@ -129,7 +122,6 @@ private[oap] class OapExecutorRuntime(sparkEnv: SparkEnv) extends OapRuntime {
   override val fiberLockManager = new FiberLockManager
 
   override def stop(): Unit = {
-    memoryManager.stop()
     fiberCacheManager.stop()
     oapRpcManager.stop()
     dataFileMetaCacheManager.stop()

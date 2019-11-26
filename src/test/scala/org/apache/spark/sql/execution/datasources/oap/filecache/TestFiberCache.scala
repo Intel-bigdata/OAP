@@ -20,13 +20,13 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import org.apache.spark.sql.oap.OapRuntime
 
 class TestFiberCache(fiberCache: FiberCache)
-  extends FiberCache(fiberData =
-    MemoryBlockHolder(CacheEnum.GENERAL, null, fiberCache.getBaseOffset,
+  extends FiberCache(FiberType.DATA, fiberData =
+    MemoryBlockHolder(null, fiberCache.getBaseOffset,
       fiberCache.size(), fiberCache.getOccupiedSize())) {
 
   def free(): Unit = {
     if (!disposed) {
-      OapRuntime.get.foreach(_.memoryManager.free(fiberData))
+      OapRuntime.get.foreach(_.fiberCacheManager.freeFiberMemory(this))
     }
     disposed = true
   }

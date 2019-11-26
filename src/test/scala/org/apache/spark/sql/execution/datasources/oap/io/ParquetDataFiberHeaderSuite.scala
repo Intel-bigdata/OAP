@@ -40,7 +40,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(!header.allNulls)
     assert(header.dicLength == 0)
 
-    val fiberCache = OapRuntime.getOrCreate.memoryManager
+    val fiberCache = OapRuntime.getOrCreate.fiberCacheManager
       .getEmptyDataFiberCache(ParquetDataFiberHeader.defaultSize)
     val address = fiberCache.getBaseOffset
     header.writeToCache(address)
@@ -66,7 +66,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(!header.allNulls)
     assert(header.dicLength == 3)
 
-    val fiberCache = OapRuntime.getOrCreate.memoryManager
+    val fiberCache = OapRuntime.getOrCreate.fiberCacheManager
       .getEmptyDataFiberCache(ParquetDataFiberHeader.defaultSize)
     val address = fiberCache.getBaseOffset
     header.writeToCache(address)
@@ -86,7 +86,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(header.allNulls)
     assert(header.dicLength == 0)
 
-    val fiberCache = OapRuntime.getOrCreate.memoryManager
+    val fiberCache = OapRuntime.getOrCreate.fiberCacheManager
       .getEmptyDataFiberCache(ParquetDataFiberHeader.defaultSize)
     val address = fiberCache.getBaseOffset
     header.writeToCache(address)
@@ -109,7 +109,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(header.allNulls)
     assert(header.dicLength == 3)
 
-    val fiberCache = OapRuntime.getOrCreate.memoryManager
+    val fiberCache = OapRuntime.getOrCreate.fiberCacheManager
       .getEmptyDataFiberCache(ParquetDataFiberHeader.defaultSize)
     val address = fiberCache.getBaseOffset
     header.writeToCache(address)
@@ -131,7 +131,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(!header.allNulls)
     assert(header.dicLength == 0)
 
-    val fiberCache = OapRuntime.getOrCreate.memoryManager
+    val fiberCache = OapRuntime.getOrCreate.fiberCacheManager
       .getEmptyDataFiberCache(ParquetDataFiberHeader.defaultSize)
     val address = fiberCache.getBaseOffset
     header.writeToCache(address)
@@ -158,7 +158,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
     assert(!header.allNulls)
     assert(header.dicLength == 3)
 
-    val fiberCache = OapRuntime.getOrCreate.memoryManager
+    val fiberCache = OapRuntime.getOrCreate.fiberCacheManager
       .getEmptyDataFiberCache(ParquetDataFiberHeader.defaultSize)
     val address = fiberCache.getBaseOffset
     header.writeToCache(address)

@@ -23,6 +23,7 @@ import java.util.concurrent.locks.{Condition, ReentrantLock, ReentrantReadWriteL
 
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.FSDataInputStream
 import org.apache.parquet.format.CompressionCodec
 
 import org.apache.spark.SparkEnv
@@ -32,6 +33,7 @@ import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
+import org.apache.spark.unsafe.{Platform}
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.OapBitSet
 
@@ -127,8 +129,7 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 }
 
 private[sql] class FiberCacheManager(
-    sparkEnv: SparkEnv, memoryManager: MemoryManager) extends Logging {
-
+    sparkEnv: SparkEnv) extends Logging {
   private val GUAVA_CACHE = "guava"
   private val SIMPLE_CACHE = "simple"
   private val DEFAULT_CACHE_STRATEGY = GUAVA_CACHE
@@ -142,6 +143,12 @@ private[sql] class FiberCacheManager(
 
   private val _dcpmmWaitingThreshold = sparkEnv.conf.get(OapConf.DCPMM_FREE_WAIT_THRESHOLD)
 
+  def cacheAllocator: CacheMemoryAllocator = CacheMemoryAllocator(sparkEnv)
+
+  def dataCacheMemory: Long = cacheAllocator.dataCacheMemory
+  def indexCacheMemory: Long = cacheAllocator.indexCacheMemory
+  def cacheGuardianMemory: Long = cacheAllocator.cacheGuardianMemory
+
   def dataCacheCompressEnable: Boolean = _dataCacheCompressEnable
   def dataCacheCompressionCodec: String = _dataCacheCompressionCodec
   def dataCacheCompressionSize: Int = _dataCacheCompressionSize
@@ -151,15 +158,15 @@ private[sql] class FiberCacheManager(
   private val cacheBackend: OapCache = {
     val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
     if (cacheName.equals(GUAVA_CACHE)) {
-      val indexDataSeparationEnable = sparkEnv.conf.getBoolean(
+      val separateCache = sparkEnv.conf.getBoolean(
         OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
         OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get
       )
       new GuavaOapCache(
-        memoryManager.dataCacheMemory,
-        memoryManager.indexCacheMemory,
-        memoryManager.cacheGuardianMemory,
-        indexDataSeparationEnable)
+        dataCacheMemory,
+        indexCacheMemory,
+        cacheGuardianMemory,
+        separateCache)
     } else if (cacheName.equals(SIMPLE_CACHE)) {
       new SimpleOapCache()
     } else {
@@ -168,6 +175,7 @@ private[sql] class FiberCacheManager(
   }
 
   def stop(): Unit = {
+    cacheAllocator.stop()
     cacheBackend.cleanUp()
   }
 
@@ -186,6 +194,63 @@ private[sql] class FiberCacheManager(
       dataCompressCodec: String = "SNAPPY"): Unit = {
     _dataCacheCompressEnable = dataEnable
     _dataCacheCompressionCodec = dataCompressCodec
+  }
+
+  private[filecache] def allocateFiberMemory(fiberType: FiberType.FiberType,
+    length: Long): MemoryBlockHolder = {
+    fiberType match {
+      case FiberType.DATA => cacheAllocator.allocateDataMemory(length)
+      case FiberType.INDEX => cacheAllocator.allocateIndexMemory(length)
+      case _ => throw new UnsupportedOperationException("Unsupported fiber type")
+    }
+  }
+
+  private[filecache] def freeFiberMemory(fiberCache: FiberCache): Unit = {
+    fiberCache.fiberType match {
+      case FiberType.DATA => cacheAllocator.freeDataMemory(fiberCache.fiberData)
+      case FiberType.INDEX => cacheAllocator.freeIndexMemory(fiberCache.fiberData)
+      case _ => throw new UnsupportedOperationException("Unsupported fiber type")
+    }
+  }
+
+  @inline protected def toFiberCache(fiberType: FiberType.FiberType,
+    bytes: Array[Byte]): FiberCache = {
+    val block = allocateFiberMemory(fiberType, bytes.length)
+    Platform.copyMemory(
+      bytes,
+      Platform.BYTE_ARRAY_OFFSET,
+      block.baseObject,
+      block.baseOffset,
+      bytes.length)
+    FiberCache(fiberType, block)
+  }
+
+  /**
+   * Used by IndexFile
+   */
+  def toIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): FiberCache = {
+    val bytes = new Array[Byte](length)
+    in.readFully(position, bytes)
+    toFiberCache(FiberType.INDEX, bytes)
+  }
+
+  /**
+   * Used by IndexFile. For decompressed data
+   */
+  def toIndexFiberCache(bytes: Array[Byte]): FiberCache = {
+    toFiberCache(FiberType.INDEX, bytes)
+  }
+
+  /**
+   * Used by OapDataFile since we need to parse the raw data in on-heap memory before put it into
+   * off-heap memory
+   */
+  def toDataFiberCache(bytes: Array[Byte]): FiberCache = {
+    toFiberCache(FiberType.DATA, bytes)
+  }
+
+  def getEmptyDataFiberCache(length: Long): FiberCache = {
+    FiberCache(FiberType.DATA, allocateFiberMemory(FiberType.DATA, length))
   }
 
   def releaseIndexCache(indexName: String): Unit = {

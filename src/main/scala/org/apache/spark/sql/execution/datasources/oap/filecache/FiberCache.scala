@@ -30,7 +30,13 @@ import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
 
-case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
+object FiberType extends Enumeration {
+  type FiberType = Value
+  val INDEX, DATA, GENERAL = Value
+}
+
+case class FiberCache(fiberType: FiberType.FiberType, fiberData: MemoryBlockHolder)
+  extends Logging {
 
   // This is and only is set in `cache() of OapCache`
   // TODO: make it immutable
@@ -162,13 +168,7 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   def isDisposed: Boolean = disposed
   protected[filecache] def realDispose(): Unit = {
     if (!disposed) {
-      if (!isFailedMemoryBlock()) {
-        OapRuntime.get.foreach(_.memoryManager.free(fiberData))
-      } else {
-        this.column = null
-        this.originByteArray = null
-      }
-      OapRuntime.get.foreach(_.fiberLockManager.removeFiberLock(fiberId))
+      OapRuntime.get.foreach(_.fiberCacheManager.freeFiberMemory(this))
     }
     disposed = true
   }
@@ -240,16 +240,12 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   // Return the occupied size and it's typically larger than the required data size due to memory
   // alignments from underlying allocator
   def getOccupiedSize(): Long = fiberData.occupiedSize
-
-  def setMemBlockCacheType(cacheType: CacheEnum.CacheEnum): FiberCache = {
-    this.fiberData.cacheType = cacheType
-    this
-  }
 }
 
 class DecompressBatchedFiberCache (
-     override val fiberData: MemoryBlockHolder, var batchedCompressed: Boolean = false,
-     fiberCache: FiberCache) extends FiberCache (fiberData = fiberData) {
+     override val fiberType: FiberType.FiberType, override val fiberData: MemoryBlockHolder,
+     var batchedCompressed: Boolean = false, fiberCache: FiberCache)
+     extends FiberCache (fiberType = fiberType, fiberData = fiberData) {
   override  def release(): Unit = if (fiberCache !=  null) {
       fiberCache.release()
     }
@@ -264,11 +260,10 @@ object FiberCache {
   private[oap] def apply(data: Array[Byte]): FiberCache = {
     val memoryBlockHolder =
       MemoryBlockHolder(
-        CacheEnum.GENERAL,
         data,
         Platform.BYTE_ARRAY_OFFSET,
         data.length,
         data.length)
-    FiberCache(memoryBlockHolder)
+    FiberCache(FiberType.GENERAL, memoryBlockHolder)
   }
 }
