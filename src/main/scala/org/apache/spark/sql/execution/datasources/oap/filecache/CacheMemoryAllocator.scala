@@ -17,18 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.io.File
-import java.util.concurrent.atomic.AtomicLong
-
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
-import org.apache.spark.memory.MemoryMode
-import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.utils.PersistentMemoryConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
-import org.apache.spark.storage.{BlockManager, TestBlockId}
-import org.apache.spark.unsafe.{PersistentMemoryPlatform, Platform}
-import org.apache.spark.util.Utils
 
 /**
  * A cache memory allocator which handles memory allocating from underlayer
