@@ -50,7 +50,7 @@ private[sql] class FiberCacheManager(
   private val _dataCacheCompressionSize = sparkEnv.conf.get(
     OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_SIZE)
 
-  def cacheAllocator: CacheMemoryAllocator = CacheMemoryAllocator(sparkEnv)
+  private val cacheAllocator: CacheMemoryAllocator = CacheMemoryAllocator(sparkEnv)
 
   def dataCacheMemory: Long = cacheAllocator.dataCacheMemory
   def indexCacheMemory: Long = cacheAllocator.indexCacheMemory
