@@ -409,11 +409,7 @@ class GuavaOapCache(
   // This is only for test purpose
   private[filecache] def enableCacheSeparation(): Unit = {
     this.separationCache = true
-    if (cacheInstance == null) {
-      cacheInstance = initLoadingCache(DATA_MAX_WEIGHT)
-    }
-    if (indexCacheInstance == null) {
-      indexCacheInstance = initLoadingCache(INDEX_MAX_WEIGHT)
-    }
+    cacheInstance = initLoadingCache(DATA_MAX_WEIGHT)
+    indexCacheInstance = initLoadingCache(INDEX_MAX_WEIGHT)
   }
 }
