@@ -128,6 +128,14 @@ private[sql] class FiberCacheManager(
     }
   }
 
+  private[filecache] def getFiberLock(fiber: FiberId): ReentrantReadWriteLock = {
+    fiberLockManager.getFiberLock(fiber)
+  }
+
+  private[filecache] def removeFiberLock(fiber: FiberId): Unit = {
+    fiberLockManager.removeFiberLock(fiber)
+  }
+
   @inline protected def toFiberCache(fiberType: FiberType.FiberType,
     bytes: Array[Byte]): FiberCache = {
     val block = allocateFiberMemory(fiberType, bytes.length)
@@ -166,14 +174,6 @@ private[sql] class FiberCacheManager(
 
   def getEmptyDataFiberCache(length: Long): FiberCache = {
     FiberCache(FiberType.DATA, allocateFiberMemory(FiberType.DATA, length))
-  }
-
-  def getFiberLock(fiber: FiberId): ReentrantReadWriteLock = {
-    fiberLockManager.getFiberLock(fiber)
-  }
-
-  def removeFiberLock(fiber: FiberId): Unit = {
-    fiberLockManager.removeFiberLock(fiber)
   }
 
   def releaseIndexCache(indexName: String): Unit = {
