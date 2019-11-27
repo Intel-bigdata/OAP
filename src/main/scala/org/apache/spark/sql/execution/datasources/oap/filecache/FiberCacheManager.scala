@@ -53,6 +53,7 @@ private[sql] class FiberCacheManager(
   private val _dcpmmWaitingThreshold = sparkEnv.conf.get(OapConf.DCPMM_FREE_WAIT_THRESHOLD)
 
   private val cacheAllocator: CacheMemoryAllocator = CacheMemoryAllocator(sparkEnv)
+  private val fiberLockManager = new FiberLockManager()
 
   def dataCacheMemory: Long = cacheAllocator.dataCacheMemory
   def indexCacheMemory: Long = cacheAllocator.indexCacheMemory
@@ -103,6 +104,11 @@ private[sql] class FiberCacheManager(
       dataCompressCodec: String = "SNAPPY"): Unit = {
     _dataCacheCompressEnable = dataEnable
     _dataCacheCompressionCodec = dataCompressCodec
+  }
+
+  private[filecache] def freeFiber(fiberCache: FiberCache): Unit = {
+    freeFiberMemory(fiberCache)
+    fiberLockManager.removeFiberLock(fiberCache.fiberId)
   }
 
   private[filecache] def allocateFiberMemory(fiberType: FiberType.FiberType,
@@ -160,6 +166,14 @@ private[sql] class FiberCacheManager(
 
   def getEmptyDataFiberCache(length: Long): FiberCache = {
     FiberCache(FiberType.DATA, allocateFiberMemory(FiberType.DATA, length))
+  }
+
+  def getFiberLock(fiber: FiberId): ReentrantReadWriteLock = {
+    fiberLockManager.getFiberLock(fiber)
+  }
+
+  def removeFiberLock(fiber: FiberId): Unit = {
+    fiberLockManager.removeFiberLock(fiber)
   }
 
   def releaseIndexCache(indexName: String): Unit = {

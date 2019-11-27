@@ -265,7 +265,7 @@ class GuavaOapCache(
   }
 
   override def get(fiber: FiberId): FiberCache = {
-    val readLock = OapRuntime.getOrCreate.fiberLockManager.getFiberLock(fiber).readLock()
+    val readLock = OapRuntime.getOrCreate.fiberCacheManager.getFiberLock(fiber).readLock()
     readLock.lock()
     try {
         if (separationCache) {
