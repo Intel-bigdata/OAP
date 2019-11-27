@@ -68,7 +68,7 @@ case class FiberCache(fiberType: FiberType.FiberType, fiberData: MemoryBlockHold
   def tryDispose(): Boolean = {
     require(fiberId != null, "FiberId shouldn't be null for this FiberCache")
     val startTime = System.currentTimeMillis()
-    val writeLockOp = OapRuntime.get.map(_.fiberLockManager.getFiberLock(fiberId).writeLock())
+    val writeLockOp = OapRuntime.get.map(_.fiberCacheManager.getFiberLock(fiberId).writeLock())
     writeLockOp match {
       case None => return true // already stopped OapRuntime
       case Some(writeLock) =>
@@ -102,8 +102,7 @@ case class FiberCache(fiberType: FiberType.FiberType, fiberData: MemoryBlockHold
   def isDisposed: Boolean = disposed
   protected[filecache] def realDispose(): Unit = {
     if (!disposed) {
-      OapRuntime.get.foreach(_.fiberCacheManager.freeFiberMemory(this))
-      OapRuntime.get.foreach(_.fiberLockManager.removeFiberLock(fiberId))
+      OapRuntime.get.foreach(_.fiberCacheManager.freeFiber(this))
     }
     disposed = true
   }

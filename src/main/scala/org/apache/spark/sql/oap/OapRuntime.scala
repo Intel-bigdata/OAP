@@ -34,7 +34,7 @@ import org.apache.spark.util.{RpcUtils, Utils}
 
 
 /**
- * Initializing [[FiberCacheManager]], [[FiberLockManager]]
+ * Initializing [[FiberCacheManager]]
  * [[FiberSensor]], [[OapMetricsManager]], [[OapRpcManager]], [[DataFileMetaCacheManager]]
  */
 private[oap] trait OapRuntime extends Logging {
@@ -46,7 +46,6 @@ private[oap] trait OapRuntime extends Logging {
   def oapRpcManager: OapRpcManager
   def oapMetricsManager: OapMetricsManager
   def dataFileMetaCacheManager: DataFileMetaCacheManager
-  def fiberLockManager: FiberLockManager
   def stop(): Unit
 }
 
@@ -92,7 +91,6 @@ private[sql] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
   override val oapMetricsManager = new OapMetricsManager
   // TODO are the following needed for driver?
   override val dataFileMetaCacheManager = new DataFileMetaCacheManager
-  override val fiberLockManager = new FiberLockManager
 
   override def stop(): Unit = {
     if (OapRuntime.isLocal(sparkEnv.conf)) {
@@ -104,7 +102,7 @@ private[sql] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
 }
 
 /**
- * Initializing [[FiberCacheManager]], [[MemoryManager]]
+ * Initializing [[FiberCacheManager]]
  */
 private[oap] class OapExecutorRuntime(sparkEnv: SparkEnv) extends OapRuntime {
   override val fiberCacheManager = new FiberCacheManager(sparkEnv)
@@ -119,7 +117,6 @@ private[oap] class OapExecutorRuntime(sparkEnv: SparkEnv) extends OapRuntime {
     sparkEnv.conf)
   override val oapMetricsManager = new OapMetricsManager
   override val dataFileMetaCacheManager = new DataFileMetaCacheManager
-  override val fiberLockManager = new FiberLockManager
 
   override def stop(): Unit = {
     fiberCacheManager.stop()
