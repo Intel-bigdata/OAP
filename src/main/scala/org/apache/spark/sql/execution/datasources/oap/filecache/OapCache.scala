@@ -149,7 +149,16 @@ class GuavaOapCache(
   private val removalListener = new RemovalListener[FiberId, FiberCache] {
     override def onRemoval(notification: RemovalNotification[FiberId, FiberCache]): Unit = {
       logDebug(s"Put fiber into removal list. Fiber: ${notification.getKey}")
-      cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
+      if (notification.getValue.refCount == 0) {
+        // if the refCount ==0, directly free and not put in 'removalPendingQueue'
+        // to wait the single thread to release. And if release failed,
+        // still put it in 'removalPendingQueue'
+        if (!notification.getValue.tryDispose()) {
+          cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
+        }
+      } else {
+        cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
+      }
       _cacheSize.addAndGet(-notification.getValue.size())
       decFiberCountAndSize(notification.getKey, 1, notification.getValue.size())
     }
