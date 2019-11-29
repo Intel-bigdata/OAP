@@ -5,6 +5,11 @@ before_install:
 - sudo apt-get install cmake
 - sudo apt-get install libpthread-stubs0-dev
 - sudo apt-get install libnuma-dev
+install:
+- # Download spark 2.4.3
+- "[ -f spark ] || mkdir spark && cd spark && wget http://archive.apache.org/dist/spark/spark-2.4.3/spark-2.4.3-bin-hadoop2.7.tgz && cd .."
+- "tar -xf ./spark/spark-2.4.3-bin-hadoop2.7.tgz"
+- "export SPARK_HOME=`pwd`/spark-2.4.3-bin-hadoop2.7"
 before_script:
 - cd /tmp
 - git clone https://github.com/memkind/memkind.git
