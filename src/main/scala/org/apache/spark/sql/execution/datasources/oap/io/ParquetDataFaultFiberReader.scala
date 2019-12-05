@@ -82,7 +82,7 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
         column.getArrayLengths, Platform.INT_ARRAY_OFFSET, num * 4L)
       Platform.copyMemory(
         originalColumn.getArrayOffsets,
-        Platform.INT_ARRAY_OFFSET + total * 4L + start * 4L,
+        Platform.INT_ARRAY_OFFSET + start * 4L,
         column.getArrayOffsets, Platform.INT_ARRAY_OFFSET, num * 4L)
 
       var lastIndex = num - 1
@@ -106,8 +106,9 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
           column.getArrayOffset(firstIndex) + column.getArrayLength(lastIndex)
 
         val data = new Array[Byte](length)
-        Platform.copyMemory(originalColumn.getByteData,
-          Platform.BYTE_ARRAY_OFFSET + total * 8L + startOffset,
+        val child = originalColumn.getChild(0).asInstanceOf[OnHeapColumnVector]
+        Platform.copyMemory(child.getByteData,
+          Platform.BYTE_ARRAY_OFFSET + startOffset,
           data, Platform.BYTE_ARRAY_OFFSET, data.length)
         column.getChild(0).asInstanceOf[OnHeapColumnVector].setByteData(data)
       }
