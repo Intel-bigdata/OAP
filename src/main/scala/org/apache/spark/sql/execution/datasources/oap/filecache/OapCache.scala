@@ -156,9 +156,6 @@ class GuavaOapCache(
       if (!notification.getValue.tryDisposeWithoutWait()) {
         cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
       }
-      else {
-        cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
-      }
       _cacheSize.addAndGet(-notification.getValue.size())
       decFiberCountAndSize(notification.getKey, 1, notification.getValue.size())
     }
