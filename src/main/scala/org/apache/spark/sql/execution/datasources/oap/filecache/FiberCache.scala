@@ -96,6 +96,39 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
     _refCount.decrementAndGet()
   }
 
+  def tryDisposeWithoutWait(): Boolean = {
+    require(fiberId != null, "FiberId shouldn't be null for this FiberCache")
+    val startTime = System.currentTimeMillis()
+    val writeLockOp = OapRuntime.get.map(_.fiberLockManager.getFiberLock(fiberId).writeLock())
+    writeLockOp match {
+      case None => return true // already stopped OapRuntime
+      case Some(writeLock) =>
+        // Give caller a chance to deal with the long wait case.
+        while (System.currentTimeMillis() - startTime <= DISPOSE_TIMEOUT) {
+          if (refCount != 0) {
+            // LRU access (get and occupy) done, but fiber was still occupied by at least one
+            // reader, so it needs to sleep some time to see if the reader done.
+            // Otherwise, it becomes a polling loop.
+            // TODO: use lock/sync-obj to leverage the concurrency APIs instead of explicit sleep.
+            return false
+          } else {
+            if (writeLock.tryLock(200, TimeUnit.MILLISECONDS)) {
+              try {
+                if (refCount == 0) {
+                  realDispose()
+                  return true
+                }
+              } finally {
+                writeLock.unlock()
+              }
+            }
+          }
+        }
+    }
+    logWarning(s"Fiber Cache Dispose waiting detected for $fiberId")
+    false
+  }
+
   def tryDispose(): Boolean = {
     require(fiberId != null, "FiberId shouldn't be null for this FiberCache")
     val startTime = System.currentTimeMillis()
