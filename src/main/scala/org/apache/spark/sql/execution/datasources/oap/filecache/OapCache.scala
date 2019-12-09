@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.{Condition, ReentrantLock}
 
 import scala.collection.JavaConverters._
 
@@ -39,8 +40,25 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
   private val removalPendingQueue = new LinkedBlockingQueue[(FiberId, FiberCache)]()
 
+  private val guardianLock = new ReentrantLock()
+  private val guardianLockCond = guardianLock.newCondition()
+
+  private var waitNotifyActive: Boolean = false
+
   // Tell if guardian thread is trying to remove one Fiber.
   @volatile private var bRemoving: Boolean = false
+
+  def enableWaitNotifyActive(): Unit = {
+    waitNotifyActive = true
+  }
+
+  def getGuardianLock(): ReentrantLock = {
+    guardianLock
+  }
+
+  def getGuardianLockCondition(): Condition = {
+    guardianLockCond
+  }
 
   def pendingFiberCount: Int = if (bRemoving) {
     removalPendingQueue.size() + 1
@@ -49,6 +67,8 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
   }
 
   def pendingFiberSize: Long = _pendingFiberSize.get()
+
+  def pendingFiberOccupiedSize: Long = _pendingFiberCapacity.get()
 
   def addRemovalFiber(fiber: FiberId, fiberCache: FiberCache): Unit = {
     _pendingFiberSize.addAndGet(fiberCache.size())
@@ -82,9 +102,20 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
       }
     } else {
       _pendingFiberSize.addAndGet(-cache.size())
-      _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
+
       // TODO: Make log more readable
       logDebug(s"Fiber removed successfully. Fiber: $fiberId")
+      if (waitNotifyActive) {
+        this.getGuardianLock().lock()
+        _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
+        if (_pendingFiberCapacity.get() <
+          OapRuntime.getOrCreate.fiberCacheManager.dcpmmWaitingThreshold) {
+          guardianLockCond.signalAll()
+        }
+        this.getGuardianLock().unlock()
+      } else {
+        _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
+      }
     }
     bRemoving = false
   }

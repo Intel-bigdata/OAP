@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.locks.{Condition, ReentrantLock, ReentrantReadWriteLock}
+import java.util.concurrent.locks.{ReentrantReadWriteLock}
 
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
@@ -89,7 +89,7 @@ private[sql] class FiberCacheManager(
     cacheBackend.cleanUp()
   }
 
-  if (memoryManager.isDcpmmUsed()) {
+  if (isDcpmmUsed()) {
     cacheBackend.getCacheGuardian.enableWaitNotifyActive()
   }
   // NOTE: all members' init should be placed before this line.
@@ -107,7 +107,11 @@ private[sql] class FiberCacheManager(
   }
 
   private[filecache] def freeFiber(fiberCache: FiberCache): Unit = {
-    freeFiberMemory(fiberCache)
+    if (!fiberCache.isFailedMemoryBlock()) {
+      freeFiberMemory(fiberCache)
+    } else {
+      fiberCache.resetColumn();
+    }
     fiberLockManager.removeFiberLock(fiberCache.fiberId)
   }
 
@@ -139,13 +143,19 @@ private[sql] class FiberCacheManager(
   @inline protected def toFiberCache(fiberType: FiberType.FiberType,
     bytes: Array[Byte]): FiberCache = {
     val block = allocateFiberMemory(fiberType, bytes.length)
-    Platform.copyMemory(
-      bytes,
-      Platform.BYTE_ARRAY_OFFSET,
-      block.baseObject,
-      block.baseOffset,
-      bytes.length)
-    FiberCache(fiberType, block)
+    if (block.length != 0) {
+      Platform.copyMemory(
+        bytes,
+        Platform.BYTE_ARRAY_OFFSET,
+        block.baseObject,
+        block.baseOffset,
+        bytes.length)
+      FiberCache(fiberType, block)
+    } else {
+      val fiberCache = FiberCache(fiberType, block)
+      fiberCache.setOriginByteArray(bytes)
+      fiberCache
+    }
   }
 
   /**
@@ -192,7 +202,7 @@ private[sql] class FiberCacheManager(
   }
 
   def isDcpmmUsed(): Boolean = {
-    memoryManager.isDcpmmUsed()
+    cacheAllocator.isDcpmmUsed()
   }
 
   def isNeedWaitForFree(): Boolean = {
@@ -201,7 +211,7 @@ private[sql] class FiberCacheManager(
         s"${OapRuntime.getOrCreate.fiberCacheManager.dcpmmWaitingThreshold}, " +
         s"cache guardian pending size: " +
         s"${OapRuntime.getOrCreate.fiberCacheManager.pendingOccupiedSize}")
-    memoryManager.isDcpmmUsed() &&
+    isDcpmmUsed() &&
       (OapRuntime.getOrCreate.fiberCacheManager.pendingOccupiedSize >
       OapRuntime.getOrCreate.fiberCacheManager.dcpmmWaitingThreshold)
   }

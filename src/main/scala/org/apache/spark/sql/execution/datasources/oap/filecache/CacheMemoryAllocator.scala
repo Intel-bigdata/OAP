@@ -107,6 +107,11 @@ private[filecache] class CacheMemoryAllocator(sparkEnv: SparkEnv)
     }
   }
 
+  def isDcpmmUsed(): Boolean = {
+    memoryManager.isDcpmmUsed() ||
+    (indexMemoryManager != null && indexMemoryManager.isDcpmmUsed())
+  }
+
   def stop(): Unit = {
     memoryManager.stop()
     if (separateMemory) {

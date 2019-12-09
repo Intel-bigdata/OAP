@@ -65,7 +65,7 @@ case class FiberCache(fiberType: FiberType.FiberType, fiberData: MemoryBlockHold
   }
 
   def isFailedMemoryBlock(): Boolean = {
-    fiberData.cacheType == CacheEnum.FAIL
+    fiberData.length == 0
   }
 
   def setOriginByteArray(bytes: Array[Byte]): Unit = {
@@ -94,6 +94,11 @@ case class FiberCache(fiberType: FiberType.FiberType, fiberData: MemoryBlockHold
     column
   }
 
+  def resetColumn() : Unit = {
+    this.column = null
+    this.originByteArray = null
+  }
+
   // TODO: seems we are safe even on lock for release.
   // 1. if we release fiber during another occupy. atomic refCount is thread-safe.
   // 2. if we release fiber during another tryDispose. the very last release lead to realDispose.
@@ -104,7 +109,7 @@ case class FiberCache(fiberType: FiberType.FiberType, fiberData: MemoryBlockHold
 
   def tryDisposeWithoutWait(): Boolean = {
     require(fiberId != null, "FiberId shouldn't be null for this FiberCache")
-    val writeLockOp = OapRuntime.get.map(_.fiberLockManager.getFiberLock(fiberId).writeLock())
+    val writeLockOp = OapRuntime.get.map(_.fiberCacheManager.getFiberLock(fiberId).writeLock())
     writeLockOp match {
       case None => return true // already stopped OapRuntime
       case Some(writeLock) =>
