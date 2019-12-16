@@ -83,6 +83,7 @@ import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.HadoopReadOptions;
 import org.apache.parquet.hadoop.util.HiddenFileFilter;
+import org.apache.parquet.hadoop.util.LazyInitHadoopInputFile;
 import org.apache.parquet.io.SeekableInputStream;
 import org.apache.parquet.hadoop.util.counters.BenchmarkCounter;
 import org.apache.parquet.io.ParquetDecodingException;
@@ -670,7 +671,7 @@ public class ParquetFileReader implements Closeable {
   @Deprecated
   public ParquetFileReader(Configuration conf, Path file, ParquetMetadata footer) throws IOException {
     this.converter = new ParquetMetadataConverter(conf);
-    this.file = HadoopInputFile.fromPath(file, conf);
+    this.file = LazyInitHadoopInputFile.fromPath(file, conf);
     this.f = this.file.newStream();
     this.options = HadoopReadOptions.builder(conf).build();
     this.footer = footer;
