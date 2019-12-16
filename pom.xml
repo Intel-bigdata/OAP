@@ -646,6 +646,7 @@
               <sources>
                 <source>src/main/spark2.4.4/java</source>
                 <source>src/main/spark2.4.4/scala</source>
+                <source>src/main/parquet1.10.1/java</source>
               </sources>
             </configuration>
           </execution>
