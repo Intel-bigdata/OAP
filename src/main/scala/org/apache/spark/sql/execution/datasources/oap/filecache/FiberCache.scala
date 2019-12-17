@@ -30,7 +30,13 @@ import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
 
-case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
+object FiberType extends Enumeration {
+  type FiberType = Value
+  val INDEX, DATA, GENERAL = Value
+}
+
+case class FiberCache(fiberType: FiberType.FiberType, fiberData: MemoryBlockHolder)
+  extends Logging {
 
   // This is and only is set in `cache() of OapCache`
   // TODO: make it immutable
@@ -59,7 +65,7 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   }
 
   def isFailedMemoryBlock(): Boolean = {
-    fiberData.cacheType == CacheEnum.FAIL
+    fiberData.length == 0
   }
 
   def setOriginByteArray(bytes: Array[Byte]): Unit = {
@@ -88,6 +94,11 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
     column
   }
 
+  def resetColumn() : Unit = {
+    this.column = null
+    this.originByteArray = null
+  }
+
   // TODO: seems we are safe even on lock for release.
   // 1. if we release fiber during another occupy. atomic refCount is thread-safe.
   // 2. if we release fiber during another tryDispose. the very last release lead to realDispose.
@@ -98,7 +109,7 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
 
   def tryDisposeWithoutWait(): Boolean = {
     require(fiberId != null, "FiberId shouldn't be null for this FiberCache")
-    val writeLockOp = OapRuntime.get.map(_.fiberLockManager.getFiberLock(fiberId).writeLock())
+    val writeLockOp = OapRuntime.get.map(_.fiberCacheManager.getFiberLock(fiberId).writeLock())
     writeLockOp match {
       case None => return true // already stopped OapRuntime
       case Some(writeLock) =>
@@ -128,7 +139,7 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   def tryDispose(): Boolean = {
     require(fiberId != null, "FiberId shouldn't be null for this FiberCache")
     val startTime = System.currentTimeMillis()
-    val writeLockOp = OapRuntime.get.map(_.fiberLockManager.getFiberLock(fiberId).writeLock())
+    val writeLockOp = OapRuntime.get.map(_.fiberCacheManager.getFiberLock(fiberId).writeLock())
     writeLockOp match {
       case None => return true // already stopped OapRuntime
       case Some(writeLock) =>
@@ -162,13 +173,7 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   def isDisposed: Boolean = disposed
   protected[filecache] def realDispose(): Unit = {
     if (!disposed) {
-      if (!isFailedMemoryBlock()) {
-        OapRuntime.get.foreach(_.memoryManager.free(fiberData))
-      } else {
-        this.column = null
-        this.originByteArray = null
-      }
-      OapRuntime.get.foreach(_.fiberLockManager.removeFiberLock(fiberId))
+      OapRuntime.get.foreach(_.fiberCacheManager.freeFiber(this))
     }
     disposed = true
   }
@@ -240,16 +245,12 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   // Return the occupied size and it's typically larger than the required data size due to memory
   // alignments from underlying allocator
   def getOccupiedSize(): Long = fiberData.occupiedSize
-
-  def setMemBlockCacheType(cacheType: CacheEnum.CacheEnum): FiberCache = {
-    this.fiberData.cacheType = cacheType
-    this
-  }
 }
 
 class DecompressBatchedFiberCache (
-     override val fiberData: MemoryBlockHolder, var batchedCompressed: Boolean = false,
-     fiberCache: FiberCache) extends FiberCache (fiberData = fiberData) {
+     override val fiberType: FiberType.FiberType, override val fiberData: MemoryBlockHolder,
+     var batchedCompressed: Boolean = false, fiberCache: FiberCache)
+     extends FiberCache (fiberType = fiberType, fiberData = fiberData) {
   override  def release(): Unit = if (fiberCache !=  null) {
       fiberCache.release()
     }
@@ -264,11 +265,10 @@ object FiberCache {
   private[oap] def apply(data: Array[Byte]): FiberCache = {
     val memoryBlockHolder =
       MemoryBlockHolder(
-        CacheEnum.GENERAL,
         data,
         Platform.BYTE_ARRAY_OFFSET,
         data.length,
         data.length)
-    FiberCache(memoryBlockHolder)
+    FiberCache(FiberType.GENERAL, memoryBlockHolder)
   }
 }

@@ -69,7 +69,7 @@ class BTreeRecordReaderWriterV1Suite extends SharedOapContext {
     override def readFiberCache(position: Long, length: Int): FiberCache = {
       // Note: Use DataFiberCache instead of IndexFiberCache to reuse current interface
       // DataFiberCache and IndexFiberCache are identical actually.
-      OapRuntime.getOrCreate.memoryManager.toDataFiberCache(read(position, length))
+      OapRuntime.getOrCreate.fiberCacheManager.toDataFiberCache(read(position, length))
     }
 
     override def read(position: Long, length: Int): Array[Byte] = {

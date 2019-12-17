@@ -35,7 +35,7 @@ class MemoryManagerSuite extends SharedOapContext {
   private var random: Random = _
   private var values: Seq[Any] = _
   private var fiberCache: FiberCache = _
-  private lazy val memoryManager = OapRuntime.getOrCreate.memoryManager
+  private lazy val fiberCacheManager = OapRuntime.getOrCreate.fiberCacheManager
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -83,7 +83,7 @@ class MemoryManagerSuite extends SharedOapContext {
       val nnkw = new NonNullKeyWriter(schema)
       nnkw.writeKey(buf, InternalRow.fromSeq(values))
       val fiberId = TestDataFiberId(null, "Test fiber for MemoryManagerSuite#0")
-      val cache = memoryManager.toDataFiberCache(buf.toByteArray)
+      val cache = fiberCacheManager.toDataFiberCache(buf.toByteArray)
       cache.fiberId = fiberId
       cache
     }
@@ -112,7 +112,7 @@ class MemoryManagerSuite extends SharedOapContext {
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
     val is = createInputStreamFromBytes(bytes)
-    val indexFiberCache = memoryManager.toIndexFiberCache(is, 0, 10240)
+    val indexFiberCache = fiberCacheManager.toIndexFiberCache(is, 0, 10240)
     val fiberId = TestDataFiberId(null, "Test fiber for MemoryManagerSuite#1")
     indexFiberCache.fiberId = fiberId
     assert(bytes === indexFiberCache.toArray)
@@ -122,7 +122,7 @@ class MemoryManagerSuite extends SharedOapContext {
   test("test data in DataFiberCache") {
     val bytes = new Array[Byte](10240)
     random.nextBytes(bytes)
-    val dataFiberCache = memoryManager.toDataFiberCache(bytes)
+    val dataFiberCache = fiberCacheManager.toDataFiberCache(bytes)
     val fiberId = TestDataFiberId(null, "Test fiber for MemoryManagerSuite#2")
     dataFiberCache.fiberId = fiberId
     assert(bytes === dataFiberCache.toArray)

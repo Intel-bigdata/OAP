@@ -35,7 +35,7 @@ class OapBitmapWrappedFiberCacheSuite
   extends QueryTest with SharedOapContext {
 
   private def loadRbFile(fin: FSDataInputStream, offset: Long, size: Int): FiberCache =
-    OapRuntime.getOrCreate.memoryManager.toIndexFiberCache(fin, offset, size)
+    OapRuntime.getOrCreate.fiberCacheManager.toIndexFiberCache(fin, offset, size)
 
   test("test the functionality of OapBitmapWrappedFiberCache class") {
     val CHUNK_SIZE = 1 << 16

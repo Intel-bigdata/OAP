@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
+import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList
+
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
@@ -70,6 +72,10 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
         throw new OapException("error header status (true, true, _)")
       case other => throw new OapException(s"impossible header status $other.")
     }
+  }
+
+  override def readBatch(rowIdList: IntList, column: OnHeapColumnVector): Unit = {
+    throw new OapException("Read with row id list is not supported.")
   }
 
   private def readBatchFromColumn(

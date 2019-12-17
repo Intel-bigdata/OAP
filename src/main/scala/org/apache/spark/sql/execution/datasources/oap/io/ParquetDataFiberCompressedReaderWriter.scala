@@ -454,7 +454,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
   }
 
   private def emptyDataFiber(fiberLength: Long): FiberCache =
-    OapRuntime.getOrCreate.memoryManager.getEmptyDataFiberCache(fiberLength)
+    OapRuntime.getOrCreate.fiberCacheManager.getEmptyDataFiberCache(fiberLength)
 }
 
 /**
@@ -754,14 +754,15 @@ class ParquetDataFiberCompressedReader (
       val decompressedBytes = new Array[Byte](decompressedBytesLength)
       new DataInputStream(cis).readFully(decompressedBytes)
       val memoryBlockHolder = new MemoryBlockHolder(
-        CacheEnum.GENERAL,
         decompressedBytes, Platform.BYTE_ARRAY_OFFSET,
         decompressedBytes.length, decompressedBytes.length)
 
       val fiberCacheReturned = if (num < defaultCapacity) {
-        new DecompressBatchedFiberCache(memoryBlockHolder, fiberBatchedInfo.compressed, fiberCache)
+        new DecompressBatchedFiberCache(fiberCache.fiberType, memoryBlockHolder,
+          fiberBatchedInfo.compressed, fiberCache)
       } else {
-        new DecompressBatchedFiberCache(memoryBlockHolder, fiberBatchedInfo.compressed, null)
+        new DecompressBatchedFiberCache(fiberCache.fiberType, memoryBlockHolder,
+          fiberBatchedInfo.compressed, null)
       }
       fiberCacheReturned.batchedCompressed = fiberBatchedInfo.compressed
       fiberCacheReturned

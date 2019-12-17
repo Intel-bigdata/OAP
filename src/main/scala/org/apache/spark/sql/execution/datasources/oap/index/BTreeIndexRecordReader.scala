@@ -85,7 +85,7 @@ private[index] abstract class BTreeIndexRecordReader(
       offset: Long, length: Int, sectionId: Int, idx: Int): FiberCache = {
 
     val readFunc =
-      () => OapRuntime.getOrCreate.memoryManager.toIndexFiberCache(readData(offset, length))
+      () => OapRuntime.getOrCreate.fiberCacheManager.toIndexFiberCache(readData(offset, length))
     val fiber = BTreeFiberId(readFunc, fileReader.getName, sectionId, idx)
     OapRuntime.getOrCreate.fiberCacheManager.get(fiber)
   }
