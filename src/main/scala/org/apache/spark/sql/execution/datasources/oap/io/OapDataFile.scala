@@ -28,6 +28,7 @@ import org.apache.parquet.column.values.dictionary.PlainValuesDictionary.{PlainB
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache._
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
@@ -41,6 +42,10 @@ private[oap] case class OapDataFileV1(
     path: String,
     schema: StructType,
     configuration: Configuration) extends OapDataFile {
+
+  private val oapDataCacheEnable =
+    configuration.getBoolean(OapConf.OAP_OAPFILEFORMAT_DATA_CACHE_ENABLED.key,
+      OapConf.OAP_OAPFILEFORMAT_DATA_CACHE_ENABLED.defaultValue.get)
 
   private val dictionaries = new Array[Dictionary](schema.length)
   private val codecFactory = new CodecFactory(configuration)
@@ -139,6 +144,53 @@ private[oap] case class OapDataFileV1(
     OapRuntime.getOrCreate.fiberCacheManager.toDataFiberCache(data)
   }
 
+  def getFiberBytes(groupId: Int, fiberId: Int): Array[Byte] = {
+    val groupMeta = meta.rowGroupsMeta(groupId)
+    val decompressor: BytesDecompressor = codecFactory.getDecompressor(meta.codec)
+
+    // get the fiber data start position
+    // TODO: update the meta to store the fiber start pos
+    var i = 0
+    var fiberStart = groupMeta.start
+    while (i < fiberId) {
+      fiberStart += groupMeta.fiberLens(i)
+      i += 1
+    }
+    val len = groupMeta.fiberLens(fiberId)
+    val uncompressedLen = groupMeta.fiberUncompressedLens(fiberId)
+    val encoding = meta.columnsMeta(fiberId).encoding
+
+    val bytes = new Array[Byte](len)
+
+    val is = meta.fin
+    // TODO: replace by FSDataInputStream.readFully(position, buffer) which is thread safe
+    is.synchronized {
+      is.seek(fiberStart)
+      is.readFully(bytes)
+    }
+
+    val dataType = schema(fiberId).dataType
+    val dictionary = getDictionary(fiberId)
+    val fiberParser =
+      if (dictionary != null) {
+        DictionaryBasedDataFiberParser(encoding, meta, dictionary, dataType)
+      } else {
+        DataFiberParser(encoding, meta, dataType)
+      }
+
+    val rowCount =
+      if (groupId == meta.groupCount - 1) {
+        meta.rowCountInLastGroup
+      } else {
+        meta.rowCountInEachGroup
+      }
+
+    // We have to read Array[Byte] from file and decode/decompress it before putToFiberCache
+    // TODO: Try to finish this in off-heap memory
+    val data = fiberParser.parse(decompressor.decompress(bytes, uncompressedLen), rowCount)
+    data
+  }
+
   private def buildIterator(
       conf: Configuration,
       requiredIds: Array[Int],
@@ -154,29 +206,62 @@ private[oap] case class OapDataFileV1(
       groupIds.iterator.filterNot(isSkippedByRowGroup(filters, _))
     }
 
-    val iterator = groupIdsNonSkipped.flatMap {
-      groupId =>
-        val fiberCacheGroup = requiredIds.map { id =>
-          val fiberCache = OapRuntime.getOrCreate.fiberCacheManager.get(
-            DataFiberId(this, id, groupId))
-          update(id, fiberCache)
-          fiberCache
-        }
+    var iterator: Iterator[Key] = null
+    if(oapDataCacheEnable) {
+      iterator = groupIdsNonSkipped.flatMap {
+        groupId =>
+          val fiberCacheGroup = requiredIds.map { id =>
+            val fiberCache = OapRuntime.getOrCreate.fiberCacheManager.get(
+              DataFiberId(this, id, groupId))
+            update(id, fiberCache)
+            fiberCache
+          }
 
-        val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
-          new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache)
-        }
+          val columns = fiberCacheGroup.zip(requiredIds).map { case (fiberCache, id) =>
+            new ColumnValues(meta.rowCountInEachGroup, schema(id).dataType, fiberCache)
+          }
 
-        val rowCount =
-          if (groupId < meta.groupCount - 1) meta.rowCountInEachGroup else meta.rowCountInLastGroup
-        rows.reset(rowCount, columns)
+          val rowCount =
+            if (groupId < meta.groupCount - 1) meta.rowCountInEachGroup
+            else meta.rowCountInLastGroup
+          rows.reset(rowCount, columns)
 
-        groupIdToRowIds match {
-          case Some(map) =>
-            map(groupId).iterator.map(rowId => rows.moveToRow(rowId % meta.rowCountInEachGroup))
-          case None => rows.toIterator
-        }
+          groupIdToRowIds match {
+            case Some(map) =>
+              map(groupId).iterator.map(rowId => rows.moveToRow(rowId % meta.rowCountInEachGroup))
+            case None => rows.toIterator
+          }
+      }
     }
+    else {
+      iterator = groupIdsNonSkipped.flatMap {
+        groupId =>
+          val fiberDataGroup = requiredIds.map { id =>
+            val fiberBytes = getFiberBytes(groupId, id)
+//            update(id, fiberCache)
+            fiberBytes
+          }
+
+          val columns = fiberDataGroup.zip(requiredIds).map { case (fiberData, id) =>
+            val columnValues: ColumnValues = new ColumnValuesBytes(meta.rowCountInEachGroup,
+              schema(id).dataType, fiberData)
+//            columnValues.getIntValue(1)
+            columnValues
+          }
+
+          val rowCount =
+            if (groupId < meta.groupCount - 1) meta.rowCountInEachGroup
+            else meta.rowCountInLastGroup
+          rows.reset(rowCount, columns)
+
+          groupIdToRowIds match {
+            case Some(map) =>
+              map(groupId).iterator.map(rowId => rows.moveToRow(rowId % meta.rowCountInEachGroup))
+            case None => rows.toIterator
+          }
+      }
+    }
+
     new OapCompletionIterator[InternalRow](iterator, inUseFiberCache.indices.foreach(release)) {
       override def close(): Unit = {
         // To ensure if any exception happens, caches are still released after calling close()
