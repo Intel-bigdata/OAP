@@ -21,6 +21,7 @@ import org.apache.spark.sql.execution.OapSparkSqlParser
 import org.apache.spark.sql.execution.datasources.OapFileSourceStrategy
 import org.apache.spark.sql.execution.datasources.oap.{OapGroupAggregateStrategy, OapSemiJoinStrategy, OapSortLimitStrategy}
 
+
 class OapExtensions extends (SparkSessionExtensions => Unit) {
   override def apply(extensions: SparkSessionExtensions): Unit = {
     // Oap Custom Strategy.
@@ -29,6 +30,6 @@ class OapExtensions extends (SparkSessionExtensions => Unit) {
     extensions.injectPlannerStrategy(_ => OapGroupAggregateStrategy)
     extensions.injectPlannerStrategy(_ => OapFileSourceStrategy)
     // Oap Custom SqlParser.
-    extensions.injectParser((session, _) => new OapSparkSqlParser(session))
+    extensions.injectParser((session, delegate) => new OapSparkSqlParser(session, delegate))
   }
 }
