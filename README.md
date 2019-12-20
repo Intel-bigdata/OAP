@@ -3,14 +3,14 @@
 
 OAP - Optimized Analytics Package (previously known as Spinach) is designed to accelerate Ad-hoc query. OAP defines a new parquet-like columnar storage data format and offering a fine-grained hierarchical cache mechanism in the unit of “Fiber” in memory. What’s more, OAP has extended the Spark SQL DDL to allow user to define the customized indices based on relation.
 ## Building
-
-for vmemcache cache strategy, please build with command:
+Firstly, please refer doc/DCPMM-Cache-Support-in-OAP.pdf to determine numa enablement options that can be applied to your environment.
+Then for vmemcache cache strategy, please build with command:
 ```
-mvn clean -q -Pvmemcache -DskipTests package
+mvn clean -q -Pvmemcache,numa-binding -DskipTests package
 ```
 for non-evictable cache strategy, use:
 ```
-mvn clean -q -Ppersistent-memory -DskipTests package
+mvn clean -q -Ppersistent-memory,numa-binding -DskipTests package
 ```
 ## Prerequisites
 You should have [Apache Spark](http://spark.apache.org/) of version 2.3.2/2.4.4 installed in your cluster
@@ -60,9 +60,10 @@ Parquet is the most popular and recommended data format in Spark open-source com
 * Orc Data Adaptor
 Orc is another popular data format. We also designed the compatible layer to allow user to create index directly on top of Orc data. With the Orc reader we implemented, query over indexed Orc data is also accelerated.
 * Compatible with multiple versions of spark
-
-## Numa Support
-* Numa binding when launch the yarn container
+* Vmemcache cace strategy is supported based on  [libvmemcache](https://github.com/pmem/vmemcache)(buffer based LRU cache), which provides data store API using <key, value> as input.
+* Non-evictable cache strategy is supported based on [memkind](https://github.com/memkind/memkind) library which is built on top of jemalloc and provides memory characteristics.
+* Numa Support
+Numa binding when launch the yarn container
 Considering the performance bring by numa binding, a patch in spark yarn side is suggested for apply. Currently we target to spark 2.3.2.
 Patch to upstream spark source code is supported. You can find the built spark under spark_source which is located at same directory with OAP
 If numa binding is enabled, spark.yarn.numa.num is required and should set it to the number of numa nodes in each hosts.
@@ -108,7 +109,7 @@ Compression Codec - Choose compression type for OAP data files.
 * Usage1: `sqlContext.conf.setConfString(SQLConf.OAP_COMPRESSION.key, "SNAPPY")`
 * Usage2: `CREATE TABLE t USING oap OPTIONS ('compression' 'SNAPPY')`
 
-Refer to [OAP User guide](https://github.com/Intel-bigdata/OAP/wiki/OAP-User-guide) for more details.
+Refer to [OAP User guide](https://github.com/Intel-bigdata/OAP/blob/OPEN_SOURCE_VMEMCACHE_SPARK_2.3.2_PREVIEW/doc/DCPMM-Cache-Support-in-OAP.pdf) for more details.
 
 ## Query Example and Performance Data
 Take 2 simple ad-hoc queries as instances, the store_sales table comes from TPCDS with data scale 200G. Generally we can see 5x boost in performance.
