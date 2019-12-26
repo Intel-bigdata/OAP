@@ -6,8 +6,8 @@
 OAP - Optimized Analytics Package is designed to accelerate Spark SQL performance on ad-hoc queries with the user defined indices and smart fine-grained in-memory data cache strategy.
 
 ## OAP Architecture Overview
-Refer to ![OAP Architecture Overview](./docs/OAP-Architect-Overview.md)
+Refer to [OAP Architecture Overview](./docs/OAP-Architect-Overview.md)
 ## OAP User Guide
-Refer to ![OAP User Guide](./docs/OAP-User-Guide.md)
+Refer to [OAP User Guide](./docs/OAP-User-Guide.md)
 ## OAP Developer Guide
-Refer to ![OAP Developer Guide](./docs/Developer-Guide.md)
+Refer to [OAP Developer Guide](./docs/Developer-Guide.md)
