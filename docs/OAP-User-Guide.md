@@ -42,7 +42,7 @@ Step 2. Run Spark shell
 ```
 When your Spark shell shows the same as below picture, it means you have run Spark with OAP successfully.
 
-![Spark_shell_running_results](./docs/image/spark_shell_oap.png)
+![Spark_shell_running_results](./image/spark_shell_oap.png)
 
 ## Configurations for YARN Cluster and Spark Standalone Mode
 ### YARN Cluster Mode
