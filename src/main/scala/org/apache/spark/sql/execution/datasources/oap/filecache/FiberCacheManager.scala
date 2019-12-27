@@ -98,8 +98,8 @@ private[sql] class FiberCacheManager(
     cacheBackend.get(fiber)
   }
 
-  def exists(fiber: FiberId): Boolean = {
-    cacheBackend.exists(fiber)
+  def getIfPresent(fiber: FiberId): FiberCache = {
+    cacheBackend.getIfPresent(fiber)
   }
 
   // only for unit test

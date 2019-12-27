@@ -308,9 +308,9 @@ public class OrcCacheReader
     int rowCount = (int)stripeInformation.getNumberOfRows();
     for (int i = 0; i < requiredColumnIds.length; ++i) {
       long start = System.nanoTime();
-      FiberCache fiberCache =
-              OapRuntime$.MODULE$.getOrCreate().fiberCacheManager().get(
-                  new VectorDataFiberId(dataFile, requiredColumnIds[i], currentStripe));
+      VectorDataFiberId fiberId =
+          new VectorDataFiberId(dataFile, requiredColumnIds[i], currentStripe);
+      FiberCache fiberCache = OapRuntime$.MODULE$.getOrCreate().fiberCacheManager().get(fiberId);
       long end = System.nanoTime();
       loadFiberTime += (end - start);
       dataFile.update(requiredColumnIds[i], fiberCache);

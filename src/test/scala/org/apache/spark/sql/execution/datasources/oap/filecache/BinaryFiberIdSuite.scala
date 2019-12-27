@@ -72,9 +72,9 @@ class BinaryFiberIdSuite extends SharedOapContext with Logging {
       fiberCache.release()
       binaryDataFiberId.cleanLoadCacheParameters()
       assert(fiberCache.refCount == 0)
-      assert(cacheManager.exists(binaryDataFiberId))
+      assert(cacheManager.getIfPresent(binaryDataFiberId) != null)
       cacheManager.clearAllFibers()
-      assert(!cacheManager.exists(binaryDataFiberId))
+      assert(cacheManager.getIfPresent(binaryDataFiberId) == null)
     }))
   }
 }

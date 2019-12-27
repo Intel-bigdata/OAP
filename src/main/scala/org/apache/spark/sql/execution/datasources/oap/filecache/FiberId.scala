@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import org.apache.parquet.hadoop.util.counters.BenchmarkCounter
 import org.apache.parquet.io.SeekableInputStream
 
 import org.apache.spark.sql.execution.datasources.oap.io.DataFile
@@ -68,7 +67,6 @@ case class BinaryDataFiberId(file: DataFile, columnIndex: Int, rowGroupId: Int) 
     val fiber = OapRuntime.getOrCreate.fiberCacheManager.getEmptyDataFiberCache(length)
     Platform.copyMemory(data,
       Platform.BYTE_ARRAY_OFFSET, null, fiber.getBaseOffset, length)
-    BenchmarkCounter.incrementBytesRead(length)
     fiber
   }
 }
