@@ -21,9 +21,9 @@ Before you run ` . $SPARK_HOME/bin/spark-shell `, you need to configure Spark fo
 
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
-spark.files                       /home/oap/jars/oap-0.6.1-with-spark-2.4.3.jar     # absolute path of OAP jar on your working node
+spark.files                       /home/oap/jars/oap-0.6.1-with-spark-2.4.3.jar   # absolute path of OAP jar on your working node
 spark.executor.extraClassPath     ./oap-0.6-with-spark-2.4.3.jar                  # relative path of OAP jar
-spark.driver.extraClassPath       /home/oap/jars/oap-0.6.1-with-spark-2.4.3.jar     # absolute path of OAP jar on your working node
+spark.driver.extraClassPath       /home/oap/jars/oap-0.6.1-with-spark-2.4.3.jar   # absolute path of OAP jar on your working node
 ```
 ### Verify Spark with OAP Integration 
 After configuration, you can follow the below steps and verify the OAP integration is working using Spark Shell.
@@ -51,7 +51,7 @@ The test creates an index on a table and then show the created index. If there i
 ![Spark_shell_running_results](./image/spark_shell_oap.png)
 
 ## Configuration for YARN Cluster Mode
-Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client*** mode. While Spark Submit tool can run Spark application in ***client*** or ***cluster*** mode deciding by --deploy-mode parameter. [Getting Started with OAP](#Getting-Started-with- OAP) session has shown the configuraitons needed for ***client*** mode. If you are running Spark Submit tool in ***cluster***mode, you need to follow the below configuation steps instead.
+Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client*** mode. While Spark Submit tool can run Spark application in ***client*** or ***cluster*** mode deciding by --deploy-mode parameter. [Getting Started with OAP](#Getting-Started-with-OAP) session has shown the configuraitons needed for ***client*** mode. If you are running Spark Submit tool in ***cluster***mode, you need to follow the below configuation steps instead.
 
 Before run `spark-submit` with ***cluster*** mode, you should add below OAP configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
 ```
