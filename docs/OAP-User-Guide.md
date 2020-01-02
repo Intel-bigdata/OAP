@@ -106,7 +106,6 @@ Use DROP OINDEX command to drop a named index.
 ```
 > spark.sql("drop oindex index1 on oap_test")
 ```
-For more detailed examples on OAP performance comparation, you can refer to this [page](https://github.com/Intel-bigdata/OAP/wiki/OAP-examples) for further instructions.
 
 ## Working with OAP Cache
 
