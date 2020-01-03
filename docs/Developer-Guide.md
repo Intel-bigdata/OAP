@@ -127,4 +127,3 @@ Note: If you are using a customized Spark, there may be conflicts in applying th
 If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.3-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.3/spark-2.4.3-bin-hadoop2.7-patched.tgz) with the patch applied.
 
 
-
