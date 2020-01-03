@@ -14,7 +14,7 @@ OAP is built using [Apache Maven](http://maven.apache.org/).
 To clone OAP project, use
 
 ```
-git clone -b branch-0.6-spark-2.4.x  https://github.com/Intel-bigdata/OAP.git
+git clone -b branch-0.6-spark-2.3.x  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
@@ -105,14 +105,14 @@ The following files need to be checked/compared for changes:
 
 #### Rebuild Spark packages with Numa binding patch 
 
-When using DCPMM as a cache medium, if you want to obtain optimum performance, you need to apply the [Numa](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.3.numa.patch](./Spark.2.4.3.numa.patch) to Spark source code.
+When using DCPMM as a cache medium, if you want to obtain optimum performance, you need to apply the [Numa](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.3.2.numa.patch](./Spark.2.3.2.numa.patch) to Spark source code.
 
-1. Download src for [Spark-2.4.3](https://archive.apache.org/dist/spark/spark-2.4.3/spark-2.4.3.tgz) and clone the src from github.
+1. Download src for [Spark-2.3.2](https://archive.apache.org/dist/spark/spark-2.3.2/spark-2.3.2.tgz) and clone the src from github.
 
 2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) Spark package.
 
 ```
-git apply  Spark.2.4.3.numa.patch
+git apply  Spark.2.3.2.numa.patch
 ```
 
 3. When deploying OAP to Spark, please add below configuration item to Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable Numa binding.
@@ -124,6 +124,6 @@ Note: If you are using a customized Spark, there may be conflicts in applying th
 
 #### Use pre-built patched Spark packages 
 
-If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.3-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.3/spark-2.4.3-bin-hadoop2.7-patched.tgz) with the patch applied.
+If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.3.2-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.3.2/spark-2.3.2-bin-hadoop2.7-patched.tgz) with the patch applied.
 
 
