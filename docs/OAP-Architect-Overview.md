@@ -79,7 +79,7 @@ When queries are executed, analyzing index files for boost performance is transp
 
 - BTREE, BITMAP Index is an optimization that is widely used in traditional databases. We also adopt this two most used index types in OAP project. BTREE index is intended for datasets that has a lot of distinct values, and distributed randomly, such as telephone number or ID number. BitMap index is intended for datasets with a limited total amount of distinct values, such as state or age.
 
-- Statistics locates in the Index file, after all index data written into index file. Sometimes, reading index could bring extra cost for some queries. So we also support four statistics (MinMax, Bloom Filter, SampleBase and PartByValue) to help filter. With statistics, we can make sure we only use index if we can possibly boost the execution.
+- Statistics locate in the Index file, after all index data written into index file. Sometimes, reading index could bring extra cost for some queries. So we also support four statistics (MinMax, Bloom Filter, SampleBase and PartByValue) to help filter. With statistics, we can make sure we only use index if we can possibly boost the execution.
 
 
 ### Cache
@@ -90,7 +90,7 @@ OAP Cache has the following characteristics:
 - OAP cache uses Off-Heap memory and stay out of JVM GC. Also OAP cache can use [DCPMM](https://www.intel.com/content/www/us/en/architecture-and-technology/optane-dc-persistent-memory.html) as high-performance, high-capacity, low-cost memory
 - Cache-Locality. OAP can schedule computing task to one executor which holds needed data in cache, by implementing a cache aware mechanism based on Spark driver and executors communication.
 - Cache granularity. A column in one RowGroup (equivalent to Stripe in ORC) of a column-oriented storage format file is loaded into a basic cache unit which is called "Fiber" in OAP.
-- Cache Eviction. OAP cache eviction uses LRU policy, and automatically cache and evict data with transparently to end user.
+- Cache Eviction. OAP cache eviction uses LRU policy, and automatically cache and evict data transparently to end user.
 - Cache configured tables. OAP also supports caching specific tables by configuration items according to actual situations, these tables are usually hot tables that are often used.
 
 
