@@ -51,7 +51,7 @@ The test creates an index on a table and then show the created index. If there i
 ![Spark_shell_running_results](./image/spark_shell_oap.png)
 
 ## Configuration for YARN Cluster Mode
-Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client*** mode. While Spark Submit tool can run Spark application in ***client*** or ***cluster*** mode deciding by --deploy-mode parameter. [Getting Started with OAP](#Getting-Started-with-OAP) session has shown the configuraitons needed for ***client*** mode. If you are running Spark Submit tool in ***cluster***mode, you need to follow the below configuation steps instead.
+Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client*** mode. While Spark Submit tool can run Spark application in ***client*** or ***cluster*** mode deciding by --deploy-mode parameter. [Getting Started with OAP](#Getting-Started-with-OAP) session has shown the configuraitons needed for ***client*** mode. If you are running Spark Submit tool in ***cluster*** mode, you need to follow the below configuation steps instead.
 
 Before run `spark-submit` with ***cluster*** mode, you should add below OAP configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
 ```
@@ -62,7 +62,7 @@ spark.driver.extraClassPath       ./oap-0.6.1-with-spark-2.4.3.jar              
 ```
 
 ## Configuration for Spark Standalone Mode
-In addition to running on the YARN cluster managers, Spark also provides a simple standalone deploy mode. If you are using Spark in Spark Standalone mode, you need to copy the oap jar to ALL the worker nodes. And then set the following configurations in “$SPARK_HOME/conf/spark-defaults” on working node.
+In addition to running on the YARN cluster manager, Spark also provides a simple standalone deploy mode. If you are using Spark in Spark Standalone mode, you need to copy the OAP jar to **all** the worker nodes. And then set the following configurations in “$SPARK_HOME/conf/spark-defaults” on working node.
 ```
 spark.sql.extensions               org.apache.spark.sql.OapExtensions
 spark.executor.extraClassPath      /home/oap/jars/oap-0.6.1-with-spark-2.4.3.jar      # absolute path on worker nodes
@@ -92,7 +92,7 @@ The following example creates an B+ Tree index on column "a" of oap_test table.
 > spark.sql("create oindex index1 on oap_test (a)")
 ```
 ###
-Use SHOW OINDEX command to show all the created indexs on a specified table. For example,
+Use SHOW OINDEX command to show all the created indexes on a specified table. For example,
 ```
 > spark.sql("show oindex from oap_test").show()
 ```
@@ -109,7 +109,7 @@ Use DROP OINDEX command to drop a named index.
 
 ## Working with OAP Cache
 
-OAP is capable to provide input data cache functionality in executor. Considering to utilize the cache data among different SQL queries, we should configure to allow different SQL queries to use the same executor process. This can be achieved by running your queries through Spark ThriftServer. The below steps assume to use Spark ThriftServer. For cache media, we support both DRAM and Intel DCPMM which means you can choose to cache data in DRAM or Intel DCPMM if you have DCPMM configured in hardware.
+OAP is capable to provide input data cache functionality in executor. Considering utilizing the cache data among different SQL queries, we should configure to allow different SQL queries to use the same executor process. This can be achieved by running your queries through Spark ThriftServer. The below steps assume to use Spark ThriftServer. For cache media, we support both DRAM and Intel DCPMM, which means you can choose to cache data in DRAM or Intel DCPMM if you have DCPMM configured in hardware.
 
 ### Use DRAM Cache 
 Step 1. Make the following configuration changes in Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf`. 
@@ -120,9 +120,10 @@ spark.memory.offHeap.size                   80g      # half of total memory size
 spark.sql.oap.parquet.data.cache.enable     true     # for parquet fileformat
 spark.sql.oap.orc.data.cache.enable         true     # for orc fileformat
 ```
-You should change the parameter spark.memory.offHeap.size value according to the availability of DRAM capacity to cache data.
+You should change the parameter `spark.memory.offHeap.size` value according to the availability of DRAM capacity to cache data.
 
 Step 2. Launch Spark ***ThriftServer***
+
 After configuration, you can launch Spark Thift Server. And use Beeline command line tool to connect to the Thrift Server to execute DDL or DML operations. And the data cache will automatically take effect for Parquet or ORC file sources. To help you to do a quick verification of cache functionality, below steps will reuse database metastore created in the [Working with OAP Index](#Working-with-OAP-Index) which contains `oap_test` table definition. In production, Spark Thrift Server will have its own metastore database directory or metastore service and use DDL's  through Beeline for creating your tables.
 
 When you run ```spark-shell``` to create table `oap_test`, `metastore_db` will be created in the directory from which you run '$SPARK_HOME/bin/spark-shell'. Go the same directory you ran Spark Shell and then execute the following command to launch Thrift JDBC server.
@@ -262,7 +263,7 @@ If you are about to use DCPMM as cache, use scripts/spark_thrift_server_yarn_wit
 - --conf spark.sql.oap.fiberCache.persistent.memory.initial.size
 - --conf spark.sql.oap.fiberCache.persistent.memory.reserved.size
 
-These configurations will overide the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
+These configurations will overwrite the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
 
 ```
 cd OAP-TPCDS-TOOL
@@ -276,7 +277,7 @@ If you are about to use DRAM as cache, use scripts/spark_thrift_server_yarn_with
 - --executor-cores
 - --conf spark.memory.offHeap.size
 
-These configurations will overide the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
+These configurations will overwrite the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
 ```
 cd OAP-TPCDS-TOOL
 sh ./scripts/spark_thrift_server_yarn_with_DRAM.sh  start
