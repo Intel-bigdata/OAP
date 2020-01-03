@@ -110,7 +110,7 @@ For more detailed examples on OAP performance comparation, you can refer to this
 
 ## Working with OAP Cache
 
-OAP is capable to provide input data cache functionality in executor. Considering to utilize the cache data among different SQL queries, we should configure to allow different SQL queries to use the same executor process. This can be achieved by running your queries through Spark ThriftServer. The below steps assume to use Spark ThriftServer. For cache media, we support both DRAM and Intel DCPMM which means you can choose to cache data in DRAM or Intel DCPMMM if you have DCPMM configured in hardware.
+OAP is capable to provide input data cache functionality in executor. Considering to utilize the cache data among different SQL queries, we should configure to allow different SQL queries to use the same executor process. This can be achieved by running your queries through Spark ThriftServer. The below steps assume to use Spark ThriftServer. For cache media, we support both DRAM and Intel DCPMM which means you can choose to cache data in DRAM or Intel DCPMM if you have DCPMM configured in hardware.
 
 ### Use DRAM Cache 
 Step 1. Make the following configuration changes in Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf`. 
