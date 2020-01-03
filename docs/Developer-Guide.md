@@ -34,7 +34,7 @@ To run any specific test suite, for example `OapDDLSuite`, use
 ```
 mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite test
 ```
-**NOTE**: Log level of OAP unit tests currently default to ERROR, please override src/test/resources/log4j.properties if needed.
+**NOTE**: Log level of OAP unit tests currently default to ERROR, please overwrite src/test/resources/log4j.properties if needed.
 
 
 #### OAP Building with DCPMM
@@ -62,7 +62,7 @@ Although OAP acts as a plugin jar to Spark, there are still a few tricks to note
 
 #### Integrate with Community Spark
 
-If you are running an Community Spark, things will be much simple. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
+If you are running an Community Spark, things will be much easier. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
 
 #### Integrate with customized Spark
 
