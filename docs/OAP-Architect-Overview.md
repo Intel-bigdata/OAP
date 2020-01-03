@@ -10,9 +10,9 @@
 
 ## Introduction
 
-Apache Spark is a fast and general-purpose cluster computing system. It provides high-level APIs in Java, Scala, Python and R, and an optimized engine that supports general execution graphs. It also supports a rich set of higher-level tools including Spark SQL for SQL and structured data processing, MLlib for machine learning, GraphX for graph processing, and Spark Streaming.
+Apache Spark is a unified analytics engine for large-scale data processing. Spark SQL* is the most popular component of Apache Spark* and it is widely used to process large scale structured data in data center. However, Spark SQL still suffers from stability and performance challenges in the highly dynamic environment with ultra large scale of data for various use cases.
 
-OAP is designed to leverage the user defined indices and smart fine-grained in-memory data caching strategy for boosting Spark SQL performance on ad-hoc queries.
+So we created OAP (Optimized Analytical Package for Spark) to address the performance issues for some of the use cases. OAP is designed to leverage the user defined indices and smart fine-grained in-memory data caching strategy for boosting Spark SQL performance.
 
 
 ![OAP-INTRODUCTION](./image/OAP-Introduction.PNG)
@@ -21,7 +21,7 @@ OAP is designed to leverage the user defined indices and smart fine-grained in-m
 
 #### Usage Scenario 1 -- Interactive queries
 
-Most customers adopted Spark SQL as a batch processing engine. Customers finally found themselves in the situation that it is to hard to separate batch processing and interactive use cases. Interactive queries need to return the data in seconds or even sub-seconds instead of minutes or hours in batch processing. This is hard and challenge for the current Spark SQL implementation.
+Most customers adopted Spark SQL as a batch processing engine. Customers finally found themselves in the situation where is hard to separate batch processing and interactive use cases. Interactive queries need to return the data in seconds or even sub-seconds instead of minutes or hours in batch processing. This is a big challenge for the current Spark SQL implementation.
 
 For example, the following interactive query wants to filter out a very small result set from a huge fact table.
 
@@ -32,7 +32,7 @@ where (event_day='20180701' and query='xxx' and winfoid='65648180412')
 limit 10
 ```
 
-Interactive queries usually processes on a large data set but return a small portion of data filtering out with a specific condition. Customers are facing big challenges in meeting the performance requirement of interactive queries as we wants the result returned in seconds instead of tens of minutes or even hours. 
+Interactive queries are usually processed on a large data set but return a small portion of data filtering out with a specific condition. Customers are facing big challenges in meeting the performance requirement of interactive queries as we want the result returned in seconds instead of tens of minutes or even hours. 
 
 By creating and storing a full B+ Tree index for key columns and using smart fine-grained in-memory data caching strategy, we can boost Spark SQL interactive queries to seconds and even sub-seconds.
 
@@ -41,7 +41,9 @@ OAP is a package for Spark to speed up interactive queries (ad-hoc queries) by u
 #### Usage Scenario 2 -- Batch processing jobs 
 
 Customers usually use Spark SQL for Business Analytics in Data Warehousing.
+
 OAP can speed up batch processing jobs with cache technologies. 
+
 OAP provides two cache strategies: Automatically cache hot data and specifically cache hot tables. Users can choose either strategy according to the actual situation.
 
 
@@ -66,7 +68,7 @@ OAP (Optimized Analytical Package for Spark) acts as a plugin jar for Spark SQL.
 
 ## OAP Features
 
-OAP has two major Features:  index and cache, for boosting Spark SQL performance on ad-hoc queries and batch processing jobs.
+OAP has two major features:  index and cache, for boosting Spark SQL performance on ad-hoc queries and batch processing jobs.
 
 
 ### Index 
@@ -77,7 +79,7 @@ When queries are executed, analyzing index files for boost performance is transp
 
 - BTREE, BITMAP Index is an optimization that is widely used in traditional databases. We also adopt this two most used index types in OAP project. BTREE index is intended for datasets that has a lot of distinct values, and distributed randomly, such as telephone number or ID number. BitMap index is intended for datasets with a limited total amount of distinct values, such as state or age.
 
-- Statistics locates in the Index file, after all index data written into index file.. Sometimes, reading index could bring extra cost for some queries. So we also support four statistics (MinMax, Bloom Filter, SampleBase and PartByValue) to help filter. With statistics, we can make sure we only use index if we can possibly boost the execution.
+- Statistics locates in the Index file, after all index data written into index file. Sometimes, reading index could bring extra cost for some queries. So we also support four statistics (MinMax, Bloom Filter, SampleBase and PartByValue) to help filter. With statistics, we can make sure we only use index if we can possibly boost the execution.
 
 
 ### Cache
