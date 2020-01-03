@@ -62,7 +62,7 @@ Although OAP acts as a plugin jar to Spark, there are still a few tricks to note
 
 #### Integrate with Community Spark
 
-If you are running an Community Spark, things will be simple. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
+If you are running an Community Spark, things will be much simple. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
 
 #### Integrate with customized Spark
 
@@ -125,5 +125,6 @@ Note: If you are using a customized Spark, there may be conflicts in applying th
 #### Use pre-built patched Spark packages 
 
 If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.3-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.3/spark-2.4.3-bin-hadoop2.7-patched.tgz) with the patch applied.
+
 
 
