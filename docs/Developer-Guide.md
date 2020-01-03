@@ -34,7 +34,7 @@ To run any specific test suite, for example `OapDDLSuite`, use
 ```
 mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite test
 ```
-**NOTE**: Log level of OAP unit tests currently default to ERROR, please overwrite src/test/resources/log4j.properties if needed.
+**NOTE**: Log level of OAP unit tests currently default to ERROR, please override src/test/resources/log4j.properties if needed.
 
 
 #### OAP Building with DCPMM
