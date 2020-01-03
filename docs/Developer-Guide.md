@@ -14,7 +14,7 @@ OAP is built using [Apache Maven](http://maven.apache.org/).
 To clone OAP project, use
 
 ```
-git clone -b branch-0.6-spark-2.3.x  https://github.com/Intel-bigdata/OAP.git
+git clone -b branch-0.6-spark-2.4.x  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
@@ -34,49 +34,47 @@ To run any specific test suite, for example `OapDDLSuite`, use
 ```
 mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite test
 ```
-**NOTE**: Log level of OAP unit tests currently default to ERROR, please override src/test/resources/log4j.properties if needed.
+**NOTE**: Log level of OAP unit tests currently default to ERROR, please overwrite src/test/resources/log4j.properties if needed.
 
 
 #### OAP Building with DCPMM
 
-If you want to use OAP with DCPMM,  you can follow the below build steps 
+If you want to use OAP with DCPMM,  you can follow the below building steps.
 
-###### Prerequisites for building
+##### Prerequisites for building with DCPMM support
 
-You will need to install required packages on the build system:
+You  need to install the required packages on the build system listed below.
 
 - gcc-c++
 - [cmake](https://help.directadmin.com/item.php?id=494)
 - [Memkind](https://github.com/memkind/memkind)
 
 
-###### Building package
-
+##### Building package
+You need to add -Ppersistent-memory to the build command line for building with DCPMM support.
 ```
 mvn clean -q -Ppersistent-memory -DskipTests package
 ```
 
-
 ## Integration with Spark
 
-Although OAP acts as a plugin jar to Spark, there are still a few tricks to note when integration with Spark. 
-Basically, OAP explored Spark extension & data source API to perform its core functionality. But there are other functionality aspects that cannot achieved by Spark extension and data source API. We made a few improvements or changes to the Spark internals to achieve the functionality. So when integrating OAP on Spark, you need to check whether you are running an unmodified Community Spark or a modified customized Spark.
+Although OAP acts as a plugin jar to Spark, there are still a few tricks to note when integration with Spark. Basically, OAP explored Spark extension & data source API to perform its core functionality. But there are other functionality aspects that cannot achieved by Spark extension and data source API. We made a few improvements or changes to the Spark internals to achieve the functionality. So when integrating OAP on Spark, you need to check whether you are running an unmodified Community Spark or a modified customized Spark.
 
 #### Integrate with Community Spark
 
-If you are running an Community Spark, things will be much simple. Refer to [OAP User Guide](OAP-User-Guide.md)
+If you are running an Community Spark, things will be much easier. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
 
 #### Integrate with customized Spark
 
 It will be more complicated to integrate OAP with a customized Spark. Steps needed for this case is to check whether the OAP changes of Spark internals will conflict or override with your private changes. 
 - If no conflicts or overrides happens, the steps are the same as the steps of unmodified version of Spark described above. 
-- If conflicts or overrides happen, you need to have a merge plan of the source code to make sure the changes you made in a file appears in the corresponding file changed in OAP project. Once merged, please rebuild OAP.
+- If conflicts or overrides happen, you need to have a merge plan of the source code to make sure the code changes you made in a Spark source file appears in the corresponding file included in OAP project. Once merged, you need to rebuild OAP.
 
-The following files need to be checked/compared
+The following files need to be checked/compared for changes:
 
 ```
 •	antlr4/org/apache/spark/sql/catalyst/parser/SqlBase.g4  
-		Add index related command in this file, such as "create/show/drop oindex". 
+		Add index related DDL in this file, such as "create/show/drop oindex". 
 •	org/apache/spark/scheduler/DAGScheduler.scala           
 		Add the oap cache location to aware task scheduling.
 •	org/apache/spark/sql/execution/DataSourceScanExec.scala   
@@ -101,26 +99,23 @@ The following files need to be checked/compared
 		Change the private access of variable to protected
 •	org/apache/spark/sql/execution/vectorized/OnHeapColumnVector.java
 		Add the get and set method for the changed protected variable.
-
 ```
 
 ## Enable Numa binding for DCPMM in Spark
 
 #### Rebuild Spark packages with Numa binding patch 
 
-When using DCPMM as a cache medium, if you want to obtain higher performance gains, you can use our [Numa](https://www.kernel.org/doc/html/v4.18/vm/numa.html) Binding patch: [Spark.2.3.2.numa.patch](./Spark.2.3.2.numa.patch)
+When using DCPMM as a cache medium, if you want to obtain optimum performance, you need to apply the [Numa](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.3.numa.patch](./Spark.2.4.3.numa.patch) to Spark source code.
 
-1. Download src for [Spark-2.3.2](https://archive.apache.org/dist/spark/spark-2.3.2/spark-2.3.2.tgz).
+1. Download src for [Spark-2.4.3](https://archive.apache.org/dist/spark/spark-2.4.3/spark-2.4.3.tgz) and clone the src from github.
 
 2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) Spark package.
 
 ```
-git apply  Spark.2.3.2.numa.patch
+git apply  Spark.2.4.3.numa.patch
 ```
 
-3. When deploying OAP to Spark, please add a configuration item to enable Numa binding.
-
-$SPARK_HOME/conf/spark-defaults.conf
+3. When deploying OAP to Spark, please add below configuration item to Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable Numa binding.
 
 ```
 spark.yarn.numa.enabled true 
@@ -129,6 +124,6 @@ Note: If you are using a customized Spark, there may be conflicts in applying th
 
 #### Use pre-built patched Spark packages 
 
-If you think it is cumbersome to apply patches, you can use our pre-built [spark-2.3.2-bin-hadoop2.7-patched.tgz](spark-2.3.2-bin-hadoop2.7-patched.tgz) to deploy directly.
+If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.3-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.3/spark-2.4.3-bin-hadoop2.7-patched.tgz) with the patch applied.
 
 
