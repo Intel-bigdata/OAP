@@ -62,7 +62,7 @@ Although OAP acts as a plugin jar to Spark, there are still a few tricks to note
 
 #### Integrate with Community Spark
 
-If you are running an Community Spark, things will be much easier. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
+If you are running an Community Spark, things will be simple. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
 
 #### Integrate with customized Spark
 
