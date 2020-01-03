@@ -15,7 +15,7 @@ Before getting started with OAP on Spark, you should have set up a working Hadoo
 ### Building OAP
 We have a pre-built OAP, you can download [OAP-0.6.1 for Spark 2.4.3 jar](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.3/oap-0.6.1-with-spark-2.4.3.jar) to your working node and put the OAP jar to your working directory such as `/home/oap/jars/`. If you’d like to build OAP from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 ### Spark Configurations for OAP
-Users usually test and run Spark SQL or scala scripts in Spark Shell which launches Spark applications on YRAN with ***client*** mode. In this section, we will start with Spark Shell then introduce other use scenarios. 
+Users usually test and run Spark SQL or Scala scripts in Spark Shell which launches Spark applications on YRAN with ***client*** mode. In this section, we will start with Spark Shell then introduce other use scenarios. 
 
 Before you run ` . $SPARK_HOME/bin/spark-shell `, you need to configure Spark for OAP integration. You need to add or update the following configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
 
@@ -51,7 +51,7 @@ The test creates an index on a table and then show the created index. If there i
 ![Spark_shell_running_results](./image/spark_shell_oap.png)
 
 ## Configuration for YARN Cluster Mode
-Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client*** mode. While Spark Submit tool can run Spark application in ***client*** or ***cluster*** mode deciding by --deploy-mode parameter. [Getting Started with OAP](#Getting-Started-with-OAP) session has shown the configuraitons needed for ***client*** mode. If you are running Spark Submit tool in ***cluster*** mode, you need to follow the below configuation steps instead.
+Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client*** mode. While Spark Submit tool can run Spark application in ***client*** or ***cluster*** mode deciding by --deploy-mode parameter. [Getting Started with OAP](#Getting-Started-with-OAP) session has shown the configurations needed for ***client*** mode. If you are running Spark Submit tool in ***cluster*** mode, you need to follow the below configuration steps instead.
 
 Before run `spark-submit` with ***cluster*** mode, you should add below OAP configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
 ```
@@ -71,7 +71,7 @@ spark.driver.extraClassPath        /home/oap/jars/oap-0.6.1-with-spark-2.4.3.jar
 
 ## Working with OAP Index
 
-After a successful OAP integration, you can use OAP SQL DDL to manage table indexs. The DDL operations include index create, drop, refresh and show. You can run Spark Shell to try and test these functions. The below index examples based on an example table created by the following commands in Spark Shell.
+After a successful OAP integration, you can use OAP SQL DDL to manage table indexes. The DDL operations include index create, drop, refresh and show. You can run Spark Shell to try and test these functions. The below index examples based on an example table created by the following commands in Spark Shell.
 
 ```
 > spark.sql(s"""CREATE TABLE oap_test (a INT, b STRING)
@@ -124,7 +124,7 @@ You should change the parameter `spark.memory.offHeap.size` value according to t
 
 Step 2. Launch Spark ***ThriftServer***
 
-After configuration, you can launch Spark Thift Server. And use Beeline command line tool to connect to the Thrift Server to execute DDL or DML operations. And the data cache will automatically take effect for Parquet or ORC file sources. To help you to do a quick verification of cache functionality, below steps will reuse database metastore created in the [Working with OAP Index](#Working-with-OAP-Index) which contains `oap_test` table definition. In production, Spark Thrift Server will have its own metastore database directory or metastore service and use DDL's  through Beeline for creating your tables.
+After configuration, you can launch Spark Thrift Server. And use Beeline command line tool to connect to the Thrift Server to execute DDL or DML operations. And the data cache will automatically take effect for Parquet or ORC file sources. To help you to do a quick verification of cache functionality, below steps will reuse database metastore created in the [Working with OAP Index](#Working-with-OAP-Index) which contains `oap_test` table definition. In production, Spark Thrift Server will have its own metastore database directory or metastore service and use DDL's  through Beeline for creating your tables.
 
 When you run ```spark-shell``` to create table `oap_test`, `metastore_db` will be created in the directory from which you run '$SPARK_HOME/bin/spark-shell'. Go the same directory you ran Spark Shell and then execute the following command to launch Thrift JDBC server.
 ```
@@ -151,7 +151,7 @@ Step 4. Run queries on table which will use the cache automatically. For example
 > SELECT * FROM oap_test WHERE a = 3;
 ...
 ```
-Step 5. To verify that the cache funtionality is in effect, you can open Spark History Web UI and go to OAP tab page. And check the cache metrics. The following picture is an example.
+Step 5. To verify that the cache functionality is in effect, you can open Spark History Web UI and go to OAP tab page. And check the cache metrics. The following picture is an example.
 
 ![webUI](./image/webUI.png)
 
@@ -160,7 +160,7 @@ Step 5. To verify that the cache funtionality is in effect, you can open Spark H
 #### Prerequisites
 Before configuring in OAP to use DCPMM cache, you need to make sure the following:
 
-- DCPMM hardwares are installed, formatted and mounted correctly on every cluster worker node. You will get a mounted directory to use if you have done this. Usually, the DCPMM on each socket will be mounted as a directory. For example, on a two sockets system, we may get two mounted directories named `/mnt/pmem0` and `/mnt/pmem1`.
+- DCPMM hardwires are installed, formatted and mounted correctly on every cluster worker node. You will get a mounted directory to use if you have done this. Usually, the DCPMM on each socket will be mounted as a directory. For example, on a two sockets system, we may get two mounted directories named `/mnt/pmem0` and `/mnt/pmem1`.
 
 - [Memkind](http://memkind.github.io/memkind/) library has been installed on every cluster worker node. Please use the latest Memkind version. You can compile Memkind based on your system. We have a pre-build binary for x86 64bit CentOS Linux and you can download [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.3/libmemkind.so.0) and put the file to `/lib64/` directory in each worker node in cluster. Memkind library depends on libnuma at the runtime. You need to make sure libnuma already exists in worker node system.
 
@@ -203,7 +203,7 @@ You need to change the value for spark.executor.instances, spark.sql.oap.fiberCa
 
 - spark.executor.instances: We suggest to configure the value to 2x number of the worker nodes considering NUMA binding is enabled. With each worker node runs two executors, each executor will be bound to one of the two sockets. And accesses the corresponding DCPMM device on that socket.
 - spark.sql.oap.fiberCache.persistent.memory.initial.size: It is configured to the available DCPMM capacity to used as data cache per exectutor.
-- spark.sql.oap.fiberCache.persistent.memory.reserved.size: When we use DCPMM as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest to reserve 20% - 25% of the available DCPMM capacity to avoid memory allocation failure. But even with an alloation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
+- spark.sql.oap.fiberCache.persistent.memory.reserved.size: When we use DCPMM as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available DCPMM capacity to avoid memory allocation failure. But even with an allocation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
 
 ##### Verify DCPMM cache functionality
 
@@ -213,7 +213,7 @@ After the configuration, and you need to restart Spark Thrift Server to make the
 
 The section provides instructions and tools for running TPC-DS queries to evaluate the cache performance at various configurations. TPC-DS suite has many queries and we select 9 I/O intensive queries for making the performance evaluation simple.
 
-We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.3/OAP-TPCDS-TOOL.zip) to simplify the running work for beginners. If you have already been familar with TPC-DS data generation and running a TPC-DS tool suite, you can skip our tool and use TPC-DS tool suite directly.
+We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.3/OAP-TPCDS-TOOL.zip) to simplify the running work for beginners. If you have already been familiar with TPC-DS data generation and running a TPC-DS tool suite, you can skip our tool and use TPC-DS tool suite directly.
 
 #### Prerequisites
 
@@ -228,7 +228,7 @@ We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigda
 1. Update the values for the following variables in OAP-TPCDS-TOOL/scripts/tool.conf based on your environment and needs.
 - SPARK_HOME: Point to the Spark home directory of your Spark setup.
 - TPCDS_KITS_DIR: The tpcds-kits directory you coped to the worker nodes in the above prepare process. For example, /home/oap/tpcds-kits
-- NAMENODE_ADDRESS: Your HDFS Namenod address in the format of host:port.
+- NAMENODE_ADDRESS: Your HDFS Namenode address in the format of host:port.
 - THRIFT_SERVER_ADDRESS: Your working node address on which you will run Thrift Server.
 - DATA_SCALE: The data scale to be generated in GB
 - DATA_FORMAT: The data file format. You can specify parquet or orc
