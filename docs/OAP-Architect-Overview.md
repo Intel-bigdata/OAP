@@ -21,7 +21,7 @@ So we created OAP (Optimized Analytical Package for Spark) to address the perfor
 
 #### Usage Scenario 1 -- Interactive queries
 
-Most customers adopted Spark SQL as a batch processing engine. Customers finally found themselves in the situation where is hard to separate batch processing and interactive use cases. Interactive queries need to return the data in seconds or even sub-seconds instead of minutes or hours in batch processing. This is a big challenge for the current Spark SQL implementation.
+Most customers adopted Spark SQL as a batch processing engine. Customers finally found themselves in the situation that is too hard to separate batch processing and interactive use cases. Interactive queries need to return the data in seconds or even sub-seconds instead of minutes or hours in batch processing. This is a big challenge for the current Spark SQL implementation.
 
 For example, the following interactive query wants to filter out a very small result set from a huge fact table.
 
