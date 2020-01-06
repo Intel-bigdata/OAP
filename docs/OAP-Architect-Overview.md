@@ -32,7 +32,7 @@ where (event_day='20180701' and query='xxx' and winfoid='65648180412')
 limit 10
 ```
 
-Interactive queries are usually processed on a large data set but return a small portion of data filtering out with a specific condition. Customers are facing big challenges in meeting the performance requirement of interactive queries as we want the result returned in seconds instead of tens of minutes or even hours. 
+Interactive queries usually process on a large data set but return a small portion of data filtering out with a specific condition. Customers are facing big challenges in meeting the performance requirement of interactive queries as we want the result returned in seconds instead of tens of minutes or even hours. 
 
 By creating and storing a full B+ Tree index for key columns and using smart fine-grained in-memory data caching strategy, we can boost Spark SQL interactive queries to seconds and even sub-seconds.
 
