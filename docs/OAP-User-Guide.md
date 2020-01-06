@@ -263,7 +263,7 @@ If you are about to use DCPMM as cache, use scripts/spark_thrift_server_yarn_wit
 - --conf spark.sql.oap.fiberCache.persistent.memory.initial.size
 - --conf spark.sql.oap.fiberCache.persistent.memory.reserved.size
 
-These configurations will overwrite the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
+These configurations will override the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
 
 ```
 cd OAP-TPCDS-TOOL
@@ -277,7 +277,7 @@ If you are about to use DRAM as cache, use scripts/spark_thrift_server_yarn_with
 - --executor-cores
 - --conf spark.memory.offHeap.size
 
-These configurations will overwrite the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
+These configurations will override the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
 ```
 cd OAP-TPCDS-TOOL
 sh ./scripts/spark_thrift_server_yarn_with_DRAM.sh  start
