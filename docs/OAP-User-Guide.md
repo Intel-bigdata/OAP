@@ -119,6 +119,7 @@ spark.memory.offHeap.enabled                true
 spark.memory.offHeap.size                   80g      # half of total memory size
 spark.sql.oap.parquet.data.cache.enable     true     # for parquet fileformat
 spark.sql.oap.orc.data.cache.enable         true     # for orc fileformat
+spark.sql.orc.copyBatchToSpark              true     # for orc fileformat
 ```
 You should change the parameter `spark.memory.offHeap.size` value according to the availability of DRAM capacity to cache data.
 
