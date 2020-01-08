@@ -64,7 +64,7 @@ public class MrOapRecordReader<T> implements RecordReader<T> {
       ParquetCacheableFileReader parquetFileReader = null;
       try {
         parquetFileReader =
-                new ParquetCacheableFileReader(configuration, file, footer.toParquetMetadata());
+            new ParquetCacheableFileReader(configuration, file, footer.toParquetMetadata());
         this.internalReader = new InternalParquetRecordReader<>(readSupport);
         this.internalReader.initialize(parquetFileReader, configuration);
       } catch (IOException e) {
