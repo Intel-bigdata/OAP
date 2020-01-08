@@ -628,7 +628,7 @@
         </executions>
         <configuration>
           <visitor>true</visitor>
-          <sourceDirectory>src/main/spark2.4.4/antlr4</sourceDirectory>
+          <sourceDirectory>src/main/antlr4</sourceDirectory>
         </configuration>
       </plugin>
       <plugin>
