@@ -17,22 +17,15 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import java.io.Closeable
-
 import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.mapreduce.RecordReader
 import org.apache.orc._
 import org.apache.orc.impl.{ReaderImpl, RecordReaderCacheImpl}
 import org.apache.orc.mapred.{OrcInputFormat, OrcStruct}
-import org.apache.orc.mapreduce._
-import org.apache.orc.storage.ql.exec.vector.{ColumnVector, VectorizedRowBatch}
-import org.apache.parquet.hadoop.{ParquetFiberDataReader, VectorizedOapRecordReader}
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.orc.{OrcMapreduceRecordReader, _}
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
@@ -40,7 +33,6 @@ import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types._
-import org.apache.spark.util.CompletionIterator
 
 /**
  * OrcDataFile is using below four record readers to read orc data file.
