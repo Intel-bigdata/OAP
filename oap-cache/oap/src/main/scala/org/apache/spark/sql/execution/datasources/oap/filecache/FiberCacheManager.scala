@@ -43,13 +43,6 @@ private[sql] class FiberCacheManager(
   private val VMEM_CACHE = "vmem"
   private val DEFAULT_CACHE_STRATEGY = GUAVA_CACHE
 
-  private var _dataCacheCompressEnable = sparkEnv.conf.get(
-    OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION)
-  private var _dataCacheCompressionCodec = sparkEnv.conf.get(
-    OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_CODEC)
-  private val _dataCacheCompressionSize = sparkEnv.conf.get(
-    OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_SIZE)
-
   private val _dcpmmWaitingThreshold = sparkEnv.conf.get(OapConf.DCPMM_FREE_WAIT_THRESHOLD)
 
   private val cacheAllocator: CacheMemoryAllocator = CacheMemoryAllocator(sparkEnv)
@@ -58,10 +51,6 @@ private[sql] class FiberCacheManager(
   def dataCacheMemory: Long = cacheAllocator.dataCacheMemory
   def indexCacheMemory: Long = cacheAllocator.indexCacheMemory
   def cacheGuardianMemory: Long = cacheAllocator.cacheGuardianMemory
-
-  def dataCacheCompressEnable: Boolean = _dataCacheCompressEnable
-  def dataCacheCompressionCodec: String = _dataCacheCompressionCodec
-  def dataCacheCompressionSize: Int = _dataCacheCompressionSize
 
   def dcpmmWaitingThreshold: Long = _dcpmmWaitingThreshold
 
@@ -106,13 +95,6 @@ private[sql] class FiberCacheManager(
 
   def getIfPresent(fiber: FiberId): FiberCache = {
     cacheBackend.getIfPresent(fiber)
-  }
-
-  // only for unit test
-  def setCompressionConf(dataEnable: Boolean = false,
-      dataCompressCodec: String = "SNAPPY"): Unit = {
-    _dataCacheCompressEnable = dataEnable
-    _dataCacheCompressionCodec = dataCompressCodec
   }
 
   private[filecache] def freeFiber(fiberCache: FiberCache): Unit = {
