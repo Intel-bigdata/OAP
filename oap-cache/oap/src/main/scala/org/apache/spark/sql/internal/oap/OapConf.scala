@@ -365,20 +365,6 @@ object OapConf {
       .checkValues(Set("v1", "v2"))
       .createWithDefault("v1")
 
-  val OAP_PARQUET_DATA_CACHE_ENABLED =
-    SqlConfAdapter.buildConf("spark.sql.oap.parquet.data.cache.enable")
-      .internal()
-      .doc("To indicate if enable parquet data cache, default false")
-      .booleanConf
-      .createWithDefault(false)
-
-  val OAP_ORC_DATA_CACHE_ENABLED =
-    SqlConfAdapter.buildConf("spark.sql.oap.orc.data.cache.enable")
-      .internal()
-      .doc("To indicate if enable orc data cache, default false")
-      .booleanConf
-      .createWithDefault(false)
-
   val OAP_ORC_BINARY_DATA_CACHE_ENABLED =
     SqlConfAdapter.buildConf("spark.sql.oap.orc.binary.cache.enable")
       .internal()
@@ -421,30 +407,6 @@ object OapConf {
       .doc("To indicate if to enable externalsorter for statistic calculation")
       .booleanConf
       .createWithDefault(true)
-
-  val OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION =
-    SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compress.enable")
-      .internal()
-      .doc("To indicate if enable/disable data fiber cache compression")
-      .booleanConf
-      .createWithDefault(false)
-
-  val OAP_DATA_FIBER_CACHE_COMPRESSION_CODEC =
-    SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compression.codec")
-      .internal()
-      .doc("Sets the compression codec use when writing data fiber cache." +
-        " Acceptable values include: LZ4, LZF, SNAPPY, ZSTD.")
-      .stringConf
-      .transform(_.toUpperCase())
-      .checkValues(Set("LZ4", "LZF", "SNAPPY", "ZSTD"))
-      .createWithDefault("LZ4")
-
-  val OAP_DATA_FIBER_CACHE_COMPRESSION_SIZE =
-    SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compression.size")
-      .internal()
-      .doc("The oap data fiber compression unit length")
-      .intConf
-      .createWithDefault(4096)
 
   val DCPMM_FREE_WAIT_THRESHOLD =
     SqlConfAdapter.buildConf("spark.sql.oap.dcpmm.free.wait.threshold")
