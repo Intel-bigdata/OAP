@@ -24,6 +24,8 @@ import java.nio.ByteBuffer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PositionedReadable;
+import org.apache.hadoop.fs.Seekable;
 import org.apache.parquet.hadoop.util.HadoopStreams;
 import org.apache.parquet.io.SeekableInputStream;
 
@@ -32,7 +34,8 @@ import org.apache.parquet.io.SeekableInputStream;
  * binary cache scenarios.
  * Note that this input stream is not thread-safe.
  */
-public class LazyInitSeekableInputStream extends SeekableInputStream {
+public class LazyInitSeekableInputStream extends SeekableInputStream
+    implements Seekable, PositionedReadable {
 
   private Path file;
 
@@ -58,6 +61,12 @@ public class LazyInitSeekableInputStream extends SeekableInputStream {
   }
 
   @Override
+  public boolean seekToNewSource(long targetPos) throws IOException {
+    throw new UnsupportedOperationException(
+        "seekToNewSource not supported for parquet input stream");
+  }
+
+  @Override
   public void readFully(byte[] bytes) throws IOException {
     input().readFully(bytes);
   }
@@ -68,18 +77,36 @@ public class LazyInitSeekableInputStream extends SeekableInputStream {
   }
 
   @Override
-  public int read(ByteBuffer buf) throws IOException {
-    return input().read(buf);
-  }
-
-  @Override
   public void readFully(ByteBuffer buf) throws IOException {
     input().readFully(buf);
   }
 
   @Override
+  public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
+    seek(position);
+    readFully(buffer, offset, length);
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer) throws IOException {
+    seek(position);
+    readFully(buffer);
+  }
+
+  @Override
+  public int read(ByteBuffer buf) throws IOException {
+    return input().read(buf);
+  }
+
+  @Override
   public int read() throws IOException {
     return input().read();
+  }
+
+  @Override
+  public int read(long position, byte[] buffer, int offset, int length) throws IOException {
+    seek(position);
+    return read(buffer, offset, length);
   }
 
   @Override

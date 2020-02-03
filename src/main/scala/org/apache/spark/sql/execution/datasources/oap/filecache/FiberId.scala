@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import org.apache.parquet.io.SeekableInputStream
+import org.apache.hadoop.fs.FSDataInputStream
 
 import org.apache.spark.sql.execution.datasources.oap.io.DataFile
 import org.apache.spark.sql.oap.OapRuntime
@@ -28,11 +28,11 @@ private[oap] abstract class FiberId {}
 case class BinaryDataFiberId(file: DataFile, columnIndex: Int, rowGroupId: Int) extends
   DataFiberId {
 
-  private var input: SeekableInputStream = _
+  private var input: FSDataInputStream = _
   private var offset: Long = _
   private var length: Int = _
 
-  def withLoadCacheParameters(input: SeekableInputStream, offset: Long, length: Int): Unit = {
+  def withLoadCacheParameters(input: FSDataInputStream, offset: Long, length: Int): Unit = {
     this.input = input
     this.offset = offset
     this.length = length
@@ -62,8 +62,7 @@ case class BinaryDataFiberId(file: DataFile, columnIndex: Int, rowGroupId: Int) 
     assert(input != null && offset >= 0 && length > 0,
       "Illegal condition when load binary Fiber to cache.")
     val data = new Array[Byte](length)
-    input.seek(offset)
-    input.readFully(data)
+    input.readFully(offset, data)
     val fiber = OapRuntime.getOrCreate.fiberCacheManager.getEmptyDataFiberCache(length)
     Platform.copyMemory(data,
       Platform.BYTE_ARRAY_OFFSET, null, fiber.getBaseOffset, length)
