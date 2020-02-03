@@ -19,6 +19,7 @@
 
 package org.apache.parquet.hadoop;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -62,8 +63,7 @@ public class LazyInitSeekableInputStream extends SeekableInputStream
 
   @Override
   public boolean seekToNewSource(long targetPos) throws IOException {
-    throw new UnsupportedOperationException(
-        "seekToNewSource not supported for parquet input stream");
+    return false;
   }
 
   @Override
@@ -83,14 +83,19 @@ public class LazyInitSeekableInputStream extends SeekableInputStream
 
   @Override
   public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
-    seek(position);
-    readFully(buffer, offset, length);
+    int nread = 0;
+    while (nread < length) {
+      int nbytes = read(position+nread, buffer, offset+nread, length-nread);
+      if (nbytes < 0) {
+        throw new EOFException("End of file reached before reading fully.");
+      }
+      nread += nbytes;
+    }
   }
 
   @Override
   public void readFully(long position, byte[] buffer) throws IOException {
-    seek(position);
-    readFully(buffer);
+    readFully(position, buffer, 0, buffer.length);
   }
 
   @Override
@@ -105,8 +110,17 @@ public class LazyInitSeekableInputStream extends SeekableInputStream
 
   @Override
   public int read(long position, byte[] buffer, int offset, int length) throws IOException {
-    seek(position);
-    return read(buffer, offset, length);
+    synchronized (this) {
+      long oldPos = getPos();
+      int nread = -1;
+      try {
+        seek(position);
+        nread = read(buffer, offset, length);
+      } finally {
+        seek(oldPos);
+      }
+      return nread;
+    }
   }
 
   @Override
