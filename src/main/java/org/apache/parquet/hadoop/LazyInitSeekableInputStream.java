@@ -19,11 +19,14 @@
 
 package org.apache.parquet.hadoop;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PositionedReadable;
+import org.apache.hadoop.fs.Seekable;
 import org.apache.parquet.hadoop.util.HadoopStreams;
 import org.apache.parquet.io.SeekableInputStream;
 
@@ -32,7 +35,8 @@ import org.apache.parquet.io.SeekableInputStream;
  * binary cache scenarios.
  * Note that this input stream is not thread-safe.
  */
-public class LazyInitSeekableInputStream extends SeekableInputStream {
+public class LazyInitSeekableInputStream extends SeekableInputStream
+    implements Seekable, PositionedReadable {
 
   private Path file;
 
@@ -58,6 +62,11 @@ public class LazyInitSeekableInputStream extends SeekableInputStream {
   }
 
   @Override
+  public boolean seekToNewSource(long targetPos) throws IOException {
+    return false;
+  }
+
+  @Override
   public void readFully(byte[] bytes) throws IOException {
     input().readFully(bytes);
   }
@@ -68,18 +77,50 @@ public class LazyInitSeekableInputStream extends SeekableInputStream {
   }
 
   @Override
-  public int read(ByteBuffer buf) throws IOException {
-    return input().read(buf);
-  }
-
-  @Override
   public void readFully(ByteBuffer buf) throws IOException {
     input().readFully(buf);
   }
 
   @Override
+  public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
+    int nread = 0;
+    while (nread < length) {
+      int nbytes = read(position+nread, buffer, offset+nread, length-nread);
+      if (nbytes < 0) {
+        throw new EOFException("End of file reached before reading fully.");
+      }
+      nread += nbytes;
+    }
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer) throws IOException {
+    readFully(position, buffer, 0, buffer.length);
+  }
+
+  @Override
+  public int read(ByteBuffer buf) throws IOException {
+    return input().read(buf);
+  }
+
+  @Override
   public int read() throws IOException {
     return input().read();
+  }
+
+  @Override
+  public int read(long position, byte[] buffer, int offset, int length) throws IOException {
+    synchronized (this) {
+      long oldPos = getPos();
+      int nread = -1;
+      try {
+        seek(position);
+        nread = read(buffer, offset, length);
+      } finally {
+        seek(oldPos);
+      }
+      return nread;
+    }
   }
 
   @Override

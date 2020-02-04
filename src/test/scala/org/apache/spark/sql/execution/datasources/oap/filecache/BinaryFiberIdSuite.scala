@@ -20,7 +20,6 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import com.google.common.util.concurrent.ExecutionError
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.hadoop.util.HadoopStreams
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.oap.io.TestDataFile
@@ -39,7 +38,7 @@ class BinaryFiberIdSuite extends SharedOapContext with Logging {
       output.write(data)
       output.close()
 
-      val input = HadoopStreams.wrap(fs.open(file))
+      val input = fs.open(file)
       val dataFile = TestDataFile(file.getName, new StructType(), configuration)
       val binaryDataFiberId = BinaryDataFiberId(dataFile, columnIndex = 0, rowGroupId = 0)
       val cacheManager = OapRuntime.getOrCreate.fiberCacheManager

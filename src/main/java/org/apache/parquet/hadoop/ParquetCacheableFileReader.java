@@ -28,6 +28,7 @@ import java.util.Map;
 
 import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.page.PageReadStore;
@@ -161,7 +162,7 @@ public class ParquetCacheableFileReader extends ParquetFileReader {
       try {
         byte[] data = new byte[length];
         fiberId = new BinaryDataFiberId(dataFile, columnIndex, rowGroupId);
-        fiberId.withLoadCacheParameters(f, offset, length);
+        fiberId.withLoadCacheParameters(new FSDataInputStream(f), offset, length);
         fiberCache = cacheManager.get(fiberId);
         long fiberOffset = fiberCache.getBaseOffset();
         Platform.copyMemory(null, fiberOffset, data, Platform.BYTE_ARRAY_OFFSET, length);
