@@ -16,6 +16,26 @@ before_script:
 - cd memkind && ./build.sh
 - make
 - sudo make install
+- cd src/test
 - cd ${TRAVIS_BUILD_DIR}
 script:
 - mvn clean -q -Ppersistent-memory test
+
+
+  cd /tmp
+- git clone https://github.com/memkind/memkind.git
+- cd memkind && ./build.sh
+- make
+- sudo make install
+- cd /tmp
+- git clone https://github.com/databricks/spark-sql-perf.git
+- cd spark-sql-perf
+- sbt package
+- mvn install:install-file -Dfile=./target/scala-2.11/spark-sql-perf_2.11-0.5.1-SNAPSHOT.jar -DgroupId=com.databricks -DartifactId=spark-sql-perf_2.11 -Dversion=0.5.1-SNAPSHOT -Dpackaging=jar
+- cd /tmp
+- git clone https://github.com/HongW2019/OAP.git
+- cd OAP
+- mvn clean -q -DskipTests package
+- mvn install:install-file -Dfile=./target/oap-0.7.0-SNAPSHOT-with-spark-2.4.4.jar -DgroupId=com.intel.ssg.bdt -DartifactId=oap -Dversion=0.7.0-SNAPSHOT -Dpackaging=jar
+
+- cd ${TRAVIS_BUILD_DIR}
