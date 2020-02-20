@@ -23,6 +23,7 @@ script:
 - cd src/test/resources/lib
 - mvn install:install-file -Dfile=./oap-original-0.7.0-SNAPSHOT-with-spark-2.4.4.jar -DgroupId=com.intel.ssg.bdt -DartifactId=oap-original -Dversion=0.7.0-SNAPSHOT -Dpackaging=jar
 - mvn install:install-file -Dfile=./spark-sql-perf_2.11-0.4.11-SNAPSHOT.jar -DgroupId=com.databricks -DartifactId=spark-sql-perf_2.11 -Dversion=0.4.11-SNAPSHOT -Dpackaging=jar
+- cd ${TRAVIS_BUILD_DIR}
 - mvn clean -q -Ppersistent-memory test
 
 
