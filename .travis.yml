@@ -16,14 +16,12 @@ before_script:
 - cd memkind && ./build.sh
 - make
 - sudo make install
-- cd ${TRAVIS_BUILD_DIR}
-script:
-- wget https://repo1.maven.org/maven2/org/reflections/reflections/0.9.10/reflections-0.9.10.jar
-- mvn install:install-file -Dfile=./reflections-0.9.10.jar -DgroupId=org.reflections -DartifactId=reflections -Dversion=0.9.10 -Dpackaging=jar
-- cd src/test/resources/lib
-- mvn install:install-file -Dfile=./oap-0.7.0-SNAPSHOT-with-spark-2.4.4.jar -DgroupId=com.intel.ssg.bdt -DartifactId=oap-original -Dversion=0.7.0-SNAPSHOT -Dpackaging=jar
+- cd ../
+- git clone https://github.com/summerDG/spark-sql-perf.git
+- cd spark-sql-perf
 - mvn install:install-file -Dfile=./spark-sql-perf_2.11-0.4.11-SNAPSHOT.jar -DgroupId=com.databricks -DartifactId=spark-sql-perf_2.11 -Dversion=0.4.11-SNAPSHOT -Dpackaging=jar
 - cd ${TRAVIS_BUILD_DIR}
+script:
 - mvn clean -q -Ppersistent-memory test
 
 
