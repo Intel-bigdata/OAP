@@ -462,9 +462,7 @@
           </sourceDirectories>
           <testSourceDirectories>
             <directory>src/test/scala</directory>
-          </testSourceDirectories>
-	   
-         
+          </testSourceDirectories> 
           <configLocation>scalastyle-config.xml</configLocation>
           <outputFile>target/scalastyle-output.xml</outputFile>
           <inputEncoding>UTF-8</inputEncoding>
