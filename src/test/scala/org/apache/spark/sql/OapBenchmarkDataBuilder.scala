@@ -64,7 +64,7 @@ object OapBenchmarkDataBuilder extends OapPerfSuiteContext with Logging {
   private val properties = {
     try {
       new mutable.HashMap[String, String]() ++=
-        Utils.getPropertiesFromFile("./oap-perf-suite/conf/oap-benchmark-default.conf")
+        Utils.getPropertiesFromFile("./conf/oap-benchmark-default.conf")
     } catch {
       case e: IllegalArgumentException => {
         logWarning(e.getMessage + ". Use default setting!")
