@@ -460,9 +460,11 @@
             <directory>src/main/scala</directory>
             <directory>src/main/spark2.4.4/scala</directory>
           </sourceDirectories>
-<!--          <testSourceDirectories>-->
-<!--            <directory>src/test/scala</directory>-->
-<!--          </testSourceDirectories>-->
+          <testSourceDirectories>
+            <directory>src/test/scala</directory>
+          </testSourceDirectories>
+	   
+         
           <configLocation>scalastyle-config.xml</configLocation>
           <outputFile>target/scalastyle-output.xml</outputFile>
           <inputEncoding>UTF-8</inputEncoding>
@@ -690,7 +692,19 @@
                 <source>src/main/orc-1.5.5-nohive/java</source>
               </sources>
             </configuration>
-          </execution>
+         </execution>
+	 <execution>
+            <id>add-test-source</id>
+            <phase>generate-sources</phase>
+            <goals>
+                <goal>add-test-source</goal>
+            </goals>
+            <configuration>
+                <sources>
+                    <source>src/test/oap-perf-suite</source>
+                </sources>
+            </configuration>
+        </execution>   
         </executions>
       </plugin>
     </plugins>
