@@ -23,7 +23,7 @@ import java.util.concurrent.locks.{Condition, ReentrantLock}
 
 import scala.collection.JavaConverters._
 
-import com.google.common.cache._
+import com.github.benmanes.caffeine.cache._
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
@@ -142,10 +142,6 @@ trait OapCache {
   def getCacheGuardian: CacheGuardian
   def cleanUp(): Unit = {
     invalidateAll(getFibers)
-    dataFiberSize.set(0L)
-    dataFiberCount.set(0L)
-    indexFiberSize.set(0L)
-    indexFiberCount.set(0L)
   }
 
   def incFiberCountAndSize(fiber: FiberId, count: Long, size: Long): Unit = {
@@ -177,7 +173,6 @@ trait OapCache {
     cache.fiberId = fiber
     cache
   }
-
 }
 
 class SimpleOapCache extends OapCache with Logging {
@@ -223,7 +218,7 @@ class SimpleOapCache extends OapCache with Logging {
   override def getCacheGuardian: CacheGuardian = cacheGuardian
 }
 
-class GuavaOapCache(
+class CaffeineOapCache(
     dataCacheMemory: Long,
     indexCacheMemory: Long,
     cacheGuardianMemory: Long,
@@ -234,57 +229,54 @@ class GuavaOapCache(
   private val cacheGuardian = new CacheGuardian(cacheGuardianMemory)
   cacheGuardian.start()
 
-  private val KB: Double = 1024
-  private val DATA_MAX_WEIGHT = (dataCacheMemory / KB).toInt
-  private val INDEX_MAX_WEIGHT = (indexCacheMemory / KB).toInt
-  private val TOTAL_MAX_WEIGHT = INDEX_MAX_WEIGHT + DATA_MAX_WEIGHT
+  private val TOTAL_MAX_WEIGHT = indexCacheMemory + dataCacheMemory
   private val CONCURRENCY_LEVEL = 4
 
   // Total cached size for debug purpose, not include pending fiber
   private val _cacheSize: AtomicLong = new AtomicLong(0)
 
+  // RemovalListener of Caffeine is always async, we should use CacheWriter if we need sync.
   private val removalListener = new RemovalListener[FiberId, FiberCache] {
-    override def onRemoval(notification: RemovalNotification[FiberId, FiberCache]): Unit = {
-      logDebug(s"Put fiber into removal list. Fiber: ${notification.getKey}")
+    override def onRemoval(id: FiberId, cache: FiberCache, removalCause: RemovalCause): Unit = {
+      logDebug(s"Put fiber into removal list. Fiber: $id")
 
-      // if the refCount ==0, directly free and not put in 'removalPendingQueue'
+      // if the refCount == 0, directly free and not put in 'removalPendingQueue'
       // to wait the single thread to release. And if release failed,
       // still put it in 'removalPendingQueue'
-      if (!notification.getValue.tryDisposeWithoutWait()) {
-        cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
+      if (!cache.tryDisposeWithoutWait()) {
+        cacheGuardian.addRemovalFiber(id, cache)
       }
-      _cacheSize.addAndGet(-notification.getValue.size())
-      decFiberCountAndSize(notification.getKey, 1, notification.getValue.size())
+      _cacheSize.addAndGet(-cache.size())
+      decFiberCountAndSize(id, 1, cache.size())
     }
   }
 
   private val weigher = new Weigher[FiberId, FiberCache] {
     override def weigh(key: FiberId, value: FiberCache): Int = {
       // We should calculate the weigh with the occupied size of the block.
-      math.ceil(value.getOccupiedSize() / KB).toInt
+      value.getOccupiedSize().toInt
     }
   }
 
   private var cacheInstance = if (separationCache) {
-    initLoadingCache(DATA_MAX_WEIGHT)
+    initLoadingCache(dataCacheMemory)
   } else {
     initLoadingCache(TOTAL_MAX_WEIGHT)
   }
 
   // this is only used when enable index and data cache separation
   private var indexCacheInstance = if (separationCache) {
-    initLoadingCache(INDEX_MAX_WEIGHT)
+    initLoadingCache(indexCacheMemory)
   } else {
     null
   }
 
-  private def initLoadingCache(weight: Int) = {
-    CacheBuilder.newBuilder()
+  private def initLoadingCache(weight: Long) = {
+    Caffeine.newBuilder()
       .recordStats()
       .removalListener(removalListener)
       .maximumWeight(weight)
       .weigher(weigher)
-      .concurrencyLevel(CONCURRENCY_LEVEL)
       .build[FiberId, FiberCache](new CacheLoader[FiberId, FiberCache] {
       override def load(key: FiberId): FiberCache = {
         val startLoadingTime = System.currentTimeMillis()
@@ -307,10 +299,11 @@ class GuavaOapCache(
           if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId]) {
             val fiberCache = cacheInstance.get(fiber)
             // Avoid loading a fiber larger than DATA_MAX_WEIGHT / CONCURRENCY_LEVEL
-            assert(fiberCache.size() <= DATA_MAX_WEIGHT * KB / CONCURRENCY_LEVEL,
+            // TODO Maybe we can remove this condition
+            assert(fiberCache.size() <= dataCacheMemory / CONCURRENCY_LEVEL,
               s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
                 s"with cache's MAX_WEIGHT" +
-                s"(${Utils.bytesToString(DATA_MAX_WEIGHT.toLong * KB.toLong)}) " +
+                s"(${Utils.bytesToString(dataCacheMemory)}) " +
                 s"/ $CONCURRENCY_LEVEL")
             fiberCache.occupy()
             fiberCache
@@ -320,10 +313,11 @@ class GuavaOapCache(
               fiber.isInstanceOf[TestIndexFiberId]) {
             val fiberCache = indexCacheInstance.get(fiber)
             // Avoid loading a fiber larger than INDEX_MAX_WEIGHT / CONCURRENCY_LEVEL
-            assert(fiberCache.size() <= INDEX_MAX_WEIGHT * KB / CONCURRENCY_LEVEL,
+            // TODO Maybe we can remove this condition
+            assert(fiberCache.size() <= indexCacheMemory / CONCURRENCY_LEVEL,
               s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
                 s"with cache's MAX_WEIGHT" +
-                s"(${Utils.bytesToString(INDEX_MAX_WEIGHT.toLong * KB.toLong)}) " +
+                s"(${Utils.bytesToString(indexCacheMemory)}) " +
                 s"/ $CONCURRENCY_LEVEL")
             fiberCache.occupy()
             fiberCache
@@ -331,10 +325,11 @@ class GuavaOapCache(
         } else {
           val fiberCache = cacheInstance.get(fiber)
           // Avoid loading a fiber larger than MAX_WEIGHT / CONCURRENCY_LEVEL
-          assert(fiberCache.size() <= TOTAL_MAX_WEIGHT * KB / CONCURRENCY_LEVEL,
+          // TODO Maybe we can remove this condition
+          assert(fiberCache.size() <= TOTAL_MAX_WEIGHT / CONCURRENCY_LEVEL,
             s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
               s"with cache's MAX_WEIGHT" +
-              s"(${Utils.bytesToString(TOTAL_MAX_WEIGHT.toLong * KB.toLong)}) / $CONCURRENCY_LEVEL")
+              s"(${Utils.bytesToString(TOTAL_MAX_WEIGHT)}) / $CONCURRENCY_LEVEL")
           fiberCache.occupy()
           fiberCache
         }
@@ -420,9 +415,9 @@ class GuavaOapCache(
 
   override def cacheCount: Long =
     if (separationCache) {
-      cacheInstance.size() + indexCacheInstance.size()
+      cacheInstance.estimatedSize() + indexCacheInstance.estimatedSize()
     } else {
-      cacheInstance.size()
+      cacheInstance.estimatedSize()
     }
 
   override def dataCacheCount: Long =
@@ -452,7 +447,7 @@ class GuavaOapCache(
   // This is only for test purpose
   private[filecache] def enableCacheSeparation(): Unit = {
     this.separationCache = true
-    cacheInstance = initLoadingCache(DATA_MAX_WEIGHT)
-    indexCacheInstance = initLoadingCache(INDEX_MAX_WEIGHT)
+    cacheInstance = initLoadingCache(dataCacheMemory)
+    indexCacheInstance = initLoadingCache(indexCacheMemory)
   }
 }

@@ -18,7 +18,6 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import com.google.common.util.concurrent.ExecutionError
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.util.HadoopStreams
 
@@ -46,20 +45,20 @@ class BinaryFiberIdSuite extends SharedOapContext with Logging {
 
       // Test input is null
       binaryDataFiberId.withLoadCacheParameters(input = null, 0, 10)
-      val e1 = intercept[ExecutionError](cacheManager.get(binaryDataFiberId))
+      val e1 = intercept[AssertionError](cacheManager.get(binaryDataFiberId))
       assert(e1.getMessage.contains("Illegal condition when load binary Fiber to cache."))
       binaryDataFiberId.cleanLoadCacheParameters()
 
 
       // Test offset < 0
       binaryDataFiberId.withLoadCacheParameters(input, offset = -1, 10)
-      val e2 = intercept[ExecutionError](cacheManager.get(binaryDataFiberId))
+      val e2 = intercept[AssertionError](cacheManager.get(binaryDataFiberId))
       assert(e2.getMessage.contains("Illegal condition when load binary Fiber to cache."))
       binaryDataFiberId.cleanLoadCacheParameters()
 
       // Test length <= 0
       binaryDataFiberId.withLoadCacheParameters(input, offset = 0, length = 0)
-      val e3 = intercept[ExecutionError](cacheManager.get(binaryDataFiberId))
+      val e3 = intercept[AssertionError](cacheManager.get(binaryDataFiberId))
       assert(e3.getMessage.contains("Illegal condition when load binary Fiber to cache."))
       binaryDataFiberId.cleanLoadCacheParameters()
 

@@ -25,7 +25,7 @@ import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.util.Utils
 
-class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfterEach{
+class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfterEach {
 
   private val kbSize = 1024
   private val mbSize = kbSize * kbSize

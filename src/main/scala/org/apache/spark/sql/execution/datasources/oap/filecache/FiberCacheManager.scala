@@ -19,9 +19,9 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.locks.{ReentrantReadWriteLock}
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.google.common.cache._
+import com.github.benmanes.caffeine.cache._
 import org.apache.hadoop.fs.FSDataInputStream
 
 import org.apache.spark.SparkEnv
@@ -31,15 +31,15 @@ import org.apache.spark.sql.execution.datasources.oap.io._
 import org.apache.spark.sql.execution.datasources.oap.utils.CacheStatusSerDe
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
-import org.apache.spark.unsafe.{Platform}
+import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.OapBitSet
 
 private[sql] class FiberCacheManager(
     sparkEnv: SparkEnv) extends Logging {
-  private val GUAVA_CACHE = "guava"
+  private val CAFFEINE_CACHE = "caffeine"
   private val SIMPLE_CACHE = "simple"
-  private val DEFAULT_CACHE_STRATEGY = GUAVA_CACHE
+  private val DEFAULT_CACHE_STRATEGY = CAFFEINE_CACHE
 
   private var _dataCacheCompressEnable = sparkEnv.conf.get(
     OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION)
@@ -65,12 +65,12 @@ private[sql] class FiberCacheManager(
 
   private val cacheBackend: OapCache = {
     val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
-    if (cacheName.equals(GUAVA_CACHE)) {
+    if (cacheName.equals(CAFFEINE_CACHE)) {
       val separateCache = sparkEnv.conf.getBoolean(
         OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
         OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get
       )
-      new GuavaOapCache(
+      new CaffeineOapCache(
         dataCacheMemory,
         indexCacheMemory,
         cacheGuardianMemory,
@@ -113,7 +113,7 @@ private[sql] class FiberCacheManager(
     if (!fiberCache.isFailedMemoryBlock()) {
       freeFiberMemory(fiberCache)
     } else {
-      fiberCache.resetColumn();
+      fiberCache.resetColumn()
     }
     fiberLockManager.removeFiberLock(fiberCache.fiberId)
   }
@@ -227,8 +227,10 @@ private[sql] class FiberCacheManager(
 
   // Only used by test suite
   private[filecache] def enableGuavaCacheSeparation(): Unit = {
-    if (cacheBackend.isInstanceOf[GuavaOapCache]) {
-      cacheBackend.asInstanceOf[GuavaOapCache].enableCacheSeparation()
+    cacheBackend match {
+      case cache: CaffeineOapCache =>
+        cache.enableCacheSeparation()
+      case _ =>
     }
   }
 
@@ -293,21 +295,18 @@ private[sql] class DataFileMetaCacheManager extends Logging {
   def cacheSize: Long = _cacheSize.get()
 
   private val cache =
-    CacheBuilder
+    Caffeine
       .newBuilder()
-      .concurrencyLevel(4) // DEFAULT_CONCURRENCY_LEVEL TODO verify that if it works
       .expireAfterAccess(1000, TimeUnit.SECONDS) // auto expire after 1000 seconds.
       .removalListener(new RemovalListener[ENTRY, DataFileMeta]() {
-        override def onRemoval(n: RemovalNotification[ENTRY, DataFileMeta])
-        : Unit = {
-          logDebug(s"Evicting Data File Meta ${n.getKey.path}")
-          _cacheSize.addAndGet(-n.getValue.len)
-          n.getValue.close
+        override def onRemoval(entry: ENTRY, meta: DataFileMeta, cause: RemovalCause): Unit = {
+          logDebug(s"Evicting Data File Meta ${entry.path}")
+          _cacheSize.addAndGet(-meta.len)
+          meta.close()
         }
       })
       .build[ENTRY, DataFileMeta](new CacheLoader[ENTRY, DataFileMeta]() {
-        override def load(entry: ENTRY)
-        : DataFileMeta = {
+        override def load(entry: ENTRY): DataFileMeta = {
           logDebug(s"Loading Data File Meta ${entry.path}")
           val meta = entry.getDataFileMeta()
           _cacheSize.addAndGet(meta.len)
