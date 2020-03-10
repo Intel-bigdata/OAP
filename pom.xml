@@ -365,6 +365,17 @@
       <artifactId>guava</artifactId>
       <version>18.0</version>
     </dependency>
+<!--    <dependency>-->
+<!--      <groupId>com.databricks</groupId>-->
+<!--      <artifactId>spark-sql-perf_2.11</artifactId>-->
+<!--      <version>0.4.11-SNAPSHOT</version>-->
+<!--    </dependency>-->
+    <dependency>
+      <groupId>org.reflections</groupId>
+      <artifactId>reflections</artifactId>
+      <version>0.9.10</version>
+      <scope>compile</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -406,6 +417,8 @@
               <include>org.apache.parquet:*</include>
               <include>org.apache.orc:*</include>
               <include>io.airlift:*</include>
+	       <include>org.reflections:reflections</include>
+              <include>com.databricks:spark-sql-perf_2.11</include>
             </includes>
           </artifactSet>
           <relocations>
@@ -419,6 +432,14 @@
             <relocation>
               <pattern>com.google.common</pattern>
               <shadedPattern>org.spark_project.guava</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.reflections</pattern>
+              <shadedPattern>org.spark_project.reflections</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.databricks</pattern>
+              <shadedPattern>org.spark_project.spark-sql-perf_2.11</shadedPattern>
             </relocation>
           </relocations>
         </configuration>
@@ -594,6 +615,24 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.2.0</version>
+        <configuration>
+          <descriptors>
+            <descriptor>src/test/assembly/test-jar-with-dependencies.xml</descriptor>
+          </descriptors>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>3.0.0</version>
         <configuration>
@@ -657,6 +696,18 @@
               </sources>
             </configuration>
           </execution>
+          <execution>
+            <id>add-test-source</id>
+            <phase>generate-sources</phase>
+            <goals>
+                <goal>add-test-source</goal>
+            </goals>
+            <configuration>
+                <sources>
+                    <source>src/test/oap-perf-suite</source>
+                </sources>
+            </configuration>
+          </execution>  
         </executions>
       </plugin>
       <plugin>
