@@ -35,29 +35,27 @@ object OapBenchmarkDataBuilder extends OapPerfSuiteContext with Logging {
   private val defaultProperties = Map(
     "oap.benchmark.compression.codec"     -> "snappy",
     "oap.benchmark.support.oap.version"   -> "0.7.0",
-    "oap.benchmark.hdfs.file.root.dir"    -> "/user/oap/oaptest/",
+    "oap.benchmark.hdfs.file.root.dir"    -> "/dailytest/",
     "oap.benchmark.database.prefix"       -> "",
     "oap.benchmark.database.postfix"      -> "",
     "oap.benchmark.tpcds.data.scale"      -> "200",
     "oap.benchmark.tpcds.data.partition"  -> "80",
-    "oap.benchmark.tpcds.data.format"     -> "parquet,orc"
+    "oap.benchmark.tpcds.data.format"     -> "parquet"
   )
 
   def getDatabase(format: String) : String = {
-    val prefix = properties.get("oap.benchmark.database.prefix").get
-    val postfix = properties.get("oap.benchmark.database.postfix").get
     val dataScale = properties.get("oap.benchmark.tpcds.data.scale").get.toInt
     val baseName = format match {
-      case "parquet" => s"parquet_tpcds_$dataScale"
-      case "orc" => s"orc_tpcds_$dataScale"
+      case "parquet" => s"parquet$dataScale"
+      case "orc" => s"orc$dataScale"
       case _ => "default"
     }
 
-    prefix + baseName + postfix
+    baseName 
   }
 
-  def formatTableLocation(rootDir: String, versionNum: String, tableFormat: String): String = {
-    s"${rootDir}/${versionNum}/tpcds/${getDatabase(tableFormat)}/"
+  def formatTableLocation(rootDir: String, tableFormat: String): String = {
+    s"${rootDir}/${getDatabase(tableFormat)}/"
   }
 
   private val properties = {
