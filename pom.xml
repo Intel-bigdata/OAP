@@ -431,10 +431,6 @@
               <pattern>org.reflections</pattern>
               <shadedPattern>org.spark_project.reflections</shadedPattern>
             </relocation>
-            <relocation>
-              <pattern>com.databricks</pattern>
-              <shadedPattern>org.spark_project.spark-sql-perf_2.11</shadedPattern>
-            </relocation>
           </relocations>
         </configuration>
         <executions>
