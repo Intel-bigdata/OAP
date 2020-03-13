@@ -35,7 +35,7 @@ object OapBenchmarkDataBuilder extends OapPerfSuiteContext with Logging {
   private val defaultProperties = Map(
     "oap.benchmark.compression.codec"     -> "snappy",
     "oap.benchmark.support.oap.version"   -> "0.7.0",
-    "oap.benchmark.hdfs.file.root.dir"    -> "/dailytest/",
+    "oap.benchmark.hdfs.file.root.dir"    -> "/dailytest",
     "oap.benchmark.database.prefix"       -> "",
     "oap.benchmark.database.postfix"      -> "",
     "oap.benchmark.tpcds.data.scale"      -> "200",
@@ -44,14 +44,17 @@ object OapBenchmarkDataBuilder extends OapPerfSuiteContext with Logging {
   )
 
   def getDatabase(format: String) : String = {
+//    val prefix = properties.get("oap.benchmark.database.prefix").get
+//    val postfix = properties.get("oap.benchmark.database.postfix").get
     val dataScale = properties.get("oap.benchmark.tpcds.data.scale").get.toInt
+//   val dataScale = 2
     val baseName = format match {
       case "parquet" => s"parquet$dataScale"
       case "orc" => s"orc$dataScale"
       case _ => "default"
     }
 
-    baseName 
+    baseName
   }
 
   def formatTableLocation(rootDir: String, tableFormat: String): String = {

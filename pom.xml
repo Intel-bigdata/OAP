@@ -365,18 +365,13 @@
       <artifactId>guava</artifactId>
       <version>18.0</version>
     </dependency>
-<!--    <dependency>-->
-<!--      <groupId>com.databricks</groupId>-->
-<!--      <artifactId>spark-sql-perf_2.11</artifactId>-->
-<!--      <version>0.4.11-SNAPSHOT</version>-->
-<!--    </dependency>-->
-    <dependency>
+   <dependency>
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
       <version>0.9.10</version>
       <scope>compile</scope>
-    </dependency>
-  </dependencies>
+   </dependency>
+</dependencies>
 
   <build>
     <plugins>
@@ -417,8 +412,7 @@
               <include>org.apache.parquet:*</include>
               <include>org.apache.orc:*</include>
               <include>io.airlift:*</include>
-	       <include>org.reflections:reflections</include>
-              <include>com.databricks:spark-sql-perf_2.11</include>
+	      <include>org.reflections:reflections</include>
             </includes>
           </artifactSet>
           <relocations>

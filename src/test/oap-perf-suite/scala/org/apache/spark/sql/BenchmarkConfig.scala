@@ -339,40 +339,40 @@ trait ParquetVsOapVsOrcConfigSet extends BenchmarkConfigSelector{
   )
 }
 
-trait OapStrategyConfigSet extends BenchmarkConfigSelector{
-  // TODO: choose conf
-  def allConfigurations: Seq[BenchmarkConfig] = Seq(
-    new BenchmarkConfig()
-      .setBenchmarkConfName("oapStrategy enabled")
-      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
-      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
-      .setSparkConf("spark.sql.oap.oindex.eis.enabled", "false")
-      .setSparkConf("spark.sql.oap.strategies.enabled", "true"),
-    new BenchmarkConfig()
-      .setBenchmarkConfName("oapStrategy disabled")
-      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
-      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
-      .setSparkConf("spark.sql.oap.oindex.eis.enabled", "true")
-      .setSparkConf("spark.sql.oap.strategies.enabled", "false")
-  )
-}
-
-trait CacheMissConfigSet extends BenchmarkConfigSelector {
-  def allConfigurations: Seq[BenchmarkConfig] = Seq(
-    new BenchmarkConfig()
-      .setBenchmarkConfName("offheap memory only")
-      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
-      .setSparkConf("spark.memory.offHeap.enabled", "true")
-      .setSparkConf("spark.memory.offHeap.size", "10g")
-      .setSparkConf("spark.sql.oap.oindex.eis.enabled", "false"),
-    new BenchmarkConfig()
-      .setBenchmarkConfName("no offheap used")
-      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
-      .setSparkConf("spark.memory.offHeap.enabled", "false")
-      .setSparkConf("spark.sql.oap.oindex.eis.enabled", "false")
-  )
-}
-
+//trait OapStrategyConfigSet extends BenchmarkConfigSelector{
+//  // TODO: choose conf
+//  def allConfigurations: Seq[BenchmarkConfig] = Seq(
+//    new BenchmarkConfig()
+//      .setBenchmarkConfName("oapStrategy enabled")
+//      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
+//      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
+//      .setSparkConf("spark.sql.oap.oindex.eis.enabled", "false")
+//      .setSparkConf("spark.sql.oap.strategies.enabled", "true"),
+//    new BenchmarkConfig()
+//      .setBenchmarkConfName("oapStrategy disabled")
+//      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
+//      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
+//      .setSparkConf("spark.sql.oap.oindex.eis.enabled", "true")
+//      .setSparkConf("spark.sql.oap.strategies.enabled", "false")
+//  )
+//}
+//
+//trait CacheMissConfigSet extends BenchmarkConfigSelector {
+//  def allConfigurations: Seq[BenchmarkConfig] = Seq(
+//    new BenchmarkConfig()
+//      .setBenchmarkConfName("offheap memory only")
+//      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
+//      .setSparkConf("spark.memory.offHeap.enabled", "true")
+//      .setSparkConf("spark.memory.offHeap.size", "10g")
+//      .setSparkConf("spark.sql.oap.oindex.eis.enabled", "false"),
+//    new BenchmarkConfig()
+//      .setBenchmarkConfName("no offheap used")
+//      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
+//      .setSparkConf("spark.memory.offHeap.enabled", "false")
+//      .setSparkConf("spark.sql.oap.oindex.eis.enabled", "false")
+//  )
+//}
+//
 trait LocalClusterConfigSet extends BenchmarkConfigSelector {
   // TODO: choose conf
   def allConfigurations: Seq[BenchmarkConfig] = Seq(
@@ -382,7 +382,7 @@ trait LocalClusterConfigSet extends BenchmarkConfigSelector {
       .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
       .setSparkConf("spark.memory.offHeap.enabled", "true")
       .setSparkConf("spark.memory.offHeap.size", "100m")
-    // TODO: Here this config does not work because in local
+//    // TODO: Here this config does not work because in local
     // mode, MemoryManager initialization do only once as it
     // is a object. 
 //    new BenchmarkConfig()
@@ -405,3 +405,4 @@ trait LocalClusterConfigSet extends BenchmarkConfigSelector {
 //      .setSparkConf("spark.sql.oap.offheap.enable", "false")
   )
 }
+
