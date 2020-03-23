@@ -1,0 +1,25 @@
+spark.driver.extraClassPath   /root/haodong/SSO/target/sso-0.1-jar-with-dependencies.jar
+spark.driver.extraJavaOptions -Djava.library.path=/root/haodong/SSO/src/main/cpp
+spark.executor.extraClassPath /root/haodong/SSO/target/sso-0.1-jar-with-dependencies.jar
+spark.executor.extraJavaOptions -Djava.library.path=/root/haodong/SSO/src/main/cpp
+
+spark.shuffle.manager org.apache.spark.shuffle.pmof.PmofShuffleManager
+
+spark.shuffle.pmof.enable_rdma true
+spark.shuffle.pmof.enable_pmem true
+
+# for persistent memory
+spark.shuffle.pmof.pmem_list /dev/dax0.0,/dev/dax1.0
+spark.shuffle.spill.pmof.MemoryThreshold 16777216 
+
+# for rdma
+spark.shuffle.pmof.server_buffer_nums 32
+spark.shuffle.pmof.client_buffer_nums 32
+spark.shuffle.pmof.map_serializer_buffer_size 262144
+spark.shuffle.pmof.reduce_serializer_buffer_size 262144
+spark.shuffle.pmof.chunk_size 262144
+spark.shuffle.pmof.server_pool_size 2
+spark.shuffle.pmof.client_pool_size 2
+#spark.shuffle.pmof.metadata_compress true
+spark.shuffle.pmof.shuffle_block_size 2097152
+spark.shuffle.pmof.node sr140-172.168.0.40,sr141-172.168.0.41,sr142-172.168.0.42,sr143-172.168.0.43
