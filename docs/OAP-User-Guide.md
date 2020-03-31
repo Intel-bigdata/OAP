@@ -281,6 +281,7 @@ spark.sql.oap.cache.guardian.memory.size                   10g      # according 
 Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks failed due to "cache guardian use too much memory", user could set `spark.sql.oap.cache.guardian.memory.size ` to a larger number, and the default size is 10GB. Besides, user could increase `spark.sql.oap.cache.guardian.free.thread.nums` or decrease `spark.sql.oap.cache.dispose.timeout.ms` to accelerate memory free.
 ### Enabling Index/Data cache separation
 OAP now supports different cache backend, which includes `guava`, `vmemcache`, `simple` and `noevict`, for different cache manager: `offheap` and `pm`. So, if you want to optimize the cache media utilization, you can enable cache separation of data and index with different cache media and strategies. 
+
 For example, We use DRAM(`offheap`) for index cache, DCPMM(`pm`) for data cache.
 Then we need these configs in spark-defaults.conf.
 ```
@@ -288,7 +289,7 @@ spark.sql.oap.index.data.cache.separation.enable          true
 spark.sql.oap.mix.index.memory.manager                    offheap
 spark.sql.oap.mix.data.memory.manager                     pm
 ```
-Or we use DRAM(`offheap`), guava for index cache; DCPMM(`pm`), vmemcache for data cache.
+Or we use DRAM(`offheap`), `guava` for index cache; DCPMM(`pm`), `vmemcache` for data cache.
 ```
 spark.sql.oap.index.data.cache.separation.enable          true
 spark.oap.cache.strategy                                  mix
@@ -297,6 +298,14 @@ spark.sql.oap.mix.index.cache.backend                     guava
 spark.sql.oap.mix.index.memory.manager                    offheap
 spark.sql.oap.mix.data.cache.backend                      vmem
 spark.sql.oap.mix.data.memory.manager                     tmp
+```
+### Enabling Binary cache 
+We introduce binary cache for both Parquet and ORC fileformat to improve cache space utilization compared to ColumnVector cache. When enabling binary cache, you should add following configs to `spark-defaults.conf`.
+```
+spark.sql.oap.parquet.binary.cache.enabled                true      # for parquet fileformat
+spark.sql.oap.parquet.data.cache.enable                   false     # for ColumnVector, default is false
+spark.sql.oap.orc.binary.cache.enable                     true      # for orc fileformat
+spark.sql.oap.orc.data.cache.enable                       false     # for ColumnVector, default is false
 ```
 ## Run TPC-DS Benchmark for OAP Cache
 
