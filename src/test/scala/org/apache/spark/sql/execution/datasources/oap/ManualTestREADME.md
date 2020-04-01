@@ -1,5 +1,8 @@
-The following is to show how to test Oap manually.
-You can paste the following code into Spark-shell.
+# Test OAP manually
+
+Paste the following code into a Spark-shell to test OAP manually.
+
+```
 
 // ======================== pre import and case class define ========================
 import org.apache.spark.{SparkConf, SparkContext}
@@ -205,3 +208,5 @@ sql("cache table tablename")
 //=========================================key scan==============================================
 df.filter("age = 6234567").selectExpr("count(name)", "sum(age)").show
 df.filter("age >= 6234567 and age <= 6234596").selectExpr("count(name)", "sum(age)").show
+
+```
