@@ -214,30 +214,30 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
       .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false")
       .setSparkConf("spark.sql.oap.orc.data.cache.enable", "true")
       .setSparkConf("spark.sql.orc.copyBatchToSpark", "true"),
-    //    new BenchmarkConfig()
-    //      .setBenchmarkConfName("oap w/ index")
-    //      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
-    //      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true"),
-    //    new BenchmarkConfig()
-    //      .setBenchmarkConfName("oap w/ index oap cache enabled")
-    //      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
-    //      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
-    //      .setSparkConf("spark.sql.oap.oapfileformat.data.cache.enable", "true"),
-    //    new BenchmarkConfig()
-    //      .setBenchmarkConfName("oap w/ index data cache separation enabled")
-    //      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
-    //      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
-    //      .setSparkConf("spark.sql.oap.oapfileformat.data.cache.enable", "true")
-    //      .setSparkConf("spark.sql.oap.index.data.cache.separation.enable", "true"),
-    //    new BenchmarkConfig()
-    //      .setBenchmarkConfName("oap w/o index")
-    //      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
-    //      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false"),
-    //    new BenchmarkConfig()
-    //      .setBenchmarkConfName("oap w/o index oap cache enabled")
-    //      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
-    //      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false")
-    //      .setSparkConf("spark.sql.oap.oapfileformat.data.cache.enable", "true"),
+//    new BenchmarkConfig()
+//      .setBenchmarkConfName("oap w/ index")
+//      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
+//      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true"),
+//    new BenchmarkConfig()
+//      .setBenchmarkConfName("oap w/ index oap cache enabled")
+//      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
+//      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
+//      .setSparkConf("spark.sql.oap.oapfileformat.data.cache.enable", "true"),
+//    new BenchmarkConfig()
+//      .setBenchmarkConfName("oap w/ index data cache separation enabled")
+//      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
+//      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
+//      .setSparkConf("spark.sql.oap.oapfileformat.data.cache.enable", "true")
+//      .setSparkConf("spark.sql.oap.index.data.cache.separation.enable", "true"),
+//    new BenchmarkConfig()
+//      .setBenchmarkConfName("oap w/o index")
+//      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
+//      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false"),
+//    new BenchmarkConfig()
+//      .setBenchmarkConfName("oap w/o index oap cache enabled")
+//      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
+//      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false")
+//      .setSparkConf("spark.sql.oap.oapfileformat.data.cache.enable", "true"),
     new BenchmarkConfig()
       .setBenchmarkConfName("parquet w/ index")
       .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
@@ -283,7 +283,7 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
       .setSparkConf("spark.sql.oap.fiberCache.memory.manager", "mix")
       .setSparkConf("spark.oap.cache.strategy", "mix"),
     new BenchmarkConfig()
-      .setBenchmarkConfName("parquet w/o index oap cache enabled with SNAPPY compress")
+      .setBenchmarkConfName("parquet w/o index oap cache enabled with SNAPPY cache compress")
       .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
       .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false")
       .setSparkConf("spark.sql.oap.parquet.data.cache.enable", "true")
