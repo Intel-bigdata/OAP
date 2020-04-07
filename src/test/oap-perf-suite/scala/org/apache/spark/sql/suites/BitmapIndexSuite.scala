@@ -16,11 +16,11 @@
  */
 package org.apache.spark.sql.suites
 
-import org.apache.spark.sql.{BenchmarkConfig, OapBenchmarkDataBuilder, OapTestSuite, ParquetVsOapVsOrcConfigSet}
+import org.apache.spark.sql.{BenchmarkConfig, OapBenchmarkDataBuilder, OapTestSuite, ParquetVsOrcConfigSet}
 import org.apache.spark.sql.internal.oap.OapConf
 
-object BitmapIndexSuite extends OapTestSuite with ParquetVsOapVsOrcConfigSet {
-  override protected def getAppName: String = "BtreeIndexBenchmarkSuite"
+object BitmapIndexSuite extends OapTestSuite with ParquetVsOrcConfigSet {
+  override protected def getAppName: String = "BitmapIndexBenchmarkSuite"
 
   private val table = "store_sales"
 
@@ -91,19 +91,11 @@ object BitmapIndexSuite extends OapTestSuite with ParquetVsOapVsOrcConfigSet {
       s"SELECT * FROM $table WHERE $attr in ( $range1to10 )"),
     OapBenchmarkTest("attr in range1to5",
       s"SELECT * FROM $table WHERE $attr in ( $range1to5 )"),
-    OapBenchmarkTest("attr = 10",
-      s"SELECT * FROM $table WHERE $attr = 10"),
-    OapBenchmarkTest("attr = 25",
-      s"SELECT * FROM $table WHERE $attr = 25"),
     // Two columns query
     OapBenchmarkTest("attr in range1to10 & ss_customer_sk >= 120000",
       s"SELECT * FROM $table WHERE $attr in ( $range1to10 ) AND ss_customer_sk >= 120000"),
     OapBenchmarkTest("attr in range1to5 & ss_list_price < 100.0",
       s"SELECT * FROM $table WHERE $attr in ( $range1to5 ) AND ss_list_price < 100.0"),
-    OapBenchmarkTest("attr = 10 & ss_net_paid > 100.0 & ss_net_paid < 200.0",
-      s"SELECT * FROM $table WHERE $attr = 10 AND ss_net_paid > 100.0 AND ss_net_paid < 200.0"),
-    OapBenchmarkTest("attr = 25 & ss_net_paid > 100.0 & ss_net_paid < 200.0",
-      s"SELECT * FROM $table WHERE $attr = 25 AND ss_net_paid > 100.0 AND ss_net_paid < 200.0"),
     // Three columns query
     OapBenchmarkTest("attr in range1to10 & ss_customer_sk >= 120000 & ss_list_price < 100.0",
       s"SELECT * FROM $table WHERE $attr in ( $range1to10 ) AND ss_customer_sk >= 120000 AND ss_list_price < 100.0"),
