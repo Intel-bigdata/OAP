@@ -1,5 +1,7 @@
 #include "codegen/arrow_compute/ext/codegen_node_visitor_v2.h"
+
 #include <gandiva/node.h>
+
 #include <iostream>
 #include <sstream>
 
@@ -21,77 +23,29 @@ arrow::Status CodeGenNodeVisitorV2::Visit(const gandiva::FunctionNode& node) {
   }
 
   auto func_name = node.descriptor()->name();
-  std::stringstream out_ss;
   std::stringstream ss;
-  std::stringstream check_ss;
   if (func_name.compare("less_than") == 0) {
-    auto check_str = child_visitor_list[0]->GetPreCheck();
-    if (!check_str.empty()) {
-      check_ss << check_str << " && ";
-    }
-    check_str = child_visitor_list[1]->GetPreCheck();
-    if (!check_str.empty()) {
-      check_ss << check_str << " && ";
-    }
     ss << "(" << child_visitor_list[0]->GetResult() << " < "
        << child_visitor_list[1]->GetResult() << ")";
   } else if (func_name.compare("greater_than") == 0) {
-    auto check_str = child_visitor_list[0]->GetPreCheck();
-    if (!check_str.empty()) {
-      check_ss << check_str << " && ";
-    }
-    check_str = child_visitor_list[1]->GetPreCheck();
-    if (!check_str.empty()) {
-      check_ss << check_str << " && ";
-    }
     ss << "(" << child_visitor_list[0]->GetResult() << " > "
        << child_visitor_list[1]->GetResult() << ")";
   } else if (func_name.compare("less_than_or_equal_to") == 0) {
-    auto check_str = child_visitor_list[0]->GetPreCheck();
-    if (!check_str.empty()) {
-      check_ss << check_str << " && ";
-    }
-    check_str = child_visitor_list[1]->GetPreCheck();
-    if (!check_str.empty()) {
-      check_ss << check_str << " && ";
-    }
     ss << "(" << child_visitor_list[0]->GetResult()
        << " <= " << child_visitor_list[1]->GetResult() << ")";
   } else if (func_name.compare("greater_than_or_equal_to") == 0) {
-    auto check_str = child_visitor_list[0]->GetPreCheck();
-    if (!check_str.empty()) {
-      check_ss << check_str << " && ";
-    }
-    check_str = child_visitor_list[1]->GetPreCheck();
-    if (!check_str.empty()) {
-      check_ss << check_str << " && ";
-    }
     ss << "(" << child_visitor_list[0]->GetResult()
        << " >= " << child_visitor_list[1]->GetResult() << ")";
   } else if (func_name.compare("equal") == 0) {
-    auto check_str = child_visitor_list[0]->GetPreCheck();
-    if (!check_str.empty()) {
-      check_ss << check_str << " && ";
-    }
-    check_str = child_visitor_list[1]->GetPreCheck();
-    if (!check_str.empty()) {
-      check_ss << check_str << " && ";
-    }
     ss << "(" << child_visitor_list[0]->GetResult()
        << " == " << child_visitor_list[1]->GetResult() << ")";
   } else if (func_name.compare("not") == 0) {
-    check_ss << child_visitor_list[0]->GetPreCheck();
-    ss << "!(" << child_visitor_list[0]->GetResult() << ")";
-  } else {
-    check_ss << child_visitor_list[0]->GetPreCheck();
     ss << child_visitor_list[0]->GetResult();
   }
   if (cur_func_id == 0) {
-    out_ss << check_ss.str() << ss.str();
-    codes_str_ = out_ss.str();
+    codes_str_ = ss.str();
   } else {
     codes_str_ = ss.str();
-    check_str_ = check_ss.str();
   }
   return arrow::Status::OK();
 }
@@ -132,15 +86,15 @@ arrow::Status CodeGenNodeVisitorV2::Visit(const gandiva::FieldNode& node) {
              << std::endl;
   *codes_ss_ << "  input_field_" << cur_func_id << " = (" << type_name << "*)"
              << get_func_list << "[" << arg_id << "](" + index + ");" << std::endl;
+  *codes_ss_ << "} else {" << std::endl;
+  *codes_ss_ << " return false;" << std::endl;
   *codes_ss_ << "}" << std::endl;
 
   std::stringstream ss;
   ss << "*input_field_" << cur_func_id;
   codes_str_ = ss.str();
 
-  std::stringstream ss_check;
-  ss_check << "(input_field_" << cur_func_id << " != nullptr)";
-  check_str_ = ss_check.str();
+  check_str_ = "";
   return arrow::Status::OK();
 }
 

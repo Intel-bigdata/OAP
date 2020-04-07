@@ -770,8 +770,8 @@ class AvgAction : public ActionBase {
   uint64_t GetResultLength() { return cache_sum_.size(); }
 
   arrow::Status Finish(uint64_t offset, uint64_t length, ArrayList* out) override {
-    for (int i = 0; i < cache_sum_.size(); i++) {
-      cache_sum_[i] /= cache_count_[i];
+    for (int i = 0; i < length; i++) {
+      cache_sum_[i + offset] /= cache_count_[i + offset];
     }
     std::shared_ptr<arrow::Array> arr_out;
     auto builder = new arrow::DoubleBuilder(ctx_->memory_pool());
@@ -995,8 +995,8 @@ class AvgByCountAction : public ActionBase {
   uint64_t GetResultLength() { return cache_sum_.size(); }
 
   arrow::Status Finish(uint64_t offset, uint64_t length, ArrayList* out) override {
-    for (int i = 0; i < cache_sum_.size(); i++) {
-      cache_sum_[i] /= cache_count_[i];
+    for (int i = 0; i < length; i++) {
+      cache_sum_[i + offset] /= cache_count_[i + offset];
     }
     auto builder = new arrow::DoubleBuilder(ctx_->memory_pool());
     for (uint64_t i = 0; i < length; i++) {
