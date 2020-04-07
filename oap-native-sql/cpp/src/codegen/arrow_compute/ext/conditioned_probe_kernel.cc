@@ -152,9 +152,11 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
     // we should put items into hashmap
     auto typed_array = std::dynamic_pointer_cast<ArrayType>(in);
     auto insert_on_found = [this](int32_t i) {
+      left_table_size_++;
       memo_index_to_arrayid_[i].emplace_back(cur_array_id_, cur_id_);
     };
     auto insert_on_not_found = [this](int32_t i) {
+      left_table_size_++;
       memo_index_to_arrayid_.push_back({ArrayItemIndex(cur_array_id_, cur_id_)});
     };
 
@@ -186,6 +188,8 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
                                 std::shared_ptr<arrow::RecordBatch>* out)>
         eval_func;
     // prepare process next function
+    std::cout << "HashMap lenghth is " << memo_index_to_arrayid_.size()
+              << ", total stored items count is " << left_table_size_ << std::endl;
     switch (join_type_) {
       case 0: { /*Inner Join*/
         eval_func = [this, schema](
@@ -224,7 +228,7 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
           auto result_schema =
               arrow::schema({arrow::field("left_indices", left_array_type),
                              arrow::field("right_indices", arrow::uint32())});
-          *out = arrow::RecordBatch::Make(result_schema, cur_id_,
+          *out = arrow::RecordBatch::Make(result_schema, right_arr_out->length(),
                                           {left_arr_out, right_arr_out});
           return arrow::Status::OK();
         };
@@ -281,8 +285,9 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
           auto result_schema =
               arrow::schema({arrow::field("left_indices", left_array_type),
                              arrow::field("right_indices", arrow::uint32())});
-          *out = arrow::RecordBatch::Make(result_schema, cur_id_,
+          *out = arrow::RecordBatch::Make(result_schema, right_arr_out->length(),
                                           {left_arr_out, right_arr_out});
+
           return arrow::Status::OK();
         };
       } break;
@@ -349,7 +354,7 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
           auto result_schema =
               arrow::schema({arrow::field("left_indices", left_array_type),
                              arrow::field("right_indices", arrow::uint32())});
-          *out = arrow::RecordBatch::Make(result_schema, cur_id_,
+          *out = arrow::RecordBatch::Make(result_schema, right_arr_out->length(),
                                           {left_arr_out, right_arr_out});
           return arrow::Status::OK();
         };
@@ -392,7 +397,7 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
           auto result_schema =
               arrow::schema({arrow::field("left_indices", left_array_type),
                              arrow::field("right_indices", arrow::uint32())});
-          *out = arrow::RecordBatch::Make(result_schema, cur_id_,
+          *out = arrow::RecordBatch::Make(result_schema, right_arr_out->length(),
                                           {left_arr_out, right_arr_out});
           return arrow::Status::OK();
         };
@@ -412,6 +417,7 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
  private:
   using ArrayType = typename arrow::TypeTraits<InType>::ArrayType;
 
+  uint64_t left_table_size_ = 0;
   std::shared_ptr<gandiva::Node> func_node_;
   std::vector<int> left_key_indices_;
   std::vector<int> right_key_indices_;

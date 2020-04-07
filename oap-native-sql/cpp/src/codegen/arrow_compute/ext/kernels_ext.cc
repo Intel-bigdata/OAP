@@ -37,6 +37,7 @@
 #include "codegen/arrow_compute/ext/codegen_node_visitor.h"
 #include "codegen/arrow_compute/ext/item_iterator.h"
 #include "codegen/arrow_compute/ext/shuffle_v2_action.h"
+#include "utils/macros.h"
 
 namespace sparkcolumnarplugin {
 namespace codegen {
@@ -183,6 +184,10 @@ class SplitArrayListWithActionKernel::Impl {
                                     std::shared_ptr<arrow::RecordBatch>* out)>
             eval_func)
         : ctx_(ctx), total_length_(total_length), eval_func_(eval_func) {}
+    ~SplitArrayWithActionResultIterator() {
+      std::cout << "SplitArrayWithActionResultIterator total took " << elapse_time_
+                << " us." << std::endl;
+    }
 
     bool HasNext() override {
       if (offset_ >= total_length_) {
@@ -197,7 +202,7 @@ class SplitArrayListWithActionKernel::Impl {
         return arrow::Status::OK();
       }
       auto length = (total_length_ - offset_) > 4096 ? 4096 : (total_length_ - offset_);
-      RETURN_NOT_OK(eval_func_(offset_, length, out));
+      TIME_MICRO_OR_RAISE(elapse_time_, eval_func_(offset_, length, out));
       offset_ += length;
       // arrow::PrettyPrint(*(*out).get(), 2, &std::cout);
       return arrow::Status::OK();
@@ -210,6 +215,7 @@ class SplitArrayListWithActionKernel::Impl {
         eval_func_;
     uint64_t offset_ = 0;
     const uint64_t total_length_;
+    uint64_t elapse_time_ = 0;
   };
 };
 

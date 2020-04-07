@@ -172,7 +172,6 @@ class ColumnarAggregation(
   logInfo(s"resultAttributes is ${resultAttributes},\naggregateToResultOrdinalList is ${aggregateToResultOrdinalList}")
 //////////////////////////////////////////////////////////////////////////////////////////////////
   def close(): Unit = {
-    logInfo(" closed");
     if (aggregator != null) {
       aggregator.close()
       aggregator = null
@@ -260,6 +259,10 @@ class ColumnarAggregation(
           return true
         }
         if ( !nextBatch ) {
+          if (result_iterator != null) {
+            result_iterator.close()
+            result_iterator = null
+          }
           return false
         }
 
@@ -273,7 +276,6 @@ class ColumnarAggregation(
             }
             cb = cbIterator.next()
   
-            val beforeEval = System.nanoTime()
             if (cb.numRows > 0) {
               updateAggregationResult(cb)
               processedNumRows += cb.numRows

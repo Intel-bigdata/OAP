@@ -321,14 +321,6 @@ class ColumnarShuffledHashJoin(
       last_cb.close()
       last_cb = null
     }
-    if (prober != null) {
-      prober.close()
-      prober = null
-    }
-    if (build_shuffler != null) {
-      build_shuffler.close()
-      build_shuffler = null
-    }
     if (probe_iterator != null) {
       probe_iterator.close()
       probe_iterator = null
@@ -337,8 +329,15 @@ class ColumnarShuffledHashJoin(
       build_shuffle_iterator.close()
       build_shuffle_iterator = null
     }
+    if (build_shuffler != null) {
+      build_shuffler.close()
+      build_shuffler = null
+    }
+    if (prober != null) {
+      prober.close()
+      prober = null
+    }
   }
-
 }
 
 object ColumnarShuffledHashJoin {
