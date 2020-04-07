@@ -187,16 +187,9 @@ class ArrowComputeCodeGenerator : public CodeGenerator {
       visitor->PrintMetrics();
       std::cout << std::endl;
     }
-    for (auto arr : batch_array[0]) {
-      std::cout << arr->ToString();
-    }
-    for (auto field : fields) {
-      std::cout << field->ToString();
-    }
 
     res_schema_ = arrow::schema(ret_types_);
     for (int i = 0; i < batch_array.size(); i++) {
-      std::cout << res_schema_->ToString() << std::endl;
       auto record_batch =
           arrow::RecordBatch::Make(res_schema_, batch_size_array[i], batch_array[i]);
 #ifdef DEBUG

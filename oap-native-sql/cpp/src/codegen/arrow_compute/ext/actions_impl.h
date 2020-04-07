@@ -139,7 +139,6 @@ class UniqueAction : public ActionBase {
     auto length = GetResultLength();
     for (uint64_t i = 0; i < length; i++) {
       if (cache_validity_[i]) {
-        std::cout << cache_[i] << std::endl;
         builder_->Append(cache_[i]);
       } else {
         builder_->AppendNull();

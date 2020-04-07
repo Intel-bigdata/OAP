@@ -162,7 +162,6 @@ class ConditionedShuffleArrayListKernel::Impl {
         }
         i = 0;
         for (auto id : output_indices_) {
-          std::cout << id << std::endl;
           if (id < left_field_list_size) {
             RETURN_NOT_OK(
                 output_action_list_[i++]->Submit(left_in[id], left_selection, &shuffle));
@@ -345,7 +344,7 @@ class ConditionedShuffleArrayListKernel::Impl {
 
     // compile the code
     std::string cmd = "gcc -Wall -Wextra " + cppfile + " -o " + tmplibfile +
-                      " -O3 -shared -fPIC -lspark_columnar_jni &> " + logfile;
+                      " -O3 -shared -fPIC -lspark_columnar_jni > " + logfile;
     int ret = system(cmd.c_str());
     if (WEXITSTATUS(ret) != EXIT_SUCCESS) {
       std::cout << "compilation failed, see " << logfile << std::endl;

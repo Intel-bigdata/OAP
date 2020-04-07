@@ -585,31 +585,44 @@ class AvgByCountArrayKernel::Impl {
     RETURN_NOT_OK(arrow::compute::Sum(ctx_, *in[1].get(), &cnt_out));
     sum_scalar_list_.push_back(sum_out.scalar());
     cnt_scalar_list_.push_back(cnt_out.scalar());
-    res_data_type_ = sum_out.scalar()->type;
+    sum_res_data_type_ = sum_out.scalar()->type;
+    cnt_res_data_type_ = cnt_out.scalar()->type;
     return arrow::Status::OK();
   }
 
+#define PROCESS_INTERNAL(SumDataType, CntDataType) \
+  case CntDataType::type_id: {                     \
+    FinishInternal<SumDataType, CntDataType>(out); \
+  } break;
+
   arrow::Status Finish(ArrayList* out) {
-    switch (res_data_type_->id()) {
-#define PROCESS(DataType)                         \
-  case DataType::type_id: {                       \
-    RETURN_NOT_OK(FinishInternal<DataType>(out)); \
+    switch (sum_res_data_type_->id()) {
+#define PROCESS(SumDataType)                           \
+  case SumDataType::type_id: {                         \
+    switch (cnt_res_data_type_->id()) {                \
+      PROCESS_INTERNAL(SumDataType, arrow::UInt64Type) \
+      PROCESS_INTERNAL(SumDataType, arrow::Int64Type)  \
+      PROCESS_INTERNAL(SumDataType, arrow::DoubleType) \
+    }                                                  \
   } break;
       PROCESS_SUPPORTED_TYPES(PROCESS)
 #undef PROCESS
+#undef PROCESS_INTERNAL
     }
     return arrow::Status::OK();
   }
 
-  template <typename DataType>
+  template <typename SumDataType, typename CntDataType>
   arrow::Status FinishInternal(ArrayList* out) {
-    using CType = typename arrow::TypeTraits<DataType>::CType;
-    using ScalarType = typename arrow::TypeTraits<DataType>::ScalarType;
-    using CntScalarType = typename arrow::TypeTraits<arrow::Int64Type>::ScalarType;
-    CType sum_res = 0;
-    CType cnt_res = 0;
+    using SumCType = typename arrow::TypeTraits<SumDataType>::CType;
+    using CntCType = typename arrow::TypeTraits<CntDataType>::CType;
+    using SumScalarType = typename arrow::TypeTraits<SumDataType>::ScalarType;
+    using CntScalarType = typename arrow::TypeTraits<CntDataType>::ScalarType;
+    SumCType sum_res = 0;
+    CntCType cnt_res = 0;
     for (size_t i = 0; i < sum_scalar_list_.size(); i++) {
-      auto sum_typed_scalar = std::dynamic_pointer_cast<ScalarType>(sum_scalar_list_[i]);
+      auto sum_typed_scalar =
+          std::dynamic_pointer_cast<SumScalarType>(sum_scalar_list_[i]);
       auto cnt_typed_scalar =
           std::dynamic_pointer_cast<CntScalarType>(cnt_scalar_list_[i]);
       sum_res += sum_typed_scalar->value;
@@ -629,10 +642,11 @@ class AvgByCountArrayKernel::Impl {
  private:
   arrow::compute::FunctionContext* ctx_;
   std::shared_ptr<arrow::DataType> data_type_;
-  std::shared_ptr<arrow::DataType> res_data_type_;
+  std::shared_ptr<arrow::DataType> cnt_res_data_type_;
+  std::shared_ptr<arrow::DataType> sum_res_data_type_;
   std::vector<std::shared_ptr<arrow::Scalar>> sum_scalar_list_;
   std::vector<std::shared_ptr<arrow::Scalar>> cnt_scalar_list_;
-};
+};  // namespace extra
 
 arrow::Status AvgByCountArrayKernel::Make(arrow::compute::FunctionContext* ctx,
                                           std::shared_ptr<arrow::DataType> data_type,

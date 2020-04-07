@@ -417,7 +417,6 @@ TEST(TestArrowCompute, GroupByTwoUtf8AggregateWithMultipleBatchTest) {
   auto res_sch = arrow::schema({f_unique_0, f_unique_1, f_sum});
   MakeInputBatch(expected_result_string, res_sch, &expected_result);
 
-  std::cout << "3" << std::endl;
   ASSERT_NOT_OK(Equals(*expected_result.get(), *(result_batch[0]).get()));
 }
 
