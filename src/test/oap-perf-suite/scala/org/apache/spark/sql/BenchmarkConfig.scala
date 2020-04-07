@@ -214,6 +214,12 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
       .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false")
       .setSparkConf("spark.sql.oap.orc.data.cache.enable", "true")
       .setSparkConf("spark.sql.orc.copyBatchToSpark", "true"),
+    new BenchmarkConfig()
+      .setBenchmarkConfName("Orc w/o index oap binary cache enabled")
+      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "orc")
+      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false")
+      .setSparkConf("spark.sql.oap.orc.binary.cache.enable", "true")
+      .setSparkConf("spark.sql.orc.copyBatchToSpark", "true"),
 //    new BenchmarkConfig()
 //      .setBenchmarkConfName("oap w/ index")
 //      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "oap")
