@@ -75,9 +75,9 @@ class SplitArrayListWithActionKernel::Impl {
       } else if (action_name_list_[action_id].compare("action_avg") == 0) {
         RETURN_NOT_OK(MakeAvgAction(ctx_, type_list[type_id], &action));
       } else if (action_name_list_[action_id].compare("action_min") == 0) {
-        RETURN_NOT_OK(MakeAvgAction(ctx_, type_list[type_id], &action));
+        RETURN_NOT_OK(MakeMinAction(ctx_, type_list[type_id], &action));
       } else if (action_name_list_[action_id].compare("action_max") == 0) {
-        RETURN_NOT_OK(MakeAvgAction(ctx_, type_list[type_id], &action));
+        RETURN_NOT_OK(MakeMaxAction(ctx_, type_list[type_id], &action));
       } else if (action_name_list_[action_id].compare("action_sum_count") == 0) {
         RETURN_NOT_OK(MakeSumCountAction(ctx_, type_list[type_id], &action));
       } else if (action_name_list_[action_id].compare("action_avgByCount") == 0) {

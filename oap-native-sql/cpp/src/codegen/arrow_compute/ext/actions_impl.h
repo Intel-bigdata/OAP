@@ -7,6 +7,7 @@
 #include <arrow/type_fwd.h>
 #include <arrow/type_traits.h>
 #include <arrow/util/checked_cast.h>
+
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -1108,6 +1109,40 @@ arrow::Status MakeAvgAction(arrow::compute::FunctionContext* ctx,
 #define PROCESS(InType)                                         \
   case InType::type_id: {                                       \
     auto action_ptr = std::make_shared<AvgAction<InType>>(ctx); \
+    *out = std::dynamic_pointer_cast<ActionBase>(action_ptr);   \
+  } break;
+    PROCESS_SUPPORTED_TYPES(PROCESS)
+#undef PROCESS
+    default:
+      break;
+  }
+  return arrow::Status::OK();
+}
+
+arrow::Status MakeMinAction(arrow::compute::FunctionContext* ctx,
+                            std::shared_ptr<arrow::DataType> type,
+                            std::shared_ptr<ActionBase>* out) {
+  switch (type->id()) {
+#define PROCESS(InType)                                         \
+  case InType::type_id: {                                       \
+    auto action_ptr = std::make_shared<MinAction<InType>>(ctx); \
+    *out = std::dynamic_pointer_cast<ActionBase>(action_ptr);   \
+  } break;
+    PROCESS_SUPPORTED_TYPES(PROCESS)
+#undef PROCESS
+    default:
+      break;
+  }
+  return arrow::Status::OK();
+}
+
+arrow::Status MakeMaxAction(arrow::compute::FunctionContext* ctx,
+                            std::shared_ptr<arrow::DataType> type,
+                            std::shared_ptr<ActionBase>* out) {
+  switch (type->id()) {
+#define PROCESS(InType)                                         \
+  case InType::type_id: {                                       \
+    auto action_ptr = std::make_shared<MaxAction<InType>>(ctx); \
     *out = std::dynamic_pointer_cast<ActionBase>(action_ptr);   \
   } break;
     PROCESS_SUPPORTED_TYPES(PROCESS)
