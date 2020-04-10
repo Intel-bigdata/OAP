@@ -429,6 +429,9 @@ class VMemCache(fiberType: FiberType) extends OapCache with Logging {
   private val conf = SparkEnv.get.conf
   private val initialSizeStr = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim
   private val vmInitialSize = Utils.byteStringAsBytes(initialSizeStr)
+  require(!OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressEnable,
+    "Vmemcache strategy doesn't support fiber cache compression currently, " +
+    "please try other strategy.")
   require(vmInitialSize > 0, "AEP initial size must be greater than zero")
   def initializeVMEMCache(): Unit = {
     if (!initialized) {
@@ -487,10 +490,6 @@ class VMemCache(fiberType: FiberType) extends OapCache with Logging {
       val length = res
       val fiberCache = emptyDataFiber(length)
       val startTime = System.currentTimeMillis()
-      if( OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressEnable ) {
-        throw new OapException("Vmemcache strategy doesn't support fiber cache compression" +
-          " currently, please try other strategy.")
-      }
       val get = VMEMCacheJNI.getNative(fiberKey.getBytes(), null,
         0, fiberKey.length, fiberCache.getBaseOffset, 0, fiberCache.size().toInt)
       logDebug(s"second getNative require ${length} bytes. " +
@@ -528,10 +527,6 @@ class VMemCache(fiberType: FiberType) extends OapCache with Logging {
 
   override def cache(fiberId: FiberId): FiberCache = {
     val fiber = super.cache(fiberId)
-    if( OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressEnable ) {
-      throw new OapException("Vmemcache strategy doesn't support fiber cache compression" +
-        " currently, please try other strategy.")
-    }
     VMEMCacheJNI.putNative(fiberId.toFiberKey().getBytes(), null, 0,
       fiberId.toFiberKey().length, fiber.getBaseOffset,
       0, fiber.getOccupiedSize().toInt)
