@@ -315,14 +315,7 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
       .setSparkConf("spark.sql.oap.parquet.binary.cache.enable", "true")
       .setSparkConf("spark.sql.oap.index.data.cache.separation.enable", "true")
       .setSparkConf("spark.sql.oap.fiberCache.memory.manager", "mix")
-      .setSparkConf("spark.oap.cache.strategy", "mix"),
-    new BenchmarkConfig()
-      .setBenchmarkConfName("parquet w/o index oap cache enabled with SNAPPY cache compress")
-      .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
-      .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false")
-      .setSparkConf("spark.sql.oap.parquet.data.cache.enable", "true")
-      .setSparkConf("spark.sql.oap.data.fiber.cache.compress.enable", "true")
-      .setSparkConf("spark.sql.oap.data.fiber.cache.compression.codec", "SNAPPY")
+      .setSparkConf("spark.oap.cache.strategy", "mix")
   )
 }
 
