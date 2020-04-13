@@ -10,7 +10,6 @@
 #include <arrow/type_traits.h>
 #include <arrow/util/bit_util.h>
 #include <arrow/util/checked_cast.h>
-#include <arrow/util/hashing.h>
 #include <arrow/visitor_inline.h>
 #include <dlfcn.h>
 #include <gandiva/configuration.h>
@@ -33,6 +32,7 @@
 #include "codegen/arrow_compute/ext/item_iterator.h"
 #include "codegen/arrow_compute/ext/kernels_ext.h"
 #include "codegen/arrow_compute/ext/shuffle_v2_action.h"
+#include "third_party/arrow/utils/hashing.h"
 
 namespace sparkcolumnarplugin {
 namespace codegen {
