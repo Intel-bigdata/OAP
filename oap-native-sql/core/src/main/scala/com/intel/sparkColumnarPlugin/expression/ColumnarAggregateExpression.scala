@@ -57,7 +57,7 @@ class ColumnarAggregateExpression(
     mode: AggregateMode,
     isDistinct: Boolean,
     resultId: ExprId)
-    extends AggregateExpression(aggregateFunction, mode, isDistinct, resultId)
+    extends AggregateExpression(aggregateFunction, mode, isDistinct, None, resultId)
     with ColumnarAggregateExpressionBase
     with Logging {
 

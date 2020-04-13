@@ -20,7 +20,7 @@
 
   <properties>
     <sbt.project.name>SparkColumnarPlugin</sbt.project.name>
-    <spark.version>3.0.0-SNAPSHOT</spark.version>
+    <spark.version>3.1.0-SNAPSHOT</spark.version>
     <scala.binary.version>2.12</scala.binary.version>
     <scala.version>2.12.8</scala.version>
     <build.testJarPhase>none</build.testJarPhase>
