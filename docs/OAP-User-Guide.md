@@ -375,7 +375,7 @@ Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks 
 
 ##### Index/Data cache separation
 
-OAP now supports different cache backends including `guava`, `vmemcache`, `simple` and `noevict`, for the `offheap` and `pm` cache managers. To optimize cache media utilization, enable cache separation of data and index with different cache media and strategies by selecting one of the following 4 configurations and add the corresponding settings to `spark-defaults.conf`.
+OAP now supports different cache backends including `guava`, `vmemcache`, `simple` and `noevict`, for the `offheap` and `pm` cache managers. To optimize cache media utilization, enable cache separation of data and index with different cache media and strategies as shown below. Note that when sharing the same media, the data cache and index cache will use a different fiber cache ratio. If you choose one of the following 4 configurations, add the corresponding settings to `spark-defaults.conf`. 
 
 1. DRAM(`offheap`) as cache media, `guava` strategy as index, and data cache backend. 
 
