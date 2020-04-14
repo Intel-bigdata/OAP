@@ -4,10 +4,10 @@
 #include <arrow/ipc/dictionary.h>
 #include <arrow/pretty_print.h>
 #include <arrow/record_batch.h>
-#include <gandiva/jni/protobuf_utils.h>
 #include <jni.h>
 #include <iostream>
 #include <string>
+#include "proto/protobuf_utils.h"
 
 #include "codegen/code_generator_factory.h"
 #include "codegen/common/result_iterator.h"

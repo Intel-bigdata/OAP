@@ -69,8 +69,8 @@ void MakeInputBatch(std::vector<std::string> input_data,
   int i = 0;
   for (auto data : input_data) {
     std::shared_ptr<Array> a0;
-    ASSERT_NOT_OK(
-        arrow::ipc::internal::json::ArrayFromJSON(sch->field(i++)->type(), data.c_str(), &a0));
+    ASSERT_NOT_OK(arrow::ipc::internal::json::ArrayFromJSON(sch->field(i++)->type(),
+                                                            data.c_str(), &a0));
     if (length == -1) {
       length = a0->length();
     }

@@ -3,6 +3,7 @@
 #include <arrow/memory_pool.h>
 #include <arrow/pretty_print.h>
 #include <arrow/record_batch.h>
+#include <arrow/testing/gtest_util.h>
 #include <arrow/type.h>
 #include <gandiva/node.h>
 #include <gtest/gtest.h>
@@ -36,8 +37,10 @@ class BenchmarkArrowComputeJoin : public ::testing::Test {
     std::shared_ptr<arrow::fs::FileSystem> left_fs;
     std::string right_file_name;
     std::string left_file_name;
-    ASSERT_NOT_OK(arrow::fs::FileSystemFromUri(right_path, &right_fs, &right_file_name));
-    ASSERT_NOT_OK(arrow::fs::FileSystemFromUri(left_path, &left_fs, &left_file_name));
+    ASSERT_OK_AND_ASSIGN(right_fs,
+                         arrow::fs::FileSystemFromUri(right_path, &right_file_name));
+    ASSERT_OK_AND_ASSIGN(left_fs,
+                         arrow::fs::FileSystemFromUri(left_path, &left_file_name));
 
     ARROW_ASSIGN_OR_THROW(right_file, right_fs->OpenInputFile(right_file_name));
     ARROW_ASSIGN_OR_THROW(left_file, left_fs->OpenInputFile(left_file_name));
@@ -102,7 +105,7 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmark) {
 
   auto indices_type = std::make_shared<FixedSizeBinaryType>(4);
   auto f_indices = field("indices", indices_type);
-  
+
   auto n_left = TreeExprBuilder::MakeFunction("codegen_left_schema", left_field_node_list,
                                               uint32());
   auto n_right = TreeExprBuilder::MakeFunction("codegen_right_schema",
@@ -114,8 +117,7 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmark) {
   auto f_res = field("res", uint32());
 
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysInner", {n_left_key, n_right_key},
-      indices_type);
+      "conditionedProbeArraysInner", {n_left_key, n_right_key}, indices_type);
   auto n_codegen_probe = TreeExprBuilder::MakeFunction(
       "codegen_withTwoInputs", {n_probeArrays, n_left, n_right}, uint32());
   auto probeArrays_expr = TreeExprBuilder::MakeExpression(n_codegen_probe, f_indices);

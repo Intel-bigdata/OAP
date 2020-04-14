@@ -2,6 +2,7 @@
 #include <arrow/io/interfaces.h>
 #include <arrow/memory_pool.h>
 #include <arrow/record_batch.h>
+#include <arrow/testing/gtest_util.h>
 #include <arrow/type.h>
 #include <gandiva/node.h>
 #include <gtest/gtest.h>
@@ -31,7 +32,7 @@ class BenchmarkArrowComputeBigScale : public ::testing::Test {
               << std::endl;
     std::shared_ptr<arrow::fs::FileSystem> fs;
     std::string file_name;
-    ASSERT_NOT_OK(arrow::fs::FileSystemFromUri(path, &fs, &file_name));
+    ASSERT_OK_AND_ASSIGN(fs, arrow::fs::FileSystemFromUri(path, &file_name));
 
     ARROW_ASSIGN_OR_THROW(file, fs->OpenInputFile(file_name));
 

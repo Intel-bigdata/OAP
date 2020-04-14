@@ -121,7 +121,7 @@ arrow::Status MakeSchema(JNIEnv* env, jbyteArray schema_arr,
 arrow::Status MakeExprVector(JNIEnv* env, jbyteArray exprs_arr,
                              gandiva::ExpressionVector* expr_vector,
                              gandiva::FieldVector* ret_types) {
-  types::ExpressionList exprs;
+  exprs::ExpressionList exprs;
   jsize exprs_len = env->GetArrayLength(exprs_arr);
   jbyte* exprs_bytes = env->GetByteArrayElements(exprs_arr, 0);
 

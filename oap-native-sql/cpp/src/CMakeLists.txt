@@ -19,9 +19,39 @@ option(BENCHMARKS "Build the benchmarks" OFF)
 option(DEBUG "Enable Debug Info" OFF)
 
 find_package(JNI REQUIRED)
-
 set(source_root_directory ${CMAKE_CURRENT_SOURCE_DIR})
 
+# Gandiva protobuf
+
+find_package(Protobuf REQUIRED)
+file(MAKE_DIRECTORY ${root_directory}/src/proto)
+set(PROTO_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/proto")
+set(PROTO_OUTPUT_FILES "${PROTO_OUTPUT_DIR}/Exprs.pb.cc")
+set(PROTO_OUTPUT_FILES ${PROTO_OUTPUT_FILES} "${PROTO_OUTPUT_DIR}/Exprs.pb.h")
+
+set_source_files_properties(${PROTO_OUTPUT_FILES} PROPERTIES GENERATED TRUE)
+
+get_filename_component(ABS_GANDIVA_PROTO ${CMAKE_CURRENT_SOURCE_DIR}/proto/Exprs.proto
+                       ABSOLUTE)
+
+add_custom_command(OUTPUT ${PROTO_OUTPUT_FILES}
+                   COMMAND protobuf::protoc
+                           --proto_path
+                           ${CMAKE_CURRENT_SOURCE_DIR}/proto
+                           --cpp_out
+                           ${PROTO_OUTPUT_DIR}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/proto/Exprs.proto
+                   DEPENDS ${ABS_GANDIVA_PROTO} protobuf::libprotobuf
+                   COMMENT "Running PROTO compiler on Exprs.proto"
+                   VERBATIM)
+
+add_custom_target(jni_proto ALL DEPENDS ${PROTO_OUTPUT_FILES})
+set(PROTO_SRCS "${PROTO_OUTPUT_DIR}/Exprs.pb.cc")
+set(PROTO_HDRS "${PROTO_OUTPUT_DIR}/Exprs.pb.h")
+
+set(GANDIVA_LINK_LIBS protobuf::libprotobuf gandiva)
+
+#######
 if(TESTS)
   find_package(GTest)
 macro(package_add_test TESTNAME)
@@ -43,7 +73,7 @@ endif()
 if(BENCHMARKS)
   find_package(GTest)
   #add_definitions(-DBENCHMARK_FILE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/source_files/)
-  add_compile_definitions(BENCHMARK_FILE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/source_files/")
+  add_compile_definitions(BENCHMARK_FILE_PATH="file://${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/source_files/")
 macro(package_add_benchmark TESTNAME)
   #configure_file(${ARGN}.in ${ARGN})
   add_executable(${TESTNAME} ${ARGN})
@@ -66,7 +96,7 @@ if(DEBUG)
 endif()
 find_library(ARROW_LIB arrow)
 find_library(GANDIVA_LIB gandiva)
-find_library(GANDIVA_PROTOBUF_LIB gandiva_protobuf)
+# find_library(GANDIVA_PROTOBUF_LIB gandiva_protobuf)
 
 # message("jni headers ${JNI_INCLUDE_DIRS}")
 # message("arrow lib ${ARROW_LIB}")
@@ -81,12 +111,14 @@ if(NOT GANDIVA_LIB)
     message(FATAL_ERROR "Gandiva library not found")
 endif()
 
-if(NOT GANDIVA_PROTOBUF_LIB)
-    message(FATAL_ERROR "Gandiva protobuf library not found")
-endif()
+# if(NOT GANDIVA_PROTOBUF_LIB)
+#    message(FATAL_ERROR "Gandiva protobuf library not found")
+# endif()
 
 set(SPARK_COLUMNAR_PLUGIN_SRCS
         jni/jni_wrapper.cc
+        ${PROTO_SRCS}
+        proto/protobuf_utils.cc
         codegen/expr_visitor.cc
         codegen/arrow_compute/expr_visitor.cc
         codegen/arrow_compute/ext/item_iterator.cc
@@ -100,8 +132,9 @@ set(SPARK_COLUMNAR_PLUGIN_SRCS
 
 file(MAKE_DIRECTORY ${root_directory}/releases)
 add_library(spark_columnar_jni SHARED ${SPARK_COLUMNAR_PLUGIN_SRCS})
-target_link_libraries(spark_columnar_jni ${ARROW_LIB} ${GANDIVA_LIB} ${GANDIVA_PROTOBUF_LIB})
-target_include_directories(spark_columnar_jni PUBLIC ${CMAKE_SYSTEM_INCLUDE_PATH} ${JNI_INCLUDE_DIRS} ${source_root_directory})
+add_dependencies(spark_columnar_jni jni_proto)
+target_link_libraries(spark_columnar_jni ${ARROW_LIB} ${GANDIVA_LIB} ${GANDIVA_LINK_LIBS})
+target_include_directories(spark_columnar_jni PUBLIC ${CMAKE_SYSTEM_INCLUDE_PATH} ${JNI_INCLUDE_DIRS} ${source_root_directory} ${PROTO_OUTPUT_DIR})
 set_target_properties(spark_columnar_jni PROPERTIES
                       LIBRARY_OUTPUT_DIRECTORY ${root_directory}/releases
 )
