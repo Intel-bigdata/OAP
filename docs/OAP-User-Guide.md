@@ -375,26 +375,46 @@ Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks 
 
 ##### Index/Data cache separation
 
-OAP now supports different cache backends including `guava`, `vmemcache`, `simple` and `noevict`, for the `offheap` and `pm` cache managers. To optimize cache media utilization, enable cache separation of data and index with different cache media and strategies. 
+OAP now supports different cache backends including `guava`, `vmemcache`, `simple` and `noevict`, for the `offheap` and `pm` cache managers. To optimize cache media utilization, enable cache separation of data and index with different cache media and strategies by selecting one of the following 4 configurations and add the corresponding settings to `spark-defaults.conf`.
 
-For example, to use DRAM(`offheap`) for index cache and DCPMM(`pm`) for data cache, set these configuration values in `spark-defaults.conf`.
-
-```
-spark.sql.oap.index.data.cache.separation.enable          true 
-spark.sql.oap.mix.index.memory.manager                    offheap
-spark.sql.oap.mix.data.memory.manager                     pm
-```
-
-Or to use DRAM(`offheap`) with `guava` for index cache and DCPMM(`pm`) with `vmemcache` for data cache.
+1. DRAM(`offheap`) as cache media, `guava` strategy as index, and data cache backend. 
 
 ```
-spark.sql.oap.index.data.cache.separation.enable          true
-spark.oap.cache.strategy                                  mix
-spark.sql.oap.fiberCache.memory.manager                   mix
-spark.sql.oap.mix.index.cache.backend                     guava
-spark.sql.oap.mix.index.memory.manager                    offheap
-spark.sql.oap.mix.data.cache.backend                      vmem
-spark.sql.oap.mix.data.memory.manager                     tmp
+spark.sql.oap.index.data.cache.separation.enable        true
+spark.oap.cache.strategy                                mix
+spark.sql.oap.fiberCache.memory.manager                 offheap
+```
+
+2. DCPMM(`pm`) as cache media, `guava` strategy as index, and data cache backend. 
+
+```
+spark.sql.oap.index.data.cache.separation.enable        true
+spark.oap.cache.strategy                                mix
+spark.sql.oap.fiberCache.memory.manager                 pm
+```
+
+3. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`pm`)/`guava` as `data` cache media and backend. 
+
+```
+spark.sql.oap.index.data.cache.separation.enable        true
+spark.oap.cache.strategy                                mix
+spark.sql.oap.fiberCache.memory.manager                 mix 
+spark.sql.oap.mix.index.memory.manager                  offheap
+spark.sql.oap.mix.data.memory.manager                   pm
+spark.sql.oap.mix.index.cache.backend                   guava
+spark.sql.oap.mix.data.cache.backend                    guava
+```
+
+4. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`tmp`)/`vmem` as `data` cache media and backend. 
+
+```
+spark.sql.oap.index.data.cache.separation.enable        true
+spark.oap.cache.strategy                                mix
+spark.sql.oap.fiberCache.memory.manager                 mix 
+spark.sql.oap.mix.index.memory.manager                  offheap
+spark.sql.oap.mix.data.memory.manager                   tmp
+spark.sql.oap.mix.index.cache.backend                   guava
+spark.sql.oap.mix.data.cache.backend                    vmem
 ```
 
 ##### Binary cache 

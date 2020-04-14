@@ -445,7 +445,7 @@ object OapConf {
     .internal()
     .doc("Retry time for TmpMemoryManager allocate")
     .intConf
-    .createWithDefault(100)
+    .createWithDefault(5000)
 
   val OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.index.statistic.externalsorter.enable")
