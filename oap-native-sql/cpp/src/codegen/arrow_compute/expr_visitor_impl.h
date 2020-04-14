@@ -329,7 +329,7 @@ class EncodeVisitorImpl : public ExprVisitorImpl {
 };
 
 ////////////////////////// SortArraysToIndicesVisitorImpl ///////////////////////
-class SortArraysToIndicesVisitorImpl : public ExprVisitorImpl {
+/*class SortArraysToIndicesVisitorImpl : public ExprVisitorImpl {
  public:
   SortArraysToIndicesVisitorImpl(ExprVisitor* p, bool nulls_first, bool asc)
       : ExprVisitorImpl(p), nulls_first_(nulls_first), asc_(asc) {}
@@ -399,7 +399,7 @@ class SortArraysToIndicesVisitorImpl : public ExprVisitorImpl {
   int col_id_;
   bool nulls_first_;
   bool asc_;
-};
+};*/
 
 ////////////////////////// ConditionedShuffleArrayListVisitorImpl ///////////////////////
 class ConditionedShuffleArrayListVisitorImpl : public ExprVisitorImpl {

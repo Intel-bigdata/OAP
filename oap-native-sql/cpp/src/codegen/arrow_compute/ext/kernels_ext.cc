@@ -7,7 +7,6 @@
 #include <arrow/compute/kernels/count.h>
 #include <arrow/compute/kernels/hash.h>
 #include <arrow/compute/kernels/minmax.h>
-#include <arrow/compute/kernels/sort_arrays_to_indices.h>
 #include <arrow/compute/kernels/sum.h>
 #include <arrow/pretty_print.h>
 #include <arrow/status.h>
@@ -249,7 +248,7 @@ arrow::Status SplitArrayListWithActionKernel::MakeResultIterator(
 }
 
 ///////////////  SortArraysToIndices  ////////////////
-class SortArraysToIndicesKernel::Impl {
+/*class SortArraysToIndicesKernel::Impl {
  public:
   Impl(arrow::compute::FunctionContext* ctx, bool nulls_first, bool asc)
       : ctx_(ctx), nulls_first_(nulls_first), asc_(asc) {}
@@ -296,7 +295,7 @@ arrow::Status SortArraysToIndicesKernel::Evaluate(
 arrow::Status SortArraysToIndicesKernel::Finish(std::shared_ptr<arrow::Array>* out) {
   return impl_->Finish(out);
 }
-
+*/
 ///////////////  UniqueArray  ////////////////
 /*class UniqueArrayKernel::Impl {
  public:

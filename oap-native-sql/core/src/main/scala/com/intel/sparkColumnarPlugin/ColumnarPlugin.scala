@@ -43,14 +43,14 @@ case class ColumnarOverrides() extends Rule[SparkPlan] {
         plan.initialInputBufferOffset,
         plan.resultExpressions,
         child)
-    case plan: SortExec =>
+    /*case plan: SortExec =>
       val child = replaceWithColumnarPlan(plan.child)
       logWarning(s"Columnar Processing for ${plan.getClass} is currently supported.")
       new ColumnarSortExec(
         plan.sortOrder,
         plan.global,
         child,
-        plan.testSpillFrequency)
+        plan.testSpillFrequency)*/
     /*case plan: ShuffleExchangeExec =>
       logWarning(s"Columnar Processing for ${plan.getClass} is currently supported.")
       new ColumnarShuffleExchangeExec(

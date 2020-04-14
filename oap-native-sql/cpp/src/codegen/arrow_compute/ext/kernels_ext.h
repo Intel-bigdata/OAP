@@ -240,7 +240,7 @@ class MaxArrayKernel : public KernalBase {
   arrow::compute::FunctionContext* ctx_;
 };
 
-class SortArraysToIndicesKernel : public KernalBase {
+/*class SortArraysToIndicesKernel : public KernalBase {
  public:
   static arrow::Status Make(arrow::compute::FunctionContext* ctx,
                             std::shared_ptr<KernalBase>* out, bool nulls_first, bool asc);
@@ -253,7 +253,7 @@ class SortArraysToIndicesKernel : public KernalBase {
   class Impl;
   std::unique_ptr<Impl> impl_;
   arrow::compute::FunctionContext* ctx_;
-};
+};*/
 
 /*class UniqueArrayKernel : public KernalBase {
  public:

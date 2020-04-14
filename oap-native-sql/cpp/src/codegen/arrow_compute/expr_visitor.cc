@@ -281,7 +281,7 @@ arrow::Status ExprVisitor::MakeExprVisitorImpl(const std::string& func_name,
     RETURN_NOT_OK(EncodeVisitorImpl::Make(p, &impl_));
     goto finish;
   }
-  if (func_name.compare("sortArraysToIndicesNullsFirstAsc") == 0) {
+  /*if (func_name.compare("sortArraysToIndicesNullsFirstAsc") == 0) {
     RETURN_NOT_OK(SortArraysToIndicesVisitorImpl::Make(p, &impl_, true, true));
     goto finish;
   }
@@ -296,7 +296,7 @@ arrow::Status ExprVisitor::MakeExprVisitorImpl(const std::string& func_name,
   if (func_name.compare("sortArraysToIndicesNullsLastDesc") == 0) {
     RETURN_NOT_OK(SortArraysToIndicesVisitorImpl::Make(p, &impl_, false, false));
     goto finish;
-  }
+  }*/
   goto unrecognizedFail;
 finish:
   return arrow::Status::OK();
