@@ -8,12 +8,12 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
 /** Helper class for JNI related operations. */
-class JniUtils {
+public class JniUtils {
   private static final String LIBRARY_NAME = "spark_columnar_jni";
   private static boolean isLoaded = false;
   private static volatile JniUtils INSTANCE;
 
-  static JniUtils getInstance() throws IOException {
+  public static JniUtils getInstance() throws IOException {
     if (INSTANCE == null) {
       synchronized (JniUtils.class) {
         if (INSTANCE == null) {

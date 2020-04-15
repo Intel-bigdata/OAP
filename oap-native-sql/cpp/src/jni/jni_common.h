@@ -18,7 +18,34 @@
 #include <gandiva/gandiva_aliases.h>
 #include <gandiva/tree_expr_builder.h>
 
+static jclass io_exception_class;
 static jclass illegal_access_exception_class;
+static jclass illegal_argument_exception_class;
+
+#define ARROW_ASSIGN_OR_THROW_IMPL(status_name, lhs, rexpr)                    \
+  auto status_name = (rexpr);                                                  \
+  if (!status_name.status().ok()) {                                            \
+    env->ThrowNew(io_exception_class, status_name.status().message().c_str()); \
+  }                                                                            \
+  lhs = std::move(status_name).ValueOrDie();
+
+#define ARROW_ASSIGN_OR_THROW_NAME(x, y) ARROW_CONCAT(x, y)
+
+// Executes an expression that returns a Result, extracting its value
+// into the variable defined by lhs (or returning on error).
+//
+// Example: Assigning to a new value
+//   ARROW_ASSIGN_OR_THROW(auto value, MaybeGetValue(arg));
+//
+// Example: Assigning to an existing value
+//   ValueType value;
+//   ARROW_ASSIGN_OR_THROW(value, MaybeGetValue(arg));
+//
+// WARNING: ASSIGN_OR_RAISE expands into multiple statements; it cannot be used
+//  in a single statement (e.g. as the body of an if statement without {})!
+#define ARROW_ASSIGN_OR_THROW(lhs, rexpr)                                              \
+  ARROW_ASSIGN_OR_THROW_IMPL(ARROW_ASSIGN_OR_THROW_NAME(_error_or_value, __COUNTER__), \
+                             lhs, rexpr);
 
 jclass CreateGlobalClassReference(JNIEnv* env, const char* class_name) {
   jclass local_class = env->FindClass(class_name);
@@ -144,4 +171,21 @@ arrow::Status MakeExprVector(JNIEnv* env, jbyteArray exprs_arr,
   }
 
   return arrow::Status::OK();
+}
+
+jbyteArray ToSchemaByteArray(JNIEnv* env, std::shared_ptr<arrow::Schema> schema) {
+  arrow::Status status;
+  std::shared_ptr<arrow::Buffer> buffer;
+  status = arrow::ipc::SerializeSchema(*schema.get(), nullptr,
+                                       arrow::default_memory_pool(), &buffer);
+  if (!status.ok()) {
+    std::string error_message =
+        "Unable to convert schema to byte array, err is " + status.message();
+    env->ThrowNew(io_exception_class, error_message.c_str());
+  }
+
+  jbyteArray out = env->NewByteArray(buffer->size());
+  auto src = reinterpret_cast<const jbyte*>(buffer->data());
+  env->SetByteArrayRegion(out, 0, buffer->size(), src);
+  return out;
 }

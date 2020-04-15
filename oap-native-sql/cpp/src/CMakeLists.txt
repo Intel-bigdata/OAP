@@ -95,6 +95,7 @@ if(DEBUG)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -DDEBUG -DDEBUG_LEVEL_1 -DDEBUG_LEVEL_2")
 endif()
 find_library(ARROW_LIB arrow)
+find_library(PARQUET_LIB parquet)
 find_library(GANDIVA_LIB gandiva)
 # find_library(GANDIVA_PROTOBUF_LIB gandiva_protobuf)
 
@@ -118,6 +119,7 @@ endif()
 set(SPARK_COLUMNAR_PLUGIN_SRCS
         jni/jni_wrapper.cc
         ${PROTO_SRCS}
+        data_source/parquet/adapter.cc
         proto/protobuf_utils.cc
         codegen/expr_visitor.cc
         codegen/arrow_compute/expr_visitor.cc
@@ -133,11 +135,19 @@ set(SPARK_COLUMNAR_PLUGIN_SRCS
 file(MAKE_DIRECTORY ${root_directory}/releases)
 add_library(spark_columnar_jni SHARED ${SPARK_COLUMNAR_PLUGIN_SRCS})
 add_dependencies(spark_columnar_jni jni_proto)
-target_link_libraries(spark_columnar_jni ${ARROW_LIB} ${GANDIVA_LIB} ${GANDIVA_LINK_LIBS})
+target_link_libraries(spark_columnar_jni ${ARROW_LIB} ${PARQUET_LIB} ${GANDIVA_LIB} ${GANDIVA_LINK_LIBS})
 target_include_directories(spark_columnar_jni PUBLIC ${CMAKE_SYSTEM_INCLUDE_PATH} ${JNI_INCLUDE_DIRS} ${source_root_directory} ${PROTO_OUTPUT_DIR})
 set_target_properties(spark_columnar_jni PROPERTIES
                       LIBRARY_OUTPUT_DIRECTORY ${root_directory}/releases
 )
 
+if(DEFINED ENV{HADOOP_HOME})
+  set(LIBHDFS3_DESTINATION $ENV{HADOOP_HOME}/lib/native)
+else()
+  set(LIBHDFS3_DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 install(TARGETS spark_columnar_jni
         DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES ${source_root_directory}/resources/libhdfs.so
+        DESTINATION ${LIBHDFS3_DESTINATION})
