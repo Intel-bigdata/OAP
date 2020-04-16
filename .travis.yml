@@ -35,6 +35,17 @@ jobs:
       - echo $TRAVIS_COMMIT_MESSAGE
       - export | grep JAVA_HOME
       before_script:
+      - #install numactl-devel
+      - apt-get install numactl-devel libcurl-devel rpm-build
+      - #install vemecache
+      - git clone https://github.com/pmem/vmemcache.git
+      - pushd vmemcache
+      - mkdir build
+      - cd build
+      - cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
+      - make package
+      - sudo rpm -i libvmemcache*.rpm
+      - popd
       - #install arrow and plasms
       - cd /tmp
       - git clone https://github.com/jikunshang/arrow-1.git
