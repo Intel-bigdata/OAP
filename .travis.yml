@@ -29,3 +29,21 @@ jobs:
       script:
       - cd ${TRAVIS_BUILD_DIR}/oap-shuffle/remote-shuffle/
       - mvn -q test
+
+    - name: oap-arrow-plasma
+      before_install:
+      - echo $TRAVIS_COMMIT_MESSAGE
+      - export | grep JAVA_HOME
+      before_script:
+      - #install arrow and plasms
+      - cd /tmp
+      - git clone https://github.com/jikunshang/arrow-1.git
+      - cd arrow && git checkout rebase_oap_master
+      - cd /cpp
+      - rm -rf release
+      - mkdir release
+      - cd release
+      script:
+      - cd ${TRAVIS_BUILD_DIR}
+      - cd cpp && mkdir build && cd build
+      - cmake .. && make
