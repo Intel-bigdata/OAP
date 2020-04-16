@@ -23,15 +23,6 @@ make -j
 make install
 ```
 
-re2
-``` shell
-git clone https://code.googlesource.com/re2
-cd re2
-make
-make test
-make install
-```
-
 cmake: 
 Arrow will download package during compiling, in order to support SSL in cmake, build cmake is optional.
 ``` shell
@@ -45,22 +36,10 @@ cmake --version
 cmake version 3.15.0-rc4
 ```
 
-double-conversion:
-Arrow parquet will need this lib
-``` shell
-git clone https://github.com/google/double-conversion.git
-cd double-conversion
-#checkout a stable release
-mkdir build
-cd build
-cmake -DBUILD_SHARED_LIBS=ON ..
-make
-make install
-```
-
-apache arrow, parquet and gandiva
+apache arrow
 ``` shell
 git clone https://github.com/Intel-bigdata/arrow.git
+cd arrow && git checkout native-sql-engine-clean
 mkdir -p arrow/cpp/release-build
 cd arrow/cpp/release-build
 cmake -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_WITH_SNAPPY=ON -DARROW_FILESYSTEM=ON -DARROW_JSON=ON ..

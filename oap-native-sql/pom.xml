@@ -20,6 +20,7 @@
 
   <properties>
     <sbt.project.name>SparkColumnarPlugin</sbt.project.name>
+    <arrow.version>0.17.0</arrow.version>
     <spark.version>3.1.0-SNAPSHOT</spark.version>
     <scala.binary.version>2.12</scala.binary.version>
     <scala.version>2.12.8</scala.version>
@@ -33,8 +34,9 @@
   </properties>
 
   <modules>
+    <!--module>cpp</module-->
+    <!--module>patch</module-->
     <module>core</module>
-    <module>benchmark</module>
   </modules>
 
 </project>

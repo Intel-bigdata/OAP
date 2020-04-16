@@ -3,15 +3,14 @@ package com.intel.sparkColumnarPlugin.expression
 import java.util.concurrent.TimeUnit._
 import com.google.common.collect.Lists
 
+import com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector
 import com.intel.sparkColumnarPlugin.vectorized.ExpressionEvaluator
 import com.intel.sparkColumnarPlugin.vectorized.BatchIterator
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.execution.vectorized.ArrowWritableColumnVector
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
-import org.apache.spark.sql.util.ArrowUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.TaskContext
 

@@ -4,11 +4,13 @@ import java.io._
 import java.nio.ByteBuffer
 
 import com.intel.sparkColumnarPlugin.expression.CodeGeneration
+import com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector
 
 import org.apache.arrow.memory.BufferAllocator
 import org.apache.arrow.vector.ipc.{ArrowStreamReader, ArrowStreamWriter}
 import org.apache.arrow.vector.types.pojo.{Field, Schema}
 import org.apache.arrow.vector.{FieldVector, VectorSchemaRoot}
+import org.apache.spark.sql.util.ArrowUtils
 
 import org.apache.spark.serializer.{
   DeserializationStream,
@@ -16,9 +18,7 @@ import org.apache.spark.serializer.{
   Serializer,
   SerializerInstance
 }
-import org.apache.spark.sql.execution.vectorized.ArrowWritableColumnVector
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.util.ArrowUtils
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import scala.collection.JavaConverters._

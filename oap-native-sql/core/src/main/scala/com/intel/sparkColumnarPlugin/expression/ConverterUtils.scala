@@ -2,12 +2,13 @@ package com.intel.sparkColumnarPlugin.expression
 
 import io.netty.buffer.ArrowBuf
 
+import com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector
+
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.optimizer._
-import org.apache.spark.sql.execution.vectorized.ArrowWritableColumnVector
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.ArrowUtils
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
 import org.apache.arrow.vector._
 import org.apache.arrow.vector.ipc.message.ArrowFieldNode

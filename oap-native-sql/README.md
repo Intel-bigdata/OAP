@@ -19,42 +19,67 @@ This project is to enable columnar processing operators for spark sql, columnar 
 
 ## Installation
 
-#### Build and install 1.11.0 Parquet, we will leverage Parquet-Arrow 1.11.0 version for convering Parquet Schema to Arrow Schema in spark. So make sure, Parquet-Arrow 1.11.0 installed in your mvn dependency path.
+### Installation option 1: For evaluation, simple and fast
 
-``` shell
-wget http://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz
-tar xzf thrift-0.12.0.tar.gz
-cd thrift-0.12.0
-chmod +x ./configure
-./configure --disable-gen-erl --disable-gen-hs --without-ruby --without-haskell --without-erlang --without-php --without-nodejs
-make install
+#### install spark 3.0.0 or above
 
-yum install boost-devel
-./configure --disable-gen-erl --disable-gen-hs --without-ruby --without-haskell --without-erlang --without-php --without-nodejs
-make install -j
+[spark download](https://spark.apache.org/downloads.html)
 
-git clone https://github.com/apache/parquet-mr.git
-cd parquet-mr
-git checkout apache-parquet-1.11.0
-mvn clean install -pl parquet-arrow -am -DskipTests
-ls /root/.m2/repository/org/apache/parquet/parquet-arrow/1.11.0/
-parquet-arrow-1.11.0.jar  parquet-arrow-1.11.0.jar.lastUpdated  parquet-arrow-1.11.0.pom  parquet-arrow-1.11.0.pom.lastUpdated  parquet-arrow-1.11.0-tests.jar  _remote.repositories
+#### install arrow 0.17.0
+
+```
+git clone https://github.com/apache/arrow && cd arrow & git checkout arrow-0.17.0
+vim ci/conda_env_gandiva.yml 
+clangdev=7
+llvmdev=7
+
+conda create -y -n pyarrow-dev -c conda-forge \
+    --file ci/conda_env_unix.yml \
+    --file ci/conda_env_cpp.yml \
+    --file ci/conda_env_python.yml \
+    --file ci/conda_env_gandiva.yml \
+    compilers \
+    python=3.7 \
+    pandas
+conda activate pyarrow-dev
 ```
 
-#### Install Apache Arrow and Gandiva
+#### Build native-sql cpp
+
+``` shell
+git clone https://github.com/Intel-bigdata/OAP.git
+cd OAP && git checkout branch-nativesql-spark-3.0.0
+cd oap-native-sql
+cp cpp/src/resources/libhdfs.so ${HADOOP_HOME}/lib/native/ 
+cp cpp/src/resources/libprotobuf.so.13 /usr/lib64/
+```
+
+Download spark-columnar-core-1.0-jar-with-dependencies.jar to local, add classPath to spark.driver.extraClassPath and spark.executor.extraClassPath
+``` shell
+Internal Location: vsr602://mnt/nvme2/chendi/000000/spark-columnar-core-1.0-jar-with-dependencies.jar
+```
+
+Download spark-sql_2.12-3.1.0-SNAPSHOT.jar to ${SPARK_HOME}/assembly/target/scala-2.12/jars/spark-sql_2.12-3.1.0-SNAPSHOT.jar
+``` shell
+Internal Location: vsr602://mnt/nvme2/chendi/000000/spark-sql_2.12-3.1.0-SNAPSHOT.jar
+```
+===
+
+### Installation option 2: For contribution, Patch and build
+
+#### install spark 3.0.0 or above
+
+Please refer this link to install Spark.
+[Apache Spark Installation](/oap-native-sql/resource/SparkInstallation.md)
+
+#### install arrow 0.17.0
 
 Please refer this markdown to install Apache Arrow and Gandiva.
 [Apache Arrow Installation](/oap-native-sql/resource/ApacheArrowInstallation.md)
 
-#### Build and install a columnarSupported spark
+#### compile and install oap-native-sql
 
-``` shell
-git clone https://github.com/intel-bigdata/sparkv.git
-cd sparkv
-./build/mvn -Pyarn -Phadoop-3.2 -Dhadoop.version=3.2.0 -DskipTests clean install
-```
-
-#### Install Googletest and Googlemock
+##### Install Googletest and Googlemock
 
 ``` shell
 git clone https://github.com/google/googletest.git
@@ -66,37 +91,44 @@ make -j
 make install
 ```
 
-#### Build this project
+##### Build this project
 
-This project has dependencies of Apache Spark and Apache Arrow, so please make sure these two project has been installed under /root/.m2/repository/ before start build this project.
 ``` shell
-cd SparkColumnarPlugin
-# libspark_columnar_jni.so is used for sparkColumnarPlugin java codes to call native functions.
+git clone https://github.com/Intel-bigdata/OAP.git
+cd OAP && git checkout branch-nativesql-spark-3.0.0
+cd oap-native-sql
 cd cpp/
 mkdir build/
 cd build/
-cmake ..
-#cmake .. -DTESTS=ON
+cmake .. -DTESTS=ON
 make -j
-# copy all the missing dependencies from arrow/cpp/src/ to /usr/local/include/
 make install
-cd ../../core/
-mvn package
+#when deploying on multiple node, make sure all nodes copied libhdfs.so and libprotobuf.so.13
 ```
-
-#### spark configuration
 
 ``` shell
-cat spark-defaults.xml
-
-spark.driver.extraClassPath /mnt/nvme2/chendi/SparkColumnarPlugin/core/target/core-1.0-jar-with-dependencies.jar:/mnt/nvme2/chendi/arrow/java/gandiva/target/arrow-gandiva-0.14.0.jar
-spark.executor.extraClassPath /mnt/nvme2/chendi/SparkColumnarPlugin/core/target/core-1.0-jar-with-dependencies.jar:/mnt/nvme2/chendi/arrow/java/gandiva/target/arrow-gandiva-0.14.0.jar
-
-org.apache.spark.example.columnar.enabled true
-spark.sql.extensions com.intel.sparkColumnarPlugin.ColumnarPlugin
-spark.sql.columnVector.arrow.enabled true
+cd SparkColumnarPlugin/core/
+mvn clean package -DskipTests
 ```
+===
 
+## spark configuration
+
+Add below configuration to spark-defaults.conf
+
+```
+##### Columnar Process Configuration
+
+spark.sql.parquet.columnarReaderBatchSize 4096
+spark.sql.sources.useV1SourceList avro
+spark.sql.join.preferSortMergeJoin false
+spark.sql.extensions com.intel.sparkColumnarPlugin.ColumnarPlugin
+
+spark.driver.extraClassPath ${PATH_TO_OAP_NATIVE_SQL}/core/target/spark-columnar-core-1.0-jar-with-dependencies.jar
+spark.executor.extraClassPath ${PATH_TO_OAP_NATIVE_SQL}/core/target/spark-columnar-core-1.0-jar-with-dependencies.jar
+
+######
+```
 ## Benchmark
 
 For initial microbenchmark performance, we add 10 fields up with spark, data size is 200G data
@@ -112,4 +144,6 @@ For initial microbenchmark performance, we add 10 fields up with spark, data siz
 ## contact
 
 chendi.xue@intel.com
+yuan.zhou@intel.com
+binwei.yang@intel.com
 jian.zhang@intel.com

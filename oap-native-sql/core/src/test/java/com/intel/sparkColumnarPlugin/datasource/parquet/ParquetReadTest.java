@@ -77,6 +77,10 @@ public class ParquetReadTest {
     System.out.println(actualSchemaRoot.getRowCount());
     assertEquals(actualSchemaRoot.getRowCount(), 16);
 
+    List<FieldVector> fields = actualSchemaRoot.getFieldVectors();
+    for (int i = 0; i < fields.size(); i++) {
+      System.out.println(fields.get(i).toString());
+    }
     actualSchemaRoot.close();
     reader.close();
     testFile.delete();

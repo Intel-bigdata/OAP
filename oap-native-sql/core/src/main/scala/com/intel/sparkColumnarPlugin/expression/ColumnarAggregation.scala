@@ -6,18 +6,19 @@ import java.util.Collections
 import java.util.concurrent.TimeUnit._
 import util.control.Breaks._
 
+import com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector
+import org.apache.spark.sql.util.ArrowUtils
 import com.intel.sparkColumnarPlugin.vectorized.ExpressionEvaluator
 import com.intel.sparkColumnarPlugin.vectorized.BatchIterator
+
 import com.google.common.collect.Lists
 import org.apache.hadoop.mapreduce.TaskAttemptID
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.BindReferences.bindReferences
-import org.apache.spark.sql.util.ArrowUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized._
-import org.apache.spark.sql.execution.vectorized.ArrowWritableColumnVector
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.TaskContext

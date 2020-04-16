@@ -23,8 +23,10 @@
 #include <memory>
 #include <unordered_map>
 
-#include <sys/types.h>
+#include <fcntl.h>
+#include <sys/file.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "codegen/arrow_compute/ext/codegen_node_visitor_v2.h"
@@ -119,8 +121,6 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
     auto start = std::chrono::steady_clock::now();
     if (func_node_) {
       LoadJITFunction(func_node_, left_field_list_, right_field_list_, &conditioner_);
-    } else {
-      conditioner_ = std::make_shared<NoneConditioner>();
     }
     auto end = std::chrono::steady_clock::now();
     std::cout
@@ -464,6 +464,8 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
     std::string signature = signature_ss.str();
     std::cout << "LoadJITFunction signature is " << signature << std::endl;
 
+    auto file_lock = FileSpinLock("/tmp");
+    std::cout << "GetFileLock" << std::endl;
     auto status = LoadLibrary(signature, out);
     if (!status.ok()) {
       // process
@@ -472,6 +474,8 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
       RETURN_NOT_OK(CompileCodes(codes, signature));
       RETURN_NOT_OK(LoadLibrary(signature, out));
     }
+    FileSpinUnLock(file_lock);
+    std::cout << "ReleaseFileLock" << std::endl;
     return arrow::Status::OK();
   }
 
@@ -480,10 +484,8 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
                            std::vector<std::shared_ptr<arrow::Field>> right_field_list) {
     // CodeGen
     std::stringstream codes_ss;
-    codes_ss << R"(
-#include <arrow/type.h>
-#include <sparkcolumnarplugin/codegen/arrow_compute/ext/array_item_index.h>
-#include <sparkcolumnarplugin/codegen/arrow_compute/ext/conditioner.h>
+    codes_ss << R"(#include <arrow/type.h>
+#include <algorithm>
 #define int8 int8_t
 #define int16 int16_t
 #define int32 int32_t
@@ -492,7 +494,26 @@ class ConditionedProbeArraysTypedImpl : public ConditionedProbeArraysKernel::Imp
 #define uint16 uint16_t
 #define uint32 uint32_t
 #define uint64 uint64_t
-using namespace sparkcolumnarplugin::codegen::arrowcompute::extra;
+
+struct ArrayItemIndex {
+  uint64_t id = 0;
+  uint64_t array_id = 0;
+  ArrayItemIndex(uint64_t array_id, uint64_t id) : array_id(array_id), id(id) {}
+};
+
+class ConditionerBase {
+public:
+  virtual arrow::Status Submit(
+      std::vector<std::function<bool(ArrayItemIndex)>> left_is_null_func_list,
+      std::vector<std::function<void *(ArrayItemIndex)>> left_get_func_list,
+      std::vector<std::function<bool(int)>> right_is_null_func_list,
+      std::vector<std::function<void *(int)>> right_get_func_list,
+      std::function<bool(ArrayItemIndex, int)> *out) {
+    return arrow::Status::NotImplemented(
+        "ConditionerBase Submit is an abstract interface.");
+  }
+};
+
 class Conditioner : public ConditionerBase {
 public:
   arrow::Status Submit(
@@ -530,14 +551,26 @@ extern "C" void MakeConditioner(std::shared_ptr<ConditionerBase> *out) {
     return codes_ss.str();
   }
 
+  int FileSpinLock(std::string path) {
+    std::string lockfile = path + "/nativesql_compile.lock";
+
+    auto fd = open(lockfile.c_str(), O_CREAT);
+    flock(fd, LOCK_EX);
+
+    return fd;
+  }
+
+  void FileSpinUnLock(int fd) {
+    flock(fd, LOCK_UN);
+    close(fd);
+  }
+
   arrow::Status CompileCodes(std::string codes, std::string signature) {
     // temporary cpp/library output files
     srand(time(NULL));
-    std::string randname = std::to_string(rand());
     std::string outpath = "/tmp";
     std::string prefix = "/spark-columnar-plugin-codegen-";
     std::string cppfile = outpath + prefix + signature + ".cc";
-    std::string tmplibfile = outpath + prefix + signature + "." + randname + ".so";
     std::string libfile = outpath + prefix + signature + ".so";
     std::string logfile = outpath + prefix + signature + ".log";
     std::ofstream out(cppfile.c_str(), std::ofstream::out);
@@ -552,8 +585,8 @@ extern "C" void MakeConditioner(std::shared_ptr<ConditionerBase> *out) {
     out.close();
 
     // compile the code
-    std::string cmd = "gcc -Wall -Wextra " + cppfile + " -o " + tmplibfile +
-                      " -O3 -shared -fPIC -lspark_columnar_jni > " + logfile;
+    std::string cmd = "gcc -Wall -Wextra " + cppfile + " -o " + libfile +
+                      " -O3 -shared -fPIC -larrow 2> " + logfile;
     int ret = system(cmd.c_str());
     if (WEXITSTATUS(ret) != EXIT_SUCCESS) {
       std::cout << "compilation failed, see " << logfile << std::endl;
@@ -561,15 +594,9 @@ extern "C" void MakeConditioner(std::shared_ptr<ConditionerBase> *out) {
     }
 
     struct stat tstat;
-    ret = stat(tmplibfile.c_str(), &tstat);
+    ret = stat(libfile.c_str(), &tstat);
     if (ret == -1) {
       std::cout << "stat failed: " << strerror(errno) << std::endl;
-      exit(EXIT_FAILURE);
-    }
-
-    ret = rename(tmplibfile.c_str(), libfile.c_str());
-    if (ret == -1) {
-      std::cout << "rename failed: " << strerror(errno) << std::endl;
       exit(EXIT_FAILURE);
     }
 
@@ -630,6 +657,9 @@ extern "C" void MakeConditioner(std::shared_ptr<ConditionerBase> *out) {
         left_get_func_list_.push_back(get);
       }
       right_id_ = i;
+      condition_check_ = [this](ArrayItemIndex left_index, int right_index) {
+        return true;
+      };
     }
 
     arrow::Status ProcessAndCacheOne(
@@ -646,21 +676,22 @@ extern "C" void MakeConditioner(std::shared_ptr<ConditionerBase> *out) {
         in_arr = in[right_key_indices_[0]];
       }
       // condition lambda preparation
-      std::vector<std::function<bool(int)>> right_is_null_func_list;
-      std::vector<std::function<void*(int)>> right_get_func_list;
-      for (int i = 0; i < in.size(); i++) {
-        auto arr = in[i];
-        std::function<bool(int)> is_null;
-        std::function<void*(int)> get;
-        input_iterator_list_[i + right_id_]->Submit(arr, &is_null, &get);
-        right_is_null_func_list.push_back(is_null);
-        right_get_func_list.push_back(get);
+      if (conditioner_) {
+        std::vector<std::function<bool(int)>> right_is_null_func_list;
+        std::vector<std::function<void*(int)>> right_get_func_list;
+        for (int i = 0; i < in.size(); i++) {
+          auto arr = in[i];
+          std::function<bool(int)> is_null;
+          std::function<void*(int)> get;
+          input_iterator_list_[i + right_id_]->Submit(arr, &is_null, &get);
+          right_is_null_func_list.push_back(is_null);
+          right_get_func_list.push_back(get);
+        }
+        conditioner_->Submit(left_is_null_func_list_, left_get_func_list_,
+                             right_is_null_func_list, right_get_func_list,
+                             &condition_check_);
       }
-      std::function<bool(ArrayItemIndex, int)> condition_check;
-      conditioner_->Submit(left_is_null_func_list_, left_get_func_list_,
-                           right_is_null_func_list, right_get_func_list,
-                           &condition_check);
-      RETURN_NOT_OK(eval_func_(in_arr, condition_check, &out_cache_));
+      RETURN_NOT_OK(eval_func_(in_arr, condition_check_, &out_cache_));
       return arrow::Status::OK();
     }
 
@@ -676,6 +707,7 @@ extern "C" void MakeConditioner(std::shared_ptr<ConditionerBase> *out) {
         eval_func_;
     int right_id_;
     std::shared_ptr<ConditionerBase> conditioner_;
+    std::function<bool(ArrayItemIndex, int)> condition_check_;
     std::vector<int> right_key_indices_;
     std::shared_ptr<arrow::RecordBatch> out_cache_;
     arrow::compute::FunctionContext* ctx_;

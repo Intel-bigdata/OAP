@@ -3,8 +3,12 @@ package com.intel.sparkColumnarPlugin.execution
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReaderFactory, PartitionReader}
+import org.apache.spark.sql.execution.datasources.{FilePartition, PartitionedFile}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
+import org.apache.spark.sql.vectorized.ColumnarBatch
+import org.apache.spark.sql.execution.datasources.v2.VectorizedFilePartitionReaderHandler
+import org.apache.spark.sql.execution.datasources.v2.parquet.ParquetPartitionReaderFactory
 
 class DataSourceRDDPartition(val index: Int, val inputPartition: InputPartition)
   extends Partition with Serializable
@@ -32,8 +36,8 @@ class ColumnarDataSourceRDD(
 
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
     val inputPartition = castPartition(split).inputPartition
-    val reader: PartitionReader[_] = if (columnarReads) {
-      partitionReaderFactory.createColumnarReader(inputPartition)
+    val reader = if (columnarReads) {
+      VectorizedFilePartitionReaderHandler.get(inputPartition, partitionReaderFactory.asInstanceOf[ParquetPartitionReaderFactory])
     } else {
       partitionReaderFactory.createReader(inputPartition)
     }
@@ -74,4 +78,5 @@ class ColumnarDataSourceRDD(
   override def getPreferredLocations(split: Partition): Seq[String] = {
     castPartition(split).inputPartition.preferredLocations()
   }
+
 }

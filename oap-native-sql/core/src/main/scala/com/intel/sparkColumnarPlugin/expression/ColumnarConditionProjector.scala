@@ -4,6 +4,8 @@ import java.util.Collections
 import java.util.concurrent.TimeUnit
 
 import com.google.common.collect.Lists
+import com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.BindReferences.bindReferences
@@ -11,7 +13,6 @@ import org.apache.spark.sql.util.ArrowUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.vectorized.ArrowWritableColumnVector
 
 import org.apache.arrow.gandiva.evaluator._
 import org.apache.arrow.gandiva.exceptions.GandivaException
@@ -192,15 +193,16 @@ class ColumnarConditionProjector(
             numInputBatches += 1
           } else {
             resColumnarBatch = null
-            logInfo(s"$cbIterator has no next, return false")
+            logInfo(s"has no next, return false")
             return false
           }
 
           numRows = columnarBatch.numRows()
           if (numRows > 0) {
             if (skip == true){
-              columnarBatch.retain()
+              logInfo("Use original ColumnarBatch")
               resColumnarBatch = columnarBatch
+              columnarBatch = null
               return true
             } 
             if (conditioner != null) {
@@ -221,8 +223,8 @@ class ColumnarConditionProjector(
               numRows = selectionVector.getRecordCount()
               if (projectList == null && numRows == columnarBatch.numRows()) {
                 logInfo("No projection and conditioned row number is as same as original row number. Directly use original ColumnarBatch")
-                columnarBatch.retain()
                 resColumnarBatch = columnarBatch
+                columnarBatch = null
                 return true
               }
             }
