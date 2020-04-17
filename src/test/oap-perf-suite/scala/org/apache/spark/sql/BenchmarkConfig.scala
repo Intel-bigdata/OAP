@@ -128,6 +128,7 @@ abstract class BenchmarkConfigSelector {
 object BenchmarkConfigSelector {
   // TODO: build config accordingly.
   val wildcardConfiguration: mutable.HashMap[String, String] = mutable.HashMap.empty
+
   def build(options: Map[String, String]): Unit = {
     wildcardConfiguration ++= options
   }
@@ -143,6 +144,7 @@ object BenchmarkConfigSelector {
     }
   }
 }
+
 trait ParquetOnlyConfigSet extends BenchmarkConfigSelector{
   // TODO: choose conf
   def allConfigurations: Seq[BenchmarkConfig] = Seq(
@@ -176,7 +178,7 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
       Seq(
         new BenchmarkConfig()
           .setBenchmarkConfName("Orc w/ index")
-          .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "orcS")
+          .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "orc")
           .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true"),
         new BenchmarkConfig()
           .setBenchmarkConfName("Orc w/ index oap cache enabled")
