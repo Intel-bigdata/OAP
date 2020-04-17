@@ -2,15 +2,15 @@
 
 
 * [Introduction](#introduction)
-* [Usage Scenarios](#Usage-Scenarios)
+* [Usage Scenarios](#usage-scenarios)
 * [OAP Architecture](#oap-architecture)
-* [OAP Features](#oap-Features)
+* [OAP Features](#oap-features)
 
 
 
 ## Introduction
 
-Apache Spark is a unified analytics engine for large-scale data processing. Spark SQL* is the most popular component of Apache Spark* , and it is widely used to process large scale structured data in data center. However, Spark SQL still suffers from stability and performance challenges in a highly dynamic environment with ultra large scale data.
+Apache Spark\* is a unified analytics engine for large-scale data processing. Spark SQL\* is the most popular component of Apache Spark , and it is widely used to process large scale structured data in data center. However, Spark SQL still suffers from stability and performance challenges in a highly dynamic environment with ultra large scale data.
 
 We created OAP (Optimized Analytical Package for Spark) to address the performance issues of some use cases. OAP is designed to leverage user defined indices and smart fine-grained in-memory data caching for boosting Spark SQL performance.
 
@@ -34,7 +34,7 @@ limit 10
 
 Interactive queries usually process a large data set but return a small portion of data filtering for a specific condition. By creating and storing a full B+ Tree index for key columns and using a smart fine-grained in-memory data caching strategy, we can boost Spark SQL interactive queries to seconds and even sub-seconds.
 
-By properly using index and cache, the performance of some interactive queries can possibly be improved by order of magnitude.
+By properly using index and cache, the performance of some interactive queries can possibly be improved by an order of magnitude.
 
 ### Usage Scenario 2 -- Batch processing jobs 
 
