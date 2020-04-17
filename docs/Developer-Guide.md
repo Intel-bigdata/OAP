@@ -1,49 +1,43 @@
 # OAP Developer Guide
 
-* [OAP Building](#OAP-Building)
-* [Integration with Spark](#integration-with-spark)
-* [Enable Numa binding for DCPMM in Spark](#enable-numa-binding-for-dcpmm-in-spark)
+* [Build OAP](#build_oap)
+* [Integrate with Spark](#integrate-with-spark)
+* [Enable NUMA binding for DCPMM in Spark](#enable-numa-binding-for-dcpmm-in-spark)
 
+## Build OAP
 
-
-## OAP Building
-
-#### Building
 OAP is built using [Apache Maven](http://maven.apache.org/).
 
-To clone OAP project, use
+Clone the OAP current development branch:
 
 ```
-git clone -b branch-0.6-spark-2.4.4  https://github.com/Intel-bigdata/OAP.git
+git clone -b branch-0.7-spark-2.4.x  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
-To build OAP package, use
+Build the OAP package:
 
 ```
 mvn clean -DskipTests package
 ```
 
-#### Running Test
+### Run Tests
 
-To run all the tests, use
+Run all the tests:
 ```
 mvn clean test
 ```
-To run any specific test suite, for example `OapDDLSuite`, use
+Run a specific test suite, for example `OapDDLSuite`:
 ```
 mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite test
 ```
-**NOTE**: Log level of OAP unit tests currently default to ERROR, please override src/test/resources/log4j.properties if needed.
+**NOTE**: The default Log level of OAP unit tests is ERROR. Override src/test/resources/log4j.properties if needed.
 
+### Build OAP with DCPMM
 
-#### OAP Building with DCPMM
+#### Prerequisites for building with DCPMM support
 
-If you want to use OAP with DCPMM,  you can follow the below building steps.
-
-##### Prerequisites for building with DCPMM support
-
-You  need to install the required packages on the build system listed below.
+Install the required packages on the build system:
 
 - gcc-c++
 - [cmake](https://help.directadmin.com/item.php?id=494)
@@ -51,33 +45,40 @@ You  need to install the required packages on the build system listed below.
 - [vmemcache](https://github.com/pmem/vmemcache)
 
 
-##### Building package
-You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache stratege, you need to build with -Ppersistent-memory also.
+#### Build package
+Add -Ppersistent-memory to the build command line to build with DCPMM support. 
+
+The Non-evictable cache strategy requires -Ppersistent-memory.
+
 ```
 mvn clean -q -Ppersistent-memory -DskipTests package
 ```
-for vmemcache cache strategy, please build with command:
+
+The vmemcache cache strategy requires -Pvmemcache:
+
 ```
 mvn clean -q -Pvmemcache -DskipTests package
 ```
-You can build with command to use all of them:
+
+Add all options:
 ```
 mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
 ```
 
-## Integration with Spark
+## Integrate with Spark
 
-Although OAP acts as a plugin jar to Spark, there are still a few tricks to note when integration with Spark. Basically, OAP explored Spark extension & data source API to perform its core functionality. But there are other functionality aspects that cannot achieved by Spark extension and data source API. We made a few improvements or changes to the Spark internals to achieve the functionality. So when integrating OAP on Spark, you need to check whether you are running an unmodified Community Spark or a modified customized Spark.
+Although OAP acts as a plug-in `.jar` to Spark, there are still a few tricks to note when integrating with Spark. While the OAP project explored using a Spark extension and the data source API to add its core functions, some required functionality could not be achieved this way. As a result, we made some changes to Spark internals instead. Before you begin, check whether you are running an unmodified Community Spark or a customized version.
 
 #### Integrate with Community Spark
 
-If you are running an Community Spark, things will be much simple. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
+If you are running Community Spark, refer to the [OAP user guide](OAP-User-Guide.md) to configure and setup Spark to work with OAP.
 
 #### Integrate with customized Spark
 
-It will be more complicated to integrate OAP with a customized Spark. Steps needed for this case is to check whether the OAP changes of Spark internals will conflict or override with your private changes. 
-- If no conflicts or overrides happens, the steps are the same as the steps of unmodified version of Spark described above. 
-- If conflicts or overrides happen, you need to have a merge plan of the source code to make sure the code changes you made in a Spark source file appears in the corresponding file included in OAP project. Once merged, you need to rebuild OAP.
+To integrate OAP with a customized installation of Spark, check whether the OAP changes of Spark internals will conflict or override your changes.
+
+- If there are no conflicts or overrides, the steps are the same an unmodified version of Spark described above. 
+- If there are conflicts or overrides, carefully merge the source code to make sure the your code changes stay in the corresponding file included in OAP project. Once merged, rebuild OAP.
 
 The following files need to be checked/compared for changes:
 
@@ -110,29 +111,27 @@ The following files need to be checked/compared for changes:
 		Add the get and set method for the changed protected variable.
 ```
 
-## Enable Numa binding for DCPMM in Spark
+## Enable NUMA binding for DCPMM in Spark
 
-#### Rebuild Spark packages with Numa binding patch 
+### Rebuild Spark packages with the NUMA binding patch 
 
-When using DCPMM as a cache medium, if you want to obtain optimum performance, you need to apply the [Numa](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.4.numa.patch](./Spark.2.4.4.numa.patch) to Spark source code.
+When using DCPMM as a cache medium, apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) [binding patch (Spark.2.4.4.numa.patch)](./Spark.2.4.4.numa.patch) to the Spark source code for optimal performance.
 
-1. Download src for [Spark-2.4.4](https://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4.tgz) and clone the src from github.
+1. Download the source for [Spark-2.4.4](https://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4.tgz) and clone the source from GitHub\*.
 
-2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) Spark package.
+2. Apply the NUMA patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) the Spark package.
 
 ```
 git apply  Spark.2.4.4.numa.patch
 ```
 
-3. When deploying OAP to Spark, please add below configuration item to Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable Numa binding.
+3. When deploying OAP to Spark, add this configuration item to the Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable NUMA binding.
 
 ```
 spark.yarn.numa.enabled true 
 ```
-Note: If you are using a customized Spark, there may be conflicts in applying the patch, you may need to manually resolve the conflicts.
+Note: If you are using a customized version of Spark, there may be conflicts in applying the patch. Manually resolve these conflicts.
 
 #### Use pre-built patched Spark packages 
 
-If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.4-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) with the patch applied.
-
-
+If it is too cumbersome to apply patches, use our pre-built [Spark (spark-2.4.4-bin-hadoop2.7-patched.tgz)](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) with the patch applied.
