@@ -367,6 +367,17 @@ spark.sql.oap.parquet.data.cache.enable                   false     # for Column
 spark.sql.oap.orc.binary.cache.enable                     true      # for orc fileformat
 spark.sql.oap.orc.data.cache.enable                       false     # for ColumnVector, default is false
 ```
+#### Use External cache strategy
+
+OAP supports arrow-plasma as external cache now and will support more other types in the future.[Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store.
+
+Provide the following conf options:
+
+```
+--conf spark.oap.cache.strategy=external
+--conf spark.sql.oap.cache.external.client.pool.size=30
+```
+[Apache Arrow](https://github.com/apache/arrow) source code is modified to support DCPMM.Here's the modified [repo](https://github.com/Intel-bigdata/arrow).
 
 #### Verify DCPMM cache functionality
 
