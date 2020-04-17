@@ -23,7 +23,62 @@ set(source_root_directory ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Gandiva protobuf
 
-find_package(Protobuf REQUIRED)
+find_package(Protobuf)
+
+if(Protobuf_FOUND)
+  set(PROTOBUF_SOURCE_URL "${Protobuf_INCLUDE_DIRS}")
+else()
+  message("Building Protocol Buffers from source")
+  set (PROTOBUF_SOURCE_URL
+       "https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/protobuf-all-3.7.1.tar.gz"
+        "https://github.com/ursa-labs/thirdparty/releases/download/latest/protobuf-v3.7.1.tar.gz"
+)
+  set(PROTOBUF_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/protobuf_ep-install")
+  set(PROTOBUF_INCLUDE_DIR "${PROTOBUF_PREFIX}/include")
+  set(
+    PROTOBUF_STATIC_LIB
+    "${PROTOBUF_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}protobuf${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    )
+  set(
+    PROTOC_STATIC_LIB
+    "${PROTOBUF_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}protoc${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    )
+  set(
+    PROTOC_BIN
+    "${PROTOBUF_PREFIX}/bin/protoc"
+    )
+  set(
+    PROTOBUF_INCLUDE
+    "${PROTOBUF_PREFIX}/include"
+    )
+  set(PROTOBUF_COMPILER "${PROTOBUF_PREFIX}/bin/protoc")
+  set(PROTOBUF_CONFIGURE_ARGS
+      "AR=${CMAKE_AR}"
+      "RANLIB=${CMAKE_RANLIB}"
+      "CC=${CMAKE_C_COMPILER}"
+      "CXX=${CMAKE_CXX_COMPILER}"
+      "--disable-shared"
+      "--prefix=${PROTOBUF_PREFIX}"
+      "CFLAGS=-fPIC"
+      "CXXFLAGS=-fPIC")
+  set(PROTOBUF_BUILD_COMMAND ${MAKE} ${MAKE_BUILD_ARGS})
+  ExternalProject_Add(protobuf_ep
+                      PREFIX protobuf_ep
+                      CONFIGURE_COMMAND "./configure" ${PROTOBUF_CONFIGURE_ARGS}
+                      BUILD_COMMAND ${PROTOBUF_BUILD_COMMAND}
+                      BUILD_IN_SOURCE 1
+                      URL ${PROTOBUF_SOURCE_URL}
+  )
+
+  file(MAKE_DIRECTORY "${PROTOBUF_INCLUDE_DIR}")
+  add_library(protobuf::libprotobuf STATIC IMPORTED)
+  set_target_properties(
+    protobuf::libprotobuf
+    PROPERTIES IMPORTED_LOCATION "${PROTOBUF_STATIC_LIB}" INTERFACE_INCLUDE_DIRECTORIES
+               "${PROTOBUF_INCLUDE_DIR}")
+  add_dependencies(protobuf::libprotobuf protobuf_ep)
+endif()
+
 file(MAKE_DIRECTORY ${root_directory}/src/proto)
 set(PROTO_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/proto")
 set(PROTO_OUTPUT_FILES "${PROTO_OUTPUT_DIR}/Exprs.pb.cc")
@@ -35,21 +90,20 @@ get_filename_component(ABS_GANDIVA_PROTO ${CMAKE_CURRENT_SOURCE_DIR}/proto/Exprs
                        ABSOLUTE)
 
 add_custom_command(OUTPUT ${PROTO_OUTPUT_FILES}
-                   COMMAND protobuf::protoc
+                   COMMAND ${PROTOC_BIN}
                            --proto_path
                            ${CMAKE_CURRENT_SOURCE_DIR}/proto
                            --cpp_out
-                           ${PROTO_OUTPUT_DIR}
+                       ${PROTO_OUTPUT_DIR}
                            ${CMAKE_CURRENT_SOURCE_DIR}/proto/Exprs.proto
-                   DEPENDS ${ABS_GANDIVA_PROTO} protobuf::libprotobuf
+                   DEPENDS protobuf_ep ${ABS_GANDIVA_PROTO}
                    COMMENT "Running PROTO compiler on Exprs.proto"
                    VERBATIM)
 
 add_custom_target(jni_proto ALL DEPENDS ${PROTO_OUTPUT_FILES})
 set(PROTO_SRCS "${PROTO_OUTPUT_DIR}/Exprs.pb.cc")
 set(PROTO_HDRS "${PROTO_OUTPUT_DIR}/Exprs.pb.h")
-
-set(GANDIVA_LINK_LIBS protobuf::libprotobuf gandiva)
+set(GANDIVA_LINK_LIBS gandiva)
 
 #######
 if(TESTS)
@@ -97,12 +151,6 @@ endif()
 find_library(ARROW_LIB arrow)
 find_library(PARQUET_LIB parquet)
 find_library(GANDIVA_LIB gandiva)
-# find_library(GANDIVA_PROTOBUF_LIB gandiva_protobuf)
-
-# message("jni headers ${JNI_INCLUDE_DIRS}")
-# message("arrow lib ${ARROW_LIB}")
-# message("gandiva lib ${GANDIVA_LIB}")
-# message("gandiva protobuf lib ${GANDIVA_PROTOBUF_LIB}")
 
 if(NOT ARROW_LIB)
     message(FATAL_ERROR "Arrow library not found")
@@ -111,10 +159,6 @@ endif()
 if(NOT GANDIVA_LIB)
     message(FATAL_ERROR "Gandiva library not found")
 endif()
-
-# if(NOT GANDIVA_PROTOBUF_LIB)
-#    message(FATAL_ERROR "Gandiva protobuf library not found")
-# endif()
 
 set(SPARK_COLUMNAR_PLUGIN_SRCS
         jni/jni_wrapper.cc
@@ -135,8 +179,10 @@ set(SPARK_COLUMNAR_PLUGIN_SRCS
 file(MAKE_DIRECTORY ${root_directory}/releases)
 add_library(spark_columnar_jni SHARED ${SPARK_COLUMNAR_PLUGIN_SRCS})
 add_dependencies(spark_columnar_jni jni_proto)
-target_link_libraries(spark_columnar_jni ${ARROW_LIB} ${PARQUET_LIB} ${GANDIVA_LIB} ${GANDIVA_LINK_LIBS})
-target_include_directories(spark_columnar_jni PUBLIC ${CMAKE_SYSTEM_INCLUDE_PATH} ${JNI_INCLUDE_DIRS} ${source_root_directory} ${PROTO_OUTPUT_DIR})
+target_link_libraries(spark_columnar_jni
+                      LINK_PUBLIC ${ARROW_LIB} ${PARQUET_LIB} ${GANDIVA_LIB} ${GANDIVA_LINK_LIBS}
+                      LINK_PRIVATE protobuf::libprotobuf)
+target_include_directories(spark_columnar_jni PUBLIC ${CMAKE_SYSTEM_INCLUDE_PATH} ${JNI_INCLUDE_DIRS} ${source_root_directory} ${PROTO_OUTPUT_DIR} ${PROTOBUF_INCLUDE})
 set_target_properties(spark_columnar_jni PROPERTIES
                       LIBRARY_OUTPUT_DIRECTORY ${root_directory}/releases
 )

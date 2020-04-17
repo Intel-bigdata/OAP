@@ -1,4 +1,3 @@
-#include <google/protobuf/io/coded_stream.h>
 
 #include <map>
 #include <memory>
