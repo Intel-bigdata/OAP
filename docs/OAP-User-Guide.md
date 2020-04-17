@@ -149,7 +149,7 @@ OAP can provide input data cache functionality to the executor. When using the c
 
 2. Launch Spark ***ThriftServer***
 
-   Launch Spark Thift Server, and use the Beeline command line tool to connect to the Thrift Server to execute DDL or DML operations. The data cache will automatically take effect for Parquet or ORC file sources. 
+   Launch Spark Thrift Server, and use the Beeline command line tool to connect to the Thrift Server to execute DDL or DML operations. The data cache will automatically take effect for Parquet or ORC file sources. 
 
    The rest of this section will show you how to do a quick verification of cache functionality. It will reuse the database metastore created in the [Working with OAP Index](#working-with-oap-index) section, which creates the `oap_test` table definition. In production, Spark Thrift Server will have its own metastore database directory or metastore service and use DDL's through Beeline for creating your tables.
 
@@ -217,7 +217,7 @@ The following are required to configure OAP to use DCPMM cache.
    mount -o dax /dev/pmem1 /mnt/pmem1
    ```
 
-   In thi case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
+   In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
 
 - [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Use the latest Memkind version. Compile Memkind based on your system or place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/libmemkind.so.0) for x86 64bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. The Memkind library depends on libnuma at the runtime, so it must already exist in the worker node system. 
 
@@ -290,7 +290,7 @@ spark.sql.extensions                  org.apache.spark.sql.OapExtensions   # Ena
 
 Change the values of `spark.executor.instances`, `spark.sql.oap.fiberCache.persistent.memory.initial.size`, and `spark.sql.oap.fiberCache.persistent.memory.reserved.size` to match your environment. 
 
-- `spark.executor.instances`: We suggest setting the value to 2x the number of worker nodes when NUMA binding is enabled. Each worker node runs two executors, each executor is bound to one of the two sockets, and accesses the corresponding DCPMM device on that socket.
+- `spark.executor.instances`: We suggest setting the value to 2X the number of worker nodes when NUMA binding is enabled. Each worker node runs two executors, each executor is bound to one of the two sockets, and accesses the corresponding DCPMM device on that socket.
 - `spark.sql.oap.fiberCache.persistent.memory.initial.size`: It is configured to the available DCPMM capacity to be used as data cache per exectutor.
 - `spark.sql.oap.fiberCache.persistent.memory.reserved.size`: When we use DCPMM as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available DCPMM capacity to avoid memory allocation failure. But even with an allocation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
 
@@ -375,9 +375,9 @@ Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks 
 
 ##### Index/Data cache separation
 
-OAP now supports different cache backends including `guava`, `vmemcache`, `simple` and `noevict`, for the `offheap` and `pm` cache managers. To optimize cache media utilization, enable cache separation of data and index with different cache media and strategies as shown below. Note that when sharing the same media, the data cache and index cache will use a different fiber cache ratio. If you choose one of the following 4 configurations, add the corresponding settings to `spark-defaults.conf`. 
+OAP now supports different cache back-ends including `guava`, `vmemcache`, `simple` and `noevict`, for the `offheap` and `pm` cache managers. To optimize cache media utilization, enable cache separation of data and index with different cache media and strategies as shown below. Note that when sharing the same media, the data cache and index cache will use a different fiber cache ratio. If you choose one of the following 4 configurations, add the corresponding settings to `spark-defaults.conf`. 
 
-1. DRAM(`offheap`) as cache media, `guava` strategy as index, and data cache backend. 
+1. DRAM(`offheap`) as cache media, `guava` strategy as index, and data cache back end. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enable        true
@@ -385,7 +385,7 @@ spark.oap.cache.strategy                            
 spark.sql.oap.fiberCache.memory.manager                 offheap
 ```
 
-2. DCPMM(`pm`) as cache media, `guava` strategy as index, and data cache backend. 
+2. DCPMM(`pm`) as cache media, `guava` strategy as index, and data cache back end. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enable        true
@@ -393,7 +393,7 @@ spark.oap.cache.strategy                            
 spark.sql.oap.fiberCache.memory.manager                 pm
 ```
 
-3. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`pm`)/`guava` as `data` cache media and backend. 
+3. DRAM(`offheap`)/`guava` as `index` cache media and back end, DCPMM(`pm`)/`guava` as `data` cache media and back end. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enable        true
@@ -405,7 +405,7 @@ spark.sql.oap.mix.index.cache.backend                   guava
 spark.sql.oap.mix.data.cache.backend                    guava
 ```
 
-4. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`tmp`)/`vmem` as `data` cache media and backend. 
+4. DRAM(`offheap`)/`guava` as `index` cache media and back end, DCPMM(`tmp`)/`vmem` as `data` cache media and back end. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enable        true
@@ -419,7 +419,7 @@ spark.sql.oap.mix.data.cache.backend                    vmem
 
 ##### Binary cache 
 
-A binary cache is available for both Parquet and ORC fileformat to improve cache space utilization compared to ColumnVector cache. When enabling binary cache, you should add following configs to `spark-defaults.conf`.
+A binary cache is available for both Parquet and ORC file format to improve cache space utilization compared to ColumnVector cache. When enabling binary cache, you should add following configs to `spark-defaults.conf`.
 
 ```
 spark.sql.oap.parquet.binary.cache.enabled                true      # for parquet fileformat
