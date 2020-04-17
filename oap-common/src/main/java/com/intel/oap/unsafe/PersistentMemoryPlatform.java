@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package com.intel.ssg.bdt.unsafe;
+package com.intel.oap.unsafe;
 
 import com.google.common.base.Preconditions;
-import com.intel.ssg.bdt.util.NativeLibraryLoader;
+import com.intel.oap.util.NativeLibraryLoader;
 
 import java.io.File;
 import java.lang.reflect.Constructor;

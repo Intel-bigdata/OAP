@@ -16,7 +16,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.intel.ssg.bdt</groupId>
+        <groupId>com.intel</groupId>
         <artifactId>oap</artifactId>
         <version>0.8.0</version>
         <relativePath>../pom.xml</relativePath>

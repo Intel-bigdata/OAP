@@ -27,7 +27,7 @@ import scala.collection.JavaConverters._
 
 import com.google.common.cache._
 import com.google.common.hash._
-import com.intel.ssg.bdt.unsafe.VMEMCacheJNI
+import com.intel.oap.unsafe.VMEMCacheJNI
 import org.apache.arrow.plasma
 import org.apache.arrow.plasma.exceptions.{DuplicateObjectException, PlasmaClientException}
 import sun.nio.ch.DirectBuffer

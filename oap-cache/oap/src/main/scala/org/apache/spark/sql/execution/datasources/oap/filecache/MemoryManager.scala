@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 import scala.util.Success
 
-import com.intel.ssg.bdt.unsafe.PersistentMemoryPlatform
+import com.intel.oap.unsafe.PersistentMemoryPlatform
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.intel.ssg.bdt.util;
+package com.intel.oap.util;
 
 import java.io.*;
 import java.util.HashMap;
