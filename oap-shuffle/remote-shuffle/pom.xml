@@ -226,7 +226,7 @@
             <directory>src/test/java</directory>
             <directory>src/test/scala</directory>
           </testSourceDirectories>
-          <configLocation>dev/checkstyle.xml</configLocation>
+          <configLocation>${basedir}/dev/checkstyle.xml</configLocation>
           <outputFile>${basedir}/target/checkstyle-output.xml</outputFile>
           <inputEncoding>${project.build.sourceEncoding}</inputEncoding>
           <outputEncoding>${project.reporting.outputEncoding}</outputEncoding>
@@ -255,7 +255,7 @@
           <testSourceDirectories>
             <directory>src/test/scala</directory>
           </testSourceDirectories>
-          <configLocation>scalastyle-config.xml</configLocation>
+          <configLocation>${basedir}/scalastyle-config.xml</configLocation>
           <outputFile>target/scalastyle-output.xml</outputFile>
           <inputEncoding>UTF-8</inputEncoding>
           <outputEncoding>UTF-8</outputEncoding>

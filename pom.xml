@@ -20,6 +20,16 @@
     <version>0.8.0</version>
     <packaging>pom</packaging>
 
+    <name>OAP</name>
+    <url>https://github.com/Intel-bigdata/OAP</url>
+
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
     <properties>
         <exec.maven.version>1.6.0</exec.maven.version>
         <guava.version>18.0</guava.version>
@@ -31,6 +41,7 @@
     <modules>
         <module>oap-common</module>
         <module>oap-cache/oap</module>
+        <module>oap-shuffle/remote-shuffle</module>
     </modules>
 
 </project>
