@@ -1,6 +1,6 @@
-package com.intel.oap.unsafe;
+package com.intel.oap.common.unsafe;
 
-import com.intel.oap.util.NativeLibraryLoader;
+import com.intel.oap.common.util.NativeLibraryLoader;
 
 import java.nio.ByteBuffer;
 

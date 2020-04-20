@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package com.intel.oap.unsafe;
+package com.intel.oap.common.unsafe;
 
 import com.google.common.base.Preconditions;
-import com.intel.oap.util.NativeLibraryLoader;
+import com.intel.oap.common.util.NativeLibraryLoader;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
