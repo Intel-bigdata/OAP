@@ -27,7 +27,7 @@ INCLUDE_DIRECTORIES(${JNI_INCLUDE_DIRS})
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-SET(SOURCE_FILES com_intel_oap_unsafe_PersistentMemoryPlatform.cpp)
+SET(SOURCE_FILES com_intel_oap_common_unsafe_PersistentMemoryPlatform.cpp)
 
 ADD_LIBRARY(pmplatform SHARED ${SOURCE_FILES})
 

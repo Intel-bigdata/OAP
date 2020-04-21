@@ -27,7 +27,7 @@ import scala.collection.JavaConverters._
 
 import com.google.common.cache._
 import com.google.common.hash._
-import com.intel.oap.unsafe.VMEMCacheJNI
+import com.intel.oap.common.unsafe.VMEMCacheJNI
 import org.apache.arrow.plasma
 import org.apache.arrow.plasma.exceptions.{DuplicateObjectException, PlasmaClientException}
 import sun.nio.ch.DirectBuffer
@@ -746,22 +746,8 @@ class MixCache(dataCacheMemory: Long,
 
   private val (dataCacheBackend, indexCacheBackend) = init()
 
-  private def isCompatibleWithMemoryManager() = {
-    val dataMemoryManager = sparkEnv.conf.get(OapConf.OAP_MIX_DATA_MEMORY_MANAGER)
-    val indexMemoryManager = sparkEnv.conf.get(OapConf.OAP_MIX_INDEX_MEMORY_MANAGER)
-    val dataCacheBackend = sparkEnv.conf.get(OapConf.OAP_MIX_DATA_CACHE_BACKEND)
-    val indexCacheBackend = OapConf.OAP_MIX_INDEX_CACHE_BACKEND
-
-    // TmpDramMemoryManager is designed only for VMemcache
-    if ((dataCacheBackend.equals("vmem") && !dataMemoryManager.equals("tmp")) ||
-      (indexCacheBackend.equals("vmem") && !indexMemoryManager.equals("tmp"))) {
-      throw new OapException("Please configure TmpDramMemoryManager(tmp) for VMemcache(vmem)")
-    }
-  }
-
   private def init(): (OapCache, OapCache) = {
     if (!separation) {
-      isCompatibleWithMemoryManager()
       val dataCacheBackend = OapCache(sparkEnv, OapConf.OAP_MIX_DATA_CACHE_BACKEND,
         dataCacheMemory, dataCacheGuardianMemory, FiberType.DATA);
       val indexCacheBackend = OapCache(sparkEnv, OapConf.OAP_MIX_INDEX_CACHE_BACKEND,

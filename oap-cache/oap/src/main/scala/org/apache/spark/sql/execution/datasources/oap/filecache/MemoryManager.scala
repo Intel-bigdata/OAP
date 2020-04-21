@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 import scala.util.Success
 
-import com.intel.oap.unsafe.PersistentMemoryPlatform
+import com.intel.oap.common.unsafe.PersistentMemoryPlatform
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
@@ -93,6 +93,31 @@ private[sql] object MemoryManager extends Logging {
    */
   private[filecache] val DUMMY_BLOCK_ID = TestBlockId("oap_memory_request_block")
 
+  private def checkConfCompatibility(cacheStrategy: String, memoryManagerOpt: String): Unit = {
+    cacheStrategy match {
+      case "guava" =>
+        if (!(memoryManagerOpt.equals("pm")||memoryManagerOpt.equals("offheap"))) {
+          throw new UnsupportedOperationException(s"For cache strategy" +
+            s" ${cacheStrategy}, memorymanager should be 'offheap' or 'pm'" +
+            s" but not ${memoryManagerOpt}.")
+        }
+      case "vmem" =>
+        if (!memoryManagerOpt.equals("tmp")) {
+          logWarning(s"current spark.sql.oap.fiberCache.memory.manager: ${memoryManagerOpt} " +
+            "takes no effect, use 'tmp' as memory manager for vmem cache instead.")
+        }
+      case "nonevict" =>
+        if (!memoryManagerOpt.equals("hybrid")) {
+          logWarning(s"current spark.sql.oap.fiberCache.memory.manager: ${memoryManagerOpt} " +
+            "takes no effect, use 'hybrid' as memory manager for nonevict cache instead.")
+        }
+      case _ =>
+        logInfo("current cache type may need further compatibility" +
+          " check against backend cache strategy and memory manager. " +
+          "Please refer enabling-indexdata-cache-separation part in OAP-User-Guide.md.")
+    }
+  }
+
   def apply(sparkEnv: SparkEnv): MemoryManager = {
     apply(sparkEnv, OapConf.OAP_FIBERCACHE_STRATEGY, FiberType.DATA)
   }
@@ -104,6 +129,7 @@ private[sql] object MemoryManager extends Logging {
       case "pm" => new PersistentMemoryManager(sparkEnv)
       case "hybrid" => new HybridMemoryManager(sparkEnv)
       case "tmp" => new TmpDramMemoryManager(sparkEnv)
+      case "kmem" => new DaxKmemMemoryManager(sparkEnv)
       case _ => throw new UnsupportedOperationException(
         s"The memory manager: ${memoryManagerOpt} is not supported now")
     }
@@ -118,38 +144,34 @@ private[sql] object MemoryManager extends Logging {
         configEntry.defaultValue.get).toLowerCase
     val memoryManagerOpt =
       conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
+    checkConfCompatibility(cacheStrategyOpt, memoryManagerOpt)
     cacheStrategyOpt match {
-      case "guava" =>
-        memoryManagerOpt match {
-          case "offheap" | "pm" => apply(sparkEnv, memoryManagerOpt)
-          case _ => throw new UnsupportedOperationException(s"For cache strategy" +
-            s" ${cacheStrategyOpt}, memorymanager should be 'offheap' or 'pm'" +
-            s" but not ${memoryManagerOpt}.")
-        }
-      case "nonevict" =>
-          if (!memoryManagerOpt.equals("hybrid")) {
-            logWarning(s"current spark.sql.oap.fiberCache.memory.manager: ${memoryManagerOpt} " +
-              "takes no effect, use 'hybrid' as memory manager for nonevict cache instead.")
-          }
-          new HybridMemoryManager(sparkEnv)
-      case "vmem" =>
-        if (!memoryManagerOpt.equals("tmp")) {
-          logWarning(s"current spark.sql.oap.fiberCache.memory.manager: ${memoryManagerOpt} " +
-            "takes no effect, use 'tmp' as memory manager for vmem cache instead.")
-        }
-        new TmpDramMemoryManager(sparkEnv)
+      case "guava" => apply(sparkEnv, memoryManagerOpt)
+      case "nonevict" => new HybridMemoryManager(sparkEnv)
+      case "vmem" => new TmpDramMemoryManager(sparkEnv)
       case "mix" =>
-        fiberType match {
-          case FiberType.DATA =>
-            val dataMemoryManagerOpt =
-              conf.get(OapConf.OAP_MIX_DATA_MEMORY_MANAGER.key, "pm").toLowerCase
-            apply(sparkEnv, dataMemoryManagerOpt)
-          case FiberType.INDEX =>
-            val indexMemoryManagerOpt =
-              conf.get(OapConf.OAP_MIX_INDEX_MEMORY_MANAGER.key, "offheap").toLowerCase
-            apply(sparkEnv, indexMemoryManagerOpt)
-          case _ =>
-            null
+        if (!memoryManagerOpt.equals("mix")) {
+          apply(sparkEnv, memoryManagerOpt)
+        } else {
+          var cacheBackendOpt = ""
+          var mixMemoryMangerOpt = ""
+          fiberType match {
+            case FiberType.DATA =>
+              cacheBackendOpt =
+                conf.get(OapConf.OAP_MIX_DATA_CACHE_BACKEND.key, "guava").toLowerCase
+              mixMemoryMangerOpt =
+                conf.get(OapConf.OAP_MIX_DATA_MEMORY_MANAGER.key, "pm").toLowerCase
+            case FiberType.INDEX =>
+              cacheBackendOpt =
+                conf.get(OapConf.OAP_MIX_INDEX_CACHE_BACKEND.key, "guava").toLowerCase
+              mixMemoryMangerOpt =
+                conf.get(OapConf.OAP_MIX_INDEX_MEMORY_MANAGER.key, "offheap").toLowerCase
+          }
+          checkConfCompatibility(cacheBackendOpt, mixMemoryMangerOpt)
+          cacheBackendOpt match {
+            case "vmem" => new TmpDramMemoryManager(sparkEnv)
+            case _ => apply(sparkEnv, mixMemoryMangerOpt)
+          }
         }
       case _ => throw new UnsupportedOperationException(
         s"The cache strategy: ${cacheStrategyOpt} is not supported now")
@@ -342,6 +364,45 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
   }
 
   override def isDcpmmUsed(): Boolean = {true}
+}
+
+private[filecache] class DaxKmemMemoryManager(sparkEnv: SparkEnv)
+  extends PersistentMemoryManager(sparkEnv) with Logging {
+
+  private val _memorySize = init()
+
+  private def init(): Long = {
+    val conf = sparkEnv.conf
+
+    val numaId = conf.getInt("spark.executor.numa.id", -1)
+    if (numaId == -1) {
+      throw new OapException("DAX KMEM mode is strongly related to numa node. " +
+        "Please enable numa binding")
+    }
+
+    val map = PersistentMemoryConfigUtils.parseConfig(conf)
+    val regularNodeNum = map.size
+    val daxNodeId = numaId + regularNodeNum
+
+    val (kmemCacheMemory, kmemCacheMemoryReserverd) = {
+      (Utils.byteStringAsBytes(
+        conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim),
+        Utils.byteStringAsBytes(
+          conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE).trim))
+    }
+    require(kmemCacheMemoryReserverd >= 0 && kmemCacheMemoryReserverd < kmemCacheMemory,
+      s"Reserved size(${kmemCacheMemoryReserverd}) should greater than zero and less than " +
+        s"initial size(${kmemCacheMemory})"
+    )
+    PersistentMemoryPlatform.setNUMANode(String.valueOf(daxNodeId), String.valueOf(numaId))
+    PersistentMemoryPlatform.initialize()
+    logInfo(s"Running DAX KMEM mode, will use ${kmemCacheMemory} as cache memory, " +
+      s"reserve $kmemCacheMemoryReserverd")
+    kmemCacheMemory - kmemCacheMemoryReserverd
+  }
+
+  override def memorySize: Long = _memorySize
+
 }
 
 private[filecache] class HybridMemoryManager(sparkEnv: SparkEnv)

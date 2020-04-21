@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.intel.oap.util;
+package com.intel.oap.common.util;
 
 import java.io.*;
 import java.util.HashMap;

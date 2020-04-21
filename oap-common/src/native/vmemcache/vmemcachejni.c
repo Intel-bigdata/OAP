@@ -54,13 +54,13 @@ static void check(JNIEnv *env)
   }
 }
 
-/*com.intel.oap.unsafe
- * Class:     com_intel_oap_unsafe_VMEMCacheJNI
+/*com.intel.oap.common.unsafe
+ * Class:     com_intel_oap_common_unsafe_VMEMCacheJNI
  * Method:    init
  * Signature: (Ljava/lang/String;J)I
  */
 JNIEXPORT jint JNICALL
-Java_com_intel_oap_unsafe_VMEMCacheJNI_init(
+Java_com_intel_oap_common_unsafe_VMEMCacheJNI_init(
     JNIEnv *env, jclass cls, jstring path, jlong maxSize)
 {
   const char* pathString = (*env)->GetStringUTFChars(env, path, NULL);
@@ -86,12 +86,12 @@ Java_com_intel_oap_unsafe_VMEMCacheJNI_init(
 }
 
 /*
- * Class:     com_intel_oap_unsafe_VMEMCacheJNI
+ * Class:     com_intel_oap_common_unsafe_VMEMCacheJNI
  * Method:    putNative
  * Signature: ([BLjava/nio/ByteBuffer;II[BLjava/nio/ByteBuffer;II)I
  */
 JNIEXPORT jint JNICALL
-Java_com_intel_oap_unsafe_VMEMCacheJNI_putNative(
+Java_com_intel_oap_common_unsafe_VMEMCacheJNI_putNative(
     JNIEnv *env, jclass cls, jbyteArray keyArray, jobject keyBuffer, jint keyOff, jint keyLen,
     jlong valueBaseAddr, jint valueOff, jint valueLen)
 {
@@ -132,12 +132,12 @@ Java_com_intel_oap_unsafe_VMEMCacheJNI_putNative(
 }
 
 /*
- * Class:     com_intel_oap_unsafe_VMEMCacheJNI
+ * Class:     com_intel_oap_common_unsafe_VMEMCacheJNI
  * Method:    put
  * Signature: ([BLjava/nio/ByteBuffer;II[BLjava/nio/ByteBuffer;II)I
  */
 JNIEXPORT jint JNICALL
-Java_com_intel_oap_unsafe_VMEMCacheJNI_put(
+Java_com_intel_oap_common_unsafe_VMEMCacheJNI_put(
     JNIEnv *env, jclass cls, jbyteArray keyArray, jobject keyBuffer, jint keyOff, jint keyLen,
     jbyteArray valueArray, jobject valueBuffer, jint valueOff, jint valueLen)
 {
@@ -188,12 +188,12 @@ Java_com_intel_oap_unsafe_VMEMCacheJNI_put(
 }
 
 /*
- * Class:     com_intel_oap_unsafe_VMEMCacheJNI
+ * Class:     com_intel_oap_common_unsafe_VMEMCacheJNI
  * Method:    get
  * Signature: ([BLjava/nio/ByteBuffer;II[BLjava/nio/ByteBuffer;II)I
  */
 JNIEXPORT jint JNICALL
-Java_com_intel_oap_unsafe_VMEMCacheJNI_get(
+Java_com_intel_oap_common_unsafe_VMEMCacheJNI_get(
     JNIEnv *env, jclass cls, jbyteArray keyArray, jobject keyBuffer, jint keyOff, jint keyLen,
     jbyteArray valueArray, jobject valueBuffer, jint valueOff, jint maxValueLen)
 {
@@ -244,12 +244,12 @@ Java_com_intel_oap_unsafe_VMEMCacheJNI_get(
 }
 
 /*
- * Class:     com_intel_oap_unsafe_VMEMCacheJNI
+ * Class:     com_intel_oap_common_unsafe_VMEMCacheJNI
  * Method:    getNative
  * Signature: ([BLjava/nio/ByteBuffer;II[BLjava/nio/ByteBuffer;II)I
  */
 JNIEXPORT jint JNICALL
-Java_com_intel_oap_unsafe_VMEMCacheJNI_getNative(
+Java_com_intel_oap_common_unsafe_VMEMCacheJNI_getNative(
     JNIEnv *env, jclass cls, jbyteArray keyArray, jobject keyBuffer, jint keyOff, jint keyLen,
     jlong valueBaseObj, jint valueOff, jint maxValueLen)
 {
@@ -290,12 +290,12 @@ Java_com_intel_oap_unsafe_VMEMCacheJNI_getNative(
 }
 
 /*
- * Class:     com_intel_oap_unsafe_VMEMCacheJNI
+ * Class:     com_intel_oap_common_unsafe_VMEMCacheJNI
  * Method:    evict
  * Signature: ([BLjava/nio/ByteBuffer;II)I
  */
 JNIEXPORT jint JNICALL
-Java_com_intel_oap_unsafe_VMEMCacheJNI_evict(
+Java_com_intel_oap_common_unsafe_VMEMCacheJNI_evict(
     JNIEnv *env, jclass cls, jbyteArray keyArray, jobject keyBuffer, jint keyOff, jint keyLen)
 {
   const char* key;
@@ -328,12 +328,12 @@ Java_com_intel_oap_unsafe_VMEMCacheJNI_evict(
 }
 
 /*
- * Class:     com_intel_dcpmcache_vmemcache_VMEMCacheJNI
+ * Class:     com_intel_oap_common_unsafe_VMEMCacheJNI
  * Method:    exist
  * Signature: ([BLjava/nio/ByteBuffer;II[BLjava/nio/ByteBuffer;II)I
  */
 JNIEXPORT jint JNICALL
-Java_com_intel_oap_unsafe_VMEMCacheJNI_exist(
+Java_com_intel_oap_common_unsafe_VMEMCacheJNI_exist(
     JNIEnv *env, jclass cls, jbyteArray keyArray, jobject keyBuffer, jint keyOff, jint keyLen)
 {
   const char* key;
@@ -362,12 +362,12 @@ Java_com_intel_oap_unsafe_VMEMCacheJNI_exist(
 }
 
 /*
- * Class:     com_intel_oap_unsafe_VMEMCacheJNI
+ * Class:     com_intel_oap_common_unsafe_VMEMCacheJNI
  * Method:    status
  * Signature: ([BLjava/nio/ByteBuffer;II[BLjava/nio/ByteBuffer;II)I
  */
 JNIEXPORT jint JNICALL
-Java_com_intel_oap_unsafe_VMEMCacheJNI_status(
+Java_com_intel_oap_common_unsafe_VMEMCacheJNI_status(
     JNIEnv *env, jclass cls, jlongArray statusArray)
 {
   stat_t stat;

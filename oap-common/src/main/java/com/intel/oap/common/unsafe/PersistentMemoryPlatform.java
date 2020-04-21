@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package com.intel.oap.unsafe;
+package com.intel.oap.common.unsafe;
 
 import com.google.common.base.Preconditions;
-import com.intel.oap.util.NativeLibraryLoader;
+import com.intel.oap.common.util.NativeLibraryLoader;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
@@ -65,7 +65,30 @@ public class PersistentMemoryPlatform {
     }
   }
 
+  /**
+   * Initialize the persistent memory with dax kmem node.
+   */
+  public static void initialize() {
+    synchronized (PersistentMemoryPlatform.class) {
+      if (!initialized) {
+        initializeKmem();
+        initialized = true;
+      }
+    }
+  }
+
+  private static native void initializeKmem();
+
   private static native void initializeNative(String path, long size, int pattern);
+
+  /**
+   * For DAX KMEM usage only
+   * @param daxNodeId the numa node created from persistent memory.
+   *                  memkind will set it as MEMKIND_DAX_KMEM_NODES env.
+   *                  by using MEMKIND_DAX_KMEM_NODES, memkind will recognize this node
+   * @param regularNodeId the numa node from dram
+   */
+  public static native void setNUMANode(String daxNodeId, String regularNodeId);
 
   /**
    * Allocate volatile memory from persistent memory.

@@ -20,7 +20,7 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.internal.oap.OapConf
 
 object BtreeIndexSuite
-    extends OapTestSuite with OapPerfSuiteContext with ParquetVsOapVsOrcConfigSet {
+    extends OapTestSuite with OapPerfSuiteContext with ParquetVsOrcConfigSet {
   override protected def getAppName: String = "BtreeIndexBenchmarkSuite"
 
   val table = "store_sales"
@@ -85,29 +85,15 @@ object BtreeIndexSuite
       s"SELECT * FROM $table WHERE $attr < ${Int.MaxValue}"),
     OapBenchmarkTest("attr < 100000",
       s"SELECT * FROM $table WHERE $attr < 100000"),
-    OapBenchmarkTest("attr < 10000",
-      s"SELECT * FROM $table WHERE $attr < 10000"),
-    OapBenchmarkTest("attr < 1000",
-      s"SELECT * FROM $table WHERE $attr < 1000"),
     OapBenchmarkTest("attr = 600000",
       s"SELECT * FROM $table WHERE $attr = 600000"),
-    OapBenchmarkTest("attr BETWEEN 10 & 20",
-      s"SELECT * FROM $table WHERE $attr BETWEEN 10 AND 20"),
-    OapBenchmarkTest("attr BETWEEN 10 & 40",
-      s"SELECT * FROM $table WHERE $attr BETWEEN 10 AND 40"),
     OapBenchmarkTest("attr BETWEEN 10 & 80",
       s"SELECT * FROM $table WHERE $attr BETWEEN 10 AND 80"),
-    
     // Two columns query
     OapBenchmarkTest("attr < 100000 & ss_ticket_number >= 120000",
       s"SELECT * FROM $table WHERE $attr < 100000 AND ss_ticket_number >= 120000"),
     OapBenchmarkTest("attr < 10000 & ss_list_price < 100.0",
       s"SELECT * FROM $table WHERE $attr < 10000 AND ss_list_price < 100.0"),
-    OapBenchmarkTest("attr < 1000 & ss_net_paid < 200.0",
-      s"SELECT * FROM $table WHERE $attr < 1000 AND ss_net_paid > 100.0 AND ss_net_paid < 200.0"),
-    OapBenchmarkTest("attr < 1000 & ss_net_paid in [100.0, 110.0]",
-      s"SELECT * FROM $table WHERE $attr < 1000 AND ss_net_paid BETWEEN 100.0 AND 110.0"),
-
     // Three columns query
     OapBenchmarkTest("attr < 100000 & ss_ticket_number >= 120000 & ss_list_price < 100.0",
       s"SELECT * FROM $table WHERE $attr < 100000 AND ss_ticket_number >= 120000 AND ss_list_price < 100.0"),

@@ -22,10 +22,10 @@
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
-  <artifactId>oap-cache</artifactId>
+  <artifactId>oap-cache-oap</artifactId>
   <packaging>jar</packaging>
 
-  <name>OAP-CACHE</name>
+  <name>OAP-CACHE-OAP</name>
 
 
 
@@ -116,7 +116,7 @@
     <dependency>
       <groupId>com.intel</groupId>
       <artifactId>oap-common</artifactId>
-      <version>${oap.common.version}</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
@@ -619,7 +619,7 @@
         <version>3.2.0</version>
         <configuration>
           <descriptors>
-            <descriptor>../../src/test/assembly/test-jar-with-dependencies.xml</descriptor>
+            <descriptor>src/test/assembly/test-jar-with-dependencies.xml</descriptor>
           </descriptors>
         </configuration>
         <executions>
