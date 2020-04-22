@@ -142,40 +142,46 @@ function gather(){
 
 prepare_maven
 echo "Choose your build type?"
-select var in "Base" "Enable_memkind" "Enable_vmemcache" "Enable_all"; do
+select var in "Base" "Enable_memkind" "Enable_vmemcache" "Enable_all" "Exit"; do
 case $var in
         Base)
-        echo "Start build the base package"
-        cd ..
-        mvn clean  -DskipTests package
+          echo "Start build the base package"
+          cd ..
+          mvn clean  -DskipTests package
         ;;
         Enable_memkind)
-        echo "Start building with memkind"
-        prepare_memkind
-        cd ..
-        mvn clean -q -Ppersistent-memory -DskipTests package
+          echo "Start building with memkind"
+          prepare_memkind
+          cd ..
+          mvn clean -q -Ppersistent-memory -DskipTests package
         ;;
         Enable_vmemcache)
-        echo "Start building with vmemcache"
-        prepare_cmake
-        prepare_vmemcache
-        cd $dev_path
-        cd ..
-        mvn clean -q -Pvmemcache -DskipTests package
+          echo "Start building with vmemcache"
+          prepare_cmake
+          prepare_vmemcache
+          cd $dev_path
+          cd ..
+          mvn clean -q -Pvmemcache -DskipTests package
         ;;
         Enable_all)
-        echo "Start building with all"
-        prepare_memkind
-        prepare_cmake
-        prepare_vmemcache
-        cd $dev_path
-        cd ..
-        mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
+          echo "Start building with all"
+          prepare_memkind
+          prepare_cmake
+          prepare_vmemcache
+          cd $dev_path
+          cd ..
+          mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
+        ;;
+        Exit)
+          echo "Bye..."
+          exit 0
         ;;
         *)
-        echo "You should choose a existing options"
+          echo "You should choose an existed options"
+          exit 1
         ;;
 esac
 break
 done
+
 gather
