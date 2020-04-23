@@ -124,7 +124,12 @@ make install
 cd SparkColumnarPlugin/core/
 mvn clean package -DskipTests
 ```
+### Notes
+[Notes for Installation Issues](/oap-native-sql/resource/InstallationNotes.md)
+  
+
 ===
+
 
 ## spark configuration
 
