@@ -14,7 +14,6 @@ libgsasl is missing, run `yum install libgsasl`
 * CentOS 7.7 looks like didn't provide the glibc we required, so binaries packaged on F30 wont work.
 ```
 20/04/21 17:46:17 WARN TaskSetManager: Lost task 0.1 in stage 1.0 (TID 2, 10.0.0.143, executor 6): java.lang.UnsatisfiedLinkError: /tmp/libgandiva_jni.sobe729912-3bbe-4bd0-bb96-4c7ce2e62336: /lib64/libm.so.6: version `GLIBC_2.29' not found (required by /tmp/libgandiva_jni.sobe729912-3bbe-4bd0-bb96-4c7ce2e62336)
-
 ```
 * Missing symbols due to old GCC version.
 ```
