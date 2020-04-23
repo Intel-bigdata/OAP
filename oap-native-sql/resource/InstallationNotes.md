@@ -7,11 +7,11 @@ mvn clean install -P arrow-jni -am -Darrow.cpp.build.dir=/root/git/t/arrow/cpp/r
 ```
 * No rule to make target '../src/protobuf_ep', needed by `src/proto/Exprs.pb.cc'
 remove the existing libprotobuf installation, then the script for find_package() will be able to download protobuf.
-* cant find the libprotobuf.so.13 in the shared lib
+* can't find the libprotobuf.so.13 in the shared lib
 copy the libprotobuf.so.13 from $OAP_DIR/oap-native-sql/cpp/src/resources to /usr/lib64/
 * unable to load libhdfs: libgsasl.so.7: cannot open shared object file
 libgsasl is missing, run `yum install libgsasl`
-* CentOS 7.7 looks like didn't provide the glibc we required, so binaries packaged on F30 wont work.
+* CentOS 7.7 looks like didn't provide the glibc we required, so binaries packaged on F30 wont work.
 ```
 20/04/21 17:46:17 WARN TaskSetManager: Lost task 0.1 in stage 1.0 (TID 2, 10.0.0.143, executor 6): java.lang.UnsatisfiedLinkError: /tmp/libgandiva_jni.sobe729912-3bbe-4bd0-bb96-4c7ce2e62336: /lib64/libm.so.6: version `GLIBC_2.29' not found (required by /tmp/libgandiva_jni.sobe729912-3bbe-4bd0-bb96-4c7ce2e62336)
 
