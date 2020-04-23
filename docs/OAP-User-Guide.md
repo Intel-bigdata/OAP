@@ -233,7 +233,15 @@ The following are required to configure OAP to use DCPMM cache.
    
    ```
   If you choose to complile from verison [Memkind_v1.10.0-oap-0.7](https://github.com/Intel-bigdata/memkind/tree/v1.10.0-oap-0.7), you can run
-  `git clone -b v1.10.0-oap-0.7 https://github.com/Intel-bigdata/memkind` then follow the same commands as above.
+  ```
+   git clone https://github.com/memkind/memkind  
+   cd memkind
+   git reset --hard 526b59887e
+   ./autogen.sh
+   ./configure
+   make
+   make install
+  ```
 - Install [Vmemcache](https://github.com/pmem/vmemcache) library on every cluster worker node if using vmemcache strategy. Follow the build/install steps from vmemcache website and make sure libvmemcache.so is in `/lib64` directory in each worker node. 
 
    Build vmemcache lib from source (for RPM-based Linux):
