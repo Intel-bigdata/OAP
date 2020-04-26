@@ -225,7 +225,7 @@ The following are required to configure OAP to use DCPMM cache.
    Build the latest memkind lib from source:
 
    ```
-   git clone https://github.com/memkind/memkind  
+   git clone https://github.com/memkind/memkind
    cd memkind
    ./autogen.sh
    ./configure
@@ -459,7 +459,7 @@ Check DCPMM cache size by checking disk space with `df -h`. For Guava/Non-evicta
 
 This section provides instructions and tools for running TPC-DS queries to evaluate the cache performance of various configurations. The TPC-DS suite has many queries and we select 9 I/O intensive queries to simplify performance evaluation.
 
-We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/OAP-TPCDS-TOOL.zip) to simplify running the workload. If you are already familiar with TPC-DS data generation and running a TPC-DS tool suite, skip our tool and use the TPC-DS tool suite directly.
+We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.7.0-spark-2.4.4/OAP-TPCDS-TOOL.zip) to simplify running the workload. If you are already familiar with TPC-DS data generation and running a TPC-DS tool suite, skip our tool and use the TPC-DS tool suite directly.
 
 ### Prerequisites
 
@@ -467,7 +467,7 @@ We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigda
 
 ### Prepare the Tool
 
-1. Download [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/OAP-TPCDS-TOOL.zip) and unzip to a folder (for example, `OAP-TPCDS-TOOL` folder) on your working node. 
+1. Download [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.7.0-spark-2.4.4/OAP-TPCDS-TOOL.zip) and unzip to a folder (for example, `OAP-TPCDS-TOOL` folder) on your working node. 
 2. Copy `OAP-TPCDS-TOOL/tools/tpcds-kits` to ALL worker nodes under the same folder (for example, `/home/oap/tpcds-kits`).
 
 ### Generate TPC-DS Data
@@ -507,9 +507,10 @@ We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigda
 
 Start the Thrift Server in the tool root folder, which is the same folder you run data generation scripts. Use either the DCPMM or DRAM scrip to start the Thrift Server.
 
-#### Use DCPMM as cache
+#### Use DCPMM as Cache Media
 
-Update the configuration values in `scripts/spark_thrift_server_yarn_with_DCPMM.sh` to reflect your environment.   Normally, you need to update the following configuration values to cache to DCPMM.
+Update the configuration values in `scripts/spark_thrift_server_yarn_with_DCPMM.sh` to reflect your environment. 
+Normally, you need to update the following configuration values to cache to DCPMM.
 
 - --driver-memory
 - --executor-memory
@@ -517,22 +518,23 @@ Update the configuration values in `scripts/spark_thrift_server_yarn_with_DCPMM.
 - --conf spark.sql.oap.fiberCache.persistent.memory.initial.size
 - --conf spark.sql.oap.fiberCache.persistent.memory.reserved.size
 
-These settings will override the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
+These settings will override the values specified in Spark configuration file ( `spark-defaults.conf`). After the configuration is done, you can execute the following command to start Thrift Server.
 
 ```
 cd OAP-TPCDS-TOOL
 sh ./scripts/spark_thrift_server_yarn_with_DCPMM.sh start
 ```
-
-#### Use DRAM as cache
+In this script, we use `guava` as cache strategy for ColumerVecor cache. you can alter to Binary cache. Or you can use `vmem` as cache strategy for ColumnVector or Binary cache, then follow above corresponding instructions to config rightly.
+#### Use DRAM as Cache Media 
 Update the configuration values in `scripts/spark_thrift_server_yarn_with_DRAM.sh` to reflect your environment. Normally, you need to update the following configuration values to cache to DRAM.
 
 - --driver-memory
 - --executor-memory
 - --executor-cores
-- --conf spark.memory.offHeap.size
+- --conf spark.sql.oap.fiberCache.offheap.memory.size
+- --conf spark.executor.memoryOverhead
 
-These settings will override the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
+These settings will override the values specified in Spark configuration file (`spark-defaults.conf`). After the configuration is done, you can execute the following command to start Thrift Server.
 
 ```
 cd OAP-TPCDS-TOOL
