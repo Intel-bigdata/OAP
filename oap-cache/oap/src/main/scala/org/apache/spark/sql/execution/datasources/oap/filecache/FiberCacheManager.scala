@@ -80,7 +80,7 @@ private[sql] class FiberCacheManager(
     } else if (cacheName.equals(SIMPLE_CACHE)) {
       new SimpleOapCache()
     } else if (cacheName.equals(NO_EVICT_CACHE)) {
-      new NonEvictPMCache(dataCacheMemorySize, dataCacheGuardianMemorySize, FiberType.DATA)
+      new NoEvictPMCache(dataCacheMemorySize, dataCacheGuardianMemorySize, FiberType.DATA)
     } else if (cacheName.equals(VMEM_CACHE)) {
       new VMemCache(FiberType.DATA)
     } else if (cacheName.equals(EXTERNAL_CACHE)) {

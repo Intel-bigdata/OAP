@@ -63,16 +63,16 @@ class MemoryManagerConfigSuite extends SharedOapContext with Logging{
     assert(memoryManager.isInstanceOf[TmpDramMemoryManager])
   }
 
-  test("nonevict with hybrid memory manager") {
+  test("noevict with hybrid memory manager") {
     val sparkEnv = SparkEnv.get
-    sparkEnv.conf.set("spark.oap.cache.strategy", "nonevict")
+    sparkEnv.conf.set("spark.oap.cache.strategy", "noevict")
     val memoryManager = MemoryManager(sparkEnv)
     assert(memoryManager.isInstanceOf[HybridMemoryManager])
   }
 
-  test("nonevict with memory manager set to pm") {
+  test("noevict with memory manager set to pm") {
     val sparkEnv = SparkEnv.get
-    sparkEnv.conf.set("spark.oap.cache.strategy", "nonevict")
+    sparkEnv.conf.set("spark.oap.cache.strategy", "noevict")
     sparkEnv.conf.set("spark.sql.oap.fiberCache.memory.manager", "pm")
     val memoryManager = MemoryManager(sparkEnv)
     assert(memoryManager.isInstanceOf[HybridMemoryManager])

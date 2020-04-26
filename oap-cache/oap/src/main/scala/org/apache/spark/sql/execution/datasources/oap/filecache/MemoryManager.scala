@@ -126,10 +126,10 @@ private[sql] object MemoryManager extends Logging {
             s" ${cacheStrategyOpt}, memorymanager should be 'offheap' or 'pm'" +
             s" but not ${memoryManagerOpt}.")
         }
-      case "nonevict" =>
+      case "noevict" =>
           if (!memoryManagerOpt.equals("hybrid")) {
             logWarning(s"current spark.sql.oap.fiberCache.memory.manager: ${memoryManagerOpt} " +
-              "takes no effect, use 'hybrid' as memory manager for nonevict cache instead.")
+              "takes no effect, use 'hybrid' as memory manager for noevict cache instead.")
           }
           new HybridMemoryManager(sparkEnv)
       case "vmem" =>

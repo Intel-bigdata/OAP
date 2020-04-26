@@ -227,7 +227,7 @@ private[filecache] object OapCache {
       case "guava" => new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
       case "vmem" => new VMemCache(fiberType)
       case "simple" => new SimpleOapCache()
-      case "noevict" => new NonEvictPMCache(cacheMemory, cacheGuardianMemory, fiberType)
+      case "noevict" => new NoEvictPMCache(cacheMemory, cacheGuardianMemory, fiberType)
       case "external" => new ExternalCache(fiberType)
       case _ => throw new UnsupportedOperationException(
         s"The cache backend: ${oapCacheOpt} is not supported now")
@@ -296,7 +296,7 @@ trait OapCache {
 
 }
 
-class NonEvictPMCache(pmSize: Long,
+class NoEvictPMCache(pmSize: Long,
                       cacheGuardianMemory: Long,
                       fiberType: FiberType) extends OapCache with Logging {
   // We don't bother the memory use of Simple Cache
