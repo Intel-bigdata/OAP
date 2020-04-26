@@ -37,7 +37,11 @@ class ColumnarDataSourceRDD(
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
     val inputPartition = castPartition(split).inputPartition
     val reader = if (columnarReads) {
-      VectorizedFilePartitionReaderHandler.get(inputPartition, partitionReaderFactory.asInstanceOf[ParquetPartitionReaderFactory])
+      partitionReaderFactory match {
+        case factory: ParquetPartitionReaderFactory =>
+          VectorizedFilePartitionReaderHandler.get(inputPartition, factory)
+        case _ => partitionReaderFactory.createColumnarReader(inputPartition)
+      }
     } else {
       partitionReaderFactory.createReader(inputPartition)
     }
