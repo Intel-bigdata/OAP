@@ -585,7 +585,7 @@ extern "C" void MakeConditioner(std::shared_ptr<ConditionerBase> *out) {
     out.close();
 
     // compile the code
-    std::string cmd = "gcc -Wall -Wextra " + cppfile + " -o " + libfile +
+    std::string cmd = "gcc -std=c++11 -Wall -Wextra " + cppfile + " -o " + libfile +
                       " -O3 -shared -fPIC -larrow 2> " + logfile;
     int ret = system(cmd.c_str());
     if (WEXITSTATUS(ret) != EXIT_SUCCESS) {
