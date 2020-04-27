@@ -87,6 +87,14 @@ the 3x shuffle size is gone through network, arriving at a remote storage system
     spark.shuffle.remote.bypassMergeThreshold     -1
 ```
 
+### Configurations fetching port for HDFS
+
+When the backend storage is HDFS, we contact http://$host:$port/conf to fetch configurations. They were not locally loaded because we assume absence of local storage.
+
+```
+    spark.shuffle.remote.hdfs.storageMasterUIPort  50070
+```
+
 ### Inherited Spark Shuffle Configurations
 
 These configurations are inherited from upstream Spark, they are still supported in remote shuffle. More explanations can be found in [Spark core docs](https://spark.apache.org/docs/2.4.4/configuration.html#shuffle-behavior) and [Spark SQL docs](https://spark.apache.org/docs/2.4.4/sql-performance-tuning.html).
@@ -119,4 +127,72 @@ These configurations are deprecated and will not take effect.
     spark.shuffle.maxChunksBeingTransferred
     spark.shuffle.registration.timeout
     spark.shuffle.registration.maxAttempts
+```
+
+## Performance Evaluation Tool
+
+Leverage this tool to evaluate shuffle write/read performance separately under your specific storage system. This tool starts one Java process with #poolSize number of threads, running the specified remote-shuffle writers/readers in this module. Additional Spark configurations can be put in "./spark.conf" and will be loaded.(and printed as part of the summary for recording)
+
+Configuration details:
+* `-h` or `--help`: display help messages
+* `-m` or `--mappers`: the number of mappers, default to 5
+* `-r` or `--reducers`: the number of reducers, default to 5
+* `-p` or `--poolSize`: the number task threads in write/read thread pool, similar to spark.executor.cores. e.g. if mappers=15, poolSize=5, it takes 3 rounds to finish this job
+* `-n` or `--rows`: the number of rows per mapper, default to 1000
+* `-b` or `--shuffleBlockRawSize`: the size of each shuffle block, default to 20000 Bytes
+* `-w` or `--writer`: the type of shuffle writers for benchmark, can be one of general, unsafe and bypassmergesort, default to unsafe
+* `-onlyWrite` or `--onlyWrite`: containing this flag then the benchmark only includes shuffle write stage, default behavior is perform both write & read
+* `-uri` or `--storageMasterUri`: Hadoop-compatible storage Master URI, default to file://
+* `-d` or `--dir`: Shuffle directory, default /tmp
+* `-l` or `--log`: Log level, default to WARN
+
+
+Sample command:
+```
+java -cp target/remote-shuffle-0.1-SNAPSHOT-test-jar-with-dependencies.jar org.apache.spark.shuffle.remote.PerformanceEvaluationTool -h
+```
+
+Sample output
+```
+unsafe shuffle writer:
+    raw total size:      123 GB
+    compressed size:     135 GB
+    duration:            88.3 seconds
+
+    throughput(raw):     1429.06843144412 MB/s
+    throughput(storage): 1570.9931870053674 MB/s
+
+    number of mappers:   210
+    number of reducers:  70
+    block size(raw):     8 MB
+    block size(storage): 9 MB
+
+    properties:          spark.reducer.maxSizeInFlight -> 100m, spark.shuffle.remote.numReadThreads -> 8, spark.shuffle.remote.reducer.maxBlocksInFlightPerAddress -> 3
+
+    records per mapper:  70
+    load size per record:9000000
+
+    shuffle storage      daos://default:1
+    shuffle folder:      /tmp/shuffle
+-------------------------------------------------------------------------------------------------------------------------
+shuffle reader:
+    raw total size:      123 GB
+    compressed size:     135 GB
+    duration:            49.8 seconds
+
+    throughput(raw):     2533.665772753123 MB/s
+    throughput(storage): 2785.2911586057153 MB/s
+
+    number of mappers:   210
+    number of reducers:  70
+    block size(raw):     8 MB
+    block size(storage): 9 MB
+
+    properties:          spark.reducer.maxSizeInFlight -> 100m, spark.shuffle.remote.numReadThreads -> 8, spark.shuffle.remote.reducer.maxBlocksInFlightPerAddress -> 3
+
+    records per mapper:  70
+    load size per record:9000000
+
+    shuffle storage      daos://default:1
+    shuffle folder:      /tmp/shuffle                                                      
 ```

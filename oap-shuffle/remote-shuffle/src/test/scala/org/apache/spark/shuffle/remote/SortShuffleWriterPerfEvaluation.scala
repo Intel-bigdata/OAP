@@ -33,17 +33,6 @@ object SortShuffleWriterPerfEvaluation extends ShuffleWriterPerfEvaluationBase {
       numMaps = 1,
       dependency = dependency)
 
-  def getWriter(mapId: Int): SortShuffleWriter[Int, ByteBuffer, ByteBuffer] = {
-
-    setup()
-
-    new SortShuffleWriter[Int, ByteBuffer, ByteBuffer](
-      blockResolver,
-      shuffleHandle,
-      mapId,
-      taskContext.get())
-  }
-
   def getRemoteWriter(mapId: Int): RemoteShuffleWriter[Int, ByteBuffer, ByteBuffer] = {
 
     setup()

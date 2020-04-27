@@ -17,14 +17,14 @@
 
 package org.apache.spark.shuffle.remote
 
-import java.io.FileWriter
+import java.io.{File, FileWriter}
 import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 
 import scala.util.Random
 
-import org.apache.commons.cli.{DefaultParser, Options}
+import org.apache.commons.cli.{DefaultParser, HelpFormatter, Options}
 import org.apache.commons.io.FileUtils
 
 import org.apache.spark.{SparkConf, SparkContext}
@@ -40,14 +40,12 @@ case class PerfOption (
   rowsPerMapper: Int,
   // Raw data size, before serialization & compression
   shuffleBlockRawSize: Long,
-  testType: String,
   writersType: String,
   onlyWrite: Boolean,
   storageMasterUri: String,
   shuffleDir: String,
   logLevel: String,
-  remoteShuffleNoDelete: Boolean,
-  transferTo: Boolean)
+  remoteShuffleNoDelete: Boolean)
 
 object PerformanceEvaluationTool {
 
@@ -59,7 +57,6 @@ object PerformanceEvaluationTool {
 
   // Raw data size, before serialization & compression
   private var shuffleBlockRawSize: Long = _
-  private var testType: String = _
   private var writersType: String = _
   private var onlyWrite: Boolean = _
 
@@ -68,9 +65,6 @@ object PerformanceEvaluationTool {
   private var logLevel: String = _
   private var remoteShuffleNoDeletion: Boolean = _
 
-  private var enableTransferTo: Boolean = _
-
-  private var conf: SparkConf = _
   private var remoteConf: SparkConf = _
   private var sc: SparkContext = _
   private var blockResolverRemote: ShuffleBlockResolver = _
@@ -88,42 +82,42 @@ object PerformanceEvaluationTool {
   def main(args: Array[String]): Unit = {
     try {
       parse(args) match {
-        case PerfOption(m, r, p, n, b, t, w, o, uri, d, l, no, tt) =>
+        case Some(PerfOption(m, r, p, n, b, w, o, uri, d, l, no)) =>
           mappers = m
           reducers = r
           poolSize = p
           rowsPerMapper = n
           shuffleBlockRawSize = b
-          testType = t
           writersType = w
           onlyWrite = o
           storageMasterUri = uri
           shuffleDir = d
           logLevel = l
           remoteShuffleNoDeletion = no
-          enableTransferTo = tt
 
           // Set two SparkConfs according to the parameters at first, these configurations are
           // going to influence all later tests.
           prepareSparkConf()
-      }
 
-      data = generateData()
+          data = generateData()
 
-      prepareEnvForShuffleWrite()
-      val timeWrite = benchmarkShuffleWrite()
+          prepareEnvForShuffleWrite()
+          val timeWrite = benchmarkShuffleWrite()
 
-      printSummaryString(s"$writersType shuffle writer ${testType}", timeWrite)
-      sc.stop()
+          printSummaryString(s"$writersType shuffle writer", timeWrite)
+          sc.stop()
 
-      if (!onlyWrite && successfulWrite) {
-        // Ensure memory pressure doesn't impact shuffle reading tests
-        System.gc()
+          if (!onlyWrite && successfulWrite) {
+            // Ensure memory pressure doesn't impact shuffle reading tests
+            System.gc()
 
-        prepareEnvForShuffleRead()
-        val timeRead = benchmarkShuffleRead()
+            prepareEnvForShuffleRead()
+            val timeRead = benchmarkShuffleRead()
 
-        printSummaryString(s"shuffle reader ${testType}", timeRead)
+            printSummaryString(s"shuffle reader", timeRead)
+          }
+
+        case None =>
       }
 
     } finally {
@@ -132,23 +126,19 @@ object PerformanceEvaluationTool {
     }
 
     def prepareSparkConf(): Unit = {
-      conf = new SparkConf(loadDefaults = false)
       remoteConf = createDefaultConf(loadDefaults = true)
         .set("spark.app.id", s"test_${UUID.randomUUID()}")
         .set(RemoteShuffleConf.STORAGE_MASTER_URI, storageMasterUri)
         .set(RemoteShuffleConf.SHUFFLE_FILES_ROOT_DIRECTORY, shuffleDir)
-      Utils.loadDefaultSparkProperties(conf, propertiesFilePath)
-      Utils.loadDefaultSparkProperties(remoteConf, propertiesFilePath)
+      if (new File(propertiesFilePath).exists()) {
+        Utils.loadDefaultSparkProperties(remoteConf, propertiesFilePath)
+      }
     }
   }
 
   private def setSC(): Unit = {
     // Make SparkEnv.get access possible
-    sc = if (testType == "remote") {
-      new SparkContext("local[1]", "shuffle_writer_remote", remoteConf)
-    } else {
-      new SparkContext("local[1]", "shuffle_writer", conf)
-    }
+    sc = new SparkContext("local[1]", "shuffle_writer_remote", remoteConf)
     sc.setLogLevel(logLevel)
   }
 
@@ -159,17 +149,17 @@ object PerformanceEvaluationTool {
       case "unsafe" => UnsafeShuffleWriterPerfEvaluation
       case "bypassmergesort" => BypassMergeSortShuffleWriterPerfEvaluation
     }
-    perfEvaluationUtil.globalSetup(reducers, storageMasterUri, shuffleDir, conf, remoteConf)
+    perfEvaluationUtil.globalSetup(reducers, storageMasterUri, shuffleDir, remoteConf)
 
     blockResolverRemote = UnsafeShuffleWriterPerfEvaluation.globalSetup(
-      reducers, storageMasterUri, shuffleDir, conf, remoteConf)
+      reducers, storageMasterUri, shuffleDir, remoteConf)
   }
 
   private def prepareEnvForShuffleRead(): Unit = {
     setSC()
     // Reuse previous remote resolver
     ShuffleReaderPerfEvaluation.globalSetup(mappers, blockResolverRemote,
-      dataSizeInStorage, storageMasterUri, shuffleDir, conf, remoteConf)
+      dataSizeInStorage, storageMasterUri, shuffleDir, remoteConf)
   }
 
   private def afterAll(): Unit = {
@@ -186,12 +176,12 @@ object PerformanceEvaluationTool {
 
   private def initOptions(): Options = {
     val options = new Options()
+    options.addOption("h", "help", false, "display help message")
     options.addOption("m", "mappers", true, "# of mappers")
     options.addOption("r", "reducers", true, "# of reducers")
     options.addOption("p", "poolSize", true, "# of threads")
     options.addOption("n", "rows", true, "# of rows per mapper")
     options.addOption("b", "shuffleBlockRawSize", true, "Size of a shuffle block")
-    options.addOption("t", "type", true, "Type of test, local or remote")
     options.addOption("w", "writer", true,
       "Type of shuffle writers, general, unsafe or bypassmergesort")
     options.addOption("onlyWrite", "onlyWrite", false, "Only testing shuffle write")
@@ -199,31 +189,36 @@ object PerformanceEvaluationTool {
     options.addOption("d", "dir", true, "Shuffle directory")
     options.addOption("l", "log", true, "Log level")
     options.addOption("noDelete", "noDelete", false, "Not deleting shuffle files after testing")
-    options.addOption("transferTo", "transferTo", true, "Shuffle directory"
-    )
 
     options
   }
 
-  private def parse(args: Array[String]): PerfOption = {
+  private def parse(args: Array[String]): Option[PerfOption] = {
     val parser = new DefaultParser
     val options = initOptions()
     val cmd = parser.parse(options, args)
-    PerfOption(
-      cmd.getOptionValue("m", "5").toInt,
-      cmd.getOptionValue("r", "5").toInt,
-      if (cmd.hasOption("p")) cmd.getOptionValue("p").toInt else cmd.getOptionValue("m", "5").toInt,
-      cmd.getOptionValue("n", "1000").toInt,
-      cmd.getOptionValue("b", "20000").toLong,
-      cmd.getOptionValue("t", "remote"),
-      cmd.getOptionValue("w", "unsafe"),
-      cmd.hasOption("onlyWrite"),
-      cmd.getOptionValue("uri", "file://"),
-      cmd.getOptionValue("d", "/tmp"),
-      cmd.getOptionValue("l", "WARN"),
-      cmd.hasOption("noDelete"),
-      cmd.getOptionValue("transferTo", "true").toBoolean
-    )
+    if (cmd.hasOption("h")) {
+      new HelpFormatter().printHelp("PerformanceEvaluationTool", options)
+      None
+    } else {
+      Some(PerfOption(
+        cmd.getOptionValue("m", "5").toInt,
+        cmd.getOptionValue("r", "5").toInt,
+        if (cmd.hasOption("p")) {
+          cmd.getOptionValue("p").toInt
+        } else {
+          cmd.getOptionValue("m", "5").toInt
+        },
+        cmd.getOptionValue("n", "1000").toInt,
+        cmd.getOptionValue("b", "20000").toLong,
+        cmd.getOptionValue("w", "unsafe"),
+        cmd.hasOption("onlyWrite"),
+        cmd.getOptionValue("uri", "file://"),
+        cmd.getOptionValue("d", "/tmp"),
+        cmd.getOptionValue("l", "WARN"),
+        cmd.hasOption("noDelete")
+      ))
+    }
   }
 
   private def generateData(): Seq[Product2[Int, ByteBuffer]] = {
@@ -249,6 +244,7 @@ object PerformanceEvaluationTool {
       pool.submit(new Runnable {
         override def run(): Unit = {
           try {
+            // Under mydebug model, saving and printing MapStatus(ranges of each blocks)
             val getMapStatus = if (logLevel.toLowerCase == "mydebug") {
               // Get all status
               true
@@ -286,21 +282,13 @@ object PerformanceEvaluationTool {
 
   private def runSingleShuffleWrite(
     mapId: Int, getMapStatus: Boolean = false): Option[MapStatus] = {
-    val writer = if (testType == "remote") {
+    val writer = {
       if (writersType == "general") {
         SortShuffleWriterPerfEvaluation.getRemoteWriter(mapId)
       } else if (writersType == "unsafe") {
         UnsafeShuffleWriterPerfEvaluation.getRemoteWriter(mapId, remoteConf)
       } else {
         BypassMergeSortShuffleWriterPerfEvaluation.getRemoteWriter(mapId, remoteConf)
-      }
-    } else {
-      if (writersType == "general") {
-        SortShuffleWriterPerfEvaluation.getWriter(mapId)
-      } else if (writersType == "unsafe") {
-        UnsafeShuffleWriterPerfEvaluation.getWriter(enableTransferTo, mapId, conf)
-      } else {
-        BypassMergeSortShuffleWriterPerfEvaluation.getWriter(mapId, enableTransferTo, conf)
       }
     }
     writer.write(data.toIterator)
@@ -342,11 +330,7 @@ object PerformanceEvaluationTool {
   }
 
   private def runSingleShuffleRead(reduceId: Int): Unit = {
-    val reader = if (testType == "remote") {
-      ShuffleReaderPerfEvaluation.getRemoteReader(reduceId, reduceId + 1)
-    } else {
-      ShuffleReaderPerfEvaluation.getRemoteReader(reduceId, reduceId + 1)
-    }
+    val reader = ShuffleReaderPerfEvaluation.getRemoteReader(reduceId, reduceId + 1)
     reader.read().length
   }
 
@@ -379,13 +363,14 @@ object PerformanceEvaluationTool {
             |    block size(storage): ${FileUtils.byteCountToDisplaySize(
           averageCompressedDataSizePerBlock)}
             |
-            |    properties:          ${Utils.getPropertiesFromFile(propertiesFilePath)
-          .mkString(", ")}
+            |    properties:          ${if (new File(propertiesFilePath).exists()) {
+          Utils.getPropertiesFromFile(propertiesFilePath)
+        } else {
+         ""
+        }.mkString(", ")}
             |
             |    records per mapper:  $rowsPerMapper
             |    load size per record:$lengthPerRow
-            |
-            |    transfer to (local)  $enableTransferTo
             |
             |    shuffle storage      $storageMasterUri
             |    shuffle folder:      $shuffleDir

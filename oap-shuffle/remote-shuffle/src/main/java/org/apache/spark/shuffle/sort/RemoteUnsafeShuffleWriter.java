@@ -93,7 +93,7 @@ public class RemoteUnsafeShuffleWriter<K, V> extends ShuffleWriter<K, V> {
   private final int outputBufferSizeInBytes;
 
   @Nullable private MapStatus mapStatus;
-  @Nullable private ShuffleRemoteSorter sorter;
+  @Nullable private RemoteUnsafeShuffleSorter sorter;
   private long peakMemoryUsedBytes = 0;
 
   /** Subclass of ByteArrayOutputStream that exposes `buf` directly. */
@@ -220,7 +220,7 @@ public class RemoteUnsafeShuffleWriter<K, V> extends ShuffleWriter<K, V> {
 
   private void open() {
     assert (sorter == null);
-    sorter = new ShuffleRemoteSorter(
+    sorter = new RemoteUnsafeShuffleSorter(
         memoryManager,
         blockManager,
         taskContext,

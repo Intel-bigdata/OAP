@@ -35,7 +35,7 @@ import org.apache.spark.storage.BlockId
 
 /**
   * NOTE: This version of Spark 2.4.0 ExternalSorter is currently imported for the interface
-  * modification of function: writePartitionedFile, to support writing to HDFS
+  * modification of function: writePartitionedFile, to support writing to Hadoop Filesystem
   *
   * Sorts and potentially merges a number of key-value pairs of type (K, V) to produce key-combiner
   * pairs of type (K, C). Uses a Partitioner to first group the keys into partitions, and then
@@ -166,9 +166,10 @@ private[spark] class RemoteSorter[K, V, C](
     }
   }
 
-  // NOTE: This is an HDFS version SpilledFile, compared with [[ExternalSorter.SpilledFile]]
-  // Information about a spilled file. Includes sizes in bytes of "batches" written by the
-  // serializer as we periodically reset its stream, as well as number of elements in each
+  // NOTE: This is an Hadoop-Filesystem-version SpilledFile, comparing with
+  // [[ExternalSorter.SpilledFile]] Information about a spilled file.
+  // Includes sizes in bytes of "batches" written by the serializer as we
+  // periodically reset its stream, as well as number of elements in each
   // partition, used to efficiently keep track of partitions when merging.
   private[this] case class SpilledFile(
       file: Path,

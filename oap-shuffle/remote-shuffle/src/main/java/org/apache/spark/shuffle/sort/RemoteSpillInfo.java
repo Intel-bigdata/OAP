@@ -22,7 +22,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.spark.storage.TempShuffleBlockId;
 
 /**
- * Metadata for a block of data written by {@link ShuffleRemoteSorter}.
+ * Metadata for a block of data written by {@link RemoteUnsafeShuffleSorter}.
  */
 final class RemoteSpillInfo {
   final long[] partitionLengths;

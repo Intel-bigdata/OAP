@@ -26,23 +26,6 @@ object UnsafeShuffleWriterPerfEvaluation extends ShuffleWriterPerfEvaluationBase
   private val shuffleHandle: SerializedShuffleHandle[Int, ByteBuffer] =
     new SerializedShuffleHandle[Int, ByteBuffer](0, 0, this.dependency)
 
-  def getWriter(
-    transferTo: Boolean, mapId: Int, conf: SparkConf): UnsafeShuffleWriter[Int, ByteBuffer] = {
-
-    val taskMemoryManager = setup()
-
-    conf.set("spark.file.transferTo", String.valueOf(transferTo))
-
-    new UnsafeShuffleWriter[Int, ByteBuffer](
-      blockManager,
-      blockResolver,
-      taskMemoryManager,
-      shuffleHandle,
-      mapId,
-      taskContext.get(),
-      conf)
-  }
-
   def getRemoteWriter(mapId: Int, conf: SparkConf): RemoteUnsafeShuffleWriter[Int, ByteBuffer] = {
 
     val taskMemoryManager = setup()

@@ -67,11 +67,11 @@ import org.apache.spark.util.Utils;
  * spill files. Instead, this merging is performed in {@link UnsafeShuffleWriter}, which uses a
  * specialized merge procedure that avoids extra serialization/deserialization.
  */
-final class ShuffleRemoteSorter extends MemoryConsumer {
+final class RemoteUnsafeShuffleSorter extends MemoryConsumer {
 
   private SerializerManager serializerManager = SparkEnv.get().serializerManager();
 
-  private static final Logger logger = LoggerFactory.getLogger(ShuffleRemoteSorter.class);
+  private static final Logger logger = LoggerFactory.getLogger(RemoteUnsafeShuffleSorter.class);
 
   @VisibleForTesting
   static final int DISK_WRITE_BUFFER_SIZE = 1024 * 1024;
@@ -112,7 +112,7 @@ final class ShuffleRemoteSorter extends MemoryConsumer {
   @Nullable private MemoryBlock currentPage = null;
   private long pageCursor = -1;
 
-  ShuffleRemoteSorter(
+  RemoteUnsafeShuffleSorter(
       TaskMemoryManager memoryManager,
       BlockManager blockManager,
       TaskContext taskContext,

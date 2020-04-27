@@ -30,23 +30,6 @@ object BypassMergeSortShuffleWriterPerfEvaluation extends ShuffleWriterPerfEvalu
       numMaps = 1,
       dependency)
 
-
-  def getWriter(mapId: Int, transferTo: Boolean, conf: SparkConf)
-  : BypassMergeSortShuffleWriter[Int, ByteBuffer] = {
-
-    setup()
-
-    val shuffleWriter = new BypassMergeSortShuffleWriter[Int, ByteBuffer](
-      blockManager,
-      blockResolver,
-      shuffleHandle,
-      mapId,
-      taskContext.get(),
-      conf)
-
-    shuffleWriter
-  }
-
   def getRemoteWriter(
     mapId: Int, conf: SparkConf): RemoteBypassMergeSortShuffleWriter[Int, ByteBuffer] = {
 

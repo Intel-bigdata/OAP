@@ -29,6 +29,7 @@ import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 
 import org.apache.spark._
+import org.apache.spark.internal.config
 import org.apache.spark.network.BlockTransferService
 import org.apache.spark.network.buffer.ManagedBuffer
 import org.apache.spark.network.netty.RemoteShuffleTransferService
@@ -134,10 +135,10 @@ class RemoteShuffleBlockIteratorSuite extends SparkFunSuite with LocalSparkConte
       body(indexCacheEnabledConf)
     }
     test(name + " w/o index cache, constraining maxBlocksInFlightPerAddress") {
-      body(indexCacheDisabledConf.set(RemoteShuffleConf.MAX_BLOCKS_IN_FLIGHT_PER_ADDRESS.key, "1"))
+      body(indexCacheDisabledConf.set(config.REDUCER_MAX_BLOCKS_IN_FLIGHT_PER_ADDRESS.key, "1"))
     }
     test(name + " w index cache, constraining maxBlocksInFlightPerAddress") {
-      body(indexCacheEnabledConf.set(RemoteShuffleConf.MAX_BLOCKS_IN_FLIGHT_PER_ADDRESS.key, "1"))
+      body(indexCacheEnabledConf.set(config.REDUCER_MAX_BLOCKS_IN_FLIGHT_PER_ADDRESS.key, "1"))
     }
     val default = RemoteShuffleConf.DATA_FETCH_EAGER_REQUIREMENT.defaultValue.get
     val testWith = (true ^ default)

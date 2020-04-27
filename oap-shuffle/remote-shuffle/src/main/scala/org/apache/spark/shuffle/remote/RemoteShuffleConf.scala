@@ -28,7 +28,7 @@ object RemoteShuffleConf {
       .createWithDefault("hdfs://localhost:9001")
 
   val STORAGE_HDFS_MASTER_UI_PORT: ConfigEntry[String] =
-    ConfigBuilder("spark.shuffle.remote.storageMasterUIPort")
+    ConfigBuilder("spark.shuffle.remote.hdfs.storageMasterUIPort")
       .doc("Contact this UI port to retrieve HDFS configurations")
       .stringConf
       .createWithDefault("50070")
@@ -40,7 +40,7 @@ object RemoteShuffleConf {
       .createWithDefault("/shuffle")
 
   val DFS_REPLICATION: ConfigEntry[Int] =
-    ConfigBuilder("spark.shuffle.remote.dfsReplication")
+    ConfigBuilder("spark.shuffle.remote.hdfs.replication")
       .doc("The default replication of remote storage system, will override dfs.replication" +
         " when HDFS is used as shuffling storage")
       .intConf
@@ -56,12 +56,15 @@ object RemoteShuffleConf {
   val REMOTE_BYPASS_MERGE_THRESHOLD: ConfigEntry[Int] =
     ConfigBuilder("spark.shuffle.remote.bypassMergeThreshold")
       .doc("Remote shuffle manager uses this threshold to decide using bypass-merge(hash-based)" +
-        "shuffle or not, a new configuration is introduced because HDFS poorly handles large" +
-        "number of small files, and the bypass-merge shuffle write algorithm may produce" +
-        "M * R files as intermediate state. Note that this is compared with M * R, instead of" +
-        " R in local file system shuffle manager")
+        "shuffle or not, a new configuration is introduced(and it's -1 by default) because we" +
+        " want to explicitly make disabling hash-based shuffle writer as the default behavior." +
+        " When memory is relatively sufficient, using sort-based shuffle writer in remote shuffle" +
+        " is often more efficient than the hash-based one. Because the bypass-merge shuffle " +
+        "writer proceeds I/O of 3x total shuffle size: 1 time for read I/O and 2 times for write" +
+        " I/Os, and this can be an even larger overhead under remote shuffle, the 3x shuffle size" +
+        " is gone through network, arriving at remote storage system.")
       .intConf
-      .createWithDefault(300)
+      .createWithDefault(-1)
 
   val REMOTE_INDEX_CACHE_SIZE: ConfigEntry[String] =
     ConfigBuilder("spark.shuffle.remote.index.cache.size")
@@ -86,19 +89,16 @@ object RemoteShuffleConf {
       .intConf
       .createWithDefault(Runtime.getRuntime.availableProcessors())
 
-  val MAX_BLOCKS_IN_FLIGHT_PER_ADDRESS: ConfigEntry[Int] =
-    ConfigBuilder("spark.shuffle.remote.reducer.maxBlocksInFlightPerAddress")
-      .doc("This configuration overrides spark.reducer.maxBlocksInFlightPerAddress and takes" +
-        "effect in RemoteShuffle, which controls the maximum blocks sending requests sent to" +
-        " one Executor. Generally a reduce task fetches index files from another executor and" +
-        " then read data files from remote storage. This is by default set to a small Int" +
-        " instead of Int.MAX in vanilla Spark due to remotely reading index files" +
-        "(of too many blocks) can be expensive, and this way we can get the index information" +
-        " earlier, and then asynchronously read data files earlier. However, a small value of" +
-        " this setting can also increase the RPC messages sent between client Executor and " +
-        "server Executor.")
-      .intConf
-      .createWithDefault(10)
+  val REUSE_FILE_HANDLE: ConfigEntry[Boolean] =
+    ConfigBuilder("spark.shuffle.remote.reuseFileHandle")
+      .doc("By switching on this feature, the file handles returned by Filesystem open operations" +
+        " will be cached/reused inside an executor(across different rounds of reduce tasks)," +
+        " eliminating open overhead. This should improve the reduce stage performance only when" +
+        " file open operations occupy majority of the time, e.g. There is a large number of" +
+        " shuffle blocks, each reading a fairly small block of data, and there is no other" +
+        " compute in the reduce stage.")
+      .booleanConf
+      .createWithDefault(false)
 
   val DATA_FETCH_EAGER_REQUIREMENT: ConfigEntry[Boolean] =
     ConfigBuilder("spark.shuffle.remote.eagerRequirementDataFetch")

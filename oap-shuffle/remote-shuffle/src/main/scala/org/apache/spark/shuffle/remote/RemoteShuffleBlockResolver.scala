@@ -20,6 +20,9 @@ package org.apache.spark.shuffle.remote
 import java.io._
 import java.nio.{ByteBuffer, LongBuffer}
 import java.util.UUID
+import java.util.function.Consumer
+
+import scala.collection.mutable
 
 import com.google.common.cache.{CacheBuilder, CacheLoader, Weigher}
 import org.apache.hadoop.fs.{FSDataInputStream, Path}
@@ -323,7 +326,14 @@ class RemoteShuffleBlockResolver(conf: SparkConf) extends ShuffleBlockResolver w
     val dir = new Path(dirPrefix)
     fs.delete(dir, true)
     try {
-      remoteShuffleTransferService.close()
+      HadoopFileSegmentManagedBuffer.handleCache.values().forEach {
+        new Consumer[mutable.HashMap[Path, FSDataInputStream]] {
+          override def accept(t: mutable.HashMap[Path, FSDataInputStream]): Unit = {
+            t.values.foreach(JavaUtils.closeQuietly)
+          }
+        }
+      }
+      JavaUtils.closeQuietly(remoteShuffleTransferService)
     } catch {
       case e: Exception => logInfo(s"Exception thrown when closing " +
         s"RemoteShuffleTransferService\n" +
