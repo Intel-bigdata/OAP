@@ -22,6 +22,7 @@ import java.util.TimeZone
 import scala.collection.JavaConverters._
 
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowOptions
+import com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector
 import org.apache.arrow.dataset.file.{FileSystem, SingleFileDatasetFactory}
 import org.apache.arrow.memory.BaseAllocator
 import org.apache.arrow.vector.VectorSchemaRoot
@@ -32,7 +33,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.vectorized.{ColumnVectorUtils, OnHeapColumnVector}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
-import org.apache.spark.sql.vectorized.{ArrowWritableColumnVector, ColumnarBatch}
+import org.apache.spark.sql.vectorized.ColumnarBatch
 
 object ArrowUtils {
   def readSchema(file: FileStatus, options: CaseInsensitiveStringMap): Option[StructType] = {
