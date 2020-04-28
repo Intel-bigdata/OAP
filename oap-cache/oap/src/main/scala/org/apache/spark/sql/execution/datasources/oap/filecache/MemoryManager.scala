@@ -149,6 +149,7 @@ private[sql] object MemoryManager extends Logging {
       case "guava" => apply(sparkEnv, memoryManagerOpt)
       case "noevict" => new HybridMemoryManager(sparkEnv)
       case "vmem" => new TmpDramMemoryManager(sparkEnv)
+      case "external" => new TmpDramMemoryManager(sparkEnv)
       case "mix" =>
         if (!memoryManagerOpt.equals("mix")) {
           apply(sparkEnv, memoryManagerOpt)
