@@ -96,13 +96,8 @@ Please refer this markdown to install Apache Arrow and Gandiva.
 ##### Install Googletest and Googlemock
 
 ``` shell
-git clone https://github.com/google/googletest.git
-cd googletest
-mkdir build
-cd build
-cmake -DBUILD_GTEST=ON -DBUILD_GMOCK=ON -DINSTALL_GTEST=ON -DINSTALL_GMOCK=ON ..
-make -j
-make install
+yum install gtest-devel
+yum install gmock
 ```
 
 ##### Build this project
