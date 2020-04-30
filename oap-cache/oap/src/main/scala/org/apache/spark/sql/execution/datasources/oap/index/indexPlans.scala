@@ -241,7 +241,7 @@ case class DropIndexCommand(
           map(p => {
             val hadoopConfiguration = broadcastedConf.value.value
             val parent = new Path(p)
-            val fs = FileSystem.get(hadoopConfiguration)
+            val fs = parent.getFileSystem(hadoopConfiguration)
             if (fs.exists(new Path(parent, OapFileFormat.OAP_META_FILE))) {
               val metaBuilder = new DataSourceMetaBuilder()
               val m = OapUtils.getMeta(hadoopConfiguration, parent)
@@ -276,7 +276,7 @@ case class DropIndexCommand(
           sparkContext.makeRDD(paths.toSeq, paths.toSeq.length).map{ p =>
             val hadoopConfiguration = broadcastedConf.value.value
             val parent = new Path(p).getParent
-            val fs = FileSystem.get(hadoopConfiguration)
+            val fs = parent.getFileSystem(hadoopConfiguration)
             fs.listStatus(parent, new PathFilter {
               override def accept(path: Path): Boolean = path.getName.endsWith(
                 "." + indexName + OapFileFormat.OAP_INDEX_EXTENSION)
