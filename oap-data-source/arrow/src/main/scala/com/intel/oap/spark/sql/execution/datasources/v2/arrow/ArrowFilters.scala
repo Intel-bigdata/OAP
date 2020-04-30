@@ -43,24 +43,29 @@ object ArrowFilters {
     }
   }
 
-  private def translateValue(value: Any): TreeNode = {
+  private def translateValue(value: Any): Option[TreeNode] = {
     value match {
-      case v: Integer => DatasetTypes.TreeNode.newBuilder.setIntNode(
-        DatasetTypes.IntNode.newBuilder.setValue(v).build)
-        .build
-      case v: Long => DatasetTypes.TreeNode.newBuilder.setLongNode(
-        DatasetTypes.LongNode.newBuilder.setValue(v).build)
-        .build
-      case v: Float => DatasetTypes.TreeNode.newBuilder.setFloatNode(
-        DatasetTypes.FloatNode.newBuilder.setValue(v).build)
-        .build
-      case v: Double => DatasetTypes.TreeNode.newBuilder.setDoubleNode(
-        DatasetTypes.DoubleNode.newBuilder.setValue(v).build)
-        .build
-      case v: Boolean => DatasetTypes.TreeNode.newBuilder.setBooleanNode(
-        DatasetTypes.BooleanNode.newBuilder.setValue(v).build)
-        .build
-      case _ => throw new UnsupportedOperationException // fixme complete this
+      case v: Integer => Some(
+        DatasetTypes.TreeNode.newBuilder.setIntNode(
+          DatasetTypes.IntNode.newBuilder.setValue(v).build)
+          .build)
+      case v: Long => Some(
+        DatasetTypes.TreeNode.newBuilder.setLongNode(
+          DatasetTypes.LongNode.newBuilder.setValue(v).build)
+          .build)
+      case v: Float => Some(
+        DatasetTypes.TreeNode.newBuilder.setFloatNode(
+          DatasetTypes.FloatNode.newBuilder.setValue(v).build)
+          .build)
+      case v: Double => Some(
+        DatasetTypes.TreeNode.newBuilder.setDoubleNode(
+          DatasetTypes.DoubleNode.newBuilder.setValue(v).build)
+          .build)
+      case v: Boolean => Some(
+        DatasetTypes.TreeNode.newBuilder.setBooleanNode(
+          DatasetTypes.BooleanNode.newBuilder.setValue(v).build)
+          .build)
+      case _ => None // fixme complete this
     }
   }
 
@@ -92,16 +97,21 @@ object ArrowFilters {
 
   private def createComparisonNode(opName: String,
                                    attribute: String, value: Any): Option[TreeNode] = {
-    Some(DatasetTypes.TreeNode.newBuilder.setCpNode(
-      DatasetTypes.ComparisonNode.newBuilder
-        .setOpName(opName) // todo make op names enumerable
-        .setLeftArg(
-          DatasetTypes.TreeNode.newBuilder.setFieldNode(
-            DatasetTypes.FieldNode.newBuilder.setName(attribute).build)
+    val translatedValue = translateValue(value)
+    translatedValue match {
+      case Some(v) => Some(
+        DatasetTypes.TreeNode.newBuilder.setCpNode(
+          DatasetTypes.ComparisonNode.newBuilder
+            .setOpName(opName) // todo make op names enumerable
+            .setLeftArg(
+              DatasetTypes.TreeNode.newBuilder.setFieldNode(
+                DatasetTypes.FieldNode.newBuilder.setName(attribute).build)
+                .build)
+            .setRightArg(v)
             .build)
-        .setRightArg(translateValue(value))
-        .build)
-      .build)
+          .build)
+      case None => None
+    }
   }
 
   def createNotNode(child: Filter): Option[TreeNode] = {

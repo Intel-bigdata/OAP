@@ -30,7 +30,8 @@ import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
 
 class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
-  private val parquetFile = "parquet-1217.parquet"
+  private val parquetFile1 = "parquet-1.parquet"
+  private val parquetFile2 = "parquet-2.parquet"
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -38,15 +39,21 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
     spark.read
       .json(Seq("{\"col\": -1}", "{\"col\": 0}", "{\"col\": 1}", "{\"col\": 2}", "{\"col\": null}")
         .toDS())
-      .write.parquet(ArrowDataSourceTest.locateResourcePath(parquetFile))
+      .write.parquet(ArrowDataSourceTest.locateResourcePath(parquetFile1))
+
+    spark.read
+      .json(Seq("{\"col\": \"a\"}", "{\"col\": \"b\"}")
+        .toDS())
+      .write.parquet(ArrowDataSourceTest.locateResourcePath(parquetFile2))
   }
 
   override def afterAll(): Unit = {
-    delete(ArrowDataSourceTest.locateResourcePath(parquetFile))
+    delete(ArrowDataSourceTest.locateResourcePath(parquetFile1))
+    delete(ArrowDataSourceTest.locateResourcePath(parquetFile2))
   }
 
   test("reading parquet file") {
-    val path = ArrowDataSourceTest.locateResourcePath(parquetFile)
+    val path = ArrowDataSourceTest.locateResourcePath(parquetFile1)
     verifyParquet(
       spark.read
         .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
@@ -55,7 +62,7 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
   }
 
   test("simple SQL query on parquet file") {
-    val path = ArrowDataSourceTest.locateResourcePath(parquetFile)
+    val path = ArrowDataSourceTest.locateResourcePath(parquetFile1)
     val frame = spark.read
       .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
       .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
@@ -67,7 +74,7 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
   }
 
   test("simple SQL query on parquet file with pushed filters") {
-    val path = ArrowDataSourceTest.locateResourcePath(parquetFile)
+    val path = ArrowDataSourceTest.locateResourcePath(parquetFile1)
     val frame = spark.read
       .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
       .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
@@ -79,6 +86,17 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
       result.schema ===
         StructType(Seq(StructField("col", LongType))))
     assert(result.collect().length === 1)
+  }
+
+  test("ignore unrecognizable types when pushing down filters") {
+    val path = ArrowDataSourceTest.locateResourcePath(parquetFile2)
+    val frame = spark.read
+      .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
+      .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
+      .arrow(path)
+    frame.createOrReplaceTempView("ptab")
+    val rows = spark.sql("select * from ptab where col = 'b'").collect()
+    assert(rows.length === 1)
   }
 
 
