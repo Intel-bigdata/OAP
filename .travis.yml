@@ -7,24 +7,19 @@ jobs:
     #oap-cache-oap is a CI building demo of the corresponding module oap-cache/oap.
     - name: oap-cache-oap
       before_install:
-      - sudo apt-get install cmake
       - sudo apt-get install libpthread-stubs0-dev
       - sudo apt-get install libnuma-dev
+      - sudo apt-get install cmake
       install:
       - # Download spark 2.4.4
       - "[ -f spark ] || mkdir spark && cd spark && wget http://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4-bin-hadoop2.7.tgz && cd .."
       - "tar -xf ./spark/spark-2.4.4-bin-hadoop2.7.tgz"
       - "export SPARK_HOME=`pwd`/spark-2.4.4-bin-hadoop2.7"
       before_script:
-      - cd /tmp
-      - git clone https://github.com/memkind/memkind.git
-      - cd memkind && ./build.sh
-      - make
-      - sudo make install
-      - cd ${TRAVIS_BUILD_DIR}
+      - cd ${TRAVIS_BUILD_DIR}/dev
+      - ./install_vmemcache.sh
+      - ./install_arrow.sh
+      - ./install_memkind.sh
       script:
-      - cd ${TRAVIS_BUILD_DIR}/oap-cache/oap/
-      - mvn clean -q -Ppersistent-memory test
-      
-      
-      
+      - cd ${TRAVIS_BUILD_DIR}
+      - mvn clean -q -Ppersistent-memory -Pvmemcache test

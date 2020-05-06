@@ -24,5 +24,4 @@ dependency-reduced-pom.xml
 derby.log
 metastore_db/
 null/
-src/main/native/build
 conf/persistent-memory.xml

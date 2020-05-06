@@ -13,7 +13,7 @@
 Before getting started with OAP on Spark, you should have set up a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark which is built with YARN support. If you don't want to build Spark by yourself, we have a pre-built Spark-2.4.4, you can download [Spark-2.4.4](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) and setup Spark on your working node.
 ## Getting Started with OAP
 ### Building OAP
-We have a pre-built OAP, you can download [OAP-0.6.1 for Spark 2.4.4 jar](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/oap-0.6.1-with-spark-2.4.4.jar) to your working node and put the OAP jar to your working directory such as `/home/oap/jars/`. If you’d like to build OAP from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+We have a pre-built OAP, you can download [OAP-0.7.0 for Spark 2.4.4 jar](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/oap-0.6.1-with-spark-2.4.4.jar) to your working node and put the OAP jar to your working directory such as `/home/oap/jars/`. If you’d like to build OAP from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 ### Spark Configurations for OAP
 Users usually test and run Spark SQL or Scala scripts in Spark Shell which launches Spark applications on YRAN with ***client*** mode. In this section, we will start with Spark Shell then introduce other use scenarios. 
 
@@ -21,9 +21,9 @@ Before you run ` . $SPARK_HOME/bin/spark-shell `, you need to configure Spark fo
 
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
-spark.files                       /home/oap/jars/oap-0.6.1-with-spark-2.4.4.jar     # absolute path of OAP jar on your working node
-spark.executor.extraClassPath     ./oap-0.6.1-with-spark-2.4.4.jar                  # relative path of OAP jar
-spark.driver.extraClassPath       /home/oap/jars/oap-0.6.1-with-spark-2.4.4.jar     # absolute path of OAP jar on your working node
+spark.files                       /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar     # absolute path of OAP jar on your working node
+spark.executor.extraClassPath     ./oap-0.7.0-with-spark-2.4.4.jar                  # relative path of OAP jar
+spark.driver.extraClassPath       /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar     # absolute path of OAP jar on your working node
 ```
 ### Verify Spark with OAP Integration 
 After configuration, you can follow the below steps and verify the OAP integration is working using Spark Shell.
@@ -56,17 +56,17 @@ Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client**
 Before run `spark-submit` with ***cluster*** mode, you should add below OAP configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
-spark.files                       /home/oap/jars/oap-0.6.1-with-spark-2.4.4.jar        # absolute path on your working node    
-spark.executor.extraClassPath     ./oap-0.6.1-with-spark-2.4.4.jar                     # relative path 
-spark.driver.extraClassPath       ./oap-0.6.1-with-spark-2.4.4.jar                     # relative path
+spark.files                       /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar        # absolute path on your working node    
+spark.executor.extraClassPath     ./oap-0.7.0-with-spark-2.4.4.jar                     # relative path 
+spark.driver.extraClassPath       ./oap-0.7.0-with-spark-2.4.4.jar                     # relative path
 ```
 
 ## Configuration for Spark Standalone Mode
 In addition to running on the YARN cluster manager, Spark also provides a simple standalone deploy mode. If you are using Spark in Spark Standalone mode, you need to copy the OAP jar to **all** the worker nodes. And then set the following configurations in “$SPARK_HOME/conf/spark-defaults” on working node.
 ```
 spark.sql.extensions               org.apache.spark.sql.OapExtensions
-spark.executor.extraClassPath      /home/oap/jars/oap-0.6.1-with-spark-2.4.4.jar      # absolute path on worker nodes
-spark.driver.extraClassPath        /home/oap/jars/oap-0.6.1-with-spark-2.4.4.jar      # absolute path on worker nodes
+spark.executor.extraClassPath      /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar      # absolute path on worker nodes
+spark.driver.extraClassPath        /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar      # absolute path on worker nodes
 ```
 
 ## Working with OAP Index
@@ -115,15 +115,15 @@ OAP is capable to provide input data cache functionality in executor. Considerin
 Step 1. Make the following configuration changes in Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf`. 
 
 ```
-spark.memory.offHeap.enabled                true
-spark.memory.offHeap.size                   80g      # half of total memory size
-spark.sql.oap.fiberCache.memory.manager     offheap  # for dram cache, use 'offheap' as the memory manager
-conf spark.oap.cache.strategy               guava    # dram cache uses guava as the cache strategy
-spark.sql.oap.parquet.data.cache.enable     true     # for parquet fileformat
-spark.sql.oap.orc.data.cache.enable         true     # for orc fileformat
-spark.sql.orc.copyBatchToSpark              true     # for orc fileformat
+spark.memory.offHeap.enabled                   false
+spark.sql.oap.fiberCache.memory.manager        offheap
+spark.sql.oap.fiberCache.offheap.memory.size   50g      # equal to the size of executor.memoryOverhead
+spark.executor.memoryOverhead                  50g      # according to the resource of cluster
+spark.sql.oap.parquet.data.cache.enable        true     # for parquet fileformat
+spark.sql.oap.orc.data.cache.enable            true     # for orc fileformat
+spark.sql.orc.copyBatchToSpark                 true     # for orc fileformat
 ```
-You should change the parameter `spark.memory.offHeap.size` value according to the availability of DRAM capacity to cache data.
+You should change the parameter `spark.sql.oap.fiberCache.offheap.memory.size` value according to the availability of DRAM capacity to cache data.
 
 Step 2. Launch Spark ***ThriftServer***
 
@@ -164,7 +164,28 @@ Step 5. To verify that the cache functionality is in effect, you can open Spark 
 Before configuring in OAP to use DCPMM cache, you need to make sure the following:
 
 - DCPMM hardwares are installed, formatted and mounted correctly on every cluster worker node with AppDirect mode(refer [guide](https://software.intel.com/en-us/articles/quick-start-guide-configure-intel-optane-dc-persistent-memory-on-linux)). You will get a mounted directory to use if you have done this. Usually, the DCPMM on each socket will be mounted as a directory. For example, on a two sockets system, we may get two mounted directories named `/mnt/pmem0` and `/mnt/pmem1`.
-
+```
+	// use impctl command to show topology and dimm info of DCPM
+	impctl show -topology
+	impctl show -dimm
+	// provision dcpm in app direct mode
+	ipmctl create -goal PersistentMemoryType=AppDirect
+	// reboot system to make configuration take affect
+	reboot
+	// check capacity provisioned for app direct mode(AppDirectCapacity)
+	impctl show -memoryresources
+	// show the DCPM region information
+	impctl show -region
+	// create namespace based on the region, multi namespaces can be created on a single region
+	ndctl create-namespace -m fsdax -r region0
+	ndctl create-namespace -m fsdax -r region1
+	// show the created namespaces
+	fdisk -l
+	// create and mount file system
+	mount -o dax /dev/pmem0 /mnt/pmem0
+	mount -o dax /dev/pmem1 /mnt/pmem1
+```
+Above file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For different number of numa nodes, corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
 - [Memkind](http://memkind.github.io/memkind/) library has been installed on every cluster worker node if memkind/non-evictable cache strategies are chosen for DCPM cache. Please use the latest Memkind version. You can compile Memkind based on your system. We have a pre-build binary for x86 64bit CentOS Linux and you can download [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/libmemkind.so.0) and put the file to `/lib64/` directory in each worker node in cluster. Memkind library depends on libnuma at the runtime. You need to make sure libnuma already exists in worker node system. To build memkind lib from source, you can:
 ```
      git clone https://github.com/memkind/memkind
@@ -193,7 +214,7 @@ To achieve the optimum performance, we need to configure NUMA for binding execut
 You also need to build spark from source to enable numa-binding support. Refer [enable-numa-binding-for-dcpmm-in-spark](./Developer-Guide.md#enable-numa-binding-for-dcpmm-in-spark).
 
 #### Configure for DCPMM 
-Create a configuration file named “persistent-memory.xml” under "$SPARK_HOME/conf/" if it doesn't exist. Use below contents as a template and change the “initialPath” to your mounted paths for DCPMM devices. 
+Create a configuration file named “persistent-memory.xml” under "$SPARK_HOME/conf/" if it doesn't exist. Use below contents as a template for 2 numa nodes server and change the “initialPath” to your mounted paths for DCPMM devices. 
 
 ```
 <persistentMemoryPool>
@@ -220,7 +241,7 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size    256g            # DCP
 spark.sql.oap.fiberCache.persistent.memory.reserved.size   50g             # Reserved space per executor
 spark.sql.extensions                  org.apache.spark.sql.OapExtensions   # Enable OAP jar in Spark
 ```
-Also need to add OAP jar absolute file path in spark.executor.extraClassPath and spark.driver.extraClassPath.
+***Also need to add OAP jar absolute file path in spark.executor.extraClassPath and spark.driver.extraClassPath.***
 
 You need to change the value for spark.executor.instances, spark.sql.oap.fiberCache.persistent.memory.initial.size, and spark.sql.oap.fiberCache.persistent.memory.reserved.size according to your real environment. 
 
@@ -234,23 +255,27 @@ You need to change the value for spark.executor.instances, spark.sql.oap.fiberCa
 
 Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and memkind library correctly. Then follow bellow configurations.
 
+Memkind library also support DAX KMEM mode. Refer [Kernel](https://github.com/memkind/memkind#kernel), this chapter will guide how to configure persistent memory as system ram. Or [Memkind support for KMEM DAX option](https://pmem.io/2020/01/20/memkind-dax-kmem.html) for more details.
+
+Please note that DAX KMEM mode need kernel version 5.x and memkind version 1.10 or above.
+
 For Parquet data format, provides following conf options:
 ```
---conf spark.sql.oap.parquet.data.cache.enable=true \
---conf spark.sql.oap.fiberCache.memory.manager=pm \
---conf spark.oap.cache.strategy=guava
---conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
---conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
+spark.sql.oap.parquet.data.cache.enable           true
+spark.sql.oap.fiberCache.memory.manager           pm / kmem
+spark.oap.cache.strategy                          guava
+spark.sql.oap.fiberCache.persistent.memory.initial.size    *g
+spark.sql.extensions                              org.apache.spark.sql.OapExtensions
 ```
 For Orc data format, provides following conf options:
 ```
---conf spark.sql.orc.copyBatchToSpark=true \
---conf spark.sql.oap.orc.data.cache.enable=true \
---conf spark.sql.oap.orc.enable=true \
---conf spark.sql.oap.fiberCache.memory.manager=pm \
---conf spark.oap.cache.strategy=guava \
---conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
---conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
+spark.sql.orc.copyBatchToSpark                   true
+spark.sql.oap.orc.data.cache.enable              true
+spark.sql.oap.orc.enable                         true
+spark.sql.oap.fiberCache.memory.manager          pm / kmem
+spark.oap.cache.strategy                         guava
+spark.sql.oap.fiberCache.persistent.memory.initial.size      *g
+spark.sql.extensions                             org.apache.spark.sql.OapExtensions
 ```
 
 #### Use Non-evictable Cache strategy
@@ -261,21 +286,16 @@ To apply Non-evictable cache strategy in your workload, please follow [prerequis
 
 For Parquet data format, provides following conf options:
 ```
---conf spark.sql.oap.parquet.data.cache.enable=true \
---conf spark.sql.oap.fiberCache.memory.manager=hybrid \
---conf spark.oap.cache.strategy=noevict \
---conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
---conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
+spark.sql.oap.parquet.data.cache.enable                  true 
+spark.oap.cache.strategy                                 noevict 
+spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
 ```
 For Orc data format, provides following conf options:
 ```
---conf spark.sql.orc.copyBatchToSpark=true \
---conf spark.sql.oap.orc.data.cache.enable=true \
---conf spark.sql.oap.orc.enable=true \
---conf spark.sql.oap.fiberCache.memory.manager=hybrid \
---conf spark.oap.cache.strategy=noevict \
---conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
---conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
+spark.sql.orc.copyBatchToSpark                           true 
+spark.sql.oap.orc.data.cache.enable                      true 
+spark.oap.cache.strategy                                 noevict 
+spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
 ```
 
 #### Use Vmemcache Cache Strategy
@@ -285,26 +305,79 @@ Vmemcache cache strategy is implemented based on libvmemcache (buffer based LRU 
 For Parquet data format, provides following conf options:
 
 ```
---conf spark.sql.oap.parquet.enable=true \
---conf spark.sql.oap.parquet.data.cache.enable=true \
---conf spark.sql.oap.fiberCache.memory.manager=tmp \
---conf spark.oap.cache.strategy=vmem \
---conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
---conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
+ 
+spark.sql.oap.parquet.data.cache.enable                    true 
+spark.oap.cache.strategy                                   vmem 
+spark.sql.oap.fiberCache.persistent.memory.initial.size    256g 
+spark.sql.oap.cache.guardian.memory.size                   10g      # according to your cluster
 ```
 
 For Orc data format, provides following conf options:
 
 ```
---conf spark.sql.oap.orc.enable=true \
---conf spark.sql.orc.copyBatchToSpark=true \
---conf spark.sql.oap.orc.data.cache.enable=true \
---conf spark.sql.oap.fiberCache.memory.manager=tmp \
---conf spark.oap.cache.strategy=vmem \
---conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
---conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
+spark.sql.orc.copyBatchToSpark                             true 
+spark.sql.oap.orc.data.cache.enable                        true 
+spark.oap.cache.strategy                                   vmem 
+spark.sql.oap.fiberCache.persistent.memory.initial.size    256g
+spark.sql.oap.cache.guardian.memory.size                   10g      # according to your cluster   
+
 ```
-Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks failed due to "cache guardian use too much memory", user could set spark.sql.oap.cache.guardian.memory.size config to a larger number, which default size is 10GB. Besides, user could increase spark.sql.oap.cache.guardian.free.thread.nums or decrease spark.sql.oap.cache.dispose.timeout.ms to accelerate memory free.
+Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks failed due to "cache guardian use too much memory", user could set `spark.sql.oap.cache.guardian.memory.size ` to a larger number, and the default size is 10GB. Besides, user could increase `spark.sql.oap.cache.guardian.free.thread.nums` or decrease `spark.sql.oap.cache.dispose.timeout.ms` to accelerate memory free.
+
+### Enabling Index/Data cache separation
+OAP now supports different cache strategies, which includes `guava`, `vmemcache`, `simple` and `noevict`, for DRAM and DCPMM. To optimize the cache media utilization, you can enable cache separation of data and index with same or different cache media. When Sharing same media, data cache and index cache will use different fiber cache ratio.
+Here we list 4 different kinds of configs for index/cache separation, if you choose one of them, please add corresponding configs to `spark-defaults.conf`.
+
+1. DRAM(`offheap`) as cache media, strategy `guava` as index and data cache backend. 
+```
+spark.sql.oap.index.data.cache.separation.enable        true
+spark.oap.cache.strategy                                mix
+spark.sql.oap.fiberCache.memory.manager                 offheap
+```
+2. DCPMM(`pm`) as cache media, strategy `guava` as index and data cache backend. 
+```
+spark.sql.oap.index.data.cache.separation.enable        true
+spark.oap.cache.strategy                                mix
+spark.sql.oap.fiberCache.memory.manager                 pm
+```
+3. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`pm`)/`guava` as `data` cache media and backend. 
+```
+spark.sql.oap.index.data.cache.separation.enable        true
+spark.oap.cache.strategy                                mix
+spark.sql.oap.fiberCache.memory.manager                 mix 
+spark.sql.oap.mix.index.memory.manager                  offheap
+spark.sql.oap.mix.data.memory.manager                   pm
+spark.sql.oap.mix.index.cache.backend                   guava
+spark.sql.oap.mix.data.cache.backend                    guava
+```
+4. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`tmp`)/`vmem` as `data` cache media and backend. 
+```
+spark.sql.oap.index.data.cache.separation.enable        true
+spark.oap.cache.strategy                                mix
+spark.sql.oap.fiberCache.memory.manager                 mix 
+spark.sql.oap.mix.index.memory.manager                  offheap
+spark.sql.oap.mix.index.cache.backend                   guava
+spark.sql.oap.mix.data.cache.backend                    vmem
+```
+### Enabling Binary cache 
+We introduce binary cache for both Parquet and ORC file format to improve cache space utilization compared to ColumnVector cache. When enabling binary cache, you should add following configs to `spark-defaults.conf`.
+```
+spark.sql.oap.parquet.binary.cache.enabled                true      # for parquet fileformat
+spark.sql.oap.parquet.data.cache.enable                   false     # for ColumnVector, default is false
+spark.sql.oap.orc.binary.cache.enable                     true      # for orc fileformat
+spark.sql.oap.orc.data.cache.enable                       false     # for ColumnVector, default is false
+```
+#### Use External cache strategy
+
+OAP supports arrow-plasma as external cache now and will support more other types in the future.[Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store.
+
+Provide the following conf options:
+
+```
+--conf spark.oap.cache.strategy=external
+--conf spark.sql.oap.cache.external.client.pool.size=30
+```
+[Apache Arrow](https://github.com/apache/arrow) source code is modified to support DCPMM.Here's the modified [repo](https://github.com/Intel-bigdata/arrow).
 
 
 #### Verify DCPMM cache functionality

@@ -115,17 +115,12 @@ private[sql] class OptimizedOrcFileFormat extends OapFileFormat {
       // For Orc, the context is used by both vectorized readers and map reduce readers.
       // See the comments in DataFile.scala.
       val context: Option[DataFileContext] = {
-        val readerOptions = OrcFile.readerOptions(conf).filesystem(fs)
-        val reader = OrcFile.createReader(path, readerOptions)
-        val requestedColIdsOrEmptyFile = OrcUtils.requestedColumnIds(
-          isCaseSensitive, dataSchema, requiredSchema, reader, conf)
-        if (requestedColIdsOrEmptyFile.isDefined) {
-          val requestedColIds = requestedColIdsOrEmptyFile.get
-          assert(requestedColIds.length == requiredSchema.length,
+        if (requiredIds.length != 0) {
+          assert(requiredIds.length == requiredSchema.length,
             "[BUG] requested column IDs do not match required schema")
           Some(OrcDataFileContext(partitionSchema, file.partitionValues,
             returningBatch, requiredSchema, dataSchema, enableOffHeapColumnVector,
-            copyToSpark, requestedColIds))
+            copyToSpark, requiredIds))
         } else {
           orcWithEmptyColIds = true
           None

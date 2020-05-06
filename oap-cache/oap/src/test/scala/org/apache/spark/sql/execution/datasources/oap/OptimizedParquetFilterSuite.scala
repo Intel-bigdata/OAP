@@ -70,7 +70,7 @@ class OptimizedParquetFilterSuite extends QueryTest with SharedOapContext with B
     data.toDF("key", "value").createOrReplaceTempView("t")
     sql("insert overwrite table parquet_test select * from t")
 
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true") {
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true") {
       val df = sql("SELECT b FROM parquet_test WHERE b = 'this is test 1'")
       checkAnswer(df, Row("this is test 1") :: Nil)
       val plans = new ArrayBuffer[SparkPlan]
@@ -93,7 +93,7 @@ class OptimizedParquetFilterSuite extends QueryTest with SharedOapContext with B
     sql("insert overwrite table parquet_test select * from t")
 
     withIndex(TestIndex("parquet_test", "index1")) {
-      withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true",
+      withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
         OapConf.OAP_PARQUET_INDEX_ENABLED.key -> "false") {
         sql("create oindex index1 on parquet_test (b)")
         val df = sql("SELECT b FROM parquet_test WHERE b = 'this is test 1'")
@@ -223,6 +223,19 @@ class OptimizedParquetFilterSuite extends QueryTest with SharedOapContext with B
       cacheManager.clearAllFibers()
       Thread.sleep(1000L)
       assert(cacheManager.dataCacheCount == 0)
+    }
+  }
+
+  test("test binary cache enabled and vector cache both enabled") {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql("insert overwrite table parquet_test select * from t")
+    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true",
+      OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true") {
+      val error = intercept[AssertionError](
+        checkAnswer(sql("SELECT * FROM parquet_test WHERE a = 1"), Row(1, "this is test 1") :: Nil))
+      assert(error.getMessage
+        .contains("Current version cannot enabled both binary Cache and vector Cache"))
     }
   }
 }

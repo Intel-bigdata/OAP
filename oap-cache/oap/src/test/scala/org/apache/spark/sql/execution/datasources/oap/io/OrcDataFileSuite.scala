@@ -66,7 +66,7 @@ class OrcDataFileSuite extends QueryTest with SharedOapContext with BeforeAndAft
   }
 
   override def afterEach(): Unit = {
-    configuration.unset(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key)
+    configuration.unset(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key)
   }
 
   private val partitionSchema: StructType = new StructType()
@@ -104,7 +104,7 @@ class OrcDataFileSuite extends QueryTest with SharedOapContext with BeforeAndAft
   }
 
   test("read by columnIds with columnar batch when cache") {
-    configuration.setBoolean(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key, true)
+    configuration.setBoolean(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key, true)
     OapRuntime.getOrCreate.fiberCacheManager.clearAllFibers()
     val reader = OrcDataFile(fileName, partitionSchema, configuration)
     val requiredIds = Array(0, 2)
@@ -151,7 +151,7 @@ class OrcDataFileSuite extends QueryTest with SharedOapContext with BeforeAndAft
   }
 
   test("read by columnIds and rowIds with columnar batch when cache") {
-    configuration.setBoolean(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key, true)
+    configuration.setBoolean(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key, true)
     OapRuntime.getOrCreate.fiberCacheManager.clearAllFibers()
     val reader = OrcDataFile(fileName, partitionSchema, configuration)
     val requiredIds = Array(0, 2)
