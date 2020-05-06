@@ -122,7 +122,7 @@ private[spark] class OapExternalSorter[K, V, C](
    */
   private[spark] def numSpills: Int = spills.size
 
-  private var countDistinct = 0
+  private val keySet = new OpenHashSet[Any]()
   require(aggregator.isDefined, "Oap always has aggregator")
   private lazy val mergeValue = aggregator.get.mergeValue
   private lazy val createCombiner = aggregator.get.createCombiner
@@ -130,16 +130,21 @@ private[spark] class OapExternalSorter[K, V, C](
     if (hadValue) {
       mergeValue(oldValue, kv._2)
     } else {
-      countDistinct += 1
       createCombiner(kv._2)
     }
   }
   def insert(record: Product2[K, V]): Unit = {
     addElementsRead()
     map.changeValue((0, record._1), update(record, _, _))
+    keySet.add(record._1)
     maybeSpillCollection(usingMap = true)
   }
-  def getDistinctCount: Int = countDistinct
+
+  def getDistinctCount: Int = {
+    val size = keySet.size
+    logInfo(s"Got DistinctCount: $size")
+    size
+  }
 
   /**
    * Spill the current in-memory collection to disk if needed.
@@ -369,7 +374,6 @@ private[spark] class OapExternalSorter[K, V, C](
               if (keys(i) == pair._1) {
                 combiners(i) = mergeCombiners(combiners(i), pair._2)
                 foundKey = true
-                countDistinct -= 1
               }
               i += 1
             }
@@ -401,7 +405,6 @@ private[spark] class OapExternalSorter[K, V, C](
           while (sorted.hasNext && sorted.head._1 == k) {
             val pair = sorted.next()
             c = mergeCombiners(c, pair._2)
-            countDistinct -= 1
           }
           (k, c)
         }

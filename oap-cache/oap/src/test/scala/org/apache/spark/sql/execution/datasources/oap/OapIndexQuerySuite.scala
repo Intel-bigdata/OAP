@@ -19,8 +19,9 @@ package org.apache.spark.sql.execution.datasources.oap
 
 import org.scalatest.BeforeAndAfterEach
 
+import org.apache.spark.SparkEnv
+import org.apache.spark.internal.config.SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD
 import org.apache.spark.sql.{QueryTest, Row}
-import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.test.oap.{SharedOapContext, TestIndex}
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
@@ -205,6 +206,28 @@ class OapIndexQuerySuite extends QueryTest with SharedOapContext with BeforeAndA
       sql("create oindex index1 on oap_test_1 (b) using btree")
       checkAnswer(sql("SELECT * FROM oap_test_1 WHERE b like 'this3%'"),
         Row(3, "this3 is test") :: Row(30, "this30 is test") :: Nil)
+    }
+  }
+
+  test("create btree index with sorter spill") {
+    val data: Seq[(Int, String)] = ((1 to 20) ++ (1 to 20)).map(i => (i, s"this$i is test"))
+    data.toDF("key", "value")
+      .repartition(1)
+      .createOrReplaceTempView("t")
+    val originShuffleSpillThreshold =
+      SparkEnv.get.conf.get(SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD)
+    try {
+      // trigger spill when build btree index.
+      SparkEnv.get.conf.set(SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD, 20)
+      withIndex(TestIndex("oap_test_1", "index1")) {
+        sql("insert overwrite table oap_test_1 select * from t")
+        sql("create oindex index1 on oap_test_1(a) using btree")
+        checkAnswer(sql("SELECT * FROM oap_test_1 WHERE a = 6"),
+          Row(6, "this6 is test") :: Row(6, "this6 is test") :: Nil)
+      }
+    } finally {
+      SparkEnv.get.conf.set(SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD,
+        originShuffleSpillThreshold)
     }
   }
 }
