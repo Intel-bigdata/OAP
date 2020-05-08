@@ -84,7 +84,7 @@ object ArrowUtils {
 
     val rowCount = vsr.getRowCount
     val vectors = ArrowWritableColumnVector.loadColumns(rowCount, fvs.asJava)
-    val partitionColumns = OnHeapColumnVector.allocateColumns(rowCount, partitionSchema)
+    val partitionColumns = ArrowWritableColumnVector.allocateColumns(rowCount, partitionSchema)
     (0 until partitionColumns.length).foreach(i => {
       ColumnVectorUtils.populate(partitionColumns(i), partitionValues, i)
       partitionColumns(i).setIsConstant()
