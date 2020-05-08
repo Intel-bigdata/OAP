@@ -47,7 +47,7 @@ using ArrayList = std::vector<std::shared_ptr<arrow::Array>>;
 class ConditionedProbeArraysKernel::Impl {
  public:
   Impl() {}
-  virtual ~Impl() {}
+  ~Impl() {}
   virtual arrow::Status Evaluate(const ArrayList& in) {
     return arrow::Status::NotImplemented(
         "ConditionedProbeArraysKernel::Impl Evaluate is abstract");
@@ -554,7 +554,7 @@ extern "C" void MakeConditioner(std::shared_ptr<ConditionerBase> *out) {
   int FileSpinLock(std::string path) {
     std::string lockfile = path + "/nativesql_compile.lock";
 
-    auto fd = open(lockfile.c_str(), O_CREAT);
+    auto fd = open(lockfile.c_str(), O_CREAT, S_IRWXU|S_IRWXG);
     flock(fd, LOCK_EX);
 
     return fd;
@@ -661,8 +661,6 @@ extern "C" void MakeConditioner(std::shared_ptr<ConditionerBase> *out) {
         return true;
       };
     }
-
-    std::string ToString() override { return "ConditionedProbeArraysResultIterator"; }
 
     arrow::Status ProcessAndCacheOne(
         ArrayList in, const std::shared_ptr<arrow::Array>& selection) override {
