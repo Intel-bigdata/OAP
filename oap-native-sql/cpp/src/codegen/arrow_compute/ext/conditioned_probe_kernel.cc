@@ -554,7 +554,7 @@ extern "C" void MakeConditioner(std::shared_ptr<ConditionerBase> *out) {
   int FileSpinLock(std::string path) {
     std::string lockfile = path + "/nativesql_compile.lock";
 
-    auto fd = open(lockfile.c_str(), O_CREAT);
+    auto fd = open(lockfile.c_str(), O_CREAT, S_IRWXU|S_IRWXG);
     flock(fd, LOCK_EX);
 
     return fd;
