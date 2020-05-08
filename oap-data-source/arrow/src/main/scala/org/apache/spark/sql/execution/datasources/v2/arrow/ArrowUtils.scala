@@ -25,7 +25,7 @@ import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowOptions
 import com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector
 import org.apache.arrow.dataset.file.{FileSystem, SingleFileDatasetFactory}
 import org.apache.arrow.memory.BaseAllocator
-import org.apache.arrow.vector.VectorSchemaRoot
+import org.apache.arrow.vector.{FieldVector, VectorSchemaRoot}
 import org.apache.arrow.vector.types.pojo.Schema
 import org.apache.hadoop.fs.FileStatus
 
@@ -78,12 +78,12 @@ object ArrowUtils {
     org.apache.spark.sql.util.ArrowUtils.toArrowSchema(t, TimeZone.getDefault.getID)
   }
 
-  def loadVsr(vsr: VectorSchemaRoot,
-              partitionValues: InternalRow, partitionSchema: StructType): ColumnarBatch = {
-    val fvs = vsr.getFieldVectors
+  def loadVsr(vsr: VectorSchemaRoot, partitionValues: InternalRow,
+              partitionSchema: StructType, dataSchema: StructType): ColumnarBatch = {
+    val fvs = getDataVectors(vsr, dataSchema)
 
     val rowCount = vsr.getRowCount
-    val vectors = ArrowWritableColumnVector.loadColumns(rowCount, fvs)
+    val vectors = ArrowWritableColumnVector.loadColumns(rowCount, fvs.asJava)
     val partitionColumns = OnHeapColumnVector.allocateColumns(rowCount, partitionSchema)
     (0 until partitionColumns.length).foreach(i => {
       ColumnVectorUtils.populate(partitionColumns(i), partitionValues, i)
@@ -96,6 +96,19 @@ object ArrowUtils {
 
   def rootAllocator(): BaseAllocator = {
     org.apache.spark.sql.util.ArrowUtils.rootAllocator
+  }
+
+  private def getDataVectors(vsr: VectorSchemaRoot,
+                             dataSchema: StructType): List[FieldVector] = {
+    // TODO Deprecate following (bad performance maybe brought).
+    // TODO Assert vsr strictly matches dataSchema instead.
+    dataSchema.map(f => {
+      val vector = vsr.getVector(f.name)
+      if (vector == null) {
+        throw new IllegalStateException("Error: no vector named " + f.name + " in record bach")
+      }
+      vector
+    }).toList
   }
 
   private def getFormat(

@@ -131,6 +131,7 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
   private val part = prefix + tpchFolder + "/part"
   private val partSupp = prefix + tpchFolder + "/partsupp"
   private val supplier = prefix + tpchFolder + "/supplier"
+  private val orders = prefix + tpchFolder + "/orders"
 
   ignore("tpch lineitem - desc") {
     val frame = spark.read
@@ -140,6 +141,16 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
     frame.createOrReplaceTempView("lineitem")
 
     spark.sql("describe lineitem").show()
+  }
+
+  ignore("tpch lineitem - read partition values") {
+    val frame = spark.read
+      .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
+      .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
+      .arrow(orders)
+    frame.createOrReplaceTempView("orders")
+
+    spark.sql("select o_orderdate from orders limit 100").show()
   }
 
   ignore("tpch lineitem - asterisk select") {
