@@ -122,8 +122,25 @@
             </goals>
             <configuration>
               <sources>
-                <source>src/main/java</source>
+                <source>${project.build.directory}/generated-sources/downloaded/java/</source>
               </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.googlecode.maven-download-plugin</groupId>
+        <artifactId>download-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>wget</goal>
+            </goals>
+            <configuration>
+              <url>https://raw.githubusercontent.com/Intel-bigdata/OAP/branch-nativesql-spark-3.0.0/oap-data-source/arrow/src/main/java/com/intel/sparkColumnarPlugin/vectorized/ArrowWritableColumnVector.java</url>
+              <outputFileName>ArrowWritableColumnVector.java</outputFileName>
+              <outputDirectory>${project.build.directory}/generated-sources/downloaded/java/com/intel/sparkColumnarPlugin/vectorized/</outputDirectory>
             </configuration>
           </execution>
         </executions>
