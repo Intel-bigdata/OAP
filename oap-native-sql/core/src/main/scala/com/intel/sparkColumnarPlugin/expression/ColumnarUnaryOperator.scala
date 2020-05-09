@@ -6,6 +6,7 @@ import org.apache.arrow.gandiva.evaluator._
 import org.apache.arrow.gandiva.exceptions.GandivaException
 import org.apache.arrow.gandiva.expression._
 import org.apache.arrow.vector.types.pojo.ArrowType
+import org.apache.arrow.vector.types.FloatingPointPrecision
 import org.apache.arrow.vector.types.pojo.Field
 import org.apache.arrow.vector.types.DateUnit
 
@@ -77,12 +78,10 @@ class ColumnarAbs(child: Expression, original: Expression)
     val (child_node, childType): (TreeNode, ArrowType) =
       child.asInstanceOf[ColumnarExpression].doColumnarCodeGen(args)
 
-    val resultType = new ArrowType.Int(32, true)
+    val resultType = new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)
     val funcNode =
       TreeBuilder.makeFunction("abs", Lists.newArrayList(child_node), resultType)
-    val castNode =
-      TreeBuilder.makeFunction("castBIGINT", Lists.newArrayList(funcNode), resultType)
-    (castNode, resultType)
+    (funcNode, resultType)
   }
 }
 
