@@ -1601,6 +1601,13 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     }
 
     @Override
+    void setInts(int rowId, int count, int value) {
+      for (int i = 0; i < count; i++) {
+        writer.setSafe(rowId + i, value);
+      }
+    }
+
+    @Override
     final void setNull(int rowId) {
       writer.setNull(rowId);
     }
@@ -1613,6 +1620,13 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     TimestampWriter(TimeStampMicroTZVector vector) {
       super(vector);
       this.writer = vector;
+    }
+
+    @Override
+    void setLongs(int rowId, int count, long value) {
+      for (int i = 0; i < count; i++) {
+        writer.setSafe(rowId + i, value);
+      }
     }
 
     @Override
