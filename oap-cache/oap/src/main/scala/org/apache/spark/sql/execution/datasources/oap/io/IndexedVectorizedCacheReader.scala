@@ -21,7 +21,8 @@ import java.util.{HashMap => JHashMap, Map => JMap}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.metadata.{IndexedBlockMetaData, ParquetMetadata}
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.{IntArrayList, IntList}
+//import org.apache.parquet.it.unimi.dsi.fastutil.ints.{IntArrayList, IntList}
+import parquet.it.unimi.dsi.fastutil.ints.{IntArrayList, IntList}
 
 class IndexedVectorizedCacheReader(
     configuration: Configuration,

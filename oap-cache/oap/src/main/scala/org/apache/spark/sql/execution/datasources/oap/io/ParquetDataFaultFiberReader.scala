@@ -17,7 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList
+//import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList
+
+import parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache

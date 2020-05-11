@@ -42,7 +42,7 @@
     <antlr.version>4.7</antlr.version>
     <scalatest.version>3.0.3</scalatest.version>
     <scalacheck.version>1.13.5</scalacheck.version>
-    <parquet.version>1.10.1</parquet.version>
+    <parquet.version>1.10.99.7.0.3.0-79</parquet.version>
     <jetty.version>9.3.24.v20180605</jetty.version>
     <maven-antrun-plugin.version>1.8</maven-antrun-plugin.version>
     <!--diff: Spark-2.4.4 use orc 1.5.5 -->
@@ -51,6 +51,10 @@
   </properties>
 
   <repositories>
+    <repository>
+      <id>cloudera</id>
+      <url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
+    </repository>
     <repository>
       <id>mavencentral</id>
       <name>maven central repository</name>

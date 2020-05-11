@@ -19,7 +19,8 @@ package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.parquet.column.{Dictionary, Encoding}
 import org.apache.parquet.io.api.Binary
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList
+//import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList
+import parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
