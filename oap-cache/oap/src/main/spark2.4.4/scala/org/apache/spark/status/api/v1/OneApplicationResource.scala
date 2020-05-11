@@ -24,12 +24,9 @@ import javax.ws.rs.core.{MediaType, Response, StreamingOutput}
 
 import scala.util.control.NonFatal
 
-import org.apache.spark.{JobExecutionStatus, SparkEnv}
 import org.apache.spark.{JobExecutionStatus, SparkContext}
-import org.apache.spark.sql.execution.datasources.oap.filecache.CacheStats
-import org.apache.spark.sql.internal.oap.OapConf
-import org.apache.spark.sql.oap.OapRuntime
-import org.apache.spark.sql.oap.ui.FiberCacheManagerSummary
+import org.apache.spark.status.api.v1
+import org.apache.spark.util.Utils
 
 @Produces(Array(MediaType.APPLICATION_JSON))
 private[v1] class AbstractApplicationResource extends BaseAppResource {
@@ -79,52 +76,6 @@ private[v1] class AbstractApplicationResource extends BaseAppResource {
   }
 
   @GET
-  @Path("fibercachemanagers")
-  def fiberList(): Seq[FiberCacheManagerSummary] =
-  {
-    val seqExecutorSummary = withUI(_.store.executorList(true))
-    seqExecutorSummary.map(
-      executorSummary =>
-      {
-        val cacheStats = OapRuntime.getOrCreate.fiberSensor.getExecutorToCacheManager.
-            getOrDefault(executorSummary.id, CacheStats())
-          val indexDataCacheSeparationEnable = SparkEnv.get.conf.getBoolean(
-            OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
-            OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get)
-
-        new FiberCacheManagerSummary(
-          executorSummary.id,
-          executorSummary.hostPort,
-          true,
-          indexDataCacheSeparationEnable,
-          executorSummary.memoryUsed,
-          executorSummary.maxMemory,
-          cacheStats.totalCacheSize,
-          cacheStats.totalCacheCount,
-          cacheStats.backendCacheSize,
-          cacheStats.backendCacheCount,
-          cacheStats.dataFiberSize,
-          cacheStats.dataFiberCount,
-          cacheStats.indexFiberSize,
-          cacheStats.indexFiberCount,
-          cacheStats.pendingFiberSize,
-          cacheStats.pendingFiberCount,
-          cacheStats.dataFiberHitCount,
-          cacheStats.dataFiberMissCount,
-          cacheStats.dataFiberLoadCount,
-          cacheStats.dataTotalLoadTime,
-          cacheStats.dataEvictionCount,
-          cacheStats.indexFiberHitCount,
-          cacheStats.indexFiberMissCount,
-          cacheStats.indexFiberLoadCount,
-          cacheStats.indexTotalLoadTime,
-          cacheStats.indexEvictionCount
-        )
-      }
-    )
-  }
-
-  @GET
   @Path("allexecutors")
   def allExecutorList(): Seq[ExecutorSummary] = withUI(_.store.executorList(false))
 
@@ -148,7 +99,15 @@ private[v1] class AbstractApplicationResource extends BaseAppResource {
 
   @GET
   @Path("environment")
-  def environmentInfo(): ApplicationEnvironmentInfo = withUI(_.store.environmentInfo())
+  def environmentInfo(): ApplicationEnvironmentInfo = withUI { ui =>
+    val envInfo = ui.store.environmentInfo()
+    new v1.ApplicationEnvironmentInfo(
+      envInfo.runtime,
+      Utils.redact(ui.conf, envInfo.sparkProperties),
+      Utils.redact(ui.conf, envInfo.hadoopProperties),
+      Utils.redact(ui.conf, envInfo.systemProperties),
+      envInfo.classpathEntries)
+  }
 
   @GET
   @Path("logs")

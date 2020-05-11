@@ -41,13 +41,13 @@ import java.nio.ByteBuffer;
  *  - Definition/Repetition levels
  *  - Dictionary ids.
  */
-public class VectorizedRleValuesReader extends ValuesReader
+public final class VectorizedRleValuesReader extends ValuesReader
     implements VectorizedValuesReader {
   // Current decoding mode. The encoded data contains groups of either run length encoded data
   // (RLE) or bit packed data. Each group contains a header that indicates which group it is and
   // the number of values in the group.
   // More details here: https://github.com/Parquet/parquet-format/blob/master/Encodings.md
-  protected enum MODE {
+  private enum MODE {
     RLE,
     PACKED
   }
@@ -61,13 +61,13 @@ public class VectorizedRleValuesReader extends ValuesReader
   private BytePacker packer;
 
   // Current decoding mode and values
-  protected MODE mode;
-  protected int currentCount;
-  protected int currentValue;
+  private MODE mode;
+  private int currentCount;
+  private int currentValue;
 
   // Buffer of decoded values if the values are PACKED.
-  protected int[] currentBuffer = new int[16];
-  protected int currentBufferIdx = 0;
+  private int[] currentBuffer = new int[16];
+  private int currentBufferIdx = 0;
 
   // If true, the bit width is fixed. This decoder is used in different places and this also
   // controls if we need to read the bitwidth from the beginning of the data stream.
@@ -608,7 +608,7 @@ public class VectorizedRleValuesReader extends ValuesReader
   /**
    * Reads the next group.
    */
-  protected void readNextGroup() {
+  private void readNextGroup() {
     try {
       int header = readUnsignedVarInt();
       this.mode = (header & 1) == 0 ? MODE.RLE : MODE.PACKED;
