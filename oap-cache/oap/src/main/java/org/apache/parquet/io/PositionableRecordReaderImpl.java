@@ -20,7 +20,9 @@ import org.apache.parquet.Preconditions;
 import org.apache.parquet.column.ColumnReader;
 import org.apache.parquet.column.impl.ColumnReadStoreImpl;
 import org.apache.parquet.io.api.RecordMaterializer;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
+//import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
+import parquet.it.unimi.dsi.fastutil.ints.IntList;
+
 
 public class PositionableRecordReaderImpl<T> extends RecordReaderImplementation<T> {
 

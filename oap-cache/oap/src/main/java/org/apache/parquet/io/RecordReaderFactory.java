@@ -23,7 +23,8 @@ import java.util.List;
 import org.apache.parquet.column.impl.ColumnReadStoreImpl;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.io.api.RecordMaterializer;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
+//import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
+import parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 import static org.apache.parquet.Preconditions.checkNotNull;
 

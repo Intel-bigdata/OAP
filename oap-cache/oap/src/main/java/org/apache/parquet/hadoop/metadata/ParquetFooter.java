@@ -19,8 +19,8 @@ package org.apache.parquet.hadoop.metadata;
 import java.util.List;
 
 import com.google.common.collect.Lists;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
+import parquet.it.unimi.dsi.fastutil.ints.IntArrayList;
+import parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 public class ParquetFooter {
 

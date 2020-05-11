@@ -35,10 +35,10 @@ import org.apache.parquet.io.ParquetDecodingException;
 import org.apache.parquet.io.RecordReader;
 import org.apache.parquet.io.RecordReaderFactory;
 import org.apache.parquet.io.api.RecordMaterializer;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.parquet.schema.MessageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import parquet.it.unimi.dsi.fastutil.ints.IntList;
 
 import static org.apache.parquet.Log.DEBUG;
 import static org.apache.parquet.hadoop.ParquetInputFormat.STRICT_TYPE_CHECKING;
