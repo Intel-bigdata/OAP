@@ -505,4 +505,20 @@ object OapConf {
       .doc("To indicate if enable parquet binary data cache, defalt false")
       .booleanConf
       .createWithDefault(false)
+
+  val OAP_CACHE_BACKEND_FALLBACK_ENABLED = {
+    SqlConfAdapter.buildConf("spark.oap.cache.backend.fallback.enabled")
+      .internal()
+      .doc("To enable cache backend fallback")
+      .booleanConf
+      .createWithDefault(true)
+  }
+
+  val OAP_TEST_CACHE_BACKEND_FALLBACK_RES = {
+    SqlConfAdapter.buildConf("spark.oap.test.cache.backend.fallback.res")
+      .internal()
+      .doc("For internal test use only")
+      .booleanConf
+      .createWithDefault(false)
+  }
 }
