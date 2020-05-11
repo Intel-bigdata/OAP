@@ -33,8 +33,10 @@ import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OapMetricsManager}
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.{BaseRelation, Filter}
 import org.apache.spark.sql.types.StructType
@@ -384,6 +386,13 @@ case class FileSourceScanExec(
   }
 
   lazy val inputRDD: RDD[InternalRow] = {
+    // for OAP
+    // init accumulator before buildReader
+    relation.fileFormat match {
+      case format: OapFileFormat =>
+        format.initMetrics(metrics)
+      case _ => Unit
+    }
     val readFile: (PartitionedFile) => Iterator[InternalRow] =
       relation.fileFormat.buildReaderWithPartitionValues(
         sparkSession = relation.sparkSession,
@@ -452,7 +461,9 @@ case class FileSourceScanExec(
     } else {
       None
     }
-  } ++ staticMetrics
+  } ++ staticMetrics ++ {
+    OapMetricsManager.metrics(sparkContext)
+  }
 
   protected override def doExecute(): RDD[InternalRow] = {
     val numOutputRows = longMetric("numOutputRows")
