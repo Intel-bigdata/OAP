@@ -2,9 +2,29 @@
 A Spark DataSouce implementation for reading files into Arrow compatible columnar vectors.
 
 ## Note
-The development of this library is still in progress. As a result some of the functionality may not be constantly stable for being used in production environments that have not been fully considered in the limited testing capabilities so far.
+The development of this library is still in progress. As a result some of the functionality may not be constantly stable for being used in production environments that have not been fully considered due to the limited testing capabilities so far.
 
 ## Build
+### Install libhdfs3 library
+
+For better performance ArrowDataSource reads HDFS files using the third-party library libhdfs3. The library should be pre-installed 
+on machines Spark Executor nodes are running on.
+
+To install the library, use of [Conda](https://docs.conda.io/en/latest/) is recommended.
+
+```
+// installing libhdfs3
+conda install -c conda-forge libhdfs3
+
+// check the installed library file
+ls -l ~/miniconda/envs/${YOUR_ENV_NAME}/lib/libhdfs3.so/lib/libhdfs3.so
+```
+
+Then add following Spark configuration options before running the DataSource to make the library to be recognized:
+
+* `spark.executorEnv.ARROW_LIBHDFS3_DIR = "~/miniconda/envs/${YOUR_ENV_NAME}/lib/"`
+* `spark.executorEnv.LD_LIBRARY_PATH = "~/miniconda/envs/${YOUR_ENV_NAME}/lib/"`
+
 ### Build and install Intel® optimized Arrow with Datasets Java API
 
 ```
@@ -21,7 +41,7 @@ cd ../../java
 mvn clean install -P arrow-jni -am -Darrow.cpp.build.dir=../cpp/build/release
 ```
 
-### Build This Library
+### Build this library
 ```
 // build
 mvn clean package
@@ -30,9 +50,9 @@ mvn clean package
 readlink -f target/spark-arrow-datasource-0.1.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
-## Get Started
+## Get started
 ### Add extra class pathes to Spark
-To enable ArrowDataSource, the previous built jar `spark-arrow-datasource-0.1.0-SNAPSHOT-jar-with-dependencies.jar` should be added to some of Spark configuration options. Typically they are:
+To enable ArrowDataSource, the previous built jar `spark-arrow-datasource-0.1.0-SNAPSHOT-jar-with-dependencies.jar` should be added to Spark configuration. Typically the options are:
 
 * `spark.driver.extraClassPath`
 * `spark.executor.extraClassPath`
