@@ -122,6 +122,35 @@
                 </plugins>
             </build>
         </profile>
+        <profile>
+            <id>libpmem</id>
+            <build>
+                <resources>
+                    <resource>
+                        <directory>${basedir}/src/resources</directory>
+                    </resource>
+                </resources>
+                <plugins>
+                    <plugin>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <version>${exec.maven.version}</version>
+                        <executions>
+                            <execution>
+                                <id>Compile libpmem</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${basedir}/src/native/libpmem/compile.sh</executable>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 
 </project>
