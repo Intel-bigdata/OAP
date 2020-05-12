@@ -36,12 +36,13 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_WITH_SNAPPY=ON -DARROW_WITH_PROTOBUF=ON -DARROW_DATASET=ON ..
 make
 
-// build and install arrow-jvm-library
+// build and install arrow jvm library
 cd ../../java
 mvn clean install -P arrow-jni -am -Darrow.cpp.build.dir=../cpp/build/release
 ```
 
 ### Build this library
+
 ```
 // build
 mvn clean package
@@ -50,8 +51,25 @@ mvn clean package
 readlink -f target/spark-arrow-datasource-0.1.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
+### Build Spark 3.1.0-SNAPSHOT
+
+Currently ArrowDataSource highly depends on the unreleased Spark 3.1.0-SNAPSHOT version. For our users it's recommended to build and run everything on Intel's optimized fork on which ArrowDataSource is tested:
+
+```
+// build spark
+git clone --branch native-sql-engine-clean https://github.com/Intel-bigdata/spark.git
+cd spark
+./dev/make-distribution.sh -Pyarn
+
+// check built spark bundle
+tree -L 3 dist/
+```
+
+If you are new to Apache Spark, please go though [Spark's official deploying guide](https://spark.apache.org/docs/latest/cluster-overview.html) before getting started with ArrowDataSource.
+
 ## Get started
 ### Add extra class pathes to Spark
+
 To enable ArrowDataSource, the previous built jar `spark-arrow-datasource-0.1.0-SNAPSHOT-jar-with-dependencies.jar` should be added to Spark configuration. Typically the options are:
 
 * `spark.driver.extraClassPath`
