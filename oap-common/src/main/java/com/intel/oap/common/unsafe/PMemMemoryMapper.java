@@ -4,7 +4,7 @@ import com.intel.oap.common.util.NativeLibraryLoader;
 
 public class PMemMemoryMapper {
 
-    private static final String LIBNAME = "pmdkpmem";
+    private static final String LIBNAME = "pmemmemorymapper";
     static {
         NativeLibraryLoader.load(LIBNAME);
     }

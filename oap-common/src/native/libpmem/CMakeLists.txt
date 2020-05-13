@@ -27,8 +27,8 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 SET(SOURCE_FILES com_intel_oap_common_unsafe_PMemMemoryMapper.cpp)
 
-ADD_LIBRARY(pmdkpmem SHARED ${SOURCE_FILES})
+ADD_LIBRARY(pmemmemorymapper SHARED ${SOURCE_FILES})
 
-INSTALL(TARGETS pmdkpmem LIBRARY DESTINATION lib)
+INSTALL(TARGETS pmemmemorymapper LIBRARY DESTINATION lib)
 
-TARGET_LINK_LIBRARIES(pmdkpmem pmem)
+TARGET_LINK_LIBRARIES(pmemmemorymapper pmem)
