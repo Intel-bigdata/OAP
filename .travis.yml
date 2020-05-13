@@ -22,7 +22,7 @@ jobs:
       - ./install_memkind.sh
       script:
       - cd ${TRAVIS_BUILD_DIR}
-      - mvn clean -q -Ppersistent-memory -Pvmemcache test
+      - mvn clean test -pl  com.intel:oap-cache-oap -q -Ppersistent-memory  -Pvmemcache  -am
     - name: oap-shuffle-remote-shuffle
       install:
       # travis will add a command by default
