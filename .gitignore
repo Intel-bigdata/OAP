@@ -4,3 +4,4 @@
 *.sh
 # IDEA config files
 .idea/
+*.iml
