@@ -1,7 +1,9 @@
 package com.intel.oap.common.storage;
 
 public interface Chunk {
-    public void writeDataToStore(Object baseObj, long baseAddress, long offset);
+    void writeDataToStore(Object baseObj, byte [] bytes, long baseAddress, long offset);
 
-    void read(int offset, int size);
+    void read(byte [] bytes, int offset, int size);
+
+    void release();
 }

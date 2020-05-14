@@ -1,5 +1,6 @@
 package com.intel.oap.common.storage;
 
+import java.io.FileOutputStream;
 import java.util.Iterator;
 
 //FIXME should new this by parameter instead of passing in by Spark
@@ -9,15 +10,13 @@ import java.util.Iterator;
  */
 public abstract class PMemDataStore {
     byte[] id;
-    ChunkAPI impl;
-    ChunkAPI fallback;
     FileChunk fileChunk;
     MemoryStats stats;
 
-    public PMemDataStore(byte [] id, MemoryStats stats){
+    public PMemDataStore(byte[] id, MemoryStats stats){
         this.id = id;
         this.stats = stats;
-        fileChunk = new FileChunk();
+        this.fileChunk = new FileChunk(id);
     }
 
     public Iterator<Chunk> getInputChunkIterator(){
