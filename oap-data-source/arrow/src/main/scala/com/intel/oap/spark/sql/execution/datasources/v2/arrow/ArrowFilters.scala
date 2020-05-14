@@ -22,8 +22,39 @@ import org.apache.arrow.dataset.DatasetTypes.TreeNode
 import org.apache.arrow.dataset.filter.FilterImpl
 
 import org.apache.spark.sql.sources._
+import org.apache.spark.sql.types.StructType
 
 object ArrowFilters {
+  def pruneWithSchema(pushedFilters: Array[Filter], schema: StructType): Seq[Filter] = {
+    pushedFilters.filter(pushedFilter => {
+      isToBeAccepted(pushedFilter, schema)
+    })
+  }
+
+  private def isToBeAccepted(pushedFilter: Filter, schema: StructType): Boolean = {
+    pushedFilter match {
+      case EqualTo(attribute, value) => existsIn(attribute, schema)
+      case GreaterThan(attribute, value) => existsIn(attribute, schema)
+      case GreaterThanOrEqual(attribute, value) => existsIn(attribute, schema)
+      case LessThan(attribute, value) => existsIn(attribute, schema)
+      case LessThanOrEqual(attribute, value) => existsIn(attribute, schema)
+      case Not(child) => isToBeAccepted(child, schema)
+      case And(left, right) => isToBeAccepted(left, schema) && isToBeAccepted(right, schema)
+      case Or(left, right) => isToBeAccepted(left, schema) && isToBeAccepted(right, schema)
+      case IsNotNull(attribute) => existsIn(attribute, schema)
+      case IsNull(attribute) => existsIn(attribute, schema)
+      case _ => false // fixme complete this
+    }
+  }
+
+  private def existsIn(attr: String, schema: StructType): Boolean = {
+    schema.foreach(f => {
+      if (f.name == attr) {
+        return true;
+      }
+    })
+    false
+  }
 
   def translateFilters(pushedFilters: Seq[Filter]): org.apache.arrow.dataset.filter.Filter = {
     val node = pushedFilters

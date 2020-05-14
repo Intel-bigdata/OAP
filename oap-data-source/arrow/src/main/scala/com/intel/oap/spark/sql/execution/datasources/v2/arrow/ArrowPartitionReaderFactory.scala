@@ -58,7 +58,7 @@ case class ArrowPartitionReaderFactory(
     val factory = ArrowUtils.makeArrowDiscovery(path, options)
     val dataset = factory.finish()
     val filter = if (enableFilterPushDown) {
-      ArrowFilters.translateFilters(pushedFilters)
+      ArrowFilters.translateFilters(ArrowFilters.pruneWithSchema(pushedFilters, readDataSchema))
     } else {
       org.apache.arrow.dataset.filter.Filter.EMPTY
     }
