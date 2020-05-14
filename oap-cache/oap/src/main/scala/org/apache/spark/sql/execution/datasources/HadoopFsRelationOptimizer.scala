@@ -133,7 +133,7 @@ object HadoopFsRelationOptimizer extends Logging {
           vectorCacheEnabled = vectorCacheEnabled &&
             runtimeConf.get(SQLConf.ORC_VECTORIZED_READER_ENABLED) &&
             runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
-            runtimeConf.get(SQLConf.ORC_COPY_BATCH_TO_SPARK) &&
+            // runtimeConf.get(SQLConf.ORC_COPY_BATCH_TO_SPARK) &&
             outputSchema.forall(_.dataType.isInstanceOf[AtomicType])
           val binaryCacheEnabled = runtimeConf.get(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED)
           logDebug(s"config - ${OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key}" +

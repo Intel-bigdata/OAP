@@ -35,13 +35,13 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <basedir>./</basedir>
-    <spark.internal.version>2.4.4</spark.internal.version>
-    <scala.version>2.11.12</scala.version>
-    <scala.binary.version>2.11</scala.binary.version>
+    <spark.internal.version>3.0.0</spark.internal.version>
+    <scala.version>2.12.10</scala.version>
+    <scala.binary.version>2.12</scala.binary.version>
     <java.version>1.8</java.version>
     <antlr.version>4.7</antlr.version>
     <scalatest.version>3.0.3</scalatest.version>
-    <scalacheck.version>1.13.5</scalacheck.version>
+    <scalacheck.version>1.14.2</scalacheck.version>
     <parquet.version>1.10.1</parquet.version>
     <jetty.version>9.3.24.v20180605</jetty.version>
     <maven-antrun-plugin.version>1.8</maven-antrun-plugin.version>
@@ -195,6 +195,21 @@
       <scope>compile</scope>
     </dependency>
     <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <version>2.7.4</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-mapreduce-client-app</artifactId>
+      <version>2.7.4</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.9</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
@@ -264,7 +279,28 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
-
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-network-common_${scala.binary.version}</artifactId>
+      <version>${spark.internal.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-network-common_${scala.binary.version}</artifactId>
+      <version>${spark.internal.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-tags_${scala.binary.version}</artifactId>
+      <version>${spark.internal.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-network-shuffle_${scala.binary.version}</artifactId>
+      <version>${spark.internal.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-plasma</artifactId>
@@ -278,7 +314,12 @@
     <dependency>
       <groupId>org.json4s</groupId>
       <artifactId>json4s-core_${scala.binary.version}</artifactId>
-      <version>3.5.3</version>
+      <version>3.6.6</version>
+    </dependency>
+    <dependency>
+      <groupId>org.json4s</groupId>
+      <artifactId>json4s-jackson_${scala.binary.version}</artifactId>
+      <version>3.6.6</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -485,7 +526,7 @@
       <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>3.2.2</version>
+          <version>4.3.0</version>
           <executions>
             <execution>
               <id>eclipse-add-source</id>
@@ -582,7 +623,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.3</version>
+        <version>3.8.1</version>
         <configuration>
           <source>${java.version}</source>
           <target>${java.version}</target>

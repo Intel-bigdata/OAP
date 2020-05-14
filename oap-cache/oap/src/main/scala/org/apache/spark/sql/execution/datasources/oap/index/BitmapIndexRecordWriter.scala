@@ -27,7 +27,7 @@ import org.apache.hadoop.mapreduce.{RecordWriter, TaskAttemptContext}
 import org.roaringbitmap.RoaringBitmap
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.FromUnsafeProjection
+import org.apache.spark.sql.catalyst.expressions.SafeProjection
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.io.IndexFile
@@ -79,7 +79,7 @@ private[oap] class BitmapIndexRecordWriter(
     writer: OutputStream,
     keySchema: StructType) extends RecordWriter[Void, InternalRow] {
 
-  @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
+  @transient private lazy val genericProjector = SafeProjection.create(keySchema)
   @transient private lazy val nnkw = new NonNullKeyWriter(keySchema)
 
   private val rowMapBitmap = new mutable.HashMap[InternalRow, RoaringBitmap]()

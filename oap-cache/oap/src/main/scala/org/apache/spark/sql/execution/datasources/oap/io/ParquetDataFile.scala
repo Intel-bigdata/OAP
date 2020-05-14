@@ -127,7 +127,7 @@ private[oap] case class ParquetDataFile(
       case _ =>
         addRequestSchemaToConf(configuration, requiredIds)
         initRecordReader(
-          new MrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
+          new MrOapRecordReader[InternalRow](new ParquetReadSupportWrapper,
             file, configuration, meta.footer))
     }
     iterator.asInstanceOf[OapCompletionIterator[Any]]
@@ -160,7 +160,7 @@ private[oap] case class ParquetDataFile(
         case _ =>
           addRequestSchemaToConf(configuration, requiredIds)
           initRecordReader(
-            new IndexedMrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
+            new IndexedMrOapRecordReader[InternalRow](new ParquetReadSupportWrapper,
               file, configuration, rowIds, meta.footer))
       }
       iterator.asInstanceOf[OapCompletionIterator[Any]]
@@ -170,9 +170,9 @@ private[oap] case class ParquetDataFile(
   def setParquetVectorizedContext(context: Option[ParquetVectorizedContext]): Unit =
     this.context = context
 
-  private def initRecordReader(reader: RecordReader[UnsafeRow]) = {
+  private def initRecordReader(reader: RecordReader[InternalRow]) = {
     reader.initialize()
-    val iterator = new FileRecordReaderIterator[UnsafeRow](reader)
+    val iterator = new FileRecordReaderIterator[InternalRow](reader)
     new OapCompletionIterator[InternalRow](iterator, {}) {
       override def close(): Unit = iterator.close()
     }

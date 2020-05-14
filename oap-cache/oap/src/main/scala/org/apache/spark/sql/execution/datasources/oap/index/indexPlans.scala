@@ -36,6 +36,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.utils.OapUtils
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.rpc.OapMessages.CacheDrop
@@ -294,7 +295,9 @@ case class DropIndexCommand(
               throw new AnalysisException(s"""Index $indexName does not exist on $parent""")
           }
         }
-      case other => sys.error(s"We don't support index dropping for ${other.simpleString}")
+      case other =>
+        throw new OapException(s"We don't support index listing for " +
+          s"${other.simpleString(SQLConf.get.maxToStringFields)}")
     }
     Seq.empty
   }
@@ -466,7 +469,8 @@ case class OapShowIndexCommand(table: TableIdentifier, relationName: String)
       case LogicalRelation(HadoopFsRelation(f, _, s, _, _, _), _, id, _) =>
         (f, s)
       case other =>
-        throw new OapException(s"We don't support index listing for ${other.simpleString}")
+        throw new OapException(s"We don't support index checking for " +
+          s"${other.simpleString(SQLConf.get.maxToStringFields)}")
     }
 
     val partitions = OapUtils.getPartitions(fileCatalog).filter(_.files.nonEmpty)
@@ -645,7 +649,8 @@ case class OapCheckIndexCommand(
       case LogicalRelation(HadoopFsRelation(f, _, s, _, _, _), _, id, _) =>
         (f, s)
       case other =>
-        throw new OapException(s"We don't support index checking for ${other.simpleString}")
+        throw new OapException(s"We don't support index checking for " +
+          s"${other.simpleString(SQLConf.get.maxToStringFields)}")
     }
 
     val rootPaths = fileCatalog.rootPaths

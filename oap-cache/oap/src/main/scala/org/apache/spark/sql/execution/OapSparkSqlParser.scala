@@ -52,6 +52,10 @@ class OapSparkSqlParser(session: SparkSession, delegate: ParserInterface) extend
       case _ => delegate.parsePlan(sqlText)
     }
   }
+
+  override def parseMultipartIdentifier(sqlText: String): Seq[String] =
+    delegate.parseMultipartIdentifier(sqlText)
+
   // scalastyle:off line.size.limit
   /**
    * Fork from `org.apache.spark.sql.catalyst.parser.AbstractSqlParser#parse(java.lang.String, scala.Function1)`.

@@ -71,7 +71,7 @@ abstract class BTreeIndexRecordWriter(
 
   protected def serializeFooter(nullKeyRowCount: Int, nodes: Seq[BTreeNodeMetaData]): Array[Byte]
 
-  @transient private lazy val genericProjector = FromUnsafeProjection(keySchema)
+  @transient private lazy val genericProjector = SafeProjection.create(keySchema)
   @transient protected lazy val nnkw = new NonNullKeyWriter(keySchema)
 
   private val combiner: Int => Seq[Int] = Seq(_)
@@ -83,7 +83,7 @@ abstract class BTreeIndexRecordWriter(
     val taskContext = TaskContext.get()
     val sorter = new OapExternalSorter[InternalRow, Int, Seq[Int]](
       taskContext, Some(aggregator), Some(ordering))
-    taskContext.addTaskCompletionListener(_ => sorter.stop())
+    taskContext.addTaskCompletionListener[Unit](_ => sorter.stop())
     sorter
   }
   private var recordCount: Int = 0

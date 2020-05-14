@@ -43,6 +43,7 @@ import org.apache.spark.sql.execution.datasources.orc.ReadOnlyNativeOrcFileForma
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ReadOnlyParquetFileFormat
 import org.apache.spark.sql.hive.orc.ReadOnlyOrcFileFormat
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.types.StructType
@@ -425,7 +426,8 @@ private[oap] object IndexUtils extends  Logging {
         val logical = LogicalRelation(fsRelation, attributes, id, isStreaming = false)
         (f, s, OapFileFormat.ORC_DATA_FILE_CLASSNAME, id, logical)
       case other =>
-        throw new OapException(s"We don't support index operation for ${other.simpleString}")
+        throw new OapException(s"We don't support index operation for " +
+          s"${other.simpleString(SQLConf.get.maxToStringFields)}")
     }
     (fileCatalog, schema, readerClassName, identifier, relation)
   }

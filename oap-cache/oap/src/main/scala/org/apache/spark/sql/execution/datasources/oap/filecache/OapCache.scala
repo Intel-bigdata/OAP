@@ -703,7 +703,7 @@ class GuavaOapCache(
         incFiberCountAndSize(key, 1, fiberCache.size())
         logDebug(
           "Load missed fiber took %s. Fiber: %s. length: %s".format(
-            Utils.getUsedTimeMs(startLoadingTime), key, fiberCache.size()))
+            Utils.getUsedTimeNs(startLoadingTime), key, fiberCache.size()))
         _cacheSize.addAndGet(fiberCache.size())
         fiberCache
       }

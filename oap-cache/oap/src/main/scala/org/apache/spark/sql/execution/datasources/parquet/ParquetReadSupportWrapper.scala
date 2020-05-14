@@ -25,14 +25,14 @@ import org.apache.parquet.io.api.RecordMaterializer
 import org.apache.parquet.schema._
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
+import org.apache.spark.sql.catalyst.InternalRow
 
 /**
  * Wrap ParquetReadSupport, it can be used outside the parquet package.
  * ParquetReadSupport extends ReadSupport[UnsafeRow] with Logging,
  * so ParquetReadSupportWrapper use the same hierarchy of inheritance.
  */
-class ParquetReadSupportWrapper extends ReadSupport[UnsafeRow] with Logging {
+class ParquetReadSupportWrapper extends ReadSupport[InternalRow] with Logging {
 
   // Proxy ParquetReadSupport instance to use.
   private val readSupport = new ParquetReadSupport
@@ -51,7 +51,7 @@ class ParquetReadSupportWrapper extends ReadSupport[UnsafeRow] with Logging {
       conf: Configuration,
       keyValueMetaData: JMap[String, String],
       fileSchema: MessageType,
-      readContext: ReadContext): RecordMaterializer[UnsafeRow] = {
+      readContext: ReadContext): RecordMaterializer[InternalRow] = {
     readSupport.prepareForRead(conf, keyValueMetaData, fileSchema, readContext)
   }
 }

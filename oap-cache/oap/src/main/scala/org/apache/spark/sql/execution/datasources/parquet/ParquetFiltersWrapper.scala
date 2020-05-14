@@ -31,9 +31,10 @@ object ParquetFiltersWrapper {
       conf: SQLConf, schema: StructType,
       predicate: sources.Filter): Option[FilterPredicate] = {
     val parquetFilters =
-      new ParquetFilters(conf.parquetFilterPushDownDate, conf.parquetFilterPushDownTimestamp,
+      new ParquetFilters(new SparkToParquetSchemaConverter(conf).convert(schema),
+      conf.parquetFilterPushDownDate, conf.parquetFilterPushDownTimestamp,
       conf.parquetFilterPushDownDecimal, conf.parquetFilterPushDownStringStartWith,
       conf.parquetFilterPushDownInFilterThreshold, conf.caseSensitiveAnalysis)
-    parquetFilters.createFilter(new SparkToParquetSchemaConverter(conf).convert(schema), predicate)
+    parquetFilters.createFilter(predicate)
   }
 }

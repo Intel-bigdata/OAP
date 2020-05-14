@@ -88,8 +88,8 @@ private[sql] class OptimizedOrcFileFormat extends OapFileFormat {
 
     val enableOffHeapColumnVector =
       sparkSession.sessionState.conf.getConf(SQLConf.COLUMN_VECTOR_OFFHEAP_ENABLED)
-    val copyToSpark =
-      sparkSession.sessionState.conf.getConf(SQLConf.ORC_COPY_BATCH_TO_SPARK)
+    val copyToSpark = false
+      // sparkSession.sessionState.conf.getConf(SQLConf.ORC_COPY_BATCH_TO_SPARK)
     val isCaseSensitive = sparkSession.sessionState.conf.caseSensitiveAnalysis
 
     // Push down the filters to the orc record reader.

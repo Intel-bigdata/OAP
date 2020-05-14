@@ -30,6 +30,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCo
 import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalAggregation, PhysicalOperation}
 import org.apache.spark.sql.catalyst.plans.{logical, LeftSemi}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.aggregate.OapAggUtils
@@ -264,7 +265,7 @@ object OapSemiJoinStrategy extends OapStrategy {
   }
 
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-    case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, condition, left, right)
+    case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, condition, left, right,_)
       if joinType == LeftSemi && canBroadcast(right) =>
       Seq(joins.BroadcastHashJoinExec(
         leftKeys, rightKeys, joinType, BuildRight, condition, planLater(left),
@@ -434,9 +435,9 @@ case class OapOrderLimitFileScanExec(
     projectList: Seq[NamedExpression],
     child: SparkPlan) extends OapFileScanExec {
 
-  override def simpleString: String = {
-    val orderByString = Utils.truncatedString(sortOrder, "[", ",", "]")
-    val outputString = Utils.truncatedString(output, "[", ",", "]")
+  override def simpleString(maxFields: Int): String = {
+    val orderByString = truncatedString(sortOrder, "[", ",", "]", maxFields)
+    val outputString = truncatedString(output, "[", ",", "]", maxFields)
 
     s"OapOrderLimitFileScanExec(limit=$limit, orderBy=$orderByString, output=$outputString)"
   }
@@ -447,8 +448,8 @@ case class OapDistinctFileScanExec(
     projectList: Seq[NamedExpression],
     child: SparkPlan) extends OapFileScanExec {
 
-  override def simpleString: String = {
-    val outputString = Utils.truncatedString(output, "[", ",", "]")
+  override def simpleString(maxFields: Int): String = {
+    val outputString = truncatedString(output, "[", ",", "]", maxFields)
 
     s"OapDistinctFileScanExec(output=$outputString, scan [$scanNumber] row of each index)"
   }
@@ -459,9 +460,9 @@ case class OapAggregationFileScanExec(
     projectList: Seq[NamedExpression],
     child: SparkPlan) extends OapFileScanExec {
 
-  override def simpleString: String = {
-    val outputString = Utils.truncatedString(output, "[", ",", "]")
-    val aggString = Utils.truncatedString(aggExpression, "[", ",", "]")
+  override def simpleString(maxFields: Int): String = {
+    val outputString = truncatedString(output, "[", ",", "]", maxFields)
+    val aggString = truncatedString(aggExpression, "[", ",", "]", maxFields)
 
     s"OapAggregationFileScanExec(output=$outputString, Aggregation function=$aggString)"
   }

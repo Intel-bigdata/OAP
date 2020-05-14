@@ -297,7 +297,7 @@ private[oap] class OapDataReaderV1(
       FilterHelper.setFilterIfExist(conf, pushed)
 
       val iter = initialize()
-      Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
+      Option(TaskContext.get()).foreach(_.addTaskCompletionListener[Unit](_ => iter.close()))
       val tot = totalRows()
       metrics.updateTotalRows(tot)
       metrics.updateIndexAndRowRead(this, tot)
