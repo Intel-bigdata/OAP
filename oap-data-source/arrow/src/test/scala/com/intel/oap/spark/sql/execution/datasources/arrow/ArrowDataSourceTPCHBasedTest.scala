@@ -16,6 +16,8 @@
  */
 package com.intel.oap.spark.sql.execution.datasources.arrow
 
+import java.util.concurrent.{Executors, TimeUnit}
+
 import com.intel.oap.spark.sql.DataFrameReaderImplicits._
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowOptions
 
@@ -34,6 +36,7 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
   private val partSupp = prefix + tpchFolder + "/partsupp"
   private val supplier = prefix + tpchFolder + "/supplier"
   private val orders = prefix + tpchFolder + "/orders"
+  private val nation = prefix + tpchFolder + "/nation"
 
   ignore("tpch lineitem - desc") {
     val frame = spark.read
@@ -217,4 +220,49 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
       "\ngroup by\n\tl_returnflag,\n\t" +
       "l_linestatus\norder by\n\tl_returnflag,\n\tl_linestatus").explain(true)
   }
+
+  ignore("tpch query 21 - memory leak") {
+    val frame1 = spark.read
+      .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
+      .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
+      .arrow(supplier)
+    frame1.createOrReplaceTempView("supplier")
+    val frame2 = spark.read
+      .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
+      .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
+      .arrow(lineitem)
+    frame2.createOrReplaceTempView("lineitem")
+    val frame3 = spark.read
+      .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
+      .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
+      .arrow(orders)
+    frame3.createOrReplaceTempView("orders")
+    val frame4 = spark.read
+      .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
+      .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
+      .arrow(nation)
+    frame4.createOrReplaceTempView("nation")
+
+    Executors.newSingleThreadExecutor().execute(() => {
+      spark.sql("select\n\ts_name,\n\tcount(*) as numwait\nfrom\n\tsupplier,\n\t" +
+        "lineitem l1,\n\torders,\n\tnation\nwhere\n\ts_suppkey = l1.l_suppkey\n\t" +
+        "and o_orderkey = l1.l_orderkey\n\tand o_orderstatus = 'F'\n\tand " +
+        "l1.l_receiptdate > l1.l_commitdate\n\tand exists (\n\t\tselect\n\t\t\t*\n\t\tfrom\n\t\t\t" +
+        "lineitem l2\n\t\twhere\n\t\t\tl2.l_orderkey = l1.l_orderkey\n\t\t\tand " +
+        "l2.l_suppkey <> l1.l_suppkey\n\t)\n\tand not exists (\n\t\tselect\n\t\t\t*\n\t\t" +
+        "from\n\t\t\tlineitem l3\n\t\twhere\n\t\t\tl3.l_orderkey = l1.l_orderkey\n\t\t\t" +
+        "and l3.l_suppkey <> l1.l_suppkey\n\t\t\tand l3.l_receiptdate > " +
+        "l3.l_commitdate\n\t)\n\tand s_nationkey = n_nationkey\n\tand n_name = 'SAUDI ARABIA'\n" +
+        "group by\n\ts_name\norder by\n\tnumwait desc,\n\t" +
+        "s_name\nlimit 100").show()
+    })
+    Executors.newSingleThreadScheduledExecutor().scheduleWithFixedDelay(() => {
+      println("[org.apache.spark.sql.util.ArrowUtils.rootAllocator]                           " +
+        "Allocated memory amount: " + ArrowUtils.rootAllocator().getAllocatedMemory)
+      println("[com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector.allocator] " +
+        "Allocated memory amount: " + com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector.allocator.getAllocatedMemory)
+    }, 0L, 100L, TimeUnit.MILLISECONDS)
+    Thread.sleep(60 * 60 * 1000L)
+  }
+
 }

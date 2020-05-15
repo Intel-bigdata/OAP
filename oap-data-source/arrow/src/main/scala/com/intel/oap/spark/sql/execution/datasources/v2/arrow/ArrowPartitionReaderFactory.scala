@@ -18,6 +18,7 @@ package com.intel.oap.spark.sql.execution.datasources.v2.arrow
 
 import scala.collection.JavaConverters._
 
+import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowPartitionReaderFactory.ColumnarBatchRetainer
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowSQLConf._
 import org.apache.arrow.dataset.scanner.ScanOptions
 
@@ -79,19 +80,42 @@ case class ArrowPartitionReaderFactory(
         readPartitionSchema, readDataSchema))
 
     new PartitionReader[ColumnarBatch] {
+      val holder = new ColumnarBatchRetainer()
 
       override def next(): Boolean = {
+        holder.release()
         itr.hasNext
       }
 
       override def get(): ColumnarBatch = {
-        itr.next()
+        val batch = itr.next()
+        holder.retain(batch)
+        batch
       }
 
       override def close(): Unit = {
+        holder.release()
         itrList.foreach(itr => itr.close())
         scanner.close() // todo memory leak?
       }
+    }
+  }
+}
+
+object ArrowPartitionReaderFactory {
+  private class ColumnarBatchRetainer {
+    private var retained: Option[ColumnarBatch] = None
+
+    def retain(batch: ColumnarBatch): Unit = {
+      if (retained.isDefined) {
+        throw new IllegalStateException
+      }
+      retained = Some(batch)
+    }
+
+    def release(): Unit = {
+      retained.foreach(b => b.close())
+      retained = None
     }
   }
 }
