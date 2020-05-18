@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.concurrent.locks.{Condition, ReentrantLock}
 
 import scala.collection.JavaConverters._
+import scala.util.Success
 
 import com.google.common.cache._
 import com.google.common.hash._
@@ -210,7 +211,43 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
   }
 }
 
-private[filecache] object OapCache {
+private[filecache] object OapCache extends Logging {
+  val PMemRelatedCacheBackend = Array("guava", "vmem", "noevict", "external")
+  def cacheFallBackDetect(sparkEnv: SparkEnv,
+                          fallBackEnabled: Boolean = true,
+                          fallBackRes: Boolean = true): Boolean = {
+    if (fallBackEnabled == false && fallBackRes == true) return true
+    if (fallBackEnabled == false && fallBackRes == false) return false
+    val conf = sparkEnv.conf
+    var numaId = conf.getInt("spark.executor.numa.id", -1)
+    val executorIdStr = sparkEnv.executorId
+    scala.util.Try(executorIdStr.toInt) match {
+      case Success(_) => logDebug("valid executor id for numa binding.") ;
+      case _ =>
+        logWarning("invalid executor id for numa binding.")
+        return false
+    }
+    val executorId = executorIdStr.toInt
+    val map = PersistentMemoryConfigUtils.parseConfig(conf)
+    if (numaId == -1) {
+      logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +
+        s"executor with NUMA when cache data to Intel Optane DC persistent memory.")
+      numaId = executorId % PersistentMemoryConfigUtils.totalNumaNode(conf)
+    }
+    val initialPath = map.get(numaId).get
+    val initialSizeStr = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim
+    val initialSize = Utils.byteStringAsBytes(initialSizeStr)
+
+    val file: File = new File(initialPath)
+    if(!file.exists()) {
+       return false
+    }
+    if(initialSize > file.getUsableSpace) {
+      logWarning(s"Required initialSize larger than usable space, will use largest usable space")
+      return false
+    }
+    true
+  }
 
   def apply(sparkEnv: SparkEnv, cacheMemory: Long,
             cacheGuardianMemory: Long, fiberType: FiberType): OapCache = {
@@ -223,16 +260,36 @@ private[filecache] object OapCache {
     val oapCacheOpt = conf.get(
       configEntry.key,
       configEntry.defaultValue.get).toLowerCase
-    oapCacheOpt match {
-      case "guava" => new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
-      case "vmem" => new VMemCache(fiberType)
-      case "simple" => new SimpleOapCache()
-      case "noevict" => new NoEvictPMCache(cacheMemory, cacheGuardianMemory, fiberType)
-      case "external" => new ExternalCache(fiberType)
-      case _ => throw new UnsupportedOperationException(
+    val memoryManagerOpt =
+      conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
+    val fallBackEnabled = conf.get(OapConf.OAP_CACHE_BACKEND_FALLBACK_ENABLED.key,
+      "true").toLowerCase
+    val fallBackRes = conf.get(OapConf.OAP_TEST_CACHE_BACKEND_FALLBACK_RES.key,
+      "true").toLowerCase
+    if (PMemRelatedCacheBackend.contains(oapCacheOpt)) {
+      if (!cacheFallBackDetect(sparkEnv, fallBackEnabled.toBoolean, fallBackRes.toBoolean)) {
+        if (oapCacheOpt.equals("guava") && memoryManagerOpt.equals("offheap")) {
+          return new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
+        }
+        logWarning(s"There is no Optane PMem DIMMs detected," +
+          s"has to fall back to simple cache implementation")
+        new SimpleOapCache()
+      }
+      else {
+        oapCacheOpt match {
+          case "guava" => new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
+          case "vmem" => new VMemCache(fiberType)
+          case "noevict" => new NoEvictPMCache(cacheMemory, cacheGuardianMemory, fiberType)
+          case "external" => new ExternalCache(fiberType)
+          case _ => throw new UnsupportedOperationException(
+            s"The cache backend: ${oapCacheOpt} is not supported now")
+        }
+      }
+    }
+    else {
+      throw new UnsupportedOperationException(
         s"The cache backend: ${oapCacheOpt} is not supported now")
     }
-
   }
 }
 
@@ -878,7 +935,12 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
   val clientRoundRobin = new AtomicInteger(0)
   val plasmaClientPool = new Array[ plasma.PlasmaClient](clientPoolSize)
   for ( i <- 0 until clientPoolSize) {
-    plasmaClientPool(i) = new plasma.PlasmaClient(externalStoreCacheSocket, "", 0)
+    try {
+      plasmaClientPool(i) = new plasma.PlasmaClient(externalStoreCacheSocket, "", 0)
+    } catch {
+      case e: Exception =>
+        logError(s"Error occurred when connecting to plasma server" + e.getMessage)
+    }
   }
 
   val cacheGuardian = new MultiThreadCacheGuardian(Int.MaxValue)
@@ -967,14 +1029,13 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
   override def getIfPresent(fiber: FiberId): FiberCache = null
 
   override def getFibers: Set[FiberId] = {
-        val list : Array[Array[Byte]] =
-        plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).list();
-        cacheTotalCount = new AtomicLong(list.length)
-        logDebug("cache total size is " + cacheTotalCount)
-        list.toSet
-        fiberSet.foreach( fiber =>
-          if ( !list.contains(hash(fiber.toFiberKey()))) fiberSet.remove(fiber) )
-        fiberSet.toSet
+    val set : Set[Array[Byte]] =
+      plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).list().asScala.toSet
+    cacheTotalCount = new AtomicLong(set.size)
+    logDebug("cache total size is " + cacheTotalCount)
+    fiberSet.foreach( fiber =>
+      if ( !set.contains(hash(fiber.toFiberKey()))) fiberSet.remove(fiber) )
+    fiberSet.toSet
   }
 
   override def invalidate(fiber: FiberId): Unit = { }
@@ -987,7 +1048,8 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
 
   override def cacheStats: CacheStats = {
     val array = new Array[Long](4)
-//    plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).metrics(array)
+    // TODO:total size will be incorrect due to it's an external cache
+    plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).metrics(array)
     cacheTotalSize = new AtomicLong(array(3) + array(1))
     // Memory store and external store used size
 

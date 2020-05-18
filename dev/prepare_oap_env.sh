@@ -102,11 +102,11 @@ function prepare_ns_arrow() {
   cd thirdparty/native_sql/
   if [ ! -d "arrow" ]; then
     git clone $intel_arrow_repo -b native-sql-engine-clean
+    cd arrow
   else
     cd arrow
     git pull
   fi
-  cd arrow
   current_arrow_path=$(pwd)
   mkdir -p cpp/release-build
 
@@ -221,10 +221,12 @@ function prepare_memkind() {
   cd thirdparty
   if [ ! -d "memkind" ]; then
     git clone $memkind_repo
+    cd memkind/
   else
+    cd memkind/
     git pull
   fi
-  cd memkind/
+
 
   yum -y install autoconf
   yum -y install automake
@@ -254,10 +256,12 @@ function prepare_vmemcache() {
   cd thirdparty
   if [ ! -d "vmemcache" ]; then
     git clone $vmemcache_repo
+    cd vmemcache
   else
+    cd vmemcache
     git pull
   fi
-  cd vmemcache
+
   mkdir -p build
   cd build
   yum -y install rpm-build
@@ -277,11 +281,13 @@ function prepare_intel_arrow() {
   cd $dev_path/thirdparty
   if [ ! -d "arrow" ]; then
     git clone https://github.com/Intel-bigdata/arrow.git -b oap-master
+    cd arrow
   else
+    cd arrow
     git pull
   fi
 
-  cd arrow/cpp
+  cd cpp
   rm -rf release
   mkdir -p release
   cd release
