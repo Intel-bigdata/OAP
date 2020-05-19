@@ -9,17 +9,17 @@ public class SPDKPMemDataStoreImpl extends PMemDataStore {
     }
 
     @Override
-    public Iterator<Chunk> getInputChunkIterator() {
-        throw new RuntimeException("Unsupported operation");
-    }
-
-    @Override
-    public Iterator<Chunk> getOutputChunkIterator() {
+    public Iterator<Chunk> getOutputChunkIterator(byte[] logicalID) {
         return null;
     }
 
     @Override
-    public byte[] getPhysicalIDbyLogicalID(byte[] id) {
-        throw new RuntimeException("Unsupported method");
+    public void freeChunks(byte[] logicalID) {
+
+    }
+
+    @Override
+    public byte[] getPhysicalIDbyLogicalID(byte[] logicalID, long currentTrunkID) {
+        return new byte[0];
     }
 }

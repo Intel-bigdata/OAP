@@ -13,26 +13,22 @@ public class FileChunk implements Chunk {
         this.id = id;
     }
 
-     public void writeDataToStore(Object baseObj, byte [] bytes, long baseAddress, long offset) {
+    @Override
+    public void write(byte[] value, int offset){
         // TODO fileStream write to data
         try {
             if(fileOutputStream == null){
                 fileOutputStream = new FileOutputStream(new String(id));
             }
-            fileOutputStream.write(bytes);
+            fileOutputStream.write(value);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    public void write(byte[] value, int offset){
-
-    }
-
-    @Override
     public void free(){
-        
+        // Do nothing since it's file stream
     }
 
     @Override

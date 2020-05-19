@@ -27,7 +27,7 @@ public class ChunkOutputStream extends FileOutputStream {
         if(byteBuffer.remaining() == 0){
             // FIXME prototype code
 //            currentBlock = pMemManager.pMemDataStore.getOutputChunkIterator().next();
-            currentBlock.writeDataToStore(b, -1, b.length);
+            currentBlock.write(b, -1);
         }
     }
 

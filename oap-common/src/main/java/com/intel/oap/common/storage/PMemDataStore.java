@@ -54,12 +54,9 @@ public abstract class PMemDataStore {
      * @param chunkSize
      * @return
      */
-    public Iterator<Chunk> getOutputChunkIterator(byte[] logicalID) {
-        return null;
-    }
+    public abstract Iterator<Chunk> getOutputChunkIterator(byte[] logicalID);
 
-    public void freeChunks(byte[] logicalID) {
-    }
+    public abstract void freeChunks(byte[] logicalID);
 
     public abstract byte [] getPhysicalIDbyLogicalID(byte[] logicalID, long currentTrunkID);
 

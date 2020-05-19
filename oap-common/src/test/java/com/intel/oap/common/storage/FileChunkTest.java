@@ -30,7 +30,7 @@ public class FileChunkTest {
     @Test
     public void testFileChunk() {
         FileChunk outputChunk = new FileChunk(fileName.getBytes());
-        outputChunk.writeDataToStore(null, data, -1, -1);
+        outputChunk.write( data, -1);
         outputChunk.release();
 
         FileChunk inputChunk = new FileChunk(fileName.getBytes());
