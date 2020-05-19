@@ -1,9 +1,15 @@
 package com.intel.oap.common.storage;
 
 public interface Chunk {
-    void writeDataToStore(Object baseObj, byte [] bytes, long baseAddress, long offset);
 
+    // FileTrunk should also use write() method.
+    // void writeDataToStore(Object baseObj, byte [] bytes, long baseAddress, long offset);
+
+    //
     void read(byte [] bytes, int offset, int size);
 
-    void release();
+    //
+    void write(byte[] value, int offset);
+
+    void free();
 }

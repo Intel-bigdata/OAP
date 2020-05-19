@@ -3,7 +3,7 @@ package com.intel.oap.common.storage;
 import java.util.Properties;
 
 public class ChunkImplFactory {
-    public static ChunkAPI getChunkImplByType(Properties properties) {
+    public static ChunkManager getChunkImplByType(Properties properties) {
         ChunkType type = ChunkType.valueOf(properties.getProperty("oap.chunk.type"));
         switch (type) {
             case PMDK:

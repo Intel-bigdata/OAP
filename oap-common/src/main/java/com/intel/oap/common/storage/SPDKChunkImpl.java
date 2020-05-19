@@ -3,7 +3,7 @@ package com.intel.oap.common.storage;
 import java.io.*;
 import java.util.Properties;
 
-public class SPDKChunkImpl implements ChunkAPI {
+public class SPDKChunkImpl implements ChunkManager {
 
     private String fileDir;
     private File file;
@@ -59,14 +59,8 @@ public class SPDKChunkImpl implements ChunkAPI {
     public void putChunk(byte[] id, Chunk chunk) {
 
     }
-
     @Override
-    public void release() {
-
-    }
-
-    @Override
-    public void free(Chunk chunk) {
+    public void remove(byte[] id) {
 
     }
 }

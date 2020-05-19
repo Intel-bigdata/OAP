@@ -13,8 +13,7 @@ public class FileChunk implements Chunk {
         this.id = id;
     }
 
-    @Override
-    public void writeDataToStore(Object baseObj, byte [] bytes, long baseAddress, long offset) {
+     public void writeDataToStore(Object baseObj, byte [] bytes, long baseAddress, long offset) {
         // TODO fileStream write to data
         try {
             if(fileOutputStream == null){
@@ -27,7 +26,17 @@ public class FileChunk implements Chunk {
     }
 
     @Override
-    public void read(byte [] bytes, int offset, int size) {
+    public void write(byte[] value, int offset){
+
+    }
+
+    @Override
+    public void free(){
+        
+    }
+
+    @Override
+    public void read(byte[] bytes, int offset, int size) {
         try {
             if(fileInputStream == null){
                 fileInputStream = new FileInputStream(new String(id));
@@ -38,7 +47,6 @@ public class FileChunk implements Chunk {
         }
     }
 
-    @Override
     public void release() {
         if(fileInputStream != null){
             try {

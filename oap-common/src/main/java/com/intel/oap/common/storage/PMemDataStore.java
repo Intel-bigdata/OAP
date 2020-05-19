@@ -2,6 +2,7 @@ package com.intel.oap.common.storage;
 
 import java.io.FileOutputStream;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
 
 //FIXME should new this by parameter instead of passing in by Spark
 /**
@@ -12,6 +13,11 @@ public abstract class PMemDataStore {
     byte[] id;
     FileChunk fileChunk;
     MemoryStats stats;
+    ConcurrentHashMap<byte[], Chunk> chunkMap;
+    ConcurrentHashMap<byte[], StreamMeta> streamMetaMap;
+    ChunkAPI chunkAPI;
+    ChunkManager chunkManager;
+    public PMemDataStore(){}
 
     public PMemDataStore(byte[] id, MemoryStats stats){
         this.id = id;
@@ -19,7 +25,7 @@ public abstract class PMemDataStore {
         this.fileChunk = new FileChunk(id);
     }
 
-    public Iterator<Chunk> getInputChunkIterator(){
+    public Iterator<Chunk> getInputChunkIterator(byte[] logicalId){
         return new Iterator<Chunk>() {
             long chuckID = 0;
 
@@ -48,11 +54,14 @@ public abstract class PMemDataStore {
      * @param chunkSize
      * @return
      */
-    public Iterator<Chunk> getOutputChunkIterator() {
+    public Iterator<Chunk> getOutputChunkIterator(byte[] logicalID) {
         return null;
     }
 
-    public abstract byte [] getPhysicalIDbyLogicalID(byte[] id);
+    public void freeChunks(byte[] logicalID) {
+    }
+
+    public abstract byte [] getPhysicalIDbyLogicalID(byte[] logicalID, long currentTrunkID);
 
 
 }
