@@ -1,13 +1,18 @@
 package com.intel.oap.common.storage;
 
+import com.intel.oap.common.storage.chunk.MemKindChunkAPIImpl;
+import com.intel.oap.common.storage.meta.Chunk;
+import com.intel.oap.common.storage.meta.FileChunk;
+import com.intel.oap.common.storage.stream.DataStore;
+
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class MemKindPMemDataStoreImpl extends PMemDataStore {
+public class MemKindDataStoreImpl extends DataStore {
     //get this value from conf
     private final long chunkSize = 100;
 
-    public MemKindPMemDataStoreImpl(MemoryStats stats){
+    public MemKindDataStoreImpl(MemoryStats stats){
         this.chunkAPI = new MemKindChunkAPIImpl();
         this.chunkManager = new MemKindChunkManagerImpl();
         this.chunkMap = new ConcurrentHashMap<>();

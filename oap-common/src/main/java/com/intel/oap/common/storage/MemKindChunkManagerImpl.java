@@ -1,5 +1,7 @@
 package com.intel.oap.common.storage;
 
+import com.intel.oap.common.storage.meta.Chunk;
+
 public class MemKindChunkManagerImpl implements ChunkManager {
     @Override
     public boolean contains(byte[] id) {
@@ -21,6 +23,11 @@ public class MemKindChunkManagerImpl implements ChunkManager {
     @Override
     public void remove(byte[] id) {
 
+    }
+
+    @Override
+    public void close() {
+        // TODO
     }
 
 

@@ -12,8 +12,8 @@ public class MemoryStats {
         usedSize += size;
     }
 
-    public long getTotalSize() {
-        return totalSize;
+    public synchronized long getRemainingSize() {
+        return totalSize - usedSize;
     }
 
     public synchronized long getUsedSize() {

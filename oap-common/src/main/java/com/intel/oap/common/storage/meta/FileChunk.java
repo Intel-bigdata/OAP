@@ -1,4 +1,6 @@
-package com.intel.oap.common.storage;
+package com.intel.oap.common.storage.meta;
+
+import com.intel.oap.common.storage.meta.Chunk;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;

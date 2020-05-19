@@ -1,5 +1,7 @@
 package com.intel.oap.common.storage;
 
+import com.intel.oap.common.storage.meta.Chunk;
+
 /**
  * expose methods for high level stream to write/read data from different backend
  */
@@ -39,9 +41,5 @@ public interface ChunkManager {
      */
     public void remove(byte[] id);
 
-//    /**
-//     * free pmem space when chunk life cycle end
-//     * @param chunk
-//     */
-//    public void free(Chunk chunk);
+    void close();
 }

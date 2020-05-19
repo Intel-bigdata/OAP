@@ -1,5 +1,6 @@
 package com.intel.oap.common.storage;
 
+import com.intel.oap.common.storage.meta.FileChunk;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;

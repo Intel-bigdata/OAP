@@ -1,4 +1,6 @@
-package com.intel.oap.common.storage;
+package com.intel.oap.common.storage.meta;
+
+import com.intel.oap.common.storage.MemoryCopyUtil;
 
 public class PMemChunk implements Chunk {
     private long baseAddress;

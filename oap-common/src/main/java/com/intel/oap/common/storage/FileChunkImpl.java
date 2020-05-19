@@ -1,16 +1,18 @@
 package com.intel.oap.common.storage;
 
+import com.intel.oap.common.storage.meta.Chunk;
+
 import java.io.*;
 import java.util.Properties;
 
-public class SPDKChunkImpl implements ChunkManager {
+public class FileChunkImpl implements ChunkManager {
 
     private String fileDir;
     private File file;
     private FileInputStream inputStream;
     private FileOutputStream outputStream;
 
-    public SPDKChunkImpl(Properties properties){
+    public FileChunkImpl(Properties properties){
         fileDir = properties.getProperty("oap.path");
     }
 
@@ -59,8 +61,28 @@ public class SPDKChunkImpl implements ChunkManager {
     public void putChunk(byte[] id, Chunk chunk) {
 
     }
+
     @Override
     public void remove(byte[] id) {
 
     }
+
+    @Override
+    public void close() {
+        if (outputStream != null) {
+            try {
+                outputStream.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if (inputStream != null) {
+            try {
+                inputStream.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
 }
+

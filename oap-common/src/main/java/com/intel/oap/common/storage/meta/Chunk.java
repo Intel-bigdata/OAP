@@ -1,5 +1,7 @@
-package com.intel.oap.common.storage;
+package com.intel.oap.common.storage.meta;
 
+
+// The entity to hold the chunk data. Provides the read/write methods
 public interface Chunk {
 
     // FileTrunk should also use write() method.

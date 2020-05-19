@@ -1,5 +1,7 @@
-package com.intel.oap.common.storage;
+package com.intel.oap.common.storage.chunk;
 
+import com.intel.oap.common.storage.meta.Chunk;
+import com.intel.oap.common.storage.meta.PMemChunk;
 import com.intel.oap.common.unsafe.PersistentMemoryPlatform;
 
 public class MemKindChunkAPIImpl implements ChunkAPI {
