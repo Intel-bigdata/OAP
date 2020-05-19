@@ -17,9 +17,9 @@
 package org.apache.parquet.hadoop;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-import java.util.TimeZone;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -378,7 +378,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         if (missingColumns[i]) continue;
         columnReaders[i] = new SkippableVectorizedColumnReader(columns.get(i),
           types.get(i).getOriginalType(), pages.getPageReader(columns.get(i)),
-          TimeZone.getDefault());
+                ZoneId.systemDefault());
       }
       totalCountLoadedSoFar += pages.getRowCount();
     }

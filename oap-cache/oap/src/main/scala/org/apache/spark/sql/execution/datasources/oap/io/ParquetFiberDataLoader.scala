@@ -17,9 +17,7 @@
 package org.apache.spark.sql.execution.datasources.oap.io
 
 import java.io.IOException
-import java.util.TimeZone
 import java.time.ZoneId
-import java.time.ZoneOffset
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.ParquetFiberDataReader
@@ -69,7 +67,7 @@ private[oap] case class ParquetFiberDataLoader(
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, originalType,
-        fiberData.getPageReader(columnDescriptor), ZoneId)
+        fiberData.getPageReader(columnDescriptor), ZoneId.systemDefault())
 
     if (OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressEnable) {
       ParquetDataFiberCompressedWriter.dumpToCache(

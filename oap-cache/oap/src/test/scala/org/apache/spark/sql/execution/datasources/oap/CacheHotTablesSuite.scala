@@ -231,108 +231,108 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
   }
 }
 
-class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
-  protected def testTableName: String = "orc_test"
-
-  protected def fileFormat: String = "orc"
-
-  test("Project-> Filter -> Scan : Optimized") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
-      verifyProjectFilterScan(
-        format => format.isInstanceOf[OptimizedOrcFileFormat],
-        (plan1, plan2) => !plan1.sameResult(plan2)
-      )
-    }
-  }
-
-  test("Project-> Filter -> Scan : Not Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
-      verifyProjectFilterScan(
-        format => format.isInstanceOf[OrcFileFormat],
-        (plan1, plan2) => plan1.sameResult(plan2)
-      )
-    }
-  }
-
-  test("Project-> Filter -> Scan : Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.orc_test;xxx") {
-      verifyProjectFilterScan(
-        format => format.isInstanceOf[OptimizedOrcFileFormat],
-        (plan1, plan2) => !plan1.sameResult(plan2)
-      )
-    }
-  }
-
-  test("Project -> Scan : Optimized") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
-      verifyProjectScan(
-        format => format.isInstanceOf[OptimizedOrcFileFormat],
-        (plan1, plan2) => !plan1.sameResult(plan2)
-      )
-    }
-  }
-
-  test("Project -> Scan :  Not Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
-      verifyProjectScan(
-        format => format.isInstanceOf[OrcFileFormat],
-        (plan1, plan2) => plan1.sameResult(plan2)
-      )
-    }
-  }
-
-  test("Project -> Scan :  Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.orc_test;xxx") {
-      verifyProjectScan(
-        format => format.isInstanceOf[OptimizedOrcFileFormat],
-        (plan1, plan2) => !plan1.sameResult(plan2)
-      )
-    }
-  }
-
-  test("Scan : Optimized") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
-      verifyScan(
-        format => format.isInstanceOf[OptimizedOrcFileFormat],
-        (plan1, plan2) => !plan1.sameResult(plan2)
-      )
-    }
-  }
-
-  test("Scan : Not Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
-      verifyScan(
-        format => format.isInstanceOf[OrcFileFormat],
-        (plan1, plan2) => plan1.sameResult(plan2)
-      )
-    }
-  }
-
-  test("Scan : Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.orc_test;xxx") {
-      verifyScan(
-        format => format.isInstanceOf[OptimizedOrcFileFormat],
-        (plan1, plan2) => !plan1.sameResult(plan2)
-      )
-    }
-  }
-}
-
+// class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
+//  protected def testTableName: String = "orc_test"
+//
+//  protected def fileFormat: String = "orc"
+//
+//  test("Project-> Filter -> Scan : Optimized") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
+//      verifyProjectFilterScan(
+//        format => format.isInstanceOf[OptimizedOrcFileFormat],
+//        (plan1, plan2) => !plan1.sameResult(plan2)
+//      )
+//    }
+//  }
+//
+//  test("Project-> Filter -> Scan : Not Optimized, only cache hot Tables") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
+//      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
+//      verifyProjectFilterScan(
+//        format => format.isInstanceOf[OrcFileFormat],
+//        (plan1, plan2) => plan1.sameResult(plan2)
+//      )
+//    }
+//  }
+//
+//  test("Project-> Filter -> Scan : Optimized, only cache hot Tables") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
+//      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
+//      OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.orc_test;xxx") {
+//      verifyProjectFilterScan(
+//        format => format.isInstanceOf[OptimizedOrcFileFormat],
+//        (plan1, plan2) => !plan1.sameResult(plan2)
+//      )
+//    }
+//  }
+//
+//  test("Project -> Scan : Optimized") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
+//      verifyProjectScan(
+//        format => format.isInstanceOf[OptimizedOrcFileFormat],
+//        (plan1, plan2) => !plan1.sameResult(plan2)
+//      )
+//    }
+//  }
+//
+//  test("Project -> Scan :  Not Optimized, only cache hot Tables") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
+//      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
+//      verifyProjectScan(
+//        format => format.isInstanceOf[OrcFileFormat],
+//        (plan1, plan2) => plan1.sameResult(plan2)
+//      )
+//    }
+//  }
+//
+//  test("Project -> Scan :  Optimized, only cache hot Tables") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
+//      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
+//      OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.orc_test;xxx") {
+//      verifyProjectScan(
+//        format => format.isInstanceOf[OptimizedOrcFileFormat],
+//        (plan1, plan2) => !plan1.sameResult(plan2)
+//      )
+//    }
+//  }
+//
+//  test("Scan : Optimized") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
+//      verifyScan(
+//        format => format.isInstanceOf[OptimizedOrcFileFormat],
+//        (plan1, plan2) => !plan1.sameResult(plan2)
+//      )
+//    }
+//  }
+//
+//  test("Scan : Not Optimized, only cache hot Tables") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
+//      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
+//      verifyScan(
+//        format => format.isInstanceOf[OrcFileFormat],
+//        (plan1, plan2) => plan1.sameResult(plan2)
+//      )
+//    }
+//  }
+//
+//  test("Scan : Optimized, only cache hot Tables") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
+//      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
+//      OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.orc_test;xxx") {
+//      verifyScan(
+//        format => format.isInstanceOf[OptimizedOrcFileFormat],
+//        (plan1, plan2) => !plan1.sameResult(plan2)
+//      )
+//    }
+//  }
+// }
+//

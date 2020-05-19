@@ -60,16 +60,16 @@ class OapOrcQuerySuite extends QueryTest with SharedOapContext with BeforeAndAft
     sql("DROP TABLE IF EXISTS t_refresh_orc")
   }
 
-  test("Query orc Format in FiberCache") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table orc_test select * from t")
-      checkAnswer(sql("SELECT * FROM orc_test WHERE a = 1"),
-        Row(1, "this is test 1") :: Nil)
-      checkAnswer(sql("SELECT * FROM orc_test WHERE a > 1 AND a <= 3"),
-        Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
-    }
-  }
+//  test("Query orc Format in FiberCache") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
+//      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+//      data.toDF("key", "value").createOrReplaceTempView("t")
+//      sql("insert overwrite table orc_test select * from t")
+//      checkAnswer(sql("SELECT * FROM orc_test WHERE a = 1"),
+//        Row(1, "this is test 1") :: Nil)
+//      checkAnswer(sql("SELECT * FROM orc_test WHERE a > 1 AND a <= 3"),
+//        Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+//    }
+//  }
 }

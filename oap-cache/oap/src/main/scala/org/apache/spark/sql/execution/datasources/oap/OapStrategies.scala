@@ -265,7 +265,7 @@ object OapSemiJoinStrategy extends OapStrategy {
   }
 
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-    case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, condition, left, right,_)
+    case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, condition, left, right, _)
       if joinType == LeftSemi && canBroadcast(right) =>
       Seq(joins.BroadcastHashJoinExec(
         leftKeys, rightKeys, joinType, BuildRight, condition, planLater(left),

@@ -18,7 +18,7 @@
 package org.apache.spark.sql.execution.datasources.parquet;
 
 import java.io.IOException;
-import java.util.TimeZone;
+import java.time.ZoneId;
 
 import org.apache.parquet.bytes.ByteBufferInputStream;
 import org.apache.parquet.bytes.BytesInput;
@@ -60,7 +60,7 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
       ColumnDescriptor descriptor,
       OriginalType originalType,
       PageReader pageReader,
-      TimeZone convertTz)
+      ZoneId convertTz)
       throws IOException {
     super(descriptor, originalType, pageReader, convertTz);
   }

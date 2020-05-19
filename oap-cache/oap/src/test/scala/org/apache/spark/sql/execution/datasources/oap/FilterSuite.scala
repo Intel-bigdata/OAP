@@ -1419,21 +1419,21 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
     }
   }
 
-  test("filtering orc in FiberCache") {
-    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
-      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
-      data.toDF("key", "value").createOrReplaceTempView("t")
-      sql("insert overwrite table orc_test select * from t")
-      withIndex(TestIndex("orc_test", "index1")) {
-        sql("create oindex index1 on orc_test (a)")
-        checkAnswer(sql("SELECT * FROM orc_test WHERE a = 1"),
-          Row(1, "this is test 1") :: Nil)
-        checkAnswer(sql("SELECT * FROM orc_test WHERE a > 1 AND a <= 3"),
-          Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
-      }
-    }
-  }
+//  test("filtering orc in FiberCache") {
+//    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
+//      SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
+//      val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+//      data.toDF("key", "value").createOrReplaceTempView("t")
+//      sql("insert overwrite table orc_test select * from t")
+//      withIndex(TestIndex("orc_test", "index1")) {
+//        sql("create oindex index1 on orc_test (a)")
+//        checkAnswer(sql("SELECT * FROM orc_test WHERE a = 1"),
+//          Row(1, "this is test 1") :: Nil)
+//        checkAnswer(sql("SELECT * FROM orc_test WHERE a > 1 AND a <= 3"),
+//          Row(2, "this is test 2") :: Row(3, "this is test 3") :: Nil)
+//      }
+//    }
+//  }
 
   test("filtering parquet in FiberCache with partition") {
     withSQLConf("spark.sql.oap.parquet.data.cache.enable" -> "true") {

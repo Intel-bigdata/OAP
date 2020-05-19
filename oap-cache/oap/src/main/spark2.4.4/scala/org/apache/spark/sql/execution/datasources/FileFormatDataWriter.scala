@@ -38,7 +38,7 @@ import org.apache.spark.util.SerializableConfiguration
 abstract class FileFormatDataWriter(
     description: WriteJobDescription,
     taskAttemptContext: TaskAttemptContext,
-    committer: FileCommitProtocol) extends DataWriter[InternalRow] {
+    committer: FileCommitProtocol) {
   /**
    * Max number of files a single task writes out due to file size. In most cases the number of
    * files written should be very small. This is just a safe guard to protect some really bad
@@ -90,7 +90,7 @@ abstract class FileFormatDataWriter(
     }
   }
 
-  override def close(): Unit = {}
+   def close(): Unit = {}
 }
 
 /** FileFormatWriteTask for empty partitions */
@@ -319,10 +319,10 @@ class WriteJobDescription(
 
 /** The result of a successful write task. */
 case class WriteTaskResult(
-                            commitMsg: TaskCommitMessage,
-                            summary: ExecutedWriteSummary,
-                            writeResults: Seq[WriteResult])
-
+              commitMsg: TaskCommitMessage,
+              summary: ExecutedWriteSummary,
+              writeResults: Seq[WriteResult])
+  extends WriterCommitMessage
 /**
  * Wrapper class for the metrics of writing data out.
  *
