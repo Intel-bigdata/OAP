@@ -94,6 +94,10 @@ object ConverterUtils extends Logging {
         getAttrFromExpr(a.child)
       case a: NormalizeNaNAndZero =>
         getAttrFromExpr(a.child)
+      case c: Coalesce =>
+        getAttrFromExpr(c.children(0))
+      case i: IsNull =>
+        getAttrFromExpr(i.child)
       case other =>
         throw new UnsupportedOperationException(s"makeStructField is unable to parse from $other (${other.getClass}).")
     }

@@ -79,6 +79,15 @@ object ColumnarExpressionConverter extends Logging {
         colBranches,
         colElseValue,
         expr)
+    case c: Coalesce =>
+      check_if_no_calculation = false
+      logInfo(s"${expr.getClass} ${expr} is supported, no_cal is $check_if_no_calculation.")
+      val exps = c.children.map{ expr =>
+        replaceWithColumnarExpression(expr, attributeSeq)
+      }
+      ColumnarCoalesceOperator.create(
+        exps,
+        expr)
     case i: In =>
       check_if_no_calculation = false
       logInfo(s"${expr.getClass} ${expr} is supported, no_cal is $check_if_no_calculation.")
