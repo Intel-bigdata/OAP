@@ -1,21 +1,17 @@
-package com.intel.oap.common.storage;
+package com.intel.oap.common.storage.stream;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 public class ChunkOutputStream extends FileOutputStream {
 
-    private PMemManager pMemManager;
-    private ByteBuffer byteBuffer;
-    private PMemChunk currentBlock;
+    private ChunkWriter chunkWriter;
 
-    public ChunkOutputStream(String name, PMemManager pMemManager) throws FileNotFoundException {
+    public ChunkOutputStream(String name, DataStore dataStore) throws FileNotFoundException {
         super(name);
-        this.pMemManager = pMemManager;
-        this.byteBuffer = ByteBuffer.allocateDirect(100); // TODO
+        this.chunkWriter = dataStore.getChunkWriter(name.getBytes());
     }
 
     public void write(int b) throws IOException {
@@ -23,12 +19,7 @@ public class ChunkOutputStream extends FileOutputStream {
     }
 
     public void write(byte b[]) throws IOException {
-        byteBuffer.put(b); // TODO overflow
-        if(byteBuffer.remaining() == 0){
-            // FIXME prototype code
-//            currentBlock = pMemManager.pMemDataStore.getOutputChunkIterator().next();
-            currentBlock.writeDataToStore(b, -1, b.length);
-        }
+        chunkWriter.write(b);
     }
 
     /**
@@ -59,7 +50,7 @@ public class ChunkOutputStream extends FileOutputStream {
      * @spec JSR-51
      */
     public void close() throws IOException {
-        throw new RuntimeException("Unsupported Operation");
+        chunkWriter.close();
     }
 
     /**
