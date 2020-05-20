@@ -1,9 +1,13 @@
-package com.intel.oap.common.storage.stream;
+package com.intel.oap.common.storage.memkind;
+
+import com.intel.oap.common.storage.stream.MetaData;
+import com.intel.oap.common.storage.stream.PMemID;
+import com.intel.oap.common.storage.stream.PMemMetaStore;
 
 import java.util.concurrent.ConcurrentHashMap;
 
 //TODO design point, how to store data on PMEM
-public class PMDKMetaStore implements PMemMetaStore {
+public class MemkindMetaStore implements PMemMetaStore {
     ConcurrentHashMap<String, PMemID> PMemHashMap = new ConcurrentHashMap();
     ConcurrentHashMap<String, MetaData> metaHashMap = new ConcurrentHashMap();
 

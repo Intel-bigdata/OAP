@@ -1,7 +1,5 @@
 package com.intel.oap.common.storage.stream;
 
-import com.intel.oap.common.storage.backup.PMemManager;
-
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;

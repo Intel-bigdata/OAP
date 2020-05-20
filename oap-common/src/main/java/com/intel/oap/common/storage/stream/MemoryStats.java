@@ -1,4 +1,4 @@
-package com.intel.oap.common.storage.backup;
+package com.intel.oap.common.storage.stream;
 
 public class MemoryStats {
     private volatile long usedSize = 0;

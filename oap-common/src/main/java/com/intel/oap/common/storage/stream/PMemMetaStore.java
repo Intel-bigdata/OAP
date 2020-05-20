@@ -1,6 +1,5 @@
 package com.intel.oap.common.storage.stream;
 
-
 public interface PMemMetaStore {
      PMemID getPMemIDByLogicalID(byte[] id, int chunkID);
 

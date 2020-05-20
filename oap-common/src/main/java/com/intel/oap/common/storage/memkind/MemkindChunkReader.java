@@ -1,6 +1,8 @@
-package com.intel.oap.common.storage.stream;
+package com.intel.oap.common.storage.memkind;
 
-import com.intel.oap.common.storage.backup.PMemManager;
+import com.intel.oap.common.storage.stream.PMemManager;
+import com.intel.oap.common.storage.stream.ChunkReader;
+import com.intel.oap.common.storage.stream.PMemID;
 
 import java.nio.ByteBuffer;
 

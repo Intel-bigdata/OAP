@@ -1,7 +1,6 @@
-package com.intel.oap.common.storage.backup;
+package com.intel.oap.common.storage.stream;
 
-import com.intel.oap.common.storage.stream.PMDKMetaStore;
-import com.intel.oap.common.storage.stream.PMemMetaStore;
+import com.intel.oap.common.storage.memkind.MemkindMetaStore;
 
 import java.util.Properties;
 
@@ -38,7 +37,7 @@ public class PMemManager {
         chunkSize = Integer.valueOf(properties.getProperty("chunkSize"));
         long totalSize = Long.valueOf(properties.getProperty("totalSize"));
         stats = new MemoryStats(totalSize);
-        pMemMetaStore = new PMDKMetaStore();
+        pMemMetaStore = new MemkindMetaStore();
     }
 
     public void close(){

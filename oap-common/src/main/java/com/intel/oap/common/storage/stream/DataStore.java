@@ -1,6 +1,7 @@
 package com.intel.oap.common.storage.stream;
 
-import com.intel.oap.common.storage.backup.PMemManager;
+import com.intel.oap.common.storage.memkind.MemkindChunkReader;
+import com.intel.oap.common.storage.memkind.MemkindChunkWriter;
 
 //FIXME should new this by parameter instead of passing in by Spark
 /**

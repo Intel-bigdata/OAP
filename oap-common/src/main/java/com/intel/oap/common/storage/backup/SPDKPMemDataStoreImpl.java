@@ -1,5 +1,7 @@
 package com.intel.oap.common.storage.backup;
 
+import com.intel.oap.common.storage.stream.MemoryStats;
+
 import java.util.Iterator;
 
 @Deprecated

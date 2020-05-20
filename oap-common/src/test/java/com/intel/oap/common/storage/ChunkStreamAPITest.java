@@ -1,6 +1,6 @@
 package com.intel.oap.common.storage;
 
-import com.intel.oap.common.storage.backup.PMemManager;
+import com.intel.oap.common.storage.stream.PMemManager;
 import com.intel.oap.common.storage.stream.ChunkInputStream;
 import com.intel.oap.common.storage.stream.ChunkOutputStream;
 import com.intel.oap.common.storage.stream.DataStore;

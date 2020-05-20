@@ -1,7 +1,5 @@
 package com.intel.oap.common.storage.stream;
 
-import com.intel.oap.common.storage.backup.PMemManager;
-
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -81,10 +79,10 @@ public abstract class ChunkWriter {
         closeInternal();
     }
 
-    abstract PMemID writeInternal(ByteBuffer byteBuffer);
+    protected abstract PMemID writeInternal(ByteBuffer byteBuffer);
 
     /**
      * Do some clean up work if needed.
      */
-    abstract void closeInternal();
+    protected abstract void closeInternal();
 }
