@@ -157,11 +157,11 @@ function prepare_intel_arrow() {
   cd release
 
   #build libarrow, libplasma, libplasma_java
-  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-g -O3" -DCMAKE_CXX_FLAGS="-g -O3" -DARROW_BUILD_TESTS=on -DARROW_PLASMA_JAVA_CLIENT=on -DARROW_PLASMA=on -DARROW_DEPENDENCY_SOURCE=BUNDLED ..
+  cmake -DCMAKE_INSTALL_PREFIX=/usr/ -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-g -O3" -DCMAKE_CXX_FLAGS="-g -O3" -DARROW_BUILD_TESTS=on -DARROW_PLASMA_JAVA_CLIENT=on -DARROW_PLASMA=on -DARROW_DEPENDENCY_SOURCE=BUNDLED ..
   make -j$(nproc)
   make install -j$(nproc)
   cd $dev_path/thirdparty/arrow/java
-  mvn clean -q -DskipTests install
+  mvn clean -pl plasma -am -q -DskipTests install
 }
 
 

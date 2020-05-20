@@ -1029,14 +1029,13 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
   override def getIfPresent(fiber: FiberId): FiberCache = null
 
   override def getFibers: Set[FiberId] = {
-        val list : Array[Array[Byte]] =
-        plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).list();
-        cacheTotalCount = new AtomicLong(list.length)
-        logDebug("cache total size is " + cacheTotalCount)
-        list.toSet
-        fiberSet.foreach( fiber =>
-          if ( !list.contains(hash(fiber.toFiberKey()))) fiberSet.remove(fiber) )
-        fiberSet.toSet
+    val set : Set[Array[Byte]] =
+      plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).list().asScala.toSet
+    cacheTotalCount = new AtomicLong(set.size)
+    logDebug("cache total size is " + cacheTotalCount)
+    fiberSet.foreach( fiber =>
+      if ( !set.contains(hash(fiber.toFiberKey()))) fiberSet.remove(fiber) )
+    fiberSet.toSet
   }
 
   override def invalidate(fiber: FiberId): Unit = { }
