@@ -25,7 +25,6 @@ public class ChunkStreamAPITest {
 
     @Test
     public void testFileStreamReadWrite() throws IOException {
-        // TODO enabled me when code is ready
         String fileName = "target/test.file";
         byte[] data = new byte[]{'a', 'b', 'c'};
         ChunkOutputStream chunkoutputStream = new ChunkOutputStream(fileName, dataStore);
