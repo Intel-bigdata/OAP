@@ -1,4 +1,4 @@
-package com.intel.oap.common.storage;
+package com.intel.oap.common.storage.stream;
 
 public class MemoryStats {
     private volatile long usedSize = 0;
@@ -12,8 +12,8 @@ public class MemoryStats {
         usedSize += size;
     }
 
-    public long getTotalSize() {
-        return totalSize;
+    public synchronized long getRemainingSize() {
+        return totalSize - usedSize;
     }
 
     public synchronized long getUsedSize() {
