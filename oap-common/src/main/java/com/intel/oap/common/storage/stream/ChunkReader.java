@@ -17,14 +17,14 @@ public abstract class ChunkReader {
     public ChunkReader(byte[] logicalID, PMemManager pMemManager){
         this.logicalID = logicalID;
         this.pMemManager = pMemManager;
-        this.remainingBuffer = ByteBuffer.allocateDirect(pMemManager.getChunkSize());
+        this.remainingBuffer = ByteBuffer.wrap(new byte[pMemManager.getChunkSize()]);
         this.metaData = pMemManager.getpMemMetaStore().getMetaFooter(logicalID);
     }
 
     public int read(byte b[]) throws IOException {
         int i = 0;
         while(i < b.length){
-            if(remainingBuffer.remaining() < 0){
+            if(remainingBuffer.remaining() == 0){
                 loadToByteBuffer();
             }
             b[i] = remainingBuffer.get();

@@ -1,5 +1,6 @@
 package com.intel.oap.common.storage;
 
+import com.intel.oap.common.storage.stream.PMDKMetaStore;
 import com.intel.oap.common.storage.stream.PMemMetaStore;
 
 import java.util.Properties;
@@ -8,6 +9,8 @@ public class PMemManager {
     private MemoryStats stats;
 
     private PMemMetaStore pMemMetaStore;
+
+    private int chunkSize;
 
     public MemoryStats getStats() {
         return stats;
@@ -21,10 +24,6 @@ public class PMemManager {
         return pMemMetaStore;
     }
 
-    public void setpMemMetaStore(PMemMetaStore pMemMetaStore) {
-        this.pMemMetaStore = pMemMetaStore;
-    }
-
     private static class PMemManagerInstance{
         private static final PMemManager instance = new PMemManager();
     }
@@ -35,10 +34,11 @@ public class PMemManager {
     }
 
     public PMemManager(Properties properties){
-        //FIXME
-        long totalSize = Long.valueOf(properties.getProperty("totalsize"));
+        //FIXME how to get?
+        chunkSize = Integer.valueOf(properties.getProperty("chunkSize"));
+        long totalSize = Long.valueOf(properties.getProperty("totalSize"));
         stats = new MemoryStats(totalSize);
-        pMemMetaStore = new Me
+        pMemMetaStore = new PMDKMetaStore();
     }
 
     public void close(){
@@ -51,7 +51,7 @@ public class PMemManager {
 
 
     public int getChunkSize(){
-        return 10; //TODO get from configuration
+        return chunkSize; //TODO get from configuration
     }
 
 }

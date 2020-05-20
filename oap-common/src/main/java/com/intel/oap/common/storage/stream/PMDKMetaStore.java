@@ -4,25 +4,30 @@ import java.util.concurrent.ConcurrentHashMap;
 
 //TODO design point, how to store data on PMEM
 public class PMDKMetaStore implements PMemMetaStore {
-    ConcurrentHashMap<String, PMemID> concurrentHashMap = new ConcurrentHashMap();
+    ConcurrentHashMap<String, PMemID> PMemHashMap = new ConcurrentHashMap();
+    ConcurrentHashMap<String, MetaData> metaHashMap = new ConcurrentHashMap();
 
     @Override
     public PMemID getPMemIDByLogicalID(byte[] id, int chunkID) {
-        return null;
+        StringBuilder keyBuilder = new StringBuilder();
+        keyBuilder.append(chunkID).append(new String(id));
+        return PMemHashMap.get(keyBuilder.toString());
     }
 
     @Override
-    public PMemID putMetaFooter(byte[] id, MetaData metaData) {
-        return null;
+    public void putMetaFooter(byte[] id, MetaData metaData) {
+        metaHashMap.put(new String(id), metaData);
     }
 
     @Override
     public void putPMemID(byte[] id, int chunkID, PMemID pMemID) {
-
+        StringBuilder keyBuilder = new StringBuilder();
+        keyBuilder.append(chunkID).append(new String(id));
+        PMemHashMap.put(keyBuilder.toString(), pMemID);
     }
 
     @Override
     public MetaData getMetaFooter(byte[] id) {
-        return null;
+        return metaHashMap.get(new String(id));
     }
 }

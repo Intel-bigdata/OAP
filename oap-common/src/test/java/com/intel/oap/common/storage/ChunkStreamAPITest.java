@@ -15,23 +15,24 @@ public class ChunkStreamAPITest {
     DataStore dataStore;
 
     @Before
-    public void perpare(){
-        PMemManager pMemManager = new PMemManager();
-      dataStore = new DataStore(pMemManager);
+    public void prepare(){
+        Properties p = new Properties();
+        p.put("totalSize", "0");
+        p.put("chunkSize", "1");
+        PMemManager pMemManager = new PMemManager(p);
+        dataStore = new DataStore(pMemManager);
     }
 
     @Test
     public void testFileStreamReadWrite() throws IOException {
         // TODO enabled me when code is ready
         String fileName = "target/test.file";
-        Properties properties = new Properties();
-        properties.put("type", "SPDK");
         byte[] data = new byte[]{'a', 'b', 'c'};
-        ChunkOutputStream chunkoutputStream = new ChunkOutputStream(fileName, null);
+        ChunkOutputStream chunkoutputStream = new ChunkOutputStream(fileName, dataStore);
         chunkoutputStream.write(data);
         chunkoutputStream.close();
 
-        ChunkInputStream chunkInputStream = new ChunkInputStream(fileName);
+        ChunkInputStream chunkInputStream = new ChunkInputStream(fileName, dataStore);
         byte[] readData = new byte[3];
         chunkInputStream.read(readData);
         chunkInputStream.close();

@@ -17,8 +17,10 @@ public abstract class ChunkWriter {
     public ChunkWriter(byte[] logicalID, PMemManager pMemManager) {
         this.logicalID = logicalID;
         this.pMemManager = pMemManager;
-        this.remainingBuffer = ByteBuffer.allocateDirect(pMemManager.getChunkSize());
+//        this.remainingBuffer = ByteBuffer.allocateDirect(pMemManager.getChunkSize());
+        remainingBuffer = ByteBuffer.wrap(new byte[pMemManager.getChunkSize()]);
     }
+
 
     public void write(byte[] bytes) throws IOException {
         // FIXME optimize this by avoiding one-by-one add. A new data structure can used like simple array
@@ -58,33 +60,21 @@ public abstract class ChunkWriter {
     }
 
     private void flushToDisk(ByteBuffer byteBuffer) throws IOException {
-        try {
-            if (outputStream == null) {
-                //FIXME
-                outputStream = new FileOutputStream("/tmp/helloworld");
-            }
-            outputStream.write(byteBuffer.array());
-            byteBuffer.clear();
-        } catch (IOException e) {
-            throw e;
-        } finally {
-            if (outputStream != null) {
-                try {
-                    outputStream.close();
-                } catch (IOException e) {
-                    throw e;
-                }
-            }
+        if (outputStream == null) {
+            //FIXME
+            outputStream = new FileOutputStream("/tmp/helloworld");
+            fallbackTriggered = true;
         }
+        outputStream.write(byteBuffer.array());
+        byteBuffer.clear();
     }
 
     public void close() throws IOException {
         if(remainingBuffer.hasRemaining()){
             flushBufferByChunk(remainingBuffer);
         }
-        if(fallbackTriggered){
-            pMemManager.getpMemMetaStore().putMetaFooter(logicalID, new MetaData(fallbackTriggered, chunkID));
-        }
+        pMemManager.getpMemMetaStore().putMetaFooter(logicalID, new MetaData(fallbackTriggered, chunkID));
+
         closeInternal();
     }
 
