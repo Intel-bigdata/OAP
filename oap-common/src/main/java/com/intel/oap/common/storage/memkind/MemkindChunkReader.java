@@ -12,7 +12,7 @@ public class MemkindChunkReader extends ChunkReader {
     }
 
     @Override
-    int readFromPMem(PMemID id, ByteBuffer data) {
+    protected int readFromPMem(PMemID id, ByteBuffer data) {
         return 0;
     }
 }

@@ -65,5 +65,5 @@ public abstract class ChunkReader {
         return size;
     }
 
-    abstract int readFromPMem(PMemID id, ByteBuffer data);
+    protected abstract int readFromPMem(PMemID id, ByteBuffer data);
 }
