@@ -27,18 +27,20 @@ public abstract class ChunkWriter {
         if (bytes == null || bytes.length == 0) {
             return;
         }
-        int i = 0;
-        while(i < bytes.length){
-            if(remainingBuffer.position() == remainingBuffer.capacity()){
+        int i = 0, j = 0;
+        while (i < bytes.length) {
+            if (j == pMemManager.getChunkSize()) {
+                j = 0;
                 // Flush buffer through chunk writer
-                try {
-                    flushBufferByChunk(remainingBuffer);
-                } catch (IOException e) {
-                    throw new IOException(e);
-                }
+                flushBufferByChunk(remainingBuffer);
             }
             remainingBuffer.put(bytes[i]);
             i++;
+            j++;
+        }
+        if(j == pMemManager.getChunkSize()){
+            // Flush buffer through chunk writer
+            flushBufferByChunk(remainingBuffer);
         }
     }
 
