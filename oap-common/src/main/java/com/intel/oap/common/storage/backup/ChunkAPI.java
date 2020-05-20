@@ -1,6 +1,4 @@
-package com.intel.oap.common.storage.chunk;
-
-import com.intel.oap.common.storage.meta.Chunk;
+package com.intel.oap.common.storage.backup;
 
 public interface ChunkAPI {
     /**

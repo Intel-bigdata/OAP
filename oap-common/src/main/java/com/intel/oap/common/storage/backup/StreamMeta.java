@@ -1,5 +1,5 @@
 
-package com.intel.oap.common.storage;
+package com.intel.oap.common.storage.backup;
 
 public class StreamMeta {
     // logicalID of this Stream

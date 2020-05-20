@@ -1,12 +1,6 @@
-package com.intel.oap.common.storage;
-
-import com.intel.oap.common.storage.chunk.MemKindChunkAPIImpl;
-import com.intel.oap.common.storage.meta.Chunk;
-import com.intel.oap.common.storage.meta.FileChunk;
-import com.intel.oap.common.storage.stream.DataStore;
+package com.intel.oap.common.storage.backup;
 
 import java.util.Iterator;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class MemKindDataStoreImpl {
     //get this value from conf

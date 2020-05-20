@@ -1,4 +1,4 @@
-package com.intel.oap.common.storage.meta;
+package com.intel.oap.common.storage.backup;
 
 public enum ChunkType {
     PMDK, PLASMA, MEMKIND, SPDK

@@ -1,4 +1,4 @@
-package com.intel.oap.common.storage.meta;
+package com.intel.oap.common.storage.backup;
 
 
 // The entity to hold the chunk data. Provides the read/write methods

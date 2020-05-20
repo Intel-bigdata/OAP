@@ -1,6 +1,6 @@
 package com.intel.oap.common.storage.stream;
 
-import com.intel.oap.common.storage.PMemManager;
+import com.intel.oap.common.storage.backup.PMemManager;
 
 //FIXME should new this by parameter instead of passing in by Spark
 /**

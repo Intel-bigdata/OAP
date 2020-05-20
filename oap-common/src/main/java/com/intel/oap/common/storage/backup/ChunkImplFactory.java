@@ -1,8 +1,4 @@
-package com.intel.oap.common.storage.chunk;
-
-import com.intel.oap.common.storage.ChunkManager;
-import com.intel.oap.common.storage.meta.ChunkType;
-import com.intel.oap.common.storage.FileChunkImpl;
+package com.intel.oap.common.storage.backup;
 
 import java.util.Properties;
 

@@ -1,6 +1,4 @@
-package com.intel.oap.common.storage;
-
-import com.intel.oap.common.storage.meta.Chunk;
+package com.intel.oap.common.storage.backup;
 
 /**
  * expose methods for high level stream to write/read data from different backend

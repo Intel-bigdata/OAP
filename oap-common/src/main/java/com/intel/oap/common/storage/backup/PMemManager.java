@@ -1,4 +1,4 @@
-package com.intel.oap.common.storage;
+package com.intel.oap.common.storage.backup;
 
 import com.intel.oap.common.storage.stream.PMDKMetaStore;
 import com.intel.oap.common.storage.stream.PMemMetaStore;
