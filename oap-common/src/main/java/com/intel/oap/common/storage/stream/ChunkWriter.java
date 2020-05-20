@@ -29,7 +29,7 @@ public abstract class ChunkWriter {
         }
         int i = 0;
         while(i < bytes.length){
-            if(remainingBuffer.position() == remainingBuffer.limit()){
+            if(remainingBuffer.position() == remainingBuffer.capacity()){
                 // Flush buffer through chunk writer
                 try {
                     flushBufferByChunk(remainingBuffer);
@@ -37,6 +37,7 @@ public abstract class ChunkWriter {
                     throw new IOException(e);
                 }
             }
+            remainingBuffer.put(bytes[i]);
             i++;
         }
     }
