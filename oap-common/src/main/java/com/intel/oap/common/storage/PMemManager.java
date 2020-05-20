@@ -2,6 +2,8 @@ package com.intel.oap.common.storage;
 
 import com.intel.oap.common.storage.stream.PMemMetaStore;
 
+import java.util.Properties;
+
 public class PMemManager {
     private MemoryStats stats;
 
@@ -30,6 +32,13 @@ public class PMemManager {
     private PMemManager(){
         setStats(new MemoryStats(100));
 //        pMemDataStore = new MemKindDataStoreImpl(stats);
+    }
+
+    public PMemManager(Properties properties){
+        //FIXME
+        long totalSize = Long.valueOf(properties.getProperty("totalsize"));
+        stats = new MemoryStats(totalSize);
+        pMemMetaStore = new Me
     }
 
     public void close(){

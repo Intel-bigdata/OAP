@@ -2,13 +2,23 @@ package com.intel.oap.common.storage;
 
 import com.intel.oap.common.storage.stream.ChunkInputStream;
 import com.intel.oap.common.storage.stream.ChunkOutputStream;
+import com.intel.oap.common.storage.stream.DataStore;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Properties;
 
 public class ChunkStreamAPITest {
+
+    DataStore dataStore;
+
+    @Before
+    public void perpare(){
+        PMemManager pMemManager = new PMemManager();
+      dataStore = new DataStore(pMemManager);
+    }
 
     @Test
     public void testFileStreamReadWrite() throws IOException {
