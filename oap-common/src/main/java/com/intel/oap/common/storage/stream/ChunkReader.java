@@ -23,33 +23,48 @@ public abstract class ChunkReader {
 
     public int read(byte b[]) throws IOException {
         int i = 0;
-        while(i < b.length){
-            if(remainingBuffer.remaining() == 0){
-                loadToByteBuffer();
-            }
+        remainingBuffer.clear();
+        int remainingSize = loadData();
+        remainingBuffer.flip();
+        while (remainingSize > 0 && i < b.length) {
             b[i] = remainingBuffer.get();
             i++;
+            remainingSize--;
+            if (remainingSize == 0) {
+                remainingBuffer.clear();
+                remainingSize = loadData();
+                remainingBuffer.flip();
+            }
         }
+
         return i;
     }
 
-    private void loadToByteBuffer() throws IOException {
-        if(chunkID == metaData.getTotalChunk() && metaData.isHasDiskData()){
-            readFromDisk(remainingBuffer);
+    private int loadData() throws IOException {
+        int size = 0;
+        if (chunkID == metaData.getTotalChunk() && metaData.isHasDiskData()) {
+            size = readFromDisk(remainingBuffer);
+        } else {
+            PMemID id = pMemManager.getpMemMetaStore().getPMemIDByLogicalID(logicalID, chunkID);
+            chunkID++;
+            size = readFromPMem(id, remainingBuffer);
         }
-        PMemID id = pMemManager.getpMemMetaStore().getPMemIDByLogicalID(logicalID, chunkID);
-        readFromPMem(id, remainingBuffer);
+        return size;
     }
 
-    private void readFromDisk(ByteBuffer remainingBuffer) throws IOException {
-        inputStream = new FileInputStream("/tmp/helloworld");
+    private int readFromDisk(ByteBuffer remainingBuffer) throws IOException {
+        if (inputStream == null){
+            inputStream = new FileInputStream("/tmp/helloworld");
+        }
         byte b[] = new byte[pMemManager.getChunkSize()];
-        while (inputStream.available() != 0 && remainingBuffer.position() != remainingBuffer.limit()) {
-            int size = inputStream.read(b);
+        int size = 0;
+        if (inputStream.available() != 0) {
+            size = inputStream.read(b);
             for (int j = 0; j < size; j++) {
                 remainingBuffer.put(b[j]);
             }
         }
+        return size;
     }
 
     abstract int readFromPMem(PMemID id, ByteBuffer data);

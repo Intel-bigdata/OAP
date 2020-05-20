@@ -43,7 +43,7 @@ public abstract class ChunkWriter {
     }
 
     private void flushBufferByChunk(ByteBuffer byteBuffer) throws IOException {
-        int dataSizeInByte = byteBuffer.limit();
+        int dataSizeInByte = byteBuffer.position();
         if (!fallbackTriggered && pMemManager.getStats().getRemainingSize() > dataSizeInByte) {
             try {
                 PMemID id = writeInternal(byteBuffer);
