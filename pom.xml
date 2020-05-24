@@ -15,12 +15,12 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.intel</groupId>
-    <artifactId>oap</artifactId>
-    <version>0.8.0</version>
+    <groupId>com.intel.oap</groupId>
+    <artifactId>oap-parent</artifactId>
+    <version>0.9.0</version>
     <packaging>pom</packaging>
 
-    <name>OAP</name>
+    <name>OAP Project Parent POM</name>
     <url>https://github.com/Intel-bigdata/OAP</url>
 
     <licenses>

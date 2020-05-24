@@ -16,14 +16,15 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.intel</groupId>
-        <artifactId>oap</artifactId>
-        <version>0.8.0</version>
+        <groupId>com.intel.oap</groupId>
+        <artifactId>oap-parent</artifactId>
+        <version>0.9.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>oap-common</artifactId>
     <packaging>jar</packaging>
+    <name>OAP Project Common</name>
 
     <dependencies>
         <dependency>

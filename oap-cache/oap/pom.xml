@@ -16,16 +16,16 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.intel</groupId>
-    <artifactId>oap</artifactId>
-    <version>0.8.0</version>
+    <groupId>com.intel.oap</groupId>
+    <artifactId>oap-parent</artifactId>
+    <version>0.9.0</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
   <artifactId>oap-cache-oap</artifactId>
   <packaging>jar</packaging>
 
-  <name>OAP-CACHE-OAP</name>
+  <name>OAP Project Cache</name>
 
 
 
@@ -114,7 +114,7 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.intel</groupId>
+      <groupId>com.intel.oap</groupId>
       <artifactId>oap-common</artifactId>
       <version>${project.version}</version>
     </dependency>

@@ -1,0 +1,14 @@
+package:
+  name: oap
+  version: 0.9
+
+build:
+  number: 3
+
+requirements:
+  run:
+    - python
+    - vmemcache
+    - memkind
+about:
+  summary: This is a simple meta-package

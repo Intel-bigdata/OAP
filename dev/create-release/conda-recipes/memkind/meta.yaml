@@ -1,0 +1,15 @@
+package:
+  name: memkind
+  version: 1.0
+
+source:
+  path: ../../../thirdparty/memkind/
+
+requirements:
+  build:
+    - gcc   4.8.5
+    - autoconf
+    - automake
+    - libtool
+  run:
+    - libgcc [linux]
