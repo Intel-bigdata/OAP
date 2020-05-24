@@ -1,7 +1,5 @@
 # SparkColumnarPlugin
 
-This project is to enable columnar processing operators for spark sql, columnar processing will use Apache Arrow to allocate memory and evaluate with LLVM. 
-
 ## Contents
 
 - [Introduction](#introduction)
@@ -11,13 +9,17 @@ This project is to enable columnar processing operators for spark sql, columnar 
 
 ## Introduction
 
-#### Two key concepts of this project:
-1. Use arrow as column vector format as intermediate data among spark operator.
-2. Use Gandiva to evaluate columnar operator expressions.
+### Key concepts of this project:
+1. Using Apache Arrow as column vector format as intermediate data among spark operator.
+2. Enable Apache Arrow native readers for Parquet and other formats.
+3. Leverage Apache Arrow Gandiva/Compute to evaluate columnar operator expressions.
+4. (WIP)New native columnar shuffle operator with efficient compression support.
 
-![Overview](/oap-native-sql/resource/overview.jpg)
+![Overview](/oap-native-sql/resource/Native_SQL_Engine_Intro.jpg)
 
 ## Installation
+
+For detailed testing scripts, please refer to [solution guide](https://github.com/Intel-bigdata/Solution_navigator/tree/master/nativesql)
 
 ### Installation option 1: For evaluation, simple and fast
 
@@ -70,7 +72,6 @@ Download spark-sql_2.12-3.1.0-SNAPSHOT.jar to ${SPARK_HOME}/assembly/target/scal
 ``` shell
 Internal Location: vsr602://mnt/nvme2/chendi/000000/spark-sql_2.12-3.1.0-SNAPSHOT.jar
 ```
-===
 
 ### Installation option 2: For contribution, Patch and build
 
@@ -119,14 +120,11 @@ make install
 cd SparkColumnarPlugin/core/
 mvn clean package -DskipTests
 ```
-### Notes
+### Additonal Notes
 [Notes for Installation Issues](/oap-native-sql/resource/InstallationNotes.md)
   
 
-===
-
-
-## spark configuration
+## Spark Configuration
 
 Add below configuration to spark-defaults.conf
 
