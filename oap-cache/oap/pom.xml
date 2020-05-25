@@ -46,7 +46,7 @@
     <jetty.version>9.3.24.v20180605</jetty.version>
     <maven-antrun-plugin.version>1.8</maven-antrun-plugin.version>
     <!--diff: Spark-2.4.4 use orc 1.5.5 -->
-    <orc.version>1.5.5</orc.version>
+    <orc.version>1.5.9</orc.version>
     <exec.maven.version>1.6.0</exec.maven.version>
   </properties>
 
@@ -743,7 +743,7 @@
                 <source>src/main/spark2.4.4/java</source>
                 <source>src/main/spark2.4.4/scala</source>
                 <source>src/main/parquet1.10.1/java</source>
-                <source>src/main/orc-1.5.5-nohive/java</source>
+                <source>src/main/orc-1.5.9-nohive/java</source>
               </sources>
             </configuration>
           </execution>
