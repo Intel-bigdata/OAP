@@ -11,10 +11,12 @@ jobs:
       - sudo apt-get install libnuma-dev
       - sudo apt-get install cmake
       install:
-      - # Download spark 2.4.4
-      - "[ -f spark ] || mkdir spark && cd spark && wget http://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4-bin-hadoop2.7.tgz && cd .."
-      - "tar -xf ./spark/spark-2.4.4-bin-hadoop2.7.tgz"
-      - "export SPARK_HOME=`pwd`/spark-2.4.4-bin-hadoop2.7"
+      - # Download spark 3.0.0
+      - "[ -f spark ] || mkdir spark && cd spark
+      - "git clone -b rc1-add-hivethrift https://github.com/HongW2019/spark.git"
+      - "cd spark"
+      - "./build/mvn -DskipTests clean -Pyarn  -Phive-1.2 -Phive-thriftserver  install"
+      - "export SPARK_HOME=`pwd`/spark"
       before_script:
       - cd ${TRAVIS_BUILD_DIR}/dev
       - ./install_vmemcache.sh
