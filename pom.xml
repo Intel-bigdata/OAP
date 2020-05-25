@@ -17,7 +17,7 @@
 
     <groupId>com.intel</groupId>
     <artifactId>oap</artifactId>
-    <version>0..0</version>
+    <version>0.9.0</version>
     <packaging>pom</packaging>
 
     <name>OAP</name>

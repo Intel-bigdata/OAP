@@ -12,7 +12,7 @@ jobs:
       - sudo apt-get install cmake
       install:
       - # Download spark 3.0.0
-      - "[ -f spark ] || mkdir spark && cd spark
+      - "[ -f spark ] || mkdir spark && cd spark"
       - "git clone -b rc1-add-hivethrift https://github.com/HongW2019/spark.git"
       - "cd spark"
       - "./build/mvn -DskipTests clean -Pyarn  -Phive-1.2 -Phive-thriftserver  install"
