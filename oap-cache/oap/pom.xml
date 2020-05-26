@@ -268,7 +268,7 @@
     <dependency>
       <groupId>com.intel.arrow</groupId>
       <artifactId>arrow-plasma</artifactId>
-      <version>0.17.0-Beta</version>
+      <version>0.17.0</version>
     </dependency>
     <dependency>
       <groupId>org.antlr</groupId>
