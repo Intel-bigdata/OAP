@@ -178,5 +178,4 @@ function  prepare_all() {
   prepare_memkind
   prepare_cmake
   prepare_vmemcache
-  prepare_intel_arrow
 }
