@@ -18,7 +18,6 @@ jobs:
       before_script:
       - cd ${TRAVIS_BUILD_DIR}/dev
       - ./install_vmemcache.sh
-      - ./install_arrow.sh
       - ./install_memkind.sh
       script:
       - cd ${TRAVIS_BUILD_DIR}
