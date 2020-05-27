@@ -1,18 +1,18 @@
 package com.intel.oap.common.storage.memkind;
 
 import com.intel.oap.common.storage.stream.MetaData;
-import com.intel.oap.common.storage.stream.PMemID;
+import com.intel.oap.common.storage.stream.PMemPhysicalAddress;
 import com.intel.oap.common.storage.stream.PMemMetaStore;
 
 import java.util.concurrent.ConcurrentHashMap;
 
 //TODO design point, how to store data on PMEM
 public class MemkindMetaStore implements PMemMetaStore {
-    ConcurrentHashMap<String, PMemID> PMemHashMap = new ConcurrentHashMap();
+    ConcurrentHashMap<String, PMemPhysicalAddress> PMemHashMap = new ConcurrentHashMap();
     ConcurrentHashMap<String, MetaData> metaHashMap = new ConcurrentHashMap();
 
     @Override
-    public PMemID getPMemIDByLogicalID(byte[] id, int chunkID) {
+    public PMemPhysicalAddress getPMemIDByLogicalID(byte[] id, int chunkID) {
         StringBuilder keyBuilder = new StringBuilder();
         keyBuilder.append(chunkID).append(new String(id));
         return PMemHashMap.get(keyBuilder.toString());
@@ -24,10 +24,10 @@ public class MemkindMetaStore implements PMemMetaStore {
     }
 
     @Override
-    public void putPMemID(byte[] id, int chunkID, PMemID pMemID) {
+    public void putPMemID(byte[] id, int chunkID, PMemPhysicalAddress pMemPhysicalAddress) {
         StringBuilder keyBuilder = new StringBuilder();
         keyBuilder.append(chunkID).append(new String(id));
-        PMemHashMap.put(keyBuilder.toString(), pMemID);
+        PMemHashMap.put(keyBuilder.toString(), pMemPhysicalAddress);
     }
 
     @Override

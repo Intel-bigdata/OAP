@@ -46,7 +46,7 @@ public abstract class ChunkWriter {
         int dataSizeInByte = byteBuffer.position();
         if (!fallbackTriggered && pMemManager.getStats().getRemainingSize() > dataSizeInByte) {
             try {
-                PMemID id = writeInternal(byteBuffer);
+                PMemPhysicalAddress id = writeInternal(byteBuffer);
                 chunkID++;
                 pMemManager.getStats().increaseSize(dataSizeInByte);
                 pMemManager.getpMemMetaStore().putPMemID(logicalID, chunkID, id);
@@ -79,7 +79,7 @@ public abstract class ChunkWriter {
         closeInternal();
     }
 
-    protected abstract PMemID writeInternal(ByteBuffer byteBuffer);
+    protected abstract PMemPhysicalAddress writeInternal(ByteBuffer byteBuffer);
 
     /**
      * Do some clean up work if needed.
