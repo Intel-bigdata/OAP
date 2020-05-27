@@ -366,36 +366,44 @@ OAP now supports multiple cache strategies, which include `guava`, `vmemcache`, 
 Here we list 4 different kinds of configs for index/cache separation, if you choose one of them, please add corresponding configs to `spark-defaults.conf`.
 
 1. DRAM(`offheap`) as cache media, strategy `guava` as index and data cache backend. 
-  ```
-  spark.sql.oap.index.data.cache.separation.enable        true
-  spark.oap.cache.strategy                                mix
-  spark.sql.oap.fiberCache.memory.manager                 offheap
-  ```
+
+   ```
+   spark.sql.oap.index.data.cache.separation.enable        true
+   spark.oap.cache.strategy                                mix
+   spark.sql.oap.fiberCache.memory.manager                 offheap
+   ```
+
 2. DCPMM(`pm`) as cache media, strategy `guava` as index and data cache backend. 
-  ```
-  spark.sql.oap.index.data.cache.separation.enable        true
-  spark.oap.cache.strategy                                mix
-  spark.sql.oap.fiberCache.memory.manager                 pm
-  ```
+  
+   ```
+   spark.sql.oap.index.data.cache.separation.enable        true
+   spark.oap.cache.strategy                                mix
+   spark.sql.oap.fiberCache.memory.manager                 pm
+   ```
+
 3. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`pm`)/`guava` as `data` cache media and backend. 
-  ```
-  spark.sql.oap.index.data.cache.separation.enable        true
-  spark.oap.cache.strategy                                mix
-  spark.sql.oap.fiberCache.memory.manager                 mix 
-  spark.sql.oap.mix.index.memory.manager                  offheap
-  spark.sql.oap.mix.data.memory.manager                   pm
-  spark.sql.oap.mix.index.cache.backend                   guava
-  spark.sql.oap.mix.data.cache.backend                    guava
-  ```
+
+   ```
+   spark.sql.oap.index.data.cache.separation.enable        true
+   spark.oap.cache.strategy                                mix
+   spark.sql.oap.fiberCache.memory.manager                 mix 
+   spark.sql.oap.mix.index.memory.manager                  offheap
+   spark.sql.oap.mix.data.memory.manager                   pm
+   spark.sql.oap.mix.index.cache.backend                   guava
+   spark.sql.oap.mix.data.cache.backend                    guava
+   ```
+
 4. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`tmp`)/`vmem` as `data` cache media and backend. 
-  ```
-  spark.sql.oap.index.data.cache.separation.enable        true
-  spark.oap.cache.strategy                                mix
-  spark.sql.oap.fiberCache.memory.manager                 mix 
-  spark.sql.oap.mix.index.memory.manager                  offheap
-  spark.sql.oap.mix.index.cache.backend                   guava
-  spark.sql.oap.mix.data.cache.backend                    vmem
-  ```
+
+   ```
+   spark.sql.oap.index.data.cache.separation.enable        true
+   spark.oap.cache.strategy                                mix
+   spark.sql.oap.fiberCache.memory.manager                 mix 
+   spark.sql.oap.mix.index.memory.manager                  offheap
+   spark.sql.oap.mix.index.cache.backend                   guava
+   spark.sql.oap.mix.data.cache.backend                    vmem
+   ```
+
 ### Enabling Binary cache 
 We introduce binary cache for both Parquet and ORC file formats to improve cache space utilization compared to ColumnVector cache. When enabling binary cache, add the following configs to `spark-defaults.conf`.
 ```
@@ -424,35 +432,35 @@ We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigda
 The tool uses Python scripts to execute Beeline commands on the Spark Thrift Server. Install python 2.7+ on your working node.
 
 #### Prepare the Tool
-2. Download the [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/OAP-TPCDS-TOOL.zip)  and unzip to a folder (for example, OAP-TPCDS-TOOL folder) on your working node. 
-3. Copy OAP-TPCDS-TOOL/tools/tpcds-kits to ALL worker nodes under the same folder (for example, /home/oap/tpcds-kits).
+1. Download the [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/OAP-TPCDS-TOOL.zip)  and unzip to a folder (for example, OAP-TPCDS-TOOL folder) on your working node. 
+2. Copy OAP-TPCDS-TOOL/tools/tpcds-kits to ALL worker nodes under the same folder (for example, /home/oap/tpcds-kits).
 
 #### Generate TPC-DS Data
 
 1. Update the values for the following variables in OAP-TPCDS-TOOL/scripts/tool.conf based on your environment and needs.
-  - SPARK_HOME: Point to the Spark home directory of your Spark setup.
-  - TPCDS_KITS_DIR: The tpcds-kits directory you coped to the worker nodes in the above prepare process. For example, /home/oap/tpcds-kits
-  - NAMENODE_ADDRESS: Your HDFS Namenode address in the format of host:port.
-  - THRIFT_SERVER_ADDRESS: Your working node address on which you will run Thrift Server.
-  - DATA_SCALE: The data scale to be generated in GB
-  - DATA_FORMAT: The data file format. You can specify parquet or orc
+   - SPARK_HOME: Point to the Spark home directory of your Spark setup.
+   - TPCDS_KITS_DIR: The tpcds-kits directory you coped to the worker nodes in the above prepare process. For example, /home/oap/tpcds-kits
+   - NAMENODE_ADDRESS: Your HDFS Namenode address in the format of host:port.
+   - THRIFT_SERVER_ADDRESS: Your working node address on which you will run Thrift Server.
+   - DATA_SCALE: The data scale to be generated in GB
+   - DATA_FORMAT: The data file format. You can specify parquet or orc
 
-  The following is an example:
+   The following is an example:
 
-  ```
-  export SPARK_HOME=/home/oap/spark-2.4.4
-  export TPCDS_KITS_DIR=/home/oap/tpcds-kits
-  export NAMENODE_ADDRESS=mynamenode:9000
-  export THRIFT_SERVER_ADDRESS=mythriftserver
-  export DATA_SCALE=2
-  export DATA_FORMAT=parquet
-  ```
+   ```
+   export SPARK_HOME=/home/oap/spark-2.4.4
+   export TPCDS_KITS_DIR=/home/oap/tpcds-kits
+   export NAMENODE_ADDRESS=mynamenode:9000
+   export THRIFT_SERVER_ADDRESS=mythriftserver
+   export DATA_SCALE=2
+   export DATA_FORMAT=parquet
+   ```
 2. Start data generation
-  At the root directory of this tool, for example, OAP-TPCDS-TOOL folder, execute scripts/run_gen_data.sh to start the data generation process. 
-  ```
-  cd OAP-TPCDS-TOOL
-  sh ./scripts/run_gen_data.sh
-  ```
+   At the root directory of this tool, for example, OAP-TPCDS-TOOL folder, execute scripts/run_gen_data.sh to start the data generation process. 
+   ```
+   cd OAP-TPCDS-TOOL
+   sh ./scripts/run_gen_data.sh
+   ```
 Once finished, the data with $scale will be generated at HDFS folder genData$scale. And database with the name "tpcds$scale" will be created with the TPC-DS tables.
 
 #### Start Spark Thrift Server
