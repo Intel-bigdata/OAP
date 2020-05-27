@@ -6,8 +6,3 @@ Please refer the below documents for more information.
 * [Shuffle](./oap-shuffle/README.md)
 
 
-## Building OAP
-
-Please refer the below documents for more information.
-
-* [Dev](./dev/README.md)

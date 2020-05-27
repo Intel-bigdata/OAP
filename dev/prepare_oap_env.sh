@@ -29,11 +29,9 @@ function prepare_maven() {
     mkdir -p /usr/local/maven
     tar -xzvf apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
     mv apache-maven-$MAVEN_TARGET_VERSION/* /usr/local/maven
-    echo 'export MAVEN_HOME=/usr/local/maven' >>env.sh
-    echo 'export PATH=$MAVEN_HOME/bin:$PATH' >>env.sh
-    echo "Please source env.sh or copy it's contents to /etc/profile and source /etc/profile!"
-    export MAVEN_HOME=/usr/local/maven
-    export PATH=$MAVEN_HOME/bin:$PATH
+    echo 'export MAVEN_HOME=/usr/local/maven' >> ~/.bashrc
+    echo 'export PATH=$MAVEN_HOME/bin:$PATH' >> ~/.bashrc
+    source ~/.bashrc
     rm -rf apache-maven*
   fi
 }
@@ -83,7 +81,7 @@ function prepare_cmake() {
 }
 
 function prepare_memkind() {
-  memkind_repo="https://github.com/memkind/memkind.git"
+  memkind_repo="https://github.com/Intel-bigdata/memkind.git"
   echo $memkind_repo
 
   mkdir -p $DEV_PATH/thirdparty
@@ -93,6 +91,7 @@ function prepare_memkind() {
   fi
   cd memkind/
   git pull
+  git checkout v1.10.0-oap-0.7
 
   yum -y install autoconf
   yum -y install automake
@@ -133,49 +132,18 @@ function prepare_vmemcache() {
   sudo rpm -i libvmemcache*.rpm
 }
 
-function gather() {
-  cd  $DEV_PATH
-  mkdir -p target
-  cp ../oap-cache/oap/target/*.jar $DEV_PATH/target/
-  cp ../oap-shuffle/remote-shuffle/target/*.jar $DEV_PATH/target/
-  cp ../oap-common/target/*.jar $DEV_PATH/target/
-  find $DEV_PATH/target -name "*test*"|xargs rm -rf
-  echo "Please check the result in  $DEV_PATH/target !"
-}
-
-
-
-
-function prepare_intel_arrow() {
-  yum -y install libpthread-stubs0-dev
-  yum -y install libnuma-dev
-
-  #install vemecache
-  prepare_vmemcache
-
-  #install arrow and plasms
-  cd  $DEV_PATH/thirdparty
-  if [ ! -d "arrow" ]; then
-    git clone https://github.com/Intel-bigdata/arrow.git -b oap-master
-  fi
-  cd arrow
-  git pull
-  cd cpp
-  rm -rf release
-  mkdir -p release
-  cd release
-
-  #build libarrow, libplasma, libplasma_java
-  cmake -DCMAKE_INSTALL_PREFIX=/usr/ -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-g -O3" -DCMAKE_CXX_FLAGS="-g -O3" -DARROW_BUILD_TESTS=on -DARROW_PLASMA_JAVA_CLIENT=on -DARROW_PLASMA=on -DARROW_DEPENDENCY_SOURCE=BUNDLED ..
-  make -j$(nproc)
-  make install -j$(nproc)
-  cd  $DEV_PATH/thirdparty/arrow/java
-  mvn clean -pl plasma -am -q -DskipTests install
-}
 
 function  prepare_all() {
   prepare_maven
   prepare_memkind
   prepare_cmake
   prepare_vmemcache
+}
+
+function oap_build_help() {
+    echo " prepare_maven      = function to install Maven"
+    echo " prepare_memkind    = function to install Memkind"
+    echo " prepare_cmake      = function to install Cmake"
+    echo " prepare_vmemcache  = function to install Vmemcache"
+    echo " prepare_all        = function to install all the above"
 }
