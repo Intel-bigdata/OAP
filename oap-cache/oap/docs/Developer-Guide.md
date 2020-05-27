@@ -11,35 +11,35 @@
 #### Build
 OAP is built using [Apache Maven\*](http://maven.apache.org/).
 
-To clone OAP project, use
+Clone the OAP project:
 
 ```
 git clone -b branch-0.6-spark-2.4.4  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
-To build OAP package, use
+Build the OAP package:
 
 ```
 mvn clean -DskipTests package
 ```
 
-#### Running Test
+#### Run Tests
 
-To run all the tests, use
+Run all the tests:
 ```
 mvn clean test
 ```
-To run any specific test suite, for example `OapDDLSuite`, use
+Run a specific test suite, for example `OapDDLSuite`:
 ```
 mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite test
 ```
 **NOTE**: Log level of OAP unit tests currently default to ERROR, please override src/test/resources/log4j.properties if needed.
 
 
-#### Build OAP with Intel® Optane™ DC Persistent Memory
+#### Build OAP with Intel® Optane™ DC Persistent Memory Module
 
-To use OAP with DCPMM follow these steps:
+Follow these steps:
 
 ##### Prerequisites for building with DCPMM support
 
@@ -67,7 +67,7 @@ mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
 
 ## Integrate with Spark
 
-Although OAP acts as a plug-in ``.jar`` to Spark, there are still a few tricks to note when integrating with Spark. The OAP team explored using the Spark extension & data source API to deliver its core functionality. However, the limits of the Spark extension and data source API meant that we had to make some changes to Spark internals. As a result you must check whether your installation is an unmodified Community Spark or a customized Spark.
+Although OAP acts as a plug-in JAR to Spark, there are still a few tricks to note when integrating with Spark. The OAP team explored using the Spark extension & data source API to deliver its core functionality. However, the limits of the Spark extension and data source API meant that we had to make some changes to Spark internals. As a result you must check whether your installation is an unmodified Community Spark or a customized Spark.
 
 #### Integrate with Community Spark
 
@@ -114,25 +114,25 @@ The following files need to be checked/compared for changes:
 
 #### Rebuild Spark packages with NUMA binding patch 
 
-When using DCPMM as a cache medium, if you want to obtain optimum performance, you need to apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.4.numa.patch](./Spark.2.4.4.numa.patch) to Spark source code.
+When using DCPMM as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.4.numa.patch](./Spark.2.4.4.numa.patch) to Spark source code for best performance.
 
 1. Download src for [Spark-2.4.4](https://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4.tgz) and clone the src from github.
 
-2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) Spark package.
+2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) the Spark package.
 
 ```
 git apply  Spark.2.4.4.numa.patch
 ```
 
-3. When deploying OAP to Spark, please add below configuration item to Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable Numa binding.
+3. Add these configuration items to the Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable NUMA binding.
 
 ```
 spark.yarn.numa.enabled true 
 ```
-Note: If you are using a customized Spark, there may be conflicts in applying the patch, you may need to manually resolve the conflicts.
+**NOTE**: If you are using a customized Spark, you will need to manually resolve the conflicts.
 
 #### Use pre-built patched Spark packages 
 
-If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.4-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) with the patch applied.
+If you prefer, use our pre-built Spark [spark-2.4.4-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) with the patch applied.
 
 \*Other names and brands may be claimed as the property of others.
