@@ -2,7 +2,7 @@ package com.intel.oap.common.storage.memkind;
 
 import com.intel.oap.common.storage.stream.PMemManager;
 import com.intel.oap.common.storage.stream.ChunkWriter;
-import com.intel.oap.common.storage.stream.PMemID;
+import com.intel.oap.common.storage.stream.PMemPhysicalAddress;
 
 import java.nio.ByteBuffer;
 
@@ -12,7 +12,7 @@ public class MemkindChunkWriter extends ChunkWriter {
     }
 
     @Override
-    protected PMemID writeInternal(ByteBuffer byteBuffer) {
+    protected PMemPhysicalAddress writeInternal(ByteBuffer byteBuffer) {
         //TODO
         return null;
     }
