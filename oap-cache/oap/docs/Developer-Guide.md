@@ -1,15 +1,15 @@
 # OAP Developer Guide
 
-* [OAP Building](#OAP-Building)
-* [Integration with Spark](#integration-with-spark)
-* [Enable Numa binding for DCPMM in Spark](#enable-numa-binding-for-dcpmm-in-spark)
+* [Build OAP](#Build-OAP)
+* [Integrate with Spark\*](#integrate-with-spark)
+* [Enable NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enable-numa-binding-for-dcpmm-in-spark)
 
 
 
-## OAP Building
+## Build OAP
 
-#### Building
-OAP is built using [Apache Maven](http://maven.apache.org/).
+#### Build
+OAP is built using [Apache Maven\*](http://maven.apache.org/).
 
 To clone OAP project, use
 
@@ -37,13 +37,13 @@ mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite 
 **NOTE**: Log level of OAP unit tests currently default to ERROR, please override src/test/resources/log4j.properties if needed.
 
 
-#### OAP Building with DCPMM
+#### Build OAP with Intel® Optane™ DC Persistent Memory
 
-If you want to use OAP with DCPMM,  you can follow the below building steps.
+To use OAP with DCPMM follow these steps:
 
 ##### Prerequisites for building with DCPMM support
 
-You  need to install the required packages on the build system listed below.
+Install the required packages on the build system:
 
 - gcc-c++
 - [cmake](https://help.directadmin.com/item.php?id=494)
@@ -51,33 +51,33 @@ You  need to install the required packages on the build system listed below.
 - [vmemcache](https://github.com/pmem/vmemcache)
 
 
-##### Building package
-You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache stratege, you need to build with -Ppersistent-memory also.
+##### Build the package
+You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache strategy, you need to build with -Ppersistent-memory also.
 ```
 mvn clean -q -Ppersistent-memory -DskipTests package
 ```
-for vmemcache cache strategy, please build with command:
+For vmemcache cache strategy, please build with command:
 ```
 mvn clean -q -Pvmemcache -DskipTests package
 ```
-You can build with command to use all of them:
+Build with this command to use all of them:
 ```
 mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
 ```
 
-## Integration with Spark
+## Integrate with Spark
 
-Although OAP acts as a plugin jar to Spark, there are still a few tricks to note when integration with Spark. Basically, OAP explored Spark extension & data source API to perform its core functionality. But there are other functionality aspects that cannot achieved by Spark extension and data source API. We made a few improvements or changes to the Spark internals to achieve the functionality. So when integrating OAP on Spark, you need to check whether you are running an unmodified Community Spark or a modified customized Spark.
+Although OAP acts as a plug-in ``.jar`` to Spark, there are still a few tricks to note when integrating with Spark. The OAP team explored using the Spark extension & data source API to deliver its core functionality. However, the limits of the Spark extension and data source API meant that we had to make some changes to Spark internals. As a result you must check whether your installation is an unmodified Community Spark or a customized Spark.
 
 #### Integrate with Community Spark
 
-If you are running an Community Spark, things will be much simple. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
+If you are running a Community Spark, things will be much simpler. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to work with OAP.
 
 #### Integrate with customized Spark
 
-It will be more complicated to integrate OAP with a customized Spark. Steps needed for this case is to check whether the OAP changes of Spark internals will conflict or override with your private changes. 
+In this case check whether the OAP changes of Spark internals will conflict with or override your private changes. 
 - If no conflicts or overrides happens, the steps are the same as the steps of unmodified version of Spark described above. 
-- If conflicts or overrides happen, you need to have a merge plan of the source code to make sure the code changes you made in a Spark source file appears in the corresponding file included in OAP project. Once merged, you need to rebuild OAP.
+- If there are conflicts or overrides, develop a merge plan of the source code to make sure the code changes you made in to the Spark source appear in the corresponding file included in OAP the project. Once merged, rebuild OAP.
 
 The following files need to be checked/compared for changes:
 
@@ -110,11 +110,11 @@ The following files need to be checked/compared for changes:
 		Add the get and set method for the changed protected variable.
 ```
 
-## Enable Numa binding for DCPMM in Spark
+## Enable NUMA binding for DCPMM in Spark
 
-#### Rebuild Spark packages with Numa binding patch 
+#### Rebuild Spark packages with NUMA binding patch 
 
-When using DCPMM as a cache medium, if you want to obtain optimum performance, you need to apply the [Numa](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.4.numa.patch](./Spark.2.4.4.numa.patch) to Spark source code.
+When using DCPMM as a cache medium, if you want to obtain optimum performance, you need to apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.4.numa.patch](./Spark.2.4.4.numa.patch) to Spark source code.
 
 1. Download src for [Spark-2.4.4](https://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4.tgz) and clone the src from github.
 
@@ -135,4 +135,4 @@ Note: If you are using a customized Spark, there may be conflicts in applying th
 
 If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.4-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) with the patch applied.
 
-
+\*Other names and brands may be claimed as the property of others.
