@@ -2,7 +2,7 @@
 
 OAP is an optimized implementation of several kinds of packages for Spark  including cache, shuffle, and others. Please refer to these documents for more information:
 
-* [Cache](./oap-cache/README.md)
+* [Cache](./oap-cache/oap/README.md)
 * [Shuffle](./oap-shuffle/README.md)
 * [Common](./oap-common/README.md)
 

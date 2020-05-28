@@ -931,6 +931,7 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
     OapRuntime.getOrCreate.fiberCacheManager.getEmptyDataFiberCache(fiberLength)
 
   var fiberSet = scala.collection.mutable.Set[FiberId]()
+  val cacheReadOnlyEnbale = conf.get(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLE)
   val clientPoolSize = conf.get(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE)
   val clientRoundRobin = new AtomicInteger(0)
   val plasmaClientPool = new Array[ plasma.PlasmaClient](clientPoolSize)
@@ -995,18 +996,22 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
       cacheGuardian.addRemovalFiber(fiberId, fiberCache)
       fiberCache
     } else {
-      val fiberCache = cache(fiberId)
-      cacheMissCount.addAndGet(1)
-      fiberSet.add(fiberId)
-      fiberCache.occupy()
-      cacheGuardian.addRemovalFiber(fiberId, fiberCache)
-      fiberCache
+      if (cacheReadOnlyEnbale) {
+        val fiberCache = cache(fiberId)
+        cacheMissCount.addAndGet(1)
+        fiberSet.add(fiberId)
+        fiberCache.occupy()
+        cacheGuardian.addRemovalFiber(fiberId, fiberCache)
+        fiberCache
+      } else {
+        val fiberCache = super.cache(fiberId)
+        fiberCache
+      }
     }
   }
 
   override def cache(fiberId: FiberId): FiberCache = {
     val fiber = super.cache(fiberId)
-    fiber.fiberId = fiberId
 
     val objectId = hash(fiberId.toString)
     if( !contains(fiberId)) {

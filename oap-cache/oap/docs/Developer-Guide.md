@@ -1,43 +1,41 @@
-# OAP Developer Guide
+# OAP-Cache Developer Guide
 
-* [Build OAP](#Build-OAP)
+* [Build OAP-Cache](#Build-OAP-Cache)
 * [Integrate with Spark\*](#integrate-with-spark)
 * [Enable NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enable-numa-binding-for-dcpmm-in-spark)
 
-
-
-## Build OAP
+## Build OAP-Cache
 
 #### Build
-OAP is built using [Apache Maven\*](http://maven.apache.org/).
+
+OAP-Cache is built using [Apache Maven\*](http://maven.apache.org/).
 
 Clone the OAP project:
 
 ```
-git clone -b branch-0.6-spark-2.4.4  https://github.com/Intel-bigdata/OAP.git
+git clone -b branch-0.8-spark-2.4.4  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
-Build the OAP package:
+Build the OAP-Cache package:
 
 ```
-mvn clean -DskipTests package
+mvn clean -pl com.intel.oap:oap-cache -am package
 ```
 
 #### Run Tests
 
 Run all the tests:
 ```
-mvn clean test
+mvn clean -pl com.intel.oap:oap-cache -am test
 ```
 Run a specific test suite, for example `OapDDLSuite`:
 ```
 mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite test
 ```
-**NOTE**: Log level of OAP unit tests currently default to ERROR, please override src/test/resources/log4j.properties if needed.
+**NOTE**: Log level of OAP-Cache unit tests currently default to ERROR, please override oap-cache/oap/src/test/resources/log4j.properties if needed.
 
-
-#### Build OAP with Intel® Optane™ DC Persistent Memory Module
+#### Build OAP-Cache with Intel® Optane™ DC Persistent Memory Module
 
 Follow these steps:
 
@@ -47,36 +45,37 @@ Install the required packages on the build system:
 
 - gcc-c++
 - [cmake](https://help.directadmin.com/item.php?id=494)
-- [Memkind](https://github.com/memkind/memkind)
+- [Memkind](https://github.com/Intel-bigdata/memkind)
 - [vmemcache](https://github.com/pmem/vmemcache)
 
 
 ##### Build the package
 You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache strategy, you need to build with -Ppersistent-memory also.
 ```
-mvn clean -q -Ppersistent-memory -DskipTests package
+mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -DskipTests package
 ```
 For vmemcache cache strategy, please build with command:
 ```
-mvn clean -q -Pvmemcache -DskipTests package
+mvn clean -q -pl com.intel.oap:oap-cache -am -Pvmemcache -DskipTests package
 ```
 Build with this command to use all of them:
 ```
-mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
+mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -Pvmemcache -DskipTests package
 ```
 
 ## Integrate with Spark
 
-Although OAP acts as a plug-in JAR to Spark, there are still a few tricks to note when integrating with Spark. The OAP team explored using the Spark extension & data source API to deliver its core functionality. However, the limits of the Spark extension and data source API meant that we had to make some changes to Spark internals. As a result you must check whether your installation is an unmodified Community Spark or a customized Spark.
+Although OAP-Cache acts as a plug-in JAR to Spark, there are still a few tricks to note when integrating with Spark. The OAP team explored using the Spark extension & data source API to deliver its core functionality. However, the limits of the Spark extension and data source API meant that we had to make some changes to Spark internals. As a result you must check whether your installation is an unmodified Community Spark or a customized Spark.
 
 #### Integrate with Community Spark
 
-If you are running a Community Spark, things will be much simpler. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to work with OAP.
+If you are running a Community Spark, things will be much simpler. Refer to [OAP-Cache User Guide](OAP-Cache-User-Guide.md) to configure and setup Spark to work with OAP.
 
 #### Integrate with customized Spark
 
-In this case check whether the OAP changes of Spark internals will conflict with or override your private changes. 
-- If no conflicts or overrides happens, the steps are the same as the steps of unmodified version of Spark described above. 
+In this case check whether the OAP-Cache changes to Spark internals will conflict with or override your private changes. 
+
+- If there are no conflicts or overrides, the steps are the same as the steps of unmodified version of Spark described above. 
 - If there are conflicts or overrides, develop a merge plan of the source code to make sure the code changes you made in to the Spark source appear in the corresponding file included in OAP the project. Once merged, rebuild OAP.
 
 The following files need to be checked/compared for changes:
@@ -125,6 +124,7 @@ git apply  Spark.2.4.4.numa.patch
 ```
 
 3. Add these configuration items to the Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable NUMA binding.
+
 
 ```
 spark.yarn.numa.enabled true 

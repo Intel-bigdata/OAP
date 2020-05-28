@@ -1,32 +1,34 @@
-# OAP User Guide
+# OAP-Cache User Guide
 
 * [Prerequisites](#Prerequisites)
-* [Getting Started with OAP](#Getting-Started-with-OAP)
+* [Getting Started with OAP-Cache](#Getting-Started-with-OAP-Cache)
 * [Configuration for YARN Cluster Mode](#Configuration-for-YARN-Cluster-Mode)
 * [Configuration for Spark Standalone Mode](#Configuration-for-Spark-Standalone-Mode)
-* [Working with OAP Index](#Working-with-OAP-Index)
-* [Working with OAP Cache](#Working-with-OAP-Cache)
-* [Run TPC-DS Benchmark for OAP Cache](#Run-TPC-DS-Benchmark-for-OAP-Cache)
+* [Working with OAP-Cache Index](#Working-with-OAP-Cache-Index)
+* [Working with OAP-Cache Cache](#Working-with-OAP-Cache)
+* [Run TPC-DS Benchmark for OAP-Cache Cache](#Run-TPC-DS-Benchmark-for-OAP-Cache)
 
 
 ## Prerequisites
-Before getting started with OAP on Spark\*, you should have set up a working Hadoop\* cluster with YARN\* and Spark. Running Spark on YARN requires a binary distribution of Spark which is built with YARN support. If you don't want to build Spark by yourself, we have a pre-built Spark-2.4.4, you can download [Spark-2.4.4](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) and setup Spark on your working node.
+<<<<<<< HEAD:oap-cache/oap/docs/OAP-User-Guide.md
+Before getting started with OAP-Cache on Spark\*, you should have set up a working Hadoop\* cluster with YARN\* and Spark. Running Spark on YARN requires a binary distribution of Spark which is built with YARN support. If you don't want to build Spark by yourself, we have a pre-built Spark-2.4.4, you can download [Spark-2.4.4](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) and setup Spark on your working node.
 ## Getting Started with OAP
 ### Building OAP
-We have a pre-built OAP, you can download [OAP-0.7.0 for Spark 2.4.4 jar](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/oap-0.6.1-with-spark-2.4.4.jar) to your working node and put the OAP JAR to your working directory such as `/home/oap/jars/`. If you’d like to build OAP from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+We have a pre-built OAP-Cache you can download [OAP-0.7.0 for Spark 2.4.4 jar](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/oap-0.6.1-with-spark-2.4.4.jar) to your working node. Unzip it and put the JARS in your working directory (`/home/oap/jars/`), and place the oap-common-\<version\>.jar in the `$SPARK_HOME/jars/` directory. If you’d like to build OAP-Cache from source code, please refer to the [Developer Guide](Developer-Guide.md) for the detailed steps. 
 ### Spark Configurations for OAP
+
 Users usually test and run Spark SQL or Scala scripts in Spark Shell which launches Spark applications on YRAN with ***client*** mode. In this section, we will start with Spark Shell then introduce other use scenarios. 
 
-Before you run ` . $SPARK_HOME/bin/spark-shell `, you need to configure Spark for OAP integration. You need to add or update the following configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
+Before you run ` . $SPARK_HOME/bin/spark-shell `, you need to configure Spark for OAP-Cache integration. You need to add or update the following configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
 
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
-spark.files                       /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar     # absolute path of OAP jar on your working node
-spark.executor.extraClassPath     ./oap-0.7.0-with-spark-2.4.4.jar                  # relative path of OAP jar
-spark.driver.extraClassPath       /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar     # absolute path of OAP jar on your working node
+spark.files                       /home/oap/jars/oap-cache-0.8.0-with-spark-2.4.4.jar     # absolute path of OAP-Cache jar on your working node
+spark.executor.extraClassPath     ./oap-cache-0.8.0-with-spark-2.4.4.jar                  # relative path of OAP-Cache jar
+spark.driver.extraClassPath       /home/oap/jars/oap-cache-0.8.0-with-spark-2.4.4.jar     # absolute path of OAP-Cache jar on your working node
 ```
-### Verify Spark with OAP Integration 
-After configuration, you can follow the below steps and verify the OAP integration is working using Spark Shell.
+### Verify Spark with OAP-Cache Integration 
+After configuration, you can follow the below steps and verify the OAP-Cache integration is working using Spark Shell.
 
 Step 1. Create a test data path on your HDFS. Take data path `hdfs:///user/oap/` for example.
 ```
@@ -36,7 +38,7 @@ Step 2. Launch Spark Shell using the following command on your working node.
 ```
 . $SPARK_HOME/bin/spark-shell
 ```
-Steps 3. In Spark Shell, execute the following commands to test OAP integration. 
+Steps 3. In Spark Shell, execute the following commands to test OAP-Cache integration. 
 ```
 > spark.sql(s"""CREATE TABLE oap_test (a INT, b STRING)
        USING parquet
@@ -51,27 +53,29 @@ The test creates an index on a table and then show the created index. If there i
 ![Spark_shell_running_results](./image/spark_shell_oap.png)
 
 ## Configuration for YARN Cluster Mode
-Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client*** mode. While Spark Submit tool can run Spark application in ***client*** or ***cluster*** mode deciding by --deploy-mode parameter. [Getting Started with OAP](#Getting-Started-with-OAP) session has shown the configurations needed for ***client*** mode. If you are running Spark Submit tool in ***cluster*** mode, you need to follow the below configuration steps instead.
+Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client*** mode. While Spark Submit tool can run Spark application in ***client*** or ***cluster*** mode deciding by --deploy-mode parameter. [Getting Started with OAP-Cache](#Getting-Started-with-OAP-Cache) session has shown the configurations needed for ***client*** mode. If you are running Spark Submit tool in ***cluster*** mode, you need to follow the below configuration steps instead.
 
-Before run `spark-submit` with ***cluster*** mode, you should add below OAP configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
+Before run `spark-submit` with ***cluster*** mode, you should add below OAP-Cache configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
-spark.files                       /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar        # absolute path on your working node    
-spark.executor.extraClassPath     ./oap-0.7.0-with-spark-2.4.4.jar                     # relative path 
-spark.driver.extraClassPath       ./oap-0.7.0-with-spark-2.4.4.jar                     # relative path
+spark.files                       /home/oap/jars/oap-cache-0.8.0-with-spark-2.4.4.jar        # absolute path on your working node    
+spark.executor.extraClassPath     ./oap-cache-0.8.0-with-spark-2.4.4.jar                     # relative path 
+spark.driver.extraClassPath       ./oap-cache-0.8.0-with-spark-2.4.4.jar                     # relative path
 ```
 
 ## Configuration for Spark Standalone Mode
-In addition to running on the YARN cluster manager, Spark also provides a simple standalone deploy mode. If you are using Spark in Spark Standalone mode, you need to copy the OAP JAR to **all** the worker nodes. And then set the following configurations in “$SPARK_HOME/conf/spark-defaults” on working node.
+<<<<<<< HEAD:oap-cache/oap/docs/OAP-User-Guide.md
+In addition to running on the YARN cluster manager, Spark also provides a simple standalone deploy mode. If you are using Spark in Spark Standalone mode, copy the OAP-Cache JAR to **all** the worker nodes. Then set the following configurations in “$SPARK_HOME/conf/spark-defaults” on working node.
+
 ```
 spark.sql.extensions               org.apache.spark.sql.OapExtensions
-spark.executor.extraClassPath      /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar      # absolute path on worker nodes
-spark.driver.extraClassPath        /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar      # absolute path on worker nodes
+spark.executor.extraClassPath      /home/oap/jars/oap-cache-0.8.0-with-spark-2.4.4.jar      # absolute path on worker nodes
+spark.driver.extraClassPath        /home/oap/jars/oap-cache-0.8.0-with-spark-2.4.4.jar      # absolute path on worker nodes
 ```
 
-## Working with OAP Index
+## Working with OAP-Cache Index
 
-After a successful OAP integration, you can use OAP SQL DDL to manage table indexes. The DDL operations include index create, drop, refresh and show. You can run Spark Shell to try and test these functions. The below index examples based on an example table created by the following commands in Spark Shell.
+After a successful OAP-Cache integration, you can use OAP-Cache SQL DDL to manage table indexes. The DDL operations include index create, drop, refresh and show. You can run Spark Shell to try and test these functions. The below index examples based on an example table created by the following commands in Spark Shell.
 
 ```
 > spark.sql(s"""CREATE TABLE oap_test (a INT, b STRING)
@@ -96,7 +100,7 @@ Use SHOW OINDEX command to show all the created indexes on a specified table. Fo
 ```
 > spark.sql("show oindex from oap_test").show()
 ```
-### Use OAP Index
+### Use OAP-Cache Index
 Using index in query is transparent. When the SQL queries have filter conditions on the column(s) which can take advantage to use the index to filter the data scan, the index will be automatically applied to the execution of Spark SQL. The following example will automatically use the underlayer index created on column "a".
 ```
 > spark.sql("SELECT * FROM oap_test WHERE a = 1").show()
@@ -109,7 +113,7 @@ Use DROP OINDEX command to drop a named index.
 
 ## Working with OAP Cache
 
-OAP is capable to provide input data cache functionality in executor. Considering utilizing the cache data among different SQL queries, we should configure to allow different SQL queries to use the same executor process. This can be achieved by running your queries through Spark ThriftServer. The below steps assume to use Spark ThriftServer. For cache media, we support both DRAM and Intel DCPMM which means you can choose to cache data in DRAM or Intel DCPMM if you have DCPMM configured in hardware.
+OAP-Cache is capable to provide input data cache functionality in executor. Considering utilizing the cache data among different SQL queries, we should configure to allow different SQL queries to use the same executor process. This can be achieved by running your queries through Spark ThriftServer. The below steps assume to use Spark ThriftServer. For cache media, we support both DRAM and Intel DCPMM which means you can choose to cache data in DRAM or Intel DCPMM if you have DCPMM configured in hardware.
 
 ### Use DRAM Cache 
 Step 1. Make the following configuration changes in Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf`. 
@@ -127,7 +131,7 @@ You should change the parameter `spark.sql.oap.fiberCache.offheap.memory.size` v
 
 Step 2. Launch Spark ***ThriftServer***
 
-After configuration, you can launch Spark Thift Server. And use Beeline command line tool to connect to the Thrift Server to execute DDL or DML operations. And the data cache will automatically take effect for Parquet or ORC file sources. To help you to do a quick verification of cache functionality, below steps will reuse database metastore created in the [Working with OAP Index](#Working-with-OAP-Index) which contains `oap_test` table definition. In production, Spark Thrift Server will have its own metastore database directory or metastore service and use DDL's  through Beeline for creating your tables.
+After configuration, you can launch Spark Thift Server. And use Beeline command line tool to connect to the Thrift Server to execute DDL or DML operations. And the data cache will automatically take effect for Parquet or ORC file sources. To help you to do a quick verification of cache functionality, below steps will reuse database metastore created in the [Working with OAP-Cache Index](#Working-with-OAP-Cache-Index) which contains `oap_test` table definition. In production, Spark Thrift Server will have its own metastore database directory or metastore service and use DDL's  through Beeline for creating your tables.
 
 When you run ```spark-shell``` to create table `oap_test`, `metastore_db` will be created in the directory from which you run '$SPARK_HOME/bin/spark-shell'. Go the same directory you ran Spark Shell and then execute the following command to launch Thrift JDBC server.
 ```
@@ -154,14 +158,14 @@ Step 4. Run queries on table which will use the cache automatically. For example
 > SELECT * FROM oap_test WHERE a = 3;
 ...
 ```
-Step 5. To verify that the cache functionality is in effect, you can open Spark History Web UI and go to OAP tab page. And check the cache metrics. The following picture is an example.
+Step 5. To verify that the cache functionality is in effect, you can open Spark History Web UI and go to OAP-Cache tab page. And check the cache metrics. The following picture is an example.
 
 ![webUI](./image/webUI.png)
 
 
 ### Use DCPMM Cache 
 #### Prerequisites
-Before configuring in OAP to use DCPMM cache, you need to make sure the following:
+Before configuring in OAP-Cache to use DCPMM cache, you need to make sure the following:
 
 - DCPMM hardwares are installed, formatted and mounted correctly on every cluster worker node with AppDirect mode(refer [guide](https://software.intel.com/en-us/articles/quick-start-guide-configure-intel-optane-dc-persistent-memory-on-linux)). You will get a mounted directory to use if you have done this. Usually, the DCPMM on each socket will be mounted as a directory. For example, on a two sockets system, we may get two mounted directories named `/mnt/pmem0` and `/mnt/pmem1`.
 ```
@@ -205,7 +209,7 @@ Above file systems are generated for 2 numa nodes, which can be checked by "numa
      make package
      sudo rpm -i libvmemcache*.rpm
 ```
-- OAP use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries. [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support DCPMM, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. You can run follow commands to install libarrow.so, libplasma.so, libplasma_java.so, plasma-store-server, arrow-plasma.jar to your machine:
+- OAP-Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries. [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support DCPMM, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. You can run follow commands to install libarrow.so, libplasma.so, libplasma_java.so, plasma-store-server, arrow-plasma.jar to your machine:
 ```
     git clone https://github.com/Intel-bigdata/arrow.git
     cd arrow
@@ -219,6 +223,7 @@ Above file systems are generated for 2 numa nodes, which can be checked by "numa
     cd ../../java
     mvn clean -q -DskipTests install
 ``` 
+Or you can refer [OAP-Cache-Developer-Guide](../../../docs/Developer-Guide.md), there is a shell script to help you  install these dependencies automatically.
 
 #### Configure for NUMA
 To achieve the optimum performance, we need to configure NUMA for binding executor to NUMA node and try access the right DCPMM device on the same NUMA node. You need install numactl on each worker node. For example, on CentOS, run following command to install numactl.
@@ -242,7 +247,7 @@ Create a configuration file named “persistent-memory.xml” under "$SPARK_HOME
   </numanode>
 </persistentMemoryPool>
 ```
-#### Configure for Spark/OAP to enable DCPMM cache
+#### Configure for Spark/OAP-Cache to enable DCPMM cache
 Make the following configuration changes in Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf`.
 
 ```
@@ -253,15 +258,16 @@ spark.memory.offHeap.enabled                               false
 spark.speculation                                          false
 spark.sql.oap.fiberCache.persistent.memory.initial.size    256g            # DCPMM capacity per executor
 spark.sql.oap.fiberCache.persistent.memory.reserved.size   50g             # Reserved space per executor
-spark.sql.extensions                  org.apache.spark.sql.OapExtensions   # Enable OAP jar in Spark
+spark.sql.extensions                  org.apache.spark.sql.OapExtensions   # Enable OAP-Cache jar in Spark
 ```
-***Also need to add OAP JAR absolute file path in spark.executor.extraClassPath and spark.driver.extraClassPath.***
+
+***Also need to add OAP-Cache JAR absolute file path in spark.executor.extraClassPath and spark.driver.extraClassPath.***
 
 Change the value for spark.executor.instances, spark.sql.oap.fiberCache.persistent.memory.initial.size, and spark.sql.oap.fiberCache.persistent.memory.reserved.size according to your real environment. 
 
 - spark.executor.instances: Configure the value to 2x the number of worker nodes if NUMA binding is enabled. With each worker node runs two executors, each executor will be bound to one of the two sockets. And accesses the corresponding Intel® Optane™ DC Persistent Memory device on that socket.
 - spark.sql.oap.fiberCache.persistent.memory.initial.size: It is configured to the available DCPMM capacity to used as data cache per exectutor.
-- spark.sql.oap.fiberCache.persistent.memory.reserved.size: When we use DCPMM as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available DCPMM capacity to avoid memory allocation failure. But even with an allocation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
+- spark.sql.oap.fiberCache.persistent.memory.reserved.size: When we use DCPMM as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available DCPMM capacity to avoid memory allocation failure. But even with an allocation failure, OAP-Cache will continue the operation to read data from original input data and will not cache the data block.
 
 ***Besides these configurations, there are other parameters based on different DCPM cache strategies(guava, non-evictable, vmemcache). You can choose one of them and follow the corresponding guides below.***
 
@@ -294,7 +300,7 @@ spark.sql.extensions                             org.apache.spark.sql.OapExtensi
 
 #### Use Non-evictable Cache strategy
 
-The Non-evictable cache strategy is also supported in OAP based on the memkind library for DCPMM.
+The Non-evictable cache strategy is also supported in OAP-Cache based on the memkind library for DCPMM.
 
 To apply Non-evictable cache strategy in your workload, please follow [prerequisites](#prerequisites-1) to set up the DCPMM hardware and the memkind library correctly. Then set these configuration values:
 
@@ -335,7 +341,8 @@ spark.oap.cache.strategy                                   vmem
 spark.sql.oap.fiberCache.persistent.memory.initial.size    256g
 spark.sql.oap.cache.guardian.memory.size                   10g      # according to your cluster   
 ```
-**NOTE:** If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks failed due to "cache guardian use too much memory", user could set `spark.sql.oap.cache.guardian.memory.size ` to a larger number, and the default size is 10GB. Besides, user could increase `spark.sql.oap.cache.guardian.free.thread.nums` or decrease `spark.sql.oap.cache.dispose.timeout.ms` to accelerate memory free.
+
+**NOTE**: If "PendingFiber Size" (on spark web-UI OAP-Cache page) is large, or some tasks failed due to "cache guardian use too much memory", user could set `spark.sql.oap.cache.guardian.memory.size ` to a larger number, and the default size is 10GB. Besides, user could increase `spark.sql.oap.cache.guardian.free.thread.nums` or decrease `spark.sql.oap.cache.dispose.timeout.ms` to accelerate memory free.
 
 #### Use External cache strategy
 
@@ -360,9 +367,9 @@ spark.sql.oap.cache.guardian.memory.size                   10g      # according 
 spark.sql.oap.cache.external.client.pool.size              10
 ```
 
-
 ### Enable Index/Data cache separation
-OAP now supports multiple cache strategies, which include `guava`, `vmemcache`, `simple` and `noevict`, for DRAM and DCPMM. To optimize cache media utilization, enable cache separation of data and index with the same or different cache media. When sharing the same media, the data cache and index cache will use a different fiber cache ratio.
+OAP-Cache now supports multiple cache strategies, which include `guava`, `vmemcache`, `simple` and `noevict`, for DRAM and DCPMM. To optimize cache media utilization, enable cache separation of data and index with the same or different cache media. When sharing the same media, the data cache and index cache will use a different fiber cache ratio.
+
 Here we list 4 different kinds of configs for index/cache separation, if you choose one of them, please add corresponding configs to `spark-defaults.conf`.
 
 1. DRAM(`offheap`) as cache media, strategy `guava` as index and data cache backend. 

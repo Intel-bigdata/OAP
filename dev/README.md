@@ -1,9 +1,9 @@
 # OAP Developer Scripts
 This directory contains scripts useful to developers when building, testing, and packaging.
 
-## Build OAP
+## Building OAP
 
-#### Prerequisites for building
+### Prerequisites for building
 Install the required packages on the build system:
 
 - Maven
@@ -19,8 +19,10 @@ source prepare_oap_env.sh
 prepare_all
 ```
 
-Build the project using the following command. All JARs will generate in path `dev/target/`.
+Build the project using the following command. All JARs will generate in `dev/target/`.
 
 ```
 sh make-distribution.sh
 ```
+
+Please refer to the [Developer-Guide](../docs/Developer-Guide.md) for more information.

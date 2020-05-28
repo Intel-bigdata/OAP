@@ -1,4 +1,4 @@
-# Spark Remote Shuffle Plugin
+# OAP Remote Shuffle Plugin
 
 Remote Shuffle is a Spark ShuffleManager plugin, shuffling data through a remote Hadoop-compatible file system, as opposed to vanilla Spark's local-disks.
 
@@ -6,7 +6,7 @@ This is an essential part of enabling Spark on disaggregated compute and storage
 
 ## Build and Deploy
 
-Build the project using the following command or download the pre-built jar: remote-shuffle-\<version\>.jar. This file needs to
+Build this module using the following command in oap-shuffle/remote-shuffle folder or download the pre-built jar: remote-shuffle-\<version\>.jar in [OAP-0.8.0 for Spark 2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-cache-0.8.0-with-spark-2.4.4.tar.gz). This file needs to
 be deployed on every compute node that runs Spark. Manually place it on all nodes or let resource manager do the work.
 
 ```

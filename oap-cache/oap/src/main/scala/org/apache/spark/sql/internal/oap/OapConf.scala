@@ -433,6 +433,13 @@ object OapConf {
       .intConf
       .createWithDefault(1)
 
+  val OAP_EXTERNAL_CACHE_READ_ONLY_ENABLE =
+    SqlConfAdapter.buildConf("spark.sql.oap.cache.external.read.only.enable")
+    .internal()
+    .doc("whether we need cache data")
+    .booleanConf
+    .createWithDefault(true)
+
   val OAP_CACHE_GUARDIAN_FREE_THREAD_NUM =
     SqlConfAdapter.buildConf("spark.sql.oap.cache.guardian.free.thread.nums")
       .internal()
