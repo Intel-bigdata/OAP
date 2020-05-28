@@ -415,7 +415,6 @@
           <shadedClassifierName>with-spark-${spark.internal.version}</shadedClassifierName>
           <artifactSet>
             <includes>
-              <include>com.intel:oap-common</include>
               <include>org.spark-project.spark:unused</include>
               <include>com.google.guava:guava</include>
               <include>org.apache.parquet:*</include>

@@ -15,7 +15,7 @@ cd OAP
 #### Prerequisites for Building
 OAP is built using [Apache Maven](http://maven.apache.org/). You need to install the required packages on the build system listed below.
 - [Cmake](https://help.directadmin.com/item.php?id=494)
-- [Memkind](https://github.com/memkind/memkind)
+- [Memkind](https://github.com/Intel-bigdata/memkind)
 - [Vmemcache](https://github.com/pmem/vmemcache)
 
 You can use the following command under the folder dev to automatically install these dependencies.
@@ -78,4 +78,11 @@ mvn clean -q -Pvmemcache -DskipTests package
 You can build with command to use all of them:
 ```shell script
 mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
+```
+
+
+#### OAP Packaging 
+If you want to generate a release package after you mvn package all modules, use the following command:
+```shell script
+sh $OAP_HOME/dev/make-distribution.sh
 ```

@@ -1,10 +1,10 @@
-# OAP Architecture Overview
+# OAP-Cache Architecture Overview
 
 
 * [Introduction](#introduction)
 * [Usage Scenarios](#Usage-Scenarios)
-* [OAP Architecture](#oap-architecture)
-* [OAP Features](#oap-Features)
+* [OAP-Cache Architecture](#oap-Cache-architecture)
+* [OAP-Cache Features](#oap-Cache-Features)
 
 
 
@@ -45,7 +45,7 @@ Customers usually use Spark SQL for Business Analytics in Data Warehousing. OAP 
 
 Users can choose either strategy based on their need.
 
-## OAP Architecture
+## OAP-Cache Architecture
 
 The following diagram shows the OAP design architecture.
 
@@ -69,7 +69,7 @@ OAP (Optimized Analytical Package for Spark) acts as a `.jar` plug-in for Spark 
 
 - Spark ***ThriftServer***\* is a good use case for OAP, because ThriftServer launches Spark Applications which can cache hot data for a long time in the background, and it also accepts query requests from different clients at the same time. Of course, using bin/spark-sql, bin/spark-shell or bin/pyspark can also use OAP, but usually only for interactive test situations.
 
-## OAP Features
+## OAP-Cache Features
 
 OAP uses indexing and caching to improve Spark SQL performance on ad-hoc queries and batch processing jobs.
 

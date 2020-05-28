@@ -4,6 +4,6 @@ OAP is an optimized plugin package designed to accelerate Spark SQL performance 
 
 Please refer the below documents for more information.
 
-* [OAP Architecture Overview](./docs/OAP-Architect-Overview.md)
-* [OAP User Guide](./docs/OAP-User-Guide.md)
+* [OAP Architecture Overview](docs/OAP-Cache-Architect-Overview.md)
+* [OAP User Guide](docs/OAP-Cache-User-Guide.md)
 * [OAP Developer Guide](./docs/Developer-Guide.md)
