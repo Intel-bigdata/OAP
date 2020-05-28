@@ -1,45 +1,45 @@
-# OAP Developer Guide
+# OAP-Cache Developer Guide
 
-* [OAP Building](#OAP-Building)
+* [OAP-Cache Building](#OAP-Building)
 * [Integration with Spark](#integration-with-spark)
 * [Enable Numa binding for DCPMM in Spark](#enable-numa-binding-for-dcpmm-in-spark)
 
 
 
-## OAP Building
+## OAP-Cache Building
 
 #### Building
-OAP is built using [Apache Maven](http://maven.apache.org/).
+OAP-Cache is built using [Apache Maven](http://maven.apache.org/).
 
 To clone OAP project, use
 
 ```
-git clone -b branch-0.6-spark-2.4.4  https://github.com/Intel-bigdata/OAP.git
+git clone -b branch-0.8-spark-2.4.4  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
-To build OAP package, use
+To build OAP-Cache package, use
 
 ```
-mvn clean -DskipTests package
+mvn clean -pl com.intel.oap:oap-cache -am package
 ```
 
 #### Running Test
 
 To run all the tests, use
 ```
-mvn clean test
+mvn clean -pl com.intel.oap:oap-cache -am test
 ```
 To run any specific test suite, for example `OapDDLSuite`, use
 ```
 mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite test
 ```
-**NOTE**: Log level of OAP unit tests currently default to ERROR, please override src/test/resources/log4j.properties if needed.
+**NOTE**: Log level of OAP-Cache unit tests currently default to ERROR, please override oap-cache/oap/src/test/resources/log4j.properties if needed.
 
 
-#### OAP Building with DCPMM
+#### OAP-Cache Building with DCPMM
 
-If you want to use OAP with DCPMM,  you can follow the below building steps.
+If you want to use OAP-Cache with DCPMM,  you can follow the below building steps.
 
 ##### Prerequisites for building with DCPMM support
 
@@ -47,35 +47,35 @@ You  need to install the required packages on the build system listed below.
 
 - gcc-c++
 - [cmake](https://help.directadmin.com/item.php?id=494)
-- [Memkind](https://github.com/memkind/memkind)
+- [Memkind](https://github.com/Intel-bigdata/memkind)
 - [vmemcache](https://github.com/pmem/vmemcache)
 
 
 ##### Building package
 You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache stratege, you need to build with -Ppersistent-memory also.
 ```
-mvn clean -q -Ppersistent-memory -DskipTests package
+mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -DskipTests package
 ```
 for vmemcache cache strategy, please build with command:
 ```
-mvn clean -q -Pvmemcache -DskipTests package
+mvn clean -q -pl com.intel.oap:oap-cache -am -Pvmemcache -DskipTests package
 ```
 You can build with command to use all of them:
 ```
-mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
+mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -Pvmemcache -DskipTests package
 ```
 
 ## Integration with Spark
 
-Although OAP acts as a plugin jar to Spark, there are still a few tricks to note when integration with Spark. Basically, OAP explored Spark extension & data source API to perform its core functionality. But there are other functionality aspects that cannot achieved by Spark extension and data source API. We made a few improvements or changes to the Spark internals to achieve the functionality. So when integrating OAP on Spark, you need to check whether you are running an unmodified Community Spark or a modified customized Spark.
+Although OAP-Cache acts as a plugin jar to Spark, there are still a few tricks to note when integration with Spark. Basically, OAP explored Spark extension & data source API to perform its core functionality. But there are other functionality aspects that cannot achieved by Spark extension and data source API. We made a few improvements or changes to the Spark internals to achieve the functionality. So when integrating OAP on Spark, you need to check whether you are running an unmodified Community Spark or a modified customized Spark.
 
 #### Integrate with Community Spark
 
-If you are running an Community Spark, things will be much simple. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
+If you are running an Community Spark, things will be much simple. Refer to [OAP-Cache User Guide](OAP-Cache-User-Guide.md) to configure and setup Spark to working with OAP.
 
 #### Integrate with customized Spark
 
-It will be more complicated to integrate OAP with a customized Spark. Steps needed for this case is to check whether the OAP changes of Spark internals will conflict or override with your private changes. 
+It will be more complicated to integrate OAP-Cache with a customized Spark. Steps needed for this case is to check whether the OAP-Cache changes of Spark internals will conflict or override with your private changes. 
 - If no conflicts or overrides happens, the steps are the same as the steps of unmodified version of Spark described above. 
 - If conflicts or overrides happen, you need to have a merge plan of the source code to make sure the code changes you made in a Spark source file appears in the corresponding file included in OAP project. Once merged, you need to rebuild OAP.
 
@@ -124,7 +124,7 @@ When using DCPMM as a cache medium, if you want to obtain optimum performance, y
 git apply  Spark.2.4.4.numa.patch
 ```
 
-3. When deploying OAP to Spark, please add below configuration item to Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable Numa binding.
+3. When deploying OAP-Cache to Spark, please add below configuration item to Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable Numa binding.
 
 ```
 spark.yarn.numa.enabled true 
