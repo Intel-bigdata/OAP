@@ -13,7 +13,7 @@
 Before getting started with OAP on Spark, you should have set up a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark which is built with YARN support. If you don't want to build Spark by yourself, we have a pre-built Spark-2.4.4, you can download [Spark-2.4.4](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) and setup Spark on your working node.
 ## Getting Started with OAP
 ### Building OAP
-We have a pre-built OAP, you can download [OAP-0.8.0 for Spark 2.4.4 tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-0.8.0-with-spark-2.4.4.jar) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`. If you’d like to build OAP from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+We have a pre-built OAP, you can download [OAP-0.7.0 for Spark 2.4.4 jar](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/oap-0.6.1-with-spark-2.4.4.jar) to your working node and put the OAP jar to your working directory such as `/home/oap/jars/`. If you’d like to build OAP from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 ### Spark Configurations for OAP
 Users usually test and run Spark SQL or Scala scripts in Spark Shell which launches Spark applications on YRAN with ***client*** mode. In this section, we will start with Spark Shell then introduce other use scenarios. 
 
@@ -21,9 +21,9 @@ Before you run ` . $SPARK_HOME/bin/spark-shell `, you need to configure Spark fo
 
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
-spark.files                       /home/oap/jars/oap-0.8.0-with-spark-2.4.4.jar     # absolute path of OAP jar on your working node
-spark.executor.extraClassPath     ./oap-0.8.0-with-spark-2.4.4.jar                  # relative path of OAP jar
-spark.driver.extraClassPath       /home/oap/jars/oap-0.8.0-with-spark-2.4.4.jar     # absolute path of OAP jar on your working node
+spark.files                       /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar     # absolute path of OAP jar on your working node
+spark.executor.extraClassPath     ./oap-0.7.0-with-spark-2.4.4.jar                  # relative path of OAP jar
+spark.driver.extraClassPath       /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar     # absolute path of OAP jar on your working node
 ```
 ### Verify Spark with OAP Integration 
 After configuration, you can follow the below steps and verify the OAP integration is working using Spark Shell.
@@ -56,17 +56,17 @@ Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client**
 Before run `spark-submit` with ***cluster*** mode, you should add below OAP configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
-spark.files                       /home/oap/jars/oap-0.8.0-with-spark-2.4.4.jar        # absolute path on your working node    
-spark.executor.extraClassPath     ./oap-0.8.0-with-spark-2.4.4.jar                     # relative path 
-spark.driver.extraClassPath       ./oap-0.8.0-with-spark-2.4.4.jar                     # relative path
+spark.files                       /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar        # absolute path on your working node    
+spark.executor.extraClassPath     ./oap-0.7.0-with-spark-2.4.4.jar                     # relative path 
+spark.driver.extraClassPath       ./oap-0.7.0-with-spark-2.4.4.jar                     # relative path
 ```
 
 ## Configuration for Spark Standalone Mode
 In addition to running on the YARN cluster manager, Spark also provides a simple standalone deploy mode. If you are using Spark in Spark Standalone mode, you need to copy the OAP jar to **all** the worker nodes. And then set the following configurations in “$SPARK_HOME/conf/spark-defaults” on working node.
 ```
 spark.sql.extensions               org.apache.spark.sql.OapExtensions
-spark.executor.extraClassPath      /home/oap/jars/oap-0.8.0-with-spark-2.4.4.jar      # absolute path on worker nodes
-spark.driver.extraClassPath        /home/oap/jars/oap-0.8.0-with-spark-2.4.4.jar      # absolute path on worker nodes
+spark.executor.extraClassPath      /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar      # absolute path on worker nodes
+spark.driver.extraClassPath        /home/oap/jars/oap-0.7.0-with-spark-2.4.4.jar      # absolute path on worker nodes
 ```
 
 ## Working with OAP Index
@@ -205,21 +205,7 @@ Above file systems are generated for 2 numa nodes, which can be checked by "numa
      make package
      sudo rpm -i libvmemcache*.rpm
 ```
-- OAP use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries. [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support DCPMM, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. You can run follow commands to install libarrow.so, libplasma.so, libplasma_java.so, plasma-store-server, arrow-plasma.jar to your machine:
-```
-    git clone https://github.com/Intel-bigdata/arrow.git
-    cd arrow
-    git checkout oap-master
-    cd cpp
-    mkdir release 
-    cd release
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-g -O3" -DCMAKE_CXX_FLAGS="-g -O3" -DARROW_PLASMA_JAVA_CLIENT=on -DARROW_PLASMA=on -DARROW_DEPENDENCY_SOURCE=BUNDLED ..
-    make -j$(nproc)
-    sudo make install -j$(nproc)
-    cd ../../java
-    mvn clean -q -DskipTests install
-``` 
-Or you can refer [OAP-Developer-Guide](../../../docs/Developer-Guide.md), there is a shell script to help you  install these dependencies automatically.
+- OAP use Plasma as a node-level external cache service, the benefit of using external cache is data can be shared across process boundaries. You can reference [Using-Plasma-As-Cache](./Using-Plasma-As-Cache.md).
 
 #### Configure for NUMA
 To achieve the optimum performance, we need to configure NUMA for binding executor to NUMA node and try access the right DCPMM device on the same NUMA node. You need install numactl on each worker node. For example, on CentOS, run following command to install numactl.
@@ -340,26 +326,7 @@ Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks 
 
 #### Use External cache strategy
 
-External cache strategy is implemented based on arrow/plasma library. To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and plasma library correctly, and start Plasma service on nodes, then refer below configurations to apply external cache strategy in your workload.
-
-For Parquet data format, provides the following conf options:
-
-```
-spark.sql.oap.parquet.data.cache.enable                    true 
-spark.oap.cache.strategy                                   external
-spark.sql.oap.cache.guardian.memory.size                   10g      # according to your cluster
-spark.sql.oap.cache.external.client.pool.size              10
-```
-
-For Orc data format, provides following conf options:
-
-```
-spark.sql.orc.copyBatchToSpark                             true 
-spark.sql.oap.orc.data.cache.enable                        true 
-spark.oap.cache.strategy                                   external 
-spark.sql.oap.cache.guardian.memory.size                   10g      # according to your cluster
-spark.sql.oap.cache.external.client.pool.size              10
-```
+Refer [how-to-use-plasma](./Using-Plasma-As-Cache.md#How to Run Spark-sql with Plasma).
 
 
 ### Enabling Index/Data cache separation
