@@ -10,7 +10,7 @@
 
 ## Introduction
 
-Apache Spark is a unified analytics engine for large-scale data processing. Spark SQL* is the most popular component of Apache Spark* , and it is widely used to process large scale structured data in data center. However, Spark SQL still suffers from stability and performance challenges in a highly dynamic environment with ultra large scale data.
+Apache Spark\* is a unified analytics engine for large-scale data processing. Spark SQL\* is the most popular component of Apache Spark, and it is widely used to process large scale structured data in data center. However, Spark SQL still suffers from stability and performance challenges in a highly dynamic environment with ultra large scale data.
 
 We created OAP-Cache to address the performance issues of some use cases. OAP-Cache is designed to leverage user defined indices and smart fine-grained in-memory data caching for boosting Spark SQL performance.
 
@@ -21,7 +21,7 @@ We created OAP-Cache to address the performance issues of some use cases. OAP-Ca
 
 ### Usage Scenario 1 -- Interactive queries
 
-Most customers adopt Spark SQL as a batch processing engine. Unfortunately, customers would discover that it is too hard to separate batch processing and interactive use cases. Interactive queries need to return the data in seconds or even sub-seconds instead of the minutes or hours of batch processing. This is a difficult challenge for the current Spark SQL implementation.
+Most customers adopt Spark SQL as a batch processing engine. Unfortunately, customers soon discover that it is too hard to separate batch processing and interactive use cases. Interactive queries need to return the data in seconds or even sub-seconds instead of the minutes or hours of batch processing. This is a difficult challenge for the current Spark SQL implementation.
 
 For example, the following interactive query attempts to filter out a very small result set from a huge fact table.
 
@@ -51,7 +51,7 @@ The following diagram shows the OAP-Cache design architecture.
 
 ![OAP-ARCHITECTURE](./image/OAP-Architecture.PNG)
 
-OAP-Cache acts as a `.jar` plug-in for Spark SQL.
+OAP-Cache acts as a JAR plug-in for Spark SQL.
 
 - We designed the compatible adapter layer for three columnar storage file formats: 
 
@@ -91,7 +91,7 @@ Caching is another core feature of OAP. It is also transparent to users. OAP-Cac
 - Cache Eviction. OAP-Cache cache eviction uses LRU policy, and automatically caches and evicts data transparently to end user.
 - Cache configured tables. OAP-Cache also supports caching specific tables by configuring items according to actual situations, these tables are usually hot tables.
 
-
+\*Other names and brands may be claimed as the property of others.
 
 
 
