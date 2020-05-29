@@ -6,3 +6,4 @@ StorageMemoryPool.scala
 UnifiedMemoryManager.scala
 StorageLevel.scala
 KMeans.scala
+MemoryAllocator.java

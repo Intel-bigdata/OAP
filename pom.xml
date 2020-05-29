@@ -39,6 +39,7 @@
         <scala.version>2.11.12</scala.version>
         <scala.binary.version>2.11</scala.binary.version>
         <maven-patch-plugin.version>1.2</maven-patch-plugin.version>
+        <maven-resource-plugin.version>2.6</maven-resource-plugin.version>
     </properties>
 
     <modules>

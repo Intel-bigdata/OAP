@@ -32,6 +32,28 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>${maven-resource-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>copy_Spark</id>
+                        <configuration>
+                            <outputDirectory>src/main/</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/resources/unchanged_spark_files</directory>
+                                </resource>
+                            </resources>
+                        </configuration>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-patch-plugin</artifactId>
                 <version>${maven-patch-plugin.version}</version>
                 <executions>
@@ -39,6 +61,10 @@
                         <id>RDD-cache-PMem-Extension-Feature-Patching</id>
                         <configuration>
                             <patchDirectory>src/main/resources/RDD-cache-PMem-Extension</patchDirectory>
+                            <patchTrackingFile>
+                                ${project.build.directory}/RDD-cache-PMem-Extension/patches-applied.txt
+                            </patchTrackingFile>
+                            <naturalOrderProcessing>true</naturalOrderProcessing>
                         </configuration>
                         <phase>process-sources</phase>
                         <goals>
