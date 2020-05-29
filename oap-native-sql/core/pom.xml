@@ -17,6 +17,7 @@
 
   <properties>
     <arrow.version>0.17.0</arrow.version>
+    <cpp.dir>../cpp/</cpp.dir>
     <cpp.build.dir>../cpp/build/releases/</cpp.build.dir>
   </properties>
   <repositories>
@@ -165,6 +166,23 @@
     <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
     <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
     <plugins>
+      <plugin>
+          <artifactId>exec-maven-plugin</artifactId>
+          <groupId>org.codehaus.mojo</groupId>
+          <version>1.6.0</version>
+          <executions>
+              <execution>
+                  <id>Build cpp</id>
+                  <phase>generate-resources</phase>
+                  <goals>
+                      <goal>exec</goal>
+                  </goals>
+                  <configuration>
+                      <executable>${cpp.dir}/compile.sh</executable>
+                  </configuration>
+              </execution>
+          </executions>
+      </plugin>
       <plugin>
         <groupId>net.alchim31.maven</groupId>
         <artifactId>scala-maven-plugin</artifactId>
