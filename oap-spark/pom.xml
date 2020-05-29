@@ -27,4 +27,26 @@
             <version>${project.version}</version>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-patch-plugin</artifactId>
+                <version>${maven-patch-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>RDD-cache-PMem-Extension-Feature-Patching</id>
+                        <configuration>
+                            <patchDirectory>src/main/resources/RDD-cache-PMem-Extension</patchDirectory>
+                        </configuration>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>apply</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
