@@ -2,19 +2,23 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <parent>
-        <artifactId>oap</artifactId>
-        <groupId>com.intel.ssg.bdt</groupId>
-        <version>1.0.0-SNAPSHOT</version>
-    </parent>
     <modelVersion>4.0.0</modelVersion>
 
+    <parent>
+        <groupId>com.intel.oap</groupId>
+        <artifactId>oap-parent</artifactId>
+        <version>0.9.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
     <artifactId>oap-spark</artifactId>
+    <packaging>jar</packaging>
+    <name>OAP Spark</name>
 
     <dependencies>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${oap.spark.version}</artifactId>
+            <artifactId>spark-core_${scala.binary.version}</artifactId>
             <version>${oap.spark.version}</version>
         </dependency>
     </dependencies>
