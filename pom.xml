@@ -38,7 +38,6 @@
         <oap.spark.version>2.4.4</oap.spark.version>
         <scala.version>2.11.12</scala.version>
         <scala.binary.version>2.11</scala.binary.version>
-        <oap.version>0.9</oap.version>
     </properties>
 
     <modules>
