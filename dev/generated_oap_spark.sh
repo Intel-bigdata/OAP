@@ -29,6 +29,6 @@ SPARK_SOURCE_DIR="$1"
 OAP_SOURCE_DIR="$2"
 FILE_DIR="${OAP_SOURCE_DIR}/dev/changes_list"
 SPARK_FILE_LIST="${FILE_DIR}/spark_changed_files"
-OAP_SPARK_SOURCE_DIR="${OAP_SOURCE_DIR}/oap-spark/src/main/resources/"
+OAP_SPARK_SOURCE_DIR="${OAP_SOURCE_DIR}/oap-spark/src/main/resources/unchanged_spark_files"
 
 move_files_from_list_to_oap $SPARK_FILE_LIST $OAP_SPARK_SOURCE_DIR

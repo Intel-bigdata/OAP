@@ -5,5 +5,5 @@ MemoryManager.scala
 StorageMemoryPool.scala
 UnifiedMemoryManager.scala
 StorageLevel.scala
-KMeans.scala
 MemoryAllocator.java
+KMeans.scala
