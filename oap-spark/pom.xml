@@ -21,5 +21,10 @@
             <artifactId>spark-core_${scala.binary.version}</artifactId>
             <version>${oap.spark.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.intel.oap</groupId>
+            <artifactId>oap-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 </project>
