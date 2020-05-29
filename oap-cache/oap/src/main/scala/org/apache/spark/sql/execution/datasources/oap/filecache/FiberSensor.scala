@@ -76,7 +76,7 @@ private[sql] class FiberSensor(
   def updateLocations(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
     val updateExecId = fiberInfo.executorId
     val updateHostName = fiberInfo.hostName
-    val host = FiberSensor.OAP_CACHE_LOCATION_TAG + updateHostName + "_"+ updateExecId
+    val host = FiberSensor.OAP_CACHE_LOCATION_TAG + updateHostName + "_" + updateExecId
     val fiberCacheStatus = CacheStatusSerDe.deserialize(fiberInfo.customizedInfo)
     logDebug(s"Got updated fiber info from host: $updateHostName, executorId: $updateExecId," +
       s"host is $host, info array len is ${fiberCacheStatus.size}")

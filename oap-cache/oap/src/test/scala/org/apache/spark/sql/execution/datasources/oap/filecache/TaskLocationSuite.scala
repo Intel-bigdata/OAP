@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import org.scalatest.BeforeAndAfterEach
+
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.oap.OapRuntime
