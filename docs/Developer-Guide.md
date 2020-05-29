@@ -82,7 +82,7 @@ mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
 
 
 #### OAP Packaging 
-If you want to generate a release package after you mvn package all modules, use the following command:
+If you want to generate a release package after you mvn package all modules, use the following command under the directory dev:
 ```shell script
-sh $OAP_HOME/dev/make-distribution.sh
+sh make-distribution.sh
 ```
