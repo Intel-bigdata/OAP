@@ -48,6 +48,8 @@ private[spark] abstract class MemoryManager(
   @GuardedBy("this")
   protected val offHeapStorageMemoryPool = new StorageMemoryPool(this, MemoryMode.OFF_HEAP)
   @GuardedBy("this")
+  protected val pmemStorageMemoryPool = new StorageMemoryPool(this, MemoryMode.PMEM)
+  @GuardedBy("this")
   protected val onHeapExecutionMemoryPool = new ExecutionMemoryPool(this, MemoryMode.ON_HEAP)
   @GuardedBy("this")
   protected val offHeapExecutionMemoryPool = new ExecutionMemoryPool(this, MemoryMode.OFF_HEAP)
@@ -61,6 +63,12 @@ private[spark] abstract class MemoryManager(
 
   offHeapExecutionMemoryPool.incrementPoolSize(maxOffHeapMemory - offHeapStorageMemory)
   offHeapStorageMemoryPool.incrementPoolSize(offHeapStorageMemory)
+
+  private[this] val pmemInitialSize = conf.getSizeAsBytes("spark.memory.pmem.initial.size", 0L)
+  private[this] val pmemUsableRatio = conf.getDouble("spark.memory.pmem.usable.ratio", 1.0)
+  protected[this] val pmemStorageMemory = (pmemInitialSize * pmemUsableRatio).toLong
+
+  pmemStorageMemoryPool.incrementPoolSize(pmemStorageMemory)
 
   /**
    * Total available on heap memory for storage, in bytes. This amount can vary over time,
@@ -76,12 +84,19 @@ private[spark] abstract class MemoryManager(
   def maxOffHeapStorageMemory: Long
 
   /**
+   * Total available pmem memory for storage, in bytes. This amount can vary over time,
+   * depending on the MemoryManager implementation.
+   */
+  def maxPMemStorageMemory: Long
+
+  /**
    * Set the [[MemoryStore]] used by this manager to evict cached blocks.
    * This must be set after construction due to initialization ordering constraints.
    */
   final def setMemoryStore(store: MemoryStore): Unit = synchronized {
     onHeapStorageMemoryPool.setMemoryStore(store)
     offHeapStorageMemoryPool.setMemoryStore(store)
+    pmemStorageMemoryPool.setMemoryStore(store)
   }
 
   /**
@@ -148,6 +163,7 @@ private[spark] abstract class MemoryManager(
     memoryMode match {
       case MemoryMode.ON_HEAP => onHeapStorageMemoryPool.releaseMemory(numBytes)
       case MemoryMode.OFF_HEAP => offHeapStorageMemoryPool.releaseMemory(numBytes)
+      case MemoryMode.PMEM => pmemStorageMemoryPool.releaseMemory(numBytes)
     }
   }
 
@@ -157,6 +173,7 @@ private[spark] abstract class MemoryManager(
   final def releaseAllStorageMemory(): Unit = synchronized {
     onHeapStorageMemoryPool.releaseAllMemory()
     offHeapStorageMemoryPool.releaseAllMemory()
+    pmemStorageMemoryPool.releaseAllMemory()
   }
 
   /**
@@ -177,7 +194,8 @@ private[spark] abstract class MemoryManager(
    * Storage memory currently in use, in bytes.
    */
   final def storageMemoryUsed: Long = synchronized {
-    onHeapStorageMemoryPool.memoryUsed + offHeapStorageMemoryPool.memoryUsed
+    onHeapStorageMemoryPool.memoryUsed + offHeapStorageMemoryPool.memoryUsed +
+      pmemStorageMemoryPool.memoryUsed
   }
 
   /**

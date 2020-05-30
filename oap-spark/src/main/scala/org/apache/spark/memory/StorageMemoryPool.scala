@@ -38,6 +38,7 @@ private[memory] class StorageMemoryPool(
   private[this] val poolName: String = memoryMode match {
     case MemoryMode.ON_HEAP => "on-heap storage"
     case MemoryMode.OFF_HEAP => "off-heap storage"
+    case MemoryMode.PMEM => "pmem storage"
   }
 
   @GuardedBy("lock")

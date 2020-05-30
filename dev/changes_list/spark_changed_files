@@ -1,9 +1,10 @@
 BlockManager.scala
-MemoryMode.java
-SparkEnv.scala
-MemoryManager.scala
-StorageMemoryPool.scala
-UnifiedMemoryManager.scala
-StorageLevel.scala
+spark/mllib/clustering/KMeans.scala
 MemoryAllocator.java
-KMeans.scala
+MemoryManager.scala
+MemoryMode.java
+PMemMemoryAllocator.java
+StorageMemoryPool.scala
+SparkEnv.scala
+StorageLevel.scala
+UnifiedMemoryManager.scala

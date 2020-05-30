@@ -31,10 +31,9 @@ import scala.concurrent.duration._
 import scala.reflect.ClassTag
 import scala.util.Random
 import scala.util.control.NonFatal
-
 import com.codahale.metrics.{MetricRegistry, MetricSet}
 import com.google.common.io.CountingOutputStream
-
+import com.intel.oap.common.unsafe.PersistentMemoryPlatform
 import org.apache.spark._
 import org.apache.spark.executor.{DataReadMethod, ShuffleWriteMetrics}
 import org.apache.spark.internal.{config, Logging}
@@ -445,6 +444,7 @@ private[spark] class BlockManager(
             val allocator = level.memoryMode match {
               case MemoryMode.ON_HEAP => ByteBuffer.allocate _
               case MemoryMode.OFF_HEAP => Platform.allocateDirectBuffer _
+              case MemoryMode.PMEM => PersistentMemoryPlatform.allocateVolatileDirectBuffer _
             }
             new EncryptedBlockData(tmpFile, blockSize, conf, key).toChunkedByteBuffer(allocator)
 
