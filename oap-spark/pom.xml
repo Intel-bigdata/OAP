@@ -57,6 +57,10 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-patch-plugin</artifactId>
                 <version>${maven-patch-plugin.version}</version>
+                <configuration>
+                    <targetDirectory>src/main/java</targetDirectory>
+                    <skipApplication>false</skipApplication>
+                </configuration>
                 <executions>
                     <execution>
                         <id>RDD-cache-PMem-Extension-Feature-Patching</id>

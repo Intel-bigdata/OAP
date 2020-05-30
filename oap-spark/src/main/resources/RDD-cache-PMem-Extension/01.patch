@@ -1,1 +1,19 @@
-ddd
+diff --git a/org/apache/spark/memory/MemoryMode.java b/org/apache/spark/memory/MemoryMode.java
+index 3a5e72d8aa..55cccee691 100644
+--- a/org/apache/spark/memory/MemoryMode.java
++++ b/org/apache/spark/memory/MemoryMode.java
+@@ -22,5 +22,6 @@ import org.apache.spark.annotation.Private;
+ @Private
+ public enum MemoryMode {
+   ON_HEAP,
+-  OFF_HEAP
++  OFF_HEAP,
++  PMEM
+ }
+diff --git a/src/main/resources/RDD-cache-PMem-Extension/01.patch b/src/main/resources/RDD-cache-PMem-Extension/01.patch
+index 69ec23d1a0..e69de29bb2 100644
+--- a/src/main/resources/RDD-cache-PMem-Extension/01.patch
++++ b/src/main/resources/RDD-cache-PMem-Extension/01.patch
+@@ -1 +0,0 @@
+-ddd
+\ No newline at end of file
