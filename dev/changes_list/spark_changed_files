@@ -4,7 +4,9 @@ MemoryAllocator.java
 MemoryManager.scala
 MemoryMode.java
 PMemMemoryAllocator.java
+spark/memory/StaticMemoryManager.scala
 StorageMemoryPool.scala
 SparkEnv.scala
 StorageLevel.scala
+spark/memory/TestMemoryManager.scala
 UnifiedMemoryManager.scala
