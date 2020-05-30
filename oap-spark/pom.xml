@@ -44,6 +44,7 @@
                                     <directory>src/main/resources/unchanged_spark_files</directory>
                                 </resource>
                             </resources>
+                            <overwrite>true</overwrite>
                         </configuration>
                         <phase>process-sources</phase>
                         <goals>

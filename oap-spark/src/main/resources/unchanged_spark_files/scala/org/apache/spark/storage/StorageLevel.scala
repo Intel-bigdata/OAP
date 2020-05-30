@@ -40,23 +40,20 @@ class StorageLevel private(
     private var _useDisk: Boolean,
     private var _useMemory: Boolean,
     private var _useOffHeap: Boolean,
-    private var _usePMem: Boolean,
     private var _deserialized: Boolean,
     private var _replication: Int = 1)
   extends Externalizable {
 
   // TODO: Also add fields for caching priority, dataset ID, and flushing.
   private def this(flags: Int, replication: Int) {
-    this((flags & 16) != 0, (flags & 8) != 0, (flags & 4) != 0, (flags & 2) != 0, (flags & 1) != 0,
-      replication)
+    this((flags & 8) != 0, (flags & 4) != 0, (flags & 2) != 0, (flags & 1) != 0, replication)
   }
 
-  def this() = this(false, true, false, false, false)  // For deserialization
+  def this() = this(false, true, false, false)  // For deserialization
 
   def useDisk: Boolean = _useDisk
   def useMemory: Boolean = _useMemory
   def useOffHeap: Boolean = _useOffHeap
-  def usePMem: Boolean = _usePMem
   def deserialized: Boolean = _deserialized
   def replication: Int = _replication
 
@@ -68,12 +65,11 @@ class StorageLevel private(
 
   private[spark] def memoryMode: MemoryMode = {
     if (useOffHeap) MemoryMode.OFF_HEAP
-    else if (usePMem) MemoryMode.PMEM
     else MemoryMode.ON_HEAP
   }
 
   override def clone(): StorageLevel = {
-    new StorageLevel(useDisk, useMemory, useOffHeap, usePMem, deserialized, replication)
+    new StorageLevel(useDisk, useMemory, useOffHeap, deserialized, replication)
   }
 
   override def equals(other: Any): Boolean = other match {
@@ -81,27 +77,23 @@ class StorageLevel private(
       s.useDisk == useDisk &&
       s.useMemory == useMemory &&
       s.useOffHeap == useOffHeap &&
-      s.usePMem == usePMem &&
       s.deserialized == deserialized &&
       s.replication == replication
     case _ =>
       false
   }
 
-  def isValid: Boolean = (useMemory || useDisk || usePMem) && (replication > 0)
+  def isValid: Boolean = (useMemory || useDisk) && (replication > 0)
 
   def toInt: Int = {
     var ret = 0
     if (_useDisk) {
-      ret |= 16
-    }
-    if (_useMemory) {
       ret |= 8
     }
-    if (_useOffHeap) {
+    if (_useMemory) {
       ret |= 4
     }
-    if (_usePMem) {
+    if (_useOffHeap) {
       ret |= 2
     }
     if (_deserialized) {
@@ -117,10 +109,9 @@ class StorageLevel private(
 
   override def readExternal(in: ObjectInput): Unit = Utils.tryOrIOException {
     val flags = in.readByte()
-    _useDisk = (flags & 16) != 0
-    _useMemory = (flags & 8) != 0
-    _useOffHeap = (flags & 4) != 0
-    _usePMem = (flags & 2) != 0
+    _useDisk = (flags & 8) != 0
+    _useMemory = (flags & 4) != 0
+    _useOffHeap = (flags & 2) != 0
     _deserialized = (flags & 1) != 0
     _replication = in.readByte()
   }
@@ -132,11 +123,10 @@ class StorageLevel private(
     val disk = if (useDisk) "disk" else ""
     val memory = if (useMemory) "memory" else ""
     val heap = if (useOffHeap) "offheap" else ""
-    val pmem = if (usePMem) "pmem" else ""
     val deserialize = if (deserialized) "deserialized" else ""
 
     val output =
-      Seq(disk, memory, heap, pmem, deserialize, s"$replication replicas").filter(_.nonEmpty)
+      Seq(disk, memory, heap, deserialize, s"$replication replicas").filter(_.nonEmpty)
     s"StorageLevel(${output.mkString(", ")})"
   }
 
@@ -147,9 +137,6 @@ class StorageLevel private(
     result += (if (useDisk) "Disk " else "")
     if (useMemory) {
       result += (if (useOffHeap) "Memory (off heap) " else "Memory ")
-    }
-    if (usePMem) {
-      result += "PMem "
     }
     result += (if (deserialized) "Deserialized " else "Serialized ")
     result += s"${replication}x Replicated"
@@ -163,20 +150,18 @@ class StorageLevel private(
  * new storage levels.
  */
 object StorageLevel {
-  val NONE = new StorageLevel(false, false, false, false, false)
-  val DISK_ONLY = new StorageLevel(true, false, false, false, false)
-  val DISK_ONLY_2 = new StorageLevel(true, false, false, false, false, 2)
-  val MEMORY_ONLY = new StorageLevel(false, true, false, false, true)
-  val MEMORY_ONLY_2 = new StorageLevel(false, true, false, false, true, 2)
-  val MEMORY_ONLY_SER = new StorageLevel(false, true, false, false, false)
-  val MEMORY_ONLY_SER_2 = new StorageLevel(false, true, false, false, false, 2)
-  val MEMORY_AND_DISK = new StorageLevel(true, true, false, false, true)
-  val MEMORY_AND_DISK_2 = new StorageLevel(true, true, false, false, true, 2)
-  val MEMORY_AND_DISK_SER = new StorageLevel(true, true, false, false, false)
-  val MEMORY_AND_DISK_SER_2 = new StorageLevel(true, true, false, false, false, 2)
-  val OFF_HEAP = new StorageLevel(true, true, true, false, false, 1)
-  val PMEM_ONLY = new StorageLevel(false, true, false, true, false, 1)
-  val PMEM_AND_DISK = new StorageLevel(true, true, false, true, false, 1)
+  val NONE = new StorageLevel(false, false, false, false)
+  val DISK_ONLY = new StorageLevel(true, false, false, false)
+  val DISK_ONLY_2 = new StorageLevel(true, false, false, false, 2)
+  val MEMORY_ONLY = new StorageLevel(false, true, false, true)
+  val MEMORY_ONLY_2 = new StorageLevel(false, true, false, true, 2)
+  val MEMORY_ONLY_SER = new StorageLevel(false, true, false, false)
+  val MEMORY_ONLY_SER_2 = new StorageLevel(false, true, false, false, 2)
+  val MEMORY_AND_DISK = new StorageLevel(true, true, false, true)
+  val MEMORY_AND_DISK_2 = new StorageLevel(true, true, false, true, 2)
+  val MEMORY_AND_DISK_SER = new StorageLevel(true, true, false, false)
+  val MEMORY_AND_DISK_SER_2 = new StorageLevel(true, true, false, false, 2)
+  val OFF_HEAP = new StorageLevel(true, true, true, false, 1)
 
   /**
    * :: DeveloperApi ::
@@ -196,8 +181,6 @@ object StorageLevel {
     case "MEMORY_AND_DISK_SER" => MEMORY_AND_DISK_SER
     case "MEMORY_AND_DISK_SER_2" => MEMORY_AND_DISK_SER_2
     case "OFF_HEAP" => OFF_HEAP
-    case "PMEM_ONLY" => PMEM_ONLY
-    case "PMEM_AND_DISK" => PMEM_AND_DISK
     case _ => throw new IllegalArgumentException(s"Invalid StorageLevel: $s")
   }
 
@@ -213,7 +196,7 @@ object StorageLevel {
       deserialized: Boolean,
       replication: Int): StorageLevel = {
     getCachedStorageLevel(
-      new StorageLevel(useDisk, useMemory, useOffHeap, false, deserialized, replication))
+      new StorageLevel(useDisk, useMemory, useOffHeap, deserialized, replication))
   }
 
   /**
@@ -226,8 +209,7 @@ object StorageLevel {
       useMemory: Boolean,
       deserialized: Boolean,
       replication: Int = 1): StorageLevel = {
-    getCachedStorageLevel(new StorageLevel(useDisk, useMemory, false, false, deserialized,
-      replication))
+    getCachedStorageLevel(new StorageLevel(useDisk, useMemory, false, deserialized, replication))
   }
 
   /**
