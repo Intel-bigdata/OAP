@@ -1,4 +1,6 @@
-#! /bin/bash
+#!/usr/bin/env bash
+
+set -eu
 
 CURRENT_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 echo $CURRENT_DIR
@@ -16,3 +18,6 @@ make install
 
 # cd $CURRENT_DIR
 # rm -r build
+
+set +eu
+
