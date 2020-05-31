@@ -10,8 +10,8 @@ fi
 mkdir build
 cd build
 cmake ..
-make -j
-make -j
+make
+make
 make install
 
 # cd $CURRENT_DIR
