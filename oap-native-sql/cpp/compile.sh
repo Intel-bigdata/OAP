@@ -14,7 +14,7 @@ cd build
 cmake ..
 make
 make
-make install
+#sudo make install
 
 # cd $CURRENT_DIR
 # rm -r build
