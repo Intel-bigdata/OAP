@@ -13,11 +13,6 @@ mkdir build
 cd build
 cmake ..
 make
-make
-#sudo make install
-
-# cd $CURRENT_DIR
-# rm -r build
 
 set +eu
 
