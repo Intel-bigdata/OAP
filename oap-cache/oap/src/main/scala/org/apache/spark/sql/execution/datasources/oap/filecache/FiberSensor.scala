@@ -76,8 +76,7 @@ private[sql] class FiberSensor(
   def updateLocations(fiberInfo: SparkListenerCustomInfoUpdate): Unit = {
     val updateExecId = fiberInfo.executorId
     val updateHostName = fiberInfo.hostName
-    val host = FiberSensor.OAP_CACHE_HOST_PREFIX + updateHostName +
-      FiberSensor.OAP_CACHE_EXECUTOR_PREFIX + updateExecId
+    val host = FiberSensor.OAP_CACHE_LOCATION_TAG + updateHostName + "_" + updateExecId
     val fiberCacheStatus = CacheStatusSerDe.deserialize(fiberInfo.customizedInfo)
     logDebug(s"Got updated fiber info from host: $updateHostName, executorId: $updateExecId," +
       s"host is $host, info array len is ${fiberCacheStatus.size}")
@@ -143,6 +142,7 @@ private[sql] object FiberSensor {
   val MAX_HOSTS_MAINTAINED = conf.get(
     OapConf.OAP_CACHE_FIBERSENSOR_MAXHOSTSMAINTAINED_NUM,
     OapConf.OAP_CACHE_FIBERSENSOR_MAXHOSTSMAINTAINED_NUM.defaultValue.get)
-  val OAP_CACHE_HOST_PREFIX = "OAP_HOST_"
-  val OAP_CACHE_EXECUTOR_PREFIX = "_OAP_EXECUTOR_"
+  // When the file location has a form like executor_[hostname]_[executorid], DAGScheduler will
+  // recognize it as a ExecutorCacheTaskLocation and corresponding task could be PROCESS_LOCAL
+  val OAP_CACHE_LOCATION_TAG = "executor_"
 }

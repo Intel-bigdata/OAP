@@ -34,7 +34,7 @@ index 48d3630..c001191 100644
    def main(args: Array[String]) {
      var driverUrl: String = null
      var executorId: String = null
-+    var numaNodeId: Option[String] = null
++    var numaNodeId: Option[String] = None
      var hostname: String = null
      var cores: Int = 0
      var appId: String = null

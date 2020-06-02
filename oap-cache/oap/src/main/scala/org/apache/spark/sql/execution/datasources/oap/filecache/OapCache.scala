@@ -18,21 +18,30 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.io.File
+import java.nio.{ByteBuffer, DirectByteBuffer}
 import java.util.concurrent.{ConcurrentHashMap, Executors, LinkedBlockingQueue}
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.concurrent.locks.{Condition, ReentrantLock}
 
 import scala.collection.JavaConverters._
+import scala.util.Success
 
 import com.google.common.cache._
+import com.google.common.hash._
+import com.intel.oap.common.unsafe.VMEMCacheJNI
+import org.apache.arrow.plasma
+import org.apache.arrow.plasma.exceptions.{DuplicateObjectException, PlasmaClientException}
+import sun.nio.ch.DirectBuffer
 
 import org.apache.spark.{SparkEnv, SparkException}
 import org.apache.spark.internal.Logging
+import org.apache.spark.internal.config.ConfigEntry
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberType.FiberType
 import org.apache.spark.sql.execution.datasources.oap.utils.PersistentMemoryConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
-import org.apache.spark.unsafe.VMEMCacheJNI
+import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.Utils
 
 private[filecache] class MultiThreadCacheGuardian(maxMemory: Long) extends CacheGuardian(maxMemory)
@@ -202,6 +211,88 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
   }
 }
 
+private[filecache] object OapCache extends Logging {
+  val PMemRelatedCacheBackend = Array("guava", "vmem", "noevict", "external")
+  def cacheFallBackDetect(sparkEnv: SparkEnv,
+                          fallBackEnabled: Boolean = true,
+                          fallBackRes: Boolean = true): Boolean = {
+    if (fallBackEnabled == false && fallBackRes == true) return true
+    if (fallBackEnabled == false && fallBackRes == false) return false
+    val conf = sparkEnv.conf
+    var numaId = conf.getInt("spark.executor.numa.id", -1)
+    val executorIdStr = sparkEnv.executorId
+    scala.util.Try(executorIdStr.toInt) match {
+      case Success(_) => logDebug("valid executor id for numa binding.") ;
+      case _ =>
+        logWarning("invalid executor id for numa binding.")
+        return false
+    }
+    val executorId = executorIdStr.toInt
+    val map = PersistentMemoryConfigUtils.parseConfig(conf)
+    if (numaId == -1) {
+      logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +
+        s"executor with NUMA when cache data to Intel Optane DC persistent memory.")
+      numaId = executorId % PersistentMemoryConfigUtils.totalNumaNode(conf)
+    }
+    val initialPath = map.get(numaId).get
+    val initialSizeStr = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim
+    val initialSize = Utils.byteStringAsBytes(initialSizeStr)
+
+    val file: File = new File(initialPath)
+    if(!file.exists()) {
+       return false
+    }
+    if(initialSize > file.getUsableSpace) {
+      logWarning(s"Required initialSize larger than usable space, will use largest usable space")
+      return false
+    }
+    true
+  }
+
+  def apply(sparkEnv: SparkEnv, cacheMemory: Long,
+            cacheGuardianMemory: Long, fiberType: FiberType): OapCache = {
+    apply(sparkEnv, OapConf.OAP_FIBERCACHE_STRATEGY, cacheMemory, cacheGuardianMemory, fiberType)
+  }
+
+  def apply(sparkEnv: SparkEnv, configEntry: ConfigEntry[String],
+            cacheMemory: Long, cacheGuardianMemory: Long, fiberType: FiberType): OapCache = {
+    val conf = sparkEnv.conf
+    val oapCacheOpt = conf.get(
+      configEntry.key,
+      configEntry.defaultValue.get).toLowerCase
+    val memoryManagerOpt =
+      conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
+    val fallBackEnabled = conf.get(OapConf.OAP_CACHE_BACKEND_FALLBACK_ENABLED.key,
+      "true").toLowerCase
+    val fallBackRes = conf.get(OapConf.OAP_TEST_CACHE_BACKEND_FALLBACK_RES.key,
+      "true").toLowerCase
+    if (PMemRelatedCacheBackend.contains(oapCacheOpt)) {
+      if (!cacheFallBackDetect(sparkEnv, fallBackEnabled.toBoolean, fallBackRes.toBoolean)) {
+        if (oapCacheOpt.equals("guava") && memoryManagerOpt.equals("offheap")) {
+          return new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
+        }
+        logWarning(s"There is no Optane PMem DIMMs detected," +
+          s"has to fall back to simple cache implementation")
+        new SimpleOapCache()
+      }
+      else {
+        oapCacheOpt match {
+          case "guava" => new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
+          case "vmem" => new VMemCache(fiberType)
+          case "noevict" => new NoEvictPMCache(cacheMemory, cacheGuardianMemory, fiberType)
+          case "external" => new ExternalCache(fiberType)
+          case _ => throw new UnsupportedOperationException(
+            s"The cache backend: ${oapCacheOpt} is not supported now")
+        }
+      }
+    }
+    else {
+      throw new UnsupportedOperationException(
+        s"The cache backend: ${oapCacheOpt} is not supported now")
+    }
+  }
+}
+
 trait OapCache {
   val dataFiberSize: AtomicLong = new AtomicLong(0)
   val indexFiberSize: AtomicLong = new AtomicLong(0)
@@ -262,8 +353,9 @@ trait OapCache {
 
 }
 
-class NonEvictPMCache(pmSize: Long,
-                      cacheGuardianMemory: Long) extends OapCache with Logging {
+class NoEvictPMCache(pmSize: Long,
+                      cacheGuardianMemory: Long,
+                      fiberType: FiberType) extends OapCache with Logging {
   // We don't bother the memory use of Simple Cache
   private val cacheGuardian = new MultiThreadCacheGuardian(Int.MaxValue)
   private val _cacheSize: AtomicLong = new AtomicLong(0)
@@ -382,7 +474,7 @@ class SimpleOapCache extends OapCache with Logging {
   override def getCacheGuardian: CacheGuardian = cacheGuardian
 }
 
-class VMemCache extends OapCache with Logging {
+class VMemCache(fiberType: FiberType) extends OapCache with Logging {
   private def emptyDataFiber(fiberLength: Long): FiberCache =
     OapRuntime.getOrCreate.fiberCacheManager.getEmptyDataFiberCache(fiberLength)
 
@@ -401,6 +493,10 @@ class VMemCache extends OapCache with Logging {
   private val conf = SparkEnv.get.conf
   private val initialSizeStr = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim
   private val vmInitialSize = Utils.byteStringAsBytes(initialSizeStr)
+  require(!conf.getBoolean( OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION.key,
+    OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION.defaultValue.get),
+    "Vmemcache strategy doesn't support fiber cache compression currently, " +
+    "please try other strategy.")
   require(vmInitialSize > 0, "AEP initial size must be greater than zero")
   def initializeVMEMCache(): Unit = {
     if (!initialized) {
@@ -510,23 +606,33 @@ class VMemCache extends OapCache with Logging {
     cacheTotalSize = status(2)
     logDebug(s"Current status is evict:$cacheEvictCount," +
       s" count:$cacheTotalCount, size:$cacheTotalSize")
-    CacheStats(
-      cacheTotalCount, // dataFiberCount
-      cacheTotalSize, // dataFiberSize JNIGet
-      0, // indexFiberCount
-      0, // indexFiberSize
-      cacheGuardian.pendingFiberCount, // pendingFiberCount
-      cacheGuardian.pendingFiberSize, // pendingFiberSize
-      cacheHitCount.get(), // dataFiberHitCount
-      cacheMissCount.get(), // dataFiberMissCount
-      cacheHitCount.get(), // dataFiberLoadCount
-      cacheTotalGetTime.get(), // dataTotalLoadTime
-      cacheEvictCount, // dataEvictionCount
-      0, // indexFiberHitCount
-      0, // indexFiberMissCount
-      0, // indexFiberLoadCount
-      0, // indexFiberLoadTime
-      0) // indexEvictionCount JNIGet
+
+    if (fiberType == FiberType.INDEX) {
+      CacheStats(
+        0, 0,
+        cacheTotalCount, cacheTotalSize,
+        cacheGuardian.pendingFiberCount, // pendingFiberCount
+        cacheGuardian.pendingFiberSize, // pendingFiberSize
+        0, 0, 0, 0, 0, // For index cache, the data fiber metrics should always be zero
+        cacheHitCount.get(), // indexFiberHitCount
+        cacheMissCount.get(), // indexFiberMissCount
+        cacheHitCount.get(), // indexFiberLoadCount
+        cacheTotalGetTime.get(), // indexTotalLoadTime
+        cacheEvictCount // indexEvictionCount
+      )
+    } else {
+      CacheStats(
+        cacheTotalCount, cacheTotalSize,
+        0, 0,
+        cacheGuardian.pendingFiberCount, // pendingFiberCount
+        cacheGuardian.pendingFiberSize, // pendingFiberSize
+        cacheHitCount.get(), // dataFiberHitCount
+        cacheMissCount.get(), // dataFiberMissCount
+        cacheHitCount.get(), // dataFiberLoadCount
+        cacheTotalGetTime.get(), // dataTotalLoadTime
+        cacheEvictCount, // dataEvictionCount
+        0, 0, 0, 0, 0) // For data cache, the index fiber metrics should always be zero
+    }
   }
 
   override def cacheCount: Long = 0
@@ -547,19 +653,16 @@ class VMemCache extends OapCache with Logging {
 }
 
 class GuavaOapCache(
-    dataCacheMemory: Long,
-    indexCacheMemory: Long,
+    cacheMemory: Long,
     cacheGuardianMemory: Long,
-    var separationCache: Boolean)
+    fiberType: FiberType)
     extends OapCache with Logging {
 
   // TODO: CacheGuardian can also track cache statistics periodically
   private val cacheGuardian = new CacheGuardian(cacheGuardianMemory)
   cacheGuardian.start()
 
-  private val DATA_MAX_WEIGHT = dataCacheMemory
-  private val INDEX_MAX_WEIGHT = indexCacheMemory
-  private val TOTAL_MAX_WEIGHT = INDEX_MAX_WEIGHT + DATA_MAX_WEIGHT
+  private val MAX_WEIGHT = cacheMemory
   private val CONCURRENCY_LEVEL = 4
 
   // Total cached size for debug purpose, not include pending fiber
@@ -587,111 +690,52 @@ class GuavaOapCache(
     }
   }
 
-  private var cacheInstance = if (separationCache) {
-    initLoadingCache(DATA_MAX_WEIGHT)
-  } else {
-    initLoadingCache(TOTAL_MAX_WEIGHT)
-  }
-
-  // this is only used when enable index and data cache separation
-  private var indexCacheInstance = if (separationCache) {
-    initLoadingCache(INDEX_MAX_WEIGHT)
-  } else {
-    null
-  }
-
-  private def initLoadingCache(weight: Long) = {
-    CacheBuilder.newBuilder()
-      .recordStats()
-      .removalListener(removalListener)
-      .maximumWeight(weight)
-      .weigher(weigher)
-      .concurrencyLevel(CONCURRENCY_LEVEL)
-      .build[FiberId, FiberCache](new CacheLoader[FiberId, FiberCache] {
+  private val cacheInstance = CacheBuilder.newBuilder()
+    .recordStats()
+    .removalListener(removalListener)
+    .maximumWeight(MAX_WEIGHT)
+    .weigher(weigher)
+    .concurrencyLevel(CONCURRENCY_LEVEL)
+    .build[FiberId, FiberCache](new CacheLoader[FiberId, FiberCache] {
       override def load(key: FiberId): FiberCache = {
         val startLoadingTime = System.currentTimeMillis()
         val fiberCache = cache(key)
         incFiberCountAndSize(key, 1, fiberCache.size())
         logDebug(
-          "Load missed index fiber took %s. Fiber: %s. length: %s".format(
+          "Load missed fiber took %s. Fiber: %s. length: %s".format(
             Utils.getUsedTimeMs(startLoadingTime), key, fiberCache.size()))
         _cacheSize.addAndGet(fiberCache.size())
         fiberCache
       }
     })
-  }
+
 
   override def get(fiber: FiberId): FiberCache = {
     val readLock = OapRuntime.getOrCreate.fiberCacheManager.getFiberLock(fiber).readLock()
     readLock.lock()
     try {
-        if (separationCache) {
-          if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId]) {
-            val fiberCache = cacheInstance.get(fiber)
-            // Avoid loading a fiber larger than DATA_MAX_WEIGHT / CONCURRENCY_LEVEL
-            assert(fiberCache.size() <= DATA_MAX_WEIGHT / CONCURRENCY_LEVEL,
-              s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
-                s"with cache's MAX_WEIGHT" +
-                s"(${Utils.bytesToString(DATA_MAX_WEIGHT.toLong)}) " +
-                s"/ $CONCURRENCY_LEVEL")
-            fiberCache.occupy()
-            fiberCache
-          } else if (
-            fiber.isInstanceOf[BTreeFiberId] ||
-              fiber.isInstanceOf[BitmapFiberId] ||
-              fiber.isInstanceOf[TestIndexFiberId]) {
-            val fiberCache = indexCacheInstance.get(fiber)
-            // Avoid loading a fiber larger than INDEX_MAX_WEIGHT / CONCURRENCY_LEVEL
-            assert(fiberCache.size() <= INDEX_MAX_WEIGHT / CONCURRENCY_LEVEL,
-              s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
-                s"with cache's MAX_WEIGHT" +
-                s"(${Utils.bytesToString(INDEX_MAX_WEIGHT)}) " +
-                s"/ $CONCURRENCY_LEVEL")
-            fiberCache.occupy()
-            fiberCache
-          } else throw new OapException(s"not support fiber type $fiber")
-        } else {
-          val fiberCache = cacheInstance.get(fiber)
-          // Avoid loading a fiber larger than MAX_WEIGHT / CONCURRENCY_LEVEL
-          assert(fiberCache.size() <= TOTAL_MAX_WEIGHT / CONCURRENCY_LEVEL,
-            s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
-              s"with cache's MAX_WEIGHT" +
-              s"(${Utils.bytesToString(TOTAL_MAX_WEIGHT)}) / $CONCURRENCY_LEVEL")
-          fiberCache.occupy()
-          fiberCache
-        }
+      val fiberCache = cacheInstance.get(fiber)
+      // Avoid loading a fiber larger than MAX_WEIGHT / CONCURRENCY_LEVEL
+      assert(fiberCache.size() <= MAX_WEIGHT / CONCURRENCY_LEVEL,
+        s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
+          s"with cache's MAX_WEIGHT" +
+          s"(${Utils.bytesToString(MAX_WEIGHT)}) / $CONCURRENCY_LEVEL")
+      fiberCache.occupy()
+      fiberCache
     } finally {
       readLock.unlock()
     }
   }
 
-  override def getIfPresent(fiber: FiberId): FiberCache =
-    if (separationCache &&
-        (fiber.isInstanceOf[BTreeFiberId] ||
-         fiber.isInstanceOf[BitmapFiberId] ||
-         fiber.isInstanceOf[TestIndexFiberId])) {
-        indexCacheInstance.getIfPresent(fiber)
-    } else {
-      cacheInstance.getIfPresent(fiber)
-    }
+  override def getIfPresent(fiber: FiberId): FiberCache = cacheInstance.getIfPresent(fiber)
 
-  override def getFibers: Set[FiberId] =
-    if (separationCache) {
-      cacheInstance.asMap().keySet().asScala.toSet ++
-        indexCacheInstance.asMap().keySet().asScala.toSet
-    } else {
-      cacheInstance.asMap().keySet().asScala.toSet
-    }
+  override def getFibers: Set[FiberId] = {
+    cacheInstance.asMap().keySet().asScala.toSet
+  }
 
-  override def invalidate(fiber: FiberId): Unit =
-    if (separationCache &&
-        (fiber.isInstanceOf[BTreeFiberId] ||
-         fiber.isInstanceOf[BitmapFiberId] ||
-         fiber.isInstanceOf[TestIndexFiberId])) {
-      indexCacheInstance.invalidate(fiber)
-    } else {
-      cacheInstance.invalidate(fiber)
-    }
+  override def invalidate(fiber: FiberId): Unit = {
+    cacheInstance.invalidate(fiber)
+  }
 
   override def invalidateAll(fibers: Iterable[FiberId]): Unit = {
     fibers.foreach(invalidate)
@@ -700,60 +744,35 @@ class GuavaOapCache(
   override def cacheSize: Long = _cacheSize.get()
 
   override def cacheStats: CacheStats = {
-    if (separationCache) {
-      val dataStats = cacheInstance.stats()
-      val indexStats = indexCacheInstance.stats()
+    val stats = cacheInstance.stats()
+    if (fiberType == FiberType.INDEX) {
       CacheStats(
         dataFiberCount.get(), dataFiberSize.get(),
         indexFiberCount.get(), indexFiberSize.get(),
         pendingFiberCount, cacheGuardian.pendingFiberSize,
-        dataStats.hitCount(),
-        dataStats.missCount(),
-        dataStats.loadCount(),
-        dataStats.totalLoadTime(),
-        dataStats.evictionCount(),
-        indexStats.hitCount(),
-        indexStats.missCount(),
-        indexStats.loadCount(),
-        indexStats.totalLoadTime(),
-        indexStats.evictionCount()
+        0, 0, 0, 0, 0, // For index cache, the data fiber metrics should always be zero
+        stats.hitCount(),
+        stats.missCount(),
+        stats.loadCount(),
+        stats.totalLoadTime(),
+        stats.evictionCount()
       )
     } else {
-      // when disable index and data cache separation
-      // we can't independently retrieve index and data cache
-      val cacheStats = cacheInstance.stats()
       CacheStats(
         dataFiberCount.get(), dataFiberSize.get(),
         indexFiberCount.get(), indexFiberSize.get(),
         pendingFiberCount, cacheGuardian.pendingFiberSize,
-        cacheStats.hitCount(),
-        cacheStats.missCount(),
-        cacheStats.loadCount(),
-        cacheStats.totalLoadTime(),
-        cacheStats.evictionCount(),
-        0L,
-        0L,
-        0L,
-        0L,
-        0L
+        stats.hitCount(),
+        stats.missCount(),
+        stats.loadCount(),
+        stats.totalLoadTime(),
+        stats.evictionCount(),
+        0, 0, 0, 0, 0 // For data cache, the index fiber metrics should always be zero
       )
     }
   }
 
-  override def cacheCount: Long =
-    if (separationCache) {
-      cacheInstance.size() + indexCacheInstance.size()
-    } else {
-      cacheInstance.size()
-    }
-
-  override def dataCacheCount: Long =
-    if (separationCache) {
-      cacheInstance.size()
-    } else {
-      cacheInstance.asMap().keySet().asScala
-        .count(fiber => fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId])
-    }
+  override def cacheCount: Long = cacheInstance.size()
 
   override def pendingFiberCount: Int = cacheGuardian.pendingFiberCount
 
@@ -766,15 +785,326 @@ class GuavaOapCache(
   override def cleanUp(): Unit = {
     super.cleanUp()
     cacheInstance.cleanUp()
-    if (separationCache) {
-      indexCacheInstance.cleanUp()
+  }
+
+  override def dataCacheCount: Long = {
+    cacheInstance.asMap().keySet().asScala
+      .count(fiber => fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId])
+  }
+}
+
+class MixCache(dataCacheMemory: Long,
+               indexCacheMemory: Long,
+               dataCacheGuardianMemory: Long,
+               indexCacheGuardianMemory: Long,
+               separation: Boolean,
+               sparkEnv: SparkEnv)
+  extends OapCache with Logging {
+
+  private val (dataCacheBackend, indexCacheBackend) = init()
+
+  private def init(): (OapCache, OapCache) = {
+    if (!separation) {
+      val dataCacheBackend = OapCache(sparkEnv, OapConf.OAP_MIX_DATA_CACHE_BACKEND,
+        dataCacheMemory, dataCacheGuardianMemory, FiberType.DATA);
+      val indexCacheBackend = OapCache(sparkEnv, OapConf.OAP_MIX_INDEX_CACHE_BACKEND,
+        indexCacheMemory, indexCacheGuardianMemory, FiberType.INDEX);
+      (dataCacheBackend, indexCacheBackend)
+    } else {
+      val dataCacheBackend = new GuavaOapCache(dataCacheMemory, dataCacheGuardianMemory,
+        FiberType.DATA)
+      val indexCacheBackend = new GuavaOapCache(indexCacheMemory, indexCacheGuardianMemory,
+        FiberType.INDEX)
+      (dataCacheBackend, indexCacheBackend)
     }
   }
 
-  // This is only for test purpose
-  private[filecache] def enableCacheSeparation(): Unit = {
-    this.separationCache = true
-    cacheInstance = initLoadingCache(DATA_MAX_WEIGHT)
-    indexCacheInstance = initLoadingCache(INDEX_MAX_WEIGHT)
+  override def get(fiberId: FiberId): FiberCache = {
+    if (fiberId.isInstanceOf[DataFiberId] ||
+      fiberId.isInstanceOf[TestDataFiberId]) {
+      val fiberCache = dataCacheBackend.get(fiberId)
+      fiberCache
+    } else if (fiberId.isInstanceOf[BTreeFiberId] ||
+      fiberId.isInstanceOf[BitmapFiberId] ||
+      fiberId.isInstanceOf[TestIndexFiberId]) {
+      val fiberCache = indexCacheBackend.get(fiberId)
+      fiberCache
+    } else {
+      throw new OapException(s"not support fiber type $fiberId")
+    }
+  }
+
+  override def getIfPresent(fiber: FiberId): FiberCache =
+    if (fiber.isInstanceOf[BTreeFiberId] ||
+      fiber.isInstanceOf[BitmapFiberId] ||
+      fiber.isInstanceOf[TestIndexFiberId]) {
+      indexCacheBackend.getIfPresent(fiber)
+    } else {
+      dataCacheBackend.getIfPresent(fiber)
+    }
+
+  override def getFibers: Set[FiberId] = {
+    dataCacheBackend.getFibers ++ indexCacheBackend.getFibers
+  }
+
+  override def invalidate(fiber: FiberId): Unit =
+    if (fiber.isInstanceOf[BTreeFiberId] ||
+      fiber.isInstanceOf[BitmapFiberId] ||
+      fiber.isInstanceOf[TestIndexFiberId]) {
+      indexCacheBackend.invalidate(fiber)
+    } else {
+      dataCacheBackend.invalidate(fiber)
+    }
+
+  override def invalidateAll(fibers: Iterable[FiberId]): Unit = {
+    fibers.foreach(invalidate)
+  }
+
+  override def cacheSize: Long = {
+    dataCacheBackend.cacheSize + indexCacheBackend.cacheSize
+  }
+
+  override def cacheStats: CacheStats = {
+    dataCacheBackend.cacheStats + indexCacheBackend.cacheStats
+  }
+
+  override def cacheCount: Long = {
+    dataCacheBackend.cacheCount + indexCacheBackend.cacheCount
+  }
+
+  override def dataCacheCount: Long = {
+    dataCacheBackend.dataCacheCount + indexCacheBackend.dataCacheCount
+  }
+
+  override def pendingFiberCount: Int = {
+    dataCacheBackend.getCacheGuardian.pendingFiberCount +
+      indexCacheBackend.getCacheGuardian.pendingFiberCount
+  }
+
+  override def pendingFiberSize: Long = {
+    dataCacheBackend.getCacheGuardian.pendingFiberSize +
+      indexCacheBackend.getCacheGuardian.pendingFiberSize
+  }
+
+  override def pendingFiberOccupiedSize: Long = {
+    dataCacheBackend.getCacheGuardian.pendingFiberOccupiedSize +
+      indexCacheBackend.getCacheGuardian.pendingFiberOccupiedSize
+  }
+
+  override def getCacheGuardian: CacheGuardian = {
+    // this method is only used in VectorizedCacheReader
+    // So we get from dataCacheBackend
+    dataCacheBackend.getCacheGuardian
+  }
+
+  override def cleanUp: Unit = {
+    dataCacheBackend.cleanUp()
+    indexCacheBackend.cleanUp()
+  }
+}
+
+class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
+  private val conf = SparkEnv.get.conf
+  private val externalStoreCacheSocket: String = "/tmp/plasmaStore"
+  private var cacheInit: Boolean = false
+  def init(): Unit = {
+    if (!cacheInit) {
+      try {
+        System.loadLibrary("plasma_java")
+        cacheInit = true
+      } catch {
+        case e: Exception => logError(s"load plasma jni lib failed " + e.getMessage)
+      }
+    }
+  }
+
+  init()
+
+  private val cacheHitCount: AtomicLong = new AtomicLong(0)
+  private val cacheMissCount: AtomicLong = new AtomicLong(0)
+  private val cacheTotalGetTime: AtomicLong = new AtomicLong(0)
+  private var cacheTotalCount: AtomicLong = new AtomicLong(0)
+  private var cacheEvictCount: AtomicLong = new AtomicLong(0)
+  private var cacheTotalSize: AtomicLong = new AtomicLong(0)
+
+  private def emptyDataFiber(fiberLength: Long): FiberCache =
+    OapRuntime.getOrCreate.fiberCacheManager.getEmptyDataFiberCache(fiberLength)
+
+  var fiberSet = scala.collection.mutable.Set[FiberId]()
+  val cacheReadOnlyEnbale = conf.get(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLE)
+  val clientPoolSize = conf.get(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE)
+  val clientRoundRobin = new AtomicInteger(0)
+  val plasmaClientPool = new Array[ plasma.PlasmaClient](clientPoolSize)
+  for ( i <- 0 until clientPoolSize) {
+    try {
+      plasmaClientPool(i) = new plasma.PlasmaClient(externalStoreCacheSocket, "", 0)
+    } catch {
+      case e: Exception =>
+        logError(s"Error occurred when connecting to plasma server" + e.getMessage)
+    }
+  }
+
+  val cacheGuardian = new MultiThreadCacheGuardian(Int.MaxValue)
+  cacheGuardian.start()
+
+  val hf: HashFunction = Hashing.murmur3_128()
+
+  def hash(key: Array[Byte]): Array[Byte] = {
+    val ret = new Array[Byte](20)
+    hf.newHasher().putBytes(key).hash().writeBytesTo(ret, 0, 20)
+    ret
+  }
+
+  def hash(key: String): Array[Byte] = {
+    hash(key.getBytes())
+  }
+
+  def delete(fiberId: FiberId): Unit = {
+    val objectId = hash(fiberId.toString)
+    plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).delete(objectId)
+  }
+
+  def contains(fiberId: FiberId): Boolean = {
+    val objectId = hash(fiberId.toString)
+    if (plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).contains(objectId)) true
+    else false
+  }
+
+  override def get(fiberId: FiberId): FiberCache = {
+    logDebug(s"external cache get FiberId is ${fiberId}")
+    val objectId = hash(fiberId.toString)
+    if(contains(fiberId)) {
+      var fiberCache : FiberCache = null
+      try{
+        logDebug(s"Cache hit, get from external cache.")
+        val plasmaClient = plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize)
+        val buf: ByteBuffer = plasmaClient.getObjAsByteBuffer(objectId, -1, false)
+        cacheHitCount.addAndGet(1)
+        fiberCache = emptyDataFiber(buf.capacity())
+        fiberCache.fiberId = fiberId
+        Platform.copyMemory(null, buf.asInstanceOf[DirectBuffer].address(),
+          null, fiberCache.fiberData.baseOffset, buf.capacity())
+        plasmaClient.release(objectId)
+      }
+      catch {
+        case getException : plasma.exceptions.PlasmaGetException =>
+          logWarning("Get exception: " + getException.getMessage)
+          fiberCache = cache(fiberId)
+          cacheMissCount.addAndGet(1)
+      }
+      fiberCache.occupy()
+      cacheGuardian.addRemovalFiber(fiberId, fiberCache)
+      fiberCache
+    } else {
+      if (cacheReadOnlyEnbale) {
+        val fiberCache = cache(fiberId)
+        cacheMissCount.addAndGet(1)
+        fiberSet.add(fiberId)
+        fiberCache.occupy()
+        cacheGuardian.addRemovalFiber(fiberId, fiberCache)
+        fiberCache
+      } else {
+        val fiberCache = super.cache(fiberId)
+        fiberCache
+      }
+    }
+  }
+
+  override def cache(fiberId: FiberId): FiberCache = {
+    val fiber = super.cache(fiberId)
+
+    val objectId = hash(fiberId.toString)
+    if( !contains(fiberId)) {
+      val plasmaClient = plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize)
+      try {
+        val buf = plasmaClient.create(objectId, fiber.size().toInt)
+        Platform.copyMemory(null, fiber.fiberData.baseOffset,
+          null, buf.asInstanceOf[DirectBuffer].address(), fiber.size())
+        plasmaClient.seal(objectId)
+        plasmaClient.release(objectId)
+      } catch {
+        case e: DuplicateObjectException => logWarning(e.getMessage)
+      }
+    }
+    fiber
+  }
+
+  private val _cacheSize: AtomicLong = new AtomicLong(0)
+
+  override def getIfPresent(fiber: FiberId): FiberCache = null
+
+  override def getFibers: Set[FiberId] = {
+    val set : Set[Array[Byte]] =
+      plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).list().asScala.toSet
+    cacheTotalCount = new AtomicLong(set.size)
+    logDebug("cache total size is " + cacheTotalCount)
+    fiberSet.foreach( fiber =>
+      if ( !set.contains(hash(fiber.toFiberKey()))) fiberSet.remove(fiber) )
+    fiberSet.toSet
+  }
+
+  override def invalidate(fiber: FiberId): Unit = { }
+
+  override def invalidateAll(fibers: Iterable[FiberId]): Unit = { }
+
+  override def cacheSize: Long = _cacheSize.get()
+
+  override def cacheCount: Long = 0
+
+  override def cacheStats: CacheStats = {
+    val array = new Array[Long](4)
+    // TODO:total size will be incorrect due to it's an external cache
+    plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).metrics(array)
+    cacheTotalSize = new AtomicLong(array(3) + array(1))
+    // Memory store and external store used size
+
+    if (fiberType == FiberType.INDEX) {
+      CacheStats(
+        0, 0,
+        cacheTotalCount.get(),
+        cacheTotalSize.get(),
+        cacheGuardian.pendingFiberCount, // pendingFiberCount
+        cacheGuardian.pendingFiberSize, // pendingFiberSize
+        0, 0, 0, 0, 0, // For index cache, the data fiber metrics should always be zero
+        cacheHitCount.get(), // indexFiberHitCount
+        cacheMissCount.get(), // indexFiberMissCount
+        cacheHitCount.get(), // indexFiberLoadCount
+        cacheTotalGetTime.get(), // indexTotalLoadTime
+        cacheEvictCount.get() // indexEvictionCount
+      )
+    } else {
+      CacheStats(
+        cacheTotalCount.get(),
+        cacheTotalSize.get(),
+        0, 0,
+        cacheGuardian.pendingFiberCount, // pendingFiberCount
+        cacheGuardian.pendingFiberSize, // pendingFiberSize
+        cacheHitCount.get(), // dataFiberHitCount
+        cacheMissCount.get(), // dataFiberMissCount
+        cacheHitCount.get(), // dataFiberLoadCount
+        cacheTotalGetTime.get(), // dataTotalLoadTime
+        cacheEvictCount.get(), // dataEvictionCount
+        0, 0, 0, 0, 0) // For data cache, the index fiber metrics should always be zero
+    }
+  }
+
+  override def pendingFiberCount: Int = {
+    cacheGuardian.pendingFiberCount
+  }
+
+  override def dataCacheCount: Long = 0
+
+  override def pendingFiberSize: Long = cacheGuardian.pendingFiberSize
+
+  override def pendingFiberOccupiedSize: Long = cacheGuardian.pendingFiberOccupiedSize
+
+  override def getCacheGuardian: CacheGuardian = cacheGuardian
+
+  override def cleanUp(): Unit = {
+    invalidateAll(getFibers)
+    dataFiberSize.set(0L)
+    dataFiberCount.set(0L)
+    indexFiberSize.set(0L)
+    indexFiberCount.set(0L)
   }
 }

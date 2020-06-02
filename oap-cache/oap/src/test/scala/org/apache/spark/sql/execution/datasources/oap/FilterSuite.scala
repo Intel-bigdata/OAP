@@ -1420,7 +1420,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering orc in FiberCache") {
-    withSQLConf(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
       SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
       val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
       data.toDF("key", "value").createOrReplaceTempView("t")

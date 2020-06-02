@@ -27,32 +27,32 @@ import org.apache.spark.sql.internal.oap.OapConf
  */
 private[filecache] class CacheMemoryAllocator(sparkEnv: SparkEnv)
   extends Logging {
-  private val separateMemory = checkSeparateMemory()
+  private val _separateMemory = checkSeparateMemory()
   private val (memoryManager, indexMemoryManager) = init()
-  private val (_dataCacheMemory, _indexCacheMemory, _cacheGuardianMemory) = calculateSizes()
+  private val (_dataCacheMemorySize, _indexCacheMemorySize,
+              _dataCacheGuardianMemorySize, _indexCacheGuardianMemorySize) = calculateSizes()
 
   private def checkSeparateMemory(): Boolean = {
-    val separateCache = sparkEnv.conf.getBoolean(
-      OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
-      OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get
-    )
     val memoryManagerOpt =
       sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
+    val cacheName =
+      sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_STRATEGY.key, "guava").toLowerCase
+
     memoryManagerOpt match {
-      case "mix" => if (separateCache) {
+      case ("mix") => if (cacheName.equals("mix")) {
         true
       } else {
         throw new UnsupportedOperationException("In order to enable mix memory manager," +
-          "you need to set to spark.sql.oap.index.data.cache.separation.enable to true")
+          "you need also to set to spark.oap.cache.strategy to mix")
       }
       case _ => false
     }
   }
-  private def calculateSizes(): (Long, Long, Long) = {
+  private def calculateSizes(): (Long, Long, Long, Long) = {
     // TO DO: make the 0.9 : 0.1 ration configurable
-    if (separateMemory) {
+    if (_separateMemory) {
       ((memoryManager.memorySize * 0.9).toLong, (indexMemoryManager.memorySize * 0.9).toLong,
-        (memoryManager.memorySize * 0.1).toLong + (indexMemoryManager.memorySize * 0.1).toLong)
+        (memoryManager.memorySize * 0.1).toLong, (indexMemoryManager.memorySize * 0.1).toLong)
     } else {
       val cacheRatio = sparkEnv.conf.getDouble(
         OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.key,
@@ -63,14 +63,14 @@ private[filecache] class CacheMemoryAllocator(sparkEnv: SparkEnv)
       val memorySize = memoryManager.memorySize
       ((memorySize * 0.9 * cacheRatio).toLong,
         (memorySize * 0.9 * (1 - cacheRatio)).toLong,
-        (memorySize * 0.1).toLong)
+        (memorySize * 0.1).toLong, 0)
     }
   }
 
   private def init(): (MemoryManager, MemoryManager) = {
-    if (separateMemory) {
-      val dataManager = MemoryManager(sparkEnv, OapConf.OAP_MIX_DATA_MEMORY_MANAGER)
-      val indexManager = MemoryManager(sparkEnv, OapConf.OAP_MIX_INDEX_MEMORY_MANAGER)
+    if (_separateMemory) {
+      val dataManager = MemoryManager(sparkEnv, OapConf.OAP_FIBERCACHE_STRATEGY, FiberType.DATA)
+      val indexManager = MemoryManager(sparkEnv, OapConf.OAP_FIBERCACHE_STRATEGY, FiberType.INDEX)
       if (indexManager.getClass.equals(dataManager.getClass)) {
         throw new UnsupportedOperationException(
           "Index Cache type and Data Cache type need to be different in Mixed mode")
@@ -88,7 +88,7 @@ private[filecache] class CacheMemoryAllocator(sparkEnv: SparkEnv)
   }
 
   def allocateIndexMemory(size: Long): MemoryBlockHolder = {
-    if (separateMemory) {
+    if (_separateMemory) {
       indexMemoryManager.allocate(size)
     } else {
       memoryManager.allocate(size)
@@ -100,7 +100,7 @@ private[filecache] class CacheMemoryAllocator(sparkEnv: SparkEnv)
   }
 
   def freeIndexMemory(block: MemoryBlockHolder): Unit = {
-    if (separateMemory) {
+    if (_separateMemory) {
       indexMemoryManager.free(block)
     } else {
       memoryManager.free(block)
@@ -114,14 +114,16 @@ private[filecache] class CacheMemoryAllocator(sparkEnv: SparkEnv)
 
   def stop(): Unit = {
     memoryManager.stop()
-    if (separateMemory) {
+    if (_separateMemory) {
       indexMemoryManager.stop()
     }
   }
 
-  def dataCacheMemory: Long = _dataCacheMemory
-  def indexCacheMemory: Long = _indexCacheMemory
-  def cacheGuardianMemory: Long = _cacheGuardianMemory
+  def dataCacheMemorySize: Long = _dataCacheMemorySize
+  def indexCacheMemorySize: Long = _indexCacheMemorySize
+  def dataCacheGuardianMemorySize: Long = _dataCacheGuardianMemorySize
+  def indexCacheGuardianMemorySize: Long = _indexCacheGuardianMemorySize
+  def separateMemory: Boolean = _separateMemory
 }
 
 private[sql] object CacheMemoryAllocator {

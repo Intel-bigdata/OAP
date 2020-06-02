@@ -42,14 +42,25 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     fiberGroupId
   }
 
+  oapSparkConf.set("spark.sql.oap.index.data.cache.separation.enable", "true")
+  oapSparkConf.set("spark.oap.cache.strategy", "mix")
+  oapSparkConf.set("spark.sql.oap.mix.data.memory.manager", "offheap")
+
   private def fiberCacheManager = OapRuntime.getOrCreate.fiberCacheManager
 
-  private def dataCacheMemorySize = fiberCacheManager.dataCacheMemory
-  private def indexCacheMemorySize = fiberCacheManager.indexCacheMemory
+  private def dataCacheMemorySize = fiberCacheManager.dataCacheMemorySize
+  private def indexCacheMemorySize = fiberCacheManager.indexCacheMemorySize
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    fiberCacheManager.enableGuavaCacheSeparation()
+  override def afterEach(): Unit = {
+    fiberCacheManager.clearAllFibers()
+  }
+
+  override def afterAll(): Unit = {
+    // restore oapSparkConf to default
+    oapSparkConf.set("spark.oap.cache.strategy", "guava")
+    oapSparkConf.set("spark.sql.oap.fiberCache.memory.manager", "offheap")
+    oapSparkConf.set("spark.sql.oap.index.data.cache.separation.enable", "false")
+    oapSparkConf.set("spark.sql.oap.mix.data.memory.manager", "pm")
   }
 
   test("unit test") {
@@ -92,8 +103,6 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     assert(stats.indexFiberMissCount == indexMemorySizeInMB * 2)
     assert(stats.indexFiberHitCount == indexMemorySizeInMB * 2)
     assert(stats.indexEvictionCount >= indexMemorySizeInMB)
-    // Call the following to evict all the fibers in case it has a impact on the following test.
-    fiberCacheManager.clearAllFibers()
     Thread.sleep(1000)
   }
 
@@ -132,8 +141,6 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     }
     assert(indexFiberCacheInUse.toArray sameElements dataInUse)
     indexFiberCacheInUse.release()
-    // Call the following to evict all the fibers in case it has a impact on the following test.
-    fiberCacheManager.clearAllFibers()
     Thread.sleep(1000)
   }
 
@@ -142,7 +149,7 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     class DataFiberTestRunner(i: Int) extends Thread {
       override def run(): Unit = {
         val dataMemorySizeInMB = (dataCacheMemorySize / mbSize).toInt
-        val data = generateData(dataMemorySizeInMB / 4 * mbSize)
+        val data = generateData(dataMemorySizeInMB / 8 * mbSize)
         val fiber = TestDataFiberId(
           () => fiberCacheManager.toDataFiberCache(data),
           s"test data fiber #$fiberGroupId.$i")
@@ -171,11 +178,9 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     indexThreads.foreach(_.start())
     dataThreads.foreach(_.join(10000))
     indexThreads.foreach(_.join(10000))
+    Thread.sleep(1000)
     dataThreads.foreach(t => assert(!t.isAlive))
     indexThreads.foreach(t => assert(!t.isAlive))
-    // Call the following to evict all the fibers in case it has an impact on the following test.
-    fiberCacheManager.clearAllFibers()
-    Thread.sleep(1000)
   }
 
   test("add a very large fiber") {
@@ -248,14 +253,14 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     newFiberGroup
     Thread.sleep(1000) // Wait some time for CacheGuardian to remove pending fibers
     val dataMemorySizeInMB = (dataCacheMemorySize / mbSize).toInt
-    val dataFibers = (1 to dataMemorySizeInMB * 2).map { i =>
+    val dataFibers = (1 to dataMemorySizeInMB).map { i =>
       val data = generateData(mbSize)
       TestDataFiberId(() => fiberCacheManager.toDataFiberCache(data),
       s"test fiber #$fiberGroupId.$i")
     }
 
     val indexMemorySizeInMB = (indexCacheMemorySize / mbSize).toInt
-    val indexFibers = (1 to indexMemorySizeInMB * 2).map { i =>
+    val indexFibers = (1 to indexMemorySizeInMB).map { i =>
       val data = generateData(mbSize)
       TestIndexFiberId(() => fiberCacheManager.toDataFiberCache(data),
       s"test fiber #$fiberGroupId.$i")
@@ -276,8 +281,6 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     // Wait some time for CacheGuardian being waken-up
     Thread.sleep(1000)
     assert(fiberCacheManager.pendingCount == 0)
-    // Call the following to evict all the fibers in case it has a impact on the following test.
-    fiberCacheManager.clearAllFibers()
     Thread.sleep(1000)
   }
 
@@ -332,7 +335,7 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     val dataMemorySizeInMB = (dataCacheMemorySize / mbSize).toInt
     val indexMemorySizeInMB = (indexCacheMemorySize / mbSize).toInt
     val pool = Executors.newCachedThreadPool()
-    val dataRunners = (1 to 6).map { i =>
+    val dataRunners = (1 to 3).map { i =>
       val data = generateData(dataMemorySizeInMB / 5 * mbSize)
       val fiber = TestDataFiberId(() => fiberCacheManager.toDataFiberCache(data),
       s"different test $i")
@@ -346,7 +349,7 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
       new TestCaller(work)
     }
 
-    val indexRunners = (1 to 6).map { i =>
+    val indexRunners = (1 to 3).map { i =>
       val data = generateData(indexMemorySizeInMB / 5 * mbSize)
       val fiber = TestIndexFiberId(() => fiberCacheManager.toDataFiberCache(data),
       s"different test $i")
@@ -368,8 +371,6 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     indexResults.foreach(r => r.get())
     Thread.sleep(2000) // wait for pending cache to free
     assert(fiberCacheManager.pendingCount == 0)
-    // Call the following to evict all the fibers in case it has a impact on the following test.
-    fiberCacheManager.clearAllFibers()
     Thread.sleep(1000)
   }
 
@@ -545,7 +546,7 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     // make fiber in use the 1st element in release queue.
     fiberCacheManager.releaseFiber(indexFiberInUse)
 
-    (1 to indexMemorySizeInMB * 2).foreach { i =>
+    (1 to indexMemorySizeInMB).foreach { i =>
       val data = generateData(mbSize)
       val fiber = TestDataFiberId(
         () => fiberCacheManager.toDataFiberCache(data),
@@ -563,8 +564,6 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     Thread.sleep(6000)
     assert(fiberCacheManager.pendingCount == 0)
 
-    // Call the following to evict all the fibers in case it has a impact on the following test.
-    fiberCacheManager.clearAllFibers()
     Thread.sleep(1000)
   }
 }

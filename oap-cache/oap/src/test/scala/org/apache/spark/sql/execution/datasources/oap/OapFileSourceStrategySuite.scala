@@ -161,7 +161,7 @@ class OapFileSourceStrategyForParquetSuite extends OapFileSourceStrategySuite {
   }
 
   test("Project -> Scan : Optimized") {
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true") {
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true") {
       verifyProjectScan(
         format => format.isInstanceOf[OptimizedParquetFileFormat],
         (plan1, plan2) => !plan1.sameResult(plan2)

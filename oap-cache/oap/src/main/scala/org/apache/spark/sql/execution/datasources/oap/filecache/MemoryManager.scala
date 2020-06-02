@@ -20,17 +20,21 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 
+import scala.util.Success
+
+import com.intel.oap.common.unsafe.PersistentMemoryPlatform
+
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config.ConfigEntry
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.oap.filecache.FiberType.FiberType
 import org.apache.spark.sql.execution.datasources.oap.utils.PersistentMemoryConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.storage.{BlockManager, TestBlockId}
-import org.apache.spark.unsafe.{PersistentMemoryPlatform, Platform, VMEMCacheJNI}
+import org.apache.spark.unsafe.Platform
 import org.apache.spark.util.Utils
-
 
 object SourceEnum extends Enumeration {
   type SourceEnum = Value
@@ -77,7 +81,7 @@ private[sql] abstract class MemoryManager {
   def isDcpmmUsed(): Boolean = {false}
 }
 
-private[sql] object MemoryManager {
+private[sql] object MemoryManager extends Logging {
   /**
    * Dummy block id to acquire memory from [[org.apache.spark.memory.MemoryManager]]
    *
@@ -89,23 +93,89 @@ private[sql] object MemoryManager {
    */
   private[filecache] val DUMMY_BLOCK_ID = TestBlockId("oap_memory_request_block")
 
-  def apply(sparkEnv: SparkEnv): MemoryManager = {
-    apply(sparkEnv, OapConf.OAP_FIBERCACHE_MEMORY_MANAGER)
+  private def checkConfCompatibility(cacheStrategy: String, memoryManagerOpt: String): Unit = {
+    cacheStrategy match {
+      case "guava" =>
+        if (!(memoryManagerOpt.equals("pm")||memoryManagerOpt.equals("offheap"))) {
+          throw new UnsupportedOperationException(s"For cache strategy" +
+            s" ${cacheStrategy}, memorymanager should be 'offheap' or 'pm'" +
+            s" but not ${memoryManagerOpt}.")
+        }
+      case "vmem" =>
+        if (!memoryManagerOpt.equals("tmp")) {
+          logWarning(s"current spark.sql.oap.fiberCache.memory.manager: ${memoryManagerOpt} " +
+            "takes no effect, use 'tmp' as memory manager for vmem cache instead.")
+        }
+      case "noevict" =>
+        if (!memoryManagerOpt.equals("hybrid")) {
+          logWarning(s"current spark.sql.oap.fiberCache.memory.manager: ${memoryManagerOpt} " +
+            "takes no effect, use 'hybrid' as memory manager for noevict cache instead.")
+        }
+      case _ =>
+        logInfo("current cache type may need further compatibility" +
+          " check against backend cache strategy and memory manager. " +
+          "Please refer enabling-indexdata-cache-separation part in OAP-User-Guide.md.")
+    }
   }
 
-  def apply(sparkEnv: SparkEnv, configEntry: ConfigEntry[String]): MemoryManager = {
-    val conf = sparkEnv.conf
-    val memoryManagerOpt =
-      conf.get(
-        configEntry.key,
-        configEntry.defaultValue.get).toLowerCase
+  def apply(sparkEnv: SparkEnv): MemoryManager = {
+    apply(sparkEnv, OapConf.OAP_FIBERCACHE_STRATEGY, FiberType.DATA)
+  }
+
+
+  def apply(sparkEnv: SparkEnv, memoryManagerOpt: String): MemoryManager = {
     memoryManagerOpt match {
       case "offheap" => new OffHeapMemoryManager(sparkEnv)
       case "pm" => new PersistentMemoryManager(sparkEnv)
       case "hybrid" => new HybridMemoryManager(sparkEnv)
       case "tmp" => new TmpDramMemoryManager(sparkEnv)
+      case "kmem" => new DaxKmemMemoryManager(sparkEnv)
       case _ => throw new UnsupportedOperationException(
         s"The memory manager: ${memoryManagerOpt} is not supported now")
+    }
+  }
+
+  def apply(sparkEnv: SparkEnv, configEntry: ConfigEntry[String],
+            fiberType: FiberType): MemoryManager = {
+    val conf = sparkEnv.conf
+    val cacheStrategyOpt =
+      conf.get(
+        configEntry.key,
+        configEntry.defaultValue.get).toLowerCase
+    val memoryManagerOpt =
+      conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
+    checkConfCompatibility(cacheStrategyOpt, memoryManagerOpt)
+    cacheStrategyOpt match {
+      case "guava" => apply(sparkEnv, memoryManagerOpt)
+      case "noevict" => new HybridMemoryManager(sparkEnv)
+      case "vmem" => new TmpDramMemoryManager(sparkEnv)
+      case "external" => new TmpDramMemoryManager(sparkEnv)
+      case "mix" =>
+        if (!memoryManagerOpt.equals("mix")) {
+          apply(sparkEnv, memoryManagerOpt)
+        } else {
+          var cacheBackendOpt = ""
+          var mixMemoryMangerOpt = ""
+          fiberType match {
+            case FiberType.DATA =>
+              cacheBackendOpt =
+                conf.get(OapConf.OAP_MIX_DATA_CACHE_BACKEND.key, "guava").toLowerCase
+              mixMemoryMangerOpt =
+                conf.get(OapConf.OAP_MIX_DATA_MEMORY_MANAGER.key, "pm").toLowerCase
+            case FiberType.INDEX =>
+              cacheBackendOpt =
+                conf.get(OapConf.OAP_MIX_INDEX_CACHE_BACKEND.key, "guava").toLowerCase
+              mixMemoryMangerOpt =
+                conf.get(OapConf.OAP_MIX_INDEX_MEMORY_MANAGER.key, "offheap").toLowerCase
+          }
+          checkConfCompatibility(cacheBackendOpt, mixMemoryMangerOpt)
+          cacheBackendOpt match {
+            case "vmem" => new TmpDramMemoryManager(sparkEnv)
+            case _ => apply(sparkEnv, mixMemoryMangerOpt)
+          }
+        }
+      case _ => throw new UnsupportedOperationException(
+        s"The cache strategy: ${cacheStrategyOpt} is not supported now")
     }
   }
 }
@@ -169,14 +239,25 @@ private[filecache] class TmpDramMemoryManager(sparkEnv: SparkEnv)
     sparkEnv.conf.get(OapConf.OAP_CACHE_GUARDIAN_MEMORY_SIZE)
   val cacheGuardianMemory = Utils.byteStringAsBytes(cacheGuardianMemorySizeStr)
   logInfo(s"cacheGuardian total use $cacheGuardianMemory bytes memory")
+  val cacheGuardianRetrySleepTimeInMs = 10
+  val cacheGuardianRetryTime =
+    sparkEnv.conf.get(OapConf.OAP_CACHE_GUARDIAN_RETRY_TIME_IN_MS) / cacheGuardianRetrySleepTimeInMs
 
   private val _memoryUsed = new AtomicLong(0)
   override def memoryUsed: Long = _memoryUsed.get()
   override def memorySize: Long = cacheGuardianMemory
 
   override private[filecache] def allocate(size: Long): MemoryBlockHolder = {
-    if (memoryUsed + size > cacheGuardianMemory) {
-      throw new OapException("cache guardian use too much memory")
+    var retryTime: Int = 0
+    while(memoryUsed + size > cacheGuardianMemory) {
+      retryTime += 1
+      Thread.sleep(cacheGuardianRetrySleepTimeInMs)
+      if (retryTime > cacheGuardianRetryTime) {
+        throw new OapException("cache guardian use too much memory over " +
+          cacheGuardianRetryTime * cacheGuardianRetrySleepTimeInMs + "ms, please consider " +
+          "increase memory size by 'spark.sql.oap.cache.guardian.memory.size' configuration or " +
+          "increase retry time by 'spark.sql.oap.cache.guardian.retry.time.in.ms' configuration")
+      }
     }
     val startTime = System.currentTimeMillis()
     val occupiedSize = size
@@ -218,7 +299,14 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     // The NUMA id should be set when the executor process start up. However, Spark don't
     // support NUMA binding currently.
     var numaId = conf.getInt("spark.executor.numa.id", -1)
-    val executorId = sparkEnv.executorId.toInt
+    val executorIdStr = sparkEnv.executorId
+    scala.util.Try(executorIdStr.toInt) match {
+      case Success(_) => logDebug("valid executor id for numa binding.") ;
+      case _ =>
+        logWarning("invalid executor id for numa binding.")
+        return 0L
+    }
+    val executorId = executorIdStr.toInt
     val map = PersistentMemoryConfigUtils.parseConfig(conf)
     if (numaId == -1) {
       logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +
@@ -279,6 +367,45 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
   override def isDcpmmUsed(): Boolean = {true}
 }
 
+private[filecache] class DaxKmemMemoryManager(sparkEnv: SparkEnv)
+  extends PersistentMemoryManager(sparkEnv) with Logging {
+
+  private val _memorySize = init()
+
+  private def init(): Long = {
+    val conf = sparkEnv.conf
+
+    val numaId = conf.getInt("spark.executor.numa.id", -1)
+    if (numaId == -1) {
+      throw new OapException("DAX KMEM mode is strongly related to numa node. " +
+        "Please enable numa binding")
+    }
+
+    val map = PersistentMemoryConfigUtils.parseConfig(conf)
+    val regularNodeNum = map.size
+    val daxNodeId = numaId + regularNodeNum
+
+    val (kmemCacheMemory, kmemCacheMemoryReserverd) = {
+      (Utils.byteStringAsBytes(
+        conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim),
+        Utils.byteStringAsBytes(
+          conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE).trim))
+    }
+    require(kmemCacheMemoryReserverd >= 0 && kmemCacheMemoryReserverd < kmemCacheMemory,
+      s"Reserved size(${kmemCacheMemoryReserverd}) should greater than zero and less than " +
+        s"initial size(${kmemCacheMemory})"
+    )
+    PersistentMemoryPlatform.setNUMANode(String.valueOf(daxNodeId), String.valueOf(numaId))
+    PersistentMemoryPlatform.initialize()
+    logInfo(s"Running DAX KMEM mode, will use ${kmemCacheMemory} as cache memory, " +
+      s"reserve $kmemCacheMemoryReserverd")
+    kmemCacheMemory - kmemCacheMemoryReserverd
+  }
+
+  override def memorySize: Long = _memorySize
+
+}
+
 private[filecache] class HybridMemoryManager(sparkEnv: SparkEnv)
   extends MemoryManager with Logging {
   private val (persistentMemoryManager, dramMemoryManager) =
@@ -297,7 +424,14 @@ private[filecache] class HybridMemoryManager(sparkEnv: SparkEnv)
     // The NUMA id should be set when the executor process start up. However, Spark don't
     // support NUMA binding currently.
     var numaId = conf.getInt("spark.executor.numa.id", -1)
-    val executorId = sparkEnv.executorId.toInt
+    val executorIdStr = sparkEnv.executorId
+    scala.util.Try(executorIdStr.toInt) match {
+      case Success(_) => logDebug("valid executor id for numa binding.") ;
+      case _ =>
+        logWarning("invalid executor id for numa binding.")
+        return(0L, 0L, 0L, 0L)
+    }
+    val executorId = executorIdStr.toInt
     val map = PersistentMemoryConfigUtils.parseConfig(conf)
     if (numaId == -1) {
       logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +

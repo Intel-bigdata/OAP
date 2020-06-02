@@ -141,7 +141,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
   protected def fileFormat: String = "parquet"
 
   test("Project-> Filter -> Scan : Optimized") {
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true") {
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true") {
       verifyProjectFilterScan(
         format => format.isInstanceOf[OptimizedParquetFileFormat],
         (plan1, plan2) => !plan1.sameResult(plan2)
@@ -150,7 +150,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
   }
 
   test("Project-> Filter -> Scan : Not Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
       verifyProjectFilterScan(
         format => format.isInstanceOf[ParquetFileFormat],
@@ -160,7 +160,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
   }
 
   test("Project-> Filter -> Scan : Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.parquet_test;xxx") {
       verifyProjectFilterScan(
@@ -171,7 +171,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
   }
 
   test("Project -> Scan : Optimized") {
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true") {
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true") {
       verifyProjectScan(
         format => format.isInstanceOf[OptimizedParquetFileFormat],
         (plan1, plan2) => !plan1.sameResult(plan2)
@@ -180,7 +180,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
   }
 
   test("Project -> Scan :  Not Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
       verifyProjectScan(
         format => format.isInstanceOf[ParquetFileFormat],
@@ -190,7 +190,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
   }
 
   test("Project -> Scan :  Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.parquet_test;xxx") {
       verifyProjectScan(
@@ -201,7 +201,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
   }
 
   test("Scan : Optimized") {
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true") {
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true") {
       verifyScan(
         format => format.isInstanceOf[OptimizedParquetFileFormat],
         (plan1, plan2) => !plan1.sameResult(plan2)
@@ -210,7 +210,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
   }
 
   test("Scan : Not Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
       verifyScan(
         format => format.isInstanceOf[ParquetFileFormat],
@@ -220,7 +220,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
   }
 
   test("Scan : Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.parquet_test;xxx") {
       verifyScan(
@@ -237,7 +237,7 @@ class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
   protected def fileFormat: String = "orc"
 
   test("Project-> Filter -> Scan : Optimized") {
-    withSQLConf(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
       SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
       verifyProjectFilterScan(
         format => format.isInstanceOf[OptimizedOrcFileFormat],
@@ -247,7 +247,7 @@ class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
   }
 
   test("Project-> Filter -> Scan : Not Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
       SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
       verifyProjectFilterScan(
@@ -258,7 +258,7 @@ class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
   }
 
   test("Project-> Filter -> Scan : Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
       SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.orc_test;xxx") {
@@ -270,7 +270,7 @@ class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
   }
 
   test("Project -> Scan : Optimized") {
-    withSQLConf(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
       SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
       verifyProjectScan(
         format => format.isInstanceOf[OptimizedOrcFileFormat],
@@ -280,7 +280,7 @@ class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
   }
 
   test("Project -> Scan :  Not Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
       SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
       verifyProjectScan(
@@ -291,7 +291,7 @@ class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
   }
 
   test("Project -> Scan :  Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
       SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.orc_test;xxx") {
@@ -303,7 +303,7 @@ class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
   }
 
   test("Scan : Optimized") {
-    withSQLConf(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
       SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true") {
       verifyScan(
         format => format.isInstanceOf[OptimizedOrcFileFormat],
@@ -313,7 +313,7 @@ class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
   }
 
   test("Scan : Not Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
       SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
       verifyScan(
@@ -324,7 +324,7 @@ class CacheHotTablesForOrcSuite extends CacheHotTablesSuite {
   }
 
   test("Scan : Optimized, only cache hot Tables") {
-    withSQLConf(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key -> "true",
+    withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
       SQLConf.ORC_COPY_BATCH_TO_SPARK.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.orc_test;xxx") {

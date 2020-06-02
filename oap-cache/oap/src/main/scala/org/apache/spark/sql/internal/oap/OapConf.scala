@@ -139,7 +139,8 @@ object OapConf {
   val OAP_INDEX_DATA_SEPARATION_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.index.data.cache.separation.enable")
       .internal()
-      .doc("This is to enable index data cache separation feature including mix memory manager")
+      .doc("This is to enable index data cache separation feature including mix memory manager" +
+        "and mix cache backend")
       .booleanConf
       .createWithDefault(false)
 
@@ -169,6 +170,16 @@ object OapConf {
       .stringConf
       .createWithDefault("offheap")
 
+  val OAP_FIBERCACHE_STRATEGY =
+    SqlConfAdapter.buildConf("spark.oap.cache.strategy")
+      .internal()
+      .doc("Sets the implement of cache strategy, it currently supports guava(Guava Cache), " +
+        "vmem(VMemCache), simple, noevict." +
+        "To enable mix mode, you need to set " +
+        "spark.sql.oap.index.data.cache.separation.enable to true")
+      .stringConf
+      .createWithDefault("guava")
+
   val OAP_MIX_INDEX_MEMORY_MANAGER =
     SqlConfAdapter.buildConf("spark.sql.oap.mix.index.memory.manager")
       .internal()
@@ -195,6 +206,20 @@ object OapConf {
         "It should be different from spark.sql.oap.mix.index.memory.manager")
       .stringConf
       .createWithDefault("pm")
+
+  val OAP_MIX_INDEX_CACHE_BACKEND =
+    SqlConfAdapter.buildConf("spark.sql.oap.mix.index.cache.backend")
+      .internal()
+      .doc("Sets the implement of index cache backend in mix mode.")
+      .stringConf
+      .createWithDefault("guava")
+
+  val OAP_MIX_DATA_CACHE_BACKEND =
+    SqlConfAdapter.buildConf("spark.sql.oap.mix.data.cache.backend")
+      .internal()
+      .doc("Sets the implement of data memory manager in mix mode.")
+      .stringConf
+      .createWithDefault("guava")
 
   val OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.config.file")
@@ -365,6 +390,20 @@ object OapConf {
       .checkValues(Set("v1", "v2"))
       .createWithDefault("v1")
 
+  val OAP_PARQUET_DATA_CACHE_ENABLED =
+    SqlConfAdapter.buildConf("spark.sql.oap.parquet.data.cache.enable")
+      .internal()
+      .doc("To indicate if enable parquet data cache, default false")
+      .booleanConf
+      .createWithDefault(false)
+
+  val OAP_ORC_DATA_CACHE_ENABLED =
+    SqlConfAdapter.buildConf("spark.sql.oap.orc.data.cache.enable")
+      .internal()
+      .doc("To indicate if enable orc data cache, default false")
+      .booleanConf
+      .createWithDefault(false)
+
   val OAP_ORC_BINARY_DATA_CACHE_ENABLED =
     SqlConfAdapter.buildConf("spark.sql.oap.orc.binary.cache.enable")
       .internal()
@@ -387,6 +426,20 @@ object OapConf {
       .stringConf
       .createWithDefault("")
 
+  val OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE =
+    SqlConfAdapter.buildConf("spark.sql.oap.cache.external.client.pool.size")
+      .internal()
+      .doc("client pool for external cache")
+      .intConf
+      .createWithDefault(1)
+
+  val OAP_EXTERNAL_CACHE_READ_ONLY_ENABLE =
+    SqlConfAdapter.buildConf("spark.sql.oap.cache.external.read.only.enable")
+    .internal()
+    .doc("whether we need cache data")
+    .booleanConf
+    .createWithDefault(true)
+
   val OAP_CACHE_GUARDIAN_FREE_THREAD_NUM =
     SqlConfAdapter.buildConf("spark.sql.oap.cache.guardian.free.thread.nums")
       .internal()
@@ -401,12 +454,43 @@ object OapConf {
       .stringConf
       .createWithDefault("10g")
 
+  val OAP_CACHE_GUARDIAN_RETRY_TIME_IN_MS =
+    SqlConfAdapter.buildConf("spark.sql.oap.cache.guardian.retry.time.in.ms")
+    .internal()
+    .doc("Retry time for TmpMemoryManager allocate")
+    .intConf
+    .createWithDefault(5000)
+
   val OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.index.statistic.externalsorter.enable")
       .internal()
       .doc("To indicate if to enable externalsorter for statistic calculation")
       .booleanConf
       .createWithDefault(true)
+
+  val OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION =
+    SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compress.enable")
+      .internal()
+      .doc("To indicate if enable/disable data fiber cache compression")
+      .booleanConf
+      .createWithDefault(false)
+
+  val OAP_DATA_FIBER_CACHE_COMPRESSION_CODEC =
+    SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compression.codec")
+      .internal()
+      .doc("Sets the compression codec use when writing data fiber cache." +
+        " Acceptable values include: LZ4, LZF, SNAPPY, ZSTD.")
+      .stringConf
+      .transform(_.toUpperCase())
+      .checkValues(Set("LZ4", "LZF", "SNAPPY", "ZSTD"))
+      .createWithDefault("LZ4")
+
+  val OAP_DATA_FIBER_CACHE_COMPRESSION_SIZE =
+    SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compression.size")
+      .internal()
+      .doc("The oap data fiber compression unit length")
+      .intConf
+      .createWithDefault(4096)
 
   val DCPMM_FREE_WAIT_THRESHOLD =
     SqlConfAdapter.buildConf("spark.sql.oap.dcpmm.free.wait.threshold")
@@ -428,4 +512,20 @@ object OapConf {
       .doc("To indicate if enable parquet binary data cache, defalt false")
       .booleanConf
       .createWithDefault(false)
+
+  val OAP_CACHE_BACKEND_FALLBACK_ENABLED = {
+    SqlConfAdapter.buildConf("spark.oap.cache.backend.fallback.enabled")
+      .internal()
+      .doc("To enable cache backend fallback")
+      .booleanConf
+      .createWithDefault(true)
+  }
+
+  val OAP_TEST_CACHE_BACKEND_FALLBACK_RES = {
+    SqlConfAdapter.buildConf("spark.oap.test.cache.backend.fallback.res")
+      .internal()
+      .doc("For internal test use only")
+      .booleanConf
+      .createWithDefault(false)
+  }
 }

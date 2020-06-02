@@ -15,20 +15,19 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.intel.ssg.bdt</groupId>
-  <artifactId>oap</artifactId>
-  <version>0.7.0-SNAPSHOT</version>
+  <parent>
+    <groupId>com.intel.oap</groupId>
+    <artifactId>oap-parent</artifactId>
+    <version>0.9.0</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>oap-cache-oap</artifactId>
   <packaging>jar</packaging>
 
-  <name>OAP</name>
-  <url>https://github.com/Intel-bigdata/OAP</url>
+  <name>OAP Project Cache</name>
 
-  <licenses>
-    <license>
-      <name>The Apache Software License, Version 2.0</name>
-      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-    </license>
-  </licenses>
+
 
   <properties>
     <!-- Build Properties -->
@@ -114,6 +113,11 @@
   </pluginRepositories>
 
   <dependencies>
+    <dependency>
+      <groupId>com.intel.oap</groupId>
+      <artifactId>oap-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-plus</artifactId>
@@ -262,6 +266,11 @@
     </dependency>
 
     <dependency>
+      <groupId>com.intel.arrow</groupId>
+      <artifactId>arrow-plasma</artifactId>
+      <version>0.17.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.antlr</groupId>
       <artifactId>antlr4-runtime</artifactId>
       <version>${antlr.version}</version>
@@ -365,7 +374,13 @@
       <artifactId>guava</artifactId>
       <version>18.0</version>
     </dependency>
-  </dependencies>
+   <dependency>
+      <groupId>org.reflections</groupId>
+      <artifactId>reflections</artifactId>
+      <version>0.9.10</version>
+      <scope>compile</scope>
+   </dependency>
+</dependencies>
 
   <build>
     <plugins>
@@ -401,11 +416,13 @@
           <shadedClassifierName>with-spark-${spark.internal.version}</shadedClassifierName>
           <artifactSet>
             <includes>
+              <include>com.intel:oap-common</include>
               <include>org.spark-project.spark:unused</include>
               <include>com.google.guava:guava</include>
               <include>org.apache.parquet:*</include>
               <include>org.apache.orc:*</include>
               <include>io.airlift:*</include>
+              <include>org.reflections:reflections</include>
             </includes>
           </artifactSet>
           <relocations>
@@ -419,6 +436,10 @@
             <relocation>
               <pattern>com.google.common</pattern>
               <shadedPattern>org.spark_project.guava</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.reflections</pattern>
+              <shadedPattern>org.spark_project.reflections</shadedPattern>
             </relocation>
           </relocations>
         </configuration>
@@ -447,7 +468,7 @@
           <testSourceDirectories>
             <directory>src/test/scala</directory>
           </testSourceDirectories>
-          <configLocation>scalastyle-config.xml</configLocation>
+          <configLocation>${basedir}/scalastyle-config.xml</configLocation>
           <outputFile>target/scalastyle-output.xml</outputFile>
           <inputEncoding>UTF-8</inputEncoding>
           <outputEncoding>UTF-8</outputEncoding>
@@ -594,6 +615,24 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.2.0</version>
+        <configuration>
+          <descriptors>
+            <descriptor>src/test/assembly/test-jar-with-dependencies.xml</descriptor>
+          </descriptors>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>3.0.0</version>
         <configuration>
@@ -607,7 +646,7 @@
             <directory>src/test/java</directory>
             <directory>src/test/spark2.4.4/java</directory>
           </testSourceDirectories>
-          <configLocation>checkstyle.xml</configLocation>
+          <configLocation>${basedir}/checkstyle.xml</configLocation>
           <outputFile>${basedir}/target/checkstyle-output.xml</outputFile>
           <inputEncoding>${project.build.sourceEncoding}</inputEncoding>
           <outputEncoding>${project.reporting.outputEncoding}</outputEncoding>
@@ -657,6 +696,18 @@
               </sources>
             </configuration>
           </execution>
+          <execution>
+            <id>add-test-source</id>
+            <phase>generate-sources</phase>
+            <goals>
+                <goal>add-test-source</goal>
+            </goals>
+            <configuration>
+                <sources>
+                    <source>src/test/oap-perf-suite</source>
+                </sources>
+            </configuration>
+          </execution>  
         </executions>
       </plugin>
       <plugin>
@@ -682,89 +733,4 @@
     </plugins>
   </build>
 
-  <profiles>
-    <profile>
-      <id>vmemcache</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skip>false</skip>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-antrun-plugin</artifactId>
-            <version>${maven-antrun-plugin.version}</version>
-            <executions>
-              <execution>
-                <id>build-vmemcahe-native</id>
-                <phase>generate-resources</phase>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-                <configuration>
-                  <target>
-                    <property name="native.src.dir" value="${basedir}/src/main/native/vmemcache/"/>
-                    <property name="build.native.target" value="${basedir}/src/main/resources/lib/linux64"/>
-                    <mkdir dir="${build.native.target}"/>
-                    <exec dir="${native.src.dir}" executable="make" failonerror="true">
-                    </exec>
-                  </target>
-                </configuration>
-              </execution>
-              <execution>
-                <id>clean-native</id>
-                <phase>clean</phase>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-                <configuration>
-                  <target>
-                    <exec dir="${basedir}/src/main/native/vmemcache" executable="make" failonerror="true">
-                      <arg value="clean" />
-                    </exec>
-                  </target>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>persistent-memory</id>
-      <build>
-        <resources>
-          <resource>
-            <directory>src/main/resources</directory>
-          </resource>
-          <resource>
-            <directory>${basedir}/conf</directory>
-          </resource>
-        </resources>
-        <plugins>
-          <plugin>
-            <artifactId>exec-maven-plugin</artifactId>
-            <groupId>org.codehaus.mojo</groupId>
-            <version>${exec.maven.version}</version>
-            <executions>
-              <execution>
-                <id>Compile native code and produce share library</id>
-                <phase>generate-resources</phase>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-                <configuration>
-                  <executable>${basedir}/src/main/native/compile.sh</executable>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
 </project>
