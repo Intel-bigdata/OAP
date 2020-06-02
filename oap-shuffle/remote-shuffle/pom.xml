@@ -28,7 +28,6 @@
   </parent>
 
   <artifactId>oap-remote-shuffle</artifactId>
-  <version>0.1</version>
   <name>OAP Project Remote Shuffle</name>
   <packaging>jar</packaging>
 
@@ -126,6 +125,7 @@
   </dependencies>
 
   <build>
+    <finalName>${project.artifactId}-${project.version}-with-spark-${spark.internal.version}</finalName>
     <plugins>
       <plugin>
         <groupId>net.alchim31.maven</groupId>

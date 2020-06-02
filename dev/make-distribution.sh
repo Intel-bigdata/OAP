@@ -9,15 +9,18 @@ OAP_VERSION=0.8.0
 
 function gather() {
   cd  $DEV_PATH
-  mkdir -p oap_jars
-  cp ../oap-cache/oap/target/*.jar $DEV_PATH/oap_jars/
-  cp ../oap-shuffle/remote-shuffle/target/*.jar $DEV_PATH/oap_jars/
-  cp ../oap-common/target/*.jar $DEV_PATH/oap_jars/
-  find $DEV_PATH/oap_jars -name "*test*"|xargs rm -rf
-  cd oap_jars
+  target_path=$DEV_PATH/release-package/oap-$OAP_VERSION/jars
+  mkdir -p $target_path
+  cp ../oap-cache/oap/target/*.jar $target_path
+  cp ../oap-shuffle/remote-shuffle/target/*.jar $target_path
+  cp ../oap-common/target/*.jar $target_path
+  find $target_path -name "*test*"|xargs rm -rf
+  cd $target_path
   rm -f oap-cache-$OAP_VERSION.jar
-  tar -czf oap-$OAP_VERSION.tar.gz *.jar
-  echo "Please check the result in  $DEV_PATH/oap_jars!"
+  cd  $DEV_PATH/release-package
+  tar -czf oap-$OAP_VERSION.tar.gz oap-$OAP_VERSION/
+  rm -rf oap-$OAP_VERSION/
+  echo "Please check the result in  $DEV_PATH/release-package!"
 }
 
 cd $OAP_HOME
