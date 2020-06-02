@@ -20,7 +20,7 @@
     <version>0.8.0</version>
     <packaging>pom</packaging>
 
-    <name>OAP</name>
+    <name>OAP Project Parent POM</name>
     <url>https://github.com/Intel-bigdata/OAP</url>
 
     <licenses>
