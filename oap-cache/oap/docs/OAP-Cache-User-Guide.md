@@ -5,19 +5,19 @@
 * [Configuration for YARN Cluster Mode](#Configuration-for-YARN-Cluster-Mode)
 * [Configuration for Spark Standalone Mode](#Configuration-for-Spark-Standalone-Mode)
 * [Working with OAP-Cache Index](#Working-with-OAP-Cache-Index)
-* [Working with OAP-Cache Cache](#Working-with-OAP-Cache)
+* [Working with OAP-Cache Cache](#Working-with-OAP-Cache-Cache)
 * [Run TPC-DS Benchmark for OAP-Cache Cache](#Run-TPC-DS-Benchmark-for-OAP-Cache)
 
 
 ## Prerequisites
 
-OAP-Cache on Spark requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support. If you don't want to build Spark by yourself, we have pre-built [Spark-2.4.4](https://github.com/Intel-bigdata/spark/releases/download/v2.4.5-intel-oap-0.8/spark-2.4.4-bin-hadoop2.7-patched.tgz).
+OAP-Cache on Spark requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support. If you don't want to build Spark by yourself, we have pre-built [Spark-2.4.4](https://github.com/Intel-bigdata/spark/releases/download/v2.4.4-intel-oap-0.8/spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.tgz ).
 
 ## Getting Started with OAP-Cache
 
 ### Building OAP-Cache
 
-Download our pre-built [OAP-0.8.0 for Spark 2.4.4 tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-cache-0.8.0-with-spark-2.4.4.jar) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the `oap-common-\<version\>-with-spark-2.4.4.jar` to the directory `$SPARK_HOME/jars/`. If you’d like to build OAP-Cache from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+Download our pre-built [OAP-0.8.0 for Spark 2.4.4 tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-cache-0.8.0-with-spark-2.4.4.jar) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the `oap-common-<version>-with-spark-2.4.4.jar` to the directory `$SPARK_HOME/jars/`. If you’d like to build OAP-Cache from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 
 ### Spark Configurations for OAP-Cache
 
@@ -562,7 +562,9 @@ cd OAP-TPCDS-TOOL
 sh ./scripts/spark_thrift_server_yarn_with_DCPMM.sh start
 ```
 In this script, we use `guava` as cache strategy for ColumerVecor cache. you can alter to Binary cache. Or you can use `vmem` as cache strategy for ColumnVector or Binary cache, then follow above corresponding instructions to config rightly.
+
 #### Use DRAM as Cache Media 
+
 Update the configuration values in `scripts/spark_thrift_server_yarn_with_DRAM.sh` to reflect your environment. Normally, you need to update the following configuration values to cache to DRAM.
 
 - --driver-memory
@@ -579,6 +581,7 @@ sh ./scripts/spark_thrift_server_yarn_with_DRAM.sh  start
 ```
 
 ### Run Queries
+
 Execute the following command to start to run queries.
 
 ```
