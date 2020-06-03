@@ -45,7 +45,7 @@ mvn clean -q -pl plasma -DskipTests install
 ## How to Run Spark-sql with Plasma
 
 ### config files:
-Follow [User guide](./OAP-Cache-User-Guide.md), and you should update config file `spark-default.conf` as follow:
+Follow [User guide](OAP-Cache-User-Guide.md), and you should update config file `spark-default.conf` as follow:
 
 For Parquet data format, provides the following conf options:
 
