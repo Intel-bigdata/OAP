@@ -3,8 +3,9 @@
 # set -e
 
 
-dev_path=$(pwd)
+OAP_HOME="$(cd "`dirname "$0"`/.."; pwd)"
+DEV_PATH=$OAP_HOME/dev
 
-source $dev_path/prepare_oap_env.sh
+source  $DEV_PATH/prepare_oap_env.sh
 
 prepare_native_sql

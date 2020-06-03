@@ -1,0 +1,14 @@
+diff --git a/sql/core/src/main/scala/org/apache/spark/sql/execution/SparkStrategies.scala b/sql/core/src/main/scala/org/apache/spark/sql/execution/SparkStrategies.scala
+index bd2684d92a..dfc924cfae 100644
+--- a/sql/core/src/main/scala/org/apache/spark/sql/execution/SparkStrategies.scala
++++ b/sql/core/src/main/scala/org/apache/spark/sql/execution/SparkStrategies.scala
+@@ -162,7 +162,8 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
+      * use the size of bytes here as estimation.
+      */
+     private def muchSmaller(a: LogicalPlan, b: LogicalPlan): Boolean = {
+-      a.stats.sizeInBytes * 3 <= b.stats.sizeInBytes
++      // a.stats.sizeInBytes * 3 <= b.stats.sizeInBytes
++      true
+     }
+ 
+     private def canBuildRight(joinType: JoinType): Boolean = joinType match {

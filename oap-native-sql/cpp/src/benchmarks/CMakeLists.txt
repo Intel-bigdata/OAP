@@ -1,0 +1,4 @@
+package_add_benchmark(BenchmarkArrowCompute arrow_compute_benchmark.cc)
+package_add_benchmark(BenchmarkArrowComputeJoin arrow_compute_benchmark_join.cc)
+package_add_benchmark(BenchmarkArrowComputeSort arrow_compute_benchmark_sort.cc)
+package_add_benchmark(BenchmarkArrowComputeBigScale arrow_compute_benchmark_big_scale.cc)

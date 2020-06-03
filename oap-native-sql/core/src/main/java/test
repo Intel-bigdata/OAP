@@ -1,0 +1,4 @@
+#!/bin/bash
+
+#java org.apache.spark.columnarPlugin.expression.ColumnarArithmeticOptimizer -XX:+UseSuperWord -XX:CompileCommand=print,*BenchmarkSIMDBlog.increment
+java com.intel.sparkColumnarPlugin.expression.ColumnarArithmeticOptimizer

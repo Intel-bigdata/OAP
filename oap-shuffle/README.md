@@ -3,7 +3,7 @@ OAP Shuffle packages include all shuffle related solutions such as optimized shu
 Please refer the below documents for more information.
 
 * [Remote Shuffle](./remote-shuffle/README.md)
-* [PMoF shuffle](./PMoF-shuffle/README.md)
+* [RPMem-shuffle](./RPMem-shuffle/README.md)
 * [Inmemory-shuffle](./Inmemory-shuffle/README.md)
 
 

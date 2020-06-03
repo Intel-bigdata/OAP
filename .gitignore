@@ -1,2 +1,6 @@
+**/target/**
+*.class
+*.iml
+*.sh
 # IDEA config files
 .idea/

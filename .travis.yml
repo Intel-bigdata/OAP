@@ -18,9 +18,42 @@ jobs:
       - "./build/mvn -DskipTests clean -Pyarn  -Phive-1.2 -Phive-thriftserver  install -q"
       - "export SPARK_HOME=`pwd`/spark"
       before_script:
-        - cd ${TRAVIS_BUILD_DIR}/dev
-        - ./install_vmemcache.sh
-        - ./install_memkind.sh
+      - cd ${TRAVIS_BUILD_DIR}/dev
+      - ./install_vmemcache.sh
+      - ./install_memkind.sh
       script:
-        - cd ${TRAVIS_BUILD_DIR}
-        - mvn clean test -pl  com.intel:oap-cache-oap -q -Ppersistent-memory  -Pvmemcache  -am
+      - cd ${TRAVIS_BUILD_DIR}
+      - mvn clean -q -Ppersistent-memory -Pvmemcache test
+      
+    - name: oap-native-sql
+      dist: bionic
+      jdk:
+        - openjdk8
+      before_install:
+      - echo ${TRAVIS_COMMIT_MESSAGE}
+      #- if [[ ${TRAVIS_COMMIT_MESSAGE} != \[oap-native-sql\]* ]]; then travis_terminate 0 ; fi ;
+      - sudo apt-get install cmake
+      - export | grep JAVA_HOME
+      install:
+      - # Download spark 3.0
+      - "[ -f spark ] || mkdir spark && cd spark && wget http://archive.apache.org/dist/spark/spark-3.0.0-preview2/spark-3.0.0-preview2-bin-hadoop2.7.tgz && cd .."
+      - "tar -xf ./spark/spark-3.0.0-preview2-bin-hadoop2.7.tgz"
+      - "export SPARK_HOME=`pwd`/spark-3.0.0-preview2-bin-hadoop2.7"
+      before_script:
+      - cd /tmp
+      - git clone https://github.com/intel-bigdata/arrow.git
+      - cd arrow && git checkout native-sql-engine-clean && cd cpp
+      - sed -i "s/\${Python3_EXECUTABLE}/\/opt\/pyenv\/shims\/python3/g" CMakeLists.txt
+      - mkdir build && cd build 
+      - cmake .. -DARROW_JNI=ON -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_FILESYSTEM=ON -DARROW_WITH_SNAPPY=ON -DARROW_JSON=ON -DARROW_DATASET=ON && make 
+      - sudo make install
+      - cd ../../java
+      - mvn clean install -q -P arrow-jni -am -Darrow.cpp.build.dir=/tmp/arrow/cpp/build/release/ -DskipTests -Dcheckstyle.skip
+      script:
+      - cd ${TRAVIS_BUILD_DIR}/oap-native-sql/
+      - cd cpp && mkdir build && cd build
+      - cmake .. && make
+      - cd ../../core
+      - mvn clean -q package -DskipTests #skip core tests
+      - cd ${TRAVIS_BUILD_DIR}/oap-data-source/arrow
+      - mvn clean -q test

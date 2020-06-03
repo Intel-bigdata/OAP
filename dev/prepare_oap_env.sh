@@ -6,8 +6,11 @@ CMAKE_TARGET_VERSION=3.11.1
 CMAKE_MIN_VERSION=3.11
 TARGET_CMAKE_SOURCE_URL=https://cmake.org/files/v3.11/cmake-3.11.1.tar.gz
 
-if [ -z "$dev_path" ]; then
-  dev_path="/tmp"
+if [ -z "$DEV_PATH" ]; then
+  cd $(dirname $BASH_SOURCE)
+  DEV_PATH=`echo $(pwd)`
+  echo $DEV_PATH
+  cd -
 fi
 
 function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" != "$1"; }
@@ -40,7 +43,7 @@ function install_gcc7() {
   yum -y install mpfr-devel
   yum -y install libmpc-devel
 
-  cd $dev_path
+  cd $DEV_PATH/thirdparty
 
   if [ ! -d "gcc-7.3.0" ]; then
     if [ ! -f "llvm-7.0.1.src.tar.xz" ]; then
@@ -51,21 +54,23 @@ function install_gcc7() {
 
   fi
   cd gcc-7.3.0/
-  mkdir -p $dev_path/thirdparty/gcc7
-  ./configure --prefix=$dev_path/thirdparty/gcc7 --disable-multilib
+  mkdir -p $DEV_PATH/thirdparty/gcc7
+  ./configure --prefix=$DEV_PATH/thirdparty/gcc7 --disable-multilib
   make -j
   make install
 }
 
 function prepare_llvm() {
 
-  cd $dev_path
-  mkdir -p thirdparty/llvm
-  cd thirdparty/llvm
-  if [ ! -f "llvm-7.0.1.src.tar.xz" ]; then
-    wget http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
+  cd $DEV_PATH
+  mkdir -p $DEV_PATH/thirdparty/llvm
+  cd $DEV_PATH/thirdparty/llvm
+  if [ ! -d "llvm-7.0.1.src" ]; then
+    if [ ! -f "llvm-7.0.1.src.tar.xz" ]; then
+      wget http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
+    fi
+    tar xf llvm-7.0.1.src.tar.xz
   fi
-  tar xf llvm-7.0.1.src.tar.xz
   cd llvm-7.0.1.src/
   cd tools
 
@@ -80,13 +85,13 @@ function prepare_llvm() {
   mkdir -p build
   cd build
 
-  if [ ! -d "$dev_path/thirdparty/gcc7" ]; then
+  if [ ! -d "$DEV_PATH/thirdparty/gcc7" ]; then
     install_gcc7
   fi
 
-  export CXX=$dev_path/thirdparty/gcc7/bin/g++
-  export CC=$dev_path/thirdparty/gcc7/bin/gcc
-  export LD_LIBRARY_PATH=$dev_path/thirdparty/gcc7/lib64:$LD_LIBRARY_PATH
+  export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
+  export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
+  export LD_LIBRARY_PATH=$DEV_PATH/thirdparty/gcc7/lib64:$LD_LIBRARY_PATH
 
   cmake -DCMAKE_BUILD_TYPE=Release ..
   cmake --build .
@@ -97,9 +102,9 @@ function prepare_llvm() {
 function prepare_ns_arrow() {
   prepare_cmake
   prepare_llvm
-  cd $dev_path
-  mkdir -p thirdparty/native_sql/
-  cd thirdparty/native_sql/
+  cd $DEV_PATH
+  mkdir -p $DEV_PATH/thirdparty/native_sql/
+  cd $DEV_PATH/thirdparty/native_sql/
   if [ ! -d "arrow" ]; then
     git clone $intel_arrow_repo -b native-sql-engine-clean
     cd arrow
@@ -110,11 +115,11 @@ function prepare_ns_arrow() {
   current_arrow_path=$(pwd)
   mkdir -p cpp/release-build
 
-  if [ ! -d "$dev_path/thirdparty/gcc7" ]; then
+  if [ ! -d "$DEV_PATH/thirdparty/gcc7" ]; then
     install_gcc7
   fi
-  export CXX=$dev_path/thirdparty/gcc7/bin/g++
-  export CC=$dev_path/thirdparty/gcc7/bin/gcc
+  export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
+  export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
 
   cd cpp/release-build
   cmake -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_WITH_SNAPPY=ON -DARROW_FILESYSTEM=ON -DARROW_JSON=ON ..
@@ -137,7 +142,7 @@ function prepare_native_sql() {
 
   intel_spark_repo="https://github.com/Intel-bigdata/spark.git"
   intel_arrow_repo="https://github.com/Intel-bigdata/arrow.git"
-  cd $dev_path/thirdparty
+  cd $DEV_PATH/thirdparty
 
   #  prepare spark
   #  if [ ! -d "spark" ]; then
@@ -150,20 +155,20 @@ function prepare_native_sql() {
   #prepare arrow
   prepare_ns_arrow
 
-  cd $dev_path
+  cd $DEV_PATH
   cd ../oap-native-sql/cpp
   mkdir -p build
   cd build/
-  if [ ! -d "$dev_path/thirdparty/gcc7" ]; then
+  if [ ! -d "$DEV_PATH/thirdparty/gcc7" ]; then
     install_gcc7
   fi
-  export CXX=$dev_path/thirdparty/gcc7/bin/g++
-  export CC=$dev_path/thirdparty/gcc7/bin/gcc
+  export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
+  export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
   cmake .. -DTESTS=OFF
   make -j
   make install
 
-  cd $dev_path
+  cd $DEV_PATH
   cd ../oap-native-sql/
   mvn clean package -DskipTests
 
@@ -171,7 +176,7 @@ function prepare_native_sql() {
 
 function prepare_cmake() {
   CURRENT_CMAKE_VERSION_STR="$(cmake --version)"
-  cd $dev_path
+  cd $DEV_PATH
 
   # echo ${CURRENT_CMAKE_VERSION_STR}
   if [[ "$CURRENT_CMAKE_VERSION_STR" == "cmake version"* ]]; then
@@ -180,10 +185,10 @@ function prepare_cmake() {
     CURRENT_CMAKE_VERSION=${array[2]}
     if version_lt $CURRENT_CMAKE_VERSION $CMAKE_MIN_VERSION; then
       echo "$CURRENT_CMAKE_VERSION is less than $CMAKE_MIN_VERSION,install cmake $CMAKE_TARGET_VERSION"
-      mkdir -p thirdparty
-      cd thirdparty
-      echo "$dev_path/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz"
-      if [ ! -f "$dev_path/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz" ]; then
+      mkdir -p $DEV_PATH/thirdparty
+      cd $DEV_PATH/thirdparty
+      echo "$DEV_PATH/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz"
+      if [ ! -f "$DEV_PATH/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz" ]; then
         wget $TARGET_CMAKE_SOURCE_URL
       fi
       tar xvf cmake-$CMAKE_TARGET_VERSION.tar.gz
@@ -193,13 +198,13 @@ function prepare_cmake() {
       gmake install
       yum remove cmake -y
       ln -s /usr/local/bin/cmake /usr/bin/
-      cd $dev_path
+      cd $DEV_PATH
     fi
   else
     echo "cmake is not installed"
-    mkdir -p thirdparty
-    cd thirdparty
-    echo "$dev_path/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz"
+    mkdir -p $DEV_PATH/thirdparty
+    cd $DEV_PATH/thirdparty
+    echo "$DEV_PATH/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz"
     if [ ! -f "cmake-$CMAKE_TARGET_VERSION.tar.gz" ]; then
       wget $TARGET_CMAKE_SOURCE_URL
     fi
@@ -209,7 +214,7 @@ function prepare_cmake() {
     ./bootstrap --system-curl
     gmake
     gmake install
-    cd $dev_path
+    cd $DEV_PATH
   fi
 }
 
@@ -217,8 +222,8 @@ function prepare_memkind() {
   memkind_repo="https://github.com/memkind/memkind.git"
   echo $memkind_repo
 
-  mkdir -p thirdparty
-  cd thirdparty
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
   if [ ! -d "memkind" ]; then
     git clone $memkind_repo
     cd memkind/
@@ -240,7 +245,7 @@ function prepare_memkind() {
   ./configure
   make
   make install
-  cd $dev_path
+  cd $DEV_PATH
 
 }
 
@@ -251,9 +256,9 @@ function prepare_vmemcache() {
   fi
   vmemcache_repo="https://github.com/pmem/vmemcache.git"
   prepare_cmake
-  cd $dev_path
-  mkdir -p thirdparty
-  cd thirdparty
+  cd $DEV_PATH
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
   if [ ! -d "vmemcache" ]; then
     git clone $vmemcache_repo
     cd vmemcache
@@ -278,7 +283,7 @@ function prepare_intel_arrow() {
   prepare_vmemcache
 
   #install arrow and plasms
-  cd $dev_path/thirdparty
+  cd $DEV_PATH/thirdparty
   if [ ! -d "arrow" ]; then
     git clone https://github.com/Intel-bigdata/arrow.git -b oap-master
     cd arrow
@@ -296,4 +301,23 @@ function prepare_intel_arrow() {
   cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-g -O3" -DCMAKE_CXX_FLAGS="-g -O3" -DARROW_BUILD_TESTS=on -DARROW_PLASMA_JAVA_CLIENT=on -DARROW_PLASMA=on -DARROW_DEPENDENCY_SOURCE=BUNDLED ..
   make -j$(nproc)
   make install -j$(nproc)
+}
+
+function gather() {
+  cd  $DEV_PATH
+  mkdir -p target
+  cp ../oap-cache/oap/target/*.jar $DEV_PATH/target/
+  cp ../oap-shuffle/remote-shuffle/target/*.jar $DEV_PATH/target/
+  cp ../oap-common/target/*.jar $DEV_PATH/target/
+  find $DEV_PATH/target -name "*test*"|xargs rm -rf
+  echo "Please check the result in  $DEV_PATH/target !"
+}
+
+
+function  prepare_all() {
+  prepare_maven
+  prepare_memkind
+  prepare_cmake
+  prepare_vmemcache
+  prepare_intel_arrow
 }
