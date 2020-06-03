@@ -10,11 +10,17 @@
 
 
 ## Prerequisites
-Before getting started with OAP-Cache on Spark, you should have set up a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark which is built with YARN support. If you don't want to build Spark by yourself, we have a pre-built Spark-2.4.4, you can download [Spark-2.4.4](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) and setup Spark on your working node.
+
+OAP-Cache on Spark requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support. If you don't want to build Spark by yourself, we have pre-built [Spark-2.4.4](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz).
+
 ## Getting Started with OAP-Cache
+
 ### Building OAP-Cache
-We have a pre-built OAP-Cache, you can download [OAP-0.8.0 for Spark 2.4.4 tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-cache-0.8.0-with-spark-2.4.4.jar) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the oap-common-\<version\>-with-spark-2.4.4.jar to the directory $SPARK_HOME/jars/. If you’d like to build OAP-Cache from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+
+Download our pre-built [OAP-0.8.0 for Spark 2.4.4 tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-cache-0.8.0-with-spark-2.4.4.jar) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the oap-common-\<version\>-with-spark-2.4.4.jar to the directory $SPARK_HOME/jars/. If you’d like to build OAP-Cache from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+
 ### Spark Configurations for OAP-Cache
+
 Users usually test and run Spark SQL or Scala scripts in Spark Shell which launches Spark applications on YRAN with ***client*** mode. In this section, we will start with Spark Shell then introduce other use scenarios. 
 
 Before you run ` . $SPARK_HOME/bin/spark-shell `, you need to configure Spark for OAP-Cache integration. You need to add or update the following configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
@@ -380,119 +386,154 @@ spark.sql.oap.fiberCache.memory.manager                 pm
 ```
 3. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`pm`)/`guava` as `data` cache media and backend. 
 ```
-spark.sql.oap.index.data.cache.separation.enable        true
-spark.oap.cache.strategy                                mix
-spark.sql.oap.fiberCache.memory.manager                 mix 
-spark.sql.oap.mix.index.memory.manager                  offheap
-spark.sql.oap.mix.data.memory.manager                   pm
-spark.sql.oap.mix.index.cache.backend                   guava
-spark.sql.oap.mix.data.cache.backend                    guava
+spark.sql.oap.index.data.cache.separation.enable         true
+spark.oap.cache.strategy                                 mix
+spark.sql.oap.fiberCache.memory.manager                  mix 
+
+spark.executor.instances                                 6               # 2x number of your worker nodes
+spark.yarn.numa.enabled                                  true            # enable numa
+spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
+spark.memory.offHeap.enabled                             false
+spark.sql.oap.fiberCache.persistent.memory.initial.size  256g            # DCPMM capacity per executor
+spark.sql.oap.fiberCache.persistent.memory.reserved.size 50g             # Reserved space per executor
+
+spark.sql.oap.fiberCache.offheap.memory.size   50g       # equal to the size of executor.memoryOverhead
+spark.executor.memoryOverhead                  50g       # according to the resource of cluster
+
+spark.sql.orc.copyBatchToSpark                 true      # for ORC file format
+spark.sql.oap.orc.data.cache.enable            true      # for ORC file format
+spark.sql.oap.parquet.data.cache.enable        true      # for Parquet file format
 ```
 4. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`tmp`)/`vmem` as `data` cache media and backend. 
 ```
-spark.sql.oap.index.data.cache.separation.enable        true
-spark.oap.cache.strategy                                mix
-spark.sql.oap.fiberCache.memory.manager                 mix 
-spark.sql.oap.mix.index.memory.manager                  offheap
-spark.sql.oap.mix.index.cache.backend                   guava
-spark.sql.oap.mix.data.cache.backend                    vmem
+spark.sql.oap.index.data.cache.separation.enable         true
+spark.oap.cache.strategy                                 mix
+spark.sql.oap.fiberCache.memory.manager                  mix 
+spark.sql.oap.mix.data.cache.backend                     vmem
+
+spark.executor.instances                                 6               # 2x number of your worker nodes
+spark.yarn.numa.enabled                                  true            # enable numa
+spark.memory.offHeap.enabled                             false
+spark.sql.oap.fiberCache.persistent.memory.initial.size  256g            # DCPMM capacity per executor
+spark.sql.oap.cache.guardian.memory.size                 10g             # according to your cluster
+
+spark.sql.oap.fiberCache.offheap.memory.size   50g       # equal to the size of executor.memoryOverhead
+spark.executor.memoryOverhead                  50g       # according to the resource of cluster
+
+spark.sql.orc.copyBatchToSpark                 true      # for ORC file format
+spark.sql.oap.orc.data.cache.enable            true      # for ORC file format
+spark.sql.oap.parquet.data.cache.enable        true      # for Parquet file format
 ```
+
 ### Enabling Binary cache 
-We introduce binary cache for both Parquet and ORC file format to improve cache space utilization compared to ColumnVector cache. When enabling binary cache, you should add following configs to `spark-defaults.conf`.
+A binary cache is available for both Parquet and ORC file format to improve cache space utilization compared to ColumnVector cache. When enabling binary cache, you should change following configs in `spark-defaults.conf`.
 ```
-spark.sql.oap.parquet.binary.cache.enabled                true      # for parquet fileformat
-spark.sql.oap.parquet.data.cache.enable                   false     # for ColumnVector, default is false
-spark.sql.oap.orc.binary.cache.enable                     true      # for orc fileformat
-spark.sql.oap.orc.data.cache.enable                       false     # for ColumnVector, default is false
+spark.sql.oap.parquet.binary.cache.enabled      true      # for parquet file format, enable binary cache
+spark.sql.oap.parquet.data.cache.enable         false     # for parquet file format, disable ColumnVector cache
+spark.sql.oap.orc.binary.cache.enable           true      # for ORC file format, enable binary cache
+spark.sql.oap.orc.data.cache.enable             false     # for ORC file format, disable ColumnVector cache
 ```
 
 #### Verify DCPMM cache functionality
 
-After the configuration, and you need to restart Spark Thrift Server to make the configuration changes taking effect. You can take the same steps described in [Use DRAM Cache](#Use-DRAM-Cache) to test and verify the cache is in working. 
+After finishing configuration, restart Spark Thrift Server for the configuration changes to take effect. Start at step 2 of the [Use DRAM Cache](#use-dram-cache) guide to verify that cache is working correctly.
 
-Besides, you can verify numa binding status by confirming keywords like "numactl --cpubind=1 --membind=1" contained in executor launch command.
+Verify NUMA binding status by confirming keywords like `numactl --cpubind=1 --membind=1` contained in executor launch command.
 
-You can also check DCPM cache size by checking the usage of disk space using command 'df -h'. For Guava/Non-evictable strategies, the command will show disk space usage increases along with workload execution. But for vmemcache strategy, you will see disk usage becomes to cache initial size once DCPM cache initialized even workload haven't actually used so much space and this value doesn't change during workload execution.
+Check DCPMM cache size by checking disk space with `df -h`. For Guava/Non-evictable strategies, the command will show disk space usage increases along with workload execution. For vmemcache strategy, disk usage will reach the initial cache size once the DCPMM cache is initialized and will not change during workload execution.
 
 ## Run TPC-DS Benchmark for OAP Cache
 
-The section provides instructions and tools for running TPC-DS queries to evaluate the cache performance at various configurations. TPC-DS suite has many queries and we select 9 I/O intensive queries for making the performance evaluation simple.
+This section provides instructions and tools for running TPC-DS queries to evaluate the cache performance of various configurations. The TPC-DS suite has many queries and we select 9 I/O intensive queries to simplify performance evaluation.
 
-We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/OAP-TPCDS-TOOL.zip) to simplify the running work for beginners. If you have already been familiar with TPC-DS data generation and running a TPC-DS tool suite, you can skip our tool and use TPC-DS tool suite directly.
+We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/OAP-TPCDS-TOOL.zip) to simplify running the workload. If you are already familiar with TPC-DS data generation and running a TPC-DS tool suite, skip our tool and use the TPC-DS tool suite directly.
 
-#### Prerequisites
+### Prerequisites
 
-- The tool use Python scripts to execute Beeline commands to Spark Thrift Server. You need to install python 2.7+ on your working node.
+- Python 2.7+ is required on the working node. 
 
-#### Prepare the Tool
-2. Download the [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/OAP-TPCDS-TOOL.zip)  and unzip to a folder (for example, OAP-TPCDS-TOOL folder) on your working node. 
-3. Copy OAP-TPCDS-TOOL/tools/tpcds-kits to ALL worker nodes under the same folder (for example, /home/oap/tpcds-kits).
+### Prepare the Tool
 
-#### Generate TPC-DS Data
+1. Download [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/OAP-TPCDS-TOOL.zip) and unzip to a folder (for example, `OAP-TPCDS-TOOL` folder) on your working node. 
+2. Copy `OAP-TPCDS-TOOL/tools/tpcds-kits` to ALL worker nodes under the same folder (for example, `/home/oap/tpcds-kits`).
 
-1. Update the values for the following variables in OAP-TPCDS-TOOL/scripts/tool.conf based on your environment and needs.
-- SPARK_HOME: Point to the Spark home directory of your Spark setup.
-- TPCDS_KITS_DIR: The tpcds-kits directory you coped to the worker nodes in the above prepare process. For example, /home/oap/tpcds-kits
-- NAMENODE_ADDRESS: Your HDFS Namenode address in the format of host:port.
-- THRIFT_SERVER_ADDRESS: Your working node address on which you will run Thrift Server.
-- DATA_SCALE: The data scale to be generated in GB
-- DATA_FORMAT: The data file format. You can specify parquet or orc
+### Generate TPC-DS Data
 
-The following is an example:
+1. Update the values for the following variables in `OAP-TPCDS-TOOL/scripts/tool.conf` based on your environment and needs.
 
-```
-export SPARK_HOME=/home/oap/spark-2.4.4
-export TPCDS_KITS_DIR=/home/oap/tpcds-kits
-export NAMENODE_ADDRESS=mynamenode:9000
-export THRIFT_SERVER_ADDRESS=mythriftserver
-export DATA_SCALE=2
-export DATA_FORMAT=parquet
-```
-2. Start data generation
-At the root directory of this tool, for example, OAP-TPCDS-TOOL folder, execute scripts/run_gen_data.sh to start the data generation process. 
-```
-cd OAP-TPCDS-TOOL
-sh ./scripts/run_gen_data.sh
-```
-Once finished, the data with $scale will be generated at HDFS folder genData$scale. And database with the name "tpcds$scale" was created with the TPC-DS tables.
+   - SPARK_HOME: Point to the Spark home directory of your Spark setup.
+   - TPCDS_KITS_DIR: The tpcds-kits directory you coped to the worker nodes in the above prepare process. For example, /home/oap/tpcds-kits
+   - NAMENODE_ADDRESS: Your HDFS Namenode address in the format of host:port.
+   - THRIFT_SERVER_ADDRESS: Your working node address on which you will run Thrift Server.
+   - DATA_SCALE: The data scale to be generated in GB
+   - DATA_FORMAT: The data file format. You can specify parquet or orc
 
-#### Start Spark Thrift Server
+   For example:
 
-You need to start the Thrift Server in the tool root folder, which is the same folder you run data generation scripts. We provide two different scripts to start Thrift Server for DCPMM and DRAM respectively.
+  ```
+  export SPARK_HOME=/home/oap/spark-2.4.4
+  export TPCDS_KITS_DIR=/home/oap/tpcds-kits
+  export NAMENODE_ADDRESS=mynamenode:9000
+  export THRIFT_SERVER_ADDRESS=mythriftserver
+  export DATA_SCALE=2
+  export DATA_FORMAT=parquet
+  ```
 
-##### Use DCPMM as cache
-If you are about to use DCPMM as cache, use scripts/spark_thrift_server_yarn_with_DCPMM.sh. You need to update the configuration values in this script to reflect the real environment. Normally, you need to update the following configuration values for DCPMM case,
+2. Start data generation.
+
+   In the root directory of this tool (`OAP-TPCDS-TOOL`), run `scripts/run_gen_data.sh` to start the data generation process. 
+
+   ```
+   cd OAP-TPCDS-TOOL
+   sh ./scripts/run_gen_data.sh
+   ```
+
+   Once finished, the `$scale` data will be generated in the HDFS folder `genData$scale`. And a database called `tpcds$scale` will contain the TPC-DS tables.
+
+### Start Spark Thrift Server
+
+Start the Thrift Server in the tool root folder, which is the same folder you run data generation scripts. Use either the DCPMM or DRAM scrip to start the Thrift Server.
+
+#### Use DCPMM as Cache Media
+
+Update the configuration values in `scripts/spark_thrift_server_yarn_with_DCPMM.sh` to reflect your environment. 
+Normally, you need to update the following configuration values to cache to DCPMM.
+
 - --driver-memory
 - --executor-memory
 - --executor-cores
 - --conf spark.sql.oap.fiberCache.persistent.memory.initial.size
 - --conf spark.sql.oap.fiberCache.persistent.memory.reserved.size
 
-These configurations will override the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
+These settings will override the values specified in Spark configuration file ( `spark-defaults.conf`). After the configuration is done, you can execute the following command to start Thrift Server.
 
 ```
 cd OAP-TPCDS-TOOL
 sh ./scripts/spark_thrift_server_yarn_with_DCPMM.sh start
 ```
+In this script, we use `guava` as cache strategy for ColumerVecor cache. you can alter to Binary cache. Or you can use `vmem` as cache strategy for ColumnVector or Binary cache, then follow above corresponding instructions to config rightly.
+#### Use DRAM as Cache Media 
+Update the configuration values in `scripts/spark_thrift_server_yarn_with_DRAM.sh` to reflect your environment. Normally, you need to update the following configuration values to cache to DRAM.
 
-##### Use DRAM as cache
-If you are about to use DRAM as cache, use scripts/spark_thrift_server_yarn_with_DRAM.sh. You need to update the configuration values in this script to reflect the real environment. Normally, you need to update the following configuration values for DRAM case,
 - --driver-memory
 - --executor-memory
 - --executor-cores
-- --conf spark.memory.offHeap.size
+- --conf spark.sql.oap.fiberCache.offheap.memory.size
+- --conf spark.executor.memoryOverhead
 
-These configurations will override the values specified in Spark configuration file. After the configuration is done, you can execute the following command to start Thrift Server.
+These settings will override the values specified in Spark configuration file (`spark-defaults.conf`). After the configuration is done, you can execute the following command to start Thrift Server.
+
 ```
 cd OAP-TPCDS-TOOL
 sh ./scripts/spark_thrift_server_yarn_with_DRAM.sh  start
 ```
-#### Run Queries
-Now you are ready to execute the queries over the data. Execute the following command to start to run queries.
+
+### Run Queries
+Execute the following command to start to run queries.
 
 ```
 cd OAP-TPCDS-TOOL
 sh ./scripts/run_tpcds.sh
 ```
 
-When all the queries are done, you will see the result.json file in the current directory.
+When all the queries are done, you will see the `result.json` file in the current directory.
