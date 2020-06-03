@@ -45,7 +45,7 @@ mvn clean -q -pl plasma -DskipTests install
 ## How to Run Spark-sql with Plasma
 
 ### config files:
-you should update config file `spark-default.conf` as follow:
+Follow [User guide](./OAP-Cache-User-Guide.md), and you should update config file `spark-default.conf` as follow:
 
 For Parquet data format, provides the following conf options:
 
@@ -79,7 +79,7 @@ spark.sql.oap.cache.external.client.pool.size              10
      Or you can write these parameters directly in your starting command. Use "?" to seperate different numaNodes.
  ```
 
-You can start plasma service on each node as following command
+You can start plasma service on each node as following command, and then you can run your workload.
 
 ```
 plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://propertyFilePath:/tmp/persistent-memory.properties  
