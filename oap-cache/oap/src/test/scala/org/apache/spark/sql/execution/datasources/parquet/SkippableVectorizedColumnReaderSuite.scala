@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.parquet
 
 import java.io.File
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.Random
 
 import org.apache.hadoop.fs.Path
@@ -515,7 +516,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
     val columnVector = skipAndReadToVector(parquetSchema, TimestampType)
 
     val fromZone = ZoneId.systemDefault
-    val toZone = DateTimeUtils.getZoneId("")
+    val toZone: ZoneId = ZoneOffset.UTC
 
     // assert result
     (0 until unitSize).foreach { i =>

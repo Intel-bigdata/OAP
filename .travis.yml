@@ -13,15 +13,14 @@ jobs:
       install:
       - # Download spark 3.0.0
       - "[ -f spark ] || mkdir spark && cd spark"
-      - "git clone -b rc1-add-hivethrift https://github.com/HongW2019/spark.git"
+      - "git clone -b v3.0.0-rc1 https://github.com/apache/spark.git"
       - "cd spark"
-      - "./build/mvn -DskipTests clean -Pyarn  -Phive-1.2 -Phive-thriftserver  install"
+      - "./build/mvn -DskipTests clean -Pyarn  -Phive-1.2 -Phive-thriftserver  install -q"
       - "export SPARK_HOME=`pwd`/spark"
       before_script:
-      - cd ${TRAVIS_BUILD_DIR}/dev
-      - ./install_vmemcache.sh
-      - ./install_arrow.sh
-      - ./install_memkind.sh
+        - cd ${TRAVIS_BUILD_DIR}/dev
+        - ./install_vmemcache.sh
+        - ./install_memkind.sh
       script:
-      - cd ${TRAVIS_BUILD_DIR}
-      - mvn clean -q -Ppersistent-memory -Pvmemcache test
+        - cd ${TRAVIS_BUILD_DIR}
+        - mvn clean test -pl  com.intel:oap-cache-oap -q -Ppersistent-memory  -Pvmemcache  -am

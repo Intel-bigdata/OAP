@@ -175,13 +175,6 @@ class OapFileSourceStrategyForParquetSuite extends OapFileSourceStrategySuite {
       (plan1, plan2) => plan1.sameResult(plan2)
     )
   }
-
-  test("Scan : Not Optimized") {
-    verifyScan(
-      format => format.isInstanceOf[ParquetFileFormat],
-      (plan1, plan2) => plan1.sameResult(plan2)
-    )
-  }
 }
 
 class OapFileSourceStrategyForOrcSuite extends OapFileSourceStrategySuite {
@@ -211,13 +204,6 @@ class OapFileSourceStrategyForOrcSuite extends OapFileSourceStrategySuite {
       (plan1, plan2) => plan1.sameResult(plan2)
     )
   }
-
-  test("Scan : Not Optimized") {
-    verifyScan(
-      format => format.isInstanceOf[OrcFileFormat],
-      (plan1, plan2) => plan1.sameResult(plan2)
-    )
-  }
 }
 
 class OapFileSourceStrategyForOapSuite extends OapFileSourceStrategySuite {
@@ -235,13 +221,6 @@ class OapFileSourceStrategyForOapSuite extends OapFileSourceStrategySuite {
 
   test("Project -> Scan") {
     verifyProjectScan(
-      format => format.isInstanceOf[OapFileFormat],
-      (plan1, plan2) => plan1.sameResult(plan2)
-    )
-  }
-
-  test("Scan") {
-    verifyScan(
       format => format.isInstanceOf[OapFileFormat],
       (plan1, plan2) => plan1.sameResult(plan2)
     )

@@ -185,8 +185,8 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
 
   test("add a very large fiber") {
     val ASSERT_MESSAGE_REGEX =
-      ("""assertion failed: Failed to cache fiber\(\d+\.\d [TGMK]?B\) """ +
-        """with cache's MAX_WEIGHT\(\d+\.\d [TGMK]?B\) / 4""").r
+      ("""assertion failed: Failed to cache fiber\(\d+\.\d [TGMK]?iB\) """ +
+        """with cache's MAX_WEIGHT\(\d+\.\d [TGMK]?iB\) / 4""").r
     val dataMemorySizeInMB = (dataCacheMemorySize / mbSize).toInt
     val dataException = intercept[AssertionError] {
       val data = generateData(dataMemorySizeInMB * mbSize / 2)
