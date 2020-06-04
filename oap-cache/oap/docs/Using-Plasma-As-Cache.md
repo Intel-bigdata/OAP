@@ -8,12 +8,13 @@
 ## How to build
 ### what you need 
 To use optimized Plasma cache with OAP, you need following components:  
-    1. libarrow.so, libplasma.so, libplasma_jni.so: dynamic libraries, will be used in plasma client.   
-    2. plasma-store-server: executable file, plasma cache service.  
-    3. arrow-plasma-0.17.0.jar: will be used when compile oap and spark runtime also need it. 
+    (1) libarrow.so, libplasma.so, libplasma_jni.so: dynamic libraries, will be used in plasma client.   
+    (2) plasma-store-server: executable file, plasma cache service.  
+    (3) arrow-plasma-0.17.0.jar: will be used when compile oap and spark runtime also need it. 
     
-    1 and 2 will be provided as rpm package, we provide fedora 29 and Cent OS 7.6 rpm package, you can download it on release page.
-    3 will be provided in maven central repo, you can also get it on release page. You need to download it and copy to `$SPARK_HOME/jars` dir.
+(1) and (2) will be provided as rpm package, we provide fedora 29 and Cent OS 7.6 rpm package, you can download it on release page.
+Run `rpm -ivh arrow-plasma-intel-libs-0.17.0-1*x86_64.rpm` to install it.   
+(3) will be provided in maven central repo, you can also get it on release page. You need to download it and copy to `$SPARK_HOME/jars` dir.
 
    
 ### build Plasma related files manually
@@ -66,26 +67,77 @@ spark.sql.oap.cache.external.client.pool.size              10
 ```
 
 
-#### start plasma service manually
- you can start plasma service on every node as following command
-```
-plasma-store-server -m 30000000000 -s /tmp/plasmaStore -e vmemcache://size:49000000000 &
-```    
+#### Start plasma service manually
+
  plasma config parameters:  
- 
+ ```
+ -m  how much Bytes share memory plasma will use
+ -s  Unix Domain sockcet path
+ -e  using external store
+     vmemcache: using vmemcahe as external store
+     propertyFilePath: It's recommended to use propertyFilePath to pass parameters.
+     Or you can write these parameters directly in your starting command. Use "?" to seperate different numaNodes.
+ ```
+
+You can start plasma service on each node as following command
+
 ```
--m  how much Bytes share memory plasma will use
--s  Unix Domain sockcet path
--e  using external store
-    vmemcache: using vmemcahe as external store
-    size: how much Bytes external store will use on pmem per numa node
+plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://propertyFilePath:/tmp/persistent-memory.properties  
 ```
+or 
+``` 
+plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://totalNumaNodeNum:2,\
+numaNodeId1:1,initialPath1:/mnt/pmem0,requiredSize1:15000000,readPoolSize1:12,writePoolSize1:12\
+?numaNodeId2:2,initialPath2:/mnt/pmem1,requiredSize2:15000000,readPoolSize2:12,writePoolSize2:12
+```
+
+An example persistent-memory.properties:
+
+```
+  # Example
+  totalNumaNodeNum = 2
+    
+  numaNodeId1 = 1
+  initialPath1 = /mnt/pmem0
+  requiredSize1 = 15000000
+  readPoolSize1 = 12 
+  writePoolSize1 = 12
+    
+  numaNodeId2 = 2
+  initialPath2 = /mnt/pmem1
+  requiredSize2 = 15000000
+  readPoolSize2 = 12 
+  writePoolSize2 = 12
+```
+
+```requiredSize readPoolSize writePoolSize``` is optional,will use default value if you don't pass these three parameters.
+But please remember to pass ```totalNumaNodeNum``` and ```initialPath```.
+
+*Please note that parameters in the command will cover parameters in persistent-memory.properties.*
+
  Remember to kill `plasma-store-server` process if you no longer need cache, and you should delete `/tmp/plasmaStore` which is a Unix domain socket.  
+  
+#### Use yarn to start plamsa service
+We can use yarn(hadoop version >= 3.1) to start plasma service, you should provide a json file like following.
+```
+{
+  "name": "plasma-store-service",
+  "version": 1,
+  "components" :
+  [
+   {
+     "name": "plasma-store-service",
+     "number_of_containers": 3,
+     "launch_command": "plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://propertyFilePath:/tmp/persistent-memory.properties ",
+     "resource": {
+       "cpus": 1,
+       "memory": 512
+     }
+   }
+  ]
+}
+```
 
-#### using yarn start plamsa service
- we can use yarn(hadoop version >= 3.1) to start plasma service, you should provide a yaml file like following.
-
- 
-  
-  
-  
+Run command  ```yarn app -launch plasma-store-service /tmp/plasmaLaunch.json``` to start plasma server.  
+Run ```yarn app -stop plasma-store-service``` to stop it.  
+Run ```yarn app -destroy plasma-store-service```to destroy it.
