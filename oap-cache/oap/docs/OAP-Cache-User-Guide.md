@@ -191,32 +191,32 @@ The following are required to configure OAP to use DCPMM cache.
 
 - Directories exposing DCPMM hardware on each socket. For example, on a two socket system the mounted DCPMM directories should appear as `/mnt/pmem0` and `/mnt/pmem1`. Correctly installed DCPMM must be formatted and mounted on every cluster worker node.
 
-```
-	// use impctl command to show topology and dimm info of DCPM
-	impctl show -topology
-	impctl show -dimm
-	// provision dcpm in app direct mode
-	ipmctl create -goal PersistentMemoryType=AppDirect
-	// reboot system to make configuration take affect
-	reboot
-	// check capacity provisioned for app direct mode(AppDirectCapacity)
-	impctl show -memoryresources
-	// show the DCPM region information
-	impctl show -region
-	// create namespace based on the region, multi namespaces can be created on a single region
-	ndctl create-namespace -m fsdax -r region0
-	ndctl create-namespace -m fsdax -r region1
-	// show the created namespaces
-	fdisk -l
-	// create and mount file system
-	mount -o dax /dev/pmem0 /mnt/pmem0
-	mount -o dax /dev/pmem1 /mnt/pmem1
-```
+   ```
+   // use impctl command to show topology and dimm info of DCPM
+   impctl show -topology
+   impctl show -dimm
+   // provision dcpm in app direct mode
+   ipmctl create -goal PersistentMemoryType=AppDirect
+   // reboot system to make configuration take affect
+   reboot
+   // check capacity provisioned for app direct mode(AppDirectCapacity)
+   impctl show -memoryresources
+   // show the DCPM region information
+   impctl show -region
+   // create namespace based on the region, multi namespaces can be created on a single region
+   ndctl create-namespace -m fsdax -r region0
+   ndctl create-namespace -m fsdax -r region1
+   // show the created namespaces
+   fdisk -l
+   // create and mount file system
+   mount -o dax /dev/pmem0 /mnt/pmem0
+   mount -o dax /dev/pmem1 /mnt/pmem1
+   ```
+
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
 
--[Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.7.0-spark-2.4.4/libmemkind.so.0) for x86 64bit CentOS Linux in the `/lib64/`directory of each worker node in cluster.
-The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. 
-   
+- [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/libmemkind.so.0) for x86 64bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. 
+   The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. 
    Build the latest memkind lib from source:
 
    ```
@@ -316,7 +316,7 @@ Memkind library also support DAX KMEM mode. Refer [Kernel](https://github.com/me
 
 Please note that DAX KMEM mode need kernel version 5.x and memkind version 1.10 or above.
 
-For Parquet data format, provides following conf options:
+For Parquet data format, add these conf options:
 ```
 spark.sql.oap.parquet.data.cache.enable           true
 spark.sql.oap.fiberCache.memory.manager           pm / kmem
@@ -324,7 +324,7 @@ spark.oap.cache.strategy                          guava
 spark.sql.oap.fiberCache.persistent.memory.initial.size    *g
 spark.sql.extensions                              org.apache.spark.sql.OapExtensions
 ```
-For Orc data format, provides following conf options:
+For Orc data format, add these conf options:
 ```
 spark.sql.orc.copyBatchToSpark                   true
 spark.sql.oap.orc.data.cache.enable              true
@@ -337,17 +337,17 @@ spark.sql.extensions                             org.apache.spark.sql.OapExtensi
 
 #### Non-evictable cache
 
-Another cache strategy named Non-evictable is also supported in OAP-Cache based on memkind library for DCPMM.
+The non-evictable cache strategy is also supported in OAP based on the memkind library for DCPMM.
 
 To apply Non-evictable cache strategy in your workload, please follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and memkind library correctly. Then follow bellow configurations.
 
-For Parquet data format, provides following conf options:
+For Parquet data format, add these conf options:
 ```
 spark.sql.oap.parquet.data.cache.enable                  true 
 spark.oap.cache.strategy                                 noevict 
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
 ```
-For Orc data format, provides following conf options:
+For Orc data format, add these conf options:
 ```
 spark.sql.orc.copyBatchToSpark                           true 
 spark.sql.oap.orc.data.cache.enable                      true 
@@ -360,7 +360,7 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
 The vmemcache cache strategy is based on libvmemcache (buffer based LRU cache), which provides a key-value store API. Follow these steps to enable vmemcache support in OAP-Cache.
 To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and vmemcache library correctly, then refer below configurations to apply vmemcache cache strategy in your workload.
 
-For Parquet data format, provides following conf options:
+For Parquet data format, add these conf options:
 
 ```
  
@@ -385,7 +385,7 @@ Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks 
 
 External cache strategy is implemented based on arrow/plasma library. To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and plasma library correctly, and start Plasma service on nodes, then refer below configurations to apply external cache strategy in your workload.
 
-For Parquet data format, provides the following conf options:
+For Parquet data format, add these conf options:
 
 ```
 spark.sql.oap.parquet.data.cache.enable                    true 
@@ -394,7 +394,7 @@ spark.sql.oap.cache.guardian.memory.size                   10g      # according 
 spark.sql.oap.cache.external.client.pool.size              10
 ```
 
-For Orc data format, provides following conf options:
+For Orc data format, add these conf options:
 
 ```
 spark.sql.orc.copyBatchToSpark                             true 
