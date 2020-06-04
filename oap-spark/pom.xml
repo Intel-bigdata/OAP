@@ -13,7 +13,7 @@
 
     <artifactId>oap-spark</artifactId>
     <packaging>jar</packaging>
-    <name>OAP Spark</name>
+    <name>OAP Project Spark Source Code Change</name>
 
     <dependencies>
         <dependency>
@@ -83,6 +83,7 @@
     </dependencies>
 
     <build>
+        <finalName>${project.artifactId}-${project.version}-with-spark-${oap.spark.version}</finalName>
         <plugins>
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
