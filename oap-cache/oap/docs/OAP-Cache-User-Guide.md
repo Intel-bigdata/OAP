@@ -17,7 +17,7 @@ OAP-Cache on Spark requires a working Hadoop cluster with YARN and Spark. Runnin
 
 ### Building OAP-Cache
 
-Download our pre-built OAP-Cache jar [OAP-Cache-0.8.0 for Spark-2.4.4](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-cache-0.8.0-with-spark-2.4.4.jar) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the `oap-common-0.8.0-with-spark-2.4.4.jar` to the directory `$SPARK_HOME/jars/`. If you’d like to build OAP-Cache from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+Download our pre-built OAP-Cache jar [oap-product-0.8.0-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-product-0.8.0-bin-spark-2.4.4.tar.gz) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the `oap-common-0.8.0-with-spark-2.4.4.jar` to the directory `$SPARK_HOME/jars/`. If you’d like to build OAP-Cache from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 
 ### Spark Configurations for OAP-Cache
 
