@@ -131,7 +131,7 @@ These configurations are deprecated and will not take effect.
 
 ## Performance Evaluation Tool
 
-Leverage this tool to evaluate shuffle write/read performance separately under your specific storage system. This tool starts one Java process with #poolSize number of threads, running the specified remote-shuffle writers/readers in this module. Additional Spark configurations can be put in "./spark.conf" and will be loaded.(and printed as part of the summary for recording)
+Leverage this tool to evaluate shuffle write/read performance separately under your specific storage system. This tool starts one Java process with #poolSize number of threads, running the specified remote-shuffle writers/readers in this module. Additional Spark configurations can be put in "./spark-defaults.conf" and will be loaded.(and printed as part of the summary for recording)
 
 Configuration details:
 * `-h` or `--help`: display help messages
