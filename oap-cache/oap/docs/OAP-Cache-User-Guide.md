@@ -238,7 +238,8 @@ The following are required to configure OAP to use DCPMM cache.
      make package
      sudo rpm -i libvmemcache*.rpm
 ```
-- OAP-Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries. [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support DCPMM, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. You can run follow commands to install libarrow.so, libplasma.so, libplasma_java.so, plasma-store-server, arrow-plasma.jar to your machine:
+- OAP-Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries, you can refer to [Using-Plasma-As-Cache](./Using-Plasma-As-Cache.md) to enable this feature.  
+[Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support DCPMM, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo.  You can run follow commands to install libarrow.so, libplasma.so, libplasma_java.so, plasma-store-server, arrow-plasma.jar to your machine:
     ```
     git clone https://github.com/Intel-bigdata/arrow.git
     cd arrow
