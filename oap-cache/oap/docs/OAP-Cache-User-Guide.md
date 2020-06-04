@@ -227,19 +227,17 @@ The following are required to configure OAP to use DCPMM cache.
    make
    make install
    ```
-- Install [Vmemcache](https://github.com/pmem/vmemcache) library on every cluster worker node if using vmemcache strategy. Follow the build/install steps from vmemcache website and make sure libvmemcache.so is in `/lib64` directory in each worker node. 
-
-   Build vmemcache lib from source (for RPM-based Linux):
-
-   ```
-   git clone https://github.com/pmem/vmemcache
-   cd vmemcache
-   mkdir build
-   cd build
-   cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
-   make package
-   sudo rpm -i libvmemcache*.rpm
-   ```
+   
+- [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for DCPM cache. You can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. To build vmemcache lib from source, you can (for RPM-based linux as example):
+```
+     git clone https://github.com/pmem/vmemcache
+     cd vmemcache
+     mkdir build
+     cd build
+     cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
+     make package
+     sudo rpm -i libvmemcache*.rpm
+```
 - OAP-Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries. [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support DCPMM, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. You can run follow commands to install libarrow.so, libplasma.so, libplasma_java.so, plasma-store-server, arrow-plasma.jar to your machine:
     ```
     git clone https://github.com/Intel-bigdata/arrow.git
