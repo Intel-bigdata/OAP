@@ -35,6 +35,7 @@
         <guava.version>18.0</guava.version>
         <java.version>1.8</java.version>
         <slf4j.version>1.7.16</slf4j.version>
+        <oap.spark.version>2.4.4</oap.spark.version>
     </properties>
 
     <modules>

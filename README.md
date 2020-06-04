@@ -6,8 +6,6 @@ Please refer the below documents for more information.
 * [Shuffle](./oap-shuffle/README.md)
 
 
-## Building OAP
+For whole project, we provide guide steps for developers
 
-Please refer the below documents for more information.
-
-* [Dev](./dev/README.md)
+* [OAP Product Developer Guide](./docs/Developer-Guide.md)
