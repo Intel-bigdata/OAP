@@ -82,20 +82,16 @@ It will be more complicated to integrate OAP-Cache with a customized Spark. Step
 The following files need to be checked/compared for changes:
 
 ```
-•	antlr4/org/apache/spark/sql/catalyst/parser/SqlBase.g4  
-		Add index related DDL in this file, such as "create/show/drop oindex". 
 •	org/apache/spark/scheduler/DAGScheduler.scala           
 		Add the oap cache location to aware task scheduling.
 •	org/apache/spark/sql/execution/DataSourceScanExec.scala   
-		Add the metrics info to OapMetricsManager and schedule the task to read from the cached hosts.
+		Add the metrics info to OapMetricsManager and schedule the task to read from the cached 
+•	org/apache/spark/sql/execution/datasources/FileFormatDataWriter.scala
+                Return the result of write task to driver.
 •	org/apache/spark/sql/execution/datasources/FileFormatWriter.scala
-		Return the result of write task to driver.
+		Add the result of write task. 
 •	org/apache/spark/sql/execution/datasources/OutputWriter.scala  
 		Add new API to support return the result of write task to driver.
-•	org/apache/spark/sql/hive/thriftserver/HiveThriftServer2.scala
-		Add OapEnv.init() and OapEnv.stop
-•	org/apache/spark/sql/hive/thriftserver/SparkSQLCLIDriver.scala
-		Add OapEnv.init() and OapEnv.stop in SparkSQLCLIDriver
 •	org/apache/spark/status/api/v1/OneApplicationResource.scala    
 		Update the metric data to spark web UI.
 •	org/apache/spark/SparkEnv.scala
@@ -133,6 +129,5 @@ Note: If you are using a customized Spark, there may be conflicts in applying th
 
 #### Use pre-built patched Spark packages 
 
-If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.4-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) with the patch applied.
-
+If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.tgz](https://github.com/Intel-bigdata/spark/releases/download/v2.4.4-intel-oap-0.8/spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.tgz) with the patch applied.
 
