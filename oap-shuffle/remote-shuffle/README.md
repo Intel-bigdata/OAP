@@ -6,8 +6,7 @@ This is an essential part of enabling Spark on disaggregated compute and storage
 
 ## Build and Deploy
 
-Build this module using the following command in oap-shuffle/remote-shuffle folder or download the pre-built jar: oap-remote-shuffle-\<version\>-with-spark-2.4.4.jar in [oap-product-0.8.0-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-product-0.8.0-bin-spark-2.4.4.tar.gz). This file needs to
-be deployed on every compute node that runs Spark. Manually place it on all nodes or let resource manager do the work.
+Build this module using the following command in oap-shuffle/remote-shuffle folder or download the pre-built ` oap-remote-shuffle-0.8.0-with-spark-2.4.4.jar ` from  [oap-product-0.8.0-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-product-0.8.0-bin-spark-2.4.4.tar.gz) This file needs to be deployed on every compute node that runs Spark. Manually place it on all nodes or let resource manager do the work.
 
 ```
     mvn -DskipTests clean package 
@@ -15,14 +14,14 @@ be deployed on every compute node that runs Spark. Manually place it on all node
 
 ## Enable Remote Shuffle
 
-Add the jar files to the classpath of Spark driver and executors: Put the
+Add the `.jar` files to the classpath of Spark driver and executors: Put the
 following configurations in spark-defaults.conf or Spark submit command line arguments. 
 
 Note: For DAOS users, DAOS Hadoop/Java API jars should also be included in the classpath as we leverage DAOS Hadoop filesystem.
     
 ```
-    spark.executor.extraClassPath              /path/to/remote-shuffle-dir/remote-shuffle-<version>.jar
-    spark.driver.extraClassPath                /path/to/remote-shuffle-dir/remote-shuffle-<version>.jar
+    spark.executor.extraClassPath              /<path-to-remote-shuffle-dir>/remote-shuffle-<version>.jar
+    spark.driver.extraClassPath                /<path-to-remote-shuffle-dir>/remote-shuffle-<version>.jar
 ```
 
 Enable the remote shuffle manager and specify the Hadoop storage system URI holding shuffle data.
@@ -131,7 +130,7 @@ These configurations are deprecated and will not take effect.
 
 ## Performance Evaluation Tool
 
-Leverage this tool to evaluate shuffle write/read performance separately under your specific storage system. This tool starts one Java process with #poolSize number of threads, running the specified remote-shuffle writers/readers in this module. Additional Spark configurations can be put in "./spark.conf" and will be loaded.(and printed as part of the summary for recording)
+Leverage this tool to evaluate shuffle write/read performance separately under your specific storage system. This tool starts one Java process with #poolSize number of threads, running the specified remote-shuffle writers/readers in this module. Additional Spark configurations can be put in "./spark-defaults.conf" and will be loaded.(and printed as part of the summary for recording)
 
 Configuration details:
 * `-h` or `--help`: display help messages

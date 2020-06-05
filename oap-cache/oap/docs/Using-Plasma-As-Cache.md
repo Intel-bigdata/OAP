@@ -12,9 +12,9 @@ To use optimized Plasma cache with OAP, you need following components:
     (2) plasma-store-server: executable file, plasma cache service.  
     (3) arrow-plasma-0.17.0.jar: will be used when compile oap and spark runtime also need it. 
     
-(1) and (2) will be provided as rpm package, we provide fedora 29 and Cent OS 7.6 rpm package, you can download it on release page.
+(1) and (2) will be provided as rpm package, we provide [Fedora 29](https://github.com/Intel-bigdata/arrow/releases/download/apache-arrow-0.17.0-intel-oap-0.8/arrow-plasma-intel-libs-0.17.0-1.fc29.x86_64.rpm) and [Cent OS 7.6](https://github.com/Intel-bigdata/arrow/releases/download/apache-arrow-0.17.0-intel-oap-0.8/arrow-plasma-intel-libs-0.17.0-1.el7.x86_64.rpm) rpm package, you can download it on release page.
 Run `rpm -ivh arrow-plasma-intel-libs-0.17.0-1*x86_64.rpm` to install it.   
-(3) will be provided in maven central repo, you can also get it on release page. You need to download it and copy to `$SPARK_HOME/jars` dir.
+(3) will be provided in maven central repo. You need to download [it](https://repo1.maven.org/maven2/com/intel/arrow/arrow-plasma/0.17.0/arrow-plasma-0.17.0.jar) and copy to `$SPARK_HOME/jars` dir.
 
    
 ### build Plasma related files manually
@@ -45,7 +45,7 @@ mvn clean -q -pl plasma -DskipTests install
 ## How to Run Spark-sql with Plasma
 
 ### config files:
-you should update config file `spark-default.conf` as follow:
+Follow [User guide](OAP-Cache-User-Guide.md), and you should update config file `spark-default.conf` as follow:
 
 For Parquet data format, provides the following conf options:
 
@@ -79,7 +79,7 @@ spark.sql.oap.cache.external.client.pool.size              10
      Or you can write these parameters directly in your starting command. Use "?" to seperate different numaNodes.
  ```
 
-You can start plasma service on each node as following command
+You can start plasma service on each node as following command, and then you can run your workload.
 
 ```
 plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://propertyFilePath:/tmp/persistent-memory.properties  
