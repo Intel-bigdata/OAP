@@ -1,8 +1,6 @@
 # Optimized Analytics Packages for Spark\* (OAP)
 
-
-Please refer the below documents for more information.	OAP is an optimized implementation of several kinds of packages for Spark  including cache, shuffle, and others. Please refer to these documents for more information:
-
+OAP is an optimized implementation of several kinds of packages for Spark including cache, shuffle, and others. Please refer to these documents for more information:
 
 * [Cache](./oap-cache/oap/README.md)
 * [Shuffle](./oap-shuffle/README.md)
