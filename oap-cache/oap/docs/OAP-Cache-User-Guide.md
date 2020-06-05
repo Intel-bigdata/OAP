@@ -407,10 +407,8 @@ spark.sql.oap.cache.external.client.pool.size              10
 ### Index/Data cache separation
 
 OAP-Cache now supports different cache strategies for DRAM and DCPMM. To optimize the cache media utilization, you can enable cache separation of data and index with same or different cache media. When Sharing same media, data cache and index cache will use different fiber cache ratio.
+
 Here we list 4 different kinds of configs for index/cache separation, if you choose one of them, please add corresponding configs to `spark-defaults.conf`.
-
-now supports different cache back-ends for the `offheap` and `pm` memory managers. To optimize cache media utilization, enable cache separation of data and index with different cache media and strategies as shown below. Note that when sharing the same media, the data cache and index cache will use a different fiber cache ratio. If you choose one of the following 4 configurations, add the corresponding settings to `spark-defaults.conf`. 
-
 1. DRAM(`offheap`) as cache media, `guava` strategy as index, and data cache back end. 
 
 ```
