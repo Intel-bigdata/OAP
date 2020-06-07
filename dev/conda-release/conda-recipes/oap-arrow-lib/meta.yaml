@@ -1,0 +1,9 @@
+package:
+  name: oap-arrow-lib
+  version: 0.1
+
+build:
+  number: 3
+
+about:
+  summary: This is a simple arrow lib package for OAP

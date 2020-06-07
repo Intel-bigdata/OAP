@@ -44,8 +44,8 @@ function conda_build_vmemcache() {
 }
 
 function conda_build_arrow() {
-    cd $DEV_PATH/thirdparty
-    arrow_repo=" https://github.com/Intel-bigdata/arrow.git"
+  cd $DEV_PATH/thirdparty
+  arrow_repo=" https://github.com/Intel-bigdata/arrow.git"
   if [ ! -d "arrow" ]; then
     git clone arrow_repo
   fi
@@ -60,14 +60,33 @@ function conda_build_arrow() {
   conda build .
 }
 
+function conda_build_oap_arrow_lib() {
+  cp -L $DEV_PATH/thirdparty/arrow/cpp/release-build/release/libarrow.so cp $RECIPES_PATH/oap-arrow-lib/
+  cp -L $DEV_PATH/thirdparty/arrow/cpp/release-build/release/libgandiva.so $RECIPES_PATH/oap-arrow-lib/
+  cp -L $DEV_PATH/thirdparty/arrow/cpp/release-build/release/libplasma.so $RECIPES_PATH/oap-arrow-lib/
+  cp -L $DEV_PATH/thirdparty/arrow/cpp/release-build/release/libplasma_java.so $RECIPES_PATH/oap-arrow-lib/
+  cp $DEV_PATH/thirdparty/arrow/cpp/release-build/release/plasma-store-server $RECIPES_PATH/oap-arrow-lib/
+  cd $RECIPES_PATH/oap-arrow-lib/
+  conda build .
+}
+
 function conda_build_oap() {
+  OAP_VERSION=0.9.0
+  SPARK_VERSION=2.4.4
   sh $DEV_PATH/make-distribution.sh
+  cd $DEV_PATH/release-package/
+  tar -xzvf oap-$version.tar.gz
+  cp $DEV_PATH/release-package/oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION/jars/* $RECIPES_PATH/oap/
+  cd $RECIPES_PATH/oap/
+  conda build .
+
+}
+
+function conda_build_all() {
   conda_build_memkind
   conda_build_vmemcache
   conda_build_arrow
-  cp $DEV_PATH/targets/* $RECIPES_PATH/oap/
-  cd $RECIPES_PATH/oap/
-  conda build.
+  conda_build_oap
 }
 
 

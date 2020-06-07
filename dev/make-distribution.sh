@@ -10,7 +10,7 @@ SPARK_VERSION=2.4.4
 
 function gather() {
   cd  $DEV_PATH
-  target_path=$DEV_PATH/release-package/oap-$OAP_VERSION/jars
+  target_path=$DEV_PATH/release-package/oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION/jars
   mkdir -p $target_path
   cp ../oap-cache/oap/target/*spark-$SPARK_VERSION.jar $target_path
   cp ../oap-shuffle/remote-shuffle/target/*.jar $target_path
@@ -20,8 +20,8 @@ function gather() {
   cd $target_path
   rm -f oap-cache-$OAP_VERSION.jar
   cd  $DEV_PATH/release-package
-  tar -czf oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION.tar.gz oap-$OAP_VERSION/
-  rm -rf oap-$OAP_VERSION/
+  tar -czf oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION.tar.gz oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION/
+  rm -rf oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION/
   echo "Please check the result in  $DEV_PATH/release-package!"
 }
 
