@@ -51,6 +51,7 @@ public class ChunkOutputStream extends FileOutputStream {
      */
     public void close() throws IOException {
         chunkWriter.close();
+        super.close();
     }
 
     /**

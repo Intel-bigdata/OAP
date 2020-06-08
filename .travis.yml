@@ -19,6 +19,9 @@ jobs:
       - cd ${TRAVIS_BUILD_DIR}/dev
       - ./install_vmemcache.sh
       - ./install_memkind.sh
+      - ../oap-common/src/native/memkind/compile.sh
+      - sudo cp ../oap-common/src/resources/linux/64/lib/libpmplatform.so /usr/lib/
+      - sudo ldconfig /usr/lib
       script:
       - cd ${TRAVIS_BUILD_DIR}
       - mvn clean test -pl oap-cache/oap -q -Ppersistent-memory  -Pvmemcache  -am

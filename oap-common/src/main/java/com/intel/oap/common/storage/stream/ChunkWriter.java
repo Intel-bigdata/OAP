@@ -1,13 +1,15 @@
 package com.intel.oap.common.storage.stream;
 
+import sun.nio.ch.DirectBuffer;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public abstract class ChunkWriter {
-    private PMemManager pMemManager;
-    private byte[] logicalID;
-    private int chunkID = 0;
+    protected PMemManager pMemManager;
+    protected byte[] logicalID;
+    protected int chunkID = 0;
     private ByteBuffer remainingBuffer;
     private boolean fallbackTriggered = false;
     private FileOutputStream outputStream = null;
@@ -31,6 +33,8 @@ public abstract class ChunkWriter {
                 j = 0;
                 // Flush buffer through chunk writer
                 flushBufferByChunk(remainingBuffer);
+                // clear content of remainingBuffer
+                remainingBuffer.clear();
             }
             remainingBuffer.put(bytes[i]);
             i++;
@@ -39,17 +43,18 @@ public abstract class ChunkWriter {
         if(j == pMemManager.getChunkSize()){
             // Flush buffer through chunk writer
             flushBufferByChunk(remainingBuffer);
+            remainingBuffer.clear();
         }
     }
 
     private void flushBufferByChunk(ByteBuffer byteBuffer) throws IOException {
         int dataSizeInByte = byteBuffer.position();
-        if (!fallbackTriggered && pMemManager.getStats().getRemainingSize() > dataSizeInByte) {
+        if (!fallbackTriggered && pMemManager.getStats().getRemainingSize() >= dataSizeInByte) {
             try {
                 PMemPhysicalAddress id = writeInternal(byteBuffer);
-                chunkID++;
                 pMemManager.getStats().increaseSize(dataSizeInByte);
-                pMemManager.getpMemMetaStore().putPMemID(logicalID, chunkID, id);
+                pMemManager.getpMemMetaStore().putPhysicalAddress(logicalID, chunkID, id);
+                chunkID++;
             } catch (RuntimeException re) {
                 // TODO Log Warning
                 fallbackTriggered = true;
@@ -71,7 +76,8 @@ public abstract class ChunkWriter {
     }
 
     public void close() throws IOException {
-        if(remainingBuffer.hasRemaining()){
+        // if remaining buffer has valid elements, write them to output stream
+        if(remainingBuffer.position() > 0){
             flushBufferByChunk(remainingBuffer);
         }
         pMemManager.getpMemMetaStore().putMetaFooter(logicalID, new MetaData(fallbackTriggered, chunkID));
@@ -85,4 +91,5 @@ public abstract class ChunkWriter {
      * Do some clean up work if needed.
      */
     protected abstract void closeInternal();
+
 }

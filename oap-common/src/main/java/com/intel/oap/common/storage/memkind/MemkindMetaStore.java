@@ -8,14 +8,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 //TODO design point, how to store data on PMEM
 public class MemkindMetaStore implements PMemMetaStore {
-    ConcurrentHashMap<String, PMemPhysicalAddress> PMemHashMap = new ConcurrentHashMap();
+    ConcurrentHashMap<String, MemkindPMemPhysicalAddress> pMemHashMap = new ConcurrentHashMap();
     ConcurrentHashMap<String, MetaData> metaHashMap = new ConcurrentHashMap();
 
     @Override
-    public PMemPhysicalAddress getPMemIDByLogicalID(byte[] id, int chunkID) {
+    public PMemPhysicalAddress getPhysicalAddressByID(byte[] id, int chunkID) {
         StringBuilder keyBuilder = new StringBuilder();
         keyBuilder.append(chunkID).append(new String(id));
-        return PMemHashMap.get(keyBuilder.toString());
+        return pMemHashMap.get(keyBuilder.toString());
     }
 
     @Override
@@ -24,10 +24,21 @@ public class MemkindMetaStore implements PMemMetaStore {
     }
 
     @Override
-    public void putPMemID(byte[] id, int chunkID, PMemPhysicalAddress pMemPhysicalAddress) {
+    public void removeMetaFooter(byte[] id) {
+        metaHashMap.remove(new String(id));
+    }
+    @Override
+    public void putPhysicalAddress(byte[] id, int chunkID, PMemPhysicalAddress pMemPhysicalAddress) {
         StringBuilder keyBuilder = new StringBuilder();
         keyBuilder.append(chunkID).append(new String(id));
-        PMemHashMap.put(keyBuilder.toString(), pMemPhysicalAddress);
+        pMemHashMap.put(keyBuilder.toString(), (MemkindPMemPhysicalAddress) pMemPhysicalAddress);
+    }
+
+    @Override
+    public void removePhysicalAddress(byte[] id, int chunkID, PMemPhysicalAddress pMemPhysicalAddress) {
+        StringBuilder keyBuilder = new StringBuilder();
+        keyBuilder.append(chunkID).append(new String(id));
+        pMemHashMap.remove(keyBuilder.toString());
     }
 
     @Override

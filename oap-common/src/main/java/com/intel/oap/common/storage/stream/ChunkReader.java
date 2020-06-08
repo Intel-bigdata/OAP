@@ -5,8 +5,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public abstract class ChunkReader {
-    private PMemManager pMemManager;
-    private byte[] logicalID;
+    protected PMemManager pMemManager;
+    protected byte[] logicalID;
     private int chunkID = 0;
     private ByteBuffer remainingBuffer;
     private MetaData metaData;
@@ -28,7 +28,8 @@ public abstract class ChunkReader {
             b[i] = remainingBuffer.get();
             i++;
             remainingSize--;
-            if (remainingSize == 0) {
+            // when current chunk finished read but byte array is not full-filled, switch to next chunk
+            if (remainingSize == 0 && i < b.length) {
                 remainingBuffer.clear();
                 remainingSize = loadData();
                 remainingBuffer.flip();
@@ -43,7 +44,7 @@ public abstract class ChunkReader {
         if (chunkID == metaData.getTotalChunk() && metaData.isHasDiskData()) {
             size = readFromDisk(remainingBuffer);
         } else {
-            PMemPhysicalAddress id = pMemManager.getpMemMetaStore().getPMemIDByLogicalID(logicalID, chunkID);
+            PMemPhysicalAddress id = pMemManager.getpMemMetaStore().getPhysicalAddressByID(logicalID, chunkID);
             chunkID++;
             size = readFromPMem(id, remainingBuffer);
         }
@@ -65,5 +66,13 @@ public abstract class ChunkReader {
         return size;
     }
 
+    /**
+     * read data from a address mappted to physical ID
+     * @param id
+     * @param data
+     * @return
+     */
     protected abstract int readFromPMem(PMemPhysicalAddress id, ByteBuffer data);
+
+    protected abstract void freeFromPMem();
 }

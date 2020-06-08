@@ -7,7 +7,7 @@ import java.io.InputStream;
 import java.nio.channels.FileChannel;
 
 public class ChunkInputStream extends FileInputStream {
-   private ChunkReader chunkReader;
+   protected ChunkReader chunkReader;
 
     public ChunkInputStream(String name, DataStore dataStore) throws FileNotFoundException {
         super(name);
@@ -19,6 +19,7 @@ public class ChunkInputStream extends FileInputStream {
     }
 
     public int read(byte b[]) throws IOException {
+        assert(b.length > 0);
         return chunkReader.read(b);
     }
 
@@ -34,4 +35,7 @@ public class ChunkInputStream extends FileInputStream {
         throw new UnsupportedOperationException("Unsupported operation");
     }
 
+    public void free() throws IOException {
+        chunkReader.freeFromPMem();
+    }
 }
