@@ -15,8 +15,8 @@ spark.yarn.numa.enabled true
 spark.yarn.numa.num [Your numa node number]
 
 spark.files                       file://${{PATH_TO_OAP_SPARK_JAR}/oap-spark-${VERSION}.jar,file://${{PATH_TO_OAP_COMMON_JAR}/oap-common-${VERSION}.jar
-spark.executor.extraClassPath     ./oap-spark-${VERSION}.jar,./oap-common-${VERSION}.jar
-spark.driver.extraClassPath       file://${{PATH_TO_OAP_SPARK_JAR}/oap-spark-${VERSION}.jar,file://${{PATH_TO_OAP_COMMON_JAR}/oap-common-${VERSION}.jar
+spark.executor.extraClassPath     ./oap-spark-${VERSION}.jar:./oap-common-${VERSION}.jar
+spark.driver.extraClassPath       file://${{PATH_TO_OAP_SPARK_JAR}/oap-spark-${VERSION}.jar:file://${{PATH_TO_OAP_COMMON_JAR}/oap-common-${VERSION}.jar
 ```
 
 ## Use Optane PMem to cache data
