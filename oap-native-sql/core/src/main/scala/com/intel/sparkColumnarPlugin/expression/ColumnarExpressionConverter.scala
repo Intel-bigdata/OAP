@@ -153,6 +153,13 @@ object ColumnarExpressionConverter extends Logging {
       ColumnarConcatOperator.create(
         exps,
         expr)
+    case r: Round =>
+      check_if_no_calculation = false
+      logInfo(s"${expr.getClass} ${expr} is supported, no_cal is $check_if_no_calculation.")
+      ColumnarRoundOperator.create(
+        replaceWithColumnarExpression(r.child, attributeSeq),
+        replaceWithColumnarExpression(r.scale),
+        expr)
     case expr =>
       logWarning(s"${expr.getClass} ${expr} is not currently supported.")
       expr
