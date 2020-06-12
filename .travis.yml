@@ -1,4 +1,5 @@
 sudo: required
+<<<<<<< HEAD
 dist: trusty
 language: java
 jobs:
@@ -24,13 +25,26 @@ jobs:
       - mvn clean -q -Ppersistent-memory -Pvmemcache test
       
     - name: oap-native-sql
+=======
+dist: bionic
+language: generic
+jdk: openjdk8
+jobs:
+  include:
+      
+    - name: 
+>>>>>>> 40287d3a9bb770e07f0da1dca74e20eacd329dd1
       dist: bionic
       jdk:
         - openjdk8
       before_install:
       - echo ${TRAVIS_COMMIT_MESSAGE}
       #- if [[ ${TRAVIS_COMMIT_MESSAGE} != \[oap-native-sql\]* ]]; then travis_terminate 0 ; fi ;
+<<<<<<< HEAD
       - sudo apt-get install cmake
+=======
+      - sudo apt-get install -y openjdk-8-jdk git maven g++-7 cmake build-essential libboost-dev libboost-system-dev autogen autoconf libtool pandoc
+>>>>>>> 40287d3a9bb770e07f0da1dca74e20eacd329dd1
       - export | grep JAVA_HOME
       install:
       - # Download spark 3.0
@@ -39,6 +53,7 @@ jobs:
       - "export SPARK_HOME=`pwd`/spark-3.0.0-preview2-bin-hadoop2.7"
       before_script:
       - cd /tmp
+<<<<<<< HEAD
       - git clone https://github.com/intel-bigdata/arrow.git
       - cd arrow && git checkout native-sql-engine-clean && cd cpp
       - sed -i "s/\${Python3_EXECUTABLE}/\/opt\/pyenv\/shims\/python3/g" CMakeLists.txt
@@ -55,3 +70,28 @@ jobs:
       - mvn clean -q package -DskipTests #skip core tests
       - cd ${TRAVIS_BUILD_DIR}/oap-data-source/arrow
       - mvn clean -q test
+=======
+      #libfabric   
+      - git clone https://github.com/ofiwg/libfabric.git &&  cd libfabric && git checkout -b v1.8.0 tags/v1.8.0 && ./autogen.sh && ./configure --prefix=/opt/local --enable-sockets && make -j && make install
+      #HPNL
+      - cd /tmp
+      - git clone https://github.com/Intel-bigdata/HPNL.git
+      - cd HPNL && git submodule update --init --recursive && mkdir build &&  cd build
+      - cmake -DWITH_VERBS=ON -DWITH_JAVA=ON -DLIBFABRIC_PREFIX=/opt/local
+      - make -j && make install
+      - cd ../java/hpnl
+      - mvn install
+      #ndctl & PMDK
+      - cd /tmp
+      - git clone https://github.com/pmem/ndctl.git && cd ndctl && git checkout v63 &&  ./autogen.sh &&  ./configure CFLAGS='-g -O2' --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib64 &&  make -j &&  make check &&  make install 
+      - git clone https://github.com/pmem/pmdk.git &&  cd pmdk && git checkout tags/1.8 &&  make -j && make install
+      #RPMem
+      - cd /tmp
+      - git clone https://github.com/efficient/libcuckoo && mkdir build && cd build 
+      - cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_EXAMPLES=1 -DBUILD_TESTS=1 ..
+      - make all && make install
+      - cd /tmp
+      - git clone https://github.com/Intel-bigdata/Spark-PMoF.git
+      - cd Spark-PMoF
+      - mvn install -DskipTests
+>>>>>>> 40287d3a9bb770e07f0da1dca74e20eacd329dd1

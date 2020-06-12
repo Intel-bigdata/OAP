@@ -1,0 +1,23 @@
+FROM ubuntu:18.04
+MAINTAINER Haodong haodong.tang@intel.com
+RUN apt-get update -y
+RUN apt-get install -y openjdk-8-jdk git maven g++-7 cmake build-essential libboost-dev libboost-system-dev autogen autoconf libtool
+RUN git clone https://github.com/ofiwg/libfabric.git; cd libfabric; git checkout -b v1.8.0 tags/v1.8.0; ./autogen.sh; ./configure --prefix=/usr/local --enable-sockets && make -j && make install
+ENV LD_LIBRARY_PATH /usr/local/lib
+ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64
+RUN ldconfig
+RUN git clone https://github.com/Intel-bigdata/HPNL.git
+RUN cd HPNL; git submodule update --init --recursive
+RUN cd HPNL; mkdir build && cd build; cmake -DWITH_JAVA=ON .. && make install -j && ctest
+ARG MAVEN_OPTS
+RUN cd HPNL/java/hpnl; mvn install
+
+RUN apt-get install -y libndctl-dev libdaxctl-dev pkg-config
+RUN cd /; git clone https://github.com/pmem/pmdk.git
+RUN cd pmdk; git checkout -b 1.6 tags/1.6; make -j; make install -j;
+RUN cd /; git clone https://github.com/efficient/libcuckoo.git
+RUN cd libcuckoo; mkdir build; cd build; cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_EXAMPLES=1 -DBUILD_TESTS=1 ..; make -j; make install -j
+RUN mkdir /Spark-PMoF
+WORKDIR /Spark-PMoF
+COPY . .
+RUN mvn install -DskipTests
