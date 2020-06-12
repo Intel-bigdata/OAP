@@ -904,7 +904,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
       val pageReader = rowGroup.getPageReader(descriptor)
       val timeZone = ZoneId.systemDefault
       val columnReader =
-        new SkippableVectorizedColumnReader(descriptor, originalType, pageReader, timeZone)
+        new SkippableVectorizedColumnReader(descriptor, originalType, pageReader, timeZone, true)
       val columnVector = new OnHeapColumnVector(unitSize, dataType)
       columnReader.skipBatch(unitSize, columnVector.dataType)
       columnVector.reset()
@@ -932,7 +932,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
       val pageReader = rowGroup.getPageReader(descriptor)
       val timeZone = ZoneId.systemDefault
       val columnReader =
-        new SkippableVectorizedColumnReader(descriptor, originalType, pageReader, timeZone)
+        new SkippableVectorizedColumnReader(descriptor, originalType, pageReader, timeZone, true)
       columnReader.skipBatch(unitSize, dataType)
     } finally {
       if (reader != null) reader.close()

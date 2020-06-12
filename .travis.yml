@@ -13,7 +13,7 @@ jobs:
       install:
       - # Download spark 3.0.0
       - "[ -f spark ] || mkdir spark && cd spark"
-      - "git clone -b v3.0.0-rc1 https://github.com/apache/spark.git"
+      - "git clone -b oap-master https://github.com/Intel-bigdata/spark.git"
       - "cd spark"
       - "./build/mvn -DskipTests clean -Pyarn  -Phive-1.2 -Phive-thriftserver  install -q"
       - "export SPARK_HOME=`pwd`/spark"
