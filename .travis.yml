@@ -40,7 +40,7 @@ jobs:
       before_script:
       - cd /tmp
       - git clone https://github.com/intel-bigdata/arrow.git
-      - cd arrow && git checkout native-sql-engine-clean && cd cpp
+      - cd arrow && git checkout oap-master && cd cpp
       - sed -i "s/\${Python3_EXECUTABLE}/\/opt\/pyenv\/shims\/python3/g" CMakeLists.txt
       - mkdir build && cd build 
       - cmake .. -DARROW_JNI=ON -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_FILESYSTEM=ON -DARROW_WITH_SNAPPY=ON -DARROW_JSON=ON -DARROW_DATASET=ON && make 

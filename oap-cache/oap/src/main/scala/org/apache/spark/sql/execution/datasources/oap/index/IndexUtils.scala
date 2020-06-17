@@ -467,7 +467,7 @@ private[oap] object IndexUtils extends  Logging {
     }
 
     val committer = FileCommitProtocol.instantiate(
-      sparkSession.sessionState.conf.fileCommitProtocolClass,
+      classOf[OapIndexCommitProtocol].getCanonicalName,
       jobId = java.util.UUID.randomUUID().toString,
       outputPath = outPutPath.toUri.toString,
       false)
