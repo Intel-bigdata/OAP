@@ -98,7 +98,7 @@ class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializab
       val itr = itrList
         .toIterator
         .flatMap(itr => itr.asScala)
-        .map(vsr => ArrowUtils.loadVsr(vsr, file.partitionValues, partitionSchema, dataSchema))
+        .map(vsr => ArrowUtils.loadVectors(vsr, file.partitionValues, partitionSchema, dataSchema))
       new UnsafeItr(itr).asInstanceOf[Iterator[InternalRow]]
     }
   }

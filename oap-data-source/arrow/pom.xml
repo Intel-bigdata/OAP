@@ -8,7 +8,7 @@
     <scala.version>2.12.10</scala.version>
     <scala.binary.version>2.12</scala.binary.version>
     <spark.version>3.1.0-SNAPSHOT</spark.version>
-    <arrow.version>0.17.0 </arrow.version>
+    <arrow.version>0.17.0</arrow.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
   </properties>
@@ -112,40 +112,43 @@
     <testSourceDirectory>src/test/scala</testSourceDirectory>
     <plugins>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
         <executions>
           <execution>
+            <id>copy-writable-vector-source</id>
             <phase>generate-sources</phase>
             <goals>
-              <goal>add-source</goal>
+              <goal>copy-resources</goal>
             </goals>
             <configuration>
-              <sources>
-                <source>${project.build.directory}/generated-sources/downloaded/java/</source>
-              </sources>
+              <outputDirectory>${project.build.directory}/generated-sources/copied/java/</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/../../oap-native-sql/core/src/main/java/</directory>
+                  <includes>
+                    <include>**/ArrowWritableColumnVector.java</include>
+                  </includes>
+                </resource>
+              </resources>
             </configuration>
           </execution>
         </executions>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
+        <artifactId>build-helper-maven-plugin</artifactId>
         <executions>
           <execution>
-            <id>download-writable-column-vector</id>
+            <id>add-src-1</id>
             <phase>generate-sources</phase>
             <goals>
-              <goal>exec</goal>
+              <goal>add-source</goal>
             </goals>
             <configuration>
-              <executable>curl</executable>
-              <arguments>
-                <argument>https://raw.githubusercontent.com/Intel-bigdata/OAP/branch-nativesql-spark-3.0.0/oap-native-sql/core/src/main/java/com/intel/sparkColumnarPlugin/vectorized/ArrowWritableColumnVector.java</argument>
-                <argument>--create-dirs</argument>
-                <argument>-o</argument>>
-                <argument>${project.build.directory}/generated-sources/downloaded/java/com/intel/sparkColumnarPlugin/vectorized/ArrowWritableColumnVector.java</argument>
-              </arguments>
+              <sources>
+                <source>${project.build.directory}/generated-sources/copied/java/</source>
+              </sources>
             </configuration>
           </execution>
         </executions>

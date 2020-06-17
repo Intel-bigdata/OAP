@@ -29,6 +29,7 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.complex.*;
+import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.holders.NullableVarCharHolder;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -62,6 +63,7 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
 
   private int ordinal;
   private ValueVector vector;
+  private ValueVector dictionaryVector;
 
   public static BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
   public static BufferAllocator getNewAllocator() {
@@ -90,7 +92,24 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     return vectors;
   }
 
-  public static ArrowWritableColumnVector[] loadColumns(int capacity, List<FieldVector> fieldVectors) {
+  public static ArrowWritableColumnVector[] loadColumns(int capacity,
+                                                        List<FieldVector> fieldVectors,
+                                                        List<FieldVector> dictionaryVectors) {
+    if (fieldVectors.size() != dictionaryVectors.size()) {
+      throw new IllegalArgumentException("Mismatched field vectors and dictionary vectors. " +
+              "Field vector count: " + fieldVectors.size() + ", " +
+              "dictionary vector count: " + dictionaryVectors.size());
+    }
+    ArrowWritableColumnVector[] vectors = new ArrowWritableColumnVector[fieldVectors.size()];
+    for (int i = 0; i < fieldVectors.size(); i++) {
+      vectors[i] = new ArrowWritableColumnVector(fieldVectors.get(i), dictionaryVectors.get(i),
+              i, capacity, false);
+    }
+    return vectors;
+  }
+
+  public static ArrowWritableColumnVector[] loadColumns(int capacity,
+                                                        List<FieldVector> fieldVectors) {
     ArrowWritableColumnVector[] vectors = new ArrowWritableColumnVector[fieldVectors.size()];
     for (int i = 0; i < fieldVectors.size(); i++) {
       vectors[i] = new ArrowWritableColumnVector(fieldVectors.get(i), i, capacity, false);
@@ -106,19 +125,26 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     return loadColumns(capacity, root.getFieldVectors());
   }
 
-  public ArrowWritableColumnVector(ValueVector vector, int ordinal, int capacity, boolean init){
+  @Deprecated
+  public ArrowWritableColumnVector(ValueVector vector, int ordinal, int capacity, boolean init) {
+    this(vector, null, ordinal, capacity, init);
+  }
+
+  public ArrowWritableColumnVector(ValueVector vector, ValueVector dicionaryVector,
+                                   int ordinal, int capacity, boolean init) {
     super(capacity, ArrowUtils.fromArrowField(vector.getField()));
     vectorCount.getAndIncrement();
     refCnt.getAndIncrement();
 
     this.ordinal = ordinal;
     this.vector = vector;
+    this.dictionaryVector = dicionaryVector;
     if (init) {
       vector.setInitialCapacity(capacity);
       vector.allocateNew();
     }
     writer = createVectorWriter(vector);
-    createVectorAccessor(vector);
+    createVectorAccessor(vector, dicionaryVector);
   }
 
   public ArrowWritableColumnVector(int capacity, DataType dataType) {
@@ -135,15 +161,30 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     vector.setInitialCapacity(capacity);
     vector.allocateNew();
     this.writer = createVectorWriter(vector);
-    createVectorAccessor(vector);
-
+    createVectorAccessor(vector, null);
   }
 
   public ValueVector getValueVector() {
     return vector;
   }
 
-  private void createVectorAccessor(ValueVector vector) {
+  private void createVectorAccessor(ValueVector vector, ValueVector dictionary) {
+    if (dictionary != null) {
+      if (!(vector instanceof IntVector)) {
+        throw new IllegalArgumentException("Expect int32 index vector. Found: " +
+                vector.getMinorType());
+      }
+      IntVector index = (IntVector) vector;
+      if (dictionary instanceof VarBinaryVector) {
+        accessor = new DictionaryEncodedBinaryAccessor(index, (VarBinaryVector) dictionary);
+      } else if (dictionary instanceof VarCharVector) {
+        accessor = new DictionaryEncodedStringAccessor(index, (VarCharVector) dictionary);
+      } else {
+        throw new IllegalArgumentException("Unrecognized index value type: " +
+                dictionary.getMinorType());
+      }
+      return;
+    }
     if (vector instanceof BitVector) {
       accessor = new BooleanAccessor((BitVector) vector);
     } else if (vector instanceof TinyIntVector) {
@@ -271,6 +312,9 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
       childColumns = null;
     }
     vector.close();
+    if (dictionaryVector != null) {
+      dictionaryVector.close();
+    }
   }
 
   public static String stat() {
@@ -963,6 +1007,32 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     }
   }
 
+  private static class DictionaryEncodedStringAccessor extends ArrowVectorAccessor {
+
+    private final IntVector index;
+    private final VarCharVector dictionary;
+    private final NullableVarCharHolder stringResult = new NullableVarCharHolder();
+
+    DictionaryEncodedStringAccessor(IntVector index, VarCharVector dictionary) {
+      super(index);
+      this.index = index;
+      this.dictionary = dictionary;
+    }
+
+    @Override
+    final UTF8String getUTF8String(int rowId) {
+      int idx = index.get(rowId);
+      dictionary.get(idx, stringResult);
+      if (stringResult.isSet == 0) {
+        return null;
+      } else {
+        return UTF8String.fromAddress(null,
+                stringResult.buffer.memoryAddress() + stringResult.start,
+                stringResult.end - stringResult.start);
+      }
+    }
+  }
+
   private static class BinaryAccessor extends ArrowVectorAccessor {
 
     private final VarBinaryVector accessor;
@@ -975,6 +1045,23 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     @Override
     final byte[] getBinary(int rowId) {
       return accessor.getObject(rowId);
+    }
+  }
+
+  private static class DictionaryEncodedBinaryAccessor extends ArrowVectorAccessor {
+    private final IntVector index;
+    private final VarBinaryVector dictionary;
+
+    DictionaryEncodedBinaryAccessor(IntVector index, VarBinaryVector dictionary) {
+      super(index);
+      this.index = index;
+      this.dictionary = dictionary;
+    }
+
+    @Override
+    final byte[] getBinary(int rowId) {
+      int idx = index.get(rowId);
+      return dictionary.getObject(idx);
     }
   }
 

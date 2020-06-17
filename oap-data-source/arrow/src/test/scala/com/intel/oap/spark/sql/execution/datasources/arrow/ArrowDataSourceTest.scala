@@ -22,16 +22,19 @@ import java.lang.management.ManagementFactory
 
 import com.intel.oap.spark.sql.DataFrameReaderImplicits._
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowOptions
+import com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector
 import com.sun.management.UnixOperatingSystemMXBean
 import org.apache.commons.io.FileUtils
 
 import org.apache.spark.sql.{DataFrame, QueryTest}
+import org.apache.spark.sql.execution.datasources.v2.arrow.ArrowUtils
 import org.apache.spark.sql.test.SharedSparkSession
-import org.apache.spark.sql.types.{LongType, StructField, StructType}
+import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
 
 class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
   private val parquetFile1 = "parquet-1.parquet"
   private val parquetFile2 = "parquet-2.parquet"
+  private val parquetFile3 = "parquet-3.parquet"
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -47,11 +50,19 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
         .toDS())
       .repartition(1)
       .write.parquet(ArrowDataSourceTest.locateResourcePath(parquetFile2))
+
+    spark.read
+      .json(Seq("{\"col1\": \"apple\", \"col2\": 100}", "{\"col1\": \"pear\", \"col2\": 200}",
+        "{\"col1\": \"apple\", \"col2\": 300}")
+        .toDS())
+      .repartition(1)
+      .write.parquet(ArrowDataSourceTest.locateResourcePath(parquetFile3))
   }
 
   override def afterAll(): Unit = {
     delete(ArrowDataSourceTest.locateResourcePath(parquetFile1))
     delete(ArrowDataSourceTest.locateResourcePath(parquetFile2))
+    delete(ArrowDataSourceTest.locateResourcePath(parquetFile3))
     super.afterAll()
   }
 
@@ -64,7 +75,7 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
         .arrow(path))
   }
 
-  test("simple SQL query on parquet file") {
+  test("simple SQL query on parquet file - 1") {
     val path = ArrowDataSourceTest.locateResourcePath(parquetFile1)
     val frame = spark.read
       .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
@@ -74,6 +85,27 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
     verifyParquet(spark.sql("select * from ptab"))
     verifyParquet(spark.sql("select col from ptab"))
     verifyParquet(spark.sql("select col from ptab where col is not null or col is null"))
+  }
+
+  test("simple SQL query on parquet file - 2") {
+    val path = ArrowDataSourceTest.locateResourcePath(parquetFile3)
+    val frame = spark.read
+      .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
+      .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
+      .arrow(path)
+    frame.createOrReplaceTempView("ptab")
+    val sqlFrame = spark.sql("select * from ptab")
+    assert(
+      sqlFrame.schema ===
+        StructType(Seq(StructField("col1", StringType), StructField("col2", LongType))))
+    val rows = sqlFrame.collect()
+    assert(rows(0).get(0) == "apple")
+    assert(rows(0).get(1) == 100)
+    assert(rows(1).get(0) == "pear")
+    assert(rows(1).get(1) == 200)
+    assert(rows(2).get(0) == "apple")
+    assert(rows(2).get(1) == 300)
+    assert(rows.length === 3)
   }
 
   test("simple SQL query on parquet file with pushed filters") {
@@ -161,6 +193,11 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
 
   def delete(path: String): Unit = {
     FileUtils.forceDelete(new File(path))
+  }
+
+  def closeAllocators(): Unit = {
+    ArrowUtils.rootAllocator().close()
+    ArrowWritableColumnVector.allocator.close()
   }
 }
 
