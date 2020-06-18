@@ -220,15 +220,9 @@ function prepare_intel_arrow() {
   export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
 
   cd cpp/release-build
-  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-g -O3" -DCMAKE_CXX_FLAGS="-g -O3"  -DARROW_PLASMA_JAVA_CLIENT=on -DARROW_PLASMA=on -DARROW_DEPENDENCY_SOURCE=BUNDLED -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_WITH_SNAPPY=ON -DARROW_FILESYSTEM=ON -DARROW_JSON=ON ..
+  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-g -O3" -DCMAKE_CXX_FLAGS="-g -O3"  -DARROW_PLASMA_JAVA_CLIENT=on -DARROW_PLASMA=on -DARROW_DEPENDENCY_SOURCE=BUNDLED -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_WITH_SNAPPY=ON -DARROW_FILESYSTEM=ON -DARROW_JSON=ON -DARROW_WITH_PROTOBUF=ON -DARROW_DATASET=ON ..
   make -j
   make install
-
-  # build java
-#  cd ../../java
-#  mvn clean install -P arrow-jni -am -Darrow.cpp.build.dir=$current_arrow_path/cpp/release-build/release/ -DskipTests
-  # if you are behine proxy, please also add proxy for socks
-  # mvn clean install -P arrow-jni -am -Darrow.cpp.build.dir=../cpp/release-build/release/ -DskipTests -DsocksProxyHost=${proxyHost} -DsocksProxyPort=1080
 }
 
 
@@ -288,6 +282,86 @@ function prepare_native_sql_cpp() {
 
 }
 
+function prepare_libfabric() {
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  git clone https://github.com/ofiwg/libfabric.git
+  cd libfabric
+  git checkout v1.6.0
+  ./autogen.sh
+  ./configure --disable-sockets --enable-verbs --disable-mlx
+  make -j &&  make install
+}
+
+function prepare_HPNL(){
+  yum -y install cmake boost-devel boost-system
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  git clone https://github.com/Intel-bigdata/HPNL.git
+  cd HPNL
+  git checkout origin/spark-pmof-test --track
+  git submodule update --init --recursive
+  mkdir build
+  cd build
+  cmake -DWITH_VERBS=ON -DWITH_JAVA=ON ..
+  make -j && make install
+  cd ../java/hpnl
+  mvn  install -DskipTests
+}
+
+function prepare_ndctl() {
+  yum install -y autoconf asciidoctor kmod-devel.x86_64 libudev-devel libuuid-devel jsonc-devel jemalloc-devel
+  yum groupinstall -y "Development Tools"
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  git clone https://github.com/pmem/ndctl.git
+  cd ndctl
+  git checkout v63
+  ./autogen.sh
+  ./configure CFLAGS='-g -O2' --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib64
+  make -j
+  make check
+  make install
+  cd ../java/hnpl
+  mvn install
+}
+
+function prepare_PMDK() {
+  yum install -y pandoc
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  git clone https://github.com/pmem/pmdk.git
+  cd pmdk
+  git checkout tags/1.8
+  make -j && make install
+  export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH
+  echo 'export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH' > /etc/profile.d/pmdk.sh
+  echo 'export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH' > ~/.bashrc
+  source ~/.bashrc
+}
+
+function prepare_libcuckoo() {
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  git clone https://github.com/efficient/libcuckoo
+  mkdir build
+  cd build
+  cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_EXAMPLES=1 -DBUILD_TESTS=1 ..
+  make all && make install
+
+
+}
+function prepare_PMoF() {
+  prepare_libfabric
+  prepare_HPNL
+  prepare_ndctl
+  prepare_PMDK
+  prepare_libcuckoo
+  cd $DEV_PATH/thirdparty
+  git clone https://github.com/Intel-bigdata/Spark-PMoF.git
+  cd Spark-PMoF
+  mvn install -DskipTests
+}
 
 function  prepare_all() {
   prepare_maven

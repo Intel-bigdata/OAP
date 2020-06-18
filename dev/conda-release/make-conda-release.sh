@@ -17,6 +17,7 @@ fi
 
 function conda_build_memkind() {
   memkind_repo="https://github.com/Intel-bigdata/memkind.git"
+  mkdir -p $DEV_PATH/thirdparty
   cd $DEV_PATH/thirdparty
   if [ ! -d "memkind" ]; then
     git clone $memkind_repo
@@ -31,6 +32,7 @@ function conda_build_memkind() {
 
 
 function conda_build_vmemcache() {
+  mkdir -p $DEV_PATH/thirdparty
   cd $DEV_PATH/thirdparty
   vmemcache_repo="https://github.com/pmem/vmemcache.git"
   if [ ! -d "vmemcache" ]; then
@@ -44,6 +46,7 @@ function conda_build_vmemcache() {
 }
 
 function conda_build_arrow() {
+  mkdir -p $DEV_PATH/thirdparty
   cd $DEV_PATH/thirdparty
   arrow_repo=" https://github.com/Intel-bigdata/arrow.git"
   if [ ! -d "arrow" ]; then
