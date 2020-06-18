@@ -528,4 +528,11 @@ object OapConf {
       .booleanConf
       .createWithDefault(false)
   }
+
+  val OAP_INDEXFILEOUTPUTCOMMITTER_ALGORITHM_VERSION =
+    SqlConfAdapter.buildConf("spark.sql.oap.indexfileoutputcommitter.algorithm.version")
+      .internal()
+      .doc("The commit algorithm version used by create index job")
+      .intConf
+      .createWithDefault(2)
 }
