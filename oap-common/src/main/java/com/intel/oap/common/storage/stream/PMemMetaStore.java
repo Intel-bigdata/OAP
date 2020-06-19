@@ -10,7 +10,7 @@ public interface PMemMetaStore {
 
      void putPhysicalAddress(byte[] id, int chunkID, PMemPhysicalAddress pMemPhysicalAddress);
 
-     void removePhysicalAddress(byte[] id, int chunkID, PMemPhysicalAddress pMemPhysicalAddress);
+     void removePhysicalAddress(byte[] id, int chunkID);
 
      MetaData getMetaFooter(byte[] id);
 }

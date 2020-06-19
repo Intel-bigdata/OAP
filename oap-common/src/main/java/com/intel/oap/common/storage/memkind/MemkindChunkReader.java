@@ -42,7 +42,7 @@ public class MemkindChunkReader extends ChunkReader {
         while(currentTrunkID < metaData.getTotalChunk()) {
             PMemPhysicalAddress pMemPhysicalAddress = pMemMetaStore.getPhysicalAddressByID(logicalID, currentTrunkID);
             PersistentMemoryPlatform.freeMemory(((MemkindPMemPhysicalAddress) pMemPhysicalAddress).getBaseAddress());
-            pMemMetaStore.removePhysicalAddress(logicalID, currentTrunkID, pMemPhysicalAddress);
+            pMemMetaStore.removePhysicalAddress(logicalID, currentTrunkID);
             currentTrunkID++;
         }
         // delete file

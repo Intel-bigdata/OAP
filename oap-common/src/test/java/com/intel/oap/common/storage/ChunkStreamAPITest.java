@@ -46,8 +46,10 @@ public class ChunkStreamAPITest {
         Properties p = new Properties();
         p.setProperty("totalSize", totalSize);
         p.setProperty("chunkSize", chunkSize);
+        p.setProperty("metaStore", "memkind");
+        p.setProperty("storetype", "memkind");
         PMemManager pMemManager = new PMemManager(p);
-        dataStore = new DataStore(pMemManager);
+        dataStore = new DataStore(pMemManager, p);
         String fileName = "target/test.file";
         PersistentMemoryPlatform.initialize("target/tmp/", 16 * 1024 *1024, 0);
         byte[] readData = new byte[data.length];
@@ -71,8 +73,10 @@ public class ChunkStreamAPITest {
         Properties p = new Properties();
         p.put("totalSize", "1024");
         p.put("chunkSize", "10");
+        p.setProperty("metaStore", "memkind");
+        p.setProperty("storetype", "memkind");
         PMemManager pMemManager = new PMemManager(p);
-        dataStore = new DataStore(pMemManager);
+        dataStore = new DataStore(pMemManager, p);
         String fileName = "target/test.file";
         ChunkOutputStream chunkOutputStream = new ChunkOutputStream(fileName, dataStore);
         chunkOutputStream.close();

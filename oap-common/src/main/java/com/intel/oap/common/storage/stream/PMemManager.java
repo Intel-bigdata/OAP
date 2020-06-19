@@ -1,6 +1,7 @@
 package com.intel.oap.common.storage.stream;
 
 import com.intel.oap.common.storage.memkind.MemkindMetaStore;
+import com.intel.oap.common.storage.pmemblk.PMemBlkMetaStore;
 
 import java.util.Properties;
 
@@ -36,8 +37,17 @@ public class PMemManager {
         //FIXME how to get?
         chunkSize = Integer.valueOf(properties.getProperty("chunkSize"));
         long totalSize = Long.valueOf(properties.getProperty("totalSize"));
+        String metaStore = properties.getProperty("metaStore");
         stats = new MemoryStats(totalSize);
-        pMemMetaStore = new MemkindMetaStore();
+
+        switch (metaStore) {
+            case "memkind":
+                pMemMetaStore = new MemkindMetaStore();
+                break;
+            case "pmemblk":
+                pMemMetaStore = new PMemBlkMetaStore(properties);
+                break;
+        }
     }
 
     public void close(){

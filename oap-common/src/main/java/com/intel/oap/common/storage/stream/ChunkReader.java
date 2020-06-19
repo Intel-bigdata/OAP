@@ -45,8 +45,12 @@ public abstract class ChunkReader {
             size = readFromDisk(remainingBuffer);
         } else {
             PMemPhysicalAddress id = pMemManager.getpMemMetaStore().getPhysicalAddressByID(logicalID, chunkID);
-            chunkID++;
-            size = readFromPMem(id, remainingBuffer);
+            if (id != null) {
+                chunkID++;
+                size = readFromPMem(id, remainingBuffer);
+            } else {
+                size = 0;
+            }
         }
         return size;
     }

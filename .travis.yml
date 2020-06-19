@@ -1,6 +1,7 @@
 sudo: required
-dist: trusty
+dist: bionic
 language: java
+jdk: openjdk8
 jobs:
   include:
     #Other modules can refer to oap-cache-oap to build independent travis-ci job,
@@ -10,6 +11,8 @@ jobs:
       - sudo apt-get install libpthread-stubs0-dev
       - sudo apt-get install libnuma-dev
       - sudo apt-get install cmake
+      - sudo apt-get install asciidoctor libkmod-dev libudev-dev uuid uuid-dev libjson-c-dev systemd libkeyutils-dev
+      - sudo apt-get install pandoc libgtest-dev pkg-config libtbb-dev rapidjson-dev valgrind
       install:
       - # Download spark 3.0.0
       - "[ -f spark ] || mkdir spark && cd spark && wget https://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0-bin-hadoop2.7.tgz && cd .."
@@ -19,8 +22,12 @@ jobs:
       - cd ${TRAVIS_BUILD_DIR}/dev
       - ./install_vmemcache.sh
       - ./install_memkind.sh
+      - ./install_pmdk.sh
+      - ./install_pmemkv.sh
       - ../oap-common/src/native/memkind/compile.sh
+      - ../oap-common/src/native/libpmemblk/compile.sh
       - sudo cp ../oap-common/src/resources/linux/64/lib/libpmplatform.so /usr/lib/
+      - sudo cp ../oap-common/src/resources/linux/64/lib/libpmblkplatform.so /usr/lib/
       - sudo ldconfig /usr/lib
       script:
       - cd ${TRAVIS_BUILD_DIR}

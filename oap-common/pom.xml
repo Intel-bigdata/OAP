@@ -32,6 +32,12 @@
 
     <dependencies>
         <dependency>
+            <groupId>io.pmem</groupId>
+            <artifactId>pmemkv</artifactId>
+            <version>${pmemkv.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>${guava.version}</version>
@@ -71,6 +77,19 @@
                         <arg>-Xlint:all,-serial,-path</arg>
                     </compilerArgs>
                 </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
@@ -135,7 +154,7 @@
             </build>
         </profile>
         <profile>
-            <id>libpmem</id>
+            <id>libpmemblk</id>
             <build>
                 <resources>
                     <resource>
@@ -149,13 +168,13 @@
                         <version>${exec.maven.version}</version>
                         <executions>
                             <execution>
-                                <id>Compile libpmem</id>
+                                <id>Compile libpmemblk</id>
                                 <phase>generate-resources</phase>
                                 <goals>
                                     <goal>exec</goal>
                                 </goals>
                                 <configuration>
-                                    <executable>${basedir}/src/native/libpmem/compile.sh</executable>
+                                    <executable>${basedir}/src/native/libpmemblk/compile.sh</executable>
                                 </configuration>
                             </execution>
                         </executions>
