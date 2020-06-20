@@ -12,11 +12,9 @@ jobs:
       - sudo apt-get install cmake
       install:
       - # Download spark 3.0.0
-      - "[ -f spark ] || mkdir spark && cd spark"
-      - "git clone -b oap-master https://github.com/Intel-bigdata/spark.git"
-      - "cd spark"
-      - "./build/mvn -DskipTests clean -Pyarn  -Phive-1.2 -Phive-thriftserver -q"
-      - "export SPARK_HOME=`pwd`"
+      - "[ -f spark ] || mkdir spark && cd spark && wget https://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0-bin-hadoop2.7-hive1.2.tgz && cd .."
+      - "tar -xf ./spark/spark-3.0.0-bin-hadoop2.7-hive1.2.tgz"
+      - "export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7-hive1.2"
       before_script:
       - cd ${TRAVIS_BUILD_DIR}/dev
       - ./install_vmemcache.sh
