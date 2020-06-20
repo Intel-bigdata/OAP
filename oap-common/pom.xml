@@ -45,6 +45,7 @@
     </dependencies>
 
     <build>
+        <finalName>${project.artifactId}-${project.version}-with-spark-${oap.spark.version}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
