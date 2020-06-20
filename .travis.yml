@@ -15,7 +15,7 @@ jobs:
       - "[ -f spark ] || mkdir spark && cd spark"
       - "git clone -b oap-master https://github.com/Intel-bigdata/spark.git"
       - "cd spark"
-      - "./build/mvn -DskipTests clean -Pyarn  -Phive-1.2 -Phive-thriftserver  install -q"
+      - "./build/mvn -DskipTests clean -Pyarn  -Phive-1.2 -Phive-thriftserver -q"
       - "export SPARK_HOME=`pwd`/spark"
       before_script:
       - cd ${TRAVIS_BUILD_DIR}/dev

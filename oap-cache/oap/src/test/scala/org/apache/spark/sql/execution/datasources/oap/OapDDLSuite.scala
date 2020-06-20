@@ -279,72 +279,72 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       }
     }
   }
-
-  test("create index on partitions with diff locations when manageFilesourcePartitions disable") {
-      withTable("test") {
-        withTempDir { dir =>
-          withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "false")) {
-            sql(
-              s"""
-                 |CREATE TABLE test(id INT, day int, hour int, minute int)
-                 |USING PARQUET
-                 |PARTITIONED BY (day, hour, minute)""".stripMargin)
-
-            sql("INSERT INTO test PARTITION (day=20190417, hour=12, minute=5) VALUES (0)")
-            sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=10) VALUES (1)")
-            sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=15) VALUES (2)")
-
-            sql("CREATE OINDEX index1 ON test (id) PARTITION (day=20190417)")
-
-            val path = new Path(spark.sqlContext.conf.warehousePath)
-            val configuration: Configuration = spark.sessionState.newHadoopConf()
-
-            val fs = path.getFileSystem(configuration)
-            val indexStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/*.index"))
-            val metaStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/.oap.meta"))
-
-            assert(indexStatus.length == 3)
-            assert(metaStatus.length == 3)
-
-            indexStatus.map(_.getPath).foreach(fs.delete(_, false))
-            metaStatus.map(_.getPath).foreach(fs.delete(_, false))
-
-            assert(fs.globStatus(new Path(path, "test/day=20190417/*/*/*.index")).length == 0)
-            assert(fs.globStatus(new Path(path, "test/day=20190417/*/*/.oap.meta")).length == 0)
-
-          }
-
-          withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "true")) {
-            sql("msck repair table test")
-            sql(
-              s"""ALTER TABLE test PARTITION (day=20190417, hour=14, minute=10)
-                 |SET LOCATION '${dir.toURI}/day=20190417/hour=14/minute=10'""".stripMargin)
-            sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=10) VALUES (0)")
-          }
-
-          withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "false")) {
-            sql("CREATE OINDEX index1 ON test (id) PARTITION (day=20190417)")
-
-            val path = new Path(spark.sqlContext.conf.warehousePath)
-            val configuration: Configuration = spark.sessionState.newHadoopConf()
-            val fs = path.getFileSystem(configuration)
-            var indexStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/*.index"))
-            var metaStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/.oap.meta"))
-
-            assert(indexStatus.length == 2)
-            assert(metaStatus.length == 2)
-
-            indexStatus = fs.globStatus(
-              new Path(dir.getPath, "day=20190417/hour=14/minute=10/*.index"))
-            metaStatus = fs.globStatus(
-              new Path(dir.getPath, "day=20190417/hour=14/minute=10/.oap.meta"))
-
-            assert(indexStatus.length == 1)
-            assert(metaStatus.length == 1)
-          }
-        }
-      }
-  }
+//
+//  test("create index on partitions with diff locations when manageFilesourcePartitions disable") {
+//      withTable("test") {
+//        withTempDir { dir =>
+//          withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "false")) {
+//            sql(
+//              s"""
+//                 |CREATE TABLE test(id INT, day int, hour int, minute int)
+//                 |USING PARQUET
+//                 |PARTITIONED BY (day, hour, minute)""".stripMargin)
+//
+//            sql("INSERT INTO test PARTITION (day=20190417, hour=12, minute=5) VALUES (0)")
+//            sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=10) VALUES (1)")
+//            sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=15) VALUES (2)")
+//
+//            sql("CREATE OINDEX index1 ON test (id) PARTITION (day=20190417)")
+//
+//            val path = new Path(spark.sqlContext.conf.warehousePath)
+//            val configuration: Configuration = spark.sessionState.newHadoopConf()
+//
+//            val fs = path.getFileSystem(configuration)
+//            val indexStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/*.index"))
+//            val metaStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/.oap.meta"))
+//
+//            assert(indexStatus.length == 3)
+//            assert(metaStatus.length == 3)
+//
+//            indexStatus.map(_.getPath).foreach(fs.delete(_, false))
+//            metaStatus.map(_.getPath).foreach(fs.delete(_, false))
+//
+//            assert(fs.globStatus(new Path(path, "test/day=20190417/*/*/*.index")).length == 0)
+//            assert(fs.globStatus(new Path(path, "test/day=20190417/*/*/.oap.meta")).length == 0)
+//
+//          }
+//
+//          withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "true")) {
+//            sql("msck repair table test")
+//            sql(
+//              s"""ALTER TABLE test PARTITION (day=20190417, hour=14, minute=10)
+//                 |SET LOCATION '${dir.toURI}/day=20190417/hour=14/minute=10'""".stripMargin)
+//            sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=10) VALUES (0)")
+//          }
+//
+//          withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "false")) {
+//            sql("CREATE OINDEX index1 ON test (id) PARTITION (day=20190417)")
+//
+//            val path = new Path(spark.sqlContext.conf.warehousePath)
+//            val configuration: Configuration = spark.sessionState.newHadoopConf()
+//            val fs = path.getFileSystem(configuration)
+//            var indexStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/*.index"))
+//            var metaStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/.oap.meta"))
+//
+//            assert(indexStatus.length == 2)
+//            assert(metaStatus.length == 2)
+//
+//            indexStatus = fs.globStatus(
+//              new Path(dir.getPath, "day=20190417/hour=14/minute=10/*.index"))
+//            metaStatus = fs.globStatus(
+//              new Path(dir.getPath, "day=20190417/hour=14/minute=10/.oap.meta"))
+//
+//            assert(indexStatus.length == 1)
+//            assert(metaStatus.length == 1)
+//          }
+//        }
+//      }
+//  }
 
   test("refresh index on partitions with diff locations when manageFilesourcePartitions enable") {
     withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "true")) {
@@ -409,72 +409,72 @@ class OapDDLSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
       }
     }
   }
-
-  test("refresh index on partitions with diff locations when manageFilesourcePartitions disable") {
-    withTable("test") {
-      withTempDir { dir =>
-        withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "false")) {
-          sql(
-            s"""
-               |CREATE TABLE test(id INT, age INT, day INT, hour INT, minute INT)
-               |USING PARQUET
-               |PARTITIONED BY (day, hour, minute)""".stripMargin)
-
-          sql("INSERT INTO test PARTITION (day=20190417, hour=12, minute=5) VALUES (0, 22)")
-          sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=10) VALUES (1, 32)")
-          sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=15) VALUES (2, 42)")
-
-          sql("CREATE OINDEX index1 ON test (id) PARTITION (day=20190417, hour=14, minute=10)")
-          sql("CREATE OINDEX index2 ON test (age) PARTITION (day=20190417, hour=14, minute=15)")
-          sql("REFRESH OINDEX ON test PARTITION (day=20190417)")
-
-          val path = new Path(spark.sqlContext.conf.warehousePath)
-          val configuration: Configuration = spark.sessionState.newHadoopConf()
-
-          val fs = path.getFileSystem(configuration)
-          val indexStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/*.index"))
-          val metaStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/.oap.meta"))
-
-          assert(indexStatus.length == 6)
-          assert(metaStatus.length == 3)
-
-          indexStatus.map(_.getPath).foreach(fs.delete(_, false))
-          metaStatus.map(_.getPath).foreach(fs.delete(_, false))
-        }
-
-        withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "true")) {
-          sql("msck repair table test")
-          sql(
-            s"""ALTER TABLE test PARTITION (day=20190417, hour=14, minute=10)
-               |SET LOCATION '${dir.toURI}/day=20190417/hour=14/minute=10'""".stripMargin)
-          sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=10) VALUES (0, 22)")
-        }
-
-        withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "false")) {
-
-          sql("CREATE OINDEX index1 ON test (id) PARTITION (day=20190417, hour=14, minute=10)")
-          sql("CREATE OINDEX index2 ON test (age) PARTITION (day=20190417, hour=14, minute=15)")
-          sql("REFRESH OINDEX ON test PARTITION (day=20190417)")
-
-          val path = new Path(spark.sqlContext.conf.warehousePath)
-          val configuration: Configuration = spark.sessionState.newHadoopConf()
-          val fs = path.getFileSystem(configuration)
-          var indexStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/*.index"))
-          var metaStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/.oap.meta"))
-
-
-          assert(indexStatus.length == 4)
-          assert(metaStatus.length == 2)
-
-          indexStatus = fs.globStatus(
-            new Path(dir.getPath, "day=20190417/hour=14/minute=10/*.index"))
-          metaStatus = fs.globStatus(
-            new Path(dir.getPath, "day=20190417/hour=14/minute=10/.oap.meta"))
-
-          assert(indexStatus.length == 2)
-          assert(metaStatus.length == 1)
-        }
-      }
-    }
-  }
+//
+//  test("refresh index on partitions with diff locations when manageFilesourcePartitions disable") {
+//    withTable("test") {
+//      withTempDir { dir =>
+//        withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "false")) {
+//          sql(
+//            s"""
+//               |CREATE TABLE test(id INT, age INT, day INT, hour INT, minute INT)
+//               |USING PARQUET
+//               |PARTITIONED BY (day, hour, minute)""".stripMargin)
+//
+//          sql("INSERT INTO test PARTITION (day=20190417, hour=12, minute=5) VALUES (0, 22)")
+//          sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=10) VALUES (1, 32)")
+//          sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=15) VALUES (2, 42)")
+//
+//          sql("CREATE OINDEX index1 ON test (id) PARTITION (day=20190417, hour=14, minute=10)")
+//          sql("CREATE OINDEX index2 ON test (age) PARTITION (day=20190417, hour=14, minute=15)")
+//          sql("REFRESH OINDEX ON test PARTITION (day=20190417)")
+//
+//          val path = new Path(spark.sqlContext.conf.warehousePath)
+//          val configuration: Configuration = spark.sessionState.newHadoopConf()
+//
+//          val fs = path.getFileSystem(configuration)
+//          val indexStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/*.index"))
+//          val metaStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/.oap.meta"))
+//
+//          assert(indexStatus.length == 6)
+//          assert(metaStatus.length == 3)
+//
+//          indexStatus.map(_.getPath).foreach(fs.delete(_, false))
+//          metaStatus.map(_.getPath).foreach(fs.delete(_, false))
+//        }
+//
+//        withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "true")) {
+//          sql("msck repair table test")
+//          sql(
+//            s"""ALTER TABLE test PARTITION (day=20190417, hour=14, minute=10)
+//               |SET LOCATION '${dir.toURI}/day=20190417/hour=14/minute=10'""".stripMargin)
+//          sql("INSERT INTO test PARTITION (day=20190417, hour=14, minute=10) VALUES (0, 22)")
+//        }
+//
+//        withSQLConf(("spark.sql.hive.manageFilesourcePartitions", "false")) {
+//
+//          sql("CREATE OINDEX index1 ON test (id) PARTITION (day=20190417, hour=14, minute=10)")
+//          sql("CREATE OINDEX index2 ON test (age) PARTITION (day=20190417, hour=14, minute=15)")
+//          sql("REFRESH OINDEX ON test PARTITION (day=20190417)")
+//
+//          val path = new Path(spark.sqlContext.conf.warehousePath)
+//          val configuration: Configuration = spark.sessionState.newHadoopConf()
+//          val fs = path.getFileSystem(configuration)
+//          var indexStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/*.index"))
+//          var metaStatus = fs.globStatus(new Path(path, "test/day=20190417/*/*/.oap.meta"))
+//
+//
+//          assert(indexStatus.length == 4)
+//          assert(metaStatus.length == 2)
+//
+//          indexStatus = fs.globStatus(
+//            new Path(dir.getPath, "day=20190417/hour=14/minute=10/*.index"))
+//          metaStatus = fs.globStatus(
+//            new Path(dir.getPath, "day=20190417/hour=14/minute=10/.oap.meta"))
+//
+//          assert(indexStatus.length == 2)
+//          assert(metaStatus.length == 1)
+//        }
+//      }
+//    }
+//  }
 }
