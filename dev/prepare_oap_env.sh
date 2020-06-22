@@ -80,6 +80,29 @@ function prepare_cmake() {
   fi
 }
 
+function install_gcc7() {
+  #for gcc7
+  yum -y install gmp-devel
+  yum -y install mpfr-devel
+  yum -y install libmpc-devel
+
+  cd $DEV_PATH/thirdparty
+
+  if [ ! -d "gcc-7.3.0" ]; then
+    if [ ! -f "llvm-7.0.1.src.tar.xz" ]; then
+      wget https://bigsearcher.com/mirrors/gcc/releases/gcc-7.3.0/gcc-7.3.0.tar.xz
+    fi
+    xz -d gcc-7.3.0.tar.xz
+    tar -xvf gcc-7.3.0.tar
+  fi
+
+  cd gcc-7.3.0/
+  mkdir -p $DEV_PATH/thirdparty/gcc7
+  ./configure --prefix=$DEV_PATH/thirdparty/gcc7 --disable-multilib
+  make -j
+  make install
+}
+
 function prepare_memkind() {
   memkind_repo="https://github.com/Intel-bigdata/memkind.git"
   echo $memkind_repo
@@ -132,12 +155,101 @@ function prepare_vmemcache() {
   sudo rpm -i libvmemcache*.rpm
 }
 
+function prepare_libfabric() {
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  if [ ! -d "libfabric" ]; then
+    git clone https://github.com/ofiwg/libfabric.git
+  fi
+  cd libfabric
+  git checkout v1.6.0
+  ./autogen.sh
+  ./configure --disable-sockets --disable-verbs --disable-mlx
+#  ./configure --disable-sockets --enable-verbs --disable-mlx
+  make -j &&  make install
+}
+
+function prepare_HPNL(){
+  yum -y install cmake boost-devel boost-system
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  if [ ! -d "HPNL" ]; then
+    git clone https://github.com/Intel-bigdata/HPNL.git
+  fi
+  cd HPNL
+  git checkout origin/spark-pmof-test --track
+  git submodule update --init --recursive
+  mkdir build
+  cd build
+  cmake -DWITH_VERBS=ON -DWITH_JAVA=ON ..
+  make -j && make install
+  cd ../java/hpnl
+  mvn  install -DskipTests
+}
+
+function prepare_ndctl() {
+  yum install -y autoconf asciidoctor kmod-devel.x86_64 libudev-devel libuuid-devel json-c-devel jemalloc-devel
+  yum groupinstall -y "Development Tools"
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  if [ ! -d "ndctl" ]; then
+    git clone https://github.com/pmem/ndctl.git
+  fi
+  cd ndctl
+  git checkout v63
+  ./autogen.sh
+  ./configure CFLAGS='-g -O2' --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib64
+  make -j
+  make check
+  make install
+}
+
+function prepare_PMDK() {
+  yum install -y pandoc
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  if [ ! -d "pmdk" ]; then
+    git clone https://github.com/pmem/pmdk.git
+  fi
+  cd pmdk
+  git checkout tags/1.8
+  make -j && make install
+  export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH
+  echo 'export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH' > /etc/profile.d/pmdk.sh
+  echo 'export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH' > ~/.bashrc
+  source ~/.bashrc
+}
+
+function prepare_libcuckoo() {
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  git clone https://github.com/efficient/libcuckoo
+  cd libcuckoo
+  mkdir build
+  cd build
+  cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_EXAMPLES=1 -DBUILD_TESTS=1 ..
+  make all && make install
+}
+
+function prepare_PMoF() {
+  prepare_libfabric
+  prepare_HPNL
+  prepare_ndctl
+  prepare_PMDK
+  prepare_libcuckoo
+  cd $DEV_PATH
+  cd ../oap-shuffle/RPMem-shuffle
+  export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
+  export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
+  mvn package -DskipTests
+}
 
 function  prepare_all() {
   prepare_maven
   prepare_memkind
   prepare_cmake
   prepare_vmemcache
+  prepare_PMoF
 }
 
 function oap_build_help() {

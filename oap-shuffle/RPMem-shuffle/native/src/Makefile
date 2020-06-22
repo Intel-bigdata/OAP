@@ -1,5 +1,5 @@
 .PHONY:all
-CC=g++
+
 
 INCLUDES=-I${JAVA_HOME} -I${JAVA_HOME}/include/linux -I${JAVA_HOME}/include
 CFLAGS=-std=c++14 -fPIC -shared -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv -o0
@@ -10,7 +10,7 @@ MAIN=libjnipmdk.so
 all: clean $(MAIN) install
 
 $(MAIN):
-	$(CC) $(CFLAGS) $(INCLUDES) -o $(MAIN) lib_jni_pmdk.cpp $(LIBS)
+	$(CXX) $(CFLAGS) $(INCLUDES) -o $(MAIN) lib_jni_pmdk.cpp $(LIBS)
 
 install:
 	if [ -d "/usr/lib" ]; then cp -rf $(MAIN) /usr/lib/; fi
@@ -25,8 +25,8 @@ test: clean_test 010-TestCasePersistentMemoryPool run_test
 benchmark: clean_test 010-TestCasePersistentMemoryPool run_benchmark
 
 010-TestCasePersistentMemoryPool:
-	$(CC) $(CFLAGS) $(INCLUDES) -o $(MAIN) lib_jni_pmdk.cpp $(LIBS)
-	$(CC) -std=c++14 010-TestCasePersistentMemoryPool.cpp -o 010-TestCasePersistentMemoryPool -lpthread -ljnipmdk -lpmemobj
+	$(CXX) $(CFLAGS) $(INCLUDES) -o $(MAIN) lib_jni_pmdk.cpp $(LIBS)
+	$(CXX) -std=c++14 010-TestCasePersistentMemoryPool.cpp -o 010-TestCasePersistentMemoryPool -lpthread -ljnipmdk -lpmemobj
 
 clean_test:
 	rm -f 010-TestCasePersistentMemoryPool
