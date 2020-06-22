@@ -1,0 +1,53 @@
+sudo: required
+dist: trusty
+language: generic
+jobs:
+  include:
+      
+    - name: oap-Rpmem-shuffle
+      dist: bionic
+      jdk:
+        - openjdk8
+      before_install:
+      - echo ${TRAVIS_COMMIT_MESSAGE}
+      #- if [[ ${TRAVIS_COMMIT_MESSAGE} != \[oap-native-sql\]* ]]; then travis_terminate 0 ; fi ;
+      - sudo apt-get install -y openjdk-8-jdk git maven g++-7 cmake build-essential libboost-dev libboost-system-dev autogen autoconf libtool pandoc asciidoctor libkmod-dev libdaxctl-dev pkg-config libkmod2 kmod libuuid1 libudev1 libudev-dev libjson-c-dev libjemalloc-dev
+      - export | grep JAVA_HOME
+      - "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" 
+      - export |grep JAVA_HOME
+      install:
+      - # Download spark 3.0
+      - "[ -f spark ] || mkdir spark && cd spark && wget http://archive.apache.org/dist/spark/spark-3.0.0-preview2/spark-3.0.0-preview2-bin-hadoop2.7.tgz && cd .."
+      - "tar -xf ./spark/spark-3.0.0-preview2-bin-hadoop2.7.tgz"
+      - "export SPARK_HOME=`pwd`/spark-3.0.0-preview2-bin-hadoop2.7"
+      before_script:
+      - cd /tmp
+      #libfabric   
+      - git clone https://github.com/ofiwg/libfabric.git &&  cd libfabric && git checkout -b v1.8.0 tags/v1.8.0 && ./autogen.sh && ./configure --prefix=/usr/local --enable-sockets 
+      - make -j && sudo make install
+      #HPNL
+      - cd /tmp
+      - git clone https://github.com/Intel-bigdata/HPNL.git
+      - cd HPNL && git submodule update --init --recursive && mkdir build &&  cd build
+      - cmake -DWITH_VERBS=ON -DWITH_JAVA=ON ..
+      - make -j && sudo make install
+      - cd ../java/hpnl
+      - sudo mvn install -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+      #ndctl 
+      - cd /tmp
+      - git clone https://github.com/pmem/ndctl.git && cd ndctl && git checkout v63 &&  ./autogen.sh &&  ./configure CFLAGS='-g -O2' --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib64 &&  make -j &&  make check &&  sudo make install 
+      #PMDK
+      - cd /tmp
+      - git clone https://github.com/pmem/pmdk.git &&  cd pmdk && git checkout tags/1.8
+      # PMDK uses pkg_config to find lbndctl, disable it for now
+      - make NDCTL_ENABLE=n
+      - sudo make NDCTL_ENABLE=n install
+      #RPMem
+      - cd /tmp
+      - git clone https://github.com/efficient/libcuckoo && cd libcuckoo && mkdir build && cd build  && cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_EXAMPLES=1 -DBUILD_TESTS=1 ..
+      - make all && sudo make install
+      - cd /tmp
+      - git clone https://github.com/Intel-bigdata/Spark-PMoF.git
+      - cd Spark-PMoF
+      # skip tests, do tests locally 
+      - sudo mvn install -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn

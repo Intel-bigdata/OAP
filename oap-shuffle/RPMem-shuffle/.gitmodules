@@ -1,0 +1,4 @@
+[submodule "rpmp/include/spdlog"]
+	path = rpmp/include/spdlog
+	url = https://github.com/gabime/spdlog.git
+	branch = v1.x

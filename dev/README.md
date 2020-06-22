@@ -1,8 +1,8 @@
 # OAP Developer Scripts
-This directory contains scripts useful to developers when building, testing, packaging.
+This directory contains scripts useful to developers when building, testing, and packaging.
 
 ## Building OAP
 
-Please refer the below documents for more information.
+Please refer to below document for more information.
 
 * [Developer-Guide](../docs/Developer-Guide.md)
