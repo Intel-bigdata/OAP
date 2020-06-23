@@ -16,6 +16,7 @@
  */
 package com.intel.oap.spark.sql.execution.datasources.v2.arrow
 
+import org.apache.arrow.memory.AllocationListener
 import org.apache.hadoop.fs.FileStatus
 
 import org.apache.spark.sql.SparkSession

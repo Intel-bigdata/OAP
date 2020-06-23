@@ -26,6 +26,7 @@ import com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector
 import com.sun.management.UnixOperatingSystemMXBean
 import org.apache.commons.io.FileUtils
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.{DataFrame, QueryTest}
 import org.apache.spark.sql.execution.datasources.v2.arrow.ArrowUtils
 import org.apache.spark.sql.test.SharedSparkSession
@@ -35,6 +36,12 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
   private val parquetFile1 = "parquet-1.parquet"
   private val parquetFile2 = "parquet-2.parquet"
   private val parquetFile3 = "parquet-3.parquet"
+
+  override protected def sparkConf: SparkConf = {
+    val conf = super.sparkConf
+    conf.set("spark.memory.offHeap.size", String.valueOf(1 * 1024 * 1024))
+    conf
+  }
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -196,7 +203,7 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
   }
 
   def closeAllocators(): Unit = {
-    ArrowUtils.rootAllocator().close()
+    ArrowUtils.defaultAllocator().close()
     ArrowWritableColumnVector.allocator.close()
   }
 }

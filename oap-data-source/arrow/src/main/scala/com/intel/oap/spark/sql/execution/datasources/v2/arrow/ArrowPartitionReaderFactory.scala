@@ -23,6 +23,7 @@ import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowSQLConf._
 import org.apache.arrow.dataset.scanner.ScanOptions
 
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.memory.TaskMemoryManager
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader}
 import org.apache.spark.sql.execution.datasources.PartitionedFile
@@ -56,7 +57,9 @@ case class ArrowPartitionReaderFactory(
   override def buildColumnarReader(
       partitionedFile: PartitionedFile): PartitionReader[ColumnarBatch] = {
     val path = partitionedFile.filePath
-    val factory = ArrowUtils.makeArrowDiscovery(path, options)
+    val taskMemoryManager = ArrowUtils.getTaskMemoryManager()
+    val factory = ArrowUtils.makeArrowDiscovery(path, options,
+      new ExecutionMemoryAllocationListener(taskMemoryManager))
     val dataset = factory.finish()
     val filter = if (enableFilterPushDown) {
       ArrowFilters.translateFilters(ArrowFilters.pruneWithSchema(pushedFilters, readDataSchema))

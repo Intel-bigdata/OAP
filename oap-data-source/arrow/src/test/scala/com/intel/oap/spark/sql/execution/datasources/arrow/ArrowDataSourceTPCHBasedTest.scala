@@ -20,6 +20,7 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import com.intel.oap.spark.sql.DataFrameReaderImplicits._
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowOptions
+import org.apache.spark.SparkConf
 
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.execution.datasources.v2.arrow.ArrowUtils
@@ -37,6 +38,13 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
   private val supplier = prefix + tpchFolder + "/supplier"
   private val orders = prefix + tpchFolder + "/orders"
   private val nation = prefix + tpchFolder + "/nation"
+
+
+  override protected def sparkConf: SparkConf = {
+    val conf = super.sparkConf
+    conf.set("spark.memory.offHeap.size", String.valueOf(128 * 1024 * 1024))
+    conf
+  }
 
   ignore("tpch lineitem - desc") {
     val frame = spark.read
@@ -110,7 +118,7 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
       val aPrev = System.currentTimeMillis()
       (0 until iterations).foreach(_ => {
         // scalastyle:off println
-        println(ArrowUtils.rootAllocator().getAllocatedMemory())
+        println(ArrowUtils.defaultAllocator().getAllocatedMemory())
         // scalastyle:on println
         spark.sql("select\n\tsum(l_extendedprice * l_discount) as revenue\n" +
           "from\n\tlineitem_arrow\n" +
@@ -221,7 +229,7 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
       "l_linestatus\norder by\n\tl_returnflag,\n\tl_linestatus").explain(true)
   }
 
-  ignore("tpch query 21 - memory leak") {
+  test("tpch query 21 - memory leak") {
     val frame1 = spark.read
       .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
       .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
@@ -258,7 +266,7 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
     })
     Executors.newSingleThreadScheduledExecutor().scheduleWithFixedDelay(() => {
       println("[org.apache.spark.sql.util.ArrowUtils.rootAllocator]                           " +
-        "Allocated memory amount: " + ArrowUtils.rootAllocator().getAllocatedMemory)
+        "Allocated memory amount: " + ArrowUtils.defaultAllocator().getAllocatedMemory)
       println("[com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector.allocator] " +
         "Allocated memory amount: " + com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector.allocator.getAllocatedMemory)
     }, 0L, 100L, TimeUnit.MILLISECONDS)
