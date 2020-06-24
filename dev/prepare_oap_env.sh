@@ -89,7 +89,7 @@ function install_gcc7() {
   cd $DEV_PATH/thirdparty
 
   if [ ! -d "gcc-7.3.0" ]; then
-    if [ ! -f "llvm-7.0.1.src.tar.xz" ]; then
+    if [ ! -f "gcc-7.3.0.tar.xz" ]; then
       wget https://bigsearcher.com/mirrors/gcc/releases/gcc-7.3.0/gcc-7.3.0.tar.xz
     fi
     xz -d gcc-7.3.0.tar.xz
@@ -237,11 +237,6 @@ function prepare_PMoF() {
   prepare_ndctl
   prepare_PMDK
   prepare_libcuckoo
-  cd $DEV_PATH
-  cd ../oap-shuffle/RPMem-shuffle
-  export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
-  export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
-  mvn package -DskipTests
 }
 
 function  prepare_all() {
@@ -257,5 +252,6 @@ function oap_build_help() {
     echo " prepare_memkind    = function to install Memkind"
     echo " prepare_cmake      = function to install Cmake"
     echo " prepare_vmemcache  = function to install Vmemcache"
+    echo " prepare_PMoF       = function to install prerequisites of PMoF"
     echo " prepare_all        = function to install all the above"
 }
