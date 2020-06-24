@@ -44,6 +44,8 @@ class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with 
   override def beforeEach(): Unit = {
     super.beforeEach()
     MockitoAnnotations.initMocks(this)
+    conf.set("spark.shuffle.compress", "false")
+    conf.set("spark.shuffle.spill.compress", "false")
     conf.set("spark.shuffle.pmof.enable_rdma", "false")
     conf.set("spark.shuffle.pmof.enable_pmem", "true")
     conf.set("spark.shuffle.pmof.pmem_list", "/dev/dax0.0")

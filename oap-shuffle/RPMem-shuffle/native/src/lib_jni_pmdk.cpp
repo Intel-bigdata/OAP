@@ -52,7 +52,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeCloseDevice
   (JNIEnv *env, jclass obj, jlong kv) {
   pmemkv *pmkv = static_cast<pmemkv*>((void*)kv);
-  pmkv->free_all();
+  //pmkv->free_all();
   delete pmkv;
 }
 

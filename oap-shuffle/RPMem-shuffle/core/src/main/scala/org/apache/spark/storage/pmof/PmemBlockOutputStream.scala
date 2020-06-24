@@ -43,7 +43,7 @@ private[spark] class PmemBlockOutputStream(
   val recordsArray: ArrayBuffer[Int] = ArrayBuffer()
   var spilled: Boolean = false
   var partitionMeta: Array[(Long, Int, Int)] = _
-  val root_dir = Utils.getConfiguredLocalDirs(conf).toList(0)
+  val root_dir = Utils.getConfiguredLocalDirs(conf).toList.sortWith(_ < _)(0)
 
   val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(pmofConf,
     root_dir, pmofConf.path_list, blockId.name, pmofConf.maxPoolSize)
@@ -82,12 +82,10 @@ private[spark] class PmemBlockOutputStream(
   }
 
   def maybeSpill(force: Boolean = false): Unit = {
-    if (force == true) {
-      flush()
-    }
     if ((pmofConf.spill_throttle != -1 && pmemOutputStream.remainingSize >= pmofConf.spill_throttle) || force == true) {
       val start = System.nanoTime()
-      pmemOutputStream.flush()
+      flush()
+      pmemOutputStream.doFlush()
       val bufSize = pmemOutputStream.flushedSize
       if (bufSize > 0) {
         recordsArray += recordsPerBlock

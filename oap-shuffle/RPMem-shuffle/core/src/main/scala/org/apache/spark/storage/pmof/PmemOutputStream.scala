@@ -19,22 +19,26 @@ class PmemOutputStream(
   val length: Int = bufferSize
   var bufferFlushedSize: Int = 0
   var bufferRemainingSize: Int = 0
-  val buf: ByteBuf = NettyByteBufferPool.allocateNewBuffer(length)
-  val byteBuffer: ByteBuffer = buf.nioBuffer(0, length)
+  val buf: ByteBuf = NettyByteBufferPool.allocateFlexibleNewBuffer(length)
 
   override def write(bytes: Array[Byte], off: Int, len: Int): Unit = {
-    byteBuffer.put(bytes, off, len)
+    buf.writeBytes(bytes, off, len)
     bufferRemainingSize += len
   }
 
   override def write(byte: Int): Unit = {
-    byteBuffer.putInt(byte)
+    buf.writeInt(byte)
     bufferRemainingSize += 4
   }
 
   override def flush(): Unit = {
+  }
+
+  def doFlush(): Unit = {
     if (bufferRemainingSize > 0) {
+      val byteBuffer: ByteBuffer = buf.nioBuffer()
       persistentMemoryWriter.setPartition(numPartitions, blockId, byteBuffer, bufferRemainingSize, set_clean)
+      logDebug(s"flush ${blockId} size ${bufferRemainingSize}")
       bufferFlushedSize += bufferRemainingSize
       bufferRemainingSize = 0
     }
@@ -54,7 +58,7 @@ class PmemOutputStream(
   def reset(): Unit = {
     bufferRemainingSize = 0
     bufferFlushedSize = 0
-    byteBuffer.clear()
+    buf.clear()
   }
 
   override def close(): Unit = synchronized {

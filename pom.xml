@@ -48,6 +48,7 @@
         <module>oap-cache/oap</module>
         <module>oap-shuffle/remote-shuffle</module>
         <module>oap-spark</module>
+        <module>oap-shuffle/RPMem-shuffle</module>
     </modules>
 
 </project>

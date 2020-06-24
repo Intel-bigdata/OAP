@@ -12,6 +12,7 @@ class PmemInputStream(
   val blockInfo: Array[(Long, Int)] = persistentMemoryHandler.getPartitionBlockInfo(blockId)
   var available_bytes: Int = persistentMemoryHandler.getPartitionSize(blockId).toInt
   val buf = new PmemBuffer(available_bytes)
+  logDebug(s"${blockId} size ${available_bytes}")
 
   load(available_bytes)
 

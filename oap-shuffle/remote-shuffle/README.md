@@ -1,10 +1,16 @@
-# OAP Remote Shuffle Plugin
+# Remote Shuffle
 
-Remote Shuffle is a Spark ShuffleManager plugin, shuffling data through a remote Hadoop-compatible file system, as opposed to vanilla Spark's local-disks.
+## Contents
+- [Introduction](#introduction)
+- [User Guide](#userguide)
+
+## Introduction
+Remote Shuffle is a Spark* ShuffleManager plugin, shuffling data through a remote Hadoop-compatible file system, as opposed to vanilla Spark's local-disks.
 
 This is an essential part of enabling Spark on disaggregated compute and storage architecture.
 
-## Build and Deploy
+## User Guide
+### Build and Deploy
 
 Build this module using the following command in oap-shuffle/remote-shuffle folder or download the pre-built ` oap-remote-shuffle-0.8.0-with-spark-2.4.4.jar ` from  [oap-product-0.8.0-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-product-0.8.0-bin-spark-2.4.4.tar.gz) This file needs to be deployed on every compute node that runs Spark. Manually place it on all nodes or let resource manager do the work.
 
@@ -12,7 +18,7 @@ Build this module using the following command in oap-shuffle/remote-shuffle fold
     mvn -DskipTests clean package 
 ```
 
-## Enable Remote Shuffle
+### Enable Remote Shuffle
 
 Add the `.jar` files to the classpath of Spark driver and executors: Put the
 following configurations in spark-defaults.conf or Spark submit command line arguments. 
@@ -31,11 +37,11 @@ Enable the remote shuffle manager and specify the Hadoop storage system URI hold
     spark.shuffle.remote.storageMasterUri      daos://default:1 # Or hdfs://namenode:port, file:///my/shuffle/dir
 ```
 
-## Configurations
+### Configurations
 
 Configurations and tuning parameters that change the behavior of remote shuffle. Most of them should work well under default values.
 
-### Shuffle Root Directory
+#### Shuffle Root Directory
 
 This is to configure the root directory holding remote shuffle files. For each Spark application, a
 directory named after application ID is created under this root directory.
@@ -44,7 +50,7 @@ directory named after application ID is created under this root directory.
     spark.shuffle.remote.filesRootDirectory     /shuffle
 ```
 
-### Index Cache Size
+#### Index Cache Size
 
 This is to configure the cache size for shuffle index files per executor. Shuffle data includes data files and
 index files. An index file is small but will be read many (the number of reducers) times. On a large scale, constantly
@@ -59,7 +65,7 @@ it locally. The feature can also be disabled by setting the value to zero.
     spark.shuffle.remote.index.cache.size        30m
 ```
 
-### Number of Threads Reading Data Files
+#### Number of Threads Reading Data Files
 
 This is one of the parameters influencing shuffle read performance. It is to determine number of threads per executor reading shuffle data files from storage.
 
@@ -67,7 +73,7 @@ This is one of the parameters influencing shuffle read performance. It is to det
     spark.shuffle.remote.numReadThreads           5
 ```
 
-### Number of Threads Transitioning Index Files (when index cache is enabled)
+#### Number of Threads Transitioning Index Files (when index cache is enabled)
 
 This is one of the parameters influencing shuffle read performance. It is to determine the number of client and server threads that transmit index information from another executor’s cache. It is only valid when the index cache feature is enabled.
 
@@ -75,7 +81,7 @@ This is one of the parameters influencing shuffle read performance. It is to det
     spark.shuffle.remote.numIndexReadThreads      3
 ```
 
-### Bypass-merge-sort Threshold
+#### Bypass-merge-sort Threshold
 
 This threshold is used to decide using bypass-merge(hash-based) shuffle or not. By default we disable(by setting it to -1) 
 hash-based shuffle writer in remote shuffle, because when memory is relatively sufficient, sort-based shuffle writer is often more efficient than the hash-based one.
@@ -86,7 +92,7 @@ the 3x shuffle size is gone through network, arriving at a remote storage system
     spark.shuffle.remote.bypassMergeThreshold     -1
 ```
 
-### Configurations fetching port for HDFS
+#### Configurations fetching port for HDFS
 
 When the backend storage is HDFS, we contact http://$host:$port/conf to fetch configurations. They were not locally loaded because we assume absence of local storage.
 
@@ -94,7 +100,7 @@ When the backend storage is HDFS, we contact http://$host:$port/conf to fetch co
     spark.shuffle.remote.hdfs.storageMasterUIPort  50070
 ```
 
-### Inherited Spark Shuffle Configurations
+#### Inherited Spark Shuffle Configurations
 
 These configurations are inherited from upstream Spark, they are still supported in remote shuffle. More explanations can be found in [Spark core docs](https://spark.apache.org/docs/2.4.4/configuration.html#shuffle-behavior) and [Spark SQL docs](https://spark.apache.org/docs/2.4.4/sql-performance-tuning.html).
 ```
@@ -113,7 +119,7 @@ These configurations are inherited from upstream Spark, they are still supported
     spark.sql.shuffle.partitions
 ```
 
-### Deprecated Spark Shuffle Configurations
+#### Deprecated Spark Shuffle Configurations
 
 These configurations are deprecated and will not take effect.
 ```
@@ -128,7 +134,7 @@ These configurations are deprecated and will not take effect.
     spark.shuffle.registration.maxAttempts
 ```
 
-## Performance Evaluation Tool
+### Performance Evaluation Tool
 
 Leverage this tool to evaluate shuffle write/read performance separately under your specific storage system. This tool starts one Java process with #poolSize number of threads, running the specified remote-shuffle writers/readers in this module. Additional Spark configurations can be put in "./spark-defaults.conf" and will be loaded.(and printed as part of the summary for recording)
 

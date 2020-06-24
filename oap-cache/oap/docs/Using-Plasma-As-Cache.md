@@ -1,4 +1,4 @@
-# OAP- How to use Plasma as cache
+# OAP- How to use Plasma
 ## Introduction
 - OAP use Plasma as a node-level external cache service, the benefit of using external cache is data can be shared across process boundaries. [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support Intel Optane PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. Plasma cache Architecture shown as following figure. A Spark executor contains one or more Plasma client, clients communicate with Plasma Store server via unix domain socket on local node, data can be shared through shared memory across multi executors. Data will be cached in shared memory first, and plasma store will evict data to Intel Optane PMem since PMem has larger capacity.   
  
@@ -35,7 +35,7 @@ sudo make install -j$(nproc)
 ```
 
 #### arrow-plasma-0.17.0.jar  
-   change to arrow repo java direction, run following command, this will install arrow jars to your local maven repo, and you can compile oap-cache package now. Beisdes, you need copy arrow-plasma-0.17.0.jar to `$SPARK_HOME/jars/` dir, cause this jar is needed when using external cache.
+   change to arrow repo java direction, run following command, this will install arrow jars to your local maven repo, and you can compile oap-cache module package now. Beisdes, you need copy arrow-plasma-0.17.0.jar to `$SPARK_HOME/jars/` dir, cause this jar is needed when using external cache.
    
 ```
 cd $ARROW_REPO_DIR/java
@@ -45,7 +45,7 @@ mvn clean -q -pl plasma -DskipTests install
 ## How to Run Spark-sql with Plasma
 
 ### config files:
-Follow [User guide](OAP-Cache-User-Guide.md), and you should update config file `spark-default.conf` as follow:
+Follow [User guide](User-Guide.md), and you should update config file `spark-default.conf` as follow:
 
 For Parquet data format, provides the following conf options:
 
