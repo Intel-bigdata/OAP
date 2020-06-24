@@ -31,7 +31,7 @@ class ExecutionMemoryAllocationListener(mm: TaskMemoryManager)
     val granted = acquireMemory(size)
     if (granted < size) {
       throw new OutOfMemoryException("Failed allocating spark execution memory. Acquired: " +
-        size + ", grated: " + granted)
+        size + ", granted: " + granted)
     }
   }
 
