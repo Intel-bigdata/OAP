@@ -1,11 +1,10 @@
 package org.apache.spark.storage.pmof;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.spark.jni.pmof.JniUtils;
 
 public class PersistentMemoryPool {
-    static {
-        System.load("/usr/local/lib/libjnipmdk.so");
-    }
     private static native long nativeOpenDevice(String path, long size);
     private static native void nativeSetBlock(long deviceHandler, String key, ByteBuffer byteBuffer, int size, boolean clean);
     private static native long[] nativeGetBlockIndex(long deviceHandler, String key);
@@ -19,7 +18,8 @@ public class PersistentMemoryPool {
     private String device;
     private long deviceHandler;
 
-    PersistentMemoryPool(String path, long pool_size) {
+    PersistentMemoryPool(String path, long pool_size) throws IOException {
+      JniUtils.getInstance("jnipmdk");
       this.device = path; 
       pool_size = pool_size == -1 ? DEFAULT_PMPOOL_SIZE : pool_size;
       this.deviceHandler = nativeOpenDevice(path, pool_size);

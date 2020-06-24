@@ -12,7 +12,7 @@
     </parent>
     <packaging>jar</packaging>
 
-    <artifactId>java</artifactId>
+    <artifactId>oap-rpmem-shuffle</artifactId>
     <version>1.0</version>
 
     <dependencies>
@@ -58,7 +58,14 @@
         </dependency> 
     </dependencies>
     <build>
-        <finalName>${project.artifactId}-${project.version}-with-spark-${oap.spark.version}</finalName>
+      <resources>
+        <resource>
+          <directory>../native/src/</directory>
+          <includes>
+            <include>**/libjnipmdk.so</include>
+          </includes>
+        </resource>
+      </resources>
         <plugins>
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
