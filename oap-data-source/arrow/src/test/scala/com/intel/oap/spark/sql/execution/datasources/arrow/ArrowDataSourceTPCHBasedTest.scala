@@ -229,7 +229,7 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
       "l_linestatus\norder by\n\tl_returnflag,\n\tl_linestatus").explain(true)
   }
 
-  test("tpch query 21 - memory leak") {
+  ignore("tpch query 21 - memory leak") {
     val frame1 = spark.read
       .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
       .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
