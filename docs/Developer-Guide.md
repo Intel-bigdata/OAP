@@ -1,10 +1,10 @@
-# OAP Product Developer Guide
+# OAP Developer Guide
 
 **NOTE**: This document is for the whole project of OAP about building, you can learn more detailed information from every module's  document.
-* [OAP Project Cache](../oap-cache/oap/docs/Developer-Guide.md) 
-* [OAP Project Remote Shuffle](../oap-shuffle/remote-shuffle/README.md) 
+* [SQL Index and Data Source Cache](../oap-cache/oap/docs/Developer-Guide.md) 
+* [Remote Shuffle](../oap-shuffle/remote-shuffle/README.md#developer-guide) 
 
-## OAP Product Building
+## OAP Building
 
 To clone OAP project, use
 ```shell script
