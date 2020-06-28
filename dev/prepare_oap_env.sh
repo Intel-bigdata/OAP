@@ -164,8 +164,18 @@ function prepare_libfabric() {
   cd libfabric
   git checkout v1.6.0
   ./autogen.sh
-  ./configure --disable-sockets --disable-verbs --disable-mlx
-#  ./configure --disable-sockets --enable-verbs --disable-mlx
+
+  if [ -z "$ENABLE_RDMA" ]; then
+    ENABLE_RDMA=false
+  fi
+
+  if $ENABLE_RDMA
+  then
+      ./configure --disable-sockets --enable-verbs --disable-mlx
+  else
+      ./configure --disable-sockets --disable-verbs --disable-mlx
+  fi
+
   make -j &&  make install
 }
 
