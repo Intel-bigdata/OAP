@@ -14,3 +14,18 @@ Below libraries need to be installed in the machine
 ```
 mvn clean package -Ppersistent-memory,vmemcache
 ```
+
+## Run benchmark
+
+make sure PMem directory /mnt/pmem0 can be initialized with 400G size.
+```
+mvn clean install -Ppersistent-memory
+java -jar target/benchmarks.jar PMemStreamWriteTest -f 1 -t 1
+java -jar target/benchmarks.jar PMemStreamWriteTest -f 1 -t 4
+java -jar target/benchmarks.jar PMemDirectWriteTest -f 1 -t 1
+java -jar target/benchmarks.jar PMemDirectWriteTest -f 1 -t 4
+java -jar target/benchmarks.jar PMemStreamReadTest -f 1 -t 1
+java -jar target/benchmarks.jar PMemStreamReadTest -f 1 -t 4
+java -jar target/benchmarks.jar PMemDirectReadTest -f 1 -t 1
+java -jar target/benchmarks.jar PMemDirectReadTest -f 1 -t 4
+```
