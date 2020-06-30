@@ -4,7 +4,16 @@ June 2020
 
 Revision 1.4
 
-## Notes
+[Notes](#notes)  
+[1. RPMem shuffle extension introduction](#rpmem-shuffle-extension-introduction)  
+[2. Recommended HW environment](#recommended-hw-environment)  
+[3. Install and configure PMem](#install-and-configure-pmem)  
+[4. Configure and Validate RDMA](#configure-and-validate-rdma)  
+[5. Install RPMem shuffle extension for Spark](#install-rpmem-shuffle-extension-for-spark)  
+[6. RPMem Shuffle Extension for Spark Testing](#rpmem-shffle-extension-for-spark-testing)  
+[Reference](#reference)   
+
+## <a id="notes"></a>Notes 
 
 Shuffle RPMem extension for Spark (AKA. RPMem shuffle extension, previously Spark-PMoF) depends on multiple
 native libraries like libfabrics, libcuckoo, PMDK. This enabling guide
@@ -14,7 +23,7 @@ libraries might vary depends on the OS version and distribution you are
 using.
 Yarn, HDFS, Spark installation and configuration is out of the scope of this document.
 
-## 1. RPMem shuffle extension introduction
+## <a id="rpmem-shuffle-extension-introduction"></a>1. RPMem shuffle extension introduction
 
 Intel Optane DC persistent memory is the next-generation storage
 at memory speed. It close the performance gap between DRAM memory
@@ -49,7 +58,7 @@ will introduce how to deploy and use RPMem shuffle extension for Spark.
 
 Figure 1: RPMem shuffle extension for Spark
 
-## 2. Recommended HW environment
+## <a id="recommended-hw-environment"></a>2. Recommended HW environment
 
 ### 2.1. System Configuration 
 --------------------------
@@ -104,24 +113,24 @@ This deplopment guide was based on ww08.2019  BKC (best known configuration). Pl
 Please refer to backup if you do not have BKC access. BKC
 installation/enabling or FW installation is out of the scope of this guide.
 
-## 3. Install and configure PMEM (example) 
+## <a id="install-and-configure-pmem"></a>3. Install and configure PMEM (example) 
 
 1)  Please install *ipmctl* and *ndctl* according to your OS version
 2)  Run *ipmctl show -dimm* to check whether dimms can be recognized
 3)  Run *ipmctl create -goal PersistentMemoryType=AppDirect* to create AD
     mode
 4)  Run *ndctl list -R*, you will see **region0** and **region1**. 
-5)  Assume you have 4x PMEM installed on 1 node.
-    a.  Run ndctl create-namespace –m devdax -r region0 -s 120g
-    b.  Run ndctl create-namespace –m devdax –r region0 –s 120g
-    c.  Run ndctl create-namespace –m devdax –r region1 –s 120g
-    d.  Run ndctl create-namespace –m devdax –r region1 –s 120g
+5)  Assume you have 4x PMEM installed on 1 node.  
+    a.  Run *ndctl create-namespace –m devdax -r region0 -s 120g*  
+    b.  Run *ndctl create-namespace –m devdax –r region0 –s 120g*  
+    c.  Run *ndctl create-namespace –m devdax –r region1 –s 120g*  
+    d.  Run *ndctl create-namespace –m devdax –r region1 –s 120g*  
     This will create four namespaces, namely /dev/dax0.0, /dev/dax0.1, /dev/dax1.0,
         /dev/dax1.1 in that node, and it will be used as RPMem shuffle media. 
 
         You can change your configuration (namespaces numbers, size) accordingly.
 
-## 4. Configure and Validate RDMA
+## <a id="configure-and-validate-rdma"></a>4. Configure and Validate RDMA
 ------------------------
 **Notes**
 This part is vendor specific, it might NOT applied to your environment, please check your switch, NIC mannuals accordingly. 
@@ -332,7 +341,7 @@ ping data: rdma-ping-3: DEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstu
 ```
 Please refer to your NIC manuual for detail instructions on how to validate RDMA works. 
 
-## 5. Install RPMem shuffle extension for Spark 
+## <a id="install-rpmem-shuffle-extension-for-spark"></a>5. Install RPMem shuffle extension for Spark
 ---------------------------
 
 ### 5.1.1 Install HPNL (<https://github.com/Intel-bigdata/HPNL>)
@@ -361,8 +370,7 @@ Assume *Project_root_path* is HPNL folder’s path, *HPNL* here.
 
 ```bash
 sudo apt-get install cmake libboost-dev libboost-system-dev
-#remove with_java.
-sudo apt-get install cmake libboost-dev libboost-system-dev
+
 #Fedora
 dnf install cmake boost-devel boost-system
 git clone https://github.com/Intel-bigdata/HPNL.git
@@ -370,7 +378,7 @@ cd HPNL
 git checkout origin/spark-pmof-test --track
 git submodule update --init --recursive
 mkdir build; cd build
-cmake -DWITH_VERBS=ON -DWITH_JAVA=ON ..
+cmake -DWITH_VERBS=ON
 make -j && make install
 cd ${project_root_path}/java/hpnl
 mvn install
@@ -399,8 +407,6 @@ git checkout v63
 make -j
 make check
 make install
-cd ../java/hnpl
-mvn install
 ```
  
 #### 5.2.3 install PMDK
@@ -440,7 +446,7 @@ Network fabrics, including Socket, RDMA and Omni-Path. There are several
 configurations files needs to be modified in order to run RPMem shuffle extension. 
 
 #### Prerequisite
-Use below cmd to remove original initialization of one PMem, this is a
+Use below command to remove original initialization of one PMem, this is a
 **MUST** step, or RPMemShuffle won’t be able to open PMem devices.
 ```bash
 pmempool rm ${device_name}
@@ -449,22 +455,22 @@ pmempool rm ${device_name}
 
 **Refer to the Reference section for detail descrption of each parameter.** 
 
-#### Enable RPMemShuffle**
+#### Enable RPMemShuffle
 ```bash
-spark.shuffle.manager						org.apache.spark.shuffle.pmof.PmofShuffleManager
+spark.shuffle.manager						                    org.apache.spark.shuffle.pmof.PmofShuffleManager
 spark.driver.extraClassPath                                     /$path /Spark-PMoF/core/target/Spark-PMoF-1.0-jar-with-dependencies.jar
 spark.executor.extraClassPath                                   /$path/Spark-PMoF/core/target/Spark-PMoF-1.0-jar-with-dependencies.jar
 
 ```
-#### Switch On/Off PMem and RDMA**
+#### Switch On/Off PMem and RDMA
 ```bash
 spark.shuffle.pmof.enable_rdma 					true
 spark.shuffle.pmof.enable_pmem 					true
 ```
 
-#### Add PMem information to spark config**
+#### Add PMem information to spark config
 
-Explaination: 
+Explanation: 
 spark.shuffle.pmof.pmem\_capacity: the capacity of one PMem device, this
 value will be used when register PMem device to RDMA. 
 
@@ -478,8 +484,7 @@ task set to which PMem device, this is a performance optimal
 configuration for better PMem numa accessing.
 
 spark.io.compression.codec: use “snappy” to do shuffle data and spilling
-data compression, this is a **MUST** when enabled PMem due to a default LZ4
-+ ByteBuffer incompatible issue.
+data compression, this is a **MUST** when enabled PMem due to a default LZ4 ByteBuffer incompatible issue.
 ```bash
 spark.shuffle.pmof.pmem_capacity    				${total_size_of_one_device}
 spark.shuffle.pmof.pmem_list              			${device_name},${device_name},…
@@ -489,9 +494,9 @@ spark.shuffle.pmof.dev_core_set         			${device_name}:${core_range};…
 spark.io.compression.codec                  			snappy
 
 ```
-#### Memory configuration suggestion**
+#### Memory configuration suggestion
 
-Appliable for any release before v1.0.3. 
+Suitable for any release before OAP 0.8. In OAP 0.8 release, the memory footprint of each core is reduced dramatically and the formula below is not applicable any more.  
 
 Spark.executor.memory must be greater than shuffle\_block\_size \*
 numPartitions \* numCores \* 2 (for both shuffle and external sort), for example, default HiBench Terasort
@@ -499,7 +504,7 @@ numPartition is 200, and we configured 10 cores each executor, then this
 executor must has memory capacity greater than
 2MB(spark.shuffle.pmof.shuffle\_block\_size) \* 200 \* 10 \* 2 = 8G. 
 
-Recommendation configuration as below, but it needs to be adjustted accordingly based on your system configurations. 
+Recommendation configuration as below, but it needs to be adjusted accordingly based on your system configurations. 
 ```bash 
 Yarn.executor.num    4                                          // same as PMem namespaces number
 Yarn.executor.cores  18                                     	// total core number divide executor number
@@ -512,13 +517,12 @@ spark.shuffle.pmof.spill_throttle       2096128                 // 2MB – 1024 
 								// equal to shuffle_block_size
 spark.driver.memory    						10g
 spark.yarn.driver.memoryOverhead 				5g
-=======
 
 
 ```
 **Configuration of RDMA enabled case**
 
-spark.shuffle.pmof.node : spark nodes and RDMA ip mapping list
+spark.shuffle.pmof.node : spark nodes and RDMA ip mapping list  
 spark.driver.rhost / spark.driver.rport : Specify spark driver RDMA IP and port
 
 ```bash 
@@ -534,7 +538,7 @@ spark.driver.rhost                                              172.168.0.209 //
 spark.driver.rport                                              61000
 
 ```
-## 6. RPMem Shuffle Extension for Spark Testing 
+## <a id="rpmem-shffle-extension-for-spark-testing"></a>6. RPMem Shuffle Extension for Spark Testing 
 -----------------------------
 
 RPmem shuffle extension have been tested and validated with Terasort and Decision support worklods. 
@@ -698,7 +702,7 @@ Check the result at spark history server to see the execution time and
 other spark metrics like spark shuffle spill status. (Need to start
 history server by *\$SPARK\_HOME/sbin/start-history-server.sh*)
 
-## Reference 
+## <a id="reference"></a>Reference 
 ----------------------------
 
 ### RPMemShuffle Spark configuration
