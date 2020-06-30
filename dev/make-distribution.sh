@@ -2,10 +2,34 @@
 set -e
 
 OAP_HOME="$(cd "`dirname "$0"`/.."; pwd)"
-
 DEV_PATH=$OAP_HOME/dev
+
 OAP_VERSION=0.8.0
 SPARK_VERSION=2.4.4
+
+GCC_MIN_VERSION=7.0
+
+
+function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" != "$1"; }
+
+function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" == "$1"; }
+
+function check_gcc() {
+  CURRENT_GCC_VERSION_STR="$(gcc --version)"
+  array=(${CURRENT_GCC_VERSION_STR//,/ })
+  CURRENT_GCC_VERSION=${array[2]}
+  echo $CURRENT_GCC_VERSION
+  if version_lt $CURRENT_GCC_VERSION $GCC_MIN_VERSION; then
+    if [ ! -f "$DEV_PATH/thirdparty/gcc7/bin/gcc" ]; then
+      source $DEV_PATH/prepare_oap_env.sh
+      install_gcc7
+    fi
+    export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
+    export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
+  fi
+}
+
+
 function gather() {
   cd  $DEV_PATH
   package_name=oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION
@@ -25,7 +49,7 @@ function gather() {
 }
 
 cd $OAP_HOME
-export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
-export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
+
+check_gcc
 mvn clean  -Ppersistent-memory -Pvmemcache -DskipTests package
 gather
