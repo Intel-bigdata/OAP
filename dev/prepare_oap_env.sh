@@ -34,6 +34,7 @@ function prepare_maven() {
     echo "mvn is installed"
   else
     echo "mvn is not installed"
+    $INSTALL_TOOL -y install wget
     wget https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
     mkdir -p /usr/local/maven
     tar -xzvf apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
@@ -253,7 +254,6 @@ function prepare_libcuckoo() {
 }
 
 function prepare_PMoF() {
-  install_gcc7
   prepare_libfabric
   prepare_HPNL
   prepare_ndctl
@@ -266,7 +266,6 @@ function  prepare_all() {
   prepare_memkind
   prepare_cmake
   prepare_vmemcache
-  install_gcc7
   prepare_PMoF
 }
 
