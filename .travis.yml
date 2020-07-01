@@ -12,9 +12,9 @@ jobs:
       - sudo apt-get install cmake
       install:
       - # Download spark 3.0.0
-      - "[ -f spark ] || mkdir spark && cd spark && wget https://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0-bin-hadoop2.7-hive1.2.tgz && cd .."
-      - "tar -xf ./spark/spark-3.0.0-bin-hadoop2.7-hive1.2.tgz"
-      - "export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7-hive1.2"
+      - "[ -f spark ] || mkdir spark && cd spark && wget https://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0-bin-hadoop2.7.tgz && cd .."
+      - "tar -xf ./spark/spark-3.0.0-bin-hadoop2.7.tgz"
+      - "export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7"
       before_script:
       - cd ${TRAVIS_BUILD_DIR}/dev
       - ./install_vmemcache.sh

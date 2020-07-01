@@ -230,10 +230,10 @@ private[oap] case class OrcDataFile(
     val field = schema.fields(fiberId)
     val toColumn = new OnHeapColumnVector(rowCount, field.dataType)
     if (fromColumn.isRepeating) {
-      OrcCacheReader.putRepeatingValues(rowCount, field, fromColumn, toColumn)
+     OrcCacheReader.putRepeatingValues(rowCount, field, fromColumn, toColumn)
     }
     else if (fromColumn.noNulls) {
-      OrcCacheReader.putNonNullValues(rowCount, field, fromColumn, toColumn)
+    OrcCacheReader.putNonNullValues(rowCount, field, fromColumn, toColumn)
     }
     else {
       OrcCacheReader.putValues(rowCount, field, fromColumn, toColumn)
