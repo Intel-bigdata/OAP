@@ -2,9 +2,12 @@
 This document provides information for guiding you how to install OAP on your cluster nodes. Some steps needs to compile and install specicic libraries to your system which requires root access.
 
 ## Contents
-- [Prerequisites](#Prerequisites)
-- [Compiling OAP](#Compiling OAP)
-- [Configuration](#Configuration)
+- [OAP Installation Guide](#oap-installation-guide)
+  - [Contents](#contents)
+  - [Prerequisites](#prerequisites)
+      - [Install prerequisites](#install-prerequisites)
+    - [Compiling OAP](#compiling-oap)
+    - [Configuration](#configuration)
 
 ## Prerequisites 
 To enable Shuffle Remote PMem extension, you must configure and validate RDMA in advance, you can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md) for more details.
