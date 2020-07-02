@@ -345,6 +345,8 @@ Please refer to your NIC manuual for detail instructions on how to validate RDMA
 ---------------------------
 
 ### 5.1.1 Install HPNL (<https://github.com/Intel-bigdata/HPNL>)
+If you have completed all steps in installation guide,  you can ignore this section and refer to [5.3 Configure RPMem extension for spark shuffle in Spark](#53-configure-rpmem-extension-for-spark-shuffle-in-spark).
+
 ----------------------------------------------------------
 
 HPNL is a fast, CPU-Efficient network library designed for modern

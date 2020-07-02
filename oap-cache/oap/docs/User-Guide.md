@@ -17,7 +17,7 @@ SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with 
 
 ### Building
 
-Download our pre-built jar [oap-product-0.8.0-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/oap-product-0.8.0-bin-spark-2.4.4.tar.gz) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the `oap-common-0.8.0-with-spark-2.4.4.jar` to the directory `$SPARK_HOME/jars/`. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+Download our pre-built jar [oap-product-0.8.1-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/oap-product-0.8.1-bin-spark-2.4.4.tar.gz) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the `oap-common-0.8.1-with-spark-2.4.4.jar` to the directory `$SPARK_HOME/jars/`. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 
 ### Spark Configurations
 
@@ -28,11 +28,11 @@ Before you run ` . $SPARK_HOME/bin/spark-shell `, you need to configure Spark fo
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
 # absolute path of the jar on your working node
-spark.files                       /home/oap/jars/oap-cache-0.8.0-with-spark-2.4.4.jar
+spark.files                       /home/oap/jars/oap-cache-0.8.1-with-spark-2.4.4.jar
 # relative path of the jar
-spark.executor.extraClassPath     ./oap-cache-0.8.0-with-spark-2.4.4.jar
+spark.executor.extraClassPath     ./oap-cache-0.8.1-with-spark-2.4.4.jar
 # absolute path of the jar on your working node
-spark.driver.extraClassPath       /home/oap/jars/oap-cache-0.8.0-with-spark-2.4.4.jar
+spark.driver.extraClassPath       /home/oap/jars/oap-cache-0.8.1-with-spark-2.4.4.jar
 ```
 ### Verify Integration 
 
@@ -71,11 +71,11 @@ Add the following OAP configuration settings to `$SPARK_HOME/conf/spark-defaults
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
 # absolute path on your working node
-spark.files                       /home/oap/jars/oap-cache-0.8.0-with-spark-2.4.4.jar
+spark.files                       /home/oap/jars/oap-cache-0.8.1-with-spark-2.4.4.jar
 # relative path    
-spark.executor.extraClassPath     ./oap-cache-0.8.0-with-spark-2.4.4.jar
+spark.executor.extraClassPath     ./oap-cache-0.8.1-with-spark-2.4.4.jar
 # relative path 
-spark.driver.extraClassPath       ./oap-cache-0.8.0-with-spark-2.4.4.jar
+spark.driver.extraClassPath       ./oap-cache-0.8.1-with-spark-2.4.4.jar
 ```
 
 ## Configuration for Spark Standalone Mode
@@ -87,9 +87,9 @@ In addition to running on the YARN cluster manager, Spark also provides a simple
 ```
 spark.sql.extensions               org.apache.spark.sql.OapExtensions
 # absolute path on worker nodes
-spark.executor.extraClassPath      /home/oap/jars/oap-cache-0.8.0-with-spark-2.4.4.jar
+spark.executor.extraClassPath      /home/oap/jars/oap-cache-0.8.1-with-spark-2.4.4.jar
 # absolute path on worker nodes
-spark.driver.extraClassPath        /home/oap/jars/oap-cache-0.8.0-with-spark-2.4.4.jar
+spark.driver.extraClassPath        /home/oap/jars/oap-cache-0.8.1-with-spark-2.4.4.jar
 ```
 
 ## Working with SQL Index
@@ -228,7 +228,7 @@ The following are required to configure OAP to use DCPMM cache.
 
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
 
-- For cache solution guava/non-evict, make sure [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/libmemkind.so.0) for x86 64bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. 
+- For cache solution guava/non-evict, make sure [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/libmemkind.so.0) for x86 64bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. 
    The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. 
    Build the latest memkind lib from source:
 
@@ -241,7 +241,7 @@ The following are required to configure OAP to use DCPMM cache.
    make install
    ```
    
-- For cache solution Vmemcahe/external cache, make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for DCPM cache. You can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. To build vmemcache lib from source, you can (for RPM-based linux as example):
+- For cache solution Vmemcahe/external cache, make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for DCPM cache. You can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. To build vmemcache lib from source, you can (for RPM-based linux as example):
 ```
      git clone https://github.com/pmem/vmemcache
      cd vmemcache
@@ -543,7 +543,7 @@ Check DCPMM cache size by checking disk space with `df -h`. For Guava/Non-evicta
 
 This section provides instructions and tools for running TPC-DS queries to evaluate the cache performance of various configurations. The TPC-DS suite has many queries and we select 9 I/O intensive queries to simplify performance evaluation.
 
-We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/OAP-TPCDS-TOOL.zip) to simplify running the workload. If you are already familiar with TPC-DS data generation and running a TPC-DS tool suite, skip our tool and use the TPC-DS tool suite directly.
+We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/OAP-TPCDS-TOOL.zip) to simplify running the workload. If you are already familiar with TPC-DS data generation and running a TPC-DS tool suite, skip our tool and use the TPC-DS tool suite directly.
 
 ### Prerequisites
 
@@ -551,7 +551,7 @@ We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigda
 
 ### Prepare the Tool
 
-1. Download [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/OAP-TPCDS-TOOL.zip) and unzip to a folder (for example, `OAP-TPCDS-TOOL` folder) on your working node. 
+1. Download [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/OAP-TPCDS-TOOL.zip) and unzip to a folder (for example, `OAP-TPCDS-TOOL` folder) on your working node. 
 2. Copy `OAP-TPCDS-TOOL/tools/tpcds-kits` to ALL worker nodes under the same folder (for example, `/home/oap/tpcds-kits`).
 
 ### Generate TPC-DS Data

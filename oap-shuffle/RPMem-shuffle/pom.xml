@@ -8,13 +8,13 @@
 <parent>
 	<groupId>com.intel.oap</groupId>
 	<artifactId>oap-parent</artifactId>
-	<version>0.8.0</version>
+	<version>0.8.1</version>
 	<relativePath>../../pom.xml</relativePath>
 </parent>
 
 <artifactId>oap-rpmem-shuffle</artifactId>
 <packaging>pom</packaging>
-<name>OAP Project RPMem Shuffle</name>
+<name>OAP Project RPMem Shuffle  Parent POM</name>
 
 <licenses>
 	<license>
