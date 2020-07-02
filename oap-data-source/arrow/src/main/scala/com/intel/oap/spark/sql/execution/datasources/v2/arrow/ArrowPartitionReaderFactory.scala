@@ -16,6 +16,8 @@
  */
 package com.intel.oap.spark.sql.execution.datasources.v2.arrow
 
+import java.net.URLDecoder
+
 import scala.collection.JavaConverters._
 
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowPartitionReaderFactory.ColumnarBatchRetainer
@@ -58,7 +60,7 @@ case class ArrowPartitionReaderFactory(
       partitionedFile: PartitionedFile): PartitionReader[ColumnarBatch] = {
     val path = partitionedFile.filePath
     val taskMemoryManager = ArrowUtils.getTaskMemoryManager()
-    val factory = ArrowUtils.makeArrowDiscovery(path, options,
+    val factory = ArrowUtils.makeArrowDiscovery(URLDecoder.decode(path, "UTF-8"), options,
       new ExecutionMemoryAllocationListener(taskMemoryManager))
     val dataset = factory.finish()
     val filter = if (enableFilterPushDown) {

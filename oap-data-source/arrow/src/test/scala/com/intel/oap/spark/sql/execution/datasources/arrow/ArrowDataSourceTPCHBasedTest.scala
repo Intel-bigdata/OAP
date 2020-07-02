@@ -20,8 +20,8 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import com.intel.oap.spark.sql.DataFrameReaderImplicits._
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowOptions
-import org.apache.spark.SparkConf
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.execution.datasources.v2.arrow.ArrowUtils
 import org.apache.spark.sql.internal.SQLConf
@@ -54,6 +54,16 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
     frame.createOrReplaceTempView("lineitem")
 
     spark.sql("describe lineitem").show()
+  }
+
+  test("tpch part - special characters in path") {
+    val frame = spark.read
+      .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
+      .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
+      .arrow(part)
+    frame.createOrReplaceTempView("part")
+
+    spark.sql("select * from part limit 100").show()
   }
 
   ignore("tpch lineitem - read partition values") {

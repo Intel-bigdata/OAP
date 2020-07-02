@@ -719,7 +719,8 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
 
   @Override
   public int putByteArray(int rowId, byte[] value, int offset, int length) {
-    throw new UnsupportedOperationException();
+    writer.setBytes(rowId, length, value, offset);
+    return length;
   }
 
   //

@@ -17,6 +17,8 @@
 
 package com.intel.oap.spark.sql.execution.datasources.arrow
 
+import java.net.URLDecoder
+
 import scala.collection.JavaConverters._
 
 import com.intel.oap.spark.sql.execution.datasources.arrow.ArrowFileFormat.UnsafeItr
@@ -74,7 +76,7 @@ class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializab
       val enableFilterPushDown = sqlConf.arrowFilterPushDown
       val taskMemoryManager = ArrowUtils.getTaskMemoryManager()
       val factory = ArrowUtils.makeArrowDiscovery(
-        file.filePath, new ArrowOptions(
+        URLDecoder.decode(file.filePath, "UTF-8"), new ArrowOptions(
           new CaseInsensitiveStringMap(
             options.asJava).asScala.toMap),
         new ExecutionMemoryAllocationListener(taskMemoryManager))
