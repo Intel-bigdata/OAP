@@ -205,67 +205,38 @@ The following are required to configure OAP to use DCPMM cache.
 - Directories exposing DCPMM hardware on each socket. For example, on a two socket system the mounted DCPMM directories should appear as `/mnt/pmem0` and `/mnt/pmem1`. Correctly installed DCPMM must be formatted and mounted on every cluster worker node.
 
    ```
-   // use impctl command to show topology and dimm info of DCPM
-   impctl show -topology
-   impctl show -dimm
+   // use ipmctl command to show topology and dimm info of DCPM
+   ipmctl show -topology
+   ipmctl show -dimm
    // provision dcpm in app direct mode
    ipmctl create -goal PersistentMemoryType=AppDirect
    // reboot system to make configuration take affect
    reboot
    // check capacity provisioned for app direct mode(AppDirectCapacity)
-   impctl show -memoryresources
+   ipmctl show -memoryresources
    // show the DCPM region information
-   impctl show -region
+   ipmctl show -region
    // create namespace based on the region, multi namespaces can be created on a single region
    ndctl create-namespace -m fsdax -r region0
    ndctl create-namespace -m fsdax -r region1
    // show the created namespaces
    fdisk -l
    // create and mount file system
+   echo y | mkfs.ext4 /dev/pmem0
+   echo y | mkfs.ext4 /dev/pmem1
    mount -o dax /dev/pmem0 /mnt/pmem0
    mount -o dax /dev/pmem1 /mnt/pmem1
    ```
 
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
 
-- For cache solution guava/non-evict, make sure [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/libmemkind.so.0) for x86 64bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. 
-   The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. 
-   Build the latest memkind lib from source:
 
-   ```
-   git clone https://github.com/memkind/memkind
-   cd memkind
-   ./autogen.sh
-   ./configure
-   make
-   make install
-   ```
-   
-- For cache solution Vmemcahe/external cache, make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for DCPM cache. You can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. To build vmemcache lib from source, you can (for RPM-based linux as example):
-```
-     git clone https://github.com/pmem/vmemcache
-     cd vmemcache
-     mkdir build
-     cd build
-     cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
-     make package
-     sudo rpm -i libvmemcache*.rpm
-```
-- Data Source Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries, you can refer to [Using-Plasma-As-Cache](./Using-Plasma-As-Cache.md) to enable this feature.  
-[Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support DCPMM, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo.  You can run follow commands to install libarrow.so, libplasma.so, libplasma_java.so, plasma-store-server, arrow-plasma.jar to your machine:
-    ```
-    git clone https://github.com/Intel-bigdata/arrow.git
-    cd arrow
-    git checkout oap-master
-    cd cpp
-    mkdir release 
-    cd release
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-g -O3" -DCMAKE_CXX_FLAGS="-g -O3" -DARROW_PLASMA_JAVA_CLIENT=on -DARROW_PLASMA=on -DARROW_DEPENDENCY_SOURCE=BUNDLED ..
-    make -j$(nproc)
-    sudo make install -j$(nproc)
-    cd ../../java
-    mvn clean -q -DskipTests install
-    ``` 
+- For cache solution guava/non-evict, make sure [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/libmemkind.so.0) for x86_64 bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. Build and install step can refer to [build and install memkind](./Developer-Guide.md#build-and-install-memkind)
+
+- For cache solution Vmemcahe/external cache, make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for DCPM cache. You can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.0-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
+
+- Data Source Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support DCPMM, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. Build and install step can refer to [build and install plasma](./Developer-Guide.md#build-and-install-plasma)
+ 
 Or you can refer to [Developer-Guide](../../../docs/Developer-Guide.md), there is a shell script to help you install these dependencies automatically.
 
 #### Configure for NUMA
@@ -389,7 +360,6 @@ To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM h
 For Parquet data format, add these conf options:
 
 ```
- 
 spark.sql.oap.parquet.data.cache.enable                    true 
 spark.oap.cache.strategy                                   vmem 
 spark.sql.oap.fiberCache.persistent.memory.initial.size    256g 
@@ -411,7 +381,7 @@ Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks 
 
 #### External cache using plasma
 
-External cache strategy is implemented based on arrow/plasma library. To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and plasma library correctly, and start Plasma service on nodes, then refer below configurations to apply external cache strategy in your workload.
+External cache strategy is implemented based on arrow/plasma library. To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware. Then install arrow rpm package which include plasma library and executable file and copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer below configurations to apply external cache strategy and start plasma service on each node and start your workload.
 
 For Parquet data format, add these conf options:
 
@@ -433,6 +403,81 @@ spark.oap.cache.strategy                                   external
 spark.sql.oap.cache.guardian.memory.size                   10g
 spark.sql.oap.cache.external.client.pool.size              10
 ```
+
+- Start plasma service manually
+
+plasma config parameters:  
+ ```
+ -m  how much Bytes share memory plasma will use
+ -s  Unix Domain sockcet path
+ -e  using external store
+     vmemcache: using vmemcahe as external store
+     propertyFilePath: It's recommended to use propertyFilePath to pass parameters.
+     Or you can write these parameters directly in your starting command. Use "?" to seperate different numaNodes.
+ ```
+
+You can start plasma service on each node as following command, and then you can run your workload.
+
+```
+plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://propertyFilePath:/tmp/persistent-memory.properties  
+```
+or 
+``` 
+plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://totalNumaNodeNum:2,\
+numaNodeId1:1,initialPath1:/mnt/pmem0,requiredSize1:15000000,readPoolSize1:12,writePoolSize1:12\
+?numaNodeId2:2,initialPath2:/mnt/pmem1,requiredSize2:15000000,readPoolSize2:12,writePoolSize2:12
+```
+
+An example persistent-memory.properties:
+
+```
+  # Example
+  totalNumaNodeNum = 2
+    
+  numaNodeId1 = 1
+  initialPath1 = /mnt/pmem0
+  requiredSize1 = 15000000
+  readPoolSize1 = 12 
+  writePoolSize1 = 12
+    
+  numaNodeId2 = 2
+  initialPath2 = /mnt/pmem1
+  requiredSize2 = 15000000
+  readPoolSize2 = 12 
+  writePoolSize2 = 12
+```
+
+```requiredSize readPoolSize writePoolSize``` is optional,will use default value if you don't pass these three parameters.
+But please remember to pass ```totalNumaNodeNum``` and ```initialPath```.
+
+*Please note that parameters in the command will cover parameters in persistent-memory.properties.*
+
+ Remember to kill `plasma-store-server` process if you no longer need cache, and you should delete `/tmp/plasmaStore` which is a Unix domain socket.  
+  
+- Use yarn to start plamsa service  
+We can use yarn(hadoop version >= 3.1) to start plasma service, you should provide a json file like following.
+```
+{
+  "name": "plasma-store-service",
+  "version": 1,
+  "components" :
+  [
+   {
+     "name": "plasma-store-service",
+     "number_of_containers": 3,
+     "launch_command": "plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://propertyFilePath:/tmp/persistent-memory.properties ",
+     "resource": {
+       "cpus": 1,
+       "memory": 512
+     }
+   }
+  ]
+}
+```
+
+Run command  ```yarn app -launch plasma-store-service /tmp/plasmaLaunch.json``` to start plasma server.  
+Run ```yarn app -stop plasma-store-service``` to stop it.  
+Run ```yarn app -destroy plasma-store-service```to destroy it.
 
 
 ### Index/Data cache separation
