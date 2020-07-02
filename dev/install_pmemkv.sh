@@ -24,13 +24,7 @@ sudo cmake .
 sudo make
 
 cd /tmp
-git clone https://github.com/pmem/pmemkv-java.git
+git clone https://github.com/pmem/pmemkv-java.git -b stable-1.0
 cd pmemkv-java
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/src/gtest
-make pmemkv-jni
-sudo cp libpmemkv-jni.so /usr/lib
-cd ..
-export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:./build
 mvn install -DskipTests
+sudo cp src/main/cpp/target/libpmemkv-jni.so /usr/lib

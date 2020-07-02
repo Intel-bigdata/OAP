@@ -12,7 +12,7 @@ public class PMemBlkMetaStore implements PMemMetaStore {
 
     private AtomicInteger index = new AtomicInteger(0);
 
-    Database pmemkvDB;
+    Database<String, String> pmemkvDB;
 
     public PMemBlkMetaStore(Properties properties) {
         String pmemkvEngine = properties.getProperty("pmemkv_engine");

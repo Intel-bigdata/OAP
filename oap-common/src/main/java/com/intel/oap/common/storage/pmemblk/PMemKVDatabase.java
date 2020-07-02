@@ -1,21 +1,24 @@
 package com.intel.oap.common.storage.pmemblk;
 
+import io.pmem.pmemkv.Converter;
 import io.pmem.pmemkv.Database;
 
 import java.io.File;
+import java.nio.ByteBuffer;
 
 public class PMemKVDatabase {
 
-    private static Database db;
+    private static Database<String, String> db;
 
     public static Database open(String engine, String path, long size) {
-        StringBuffer dbConfig = new StringBuffer();
-        dbConfig.append("{\"path\":").append("\"" + path + "\", ");
-        if (isCreated(path))
-            dbConfig.append("\"force_create\":0}");
-        else
-            dbConfig.append("\"size\":" + size + ", \"force_create\":1}");
-        db = new Database(engine, dbConfig.toString());
+        boolean forceCreate = !isCreated(path);
+        db = new Database.Builder<String, String>(engine)
+                .setSize(size)
+                .setPath(path)
+                .setForceCreate(forceCreate)
+                .setKeyConverter(new StringConverter())
+                .setValueConverter(new StringConverter())
+                .build();
         return db;
     }
 
@@ -28,4 +31,21 @@ public class PMemKVDatabase {
         return pmemkvDB.exists();
     }
 
+}
+
+class StringConverter implements Converter<String> {
+    public ByteBuffer toByteBuffer(String entry) {
+        return ByteBuffer.wrap(entry.getBytes());
+    }
+
+    public String fromByteBuffer(ByteBuffer entry) {
+        if (entry.hasArray()) {
+            return new String(entry.array());
+        } else {
+            byte[] bytes;
+            bytes = new byte[entry.capacity()];
+            entry.get(bytes);
+            return new String(bytes);
+        }
+    }
 }
