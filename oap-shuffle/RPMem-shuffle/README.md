@@ -359,7 +359,8 @@ You might need to install automake/libtool first to resolve dependency
 issues.
 
 ```bash
-git clone <https://github.com/ofiwg/libfabric.git>
+git clone https://github.com/ofiwg/libfabric.git
+cd  libfabric
 git checkout v1.6.0
 ./autogen.sh
 ./configure --disable-sockets --enable-verbs --disable-mlx
@@ -388,8 +389,7 @@ mvn install
 ### 5.2 install basic C library dependencies
 --------------------------
 ```bash
-yum install -y autoconf asciidoctor kmod-devel.x86\_64 libudev-devel
-    libuuid-devel json-c-devel jemalloc-devel
+yum install -y autoconf asciidoctor kmod-devel.x86\_64 libudev-devel libuuid-devel json-c-devel jemalloc-devel
 yum groupinstall -y "Development Tools"
 ```
 
@@ -426,12 +426,13 @@ echo “export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH” >
 -----------------------------------------------
 ```bash
 git clone  https://github.com/efficient/libcuckoo
+cd libcuckoo
 mkdir build
 cd build
 cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_EXAMPLES=1 -DBUILD_TESTS=1 ..
 make all && make install
-git clone https://github.com/intel-bigdata/oap.git
-cd oap/oap-shuffle/RPMem-shuffle
+git clone -b v0.8.1-spark-2.4.4 https://github.com/intel-bigdata/OAP.git
+cd OAP/oap-shuffle/RPMem-shuffle
 mvn install -DskipTests
 
 ```
