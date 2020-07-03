@@ -17,15 +17,15 @@ June 2020
 Shuffle RPMem extension for Spark (AKA. RPMem shuffle extension, previously Spark-PMoF) depends on multiple
 native libraries like libfabrics, libcuckoo, PMDK. This enabling guide
 covers the installing process for the time being, but it might change as
-the install commands and related dependency packages for the 3^rd^ party
-libraries might vary depends on the OS version and distribution you are
+the install commands and related dependency packages for the 3rd party
+libraries might vary depending on the OS version and distribution you are
 using.
 Yarn, HDFS, Spark installation and configuration is out of the scope of this document.
 
 ## <a id="rpmem-shuffle-extension-introduction"></a>1. RPMem shuffle extension introduction
 
 Intel Optane DC persistent memory is the next-generation storage
-at memory speed. It close the performance gap between DRAM memory
+at memory speed. It closes the performance gap between DRAM memory
 technology and traditional NAND SSDs. Remote Persistent Memory extends PMem usage to new
 scenario, lots of new usage cases & value proposition can be developed.
 
@@ -107,7 +107,7 @@ was installed on the SUT as an exmaple.
 ### 2.4 Recommended PMEM BKC (optional) 
 --------------------------
 
-This deplopment guide was based on ww08.2019  BKC (best known configuration). Please contact your HW vendor for latest BKC.
+This development guide was based on ww08.2019 BKC (best known configuration). Please contact your HW vendor for latest BKC.
 
 Please refer to backup if you do not have BKC access. BKC
 installation/enabling or FW installation is out of the scope of this guide.
@@ -132,7 +132,7 @@ installation/enabling or FW installation is out of the scope of this guide.
 ## <a id="configure-and-validate-rdma"></a>4. Configure and Validate RDMA
 ------------------------
 **Notes**
-This part is vendor specific, it might NOT applied to your environment, please check your switch, NIC mannuals accordingly. 
+This part is vendor specific, it might NOT apply to your environment, please check your switch, NIC manuals accordingly. 
 
 ### 4.1 Configure and test iWARP RDMA
 ---------------------------------
@@ -161,7 +161,7 @@ dnf install cmake gcc libnl3-devel libudev-devel pkgconfig
 ``` 
 ####  4.1.2 Switch Configuration (optional)
 
-This part is HW specific, **please check your switch mannual accordingly.** 
+This part is HW specific, **please check your switch manual accordingly.** 
 Connect the console port to PC. Username is admin. No password. Enter
 global configuration mode.
 
@@ -202,7 +202,7 @@ switch (config-if-et1) # **priority-flow-control priority 3 no-drop**
 
 #### A. Example: Mellanox Enabling RoCE V2 RDMA (Optional) 
 
-There are lots of packages need to be installed for dependency, please refer to your RDMA NIC's mannualls to installed it correctlyu. 
+There are lots of packages need to be installed for dependency, please refer to your RDMA NIC's manualls to install it correctly. 
 ``` bash
 yum install atk gcc-gfortran tcsh gtk2 tcl tk
 ```
@@ -544,7 +544,7 @@ spark.driver.rport                                              61000
 ## <a id="rpmem-shffle-extension-for-spark-testing"></a>7. RPMem Shuffle Extension for Spark Testing 
 -----------------------------
 
-RPmem shuffle extension have been tested and validated with Terasort and Decision support worklods. 
+RPmem shuffle extension have been tested and validated with Terasort and Decision support workloads. 
 
 ### 7.1 Decision support workloads 
 -------------------------------
