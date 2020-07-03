@@ -18,4 +18,4 @@ Please refer to the corresponding documents below for the introduction and how t
 Please follow the below link for the guide for developers.
 * [OAP Developer Guide](./docs/Developer-Guide.md)
 
-\*Other names and brands may be claimed as the property of others.
+###### \*Other names and brands may be claimed as the property of others.
