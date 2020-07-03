@@ -120,10 +120,10 @@ installation/enabling or FW installation is out of the scope of this guide.
     mode
 4)  Run *ndctl list -R*, you will see **region0** and **region1**. 
 5)  Assume you have 4x PMEM installed on 1 node.  
-    a.  Run *ndctl create-namespace –m devdax -r region0 -s 120g*  
-    b.  Run *ndctl create-namespace –m devdax –r region0 –s 120g*  
-    c.  Run *ndctl create-namespace –m devdax –r region1 –s 120g*  
-    d.  Run *ndctl create-namespace –m devdax –r region1 –s 120g*  
+    a.  Run *ndctl create-namespace -m devdax -r region0 -s 120g*  
+    b.  Run *ndctl create-namespace -m devdax -r region0 –s 120g*  
+    c.  Run *ndctl create-namespace -m devdax -r region1 –s 120g*  
+    d.  Run *ndctl create-namespace -m devdax -r region1 –s 120g*  
     This will create four namespaces, namely /dev/dax0.0, /dev/dax0.1, /dev/dax1.0,
         /dev/dax1.1 in that node, and it will be used as RPMem shuffle media. 
 
