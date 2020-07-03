@@ -31,7 +31,6 @@ import org.apache.spark.util.configuration.pmof.PmofConf
 
 class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with Matchers {
   private val shuffleId = 0
-  private val numMaps = 5
   private var shuffleBlockResolver: PmemShuffleBlockResolver = _
   private var serializer: JavaSerializer = _
   private var pmofConf: PmofConf = _
@@ -80,7 +79,7 @@ class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with 
       when(dependency.aggregator).thenReturn(None)
       when(dependency.keyOrdering).thenReturn(None)
 
-      new BaseShuffleHandle(shuffleId, numMaps = numMaps, dependency)
+      new BaseShuffleHandle(shuffleId, dependency)
     }
 
     def records: Iterator[(Int, Int)] =
@@ -131,7 +130,7 @@ class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with 
       when(dependency.aggregator).thenReturn(None)
       when(dependency.keyOrdering).thenReturn(None)
 
-      new BaseShuffleHandle(shuffleId, numMaps = numMaps, dependency)
+      new BaseShuffleHandle(shuffleId, dependency)
     }
 
     def records: Iterator[(Int, Int)] =

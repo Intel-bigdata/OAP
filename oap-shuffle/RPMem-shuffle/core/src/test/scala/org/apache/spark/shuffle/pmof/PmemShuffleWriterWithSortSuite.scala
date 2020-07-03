@@ -102,7 +102,7 @@ class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkConte
       when(dependency.keyOrdering).thenReturn(Some(ord))
       when(dependency.mapSideCombine).thenReturn(true)
 
-      new BaseShuffleHandle(shuffleId, numMaps = numMaps, dependency)
+      new BaseShuffleHandle(shuffleId, dependency)
     }
     val writer = new PmemShuffleWriter[Int, Int, Int](
       shuffleBlockResolver,

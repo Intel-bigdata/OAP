@@ -45,7 +45,7 @@ private[spark] class BaseShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
   override def read(): Iterator[Product2[K, C]] = {
     val wrappedStreams = new ShuffleBlockFetcherIterator(
       context,
-      blockManager.shuffleClient,
+      blockManager.blockStoreClient,
       blockManager,
       mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
       serializerManager.wrapStream,
@@ -54,7 +54,11 @@ private[spark] class BaseShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
       SparkEnv.get.conf.getInt("spark.reducer.maxReqsInFlight", Int.MaxValue),
       SparkEnv.get.conf.get(config.REDUCER_MAX_BLOCKS_IN_FLIGHT_PER_ADDRESS),
       SparkEnv.get.conf.get(config.MAX_REMOTE_BLOCK_SIZE_FETCH_TO_MEM),
-      SparkEnv.get.conf.getBoolean("spark.shuffle.detectCorrupt", true))
+      SparkEnv.get.conf.getBoolean("spark.shuffle.detectCorrupt", true),
+      detectCorruptUseExtraMemory = SparkEnv.get.conf.get(config.SHUFFLE_DETECT_CORRUPT_MEMORY),
+      null,
+      false
+    )
 
     val serializerInstance = dep.serializer.newInstance()
 
@@ -105,7 +109,7 @@ private[spark] class BaseShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
         logDebug("call PmemExternalSorter.insertAll for shuffle_0_" + handle.shuffleId + "_[" + startPartition + "," + endPartition + "]")
         sorter.insertAll(aggregatedIter)
         // Use completion callback to stop sorter if task was finished/cancelled.
-        context.addTaskCompletionListener(_ => {
+        context.addTaskCompletionListener[Unit](_ => {
           sorter.stop()
         })
         CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](sorter.iterator, sorter.stop())

@@ -25,7 +25,7 @@ import javax.annotation.concurrent.GuardedBy
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.buffer.{FileSegmentManagedBuffer, ManagedBuffer}
 import org.apache.spark.network.pmof._
-import org.apache.spark.network.shuffle.{DownloadFile, DownloadFileManager, DownloadFileWritableChannel, ShuffleClient, SimpleDownloadFile}
+import org.apache.spark.network.shuffle.{DownloadFile, DownloadFileManager, BlockStoreClient, SimpleDownloadFile}
 import org.apache.spark.network.util.TransportConf
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.storage._
@@ -47,7 +47,7 @@ import scala.concurrent.Future
   * using too much memory.
   *
   * @param context                     [[TaskContext]], used for metrics update
-  * @param shuffleClient               [[ShuffleClient]] for fetching remote blocks
+  * @param blockStoreClient            [[BlockStoreClient]] for fetching remote blocks
   * @param blockManager                [[BlockManager]] for reading local blocks
   * @param blocksByAddress             list of blocks to fetch grouped by the [[BlockManagerId]].
   *                                    For each block we also require the size (in bytes as a long field) in
@@ -62,9 +62,9 @@ import scala.concurrent.Future
   */
 private[spark]
 final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
-                                            shuffleClient: ShuffleClient,
+                                            blockStoreClient: BlockStoreClient,
                                             blockManager: BlockManager,
-                                            blocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long)])],
+                                            blocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long, Int)])],
                                             streamWrapper: (BlockId, InputStream) => InputStream,
                                             maxBytesInFlight: Long,
                                             maxReqsInFlight: Int,
@@ -125,7 +125,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
   initialize()
 
   def initialize(): Unit = {
-    context.addTaskCompletionListener(_ => cleanup())
+    context.addTaskCompletionListener[Unit](_ => cleanup())
 
     val remoteBlocksByAddress = blocksByAddress.filter(_._1.executorId != blockManager.blockManagerId.executorId)
     for ((address, blockInfos) <- blocksByAddress) {
@@ -138,7 +138,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     startFetch(remoteBlocksByAddress)
   }
 
-  def startFetch(remoteBlocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long)])]): Unit = {
+  def startFetch(remoteBlocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long, Int)])]): Unit = {
     for ((blockManagerId, blockInfos) <- remoteBlocksByAddress) {
       startFetchMetadata(blockManagerId, blockInfos.filter(_._2 != 0).map(_._1).toArray)
     }
@@ -181,7 +181,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     numBlocksToFetch += blockIds.length
     numRemoteBlockToFetch.addAndGet(blockIds.length)
 
-    val rdmaTransferService = shuffleClient.asInstanceOf[PmofTransferService]
+    val rdmaTransferService = blockStoreClient.asInstanceOf[PmofTransferService]
     rdmaTransferService.fetchBlockInfo(blockIds, receivedCallback)
   }
 
@@ -195,7 +195,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     while (iter.hasNext) {
       val blockId = iter.next()
       try {
-        val buf = blockManager.getBlockData(blockId)
+        val buf = blockManager.getLocalBlockData(blockId)
         shuffleMetrics.incLocalBlocksFetched(1)
         shuffleMetrics.incLocalBytesRead(buf.size)
         buf.retain()
@@ -361,7 +361,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     val blockManagerId = rdmaRequest.blockManagerId
     val shuffleBlockIdName = rdmaRequest.shuffleBlockIdName
 
-    val pmofTransferService = shuffleClient.asInstanceOf[PmofTransferService]
+    val pmofTransferService = blockStoreClient.asInstanceOf[PmofTransferService]
 
     val blockFetchingReadCallback = new ReadCallback {
       def onSuccess(shuffleBuffer: ShuffleBuffer, f: Int => Unit): Unit = {
@@ -405,7 +405,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
   private def throwFetchFailedException(blockId: BlockId, address: BlockManagerId, e: Throwable) = {
     blockId match {
       case ShuffleBlockId(shufId, mapId, reduceId) =>
-        throw new FetchFailedException(address, shufId.toInt, mapId.toInt, reduceId, e)
+        throw new FetchFailedException(address, shufId.toInt, mapId.toInt, reduceId, 0, "FetchFailedException", e)
       case _ =>
         throw new SparkException(
           "Failed to get block " + blockId + ", which is not a shuffle block", e)

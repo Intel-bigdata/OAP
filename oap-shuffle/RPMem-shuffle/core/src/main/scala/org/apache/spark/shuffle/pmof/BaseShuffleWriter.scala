@@ -34,7 +34,7 @@ private[spark] class BaseShuffleWriter[K, V, C](shuffleBlockResolver: IndexShuff
                                                 blockManager: BlockManager,
                                                 serializerManager: SerializerManager,
                                                 handle: BaseShuffleHandle[K, V, C],
-                                                mapId: Int,
+                                                mapId: Long,
                                                 context: TaskContext,
                                                 pmofConf: PmofConf)
   extends ShuffleWriter[K, V] with Logging {
@@ -80,9 +80,9 @@ private[spark] class BaseShuffleWriter[K, V, C](shuffleBlockResolver: IndexShuff
         val blockManagerId: BlockManagerId =
           BlockManagerId(shuffleServerId.executorId, PmofTransferService.shuffleNodesMap(shuffleServerId.host),
             PmofTransferService.getTransferServiceInstance(pmofConf, blockManager).port, shuffleServerId.topologyInfo)
-        mapStatus = MapStatus(blockManagerId, partitionLengths)
+        mapStatus = MapStatus(blockManagerId, partitionLengths, mapId)
       } else {
-        mapStatus = MapStatus(shuffleServerId, partitionLengths)
+        mapStatus = MapStatus(shuffleServerId, partitionLengths, mapId)
       }
     } finally {
       if (tmp.exists() && !tmp.delete()) {

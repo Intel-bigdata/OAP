@@ -19,7 +19,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
   private[this] val pmofConf = new PmofConf(conf)
   var metadataResolver: MetadataResolver = _
 
-  override def registerShuffle[K, V, C](shuffleId: Int, numMaps: Int, dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
+  override def registerShuffle[K, V, C](shuffleId: Int, dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
     val env: SparkEnv = SparkEnv.get
 
     metadataResolver = MetadataResolver.getMetadataResolver(pmofConf)
@@ -28,19 +28,17 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
       PmofTransferService.getTransferServiceInstance(pmofConf: PmofConf, env.blockManager, this, isDriver = true)
     }
 
-    new BaseShuffleHandle(shuffleId, numMaps, dependency)
+    new BaseShuffleHandle(shuffleId, dependency)
   }
 
-  override def getWriter[K, V](handle: ShuffleHandle, mapId: Int, context: TaskContext): ShuffleWriter[K, V] = {
+  override def getWriter[K, V](handle: ShuffleHandle, mapId: Long, context: TaskContext, metrics: ShuffleWriteMetricsReporter): ShuffleWriter[K, V] = {
     assert(handle.isInstanceOf[BaseShuffleHandle[_, _, _]])
 
     val env: SparkEnv = SparkEnv.get
     val blockManager = SparkEnv.get.blockManager
     val serializerManager = SparkEnv.get.serializerManager
-    val numMaps = handle.asInstanceOf[BaseShuffleHandle[_, _, _]].numMaps
 
     metadataResolver = MetadataResolver.getMetadataResolver(pmofConf)
-    numMapsForShuffle.putIfAbsent(handle.shuffleId, numMaps)
 
     if (pmofConf.enableRdma) {
       PmofTransferService.getTransferServiceInstance(pmofConf, env.blockManager, this)
@@ -55,7 +53,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
     }
   }
 
-  override def getReader[K, C](handle: _root_.org.apache.spark.shuffle.ShuffleHandle, startPartition: Int, endPartition: Int, context: _root_.org.apache.spark.TaskContext): _root_.org.apache.spark.shuffle.ShuffleReader[K, C] = {
+  override def getReader[K, C](handle: _root_.org.apache.spark.shuffle.ShuffleHandle, startPartition: Int, endPartition: Int, context: _root_.org.apache.spark.TaskContext, metrics: ShuffleReadMetricsReporter): _root_.org.apache.spark.shuffle.ShuffleReader[K, C] = {
     if (pmofConf.enableRdma) {
       new RdmaShuffleReader(handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
         startPartition, endPartition, context, pmofConf)
@@ -84,4 +82,6 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
     else
       new IndexShuffleBlockResolver(conf)
   }
+
+  override def getReaderForRange[K, C](handle: ShuffleHandle, startMapIndex: Int, endMapIndex: Int, startPartition: Int, endPartition: Int, context: TaskContext, metrics: ShuffleReadMetricsReporter): ShuffleReader[K, C] = ???
 }
