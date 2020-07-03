@@ -724,8 +724,8 @@ spark.driver.memory    10g
 spark.yarn.driver.memoryOverhead 5g
 
 spark.io.compression.codec                                  snappy
-spark.driver.extraClassPath                                 /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-0.8.1-jar-with-dependencies.jar
-spark.executor.extraClassPath                               /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-0.8.1-jar-with-dependencies.jar
+spark.driver.extraClassPath                                 /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-0.8.1-jar-with-dependencies.jar
+spark.executor.extraClassPath                               /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-0.8.1-jar-with-dependencies.jar
 spark.shuffle.manager                                       org.apache.spark.shuffle.pmof.PmofShuffleManager
 spark.shuffle.pmof.enable_rdma                              true
 spark.shuffle.pmof.enable_pmem                              true
