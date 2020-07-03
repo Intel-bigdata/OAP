@@ -195,7 +195,6 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
       val df = sql("SELECT df1.id, df2.k FROM df1 JOIN df2 ON df1.k = df2.k AND df2.id < 2")
       assert(df.queryExecution.executedPlan.toString().contains("dynamicpruningexpression"))
       checkAnswer(df, Row(0, 0) :: Row(1, 1) :: Nil)
-      Thread.sleep(1000000L)
     }
   }
 
