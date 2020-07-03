@@ -23,8 +23,9 @@ import scala.collection.JavaConverters._
 
 import com.intel.oap.spark.sql.execution.datasources.arrow.ArrowFileFormat.UnsafeItr
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.{ArrowFilters, ArrowOptions, ExecutionMemoryAllocationListener}
+import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowPartitionReaderFactory.ColumnarBatchRetainer
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowSQLConf._
-import org.apache.arrow.dataset.scanner.ScanOptions
+import org.apache.arrow.dataset.scanner.{ScanOptions, ScanTask}
 import org.apache.arrow.memory.AllocationListener
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileStatus
@@ -36,7 +37,8 @@ import org.apache.spark.sql.execution.datasources.{FileFormat, OutputWriterFacto
 import org.apache.spark.sql.execution.datasources.v2.arrow.ArrowUtils
 import org.apache.spark.sql.sources.{DataSourceRegister, Filter}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.util.CaseInsensitiveStringMap;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap
+import org.apache.spark.sql.vectorized.ColumnarBatch;
 
 class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializable {
 
@@ -70,10 +72,10 @@ class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializab
       filters: Seq[Filter],
       options: Map[String, String],
       hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
-    (file: PartitionedFile) => {
+    val sqlConf = sparkSession.sessionState.conf;
+    val enableFilterPushDown = sqlConf.arrowFilterPushDown
 
-      val sqlConf = sparkSession.sessionState.conf;
-      val enableFilterPushDown = sqlConf.arrowFilterPushDown
+    (file: PartitionedFile) => {
       val taskMemoryManager = ArrowUtils.getTaskMemoryManager()
       val factory = ArrowUtils.makeArrowDiscovery(
         URLDecoder.decode(file.filePath, "UTF-8"), new ArrowOptions(
@@ -104,7 +106,7 @@ class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializab
         .toIterator
         .flatMap(itr => itr.asScala)
         .map(vsr => ArrowUtils.loadVectors(vsr, file.partitionValues, partitionSchema, dataSchema))
-      new UnsafeItr(itr).asInstanceOf[Iterator[InternalRow]]
+      new UnsafeItr(itr, itrList).asInstanceOf[Iterator[InternalRow]]
     }
   }
 
@@ -112,9 +114,43 @@ class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializab
 }
 
 object ArrowFileFormat {
-  class UnsafeItr[T](delegate: Iterator[T]) extends Iterator[T] {
-    override def hasNext: Boolean = delegate.hasNext
+  class UnsafeItr[T](delegate: Iterator[ColumnarBatch], itrList: List[ScanTask.Itr])
+    extends Iterator[ColumnarBatch] {
+    val holder = new ColumnarBatchRetainer()
 
-    override def next(): T = delegate.next()
+    def close(): Unit = {
+      itrList.foreach(itr => itr.close())
+    }
+
+    override def hasNext: Boolean = {
+      holder.release()
+      val hasNext = delegate.hasNext
+      if (!hasNext) {
+        close()
+      }
+      hasNext
+    }
+
+    override def next(): ColumnarBatch = {
+      val b = delegate.next()
+      holder.retain(b)
+      b
+    }
+  }
+
+  class ColumnarBatchRetainer {
+    private var retained: Option[ColumnarBatch] = None
+
+    def retain(batch: ColumnarBatch): Unit = {
+      if (retained.isDefined) {
+        throw new IllegalStateException
+      }
+      retained = Some(batch)
+    }
+
+    def release(): Unit = {
+      retained.foreach(b => b.close())
+      retained = None
+    }
   }
 }
