@@ -1,101 +1,154 @@
-# OAP Developer Guide
+# Developer Guide
 
-* [OAP Building](#OAP-Building)
-* [Integration with Spark](#integration-with-spark)
-* [Enable Numa binding for DCPMM in Spark](#enable-numa-binding-for-dcpmm-in-spark)
+* [Build](#Build)
+* [Integrate with Spark\*](#integrate-with-spark)
+* [Enable NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enable-numa-binding-for-dcpmm-in-spark)
 
+## Build
 
+#### Build
 
-## OAP Building
+Build with using [Apache Maven\*](http://maven.apache.org/).
 
-#### Building
-OAP is built using [Apache Maven](http://maven.apache.org/).
-
-To clone OAP project, use
+Clone the OAP project:
 
 ```
-git clone -b branch-0.6-spark-2.4.4  https://github.com/Intel-bigdata/OAP.git
+git clone -b branch-0.8-spark-2.4.x  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
-To build OAP package, use
+Build the package:
 
 ```
-mvn clean -DskipTests package
+mvn clean -pl com.intel.oap:oap-cache -am package
 ```
 
-#### Running Test
+#### Run Tests
 
-To run all the tests, use
+Run all the tests:
 ```
-mvn clean test
+mvn clean -pl com.intel.oap:oap-cache -am test
 ```
-To run any specific test suite, for example `OapDDLSuite`, use
+Run a specific test suite, for example `OapDDLSuite`:
 ```
 mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite test
 ```
-**NOTE**: Log level of OAP unit tests currently default to ERROR, please override src/test/resources/log4j.properties if needed.
+**NOTE**: Log level of unit tests currently default to ERROR, please override oap-cache/oap/src/test/resources/log4j.properties if needed.
 
+#### Build with Intel® Optane™ DC Persistent Memory Module
 
-#### OAP Building with DCPMM
-
-If you want to use OAP with DCPMM,  you can follow the below building steps.
+Follow these steps:
 
 ##### Prerequisites for building with DCPMM support
 
-You  need to install the required packages on the build system listed below.
+Install the required packages on the build system:
 
 - gcc-c++
 - [cmake](https://help.directadmin.com/item.php?id=494)
-- [Memkind](https://github.com/memkind/memkind)
+- [Memkind](https://github.com/Intel-bigdata/memkind)
 - [vmemcache](https://github.com/pmem/vmemcache)
 
+##### build and install memkind
+ The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. 
+   Build the latest memkind lib from source:
 
-##### Building package
-You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache stratege, you need to build with -Ppersistent-memory also.
 ```
-mvn clean -q -Ppersistent-memory -DskipTests package
+git clone https://github.com/memkind/memkind
+cd memkind
+./autogen.sh
+./configure
+make
+make install
+   ``` 
+##### build and install vmemcache
+
+To build vmemcache lib from source, you can (for RPM-based linux as example):
 ```
-for vmemcache cache strategy, please build with command:
+git clone https://github.com/pmem/vmemcache
+cd vmemcache
+mkdir build
+cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
+make package
+sudo rpm -i libvmemcache*.rpm
 ```
-mvn clean -q -Pvmemcache -DskipTests package
+##### build and install plasma
+To use optimized Plasma cache with OAP, you need following components:  
+    (1) libarrow.so, libplasma.so, libplasma_jni.so: dynamic libraries, will be used in plasma client.   
+    (2) plasma-store-server: executable file, plasma cache service.  
+    (3) arrow-plasma-0.17.0.jar: will be used when compile oap and spark runtime also need it. 
+    
+(1) and (2) will be provided as rpm package, we provide [Fedora 29](https://github.com/Intel-bigdata/arrow/releases/download/apache-arrow-0.17.0-intel-oap-0.8/arrow-plasma-intel-libs-0.17.0-1.fc29.x86_64.rpm) and [Cent OS 7.6](https://github.com/Intel-bigdata/arrow/releases/download/apache-arrow-0.17.0-intel-oap-0.8/arrow-plasma-intel-libs-0.17.0-1.el7.x86_64.rpm) rpm package, you can download it on release page.
+Run `rpm -ivh arrow-plasma-intel-libs-0.17.0-1*x86_64.rpm` to install it.   
+(3) will be provided in maven central repo. You need to download [it](https://repo1.maven.org/maven2/com/intel/arrow/arrow-plasma/0.17.0/arrow-plasma-0.17.0.jar) and copy to `$SPARK_HOME/jars` dir.
+
+- so file and binary file  
+  clone code from Intel-arrow repo and run following commands, this will install libplasma.so, libarrow.so, libplasma_jni.so and plasma-store-server to your system path(/usr/lib64 by default). And if you are using spark in a cluster environment, you can copy these files to all nodes in your cluster if os or distribution are same, otherwise, you need compile it on each node.
+  
 ```
-You can build with command to use all of them:
-```
-mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
+cd /tmp
+git clone https://github.com/Intel-bigdata/arrow.git
+cd arrow && git checkout oap-master
+cd cpp
+mkdir release
+cd release
+#build libarrow, libplasma, libplasma_java
+cmake -DCMAKE_INSTALL_PREFIX=/usr/ -DCMAKE_BUILD_TYPE=Release -DARROW_BUILD_TESTS=on -DARROW_PLASMA_JAVA_CLIENT=on -DARROW_PLASMA=on -DARROW_DEPENDENCY_SOURCE=BUNDLED  ..
+make -j$(nproc)
+sudo make install -j$(nproc)
 ```
 
-## Integration with Spark
+- arrow-plasma-0.17.0.jar  
+   change to arrow repo java direction, run following command, this will install arrow jars to your local maven repo, and you can compile oap-cache module package now. Beisdes, you need copy arrow-plasma-0.17.0.jar to `$SPARK_HOME/jars/` dir, cause this jar is needed when using external cache.
+   
+```
+cd $ARROW_REPO_DIR/java
+mvn clean -q -pl plasma -DskipTests install
+```
 
-Although OAP acts as a plugin jar to Spark, there are still a few tricks to note when integration with Spark. Basically, OAP explored Spark extension & data source API to perform its core functionality. But there are other functionality aspects that cannot achieved by Spark extension and data source API. We made a few improvements or changes to the Spark internals to achieve the functionality. So when integrating OAP on Spark, you need to check whether you are running an unmodified Community Spark or a modified customized Spark.
+
+##### Build the package
+You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache strategy, you need to build with -Ppersistent-memory also.
+```
+mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -DskipTests package
+```
+For vmemcache cache strategy, please build with command:
+```
+mvn clean -q -pl com.intel.oap:oap-cache -am -Pvmemcache -DskipTests package
+```
+Build with this command to use all of them:
+```
+mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -Pvmemcache -DskipTests package
+```
+
+## Integrate with Spark
+
+Although SQL Index and Data Source Cache act as a plug-in JAR to Spark, there are still a few tricks to note when integrating with Spark. The OAP team explored using the Spark extension & data source API to deliver its core functionality. However, the limits of the Spark extension and data source API meant that we had to make some changes to Spark internals. As a result you must check whether your installation is an unmodified Community Spark or a customized Spark.
 
 #### Integrate with Community Spark
 
-If you are running an Community Spark, things will be much simple. Refer to [OAP User Guide](OAP-User-Guide.md) to configure and setup Spark to working with OAP.
+If you are running a Community Spark, things will be much simpler. Refer to [User Guide](User-Guide.md) to configure and setup Spark to work with OAP.
 
 #### Integrate with customized Spark
 
-It will be more complicated to integrate OAP with a customized Spark. Steps needed for this case is to check whether the OAP changes of Spark internals will conflict or override with your private changes. 
-- If no conflicts or overrides happens, the steps are the same as the steps of unmodified version of Spark described above. 
-- If conflicts or overrides happen, you need to have a merge plan of the source code to make sure the code changes you made in a Spark source file appears in the corresponding file included in OAP project. Once merged, you need to rebuild OAP.
+In this case check whether the OAP changes to Spark internals will conflict with or override your private changes. 
+
+- If there are no conflicts or overrides, the steps are the same as the steps of unmodified version of Spark described above. 
+- If there are conflicts or overrides, develop a merge plan of the source code to make sure the code changes you made in to the Spark source appear in the corresponding file included in OAP the project. Once merged, rebuild OAP.
 
 The following files need to be checked/compared for changes:
 
 ```
-•	antlr4/org/apache/spark/sql/catalyst/parser/SqlBase.g4  
-		Add index related DDL in this file, such as "create/show/drop oindex". 
 •	org/apache/spark/scheduler/DAGScheduler.scala           
 		Add the oap cache location to aware task scheduling.
 •	org/apache/spark/sql/execution/DataSourceScanExec.scala   
-		Add the metrics info to OapMetricsManager and schedule the task to read from the cached hosts.
+		Add the metrics info to OapMetricsManager and schedule the task to read from the cached 
+•	org/apache/spark/sql/execution/datasources/FileFormatDataWriter.scala
+                Return the result of write task to driver.
 •	org/apache/spark/sql/execution/datasources/FileFormatWriter.scala
-		Return the result of write task to driver.
+		Add the result of write task. 
 •	org/apache/spark/sql/execution/datasources/OutputWriter.scala  
 		Add new API to support return the result of write task to driver.
-•	org/apache/spark/sql/hive/thriftserver/HiveThriftServer2.scala
-		Add OapEnv.init() and OapEnv.stop
-•	org/apache/spark/sql/hive/thriftserver/SparkSQLCLIDriver.scala
-		Add OapEnv.init() and OapEnv.stop in SparkSQLCLIDriver
 •	org/apache/spark/status/api/v1/OneApplicationResource.scala    
 		Update the metric data to spark web UI.
 •	org/apache/spark/SparkEnv.scala
@@ -110,29 +163,30 @@ The following files need to be checked/compared for changes:
 		Add the get and set method for the changed protected variable.
 ```
 
-## Enable Numa binding for DCPMM in Spark
+## Enable NUMA binding for DCPMM in Spark
 
-#### Rebuild Spark packages with Numa binding patch 
+#### Rebuild Spark packages with NUMA binding patch 
 
-When using DCPMM as a cache medium, if you want to obtain optimum performance, you need to apply the [Numa](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.4.numa.patch](./Spark.2.4.4.numa.patch) to Spark source code.
+When using DCPMM as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.4.numa.patch](./Spark.2.4.4.numa.patch) to Spark source code for best performance.
 
 1. Download src for [Spark-2.4.4](https://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4.tgz) and clone the src from github.
 
-2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) Spark package.
+2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) the Spark package.
 
 ```
 git apply  Spark.2.4.4.numa.patch
 ```
 
-3. When deploying OAP to Spark, please add below configuration item to Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable Numa binding.
+3. Add these configuration items to the Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable NUMA binding.
+
 
 ```
 spark.yarn.numa.enabled true 
 ```
-Note: If you are using a customized Spark, there may be conflicts in applying the patch, you may need to manually resolve the conflicts.
+**NOTE**: If you are using a customized Spark, you will need to manually resolve the conflicts.
 
 #### Use pre-built patched Spark packages 
 
-If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.4-bin-hadoop2.7-patched.tgz](https://github.com/Intel-bigdata/OAP/releases/download/v0.6.1-spark-2.4.4/spark-2.4.4-bin-hadoop2.7-patched.tgz) with the patch applied.
+If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.tgz](https://github.com/Intel-bigdata/spark/releases/download/v2.4.4-intel-oap-0.8/spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.tgz) with the patch applied.
 
-
+\*Other names and brands may be claimed as the property of others.

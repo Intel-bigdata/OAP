@@ -139,14 +139,6 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmark) {
       "codegen_withTwoInputs", {n_probeArrays, n_left, n_right}, uint32());
   auto probeArrays_expr = TreeExprBuilder::MakeExpression(n_codegen_probe, f_indices);
 
-  auto n_conditionedShuffleArrayList =
-      TreeExprBuilder::MakeFunction("conditionedShuffleArrayList", {}, uint32());
-  auto n_codegen_shuffle = TreeExprBuilder::MakeFunction(
-      "codegen_withTwoInputs", {n_conditionedShuffleArrayList, n_left, n_right},
-      uint32());
-
-  auto conditionShuffleExpr = TreeExprBuilder::MakeExpression(n_codegen_shuffle, f_res);
-
   auto schema_table_0 = arrow::schema(left_field_list);
   auto schema_table_1 = arrow::schema(right_field_list);
   std::vector<std::shared_ptr<Field>> field_list(left_field_list.size() +
@@ -160,7 +152,6 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmark) {
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> dummy_result_batches;
   std::shared_ptr<ResultIterator<arrow::RecordBatch>> probe_result_iterator;
-  std::shared_ptr<ResultIterator<arrow::RecordBatch>> shuffle_result_iterator;
 
   ////////////////////// evaluate //////////////////////
   std::shared_ptr<arrow::RecordBatch> left_record_batch;
@@ -169,16 +160,14 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmark) {
   uint64_t elapse_left_read = 0;
   uint64_t elapse_right_read = 0;
   uint64_t elapse_eval = 0;
+  uint64_t elapse_finish = 0;
   uint64_t elapse_probe_process = 0;
   uint64_t elapse_shuffle_process = 0;
   uint64_t num_batches = 0;
   uint64_t num_rows = 0;
 
   TIME_MICRO_OR_THROW(elapse_gen, CreateCodeGenerator(left_schema, {probeArrays_expr},
-                                                      {f_indices}, &expr_probe, true));
-  TIME_MICRO_OR_THROW(
-      elapse_gen, CreateCodeGenerator(schema_table_0, {conditionShuffleExpr}, field_list,
-                                      &expr_shuffle, true));
+                                                      field_list, &expr_probe, true));
 
   do {
     TIME_MICRO_OR_THROW(elapse_left_read,
@@ -186,16 +175,12 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmark) {
     if (left_record_batch) {
       TIME_MICRO_OR_THROW(elapse_eval,
                           expr_probe->evaluate(left_record_batch, &dummy_result_batches));
-      TIME_MICRO_OR_THROW(
-          elapse_eval, expr_shuffle->evaluate(left_record_batch, &dummy_result_batches));
       num_batches += 1;
     }
   } while (left_record_batch);
   std::cout << "Readed left table with " << num_batches << " batches." << std::endl;
 
-  TIME_MICRO_OR_THROW(elapse_eval, expr_probe->finish(&probe_result_iterator));
-  TIME_MICRO_OR_THROW(elapse_eval, expr_shuffle->SetDependency(probe_result_iterator));
-  TIME_MICRO_OR_THROW(elapse_eval, expr_shuffle->finish(&shuffle_result_iterator));
+  TIME_MICRO_OR_THROW(elapse_finish, expr_probe->finish(&probe_result_iterator));
 
   num_batches = 0;
   uint64_t num_output_batches = 0;
@@ -209,9 +194,7 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmark) {
         right_column_vector.push_back(right_record_batch->column(i));
       }
       TIME_MICRO_OR_THROW(elapse_probe_process,
-                          probe_result_iterator->ProcessAndCacheOne(right_column_vector));
-      TIME_MICRO_OR_THROW(elapse_shuffle_process,
-                          shuffle_result_iterator->Process(right_column_vector, &out));
+                          probe_result_iterator->Process(right_column_vector, &out));
       num_batches += 1;
       num_output_batches++;
       num_rows += out->num_rows();
@@ -219,16 +202,17 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmark) {
   } while (right_record_batch);
   std::cout << "Readed right table with " << num_batches << " batches." << std::endl;
 
-  std::cout << "BenchmarkArrowComputeJoin processed " << num_batches
-            << " batches, then output " << num_output_batches << " batches with "
-            << num_rows << " rows, to complete, it took " << TIME_TO_STRING(elapse_gen)
-            << " doing codegen, took " << TIME_TO_STRING(elapse_left_read)
-            << " doing left BatchRead, took " << TIME_TO_STRING(elapse_right_read)
-            << " doing right BatchRead, took " << TIME_TO_STRING(elapse_eval)
-            << " doing left table hashmap insert, took "
-            << TIME_TO_STRING(elapse_probe_process) << " doing probe indice fetch, took "
-            << TIME_TO_STRING(elapse_shuffle_process) << " doing final shuffle."
-            << std::endl;
+  std::cout << "=========================================="
+            << "\nBenchmarkArrowComputeJoin processed " << num_batches << " batches"
+            << "\noutput " << num_output_batches << " batches with " << num_rows
+            << " rows"
+            << "\nCodeGen took " << TIME_TO_STRING(elapse_gen)
+            << "\nLeft Batch Read took " << TIME_TO_STRING(elapse_left_read)
+            << "\nRight Batch Read took " << TIME_TO_STRING(elapse_right_read)
+            << "\nLeft Table Hash Insert took " << TIME_TO_STRING(elapse_eval)
+            << "\nMake Result Iterator took " << TIME_TO_STRING(elapse_finish)
+            << "\nProbe and Shuffle took " << TIME_TO_STRING(elapse_probe_process) << "\n"
+            << "===========================================" << std::endl;
 }
 
 TEST_F(BenchmarkArrowComputeJoin, JoinBenchmarkWithCondition) {
@@ -266,14 +250,6 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmarkWithCondition) {
       "codegen_withTwoInputs", {n_probeArrays, n_left, n_right}, uint32());
   auto probeArrays_expr = TreeExprBuilder::MakeExpression(n_codegen_probe, f_indices);
 
-  auto n_conditionedShuffleArrayList =
-      TreeExprBuilder::MakeFunction("conditionedShuffleArrayList", {}, uint32());
-  auto n_codegen_shuffle = TreeExprBuilder::MakeFunction(
-      "codegen_withTwoInputs", {n_conditionedShuffleArrayList, n_left, n_right},
-      uint32());
-
-  auto conditionShuffleExpr = TreeExprBuilder::MakeExpression(n_codegen_shuffle, f_res);
-
   auto schema_table_0 = arrow::schema(left_field_list);
   auto schema_table_1 = arrow::schema(right_field_list);
   std::vector<std::shared_ptr<Field>> field_list(left_field_list.size() +
@@ -283,32 +259,25 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmarkWithCondition) {
   auto schema_table = arrow::schema(field_list);
   ///////////////////// Calculation //////////////////
   std::shared_ptr<CodeGenerator> expr_probe;
-  std::shared_ptr<CodeGenerator> expr_shuffle;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> dummy_result_batches;
   std::shared_ptr<ResultIterator<arrow::RecordBatch>> probe_result_iterator;
-  std::shared_ptr<ResultIterator<arrow::RecordBatch>> shuffle_result_iterator;
 
   ////////////////////// evaluate //////////////////////
   std::shared_ptr<arrow::RecordBatch> left_record_batch;
   std::shared_ptr<arrow::RecordBatch> right_record_batch;
   uint64_t elapse_gen = 0;
-  auto n_codegen = TreeExprBuilder::MakeFunction(
-      "codegen_withTwoInputs", {n_conditionedShuffleArrayList, n_left, n_right},
-      uint32());
   uint64_t elapse_left_read = 0;
   uint64_t elapse_right_read = 0;
   uint64_t elapse_eval = 0;
+  uint64_t elapse_finish = 0;
   uint64_t elapse_probe_process = 0;
   uint64_t elapse_shuffle_process = 0;
   uint64_t num_batches = 0;
   uint64_t num_rows = 0;
 
   TIME_MICRO_OR_THROW(elapse_gen, CreateCodeGenerator(left_schema, {probeArrays_expr},
-                                                      {f_indices}, &expr_probe, true));
-  TIME_MICRO_OR_THROW(
-      elapse_gen, CreateCodeGenerator(schema_table_0, {conditionShuffleExpr}, field_list,
-                                      &expr_shuffle, true));
+                                                      field_list, &expr_probe, true));
 
   do {
     TIME_MICRO_OR_THROW(elapse_left_read,
@@ -316,16 +285,12 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmarkWithCondition) {
     if (left_record_batch) {
       TIME_MICRO_OR_THROW(elapse_eval,
                           expr_probe->evaluate(left_record_batch, &dummy_result_batches));
-      TIME_MICRO_OR_THROW(
-          elapse_eval, expr_shuffle->evaluate(left_record_batch, &dummy_result_batches));
       num_batches += 1;
     }
   } while (left_record_batch);
   std::cout << "Readed left table with " << num_batches << " batches." << std::endl;
 
-  TIME_MICRO_OR_THROW(elapse_eval, expr_probe->finish(&probe_result_iterator));
-  TIME_MICRO_OR_THROW(elapse_eval, expr_shuffle->SetDependency(probe_result_iterator));
-  TIME_MICRO_OR_THROW(elapse_eval, expr_shuffle->finish(&shuffle_result_iterator));
+  TIME_MICRO_OR_THROW(elapse_finish, expr_probe->finish(&probe_result_iterator));
 
   num_batches = 0;
   uint64_t num_output_batches = 0;
@@ -339,9 +304,7 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmarkWithCondition) {
         right_column_vector.push_back(right_record_batch->column(i));
       }
       TIME_MICRO_OR_THROW(elapse_probe_process,
-                          probe_result_iterator->ProcessAndCacheOne(right_column_vector));
-      TIME_MICRO_OR_THROW(elapse_shuffle_process,
-                          shuffle_result_iterator->Process(right_column_vector, &out));
+                          probe_result_iterator->Process(right_column_vector, &out));
       num_batches += 1;
       num_output_batches++;
       num_rows += out->num_rows();
@@ -349,16 +312,17 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmarkWithCondition) {
   } while (right_record_batch);
   std::cout << "Readed right table with " << num_batches << " batches." << std::endl;
 
-  std::cout << "BenchmarkArrowComputeJoin processed " << num_batches
-            << " batches, then output " << num_output_batches << " batches with "
-            << num_rows << " rows, to complete, it took " << TIME_TO_STRING(elapse_gen)
-            << " doing codegen, took " << TIME_TO_STRING(elapse_left_read)
-            << " doing left BatchRead, took " << TIME_TO_STRING(elapse_right_read)
-            << " doing right BatchRead, took " << TIME_TO_STRING(elapse_eval)
-            << " doing left table hashmap insert, took "
-            << TIME_TO_STRING(elapse_probe_process) << " doing probe indice fetch, took "
-            << TIME_TO_STRING(elapse_shuffle_process) << " doing final shuffle."
-            << std::endl;
+  std::cout << "=========================================="
+            << "\nBenchmarkArrowComputeJoin processed " << num_batches << " batches"
+            << "\noutput " << num_output_batches << " batches with " << num_rows
+            << " rows"
+            << "\nCodeGen took " << TIME_TO_STRING(elapse_gen)
+            << "\nLeft Batch Read took " << TIME_TO_STRING(elapse_left_read)
+            << "\nRight Batch Read took " << TIME_TO_STRING(elapse_right_read)
+            << "\nLeft Table Hash Insert took " << TIME_TO_STRING(elapse_eval)
+            << "\nMake Result Iterator took " << TIME_TO_STRING(elapse_finish)
+            << "\nProbe and Shuffle took " << TIME_TO_STRING(elapse_probe_process) << "\n"
+            << "===========================================" << std::endl;
 }
 }  // namespace codegen
 }  // namespace sparkcolumnarplugin

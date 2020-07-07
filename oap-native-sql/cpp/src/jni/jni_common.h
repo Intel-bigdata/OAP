@@ -207,3 +207,45 @@ jbyteArray ToSchemaByteArray(JNIEnv* env, std::shared_ptr<arrow::Schema> schema)
   env->SetByteArrayRegion(out, 0, buffer->size(), src);
   return out;
 }
+
+arrow::Result<std::shared_ptr<arrow::Buffer>> DecompressBuffer(
+    jlong in_addr, jlong in_size, arrow::Compression::type compression_codec) {
+  if (compression_codec == arrow::Compression::UNCOMPRESSED) {
+    return std::shared_ptr<arrow::Buffer>(
+        new arrow::Buffer(reinterpret_cast<const uint8_t*>(in_addr), in_size));
+  }
+
+  if (in_size == 0) {
+    return nullptr;
+  }
+
+  if (in_size < 8) {
+    return Status::Invalid(
+        "Likely corrupted message, compressed buffers "
+        "are larger than 8 bytes by construction");
+  }
+
+  auto data = reinterpret_cast<const uint8_t*>(in_addr);
+
+  std::unique_ptr<arrow::util::Codec> codec;
+  ARROW_ASSIGN_OR_RAISE(codec, arrow::util::Codec::Create(compression_codec));
+
+  int64_t compressed_size = in_size - sizeof(int64_t);
+  int64_t uncompressed_size = arrow::util::SafeLoadAs<int64_t>(data);
+
+  std::shared_ptr<arrow::Buffer> uncompressed;
+  ARROW_ASSIGN_OR_RAISE(uncompressed, arrow::AllocateBuffer(uncompressed_size))
+
+  int64_t actual_decompressed;
+  ARROW_ASSIGN_OR_RAISE(
+      actual_decompressed,
+      codec->Decompress(compressed_size, data + sizeof(int64_t), uncompressed_size,
+                        uncompressed->mutable_data()));
+
+  if (actual_decompressed != uncompressed_size) {
+    return Status::Invalid("Failed to fully decompress buffer, expected ",
+                           uncompressed_size, " bytes but decompressed ",
+                           actual_decompressed);
+  }
+  return uncompressed;
+}

@@ -23,6 +23,7 @@
 #include <arrow/ipc/dictionary.h>
 #include <arrow/pretty_print.h>
 #include <arrow/record_batch.h>
+#include <arrow/util/compression.h>
 #include <jni.h>
 #include <iostream>
 #include <string>
@@ -33,6 +34,7 @@
 #include "codegen/common/result_iterator.h"
 #include "jni/concurrent_map.h"
 #include "jni/jni_common.h"
+#include "shuffle/splitter.h"
 
 namespace types {
 class ExpressionList;
@@ -47,6 +49,9 @@ static jmethodID arrow_field_node_builder_constructor;
 static jclass arrowbuf_builder_class;
 static jmethodID arrowbuf_builder_constructor;
 
+static jclass partition_file_info_class;
+static jmethodID partition_file_info_constructor;
+
 using arrow::jni::ConcurrentMap;
 static ConcurrentMap<std::shared_ptr<arrow::Buffer>> buffer_holder_;
 
@@ -56,6 +61,11 @@ using CodeGenerator = sparkcolumnarplugin::codegen::CodeGenerator;
 static arrow::jni::ConcurrentMap<std::shared_ptr<CodeGenerator>> handler_holder_;
 static arrow::jni::ConcurrentMap<std::shared_ptr<ResultIterator<arrow::RecordBatch>>>
     batch_iterator_holder_;
+
+using sparkcolumnarplugin::shuffle::Splitter;
+static arrow::jni::ConcurrentMap<std::shared_ptr<Splitter>> shuffle_splitter_holder_;
+static arrow::jni::ConcurrentMap<std::shared_ptr<arrow::Schema>>
+    decompression_schema_holder_;
 
 std::shared_ptr<CodeGenerator> GetCodeGenerator(JNIEnv* env, jlong id) {
   auto handler = handler_holder_.Lookup(id);
@@ -74,6 +84,16 @@ std::shared_ptr<ResultIterator<arrow::RecordBatch>> GetBatchIterator(JNIEnv* env
     env->ThrowNew(illegal_argument_exception_class, error_message.c_str());
   }
   return handler;
+}
+
+std::shared_ptr<Splitter> GetShuffleSplitter(JNIEnv* env, jlong id) {
+  auto splitter = shuffle_splitter_holder_.Lookup(id);
+  if (!splitter) {
+    std::string error_message = "invalid reader id " + std::to_string(id);
+    env->ThrowNew(illegal_argument_exception_class, error_message.c_str());
+  }
+
+  return splitter;
 }
 
 jobject MakeRecordBatchBuilder(JNIEnv* env, std::shared_ptr<arrow::Schema> schema,
@@ -163,21 +183,26 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       CreateGlobalClassReference(env, "Ljava/lang/IllegalArgumentException;");
 
   arrow_record_batch_builder_class = CreateGlobalClassReference(
-      env, "Lcom/intel/sparkColumnarPlugin/vectorized/ArrowRecordBatchBuilder;");
+      env, "Lcom/intel/oap/vectorized/ArrowRecordBatchBuilder;");
   arrow_record_batch_builder_constructor =
       GetMethodID(env, arrow_record_batch_builder_class, "<init>",
-                  "(I[Lcom/intel/sparkColumnarPlugin/vectorized/ArrowFieldNodeBuilder;"
-                  "[Lcom/intel/sparkColumnarPlugin/vectorized/ArrowBufBuilder;)V");
+                  "(I[Lcom/intel/oap/vectorized/ArrowFieldNodeBuilder;"
+                  "[Lcom/intel/oap/vectorized/ArrowBufBuilder;)V");
 
   arrow_field_node_builder_class = CreateGlobalClassReference(
-      env, "Lcom/intel/sparkColumnarPlugin/vectorized/ArrowFieldNodeBuilder;");
+      env, "Lcom/intel/oap/vectorized/ArrowFieldNodeBuilder;");
   arrow_field_node_builder_constructor =
       GetMethodID(env, arrow_field_node_builder_class, "<init>", "(II)V");
 
   arrowbuf_builder_class = CreateGlobalClassReference(
-      env, "Lcom/intel/sparkColumnarPlugin/vectorized/ArrowBufBuilder;");
+      env, "Lcom/intel/oap/vectorized/ArrowBufBuilder;");
   arrowbuf_builder_constructor =
       GetMethodID(env, arrowbuf_builder_class, "<init>", "(JJIJ)V");
+
+  partition_file_info_class = CreateGlobalClassReference(
+      env, "Lcom/intel/oap/vectorized/PartitionFileInfo;");
+  partition_file_info_constructor =
+      GetMethodID(env, partition_file_info_class, "<init>", "(ILjava/lang/String;)V");
 
   return JNI_VERSION;
 }
@@ -194,14 +219,32 @@ void JNI_OnUnload(JavaVM* vm, void* reserved) {
   env->DeleteGlobalRef(arrow_field_node_builder_class);
   env->DeleteGlobalRef(arrowbuf_builder_class);
   env->DeleteGlobalRef(arrow_record_batch_builder_class);
+  env->DeleteGlobalRef(partition_file_info_class);
 
   buffer_holder_.Clear();
   handler_holder_.Clear();
   batch_iterator_holder_.Clear();
+  shuffle_splitter_holder_.Clear();
+  decompression_schema_holder_.Clear();
+}
+
+JNIEXPORT void JNICALL
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeSetJavaTmpDir(
+    JNIEnv* env, jobject obj, jstring pathObj) {
+  jboolean ifCopy;
+  auto path = env->GetStringUTFChars(pathObj, &ifCopy);
+  setenv("NATIVESQL_TMP_DIR", path, 1);
+  env->ReleaseStringUTFChars(pathObj, path);
+}
+
+JNIEXPORT void JNICALL
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeSetBatchSize(
+    JNIEnv* env, jobject obj, jint batch_size) {
+  setenv("NATIVESQL_BATCH_SIZE", std::to_string(batch_size).c_str(), 1);
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nativeBuild(
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeBuild(
     JNIEnv* env, jobject obj, jbyteArray schema_arr, jbyteArray exprs_arr,
     jbyteArray res_schema_arr, jboolean return_when_finish = false) {
   arrow::Status status;
@@ -259,7 +302,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nati
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nativeBuildWithFinish(
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeBuildWithFinish(
     JNIEnv* env, jobject obj, jbyteArray schema_arr, jbyteArray exprs_arr,
     jbyteArray finish_exprs_arr) {
   arrow::Status status;
@@ -301,7 +344,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nati
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nativeSetReturnFields(
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeSetReturnFields(
     JNIEnv* env, jobject obj, jlong id, jbyteArray schema_arr) {
   std::shared_ptr<arrow::Schema> schema;
   arrow::Status msg = MakeSchema(env, schema_arr, &schema);
@@ -319,7 +362,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nati
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nativeClose(
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeClose(
     JNIEnv* env, jobject obj, jlong id) {
   auto handler = GetCodeGenerator(env, id);
   if (handler.use_count() > 2) {
@@ -338,7 +381,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nati
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nativeEvaluate(
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeEvaluate(
     JNIEnv* env, jobject obj, jlong id, jint num_rows, jlongArray buf_addrs,
     jlongArray buf_sizes) {
   arrow::Status status;
@@ -386,7 +429,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nati
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nativeEvaluateWithSelection(
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeEvaluateWithSelection(
     JNIEnv* env, jobject obj, jlong id, jint num_rows, jlongArray buf_addrs,
     jlongArray buf_sizes, jint selection_vector_count, jlong selection_vector_buf_addr,
     jlong selection_vector_buf_size) {
@@ -443,7 +486,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nati
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nativeSetMember(
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeSetMember(
     JNIEnv* env, jobject obj, jlong id, jint num_rows, jlongArray buf_addrs,
     jlongArray buf_sizes) {
   arrow::Status status;
@@ -478,7 +521,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nati
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nativeFinish(
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeFinish(
     JNIEnv* env, jobject obj, jlong id) {
   arrow::Status status;
   std::shared_ptr<CodeGenerator> handler = GetCodeGenerator(env, id);
@@ -506,7 +549,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nati
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nativeFinishByIterator(
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeFinishByIterator(
     JNIEnv* env, jobject obj, jlong id) {
   arrow::Status status;
   std::shared_ptr<CodeGenerator> handler = GetCodeGenerator(env, id);
@@ -522,7 +565,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nati
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nativeSetDependency(
+Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeSetDependency(
     JNIEnv* env, jobject obj, jlong id, jlong iter_id, int index) {
   arrow::Status status;
   std::shared_ptr<CodeGenerator> handler = GetCodeGenerator(env, id);
@@ -536,7 +579,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_ExpressionEvaluatorJniWrapper_nati
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeNext(JNIEnv* env,
+Java_com_intel_oap_vectorized_BatchIterator_nativeNext(JNIEnv* env,
                                                                        jobject obj,
                                                                        jlong id) {
   arrow::Status status;
@@ -554,7 +597,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeNext(JNIEnv* e
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeProcess(
+Java_com_intel_oap_vectorized_BatchIterator_nativeProcess(
     JNIEnv* env, jobject obj, jlong id, jbyteArray schema_arr, jint num_rows,
     jlongArray buf_addrs, jlongArray buf_sizes) {
   arrow::Status status;
@@ -601,7 +644,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeProcess(
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeProcessWithSelection(
+Java_com_intel_oap_vectorized_BatchIterator_nativeProcessWithSelection(
     JNIEnv* env, jobject obj, jlong id, jbyteArray schema_arr, jint num_rows,
     jlongArray buf_addrs, jlongArray buf_sizes, jint selection_vector_count,
     jlong selection_vector_buf_addr, jlong selection_vector_buf_size) {
@@ -657,7 +700,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeProcessWithSel
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeProcessAndCacheOne(
+Java_com_intel_oap_vectorized_BatchIterator_nativeProcessAndCacheOne(
     JNIEnv* env, jobject obj, jlong id, jbyteArray schema_arr, jint num_rows,
     jlongArray buf_addrs, jlongArray buf_sizes) {
   arrow::Status status;
@@ -701,7 +744,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeProcessAndCach
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeProcessAndCacheOneWithSelection(
+Java_com_intel_oap_vectorized_BatchIterator_nativeProcessAndCacheOneWithSelection(
     JNIEnv* env, jobject obj, jlong id, jbyteArray schema_arr, jint num_rows,
     jlongArray buf_addrs, jlongArray buf_sizes, jint selection_vector_count,
     jlong selection_vector_buf_addr, jlong selection_vector_buf_size) {
@@ -753,7 +796,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeProcessAndCach
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeClose(JNIEnv* env,
+Java_com_intel_oap_vectorized_BatchIterator_nativeClose(JNIEnv* env,
                                                                         jobject this_obj,
                                                                         jlong id) {
 #ifdef DEBUG
@@ -766,7 +809,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_BatchIterator_nativeClose(JNIEnv* 
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_vectorized_AdaptorReferenceManager_nativeRelease(
+Java_com_intel_oap_vectorized_AdaptorReferenceManager_nativeRelease(
     JNIEnv* env, jobject this_obj, jlong id) {
 #ifdef DEBUG
   auto it = buffer_holder_.Lookup(id);
@@ -779,7 +822,7 @@ Java_com_intel_sparkColumnarPlugin_vectorized_AdaptorReferenceManager_nativeRele
 
 ///////////// Parquet Reader and Writer /////////////
 JNIEXPORT jlong JNICALL
-Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_nativeOpenParquetReader(
+Java_com_intel_oap_datasource_parquet_ParquetReaderJniWrapper_nativeOpenParquetReader(
     JNIEnv* env, jobject obj, jstring path, jlong batch_size) {
   arrow::Status status;
   std::string cpath = JStringToCString(env, path);
@@ -814,7 +857,7 @@ Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_na
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_nativeInitParquetReader(
+Java_com_intel_oap_datasource_parquet_ParquetReaderJniWrapper_nativeInitParquetReader(
     JNIEnv* env, jobject obj, jlong id, jintArray column_indices,
     jintArray row_group_indices) {
   // Prepare column_indices and row_group_indices from java array.
@@ -856,7 +899,7 @@ Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_na
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_nativeInitParquetReader2(
+Java_com_intel_oap_datasource_parquet_ParquetReaderJniWrapper_nativeInitParquetReader2(
     JNIEnv* env, jobject obj, jlong id, jintArray column_indices, jlong start_pos,
     jlong end_pos) {
   // Prepare column_indices and row_group_indices from java array.
@@ -883,7 +926,7 @@ Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_na
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_nativeCloseParquetReader(
+Java_com_intel_oap_datasource_parquet_ParquetReaderJniWrapper_nativeCloseParquetReader(
     JNIEnv* env, jobject obj, jlong id) {
   reader_holder_.Erase(id);
 #ifdef DEBUG
@@ -898,7 +941,7 @@ Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_na
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_nativeReadNext(
+Java_com_intel_oap_datasource_parquet_ParquetReaderJniWrapper_nativeReadNext(
     JNIEnv* env, jobject obj, jlong id) {
   arrow::Status status;
   auto reader = GetFileReader(env, id);
@@ -918,7 +961,7 @@ Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_na
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_nativeGetSchema(
+Java_com_intel_oap_datasource_parquet_ParquetReaderJniWrapper_nativeGetSchema(
     JNIEnv* env, jobject obj, jlong id) {
   arrow::Status status;
   auto reader = GetFileReader(env, id);
@@ -940,7 +983,7 @@ Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetReaderJniWrapper_na
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetWriterJniWrapper_nativeOpenParquetWriter(
+Java_com_intel_oap_datasource_parquet_ParquetWriterJniWrapper_nativeOpenParquetWriter(
     JNIEnv* env, jobject obj, jstring path, jbyteArray schemaBytes) {
   arrow::Status status;
   std::shared_ptr<arrow::Schema> schema;
@@ -983,7 +1026,7 @@ Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetWriterJniWrapper_na
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetWriterJniWrapper_nativeCloseParquetWriter(
+Java_com_intel_oap_datasource_parquet_ParquetWriterJniWrapper_nativeCloseParquetWriter(
     JNIEnv* env, jobject obj, jlong id) {
   arrow::Status status;
   auto writer = GetFileWriter(env, id);
@@ -997,7 +1040,7 @@ Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetWriterJniWrapper_na
 }
 
 JNIEXPORT void JNICALL
-Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetWriterJniWrapper_nativeWriteNext(
+Java_com_intel_oap_datasource_parquet_ParquetWriterJniWrapper_nativeWriteNext(
     JNIEnv* env, jobject obj, jlong id, jint num_rows, jlongArray bufAddrs,
     jlongArray bufSizes) {
   // convert input data to record batch
@@ -1041,6 +1084,289 @@ Java_com_intel_sparkColumnarPlugin_datasource_parquet_ParquetWriterJniWrapper_na
   env->ReleaseLongArrayElements(bufAddrs, in_buf_addrs, JNI_ABORT);
   env->ReleaseLongArrayElements(bufSizes, in_buf_sizes, JNI_ABORT);
 }
+
+JNIEXPORT jlong JNICALL
+Java_com_intel_oap_vectorized_ShuffleSplitterJniWrapper_make(
+    JNIEnv* env, jobject, jbyteArray schema_arr, jlong buffer_size, jstring pathObj) {
+  std::shared_ptr<arrow::Schema> schema;
+  arrow::Status status;
+
+  auto joined_path = env->GetStringUTFChars(pathObj, JNI_FALSE);
+  setenv("NATIVESQL_SPARK_LOCAL_DIRS", joined_path, 1);
+
+  env->ReleaseStringUTFChars(pathObj, joined_path);
+
+  status = MakeSchema(env, schema_arr, &schema);
+  if (!status.ok()) {
+    env->ThrowNew(
+        io_exception_class,
+        std::string("failed to readSchema, err msg is " + status.message()).c_str());
+  }
+
+  auto result = Splitter::Make(schema);
+  if (!result.ok()) {
+    env->ThrowNew(io_exception_class,
+                  std::string("Failed create native shuffle splitter").c_str());
+  }
+
+  (*result)->set_buffer_size(buffer_size);
+
+  return shuffle_splitter_holder_.Insert(std::shared_ptr<Splitter>(*result));
+}
+
+JNIEXPORT void JNICALL
+Java_com_intel_oap_vectorized_ShuffleSplitterJniWrapper_split(
+    JNIEnv* env, jobject, jlong splitter_id, jint num_rows, jlongArray buf_addrs,
+    jlongArray buf_sizes) {
+  auto splitter = GetShuffleSplitter(env, splitter_id);
+
+  int in_bufs_len = env->GetArrayLength(buf_addrs);
+  if (in_bufs_len != env->GetArrayLength(buf_sizes)) {
+    std::string error_message =
+        "native split: mismatch in arraylen of buf_addrs and buf_sizes";
+    env->ThrowNew(io_exception_class, error_message.c_str());
+  }
+  jlong* in_buf_addrs = env->GetLongArrayElements(buf_addrs, JNI_FALSE);
+  jlong* in_buf_sizes = env->GetLongArrayElements(buf_sizes, JNI_FALSE);
+
+  std::shared_ptr<arrow::RecordBatch> in;
+  auto status = MakeRecordBatch(splitter->schema(), num_rows, (int64_t*)in_buf_addrs,
+                                (int64_t*)in_buf_sizes, in_bufs_len, &in);
+
+  env->ReleaseLongArrayElements(buf_addrs, in_buf_addrs, JNI_ABORT);
+  env->ReleaseLongArrayElements(buf_sizes, in_buf_sizes, JNI_ABORT);
+
+  if (!status.ok()) {
+    env->ThrowNew(io_exception_class,
+                  std::string("native split: make record batch failed").c_str());
+  }
+
+  status = splitter->Split(*in);
+
+  if (!status.ok()) {
+    env->ThrowNew(io_exception_class,
+                  std::string("native split: splitter split failed").c_str());
+  }
+}
+
+JNIEXPORT void JNICALL
+Java_com_intel_oap_vectorized_ShuffleSplitterJniWrapper_stop(
+    JNIEnv* env, jobject, jlong splitter_id) {
+  auto splitter = GetShuffleSplitter(env, splitter_id);
+  auto status = splitter->Stop();
+
+  if (!status.ok()) {
+    env->ThrowNew(io_exception_class,
+                  std::string("native split: splitter stop failed, error message is " +
+                              status.message())
+                      .c_str());
+  }
+}
+
+JNIEXPORT void JNICALL
+Java_com_intel_oap_vectorized_ShuffleSplitterJniWrapper_setPartitionBufferSize(
+    JNIEnv* env, jobject, jlong splitter_id, jlong buffer_size) {
+  auto splitter = GetShuffleSplitter(env, splitter_id);
+
+  splitter->set_buffer_size((int64_t)buffer_size);
+}
+
+JNIEXPORT void JNICALL
+Java_com_intel_oap_vectorized_ShuffleSplitterJniWrapper_setCompressionCodec(
+    JNIEnv* env, jobject, jlong splitter_id, jstring codec_jstr) {
+  auto splitter = GetShuffleSplitter(env, splitter_id);
+
+  auto compression_codec = arrow::Compression::UNCOMPRESSED;
+  auto codec_l = env->GetStringUTFChars(codec_jstr, JNI_FALSE);
+  if (codec_l != nullptr) {
+    std::string codec_u;
+    std::transform(codec_l, codec_l + std::strlen(codec_l), std::back_inserter(codec_u),
+                   ::toupper);
+    auto result = arrow::util::Codec::GetCompressionType(codec_u);
+    if (result.ok()) {
+      compression_codec = *result;
+    } else {
+      env->ThrowNew(io_exception_class,
+                    std::string("failed to get compression codec, error message is " +
+                                result.status().message())
+                        .c_str());
+    }
+    if (compression_codec == arrow::Compression::LZ4) {
+      compression_codec = arrow::Compression::LZ4_FRAME;
+    }
+  }
+  env->ReleaseStringUTFChars(codec_jstr, codec_l);
+
+  splitter->set_compression_codec(compression_codec);
+}
+
+JNIEXPORT jobjectArray JNICALL
+Java_com_intel_oap_vectorized_ShuffleSplitterJniWrapper_getPartitionFileInfo(
+    JNIEnv* env, jobject, jlong splitter_id) {
+  auto splitter = GetShuffleSplitter(env, splitter_id);
+
+  const auto& partition_file_info = splitter->GetPartitionFileInfo();
+  auto num_partitions = partition_file_info.size();
+
+  jobjectArray partition_file_info_array =
+      env->NewObjectArray(num_partitions, partition_file_info_class, nullptr);
+
+  for (auto i = 0; i < num_partitions; ++i) {
+    jobject file_info_obj =
+        env->NewObject(partition_file_info_class, partition_file_info_constructor,
+                       partition_file_info[i].first,
+                       env->NewStringUTF(partition_file_info[i].second.c_str()));
+    env->SetObjectArrayElement(partition_file_info_array, i, file_info_obj);
+  }
+  return partition_file_info_array;
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_intel_oap_vectorized_ShuffleSplitterJniWrapper_getTotalBytesWritten(
+    JNIEnv* env, jobject, jlong splitter_id) {
+  auto splitter = GetShuffleSplitter(env, splitter_id);
+  auto result = splitter->TotalBytesWritten();
+
+  if (!result.ok()) {
+    env->ThrowNew(io_exception_class,
+                  std::string("native split: get total bytes written failed").c_str());
+  }
+
+  return (jlong)*result;
+}
+
+JNIEXPORT void JNICALL
+Java_com_intel_oap_vectorized_ShuffleSplitterJniWrapper_close(
+    JNIEnv* env, jobject, jlong splitter_id) {
+  shuffle_splitter_holder_.Erase(splitter_id);
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_intel_oap_vectorized_ShuffleDecompressionJniWrapper_make(
+    JNIEnv* env, jobject, jbyteArray schema_arr) {
+  std::shared_ptr<arrow::Schema> schema;
+  arrow::Status status;
+
+  status = MakeSchema(env, schema_arr, &schema);
+  if (!status.ok()) {
+    env->ThrowNew(
+        io_exception_class,
+        std::string("failed to readSchema, err msg is " + status.message()).c_str());
+  }
+
+  return decompression_schema_holder_.Insert(schema);
+}
+
+JNIEXPORT jobject JNICALL
+Java_com_intel_oap_vectorized_ShuffleDecompressionJniWrapper_decompress(
+    JNIEnv* env, jobject obj, jlong schema_holder_id, jstring codec_jstr, jint num_rows,
+    jlongArray buf_addrs, jlongArray buf_sizes, jlongArray buf_mask) {
+  auto schema = decompression_schema_holder_.Lookup(schema_holder_id);
+
+  int in_bufs_len = env->GetArrayLength(buf_addrs);
+  if (in_bufs_len != env->GetArrayLength(buf_sizes)) {
+    std::string error_message =
+        "native decompress: mismatch in arraylen of buf_addrs and buf_sizes";
+    env->ThrowNew(io_exception_class, error_message.c_str());
+  }
+
+  auto in_buf_addrs = env->GetLongArrayElements(buf_addrs, JNI_FALSE);
+  auto in_buf_sizes = env->GetLongArrayElements(buf_sizes, JNI_FALSE);
+  auto in_buf_mask = env->GetLongArrayElements(buf_mask, JNI_FALSE);
+  int buf_idx = 0;
+  int field_idx = 0;
+
+  // get decompression compression_codec
+  auto compression_codec = arrow::Compression::UNCOMPRESSED;
+  auto codec_l = env->GetStringUTFChars(codec_jstr, JNI_FALSE);
+  if (codec_l != nullptr) {
+    std::string codec_u;
+    std::transform(codec_l, codec_l + std::strlen(codec_l), std::back_inserter(codec_u),
+                   ::toupper);
+    auto result = arrow::util::Codec::GetCompressionType(codec_u);
+    if (result.ok()) {
+      compression_codec = *result;
+    } else {
+      env->ThrowNew(io_exception_class,
+                    std::string("failed to get compression codec, error message is " +
+                                result.status().message())
+                        .c_str());
+    }
+    if (compression_codec == arrow::Compression::LZ4) {
+      compression_codec = arrow::Compression::LZ4_FRAME;
+    }
+  }
+  env->ReleaseStringUTFChars(codec_jstr, codec_l);
+
+  std::vector<std::shared_ptr<arrow::ArrayData>> arrays;
+  while (field_idx < schema->num_fields()) {
+    auto field = schema->field(field_idx);
+    std::vector<std::shared_ptr<arrow::Buffer>> buffers;
+
+    // decompress validity buffer
+    auto result = arrow::BitUtil::GetBit((uint8_t*)in_buf_mask, buf_idx)
+                      ? DecompressBuffer(in_buf_addrs[buf_idx], in_buf_sizes[buf_idx],
+                                         arrow::Compression::UNCOMPRESSED)
+                      : DecompressBuffer(in_buf_addrs[buf_idx], in_buf_sizes[buf_idx],
+                                         compression_codec);
+    if (result.ok()) {
+      buffers.push_back(std::move(result).ValueOrDie());
+    } else {
+      env->ThrowNew(
+          io_exception_class,
+          std::string("failed to decompress validity buffer, error message is " +
+                      result.status().message())
+              .c_str());
+    }
+
+    // decompress value buffer
+    result = DecompressBuffer(in_buf_addrs[buf_idx + 1], in_buf_sizes[buf_idx + 1],
+                              compression_codec);
+    if (result.ok()) {
+      buffers.push_back(std::move(result).ValueOrDie());
+    } else {
+      env->ThrowNew(io_exception_class,
+                    std::string("failed to decompress value buffer, error message is " +
+                                result.status().message())
+                        .c_str());
+    }
+
+    if (arrow::is_binary_like(field->type()->id())) {
+      // decompress offset buffer
+      result = DecompressBuffer(in_buf_addrs[buf_idx + 2], in_buf_sizes[buf_idx + 2],
+                                compression_codec);
+      if (result.ok()) {
+        buffers.push_back(std::move(result).ValueOrDie());
+      } else {
+        env->ThrowNew(
+            io_exception_class,
+            std::string("failed to decompress offset buffer, error message is " +
+                        result.status().message())
+                .c_str());
+      }
+      buf_idx += 3;
+    } else {
+      buf_idx += 2;
+    }
+    arrays.push_back(arrow::ArrayData::Make(field->type(), num_rows, std::move(buffers)));
+
+    ++field_idx;
+  }
+
+  env->ReleaseLongArrayElements(buf_addrs, in_buf_addrs, JNI_ABORT);
+  env->ReleaseLongArrayElements(buf_sizes, in_buf_sizes, JNI_ABORT);
+  env->ReleaseLongArrayElements(buf_mask, in_buf_mask, JNI_ABORT);
+
+  return MakeRecordBatchBuilder(
+      env, schema, arrow::RecordBatch::Make(schema, num_rows, std::move(arrays)));
+}
+
+JNIEXPORT void JNICALL
+Java_com_intel_oap_vectorized_ShuffleDecompressionJniWrapper_close(
+    JNIEnv* env, jobject, jlong schema_holder_id) {
+  decompression_schema_holder_.Erase(schema_holder_id);
+}
+
 #ifdef __cplusplus
 }
 #endif

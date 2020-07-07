@@ -22,15 +22,15 @@ import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.ql.exec.vector.*;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.orc.*;
 import org.apache.orc.impl.DataReaderProperties;
 import org.apache.orc.impl.ReaderImpl;
 import org.apache.orc.impl.RecordReaderBinaryCacheImpl;
 import org.apache.orc.impl.RecordReaderBinaryCacheUtils;
 import org.apache.orc.mapred.OrcInputFormat;
-import org.apache.orc.storage.common.type.HiveDecimal;
-import org.apache.orc.storage.ql.exec.vector.*;
-import org.apache.orc.storage.serde2.io.HiveDecimalWritable;
 
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.catalyst.InternalRow;

@@ -21,6 +21,7 @@ import java.util.concurrent.{Executors, TimeUnit}
 import com.intel.oap.spark.sql.DataFrameReaderImplicits._
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowOptions
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.execution.datasources.v2.arrow.ArrowUtils
 import org.apache.spark.sql.internal.SQLConf
@@ -38,6 +39,13 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
   private val orders = prefix + tpchFolder + "/orders"
   private val nation = prefix + tpchFolder + "/nation"
 
+
+  override protected def sparkConf: SparkConf = {
+    val conf = super.sparkConf
+    conf.set("spark.memory.offHeap.size", String.valueOf(128 * 1024 * 1024))
+    conf
+  }
+
   ignore("tpch lineitem - desc") {
     val frame = spark.read
       .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
@@ -46,6 +54,16 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
     frame.createOrReplaceTempView("lineitem")
 
     spark.sql("describe lineitem").show()
+  }
+
+  ignore("tpch part - special characters in path") {
+    val frame = spark.read
+      .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
+      .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
+      .arrow(part)
+    frame.createOrReplaceTempView("part")
+
+    spark.sql("select * from part limit 100").show()
   }
 
   ignore("tpch lineitem - read partition values") {
@@ -110,7 +128,7 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
       val aPrev = System.currentTimeMillis()
       (0 until iterations).foreach(_ => {
         // scalastyle:off println
-        println(ArrowUtils.rootAllocator().getAllocatedMemory())
+        println(ArrowUtils.defaultAllocator().getAllocatedMemory())
         // scalastyle:on println
         spark.sql("select\n\tsum(l_extendedprice * l_discount) as revenue\n" +
           "from\n\tlineitem_arrow\n" +
@@ -258,9 +276,9 @@ class ArrowDataSourceTPCHBasedTest extends QueryTest with SharedSparkSession {
     })
     Executors.newSingleThreadScheduledExecutor().scheduleWithFixedDelay(() => {
       println("[org.apache.spark.sql.util.ArrowUtils.rootAllocator]                           " +
-        "Allocated memory amount: " + ArrowUtils.rootAllocator().getAllocatedMemory)
-      println("[com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector.allocator] " +
-        "Allocated memory amount: " + com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector.allocator.getAllocatedMemory)
+        "Allocated memory amount: " + ArrowUtils.defaultAllocator().getAllocatedMemory)
+      println("[com.intel.oap.vectorized.ArrowWritableColumnVector.allocator] " +
+        "Allocated memory amount: " + com.intel.oap.vectorized.ArrowWritableColumnVector.allocator.getAllocatedMemory)
     }, 0L, 100L, TimeUnit.MILLISECONDS)
     Thread.sleep(60 * 60 * 1000L)
   }

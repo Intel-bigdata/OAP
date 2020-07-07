@@ -1,9 +1,6 @@
-OAP Shuffle packages include all shuffle related solutions such as optimized shuffle implenentations for Spark.
+This folder contains all optimized Spark* shuffle solutions. Currently we provide two shuffle optimizations for Apache Spark*: Shuffle Remote PMem Extension and Remote Shuffle.
 
-Please refer the below documents for more information.
-
+# User Guide
+Please refer to the corresponding feature link for the introduction and how to use for each feature.
+* [Shuffle Remote PMem Extension](./RPMem-shuffle/README.md)
 * [Remote Shuffle](./remote-shuffle/README.md)
-* [RPMem-shuffle](./RPMem-shuffle/README.md)
-* [Inmemory-shuffle](./Inmemory-shuffle/README.md)
-
-

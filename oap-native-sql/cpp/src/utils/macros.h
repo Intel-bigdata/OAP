@@ -39,5 +39,23 @@
     time += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count(); \
   } while (false);
 
+#define VECTOR_PRINT(v, name)          \
+  std::cout << "[" << name << "]:";    \
+  for (int i = 0; i < v.size(); i++) { \
+    if (i != v.size() - 1)             \
+      std::cout << v[i] << ",";        \
+    else                               \
+      std::cout << v[i];               \
+  }                                    \
+  std::cout << std::endl;
+
+#define THROW_NOT_OK(expr)                     \
+  do {                                         \
+    auto __s = (expr);                         \
+    if (!__s.ok()) {                           \
+      throw std::runtime_error(__s.message()); \
+    }                                          \
+  } while (false);
+
 #define TIME_TO_STRING(time) \
   (time > 10000 ? time / 1000 : time) << (time > 10000 ? " ms" : " us")

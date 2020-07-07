@@ -61,7 +61,7 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
       OriginalType originalType,
       PageReader pageReader,
       ZoneId convertTz,
-      boolean rebaseDateTime
+      String rebaseDateTime
       )
       throws IOException {
     super(descriptor, originalType, pageReader, convertTz, rebaseDateTime);

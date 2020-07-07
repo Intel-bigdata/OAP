@@ -27,16 +27,13 @@
 namespace sparkcolumnarplugin {
 namespace codegen {
 
-TEST(TestArrowCompute, JoinTestUsingInnerJoin) {
+TEST(TestArrowComputeJoin, JoinTestUsingInnerJoin) {
   ////////////////////// prepare expr_vector ///////////////////////
   auto table0_f0 = field("table0_f0", uint32());
   auto table0_f1 = field("table0_f1", uint32());
   auto table0_f2 = field("table0_f2", uint32());
   auto table1_f0 = field("table1_f0", uint32());
   auto table1_f1 = field("table1_f1", uint32());
-
-  auto indices_type = std::make_shared<FixedSizeBinaryType>(4);
-  auto f_indices = field("indices", indices_type);
 
   auto n_left = TreeExprBuilder::MakeFunction(
       "codegen_left_schema",
@@ -53,19 +50,11 @@ TEST(TestArrowCompute, JoinTestUsingInnerJoin) {
       "codegen_left_key_schema", {TreeExprBuilder::MakeField(table0_f0)}, uint32());
   auto n_right_key = TreeExprBuilder::MakeFunction(
       "codegen_right_key_schema", {TreeExprBuilder::MakeField(table1_f0)}, uint32());
-  auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysInner", {n_left_key, n_right_key}, indices_type);
+  auto n_probeArrays = TreeExprBuilder::MakeFunction("conditionedProbeArraysInner",
+                                                     {n_left_key, n_right_key}, uint32());
   auto n_codegen_probe = TreeExprBuilder::MakeFunction(
       "codegen_withTwoInputs", {n_probeArrays, n_left, n_right}, uint32());
   auto probeArrays_expr = TreeExprBuilder::MakeExpression(n_codegen_probe, f_res);
-
-  auto n_conditionedShuffleArrayList =
-      TreeExprBuilder::MakeFunction("conditionedShuffleArrayList", {}, uint32());
-  auto n_codegen_shuffle = TreeExprBuilder::MakeFunction(
-      "codegen_withTwoInputs", {n_conditionedShuffleArrayList, n_left, n_right},
-      uint32());
-
-  auto conditionShuffleExpr = TreeExprBuilder::MakeExpression(n_codegen_shuffle, f_res);
 
   auto schema_table_0 = arrow::schema({table0_f0, table0_f1, table0_f2});
   auto schema_table_1 = arrow::schema({table1_f0, table1_f1});
@@ -73,18 +62,13 @@ TEST(TestArrowCompute, JoinTestUsingInnerJoin) {
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
   ///////////////////// Calculation //////////////////
   std::shared_ptr<CodeGenerator> expr_probe;
-  ASSERT_NOT_OK(CreateCodeGenerator(schema_table_0, {probeArrays_expr}, {f_indices},
-                                    &expr_probe, true));
-  std::shared_ptr<CodeGenerator> expr_conditioned_shuffle;
-  ASSERT_NOT_OK(
-      CreateCodeGenerator(schema_table, {conditionShuffleExpr},
-                          {table0_f0, table0_f1, table0_f2, table1_f0, table1_f1},
-                          &expr_conditioned_shuffle, true));
+  ASSERT_NOT_OK(CreateCodeGenerator(
+      schema_table_0, {probeArrays_expr},
+      {table0_f0, table0_f1, table0_f2, table1_f0, table1_f1}, &expr_probe, true));
   std::shared_ptr<arrow::RecordBatch> input_batch;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> dummy_result_batches;
   std::shared_ptr<ResultIterator<arrow::RecordBatch>> probe_result_iterator;
-  std::shared_ptr<ResultIterator<arrow::RecordBatch>> shuffle_result_iterator;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> table_0;
   std::vector<std::shared_ptr<arrow::RecordBatch>> table_1;
@@ -128,11 +112,8 @@ TEST(TestArrowCompute, JoinTestUsingInnerJoin) {
   ////////////////////// evaluate //////////////////////
   for (auto batch : table_0) {
     ASSERT_NOT_OK(expr_probe->evaluate(batch, &dummy_result_batches));
-    ASSERT_NOT_OK(expr_conditioned_shuffle->evaluate(batch, &dummy_result_batches));
   }
   ASSERT_NOT_OK(expr_probe->finish(&probe_result_iterator));
-  ASSERT_NOT_OK(expr_conditioned_shuffle->SetDependency(probe_result_iterator));
-  ASSERT_NOT_OK(expr_conditioned_shuffle->finish(&shuffle_result_iterator));
 
   for (int i = 0; i < 2; i++) {
     auto left_batch = table_0[i];
@@ -144,22 +125,18 @@ TEST(TestArrowCompute, JoinTestUsingInnerJoin) {
       input.push_back(right_batch->column(i));
     }
 
-    ASSERT_NOT_OK(probe_result_iterator->ProcessAndCacheOne(input));
-    ASSERT_NOT_OK(shuffle_result_iterator->Process(input, &result_batch));
+    ASSERT_NOT_OK(probe_result_iterator->Process(input, &result_batch));
     ASSERT_NOT_OK(Equals(*(expected_table[i]).get(), *result_batch.get()));
   }
 }
 
-TEST(TestArrowCompute, JoinTestWithTwoKeysUsingInnerJoin) {
+TEST(TestArrowComputeJoin, JoinTestWithTwoKeysUsingInnerJoin) {
   ////////////////////// prepare expr_vector ///////////////////////
   auto table0_f0 = field("table0_f0", utf8());
   auto table0_f1 = field("table0_f1", utf8());
   auto table0_f2 = field("table0_f2", int32());
   auto table1_f0 = field("table1_f0", utf8());
   auto table1_f1 = field("table1_f1", utf8());
-
-  auto indices_type = std::make_shared<FixedSizeBinaryType>(4);
-  auto f_indices = field("indices", indices_type);
 
   auto n_left = TreeExprBuilder::MakeFunction(
       "codegen_left_schema",
@@ -173,22 +150,18 @@ TEST(TestArrowCompute, JoinTestWithTwoKeysUsingInnerJoin) {
   auto f_res = field("res", uint32());
 
   auto n_left_key = TreeExprBuilder::MakeFunction(
-      "codegen_left_key_schema", {TreeExprBuilder::MakeField(table0_f0), TreeExprBuilder::MakeField(table0_f1)}, uint32());
+      "codegen_left_key_schema",
+      {TreeExprBuilder::MakeField(table0_f0), TreeExprBuilder::MakeField(table0_f1)},
+      uint32());
   auto n_right_key = TreeExprBuilder::MakeFunction(
-      "codegen_right_key_schema", {TreeExprBuilder::MakeField(table1_f0), TreeExprBuilder::MakeField(table1_f1)}, uint32());
-  auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysInner", {n_left_key, n_right_key}, indices_type);
+      "codegen_right_key_schema",
+      {TreeExprBuilder::MakeField(table1_f0), TreeExprBuilder::MakeField(table1_f1)},
+      uint32());
+  auto n_probeArrays = TreeExprBuilder::MakeFunction("conditionedProbeArraysInner",
+                                                     {n_left_key, n_right_key}, uint32());
   auto n_codegen_probe = TreeExprBuilder::MakeFunction(
       "codegen_withTwoInputs", {n_probeArrays, n_left, n_right}, uint32());
   auto probeArrays_expr = TreeExprBuilder::MakeExpression(n_codegen_probe, f_res);
-
-  auto n_conditionedShuffleArrayList =
-      TreeExprBuilder::MakeFunction("conditionedShuffleArrayList", {}, uint32());
-  auto n_codegen_shuffle = TreeExprBuilder::MakeFunction(
-      "codegen_withTwoInputs", {n_conditionedShuffleArrayList, n_left, n_right},
-      uint32());
-
-  auto conditionShuffleExpr = TreeExprBuilder::MakeExpression(n_codegen_shuffle, f_res);
 
   auto schema_table_0 = arrow::schema({table0_f0, table0_f1, table0_f2});
   auto schema_table_1 = arrow::schema({table1_f0, table1_f1});
@@ -199,18 +172,14 @@ TEST(TestArrowCompute, JoinTestWithTwoKeysUsingInnerJoin) {
 
   ///////////////////// Calculation //////////////////
   std::shared_ptr<CodeGenerator> expr_probe;
-  ASSERT_NOT_OK(CreateCodeGenerator(schema_table_0, {probeArrays_expr}, {f_indices},
-                                    &expr_probe, true));
-  std::shared_ptr<CodeGenerator> expr_conditioned_shuffle;
-  ASSERT_NOT_OK(
-      CreateCodeGenerator(schema_table, {conditionShuffleExpr},
-                          {table0_f0, table0_f1, table0_f2, table1_f0, table1_f1},
-                          &expr_conditioned_shuffle, true));
+  ASSERT_NOT_OK(CreateCodeGenerator(
+      schema_table_0, {probeArrays_expr},
+      {table0_f0, table0_f1, table0_f2, table1_f0, table1_f1}, &expr_probe, true));
+
   std::shared_ptr<arrow::RecordBatch> input_batch;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> dummy_result_batches;
   std::shared_ptr<ResultIterator<arrow::RecordBatch>> probe_result_iterator;
-  std::shared_ptr<ResultIterator<arrow::RecordBatch>> shuffle_result_iterator;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> table_0;
   std::vector<std::shared_ptr<arrow::RecordBatch>> table_1;
@@ -253,11 +222,8 @@ TEST(TestArrowCompute, JoinTestWithTwoKeysUsingInnerJoin) {
   ////////////////////// evaluate //////////////////////
   for (auto batch : table_0) {
     ASSERT_NOT_OK(expr_probe->evaluate(batch, &dummy_result_batches));
-    ASSERT_NOT_OK(expr_conditioned_shuffle->evaluate(batch, &dummy_result_batches));
   }
   ASSERT_NOT_OK(expr_probe->finish(&probe_result_iterator));
-  ASSERT_NOT_OK(expr_conditioned_shuffle->SetDependency(probe_result_iterator));
-  ASSERT_NOT_OK(expr_conditioned_shuffle->finish(&shuffle_result_iterator));
 
   for (int i = 0; i < 2; i++) {
     auto left_batch = table_0[i];
@@ -269,22 +235,18 @@ TEST(TestArrowCompute, JoinTestWithTwoKeysUsingInnerJoin) {
       input.push_back(right_batch->column(i));
     }
 
-    ASSERT_NOT_OK(probe_result_iterator->ProcessAndCacheOne(input));
-    ASSERT_NOT_OK(shuffle_result_iterator->Process(input, &result_batch));
+    ASSERT_NOT_OK(probe_result_iterator->Process(input, &result_batch));
     ASSERT_NOT_OK(Equals(*(expected_table[i]).get(), *result_batch.get()));
   }
 }
 
-TEST(TestArrowCompute, JoinTestUsingOuterJoin) {
+TEST(TestArrowComputeJoin, JoinTestUsingOuterJoin) {
   ////////////////////// prepare expr_vector ///////////////////////
   auto table0_f0 = field("table0_f0", uint32());
   auto table0_f1 = field("table0_f1", uint32());
   auto table0_f2 = field("table0_f2", uint32());
   auto table1_f0 = field("table1_f0", uint32());
   auto table1_f1 = field("table1_f1", uint32());
-
-  auto indices_type = std::make_shared<FixedSizeBinaryType>(4);
-  auto f_indices = field("indices", indices_type);
 
   auto n_left = TreeExprBuilder::MakeFunction(
       "codegen_left_schema",
@@ -301,19 +263,11 @@ TEST(TestArrowCompute, JoinTestUsingOuterJoin) {
       "codegen_left_key_schema", {TreeExprBuilder::MakeField(table0_f0)}, uint32());
   auto n_right_key = TreeExprBuilder::MakeFunction(
       "codegen_right_key_schema", {TreeExprBuilder::MakeField(table1_f0)}, uint32());
-  auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysOuter", {n_left_key, n_right_key}, indices_type);
+  auto n_probeArrays = TreeExprBuilder::MakeFunction("conditionedProbeArraysOuter",
+                                                     {n_left_key, n_right_key}, uint32());
   auto n_codegen_probe = TreeExprBuilder::MakeFunction(
       "codegen_withTwoInputs", {n_probeArrays, n_left, n_right}, uint32());
   auto probeArrays_expr = TreeExprBuilder::MakeExpression(n_codegen_probe, f_res);
-
-  auto n_conditionedShuffleArrayList =
-      TreeExprBuilder::MakeFunction("conditionedShuffleArrayList", {}, uint32());
-  auto n_codegen_shuffle = TreeExprBuilder::MakeFunction(
-      "codegen_withTwoInputs", {n_conditionedShuffleArrayList, n_left, n_right},
-      uint32());
-
-  auto conditionShuffleExpr = TreeExprBuilder::MakeExpression(n_codegen_shuffle, f_res);
 
   auto schema_table_0 = arrow::schema({table0_f0, table0_f1, table0_f2});
   auto schema_table_1 = arrow::schema({table1_f0, table1_f1});
@@ -321,18 +275,14 @@ TEST(TestArrowCompute, JoinTestUsingOuterJoin) {
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
   ///////////////////// Calculation //////////////////
   std::shared_ptr<CodeGenerator> expr_probe;
-  ASSERT_NOT_OK(CreateCodeGenerator(schema_table_0, {probeArrays_expr}, {f_indices},
-                                    &expr_probe, true));
-  std::shared_ptr<CodeGenerator> expr_conditioned_shuffle;
-  ASSERT_NOT_OK(
-      CreateCodeGenerator(schema_table, {conditionShuffleExpr},
-                          {table0_f0, table0_f1, table0_f2, table1_f0, table1_f1},
-                          &expr_conditioned_shuffle, true));
+  ASSERT_NOT_OK(CreateCodeGenerator(
+      schema_table_0, {probeArrays_expr},
+      {table0_f0, table0_f1, table0_f2, table1_f0, table1_f1}, &expr_probe, true));
+
   std::shared_ptr<arrow::RecordBatch> input_batch;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> dummy_result_batches;
   std::shared_ptr<ResultIterator<arrow::RecordBatch>> probe_result_iterator;
-  std::shared_ptr<ResultIterator<arrow::RecordBatch>> shuffle_result_iterator;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> table_0;
   std::vector<std::shared_ptr<arrow::RecordBatch>> table_1;
@@ -378,11 +328,8 @@ TEST(TestArrowCompute, JoinTestUsingOuterJoin) {
   ////////////////////// evaluate //////////////////////
   for (auto batch : table_0) {
     ASSERT_NOT_OK(expr_probe->evaluate(batch, &dummy_result_batches));
-    ASSERT_NOT_OK(expr_conditioned_shuffle->evaluate(batch, &dummy_result_batches));
   }
   ASSERT_NOT_OK(expr_probe->finish(&probe_result_iterator));
-  ASSERT_NOT_OK(expr_conditioned_shuffle->SetDependency(probe_result_iterator));
-  ASSERT_NOT_OK(expr_conditioned_shuffle->finish(&shuffle_result_iterator));
 
   for (int i = 0; i < 2; i++) {
     auto left_batch = table_0[i];
@@ -394,22 +341,18 @@ TEST(TestArrowCompute, JoinTestUsingOuterJoin) {
       input.push_back(right_batch->column(i));
     }
 
-    ASSERT_NOT_OK(probe_result_iterator->ProcessAndCacheOne(input));
-    ASSERT_NOT_OK(shuffle_result_iterator->Process(input, &result_batch));
+    ASSERT_NOT_OK(probe_result_iterator->Process(input, &result_batch));
     ASSERT_NOT_OK(Equals(*(expected_table[i]).get(), *result_batch.get()));
   }
 }
 
-TEST(TestArrowCompute, JoinTestUsingAntiJoin) {
+TEST(TestArrowComputeJoin, JoinTestUsingAntiJoin) {
   ////////////////////// prepare expr_vector ///////////////////////
   auto table0_f0 = field("table0_f0", uint32());
   auto table0_f1 = field("table0_f1", uint32());
   auto table0_f2 = field("table0_f2", uint32());
   auto table1_f0 = field("table1_f0", uint32());
   auto table1_f1 = field("table1_f1", uint32());
-
-  auto indices_type = std::make_shared<FixedSizeBinaryType>(4);
-  auto f_indices = field("indices", indices_type);
 
   auto n_left = TreeExprBuilder::MakeFunction(
       "codegen_left_schema",
@@ -426,19 +369,11 @@ TEST(TestArrowCompute, JoinTestUsingAntiJoin) {
       "codegen_left_key_schema", {TreeExprBuilder::MakeField(table0_f0)}, uint32());
   auto n_right_key = TreeExprBuilder::MakeFunction(
       "codegen_right_key_schema", {TreeExprBuilder::MakeField(table1_f0)}, uint32());
-  auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysAnti", {n_left_key, n_right_key}, indices_type);
+  auto n_probeArrays = TreeExprBuilder::MakeFunction("conditionedProbeArraysAnti",
+                                                     {n_left_key, n_right_key}, uint32());
   auto n_codegen_probe = TreeExprBuilder::MakeFunction(
       "codegen_withTwoInputs", {n_probeArrays, n_left, n_right}, uint32());
   auto probeArrays_expr = TreeExprBuilder::MakeExpression(n_codegen_probe, f_res);
-
-  auto n_conditionedShuffleArrayList =
-      TreeExprBuilder::MakeFunction("conditionedShuffleArrayList", {}, uint32());
-  auto n_codegen_shuffle = TreeExprBuilder::MakeFunction(
-      "codegen_withTwoInputs", {n_conditionedShuffleArrayList, n_left, n_right},
-      uint32());
-
-  auto conditionShuffleExpr = TreeExprBuilder::MakeExpression(n_codegen_shuffle, f_res);
 
   auto schema_table_0 = arrow::schema({table0_f0, table0_f1, table0_f2});
   auto schema_table_1 = arrow::schema({table1_f0, table1_f1});
@@ -446,17 +381,12 @@ TEST(TestArrowCompute, JoinTestUsingAntiJoin) {
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
   ///////////////////// Calculation //////////////////
   std::shared_ptr<CodeGenerator> expr_probe;
-  ASSERT_NOT_OK(CreateCodeGenerator(schema_table_0, {probeArrays_expr}, {f_indices},
-                                    &expr_probe, true));
-  std::shared_ptr<CodeGenerator> expr_conditioned_shuffle;
-  ASSERT_NOT_OK(CreateCodeGenerator(schema_table, {conditionShuffleExpr},
-                                    {table1_f0, table1_f1}, &expr_conditioned_shuffle,
-                                    true));
+  ASSERT_NOT_OK(CreateCodeGenerator(schema_table_0, {probeArrays_expr},
+                                    {table1_f0, table1_f1}, &expr_probe, true));
   std::shared_ptr<arrow::RecordBatch> input_batch;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> dummy_result_batches;
   std::shared_ptr<ResultIterator<arrow::RecordBatch>> probe_result_iterator;
-  std::shared_ptr<ResultIterator<arrow::RecordBatch>> shuffle_result_iterator;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> table_0;
   std::vector<std::shared_ptr<arrow::RecordBatch>> table_1;
@@ -496,11 +426,8 @@ TEST(TestArrowCompute, JoinTestUsingAntiJoin) {
   ////////////////////// evaluate //////////////////////
   for (auto batch : table_0) {
     ASSERT_NOT_OK(expr_probe->evaluate(batch, &dummy_result_batches));
-    ASSERT_NOT_OK(expr_conditioned_shuffle->evaluate(batch, &dummy_result_batches));
   }
   ASSERT_NOT_OK(expr_probe->finish(&probe_result_iterator));
-  ASSERT_NOT_OK(expr_conditioned_shuffle->SetDependency(probe_result_iterator));
-  ASSERT_NOT_OK(expr_conditioned_shuffle->finish(&shuffle_result_iterator));
 
   for (int i = 0; i < 2; i++) {
     auto left_batch = table_0[i];
@@ -512,13 +439,12 @@ TEST(TestArrowCompute, JoinTestUsingAntiJoin) {
       input.push_back(right_batch->column(i));
     }
 
-    ASSERT_NOT_OK(probe_result_iterator->ProcessAndCacheOne(input));
-    ASSERT_NOT_OK(shuffle_result_iterator->Process(input, &result_batch));
+    ASSERT_NOT_OK(probe_result_iterator->Process(input, &result_batch));
     ASSERT_NOT_OK(Equals(*(expected_table[i]).get(), *result_batch.get()));
   }
 }
 
-TEST(TestArrowCompute, JoinTestUsingInnerJoinWithCondition) {
+TEST(TestArrowComputeJoin, JoinTestUsingInnerJoinWithCondition) {
   ////////////////////// prepare expr_vector ///////////////////////
   auto table0_f0 = field("table0_f0", uint32());
   auto table0_f1 = field("table0_f1", uint32());
@@ -526,8 +452,6 @@ TEST(TestArrowCompute, JoinTestUsingInnerJoinWithCondition) {
   auto table1_f0 = field("table1_f0", uint32());
   auto table1_f1 = field("table1_f1", uint32());
 
-  auto indices_type = std::make_shared<FixedSizeBinaryType>(4);
-  auto f_indices = field("indices", indices_type);
   auto greater_than_function = TreeExprBuilder::MakeFunction(
       "greater_than",
       {TreeExprBuilder::MakeField(table0_f1), TreeExprBuilder::MakeField(table1_f1)},
@@ -549,18 +473,10 @@ TEST(TestArrowCompute, JoinTestUsingInnerJoinWithCondition) {
       "codegen_right_schema", {TreeExprBuilder::MakeField(table1_f0)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
       "conditionedProbeArraysInner", {n_left_key, n_right_key, greater_than_function},
-      indices_type);
+      uint32());
   auto n_codegen_probe = TreeExprBuilder::MakeFunction(
       "codegen_withTwoInputs", {n_probeArrays, n_left, n_right}, uint32());
   auto probeArrays_expr = TreeExprBuilder::MakeExpression(n_codegen_probe, f_res);
-
-  auto n_conditionedShuffleArrayList =
-      TreeExprBuilder::MakeFunction("conditionedShuffleArrayList", {}, uint32());
-  auto n_codegen_shuffle = TreeExprBuilder::MakeFunction(
-      "codegen_withTwoInputs", {n_conditionedShuffleArrayList, n_left, n_right},
-      uint32());
-
-  auto conditionShuffleExpr = TreeExprBuilder::MakeExpression(n_codegen_shuffle, f_res);
 
   auto schema_table_0 = arrow::schema({table0_f0, table0_f1, table0_f2});
   auto schema_table_1 = arrow::schema({table1_f0, table1_f1});
@@ -568,18 +484,14 @@ TEST(TestArrowCompute, JoinTestUsingInnerJoinWithCondition) {
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
   ///////////////////// Calculation //////////////////
   std::shared_ptr<CodeGenerator> expr_probe;
-  ASSERT_NOT_OK(CreateCodeGenerator(schema_table_0, {probeArrays_expr}, {f_indices},
-                                    &expr_probe, true));
-  std::shared_ptr<CodeGenerator> expr_conditioned_shuffle;
-  ASSERT_NOT_OK(
-      CreateCodeGenerator(schema_table, {conditionShuffleExpr},
-                          {table0_f0, table0_f1, table0_f2, table1_f0, table1_f1},
-                          &expr_conditioned_shuffle, true));
+  ASSERT_NOT_OK(CreateCodeGenerator(
+      schema_table_0, {probeArrays_expr},
+      {table0_f0, table0_f1, table0_f2, table1_f0, table1_f1}, &expr_probe, true));
+
   std::shared_ptr<arrow::RecordBatch> input_batch;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> dummy_result_batches;
   std::shared_ptr<ResultIterator<arrow::RecordBatch>> probe_result_iterator;
-  std::shared_ptr<ResultIterator<arrow::RecordBatch>> shuffle_result_iterator;
 
   std::vector<std::shared_ptr<arrow::RecordBatch>> table_0;
   std::vector<std::shared_ptr<arrow::RecordBatch>> table_1;
@@ -620,11 +532,8 @@ TEST(TestArrowCompute, JoinTestUsingInnerJoinWithCondition) {
   ////////////////////// evaluate //////////////////////
   for (auto batch : table_0) {
     ASSERT_NOT_OK(expr_probe->evaluate(batch, &dummy_result_batches));
-    ASSERT_NOT_OK(expr_conditioned_shuffle->evaluate(batch, &dummy_result_batches));
   }
   ASSERT_NOT_OK(expr_probe->finish(&probe_result_iterator));
-  ASSERT_NOT_OK(expr_conditioned_shuffle->SetDependency(probe_result_iterator));
-  ASSERT_NOT_OK(expr_conditioned_shuffle->finish(&shuffle_result_iterator));
 
   for (int i = 0; i < 2; i++) {
     auto left_batch = table_0[i];
@@ -636,8 +545,110 @@ TEST(TestArrowCompute, JoinTestUsingInnerJoinWithCondition) {
       input.push_back(right_batch->column(i));
     }
 
-    ASSERT_NOT_OK(probe_result_iterator->ProcessAndCacheOne(input));
-    ASSERT_NOT_OK(shuffle_result_iterator->Process(input, &result_batch));
+    ASSERT_NOT_OK(probe_result_iterator->Process(input, &result_batch));
+    ASSERT_NOT_OK(Equals(*(expected_table[i]).get(), *result_batch.get()));
+  }
+}
+
+TEST(TestArrowComputeJoin, JoinTestUsingAntiJoinWithCondition) {
+  ////////////////////// prepare expr_vector ///////////////////////
+  auto table0_f0 = field("table0_f0", uint32());
+  auto table0_f1 = field("table0_f1", uint32());
+  auto table0_f2 = field("table0_f2", uint32());
+  auto table1_f0 = field("table1_f0", uint32());
+  auto table1_f1 = field("table1_f1", uint32());
+
+  auto greater_than_function = TreeExprBuilder::MakeFunction(
+      "greater_than",
+      {TreeExprBuilder::MakeField(table0_f1), TreeExprBuilder::MakeField(table1_f1)},
+      arrow::boolean());
+  auto n_left = TreeExprBuilder::MakeFunction(
+      "codegen_left_schema",
+      {TreeExprBuilder::MakeField(table0_f0), TreeExprBuilder::MakeField(table0_f1),
+       TreeExprBuilder::MakeField(table0_f2)},
+      uint32());
+  auto n_right = TreeExprBuilder::MakeFunction(
+      "codegen_right_schema",
+      {TreeExprBuilder::MakeField(table1_f0), TreeExprBuilder::MakeField(table1_f1)},
+      uint32());
+  auto f_res = field("res", uint32());
+
+  auto n_left_key = TreeExprBuilder::MakeFunction(
+      "codegen_left_key_schema", {TreeExprBuilder::MakeField(table0_f0)}, uint32());
+  auto n_right_key = TreeExprBuilder::MakeFunction(
+      "codegen_right_key_schema", {TreeExprBuilder::MakeField(table1_f0)}, uint32());
+  auto n_probeArrays = TreeExprBuilder::MakeFunction(
+      "conditionedProbeArraysAnti", {n_left_key, n_right_key, greater_than_function},
+      uint32());
+  auto n_codegen_probe = TreeExprBuilder::MakeFunction(
+      "codegen_withTwoInputs", {n_probeArrays, n_left, n_right}, uint32());
+  auto probeArrays_expr = TreeExprBuilder::MakeExpression(n_codegen_probe, f_res);
+
+  auto schema_table_0 = arrow::schema({table0_f0, table0_f1, table0_f2});
+  auto schema_table_1 = arrow::schema({table1_f0, table1_f1});
+  auto schema_table =
+      arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
+  ///////////////////// Calculation //////////////////
+  std::shared_ptr<CodeGenerator> expr_probe;
+  ASSERT_NOT_OK(CreateCodeGenerator(schema_table_0, {probeArrays_expr},
+                                    {table1_f0, table1_f1}, &expr_probe, true));
+  std::shared_ptr<arrow::RecordBatch> input_batch;
+
+  std::vector<std::shared_ptr<arrow::RecordBatch>> dummy_result_batches;
+  std::shared_ptr<ResultIterator<arrow::RecordBatch>> probe_result_iterator;
+
+  std::vector<std::shared_ptr<arrow::RecordBatch>> table_0;
+  std::vector<std::shared_ptr<arrow::RecordBatch>> table_1;
+
+  std::vector<std::string> input_data_string = {
+      "[10, 3, 1, 2, 3, 1]", "[10, 3, 1, 2, 13, 11]", "[10, 3, 1, 2, 13, 11]"};
+  MakeInputBatch(input_data_string, schema_table_0, &input_batch);
+  table_0.push_back(input_batch);
+
+  input_data_string = {"[6, 12, 5, 8, 6, 10]", "[6, 12, 5, 8, 16, 110]",
+                       "[6, 12, 5, 8, 16, 110]"};
+  MakeInputBatch(input_data_string, schema_table_0, &input_batch);
+  table_0.push_back(input_batch);
+
+  std::vector<std::string> input_data_2_string = {"[1, 2, 3, 4, 5, 6]",
+                                                  "[1, 2, 3, 4, 5, 6]"};
+  MakeInputBatch(input_data_2_string, schema_table_1, &input_batch);
+  table_1.push_back(input_batch);
+
+  input_data_2_string = {"[7, 8, 9, 10, 11, 12]", "[7, 8, 9, 10, 11, 12]"};
+  MakeInputBatch(input_data_2_string, schema_table_1, &input_batch);
+  table_1.push_back(input_batch);
+
+  //////////////////////// data prepared /////////////////////////
+
+  std::vector<std::shared_ptr<RecordBatch>> expected_table;
+  std::shared_ptr<arrow::RecordBatch> expected_result;
+  auto res_sch = arrow::schema({f_res, f_res});
+  std::vector<std::string> expected_result_string = {"[2, 4, 5]", "[2, 4, 5]"};
+  MakeInputBatch(expected_result_string, res_sch, &expected_result);
+  expected_table.push_back(expected_result);
+
+  expected_result_string = {"[7, 8, 9, 11, 12]", "[7, 8, 9, 11, 12]"};
+  MakeInputBatch(expected_result_string, res_sch, &expected_result);
+  expected_table.push_back(expected_result);
+
+  ////////////////////// evaluate //////////////////////
+  for (auto batch : table_0) {
+    ASSERT_NOT_OK(expr_probe->evaluate(batch, &dummy_result_batches));
+  }
+  ASSERT_NOT_OK(expr_probe->finish(&probe_result_iterator));
+
+  for (int i = 0; i < 2; i++) {
+    auto left_batch = table_0[i];
+    auto right_batch = table_1[i];
+
+    std::shared_ptr<arrow::RecordBatch> result_batch;
+    std::vector<std::shared_ptr<arrow::Array>> input;
+    for (int i = 0; i < right_batch->num_columns(); i++) {
+      input.push_back(right_batch->column(i));
+    }
+
+    ASSERT_NOT_OK(probe_result_iterator->Process(input, &result_batch));
     ASSERT_NOT_OK(Equals(*(expected_table[i]).get(), *result_batch.get()));
   }
 }

@@ -378,7 +378,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
         if (missingColumns[i]) continue;
         columnReaders[i] = new SkippableVectorizedColumnReader(columns.get(i),
           types.get(i).getOriginalType(), pages.getPageReader(columns.get(i)),
-                ZoneId.systemDefault(), true);
+                ZoneId.systemDefault(), "LEGACY");
       }
       totalCountLoadedSoFar += pages.getRowCount();
     }

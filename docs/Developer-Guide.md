@@ -1,10 +1,12 @@
-# OAP Product Developer Guide
+# OAP Developer Guide
 
 **NOTE**: This document is for the whole project of OAP about building, you can learn more detailed information from every module's  document.
-* [OAP Project Cache](../oap-cache/oap/docs/Developer-Guide.md) 
-* [OAP Project Remote Shuffle](../oap-shuffle/remote-shuffle/README.md) 
+* [SQL Index and Data Source Cache](../oap-cache/oap/docs/Developer-Guide.md)
+* [RDD Cache PMem Extension](../oap-spark/README.md#compiling)
+* [Shuffle Remote PMem Extension](../oap-shuffle/RPMem-shuffle/README.md#5-install-dependencies-for-shuffle-remote-pmem-extension)
+* [Remote Shuffle](../oap-shuffle/remote-shuffle/README.md#build-and-deploy)
 
-## OAP Product Building
+## OAP Building
 
 To clone OAP project, use
 ```shell script
@@ -13,10 +15,14 @@ cd OAP
 ```
 
 #### Prerequisites for Building
-OAP is built using [Apache Maven](http://maven.apache.org/). You need to install the required packages on the build system listed below.
+OAP is built using [Apache Maven](http://maven.apache.org/). You need to install the required packages on the build system listed below. To enable Shuffle Remote PMem extension, you must configure and validate RDMA in advance, you can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md) for more details.
+
 - [Cmake](https://help.directadmin.com/item.php?id=494)
 - [Memkind](https://github.com/Intel-bigdata/memkind)
 - [Vmemcache](https://github.com/pmem/vmemcache)
+- [HPNL](https://github.com/Intel-bigdata/HPNL)
+- [PMDK](https://github.com/pmem/pmdk)  
+- [GCC > 7](https://gcc.gnu.org/wiki/InstallingGCC)
 
 You can use the following command under the folder dev to automatically install these dependencies.
 
@@ -82,7 +88,7 @@ mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
 
 
 #### OAP Packaging 
-If you want to generate a release package after you mvn package all modules, use the following command under the directory dev, then you can find a tarball named oap-product-0.8.0-bin-spark-2.4.4.tar.gz in dev/release-package dictionary.
+If you want to generate a release package after you mvn package all modules, use the following command under the directory dev, then you can find a tarball named oap-product-$VERSION-bin-spark-2.4.4.tar.gz in dev/release-package dictionary.
 ```shell script
 sh make-distribution.sh
 ```

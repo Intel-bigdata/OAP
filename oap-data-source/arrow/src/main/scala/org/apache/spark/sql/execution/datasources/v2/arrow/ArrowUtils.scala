@@ -17,28 +17,38 @@
 package org.apache.spark.sql.execution.datasources.v2.arrow
 
 import java.net.URI
-import java.util.TimeZone
+import java.util.{TimeZone, UUID}
 
 import scala.collection.JavaConverters._
 
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowOptions
-import com.intel.sparkColumnarPlugin.vectorized.ArrowWritableColumnVector
+import com.intel.oap.vectorized.ArrowWritableColumnVector
 import org.apache.arrow.dataset.file.{FileSystem, SingleFileDatasetFactory}
-import org.apache.arrow.memory.BaseAllocator
-import org.apache.arrow.vector.{FieldVector, VectorSchemaRoot}
+import org.apache.arrow.dataset.scanner.ScanTask
+import org.apache.arrow.memory.{AllocationListener, BaseAllocator}
+import org.apache.arrow.vector.FieldVector
+import org.apache.arrow.vector.types.pojo.ArrowType.ArrowTypeID
 import org.apache.arrow.vector.types.pojo.Schema
 import org.apache.hadoop.fs.FileStatus
 
+import org.apache.spark.TaskContext
+import org.apache.spark.memory.TaskMemoryManager
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.vectorized.{ColumnVectorUtils, OnHeapColumnVector}
+import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 object ArrowUtils {
+
+  def getTaskMemoryManager(): TaskMemoryManager = {
+    TaskContext.get().taskMemoryManager()
+  }
+
   def readSchema(file: FileStatus, options: CaseInsensitiveStringMap): Option[StructType] = {
     val factory: SingleFileDatasetFactory =
-      makeArrowDiscovery(file.getPath.toString, new ArrowOptions(options.asScala.toMap))
+      makeArrowDiscovery(file.getPath.toString, new ArrowOptions(options.asScala.toMap),
+        AllocationListener.NOOP)
     val schema = factory.inspect()
     try {
       Option(org.apache.spark.sql.util.ArrowUtils.fromArrowSchema(schema))
@@ -50,13 +60,17 @@ object ArrowUtils {
   def readSchema(files: Seq[FileStatus], options: CaseInsensitiveStringMap): Option[StructType] =
     readSchema(files.toList.head, options) // todo merge schema
 
-  def makeArrowDiscovery(file: String, options: ArrowOptions): SingleFileDatasetFactory = {
+  def makeArrowDiscovery(file: String, options: ArrowOptions,
+                         al: AllocationListener): SingleFileDatasetFactory = {
 
     val format = getFormat(options).getOrElse(throw new IllegalStateException)
     val fs = getFs(options).getOrElse(throw new IllegalStateException)
-
+    val parent = defaultAllocator()
+    val allocator = parent
+      .newChildAllocator("Spark Managed Allocator - " + UUID.randomUUID().toString, al,
+        0, parent.getLimit)
     val factory = new SingleFileDatasetFactory(
-      org.apache.spark.sql.util.ArrowUtils.rootAllocator,
+      allocator,
       format,
       fs,
       rewriteFilePath(file))
@@ -82,12 +96,14 @@ object ArrowUtils {
     org.apache.spark.sql.util.ArrowUtils.toArrowSchema(t, TimeZone.getDefault.getID)
   }
 
-  def loadVsr(vsr: VectorSchemaRoot, partitionValues: InternalRow,
-              partitionSchema: StructType, dataSchema: StructType): ColumnarBatch = {
-    val fvs = getDataVectors(vsr, dataSchema)
+  def loadVectors(bundledVectors: ScanTask.ArrowBundledVectors, partitionValues: InternalRow,
+                  partitionSchema: StructType, dataSchema: StructType): ColumnarBatch = {
+    val rowCount: Int = getRowCount(bundledVectors)
+    val dataVectors = getDataVectors(bundledVectors, dataSchema)
+    val dictionaryVectors = getDictionaryVectors(bundledVectors, dataSchema)
 
-    val rowCount = vsr.getRowCount
-    val vectors = ArrowWritableColumnVector.loadColumns(rowCount, fvs.asJava)
+    val vectors = ArrowWritableColumnVector.loadColumns(rowCount, dataVectors.asJava,
+      dictionaryVectors.asJava)
     val partitionColumns = ArrowWritableColumnVector.allocateColumns(rowCount, partitionSchema)
     (0 until partitionColumns.length).foreach(i => {
       ColumnVectorUtils.populate(partitionColumns(i), partitionValues, i)
@@ -98,21 +114,52 @@ object ArrowUtils {
     batch
   }
 
-  def rootAllocator(): BaseAllocator = {
+  def defaultAllocator(): BaseAllocator = {
     org.apache.spark.sql.util.ArrowUtils.rootAllocator
   }
 
-  private def getDataVectors(vsr: VectorSchemaRoot,
+  private def getRowCount(bundledVectors: ScanTask.ArrowBundledVectors) = {
+    val valueVectors = bundledVectors.valueVectors
+    val rowCount = valueVectors.getRowCount
+    rowCount
+  }
+
+  private def getDataVectors(bundledVectors: ScanTask.ArrowBundledVectors,
                              dataSchema: StructType): List[FieldVector] = {
     // TODO Deprecate following (bad performance maybe brought).
     // TODO Assert vsr strictly matches dataSchema instead.
+    val valueVectors = bundledVectors.valueVectors
     dataSchema.map(f => {
-      val vector = vsr.getVector(f.name)
+      val vector = valueVectors.getVector(f.name)
       if (vector == null) {
         throw new IllegalStateException("Error: no vector named " + f.name + " in record bach")
       }
       vector
     }).toList
+  }
+
+  private def getDictionaryVectors(bundledVectors: ScanTask.ArrowBundledVectors,
+                                   dataSchema: StructType): List[FieldVector] = {
+    val valueVectors = bundledVectors.valueVectors
+    val dictionaryVectorMap = bundledVectors.dictionaryVectors
+
+    val fieldNameToDictionaryEncoding = valueVectors.getSchema.getFields.asScala.map(f => {
+      f.getName -> f.getDictionary
+    }).toMap
+
+    val dictionaryVectorsWithNulls = dataSchema.map(f => {
+      val de = fieldNameToDictionaryEncoding(f.name)
+
+      Option(de) match {
+        case None => null
+        case _ =>
+          if (de.getIndexType.getTypeID != ArrowTypeID.Int) {
+            throw new IllegalArgumentException("Wrong index type: " + de.getIndexType)
+          }
+          dictionaryVectorMap.get(de.getId).getVector
+      }
+    }).toList
+    dictionaryVectorsWithNulls
   }
 
   private def getFormat(

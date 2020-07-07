@@ -18,6 +18,11 @@ option(TESTS "Build the tests" OFF)
 option(BENCHMARKS "Build the benchmarks" OFF)
 option(DEBUG "Enable Debug Info" OFF)
 
+# same as the version required in arrow/ci/conda_env_cpp.yml
+set(BOOST_MIN_VERSION "1.42.0")
+find_package(Boost REQUIRED)
+INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
+
 find_package(JNI REQUIRED)
 set(source_root_directory ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -133,8 +138,8 @@ endif()
 
 if(BENCHMARKS)
   find_package(GTest)
-  #add_definitions(-DBENCHMARK_FILE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/source_files/)
-  add_compile_definitions(BENCHMARK_FILE_PATH="file://${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/source_files/")
+  add_definitions(-DBENCHMARK_FILE_PATH="file://${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/source_files/")
+  #add_compile_definitions(BENCHMARK_FILE_PATH="file://${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/source_files/")
 macro(package_add_benchmark TESTNAME)
   #configure_file(${ARGN}.in ${ARGN})
   add_executable(${TESTNAME} ${ARGN})
@@ -167,6 +172,22 @@ if(NOT GANDIVA_LIB)
     message(FATAL_ERROR "Gandiva library not found")
 endif()
 
+set(CODEGEN_HEADERS
+    third_party/
+    )
+file(MAKE_DIRECTORY ${root_directory}/releases/include)
+file(MAKE_DIRECTORY ${root_directory}/releases/include/codegen/common/)
+file(MAKE_DIRECTORY ${root_directory}/releases/include/codegen/third_party/)
+file(MAKE_DIRECTORY ${root_directory}/releases/include/codegen/arrow_compute/ext/)
+file(COPY third_party/ DESTINATION ${root_directory}/releases/include/)
+file(COPY third_party/ DESTINATION ${root_directory}/releases/include/third_party/)
+file(COPY codegen/arrow_compute/ext/array_item_index.h DESTINATION ${root_directory}/releases/include/codegen/arrow_compute/ext/)
+file(COPY codegen/arrow_compute/ext/code_generator_base.h DESTINATION ${root_directory}/releases/include/codegen/arrow_compute/ext/)
+file(COPY codegen/arrow_compute/ext/kernels_ext.h DESTINATION ${root_directory}/releases/include/codegen/arrow_compute/ext/)
+file(COPY codegen/common/result_iterator.h DESTINATION ${root_directory}/releases/include/codegen/common/)
+
+add_definitions(-DNATIVESQL_SRC_PATH="${root_directory}/releases")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
 set(SPARK_COLUMNAR_PLUGIN_SRCS
         jni/jni_wrapper.cc
         ${PROTO_SRCS}
@@ -174,15 +195,15 @@ set(SPARK_COLUMNAR_PLUGIN_SRCS
         proto/protobuf_utils.cc
         codegen/expr_visitor.cc
         codegen/arrow_compute/expr_visitor.cc
-        codegen/arrow_compute/ext/item_iterator.cc
-        codegen/arrow_compute/ext/shuffle_v2_action.cc
-        codegen/arrow_compute/ext/codegen_node_visitor.cc
-        codegen/arrow_compute/ext/codegen_node_visitor_v2.cc
-        codegen/arrow_compute/ext/conditioned_shuffle_kernel.cc
-        codegen/arrow_compute/ext/conditioned_probe_kernel.cc
+        codegen/arrow_compute/ext/hash_aggregate_kernel.cc
+        codegen/arrow_compute/ext/probe_kernel.cc
         codegen/arrow_compute/ext/sort_kernel.cc
         codegen/arrow_compute/ext/kernels_ext.cc
         codegen/arrow_compute/ext/codegen_common.cc
+        codegen/arrow_compute/ext/codegen_node_visitor.cc
+        codegen/arrow_compute/ext/codegen_register.cc
+        shuffle/splitter.cc
+        shuffle/partition_writer.cc
         )
 
 file(MAKE_DIRECTORY ${root_directory}/releases)

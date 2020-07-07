@@ -176,7 +176,26 @@ arrow::Status ExprVisitor::Make(const gandiva::FunctionNode& node,
                                 std::vector<std::shared_ptr<arrow::Field>> ret_fields,
                                 std::shared_ptr<ExprVisitor>* out) {
   auto func_name = node.descriptor()->name();
-  if (func_name.compare("codegen_withTwoInputs") == 0) {
+  if (func_name.compare("codegen_withOneInput") == 0) {
+    auto children = node.children();
+    if (children.size() != 2) {
+      return arrow::Status::Invalid("codegen_withOneInput expects three arguments");
+    }
+    // first child is a function
+    auto codegen_func_node =
+        std::dynamic_pointer_cast<gandiva::FunctionNode>(children[0]);
+    // second child is left_kernel_schema
+    std::vector<std::shared_ptr<arrow::Field>> field_list;
+    auto func_node = std::dynamic_pointer_cast<gandiva::FunctionNode>(children[1]);
+    for (auto field : func_node->children()) {
+      auto field_node = std::dynamic_pointer_cast<gandiva::FieldNode>(field);
+      field_list.push_back(field_node->field());
+    }
+    *out = std::make_shared<ExprVisitor>(func_name);
+    RETURN_NOT_OK((*out)->MakeExprVisitorImpl(codegen_func_node->descriptor()->name(),
+                                              codegen_func_node, field_list, ret_fields,
+                                              (*out).get()));
+  } else if (func_name.compare("codegen_withTwoInputs") == 0) {
     auto children = node.children();
     if (children.size() != 3) {
       return arrow::Status::Invalid("codegen_withTwoInputs expects three arguments");
@@ -223,18 +242,25 @@ ExprVisitor::ExprVisitor(std::string func_name) : func_name_(func_name) {}
 
 arrow::Status ExprVisitor::MakeExprVisitorImpl(
     const std::string& func_name, std::shared_ptr<gandiva::FunctionNode> func_node,
+    std::vector<std::shared_ptr<arrow::Field>> field_list,
+    std::vector<std::shared_ptr<arrow::Field>> ret_fields, ExprVisitor* p) {
+  if (func_name.compare("hashAggregateArrays") == 0) {
+    RETURN_NOT_OK(HashAggregateArraysVisitorImpl::Make(field_list, func_node->children(),
+                                                       ret_fields, p, &impl_));
+    goto finish;
+  }
+finish:
+  return arrow::Status::OK();
+
+unrecognizedFail:
+  return arrow::Status::NotImplemented("Function name ", func_name,
+                                       " is not implemented yet.");
+}
+arrow::Status ExprVisitor::MakeExprVisitorImpl(
+    const std::string& func_name, std::shared_ptr<gandiva::FunctionNode> func_node,
     std::vector<std::shared_ptr<arrow::Field>> left_field_list,
     std::vector<std::shared_ptr<arrow::Field>> right_field_list,
     std::vector<std::shared_ptr<arrow::Field>> ret_fields, ExprVisitor* p) {
-  if (func_name.compare("conditionedShuffleArrayList") == 0) {
-    std::shared_ptr<gandiva::Node> child_node;
-    if (func_node->children().size() > 0) {
-      child_node = func_node->children()[0];
-    }
-    RETURN_NOT_OK(ConditionedShuffleArrayListVisitorImpl::Make(
-        child_node, left_field_list, right_field_list, ret_fields, p, &impl_));
-    goto finish;
-  }
   if (func_name.compare("conditionedProbeArraysInner") == 0 ||
       func_name.compare("conditionedProbeArraysOuter") == 0 ||
       func_name.compare("conditionedProbeArraysAnti") == 0 ||
@@ -272,7 +298,7 @@ arrow::Status ExprVisitor::MakeExprVisitorImpl(
     }
     RETURN_NOT_OK(ConditionedProbeArraysVisitorImpl::Make(
         left_key_list, right_key_list, condition_node, join_type, left_field_list,
-        right_field_list, p, &impl_));
+        right_field_list, ret_fields, p, &impl_));
     goto finish;
   }
 finish:

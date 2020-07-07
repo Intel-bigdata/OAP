@@ -34,7 +34,7 @@ import org.apache.spark.network.netty.RemoteShuffleTransferService
 import org.apache.spark.network.shuffle.ShuffleIndexRecord
 import org.apache.spark.network.util.JavaUtils
 import org.apache.spark.shuffle.ShuffleBlockResolver
-import org.apache.spark.storage.{BlockId, ShuffleBlockId, TempLocalBlockId, TempShuffleBlockId}
+import org.apache.spark.storage.{BlockId, ShuffleBlockBatchId, ShuffleBlockId, TempLocalBlockId, TempShuffleBlockId}
 import org.apache.spark.util.Utils
 
 /**
@@ -243,16 +243,24 @@ class RemoteShuffleBlockResolver(conf: SparkConf) extends ShuffleBlockResolver w
     }
   }
 
-  def getBlockData(bId: BlockId, dirs: Option[Array[String]] = None): ManagedBuffer = {
-    val blockId = bId.asInstanceOf[ShuffleBlockId]
+  def getBlockData(blockId: BlockId, dirs: Option[Array[String]] = None): ManagedBuffer = {
+    val (shuffleId, mapId, startReduceId, endReduceId) = blockId match {
+      case id: ShuffleBlockId =>
+        (id.shuffleId, id.mapId, id.reduceId, id.reduceId + 1)
+      case batchId: ShuffleBlockBatchId =>
+        (batchId.shuffleId, batchId.mapId, batchId.startReduceId, batchId.endReduceId)
+      case _ =>
+        throw new IllegalArgumentException("unexpected shuffle block id format: " + blockId)
+    }
+
     // The block is actually going to be a range of a single map output file for this map, so
     // find out the consolidated file, then the offset within that from our index
-    val indexFile = getIndexFile(blockId.shuffleId, blockId.mapId)
+    val indexFile = getIndexFile(shuffleId, mapId)
 
     val (offset, length) =
       if (indexCacheEnabled) {
         val shuffleIndexInfo = shuffleIndexCache.get(indexFile)
-        val range = shuffleIndexInfo.getIndex(blockId.reduceId)
+        val range = shuffleIndexInfo.getIndex(startReduceId, endReduceId)
         (range.getOffset, range.getLength)
       } else {
         // SPARK-22982: if this FileInputStream's position is seeked forward by another
@@ -262,24 +270,25 @@ class RemoteShuffleBlockResolver(conf: SparkConf) extends ShuffleBlockResolver w
         // aid during SPARK-22982 and may help prevent this class of issue from re-occurring
         // in the future which is why they are left here even though SPARK-22982 is fixed.
         val in = fs.open(indexFile)
-        in.seek(blockId.reduceId * 8L)
+        in.seek(startReduceId * 8L)
         try {
-          val offset = in.readLong()
-          val nextOffset = in.readLong()
+          val startOffset = in.readLong()
+          in.seek(endReduceId * 8L)
+          val endOffset = in.readLong()
           val actualPosition = in.getPos()
-          val expectedPosition = blockId.reduceId * 8L + 16
+          val expectedPosition = endReduceId * 8L + 8
           if (actualPosition != expectedPosition) {
             throw new Exception(s"SPARK-22982: Incorrect channel position " +
               s"after index file reads: expected $expectedPosition but actual" +
               s" position was $actualPosition.")
           }
-          (offset, nextOffset - offset)
+          (startOffset, endOffset - startOffset)
         } finally {
           in.close()
         }
       }
     new HadoopFileSegmentManagedBuffer(
-      getDataFile(blockId.shuffleId, blockId.mapId),
+      getDataFile(shuffleId, mapId),
       offset,
       length)
   }
@@ -380,9 +389,9 @@ private[remote] class RemoteShuffleIndexInfo extends Logging {
   /**
     * Get index offset for a particular reducer.
     */
-  def getIndex(reduceId: Int): ShuffleIndexRecord = {
-    val offset = offsets.get(reduceId)
-    val nextOffset = offsets.get(reduceId + 1)
+  def getIndex(startReduceId: Int, endReduceId: Int): ShuffleIndexRecord = {
+    val offset = offsets.get(startReduceId)
+    val nextOffset = offsets.get(endReduceId)
     new ShuffleIndexRecord(offset, nextOffset - offset)
   }
 }

@@ -67,7 +67,7 @@ private[oap] case class ParquetFiberDataLoader(
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor)
     val columnReader =
       new VectorizedColumnReader(columnDescriptor, originalType,
-        fiberData.getPageReader(columnDescriptor), ZoneId.systemDefault, true)
+        fiberData.getPageReader(columnDescriptor), ZoneId.systemDefault, "LEGACY")
 
     if (OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressEnable) {
       ParquetDataFiberCompressedWriter.dumpToCache(

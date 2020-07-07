@@ -29,12 +29,12 @@ class ResultIterator {
     return arrow::Status::NotImplemented("ResultIterator abstract Next()");
   }
   virtual arrow::Status Process(
-      std::vector<std::shared_ptr<arrow::Array>> in, std::shared_ptr<T>* out,
+      const std::vector<std::shared_ptr<arrow::Array>>& in, std::shared_ptr<T>* out,
       const std::shared_ptr<arrow::Array>& selection = nullptr) {
     return arrow::Status::NotImplemented("ResultIterator abstract Process()");
   }
   virtual arrow::Status ProcessAndCacheOne(
-      std::vector<std::shared_ptr<arrow::Array>> in,
+      const std::vector<std::shared_ptr<arrow::Array>>& in,
       const std::shared_ptr<arrow::Array>& selection = nullptr) {
     return arrow::Status::NotImplemented("ResultIterator abstract ProcessAndCacheOne()");
   }

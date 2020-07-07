@@ -19,6 +19,7 @@
 #include <arrow/compute/context.h>
 #include <arrow/type.h>
 
+#include <sstream>
 #include <string>
 
 #include "codegen/arrow_compute/ext/code_generator_base.h"
@@ -30,11 +31,32 @@ namespace extra {
 
 std::string BaseCodes();
 
-int FileSpinLock(std::string path);
+int FileSpinLock();
 
 void FileSpinUnLock(int fd);
 
-std::string GetTypeString(std::shared_ptr<arrow::DataType> type);
+int GetBatchSize();
+std::string GetArrowTypeDefString(std::shared_ptr<arrow::DataType> type);
+std::string GetCTypeString(std::shared_ptr<arrow::DataType> type);
+std::string GetTypeString(std::shared_ptr<arrow::DataType> type,
+                          std::string tail = "Type");
+std::string GetTypedArrayDefineString(std::shared_ptr<arrow::DataType> type,
+                                      std::string name);
+template <typename T>
+std::string GetStringFromList(std::vector<T> list) {
+  std::stringstream ss;
+  for (auto i : list) {
+    ss << i << std::endl;
+  }
+  return ss.str();
+}
+arrow::Status GetIndexList(const std::vector<std::shared_ptr<arrow::Field>>& target_list,
+                           const std::vector<std::shared_ptr<arrow::Field>>& source_list,
+                           std::vector<int>* out);
+arrow::Status GetIndexListFromSchema(
+    const std::shared_ptr<arrow::Schema>& result_schema,
+    const std::vector<std::shared_ptr<arrow::Field>>& field_list,
+    std::vector<int>* index_list);
 
 arrow::Status CompileCodes(std::string codes, std::string signature);
 

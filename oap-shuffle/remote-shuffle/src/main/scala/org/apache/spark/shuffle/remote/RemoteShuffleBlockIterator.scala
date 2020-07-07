@@ -34,7 +34,7 @@ import org.apache.spark.internal.config.{REDUCER_MAX_BLOCKS_IN_FLIGHT_PER_ADDRES
 import org.apache.spark.network.buffer.ManagedBuffer
 import org.apache.spark.network.shuffle._
 import org.apache.spark.shuffle.{FetchFailedException, ShuffleReadMetricsReporter}
-import org.apache.spark.storage.{BlockException, BlockId, BlockManagerId, ShuffleBlockId}
+import org.apache.spark.storage.{BlockException, BlockId, BlockManagerId, ShuffleBlockBatchId, ShuffleBlockId}
 import org.apache.spark.util.io.ChunkedByteBufferOutputStream
 import org.apache.spark.util.{ThreadUtils, Utils}
 import org.apache.spark.{SparkConf, SparkEnv, SparkException, TaskContext}
@@ -173,9 +173,11 @@ final class RemoteShuffleBlockIterator(
     reqsInFlight += 1
 
     // so we can look up the info of each blockID
-    val infoMap = req.blocks.map { case (blockId, size, mapIndex) => (blockId.toString, (size, mapIndex))}.toMap
+    val infoMap = req.blocks.map {
+      case FetchBlockInfo(blockId, size, mapIndex) => (blockId.toString, (size, mapIndex))
+    }.toMap
     val remainingBlocks = new HashSet[String]() ++= infoMap.keys
-    val blockIds = req.blocks.map(_._1)
+    val blockIds = req.blocks.map(_.blockId)
     val address = req.address
 
     val blockFetchingListener = new BlockFetchingListener {
@@ -229,7 +231,7 @@ final class RemoteShuffleBlockIterator(
     for (blockId <- blockIds) {
       // Note by Chenzhao: Can be optimized by reading consecutive blocks
       try {
-        val buf = resolver.getBlockData(blockId.asInstanceOf[ShuffleBlockId])
+        val buf = resolver.getBlockData(blockId)
         listener.onBlockFetchSuccess(blockId.toString(), buf)
       } catch {
         case e: Exception => listener.onBlockFetchFailure(blockId.toString(), e)
@@ -238,6 +240,9 @@ final class RemoteShuffleBlockIterator(
   }
 
   // For remote shuffling, all blocks are remote, so this actually resembles RemoteFetchRequests
+  // This function is actually the most like [[collectFetchRequests]] of [[ShuffleBlockFetcherIterator]]
+  // in Spark 3.0, which serves for remote fetch requests preparing. This fashion is the only one in
+  // this project.
   private[this] def splitLocalRemoteBlocks(): ArrayBuffer[RemoteFetchRequest] = {
 
     // Make remote requests at most maxBytesInFlight / 5 in length; the reason to keep them
@@ -254,7 +259,7 @@ final class RemoteShuffleBlockIterator(
     for ((address, blockInfos) <- blocksByAddress) {
       val iterator = blockInfos.iterator
       var curRequestSize = 0L
-      var curBlocks = new ArrayBuffer[(BlockId, Long, Int)]
+      var curBlocks = new ArrayBuffer[FetchBlockInfo]
       while (iterator.hasNext) {
         val (blockId, size, mapIndex) = iterator.next()
         if (size < 0) {
@@ -262,32 +267,60 @@ final class RemoteShuffleBlockIterator(
         } else if (size == 0) {
           throw new BlockException(blockId, "Zero-sized blocks should be excluded.")
         } else {
-          curBlocks += ((blockId, size, mapIndex))
-          numBlocksToFetch += 1
+          curBlocks += FetchBlockInfo(blockId, size, mapIndex)
           curRequestSize += size
         }
-        // We only care about the amount of requests, but not the total content size of blocks,
-        // due to during this fetch process we only get a range(offset and length) for each block.
-        // The block content will not be transferred through netty, while it's read from a
-        // globally-accessible Hadoop compatible file system
-        if (curRequestSize >= targetRequestSize ||
-          curBlocks.size >= maxBlocksInFlightPerAddress) {
-          // Add this FetchRequest
-          remoteRequests += new RemoteFetchRequest(address, curBlocks)
-          logDebug(s"Creating fetch request of $curRequestSize at $address " +
-            s"with ${curBlocks.size} blocks")
-          curBlocks = new ArrayBuffer[(BlockId, Long, Int)]
-          curRequestSize = 0
+        // For batch fetch, the actual block in flight should count for merged block.
+        val mayExceedsMaxBlocks = !doBatchFetch && curBlocks.size >= maxBlocksInFlightPerAddress
+        if (curRequestSize >= targetRequestSize || mayExceedsMaxBlocks) {
+          curBlocks = createFetchRequests(curBlocks, address, isLast = false,
+            remoteRequests).to[ArrayBuffer]
+          curRequestSize = curBlocks.map(_.size).sum
         }
       }
       // Add in the final request
       if (curBlocks.nonEmpty) {
-        remoteRequests += new RemoteFetchRequest(address, curBlocks)
+        curBlocks = createFetchRequests(curBlocks, address, isLast = false,
+          remoteRequests).to[ArrayBuffer]
+        curRequestSize = curBlocks.map(_.size).sum
       }
     }
     logInfo(s"Getting $numBlocksToFetch non-empty blocks, " +
       s"number of remote requests: ${remoteRequests.size}")
     remoteRequests
+  }
+
+  private def createFetchRequests(
+      curBlocks: Seq[FetchBlockInfo],
+      address: BlockManagerId,
+      isLast: Boolean,
+      collectedRemoteRequests: ArrayBuffer[RemoteFetchRequest]): Seq[FetchBlockInfo] = {
+    val mergedBlocks = mergeContinuousShuffleBlockIdsIfNeeded(curBlocks, doBatchFetch)
+    numBlocksToFetch += mergedBlocks.size
+    var retBlocks = Seq.empty[FetchBlockInfo]
+    if (mergedBlocks.length <= maxBlocksInFlightPerAddress) {
+      collectedRemoteRequests += createFetchRequest(mergedBlocks, address)
+    } else {
+      mergedBlocks.grouped(maxBlocksInFlightPerAddress).foreach { blocks =>
+        if (blocks.length == maxBlocksInFlightPerAddress || isLast) {
+          collectedRemoteRequests += createFetchRequest(blocks, address)
+        } else {
+          // The last group does not exceed `maxBlocksInFlightPerAddress`. Put it back
+          // to `curBlocks`.
+          retBlocks = blocks
+          numBlocksToFetch -= blocks.size
+        }
+      }
+    }
+    retBlocks
+  }
+
+  private def createFetchRequest(
+      blocks: Seq[FetchBlockInfo],
+      address: BlockManagerId): RemoteFetchRequest = {
+    logDebug(s"Creating fetch request of ${blocks.map(_.size).sum} at $address "
+      + s"with ${blocks.size} blocks")
+    RemoteFetchRequest(address, blocks)
   }
 
   private[this] def initialize(): Unit = {
@@ -399,7 +432,7 @@ final class RemoteShuffleBlockIterator(
               } else {
                 logWarning(s"got an corrupted block $blockId from $address, fetch again", e)
                 corruptedBlocks += blockId
-                fetchRequests += RemoteFetchRequest(address, Array((blockId, size, mapIndex)))
+                fetchRequests += RemoteFetchRequest(address, Array(FetchBlockInfo(blockId, size, mapIndex)))
                 result = null
               }
           } finally {
@@ -505,13 +538,22 @@ private[remote] object RemoteShuffleBlockIterator {
     ThreadUtils.newDaemonCachedThreadPool("shuffle-data-fetching", maxConcurrentFetches))
 
   /**
+   * The block information to fetch used in FetchRequest.
+   * @param blockId block id
+   * @param size estimated size of the block. Note that this is NOT the exact bytes.
+   *             Size of remote block is used to calculate bytesInFlight.
+   * @param mapIndex the mapIndex for this block, which indicate the index in the map stage.
+   */
+  private[remote] case class FetchBlockInfo(blockId: BlockId, size: Long, mapIndex: Int)
+
+  /**
    * A request to fetch blocks from a remote BlockManager.
    * @param address remote BlockManager to fetch from.
    * @param blocks Sequence of tuple, where the first element is the block id,
    *               and the second element is the estimated size, used to calculate bytesInFlight.
    */
-  case class RemoteFetchRequest(address: BlockManagerId, blocks: Seq[(BlockId, Long, Int)]) {
-    val size = blocks.map(_._2).sum
+  case class RemoteFetchRequest(address: BlockManagerId, blocks: Seq[FetchBlockInfo]) {
+    val size = blocks.map(_.size).sum
   }
 
   /**
@@ -547,4 +589,85 @@ private[remote] object RemoteShuffleBlockIterator {
       mapIndex: Int,
       address: BlockManagerId,
       e: Throwable) extends RemoteFetchResult
+
+  /**
+   * This function is used to merged blocks when doBatchFetch is true. Blocks which have the
+   * same `mapId` can be merged into one block batch. The block batch is specified by a range
+   * of reduceId, which implies the continuous shuffle blocks that we can fetch in a batch.
+   * For example, input blocks like (shuffle_0_0_0, shuffle_0_0_1, shuffle_0_1_0) can be
+   * merged into (shuffle_0_0_0_2, shuffle_0_1_0_1), and input blocks like (shuffle_0_0_0_2,
+   * shuffle_0_0_2, shuffle_0_0_3) can be merged into (shuffle_0_0_0_4).
+   *
+   * @param blocks blocks to be merged if possible. May contains already merged blocks.
+   * @param doBatchFetch whether to merge blocks.
+   * @return the input blocks if doBatchFetch=false, or the merged blocks if doBatchFetch=true.
+   */
+  def mergeContinuousShuffleBlockIdsIfNeeded(
+      blocks: Seq[FetchBlockInfo],
+      doBatchFetch: Boolean): Seq[FetchBlockInfo] = {
+    val result = if (doBatchFetch) {
+      var curBlocks = new ArrayBuffer[FetchBlockInfo]
+      val mergedBlockInfo = new ArrayBuffer[FetchBlockInfo]
+
+      def mergeFetchBlockInfo(toBeMerged: ArrayBuffer[FetchBlockInfo]): FetchBlockInfo = {
+        val startBlockId = toBeMerged.head.blockId.asInstanceOf[ShuffleBlockId]
+
+        // The last merged block may comes from the input, and we can merge more blocks
+        // into it, if the map id is the same.
+        def shouldMergeIntoPreviousBatchBlockId =
+          mergedBlockInfo.last.blockId.asInstanceOf[ShuffleBlockBatchId].mapId == startBlockId.mapId
+
+        val (startReduceId, size) =
+          if (mergedBlockInfo.nonEmpty && shouldMergeIntoPreviousBatchBlockId) {
+            // Remove the previous batch block id as we will add a new one to replace it.
+            val removed = mergedBlockInfo.remove(mergedBlockInfo.length - 1)
+            (removed.blockId.asInstanceOf[ShuffleBlockBatchId].startReduceId,
+              removed.size + toBeMerged.map(_.size).sum)
+          } else {
+            (startBlockId.reduceId, toBeMerged.map(_.size).sum)
+          }
+
+        FetchBlockInfo(
+          ShuffleBlockBatchId(
+            startBlockId.shuffleId,
+            startBlockId.mapId,
+            startReduceId,
+            toBeMerged.last.blockId.asInstanceOf[ShuffleBlockId].reduceId + 1),
+          size,
+          toBeMerged.head.mapIndex)
+      }
+
+      val iter = blocks.iterator
+      while (iter.hasNext) {
+        val info = iter.next()
+        // It's possible that the input block id is already a batch ID. For example, we merge some
+        // blocks, and then make fetch requests with the merged blocks according to "max blocks per
+        // request". The last fetch request may be too small, and we give up and put the remaining
+        // merged blocks back to the input list.
+        if (info.blockId.isInstanceOf[ShuffleBlockBatchId]) {
+          mergedBlockInfo += info
+        } else {
+          if (curBlocks.isEmpty) {
+            curBlocks += info
+          } else {
+            val curBlockId = info.blockId.asInstanceOf[ShuffleBlockId]
+            val currentMapId = curBlocks.head.blockId.asInstanceOf[ShuffleBlockId].mapId
+            if (curBlockId.mapId != currentMapId) {
+              mergedBlockInfo += mergeFetchBlockInfo(curBlocks)
+              curBlocks.clear()
+            }
+            curBlocks += info
+          }
+        }
+      }
+      if (curBlocks.nonEmpty) {
+        mergedBlockInfo += mergeFetchBlockInfo(curBlocks)
+      }
+      mergedBlockInfo
+    } else {
+      blocks
+    }
+    result
+  }
+
 }

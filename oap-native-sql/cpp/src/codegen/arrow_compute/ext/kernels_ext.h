@@ -36,9 +36,6 @@ class KernalBase {
  public:
   KernalBase() {}
   ~KernalBase() {}
-  virtual arrow::Status SetMember(const std::shared_ptr<arrow::RecordBatch>& in) {
-    return arrow::Status::NotImplemented("KernalBase abstract interface.");
-  }
   virtual arrow::Status Evaluate(const ArrayList& in) {
     return arrow::Status::NotImplemented("Evaluate is abstract interface for ",
                                          kernel_name_, ", input is arrayList.");
@@ -59,20 +56,6 @@ class KernalBase {
                                          kernel_name_,
                                          ", input is arrayList, output is array.");
   }
-  virtual arrow::Status Evaluate(const std::shared_ptr<arrow::Array>& in) {
-    return arrow::Status::NotImplemented("Evaluate is abstract interface for ",
-                                         kernel_name_, ", input is array.");
-  }
-  virtual arrow::Status Evaluate(const std::shared_ptr<arrow::Array>& selection_arr,
-                                 const std::shared_ptr<arrow::Array>& in) {
-    return arrow::Status::NotImplemented("Evaluate is abstract interface for ",
-                                         kernel_name_,
-                                         ", input is selection_array and array.");
-  }
-  virtual arrow::Status Evaluate(const std::shared_ptr<arrow::Array>& in, int group_id) {
-    return arrow::Status::NotImplemented("Evaluate is abstract interface for ",
-                                         kernel_name_, ", input is array and group_id");
-  }
   virtual arrow::Status Evaluate(const std::shared_ptr<arrow::Array>& in,
                                  std::shared_ptr<arrow::Array>* out) {
     return arrow::Status::NotImplemented("Evaluate is abstract interface for ",
@@ -82,23 +65,6 @@ class KernalBase {
   virtual arrow::Status Finish(ArrayList* out) {
     return arrow::Status::NotImplemented("Finish is abstract interface for ",
                                          kernel_name_, ", output is arrayList");
-  }
-  virtual arrow::Status Finish(std::vector<ArrayList>* out) {
-    return arrow::Status::NotImplemented("Finish is abstract interface for ",
-                                         kernel_name_, ", output is batchList");
-  }
-  virtual arrow::Status Finish(std::shared_ptr<arrow::Array>* out) {
-    return arrow::Status::NotImplemented("Finish is abstract interface for ",
-                                         kernel_name_, ", output is array");
-  }
-  virtual arrow::Status SetDependencyInput(const std::shared_ptr<arrow::Array>& in) {
-    return arrow::Status::NotImplemented("SetDependencyInput is abstract interface for ",
-                                         kernel_name_, ", input is array");
-  }
-  virtual arrow::Status SetDependencyIter(
-      const std::shared_ptr<ResultIterator<arrow::RecordBatch>>& in, int index) {
-    return arrow::Status::NotImplemented("SetDependencyIter is abstract interface for ",
-                                         kernel_name_, ", input is array");
   }
   virtual arrow::Status MakeResultIterator(
       std::shared_ptr<arrow::Schema> schema,
@@ -146,13 +112,13 @@ class EncodeArrayKernel : public KernalBase {
   arrow::compute::FunctionContext* ctx_;
 };
 
-class HashAggrArrayKernel : public KernalBase {
+class HashArrayKernel : public KernalBase {
  public:
   static arrow::Status Make(arrow::compute::FunctionContext* ctx,
                             std::vector<std::shared_ptr<arrow::DataType>> type_list,
                             std::shared_ptr<KernalBase>* out);
-  HashAggrArrayKernel(arrow::compute::FunctionContext* ctx,
-                      std::vector<std::shared_ptr<arrow::DataType>> type_list);
+  HashArrayKernel(arrow::compute::FunctionContext* ctx,
+                  std::vector<std::shared_ptr<arrow::DataType>> type_list);
   arrow::Status Evaluate(const ArrayList& in,
                          std::shared_ptr<arrow::Array>* out) override;
 
@@ -280,6 +246,29 @@ class SortArraysToIndicesKernel : public KernalBase {
   arrow::compute::FunctionContext* ctx_;
 };
 
+class HashAggregateKernel : public KernalBase {
+ public:
+  static arrow::Status Make(arrow::compute::FunctionContext* ctx,
+                            std::vector<std::shared_ptr<arrow::Field>> input_field_list,
+                            std::vector<std::shared_ptr<gandiva::Node>> action_list,
+                            std::shared_ptr<arrow::Schema> result_schema,
+                            std::shared_ptr<KernalBase>* out);
+  HashAggregateKernel(arrow::compute::FunctionContext* ctx,
+                      std::vector<std::shared_ptr<arrow::Field>> input_field_list,
+                      std::vector<std::shared_ptr<gandiva::Node>> action_list,
+                      std::shared_ptr<arrow::Schema> result_schema);
+  arrow::Status Evaluate(const ArrayList& in) override;
+  arrow::Status MakeResultIterator(
+      std::shared_ptr<arrow::Schema> schema,
+      std::shared_ptr<ResultIterator<arrow::RecordBatch>>* out) override;
+
+  class Impl;
+
+ private:
+  std::unique_ptr<Impl> impl_;
+  arrow::compute::FunctionContext* ctx_;
+};
+
 /*class UniqueArrayKernel : public KernalBase {
  public:
   static arrow::Status Make(arrow::compute::FunctionContext* ctx,
@@ -294,48 +283,25 @@ class SortArraysToIndicesKernel : public KernalBase {
   arrow::compute::FunctionContext* ctx_;
 };*/
 
-class ConditionedShuffleArrayListKernel : public KernalBase {
- public:
-  static arrow::Status Make(arrow::compute::FunctionContext* ctx,
-                            std::shared_ptr<gandiva::Node> func_node,
-                            std::vector<std::shared_ptr<arrow::Field>> left_field_list,
-                            std::vector<std::shared_ptr<arrow::Field>> right_field_list,
-                            std::vector<std::shared_ptr<arrow::Field>> output_field_list,
-                            std::shared_ptr<KernalBase>* out);
-  ConditionedShuffleArrayListKernel(
-      arrow::compute::FunctionContext* ctx, std::shared_ptr<gandiva::Node> func_node,
-      std::vector<std::shared_ptr<arrow::Field>> left_field_list,
-      std::vector<std::shared_ptr<arrow::Field>> right_field_list,
-      std::vector<std::shared_ptr<arrow::Field>> output_field_list);
-  arrow::Status Evaluate(const ArrayList& in) override;
-  arrow::Status SetDependencyIter(
-      const std::shared_ptr<ResultIterator<arrow::RecordBatch>>& in, int index) override;
-  arrow::Status MakeResultIterator(
-      std::shared_ptr<arrow::Schema> schema,
-      std::shared_ptr<ResultIterator<arrow::RecordBatch>>* out) override;
-
- private:
-  class Impl;
-  std::unique_ptr<Impl> impl_;
-  arrow::compute::FunctionContext* ctx_;
-};
-
 class ConditionedProbeArraysKernel : public KernalBase {
  public:
-  static arrow::Status Make(arrow::compute::FunctionContext* ctx,
-                            std::vector<std::shared_ptr<arrow::Field>> left_key_list,
-                            std::vector<std::shared_ptr<arrow::Field>> right_key_list,
-                            std::shared_ptr<gandiva::Node> func_node, int join_type,
-                            std::vector<std::shared_ptr<arrow::Field>> left_field_list,
-                            std::vector<std::shared_ptr<arrow::Field>> right_field_list,
-                            std::shared_ptr<KernalBase>* out);
+  static arrow::Status Make(
+      arrow::compute::FunctionContext* ctx,
+      const std::vector<std::shared_ptr<arrow::Field>>& left_key_list,
+      const std::vector<std::shared_ptr<arrow::Field>>& right_key_list,
+      const std::shared_ptr<gandiva::Node>& func_node, int join_type,
+      const std::vector<std::shared_ptr<arrow::Field>>& left_field_list,
+      const std::vector<std::shared_ptr<arrow::Field>>& right_field_list,
+      const std::shared_ptr<arrow::Schema>& result_schema,
+      std::shared_ptr<KernalBase>* out);
   ConditionedProbeArraysKernel(
       arrow::compute::FunctionContext* ctx,
-      std::vector<std::shared_ptr<arrow::Field>> left_key_list,
-      std::vector<std::shared_ptr<arrow::Field>> right_key_list,
-      std::shared_ptr<gandiva::Node> func_node, int join_type,
-      std::vector<std::shared_ptr<arrow::Field>> left_field_list,
-      std::vector<std::shared_ptr<arrow::Field>> right_field_list);
+      const std::vector<std::shared_ptr<arrow::Field>>& left_key_list,
+      const std::vector<std::shared_ptr<arrow::Field>>& right_key_list,
+      const std::shared_ptr<gandiva::Node>& func_node, int join_type,
+      const std::vector<std::shared_ptr<arrow::Field>>& left_field_list,
+      const std::vector<std::shared_ptr<arrow::Field>>& right_field_list,
+      const std::shared_ptr<arrow::Schema>& result_schema);
   arrow::Status Evaluate(const ArrayList& in) override;
   arrow::Status MakeResultIterator(
       std::shared_ptr<arrow::Schema> schema,

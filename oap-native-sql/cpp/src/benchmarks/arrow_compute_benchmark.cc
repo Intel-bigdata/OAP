@@ -26,7 +26,9 @@
 #include <gtest/gtest.h>
 #include <parquet/arrow/reader.h>
 #include <parquet/file_reader.h>
+
 #include <chrono>
+
 #include "codegen/code_generator.h"
 #include "codegen/code_generator_factory.h"
 #include "codegen/common/result_iterator.h"
@@ -44,7 +46,7 @@ class BenchmarkArrowCompute : public ::testing::Test {
 #else
     std::string dir_path = "";
 #endif
-    std::string path = dir_path + "tpcds_websales_sort.parquet";
+    std::string path = dir_path + "tpcds_websales_sort_big.parquet";
     std::cout << "This Benchmark used file " << path
               << ", please download from server "
                  "vsr200://home/zhouyuan/sparkColumnarPlugin/source_files"
@@ -62,8 +64,8 @@ class BenchmarkArrowCompute : public ::testing::Test {
     ASSERT_NOT_OK(::parquet::arrow::FileReader::Make(
         pool, ::parquet::ParquetFileReader::Open(file), properties, &parquet_reader));
 
-    ASSERT_NOT_OK(parquet_reader->GetRecordBatchReader({0}, {0, 1, 2, 3, 4, 5},
-                                                       &record_batch_reader));
+    ASSERT_NOT_OK(
+        parquet_reader->GetRecordBatchReader({0}, {0, 1, 2}, &record_batch_reader));
 
     schema = record_batch_reader->schema();
 
@@ -93,12 +95,14 @@ class BenchmarkArrowCompute : public ::testing::Test {
     std::cout << "Readed " << num_batches << " batches." << std::endl;
 
     TIME_MICRO_OR_THROW(elapse_eval, expr->finish(&result_batch));
+    /*auto batch = result_batch[result_batch.size() - 1];
+    arrow::PrettyPrint(*batch.get(), 2, &std::cout);*/
 
     std::cout << "BenchmarkArrowComputeBigScale processed " << num_batches
-              << " batches, took " << TIME_TO_STRING(elapse_gen)
-              << " doing codegen, took " << TIME_TO_STRING(elapse_read)
-              << " doing BatchRead, took " << TIME_TO_STRING(elapse_eval)
-              << " doing Batch Evaluation." << std::endl;
+              << " batches,\n output " << result_batch.size() << " batches,\n took "
+              << TIME_TO_STRING(elapse_gen) << " doing codegen,\n took "
+              << TIME_TO_STRING(elapse_read) << " doing BatchRead,\n took "
+              << TIME_TO_STRING(elapse_eval) << " doing Batch Evaluation." << std::endl;
   }
 
   void StartWithIterator() {

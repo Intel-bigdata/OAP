@@ -21,10 +21,11 @@
 #include <arrow/status.h>
 #include <gandiva/node.h>
 #include <gandiva/node_visitor.h>
-#include <iostream>
 
+#include <iostream>
 #include <memory>
 #include <unordered_map>
+
 #include "codegen/common/result_iterator.h"
 #include "codegen/common/visitor_base.h"
 #include "utils/macros.h"
@@ -112,6 +113,11 @@ class ExprVisitor : public std::enable_shared_from_this<ExprVisitor> {
 #endif
   }
   arrow::Status MakeExprVisitorImpl(const std::string& func_name, ExprVisitor* p);
+  arrow::Status MakeExprVisitorImpl(const std::string& func_name,
+                                    std::shared_ptr<gandiva::FunctionNode> func_node,
+                                    std::vector<std::shared_ptr<arrow::Field>> field_list,
+                                    std::vector<std::shared_ptr<arrow::Field>> ret_fields,
+                                    ExprVisitor* p);
   arrow::Status MakeExprVisitorImpl(
       const std::string& func_name, std::shared_ptr<gandiva::FunctionNode> func_node,
       std::vector<std::shared_ptr<arrow::Field>> left_field_list,

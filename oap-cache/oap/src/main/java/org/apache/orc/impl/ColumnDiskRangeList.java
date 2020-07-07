@@ -17,7 +17,7 @@
 
 package org.apache.orc.impl;
 
-import org.apache.orc.storage.common.io.DiskRangeList;
+import org.apache.hadoop.hive.common.io.DiskRangeList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -48,56 +48,178 @@ std::string BaseCodes() {
 #include <algorithm>
 #include <iostream>
 
-template <typename T> class ResultIterator {
-public:
-  virtual bool HasNext() { return false; }
-  virtual arrow::Status Next(std::shared_ptr<T> *out) {
-    return arrow::Status::NotImplemented("ResultIterator abstract Next function");
-  }
-  virtual arrow::Status
-  Process(std::vector<std::shared_ptr<arrow::Array>> in,
-          std::shared_ptr<T> *out,
-          const std::shared_ptr<arrow::Array> &selection = nullptr) {
-    return arrow::Status::NotImplemented("ResultIterator abstract Process function");
-  }
-  virtual arrow::Status
-  ProcessAndCacheOne(std::vector<std::shared_ptr<arrow::Array>> in,
-                     const std::shared_ptr<arrow::Array> &selection = nullptr) {
-    return arrow::Status::NotImplemented(
-        "ResultIterator abstract ProcessAndCacheOne function");
-  }
-  virtual arrow::Status GetResult(std::shared_ptr<arrow::RecordBatch>* out) {
-    return arrow::Status::NotImplemented("ResultIterator abstract GetResult function");
-  }
-  virtual std::string ToString() { return ""; }
-};
+#include "codegen/arrow_compute/ext/array_item_index.h"
+#include "codegen/arrow_compute/ext/code_generator_base.h"
+#include "codegen/arrow_compute/ext/kernels_ext.h"
+#include "codegen/common/result_iterator.h"
+#include "sparsehash/sparse_hash_map.h"
+#include "third_party/arrow/utils/hashing.h"
 
-using ArrayList = std::vector<std::shared_ptr<arrow::Array>>;
-struct ArrayItemIndex {
-  uint64_t id = 0;
-  uint64_t array_id = 0;
-  ArrayItemIndex(uint64_t array_id, uint64_t id) : array_id(array_id), id(id) {}
-};
+using namespace sparkcolumnarplugin::codegen::arrowcompute::extra;
 
-class CodeGenBase {
- public:
-  virtual arrow::Status Evaluate(const ArrayList& in) {
-    return arrow::Status::NotImplemented("SortBase Evaluate is an abstract interface.");
-  }
-  virtual arrow::Status Finish(std::shared_ptr<arrow::Array>* out) {
-    return arrow::Status::NotImplemented("SortBase Finish is an abstract interface.");
-  }
-  virtual arrow::Status MakeResultIterator(
-      std::shared_ptr<arrow::Schema> schema,
-      std::shared_ptr<ResultIterator<arrow::RecordBatch>>* out) {
-    return arrow::Status::NotImplemented(
-        "SortBase MakeResultIterator is an abstract interface.");
-  }
-};)";
+)";
 }
 
-int FileSpinLock(std::string path) {
-  std::string lockfile = path + "/nativesql_compile.lock";
+std::string GetArrowTypeDefString(std::shared_ptr<arrow::DataType> type) {
+  switch (type->id()) {
+    case arrow::UInt8Type::type_id:
+      return "uint8()";
+    case arrow::Int8Type::type_id:
+      return "int8()";
+    case arrow::UInt16Type::type_id:
+      return "uint16()";
+    case arrow::Int16Type::type_id:
+      return "int16()";
+    case arrow::UInt32Type::type_id:
+      return "uint32()";
+    case arrow::Int32Type::type_id:
+      return "int32()";
+    case arrow::UInt64Type::type_id:
+      return "uint64()";
+    case arrow::Int64Type::type_id:
+      return "int64()";
+    case arrow::FloatType::type_id:
+      return "float632()";
+    case arrow::DoubleType::type_id:
+      return "float64()";
+    case arrow::Date32Type::type_id:
+      return "date32()";
+    case arrow::StringType::type_id:
+      return "utf8()";
+    default:
+      std::cout << "GetTypeString can't convert " << type->ToString() << std::endl;
+      throw;
+  }
+}
+std::string GetCTypeString(std::shared_ptr<arrow::DataType> type) {
+  switch (type->id()) {
+    case arrow::UInt8Type::type_id:
+      return "uint8_t";
+    case arrow::Int8Type::type_id:
+      return "int8_t";
+    case arrow::UInt16Type::type_id:
+      return "uint16_t";
+    case arrow::Int16Type::type_id:
+      return "int16_t";
+    case arrow::UInt32Type::type_id:
+      return "uint32_t";
+    case arrow::Int32Type::type_id:
+      return "int32_t";
+    case arrow::UInt64Type::type_id:
+      return "uint64_t";
+    case arrow::Int64Type::type_id:
+      return "int64_t";
+    case arrow::FloatType::type_id:
+      return "float";
+    case arrow::DoubleType::type_id:
+      return "double";
+    case arrow::Date32Type::type_id:
+      return "int32_t";
+    case arrow::StringType::type_id:
+      return "std::string";
+    default:
+      std::cout << "GetTypeString can't convert " << type->ToString() << std::endl;
+      throw;
+  }
+}
+std::string GetTypeString(std::shared_ptr<arrow::DataType> type, std::string tail) {
+  switch (type->id()) {
+    case arrow::UInt8Type::type_id:
+      return "UInt8" + tail;
+    case arrow::Int8Type::type_id:
+      return "Int8" + tail;
+    case arrow::UInt16Type::type_id:
+      return "UInt16" + tail;
+    case arrow::Int16Type::type_id:
+      return "Int16" + tail;
+    case arrow::UInt32Type::type_id:
+      return "UInt32" + tail;
+    case arrow::Int32Type::type_id:
+      return "Int32" + tail;
+    case arrow::UInt64Type::type_id:
+      return "UInt64" + tail;
+    case arrow::Int64Type::type_id:
+      return "Int64" + tail;
+    case arrow::FloatType::type_id:
+      return "Float" + tail;
+    case arrow::DoubleType::type_id:
+      return "Double" + tail;
+    case arrow::Date32Type::type_id:
+      return "Date32" + tail;
+    case arrow::StringType::type_id:
+      return "String" + tail;
+    default:
+      std::cout << "GetTypeString can't convert " << type->ToString() << std::endl;
+      throw;
+  }
+}
+
+std::string GetTypedArrayDefineString(std::shared_ptr<arrow::DataType> type,
+                                      std::string name) {
+  return "std::vector<std::shared_ptr<arrow::" + GetTypeString(type, "Array") + ">> " +
+         name + ";\n";
+}
+
+arrow::Status GetIndexList(const std::vector<std::shared_ptr<arrow::Field>>& target_list,
+                           const std::vector<std::shared_ptr<arrow::Field>>& source_list,
+                           std::vector<int>* out) {
+  for (auto key_field : target_list) {
+    int i = 0;
+    for (auto field : source_list) {
+      if (key_field->name() == field->name()) {
+        break;
+      }
+      i++;
+    }
+    (*out).push_back(i);
+  }
+  return arrow::Status::OK();
+}
+
+arrow::Status GetIndexListFromSchema(
+    const std::shared_ptr<arrow::Schema>& result_schema,
+    const std::vector<std::shared_ptr<arrow::Field>>& field_list,
+    std::vector<int>* index_list) {
+  int i = 0;
+  for (auto field : field_list) {
+    auto indices = result_schema->GetAllFieldIndices(field->name());
+    if (indices.size() == 1) {
+      (*index_list).push_back(i);
+    }
+    i++;
+  }
+  return arrow::Status::OK();
+}
+
+std::string GetTempPath() {
+  std::string tmp_dir_;
+  const char* env_tmp_dir = std::getenv("NATIVESQL_TMP_DIR");
+  if (env_tmp_dir != nullptr) {
+    tmp_dir_ = std::string(env_tmp_dir);
+  } else {
+#ifdef NATIVESQL_SRC_PATH
+    tmp_dir_ = NATIVESQL_SRC_PATH;
+#else
+    std::cerr << "envioroment variable NATIVESQL_TMP_DIR is not set" << std::endl;
+    throw;
+#endif
+  }
+  return tmp_dir_;
+}
+
+int GetBatchSize() {
+  int batch_size;
+  const char* env_batch_size = std::getenv("NATIVESQL_BATCH_SIZE");
+  if (env_batch_size != nullptr) {
+    batch_size = atoi(env_batch_size);
+  } else {
+    batch_size = 10000;
+  }
+  return batch_size;
+}
+
+int FileSpinLock() {
+  std::string lockfile = GetTempPath() + "/nativesql_compile.lock";
 
   auto fd = open(lockfile.c_str(), O_CREAT, S_IRWXU | S_IRWXG);
   flock(fd, LOCK_EX);
@@ -110,42 +232,11 @@ void FileSpinUnLock(int fd) {
   close(fd);
 }
 
-std::string GetTypeString(std::shared_ptr<arrow::DataType> type) {
-  switch (type->id()) {
-    case arrow::UInt8Type::type_id:
-      return "UInt8Type";
-    case arrow::Int8Type::type_id:
-      return "Int8Type";
-    case arrow::UInt16Type::type_id:
-      return "UInt16Type";
-    case arrow::Int16Type::type_id:
-      return "Int16Type";
-    case arrow::UInt32Type::type_id:
-      return "UInt32Type";
-    case arrow::Int32Type::type_id:
-      return "Int32Type";
-    case arrow::UInt64Type::type_id:
-      return "UInt64Type";
-    case arrow::Int64Type::type_id:
-      return "Int64Type";
-    case arrow::FloatType::type_id:
-      return "FloatType";
-    case arrow::DoubleType::type_id:
-      return "DoubleType";
-    case arrow::Date32Type::type_id:
-      return "Date32Type";
-    case arrow::StringType::type_id:
-      return "StringType";
-    default:
-      std::cout << "GetTypeString can't convert " << type->ToString() << std::endl;
-      throw;
-  }
-}
-
 arrow::Status CompileCodes(std::string codes, std::string signature) {
   // temporary cpp/library output files
   srand(time(NULL));
-  std::string outpath = "/tmp";
+  std::string outpath = GetTempPath() + "/tmp/";
+  mkdir(outpath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
   std::string prefix = "/spark-columnar-plugin-codegen-";
   std::string cppfile = outpath + prefix + signature + ".cc";
   std::string libfile = outpath + prefix + signature + ".so";
@@ -158,6 +249,10 @@ arrow::Status CompileCodes(std::string codes, std::string signature) {
     exit(EXIT_FAILURE);
   }
   out << codes;
+#ifdef DEBUG
+  std::cout << "BatchSize is " << GetBatchSize() << std::endl;
+  std::cout << codes << std::endl;
+#endif
   out.flush();
   out.close();
 
@@ -170,18 +265,31 @@ arrow::Status CompileCodes(std::string codes, std::string signature) {
 
   const char* env_arrow_dir = std::getenv("LIBARROW_DIR");
   std::string arrow_header;
-  std::string arrow_lib;
+  std::string arrow_lib, arrow_lib2;
+  std::string nativesql_header = " -I" + GetTempPath() + "/nativesql_include/ ";
+  std::string nativesql_header_2 = " -I" + GetTempPath() + "/include/ ";
+  std::string nativesql_lib = " -L" + GetTempPath() + " ";
   if (env_arrow_dir != nullptr) {
     arrow_header = " -I" + std::string(env_arrow_dir) + "/include ";
     arrow_lib = " -L" + std::string(env_arrow_dir) + "/lib64 ";
+    // incase there's a different location for libarrow.so
+    arrow_lib2 = " -L" + std::string(env_arrow_dir) + "/lib ";
   }
   // compile the code
-  std::string cmd = env_gcc + " -std=c++11 -Wall -Wextra " + arrow_header + arrow_lib +
-                    cppfile + " -o " + libfile + " -O3 -shared -fPIC -larrow 2> " +
+  std::string cmd = env_gcc + " -std=c++14 -Wno-deprecated-declarations " + arrow_header +
+                    arrow_lib + arrow_lib2 + nativesql_header + nativesql_header_2 +
+                    nativesql_lib + cppfile + " -o " + libfile +
+                    " -O3 -march=native -shared -fPIC -larrow -lspark_columnar_jni 2> " +
                     logfile;
+  //#ifdef DEBUG
+  std::cout << cmd << std::endl;
+  //#endif
   int ret = system(cmd.c_str());
   if (WEXITSTATUS(ret) != EXIT_SUCCESS) {
     std::cout << "compilation failed, see " << logfile << std::endl;
+    std::cout << cmd << std::endl;
+    cmd = "ls -R -l " + GetTempPath() + "; cat " + logfile;
+    system(cmd.c_str());
     exit(EXIT_FAILURE);
   }
 
@@ -197,10 +305,9 @@ arrow::Status CompileCodes(std::string codes, std::string signature) {
 
 arrow::Status LoadLibrary(std::string signature, arrow::compute::FunctionContext* ctx,
                           std::shared_ptr<CodeGenBase>* out) {
-  std::string outpath = "/tmp";
+  std::string outpath = GetTempPath() + "/tmp/";
   std::string prefix = "/spark-columnar-plugin-codegen-";
   std::string libfile = outpath + prefix + signature + ".so";
-  std::cout << "LoadLibrary " << libfile << std::endl;
   // load dynamic library
   void* dynlib = dlopen(libfile.c_str(), RTLD_LAZY);
   if (!dynlib) {
@@ -210,6 +317,7 @@ arrow::Status LoadLibrary(std::string signature, arrow::compute::FunctionContext
   // loading symbol from library and assign to pointer
   // (to be cast to function pointer later)
 
+  std::cout << "LoadLibrary " << libfile << std::endl;
   void (*MakeCodeGen)(arrow::compute::FunctionContext * ctx,
                       std::shared_ptr<CodeGenBase> * out);
   *(void**)(&MakeCodeGen) = dlsym(dynlib, "MakeCodeGen");

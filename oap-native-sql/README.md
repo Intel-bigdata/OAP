@@ -1,161 +1,44 @@
-# SparkColumnarPlugin
+# Spark Native SQL Engine
 
-## Contents
-
-- [Introduction](#introduction)
-- [Installation](#installation)
-- [Benchmark](#benchmark)
-- [Contact](#contact)
+A Native Engine for Spark SQL with vectorze SIMD optimizations
 
 ## Introduction
 
-### Key concepts of this project:
-1. Using Apache Arrow as column vector format as intermediate data among spark operator.
-2. Enable Apache Arrow native readers for Parquet and other formats.
-3. Leverage Apache Arrow Gandiva/Compute to evaluate columnar operator expressions.
-4. (WIP)New native columnar shuffle operator with efficient compression support.
+![Overview](/oap-native-sql/resource/nativesql_arch.png)
 
-![Overview](/oap-native-sql/resource/Native_SQL_Engine_Intro.jpg)
+Spark SQL works very well with structured row-based data. It used WholeStageCodeGen to improve the performance by Java JIT code. However Java JIT is usually not working very well on utilizing latest SIMD instructions, espeically under complicated queries. [Apache Arrow](https://arrow.apache.org/) provided CPU-cahce friendly columnar in-memory layout, its SIMD optimized kernels and LLVM based SQL engine Gandiva are also very efficient. Native SQL Engine used these technoligies and brought better performance to Spark SQL.
 
-## Installation
+## Key Features
 
-For detailed testing scripts, please refer to [solution guide](https://github.com/Intel-bigdata/Solution_navigator/tree/master/nativesql)
+### Apache Arrow formated intermediate data among Spark operator
 
-### Installation option 1: For evaluation, simple and fast
+![Overview](/oap-native-sql/resource/columnar.png)
 
-#### install spark 3.0.0 or above
+With [Spark 27396](https://issues.apache.org/jira/browse/SPARK-27396) its possible to pass a RDD of Columnarbatch to operators. We implementd this API with Arrow columnar format.
 
-[spark download](https://spark.apache.org/downloads.html)
+### Apache Arrow based Native Readers for Paruqet and other formats
 
-Remove original Arrow Jars inside Spark assemply folder
-``` shell
-yes | rm assembly/target/scala-2.12/jars/arrow-format-0.15.1.jar
-yes | rm assembly/target/scala-2.12/jars/arrow-vector-0.15.1.jar
-yes | rm assembly/target/scala-2.12/jars/arrow-memory-0.15.1.jar
-```
+![Overview](/oap-native-sql/resource/dataset.png)
 
-#### install arrow 0.17.0
+A native parquet reader was developed to speed up the data loading. it's based on Apache Arrow Dataset. For details please check [Arrow Data Source](../oap-data-source/README.md)
 
-```
-git clone https://github.com/apache/arrow && cd arrow & git checkout arrow-0.17.0
-vim ci/conda_env_gandiva.yml 
-clangdev=7
-llvmdev=7
+### Apache Arrow Compute/Gandiva based operators
 
-conda create -y -n pyarrow-dev -c conda-forge \
-    --file ci/conda_env_unix.yml \
-    --file ci/conda_env_cpp.yml \
-    --file ci/conda_env_python.yml \
-    --file ci/conda_env_gandiva.yml \
-    compilers \
-    python=3.7 \
-    pandas
-conda activate pyarrow-dev
-```
+![Overview](/oap-native-sql/resource/kernel.png)
 
-#### Build native-sql cpp
+We implemented common operatos based on Apache Arrow Compute and Gandiva. The SQL expression was compiled to one expression tree with protobuf and passed to native kernels. The native kernels will then evaluate the these expressions based on the input columnar batch.
 
-``` shell
-git clone https://github.com/Intel-bigdata/OAP.git
-cd OAP && git checkout branch-nativesql-spark-3.0.0
-cd oap-native-sql
-cp cpp/src/resources/libhdfs.so ${HADOOP_HOME}/lib/native/ 
-cp cpp/src/resources/libprotobuf.so.13 /usr/lib64/
-```
+### Native Columnar Shuffle Operator with efficient compression support
 
-Download spark-columnar-core-1.0-jar-with-dependencies.jar to local, add classPath to spark.driver.extraClassPath and spark.executor.extraClassPath
-``` shell
-Internal Location: vsr602://mnt/nvme2/chendi/000000/spark-columnar-core-1.0-jar-with-dependencies.jar
-```
+![Overview](/oap-native-sql/resource/shuffle.png)
 
-Download spark-sql_2.12-3.1.0-SNAPSHOT.jar to ${SPARK_HOME}/assembly/target/scala-2.12/jars/spark-sql_2.12-3.1.0-SNAPSHOT.jar
-``` shell
-Internal Location: vsr602://mnt/nvme2/chendi/000000/spark-sql_2.12-3.1.0-SNAPSHOT.jar
-```
+We implemented columnar shuffle to improve the shuffle performance. With the columnar layout we could do very efficient data compression for different data format.
 
-### Installation option 2: For contribution, Patch and build
+## Testing
 
-#### install spark 3.0.0 or above
+Check out the detailed installation/testing guide(/oap-native-sql/resource/installation.md) for quick testing
 
-Please refer this link to install Spark.
-[Apache Spark Installation](/oap-native-sql/resource/SparkInstallation.md)
-
-Remove original Arrow Jars inside Spark assemply folder
-``` shell
-yes | rm assembly/target/scala-2.12/jars/arrow-format-0.15.1.jar
-yes | rm assembly/target/scala-2.12/jars/arrow-vector-0.15.1.jar
-yes | rm assembly/target/scala-2.12/jars/arrow-memory-0.15.1.jar
-```
-
-#### install arrow 0.17.0
-
-Please refer this markdown to install Apache Arrow and Gandiva.
-[Apache Arrow Installation](/oap-native-sql/resource/ApacheArrowInstallation.md)
-
-#### compile and install oap-native-sql
-
-##### Install Googletest and Googlemock
-
-``` shell
-yum install gtest-devel
-yum install gmock
-```
-
-##### Build this project
-
-``` shell
-git clone https://github.com/Intel-bigdata/OAP.git
-cd OAP && git checkout branch-nativesql-spark-3.0.0
-cd oap-native-sql
-cd cpp/
-mkdir build/
-cd build/
-cmake .. -DTESTS=ON
-make -j
-make install
-#when deploying on multiple node, make sure all nodes copied libhdfs.so and libprotobuf.so.13
-```
-
-``` shell
-cd SparkColumnarPlugin/core/
-mvn clean package -DskipTests
-```
-### Additonal Notes
-[Notes for Installation Issues](/oap-native-sql/resource/InstallationNotes.md)
-  
-
-## Spark Configuration
-
-Add below configuration to spark-defaults.conf
-
-```
-##### Columnar Process Configuration
-
-spark.sql.parquet.columnarReaderBatchSize 4096
-spark.sql.sources.useV1SourceList avro
-spark.sql.join.preferSortMergeJoin false
-spark.sql.extensions com.intel.sparkColumnarPlugin.ColumnarPlugin
-
-spark.driver.extraClassPath ${PATH_TO_OAP_NATIVE_SQL}/core/target/spark-columnar-core-1.0-jar-with-dependencies.jar
-spark.executor.extraClassPath ${PATH_TO_OAP_NATIVE_SQL}/core/target/spark-columnar-core-1.0-jar-with-dependencies.jar
-
-######
-```
-## Benchmark
-
-For initial microbenchmark performance, we add 10 fields up with spark, data size is 200G data
-
-![Performance](/oap-native-sql/resource/performance.png)
-
-## Coding Style
-
-* For Java code, we used [google-java-format](https://github.com/google/google-java-format)
-* For Scala code, we used [Spark Scala Format](https://github.com/apache/spark/blob/master/dev/.scalafmt.conf), please use [scalafmt](https://github.com/scalameta/scalafmt) or run ./scalafmt for scala codes format
-* For Cpp codes, we used Clang-Format, check on this link [google-vim-codefmt](https://github.com/google/vim-codefmt) for details.
-
-## contact
+## Contact
 
 chendi.xue@intel.com
-yuan.zhou@intel.com
 binwei.yang@intel.com
-jian.zhang@intel.com

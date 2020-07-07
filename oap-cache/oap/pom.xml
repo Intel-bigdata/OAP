@@ -35,7 +35,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <basedir>./</basedir>
-    <spark.internal.version>3.0.1-Hive1.2-SNAPSHOT</spark.internal.version>
+    <spark.internal.version>3.0.0</spark.internal.version>
     <scala.version>2.12.10</scala.version>
     <scala.binary.version>2.12</scala.binary.version>
     <java.version>1.8</java.version>
@@ -46,7 +46,7 @@
     <jetty.version>9.3.24.v20180605</jetty.version>
     <maven-antrun-plugin.version>1.8</maven-antrun-plugin.version>
     <!--diff: Spark-2.4.4 use orc 1.5.5 -->
-    <orc.version>1.5.9</orc.version>
+    <orc.version>1.5.10</orc.version>
     <exec.maven.version>1.6.0</exec.maven.version>
   </properties>
 
@@ -96,10 +96,6 @@
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
-    </repository>
-    <repository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
     </repository>
   </repositories>
 
@@ -199,65 +195,65 @@
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-hive_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-hive_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-hive-thriftserver_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-unsafe_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.intel.spark</groupId>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-unsafe_${scala.binary.version}</artifactId>
       <version>${spark.internal.version}</version>
       <type>test-jar</type>
@@ -317,7 +313,7 @@
       <groupId>org.apache.orc</groupId>
       <artifactId>orc-core</artifactId>
       <version>${orc.version}</version>
-      <classifier>nohive</classifier>
+      <!--<classifier>nohive</classifier>-->
       <scope>compile</scope>
       <exclusions>
         <exclusion>
@@ -342,7 +338,7 @@
       <groupId>org.apache.orc</groupId>
       <artifactId>orc-mapreduce</artifactId>
       <version>${orc.version}</version>
-      <classifier>nohive</classifier>
+      <!--<classifier>nohive</classifier>-->
       <scope>compile</scope>
       <exclusions>
         <exclusion>
@@ -690,7 +686,7 @@
                 <source>src/main/spark3.0.0/java</source>
                 <source>src/main/spark3.0.0/scala</source>
                 <source>src/main/parquet1.10.1/java</source>
-                <source>src/main/orc-1.5.9-nohive/java</source>
+                <source>src/main/orc-1.5.10/java</source>
               </sources>
             </configuration>
           </execution>

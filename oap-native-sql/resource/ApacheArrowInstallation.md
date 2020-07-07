@@ -11,7 +11,7 @@ mv cfe-7.0.1.src clang
 cd ..
 mkdir build
 cd build
-cmake ..
+cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j
 cmake --build . --target install
 # check if clang has also been compiled, if no
@@ -42,7 +42,7 @@ git clone https://github.com/Intel-bigdata/arrow.git
 cd arrow && git checkout native-sql-engine-clean
 mkdir -p arrow/cpp/release-build
 cd arrow/cpp/release-build
-cmake -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_WITH_SNAPPY=ON -DARROW_FILESYSTEM=ON -DARROW_JSON=ON ..
+cmake -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_WITH_SNAPPY=ON -DARROW_WITH_LZ4=ON -DARROW_FILESYSTEM=ON -DARROW_JSON=ON ..
 make -j
 make install
 

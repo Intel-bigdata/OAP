@@ -67,25 +67,12 @@ class BenchmarkArrowComputeSort : public ::testing::Test {
     ASSERT_NOT_OK(
         parquet_reader->GetRecordBatchReader({0}, {0, 1, 2}, &record_batch_reader));
 
-    schema = record_batch_reader->schema();
-    std::cout << schema->ToString() << std::endl;
-
     ////////////////// expr prepration ////////////////
     field_list = record_batch_reader->schema()->fields();
     ret_field_list = record_batch_reader->schema()->fields();
   }
 
-  void StartWithIterator() {
-    uint64_t elapse_gen = 0;
-    uint64_t elapse_read = 0;
-    uint64_t elapse_eval = 0;
-    uint64_t elapse_sort = 0;
-    uint64_t elapse_shuffle = 0;
-    uint64_t num_batches = 0;
-    std::shared_ptr<CodeGenerator> sort_expr;
-    TIME_MICRO_OR_THROW(elapse_gen, CreateCodeGenerator(schema, {sortArrays_expr},
-                                                        {f_indices}, &sort_expr, true));
-
+  void StartWithIterator(std::shared_ptr<CodeGenerator> sort_expr) {
     std::vector<std::shared_ptr<arrow::RecordBatch>> input_batch_list;
     std::vector<std::shared_ptr<arrow::RecordBatch>> dummy_result_batches;
     std::shared_ptr<ResultIterator<arrow::RecordBatch>> sort_result_iterator;
@@ -126,45 +113,84 @@ class BenchmarkArrowComputeSort : public ::testing::Test {
   std::shared_ptr<arrow::io::RandomAccessFile> file;
   std::unique_ptr<::parquet::arrow::FileReader> parquet_reader;
   std::shared_ptr<RecordBatchReader> record_batch_reader;
-  std::shared_ptr<arrow::Schema> schema;
 
   std::vector<std::shared_ptr<::arrow::Field>> field_list;
   std::vector<std::shared_ptr<::arrow::Field>> ret_field_list;
 
   int primary_key_index = 0;
-  std::shared_ptr<arrow::Field> f_indices;
   std::shared_ptr<arrow::Field> f_res;
-  ::gandiva::ExpressionPtr sortArrays_expr;
-  ::gandiva::ExpressionPtr conditionShuffleExpr;
+
+  uint64_t elapse_gen = 0;
+  uint64_t elapse_read = 0;
+  uint64_t elapse_eval = 0;
+  uint64_t elapse_sort = 0;
+  uint64_t elapse_shuffle = 0;
+  uint64_t num_batches = 0;
 };
 
 TEST_F(BenchmarkArrowComputeSort, SortBenchmark) {
+  elapse_gen = 0;
+  elapse_read = 0;
+  elapse_eval = 0;
+  elapse_sort = 0;
+  elapse_shuffle = 0;
+  num_batches = 0;
   ////////////////////// prepare expr_vector ///////////////////////
   auto indices_type = std::make_shared<FixedSizeBinaryType>(16);
-  f_indices = field("indices", indices_type);
   f_res = field("res", arrow::uint64());
 
   std::vector<std::shared_ptr<::gandiva::Node>> gandiva_field_list;
   for (auto field : field_list) {
     gandiva_field_list.push_back(TreeExprBuilder::MakeField(field));
   }
-  auto n_left =
-      TreeExprBuilder::MakeFunction("codegen_left_schema", gandiva_field_list, uint64());
-  auto n_right = TreeExprBuilder::MakeFunction("codegen_right_schema", {}, uint64());
   auto n_sort_to_indices =
       TreeExprBuilder::MakeFunction("sortArraysToIndicesNullsFirstAsc",
                                     {gandiva_field_list[primary_key_index]}, uint64());
-  sortArrays_expr = TreeExprBuilder::MakeExpression(n_sort_to_indices, f_indices);
+  std::shared_ptr<arrow::Schema> schema;
+  schema = arrow::schema(field_list);
+  std::cout << schema->ToString() << std::endl;
 
-  auto n_conditionedShuffleArrayList =
-      TreeExprBuilder::MakeFunction("conditionedShuffleArrayList", {}, uint64());
-  auto n_codegen_shuffle = TreeExprBuilder::MakeFunction(
-      "codegen_withTwoInputs", {n_conditionedShuffleArrayList, n_left, n_right},
-      uint64());
-  conditionShuffleExpr = TreeExprBuilder::MakeExpression(n_codegen_shuffle, f_res);
+  ::gandiva::ExpressionPtr sortArrays_expr;
+  sortArrays_expr = TreeExprBuilder::MakeExpression(n_sort_to_indices, f_res);
+
+  std::shared_ptr<CodeGenerator> sort_expr;
+  TIME_MICRO_OR_THROW(elapse_gen, CreateCodeGenerator(schema, {sortArrays_expr},
+                                                      ret_field_list, &sort_expr, true));
 
   ///////////////////// Calculation //////////////////
-  StartWithIterator();
+  StartWithIterator(sort_expr);
+}
+
+TEST_F(BenchmarkArrowComputeSort, SortBenchmarkWOPayLoad) {
+  elapse_gen = 0;
+  elapse_read = 0;
+  elapse_eval = 0;
+  elapse_sort = 0;
+  elapse_shuffle = 0;
+  num_batches = 0;
+  ////////////////////// prepare expr_vector ///////////////////////
+  auto indices_type = std::make_shared<FixedSizeBinaryType>(16);
+  f_res = field("res", arrow::uint64());
+
+  std::vector<std::shared_ptr<::gandiva::Node>> gandiva_field_list;
+  for (auto field : field_list) {
+    gandiva_field_list.push_back(TreeExprBuilder::MakeField(field));
+  }
+  auto n_sort_to_indices =
+      TreeExprBuilder::MakeFunction("sortArraysToIndicesNullsFirstAsc",
+                                    {gandiva_field_list[primary_key_index]}, uint64());
+  std::shared_ptr<arrow::Schema> schema;
+  schema = arrow::schema({field_list[primary_key_index]});
+  ::gandiva::ExpressionPtr sortArrays_expr;
+  sortArrays_expr = TreeExprBuilder::MakeExpression(n_sort_to_indices, f_res);
+
+  std::shared_ptr<CodeGenerator> sort_expr;
+  TIME_MICRO_OR_THROW(elapse_gen, CreateCodeGenerator(schema, {sortArrays_expr},
+                                                      {ret_field_list[primary_key_index]},
+                                                      &sort_expr, true));
+
+  ///////////////////// Calculation //////////////////
+  StartWithIterator(sort_expr);
 }
 
 }  // namespace codegen

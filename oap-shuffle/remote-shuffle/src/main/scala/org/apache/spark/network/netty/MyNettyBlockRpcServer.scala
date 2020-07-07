@@ -20,7 +20,6 @@ package org.apache.spark.network.netty
 import java.nio.ByteBuffer
 
 import scala.language.existentials
-
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.BlockDataManager
@@ -30,7 +29,7 @@ import org.apache.spark.network.shuffle.protocol._
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.shuffle.remote.{HadoopFileSegmentManagedBuffer, MessageForHadoopManagedBuffers, RemoteShuffleManager}
 import org.apache.spark.shuffle.sort.SortShuffleManager
-import org.apache.spark.storage.{BlockId, ShuffleBlockId}
+import org.apache.spark.storage.{BlockId, ShuffleBlockBatchId, ShuffleBlockId}
 
 /**
  * Serves requests to open blocks by simply registering one chunk per block requested.
@@ -58,7 +57,8 @@ class MyNettyBlockRpcServer(
       case openBlocks: OpenBlocks =>
         val blocksNum = openBlocks.blockIds.length
         val isShuffleRequest = (blocksNum > 0) &&
-          BlockId.apply(openBlocks.blockIds(0)).isInstanceOf[ShuffleBlockId] &&
+          (BlockId.apply(openBlocks.blockIds(0)).isInstanceOf[ShuffleBlockId] ||
+            BlockId.apply(openBlocks.blockIds(0)).isInstanceOf[ShuffleBlockBatchId]) &&
           (SparkEnv.get.conf.get("spark.shuffle.manager", classOf[SortShuffleManager].getName)
             == classOf[RemoteShuffleManager].getName)
         if (isShuffleRequest) {

@@ -1,20 +1,14 @@
-### Hadoop building from source
+### Download Spark 3.0.0
 
-``` shell
-git clone https://github.com/apache/hadoop.git
-cd hadoop
-git checkout rel/release-3.2.0
-# only build binary for hadoop
-mvn clean install -Pdist -DskipTests -Dtar
-# build binary and native library such as libhdfs.so for hadoop
-# mvn clean install -Pdist,native -DskipTests -Dtar
+Currently Native SQL Engine works on the Spark 3.0.0 version.
+
+```
+wget http://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0-bin-hadoop2.7.tgz
+tar -xf ./spark-3.0.0-bin-hadoop2.7.tgz
+export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7
 ```
 
-``` shell
-export HADOOP_HOME=${HADOOP_PATH}/hadoop-dist/target/hadoop-3.2.0/
-```
-
-### [Spark building from source](https://spark.apache.org/docs/latest/building-spark.html)
+### [Or building Spark from source](https://spark.apache.org/docs/latest/building-spark.html)
 
 ``` shell
 git clone https://github.com/intel-bigdata/spark.git
@@ -30,4 +24,20 @@ Specify SPARK_HOME to spark path
 
 ``` shell
 export SPARK_HOME=${HADOOP_PATH}
+```
+
+### Hadoop building from source
+
+``` shell
+git clone https://github.com/apache/hadoop.git
+cd hadoop
+git checkout rel/release-3.2.0
+# only build binary for hadoop
+mvn clean install -Pdist -DskipTests -Dtar
+# build binary and native library such as libhdfs.so for hadoop
+# mvn clean install -Pdist,native -DskipTests -Dtar
+```
+
+``` shell
+export HADOOP_HOME=${HADOOP_PATH}/hadoop-dist/target/hadoop-3.2.0/
 ```

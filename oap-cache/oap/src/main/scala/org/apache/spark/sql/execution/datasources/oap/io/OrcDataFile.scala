@@ -23,12 +23,12 @@ import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.hive.ql.exec.vector.{ColumnVector, VectorizedRowBatch}
 import org.apache.hadoop.mapreduce.RecordReader
 import org.apache.orc._
 import org.apache.orc.impl.{ReaderImpl, RecordReaderCacheImpl}
 import org.apache.orc.mapred.{OrcInputFormat, OrcStruct}
 import org.apache.orc.mapreduce._
-import org.apache.orc.storage.ql.exec.vector.{ColumnVector, VectorizedRowBatch}
 import org.apache.parquet.hadoop.{ParquetFiberDataReader, VectorizedOapRecordReader}
 
 import org.apache.spark.sql.catalyst.InternalRow
@@ -230,10 +230,10 @@ private[oap] case class OrcDataFile(
     val field = schema.fields(fiberId)
     val toColumn = new OnHeapColumnVector(rowCount, field.dataType)
     if (fromColumn.isRepeating) {
-      OrcCacheReader.putRepeatingValues(rowCount, field, fromColumn, toColumn)
+     OrcCacheReader.putRepeatingValues(rowCount, field, fromColumn, toColumn)
     }
     else if (fromColumn.noNulls) {
-      OrcCacheReader.putNonNullValues(rowCount, field, fromColumn, toColumn)
+    OrcCacheReader.putNonNullValues(rowCount, field, fromColumn, toColumn)
     }
     else {
       OrcCacheReader.putValues(rowCount, field, fromColumn, toColumn)

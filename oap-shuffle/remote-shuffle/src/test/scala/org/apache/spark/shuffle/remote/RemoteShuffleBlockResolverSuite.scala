@@ -20,9 +20,8 @@ package org.apache.spark.shuffle.remote
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.scalatest.BeforeAndAfterEach
-
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.storage.ShuffleBlockId
+import org.apache.spark.storage.{ShuffleBlockBatchId, ShuffleBlockId}
 import org.apache.spark.util.Utils
 
 class RemoteShuffleBlockResolverSuite extends SparkFunSuite with BeforeAndAfterEach {
@@ -165,7 +164,41 @@ class RemoteShuffleBlockResolverSuite extends SparkFunSuite with BeforeAndAfterE
 
     val answerBuffer =
       resolver.getBlockData(shuffleBlockId).asInstanceOf[HadoopFileSegmentManagedBuffer]
-    val expectedBuffer = new HadoopFileSegmentManagedBuffer(dataFile, 6, 4)
+    val expectedBuffer = new HadoopFileSegmentManagedBuffer(dataFile, 6, expected.length)
+    assert(expectedBuffer.equals(answerBuffer))
+  }
+
+  // With Adaptive Execution enabled, may require a ShuffleBlockBatchId
+  test("get block data(Batch)") {
+
+    shuffleManager = new RemoteShuffleManager(conf)
+    val resolver = shuffleManager.shuffleBlockResolver
+
+    indexFile = resolver.getIndexFile(shuffleId, mapId)
+    dataFile = resolver.getDataFile(shuffleId, mapId)
+    val fs = resolver.fs
+
+    val (partitionStartId, partitionEndId) = (1, 4)
+    val expected = Array(Array[Byte](99), Array[Byte](2, 4), Array[Byte](8, 7, 6, 5))
+    val shuffleBlockId = ShuffleBlockBatchId(shuffleId, mapId, partitionStartId, partitionEndId)
+
+    val lengths = Array[Long](3, 1, 2, 4)
+    dataTmp = RemoteShuffleUtils.tempPathWith(dataFile)
+    val out = fs.create(dataTmp)
+    Utils.tryWithSafeFinally {
+      out.write(Array[Byte](3, 6, 9))
+      for (each <- expected) {
+        out.write(each)
+      }
+    } {
+      out.close()
+    }
+    // Actually this UT relies on this outside function's fine working
+    resolver.writeIndexFileAndCommit(shuffleId, mapId, lengths, dataTmp)
+
+    val answerBuffer =
+      resolver.getBlockData(shuffleBlockId).asInstanceOf[HadoopFileSegmentManagedBuffer]
+    val expectedBuffer = new HadoopFileSegmentManagedBuffer(dataFile, 3, expected.map(_.length).sum)
     assert(expectedBuffer.equals(answerBuffer))
   }
 
