@@ -24,7 +24,7 @@
 
   <artifactId>spark-columnar-core</artifactId>
   <packaging>jar</packaging>
-  <name>OAP Spark Columnar Plugin</name>
+  <name>OAP Project Spark Columnar Plugin</name>
 
   <properties>
     <cpp.dir>../cpp/</cpp.dir>

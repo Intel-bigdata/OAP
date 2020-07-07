@@ -5,6 +5,7 @@ set -x
 
 mkdir cpp/build
 pushd cpp/build
+export CXXFLAGS="${CXXFLAGS} -I${PREFIX}/x86_64-conda_cos7-linux-gnu/sysroot/usr/include -L${PREFIX}/x86_64-conda_cos7-linux-gnu/sysroot/usr/lib64 -L${PREFIX}/lib64"
 
 EXTRA_CMAKE_ARGS=""
 
@@ -13,16 +14,19 @@ if [ "$(uname)" == "Linux" ]; then
   SYSTEM_INCLUDES=$(echo | ${CXX} -E -Wp,-v -xc++ - 2>&1 | grep '^ ' | awk '{print "-isystem;" substr($1, 1)}' | tr '\n' ';')
   EXTRA_CMAKE_ARGS=" -DARROW_GANDIVA_PC_CXX_FLAGS=${SYSTEM_INCLUDES}"
 fi
-
+echo "-----"
+echo $EXTRA_CMAKE_ARGS
+echo "----"
 cmake \
     -DARROW_BOOST_USE_SHARED=ON \
+    -DARROW_BUILD_BENCHMARKS=OFF \
     -DARROW_FILESYSTEM=ON \
     -DARROW_JSON=ON \
     -DARROW_GANDIVA_JAVA=ON \
+    -DARROW_WITH_PROTOBUF=ON \
     -DARROW_PLASMA_JAVA_CLIENT=on \
     -DARROW_JNI=ON \
-    -DARROW_BUILD_BENCHMARKS=OFF \
-    -DARROW_BUILD_STATIC=OFF \
+    -DARROW_BUILD_STATIC=ON \
     -DARROW_BUILD_TESTS=OFF \
     -DARROW_BUILD_UTILITIES=OFF \
     -DARROW_DATASET=ON \

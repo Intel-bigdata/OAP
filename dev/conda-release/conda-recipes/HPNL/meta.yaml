@@ -1,0 +1,18 @@
+package:
+  name: hpnl
+  version: 1.0
+
+source:
+  path: ../../../thirdparty/HPNL/
+
+requirements:
+  build:
+    - gcc   [linux]
+    - libgcc [linux]
+    - cmake 3.11.*
+    - libfabric 1.0
+  run:
+    - libgcc [linux]
+    - libfabric 1.0
+    - gcc   [linux]
+    - sysroot_linux-64 2.17

@@ -1,14 +1,15 @@
 package:
   name: oap
-  version: 0.9
+  version: 0.1.0
 
 build:
   number: 3
 
 requirements:
   run:
-    - python
     - vmemcache
     - memkind
+    - intel-arrow-cpp
+    - hpnl
 about:
-  summary: This is a simple meta-package
+  summary: Optimized Analytics Packages for Spark is a project to optimize Spark by providing optimized implmentation of packages in various aspects including cache, shuffle, and so on.

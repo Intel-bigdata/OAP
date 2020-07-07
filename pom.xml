@@ -40,9 +40,10 @@
     <modules>
         <module>oap-common</module>
         <module>oap-cache/oap</module>
-        <module>oap-spark</module>
         <module>oap-native-sql/core</module>
         <module>oap-data-source/arrow</module>
+        <module>oap-shuffle/remote-shuffle</module>
+        <module>oap-shuffle/RPMem-shuffle</module>
     </modules>
 
 </project>

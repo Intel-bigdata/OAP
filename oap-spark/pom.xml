@@ -13,9 +13,9 @@
 
     <artifactId>oap-spark</artifactId>
     <packaging>jar</packaging>
-    <name>OAP Spark</name>
+    <name>OAP Project Spark Source Code Change</name>
 
-  <properties>
+    <properties>
     <scala.version>2.12.10</scala.version>
     <scala.binary.version>2.12</scala.binary.version>
     <maven-patch-plugin.version>1.2</maven-patch-plugin.version>

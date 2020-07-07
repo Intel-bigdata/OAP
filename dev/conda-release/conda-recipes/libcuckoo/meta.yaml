@@ -1,0 +1,14 @@
+package:
+  name: libcuckoo
+  version: 1.0
+
+source:
+  path: ../../../thirdparty/libcuckoo/
+
+requirements:
+  build:
+    - gcc   [linux]
+    - libgcc [linux]
+    - cmake 3.11.*
+  run:
+    - libgcc [linux]
