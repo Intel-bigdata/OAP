@@ -70,4 +70,6 @@ object OneDAL {
   }
 
   @native def setNumericTableValue(numTableAddr: Long, rowIndex: Int, colIndex: Int, value: Double)
+
+  @native def cAddNumericTable(cObject: Long, numericTableAddr: Long)
 }
