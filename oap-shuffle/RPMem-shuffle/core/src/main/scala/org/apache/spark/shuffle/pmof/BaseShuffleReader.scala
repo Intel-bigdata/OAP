@@ -19,8 +19,9 @@ package org.apache.spark.shuffle
 
 import org.apache.spark._
 import org.apache.spark.internal.{Logging, config}
+import org.apache.spark.io.CompressionCodec
 import org.apache.spark.serializer.SerializerManager
-import org.apache.spark.storage.{BlockManager, ShuffleBlockFetcherIterator}
+import org.apache.spark.storage.{BlockId, BlockManager, BlockManagerId, ShuffleBlockFetcherIterator}
 import org.apache.spark.util.CompletionIterator
 import org.apache.spark.util.collection.pmof.PmemExternalSorter
 import org.apache.spark.util.configuration.pmof.PmofConf
@@ -30,16 +31,42 @@ import org.apache.spark.util.configuration.pmof.PmofConf
   * requesting them from other nodes' block stores.
   */
 private[spark] class BaseShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
+                                             blocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long, Int)])],
                                              startPartition: Int,
                                              endPartition: Int,
                                              context: TaskContext,
+                                             readMetrics: ShuffleReadMetricsReporter,
                                              pmofConf: PmofConf,
                                              serializerManager: SerializerManager = SparkEnv.get.serializerManager,
                                              blockManager: BlockManager = SparkEnv.get.blockManager,
-                                             mapOutputTracker: MapOutputTracker = SparkEnv.get.mapOutputTracker)
+                                             mapOutputTracker: MapOutputTracker = SparkEnv.get.mapOutputTracker,
+                                             shouldBatchFetch: Boolean = false )
   extends ShuffleReader[K, C] with Logging {
 
   private[this] val dep = handle.dependency
+
+  private def fetchContinuousBlocksInBatch: Boolean = {
+    val conf = SparkEnv.get.conf
+    val serializerRelocatable = dep.serializer.supportsRelocationOfSerializedObjects
+    val compressed = conf.get(config.SHUFFLE_COMPRESS)
+    val codecConcatenation = if (compressed) {
+      CompressionCodec.supportsConcatenationOfSerializedStreams(CompressionCodec.createCodec(conf))
+    } else {
+      true
+    }
+    val useOldFetchProtocol = conf.get(config.SHUFFLE_USE_OLD_FETCH_PROTOCOL)
+
+    val doBatchFetch = shouldBatchFetch && serializerRelocatable &&
+      (!compressed || codecConcatenation) && !useOldFetchProtocol
+    if (shouldBatchFetch && !doBatchFetch) {
+      logDebug("The feature tag of continuous shuffle block fetching is set to true, but " +
+        "we can not enable the feature because other conditions are not satisfied. " +
+        s"Shuffle compress: $compressed, serializer relocatable: $serializerRelocatable, " +
+        s"codec concatenation: $codecConcatenation, use old shuffle fetch protocol: " +
+        s"$useOldFetchProtocol.")
+    }
+    doBatchFetch
+  }
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
@@ -47,7 +74,7 @@ private[spark] class BaseShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
       context,
       blockManager.blockStoreClient,
       blockManager,
-      mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
+      blocksByAddress,
       serializerManager.wrapStream,
       // Note: we use getSizeAsMb when no suffix is provided for backwards compatibility
       SparkEnv.get.conf.getSizeAsMb("spark.reducer.maxSizeInFlight", "48m") * 1024 * 1024,
@@ -56,9 +83,9 @@ private[spark] class BaseShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
       SparkEnv.get.conf.get(config.MAX_REMOTE_BLOCK_SIZE_FETCH_TO_MEM),
       SparkEnv.get.conf.getBoolean("spark.shuffle.detectCorrupt", true),
       detectCorruptUseExtraMemory = SparkEnv.get.conf.get(config.SHUFFLE_DETECT_CORRUPT_MEMORY),
-      null,
-      false
-    )
+      readMetrics,
+      fetchContinuousBlocksInBatch
+    ).toCompletionIterator
 
     val serializerInstance = dep.serializer.newInstance()
 
@@ -71,7 +98,6 @@ private[spark] class BaseShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
     }
 
     // Update the context task metrics for each record read.
-    val readMetrics = context.taskMetrics.createTempShuffleReadMetrics()
     val metricIter = CompletionIterator[(Any, Any), Iterator[(Any, Any)]](
       recordIter.map { record =>
         readMetrics.incRecordsRead(1)
