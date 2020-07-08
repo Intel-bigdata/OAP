@@ -221,7 +221,10 @@ function prepare_llvm() {
 
 function prepare_intel_arrow() {
   prepare_cmake
-#  prepare_llvm
+  prepare_llvm
+  $INSTALL_TOOL -y install libgsasl
+  $INSTALL_TOOL -y install libidn-devel.x86_64
+  $INSTALL_TOOL -y install libntlm.x86_64
   cd $DEV_PATH
   mkdir -p $DEV_PATH/thirdparty/
   cd $DEV_PATH/thirdparty/
@@ -246,32 +249,6 @@ function prepare_intel_arrow() {
 }
 
 
-
-function prepare_native_sql_cpp() {
-
-  #for native-sql
-  $INSTALL_TOOL -y install libgsasl
-  $INSTALL_TOOL -y install libidn-devel.x86_64
-  $INSTALL_TOOL -y install libntlm.x86_64
-
-  intel_spark_repo="https://github.com/Intel-bigdata/spark.git"
-  intel_arrow_repo="https://github.com/Intel-bigdata/arrow.git"
-  cd $DEV_PATH/thirdparty
-
-  prepare_ns_arrow
-
-  cd $DEV_PATH
-  cd ../oap-native-sql/cpp
-  mkdir -p build
-  cd build/
-  check_gcc
-  export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
-  export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
-  cmake .. -DTESTS=OFF
-  make -j
-  make install
-
-}
 
 function prepare_libfabric() {
   mkdir -p $DEV_PATH/thirdparty
