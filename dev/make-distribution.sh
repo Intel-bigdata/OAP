@@ -6,7 +6,7 @@ OAP_HOME="$(cd "`dirname "$0"`/.."; pwd)"
 
 DEV_PATH=$OAP_HOME/dev
 OAP_VERSION=0.9.0
-SPARK_VERSION=2.4.4
+SPARK_VERSION=3.0.0
 
 GCC_MIN_VERSION=7.0
 
@@ -32,6 +32,7 @@ function check_gcc() {
 function gather() {
   cd  $DEV_PATH
   package_name=oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION
+  rm -rf $DEV_PATH/release-package/*
   target_path=$DEV_PATH/release-package/$package_name/jars/
   mkdir -p $target_path
   cp ../oap-cache/oap/target/*.jar $target_path

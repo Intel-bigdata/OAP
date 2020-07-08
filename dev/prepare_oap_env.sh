@@ -6,6 +6,7 @@ MAVEN_TARGET_VERSION=3.6.3
 CMAKE_TARGET_VERSION=3.11.1
 CMAKE_MIN_VERSION=3.11
 TARGET_CMAKE_SOURCE_URL=https://cmake.org/files/v3.11/cmake-3.11.1.tar.gz
+GCC_MIN_VERSION=7.0
 
 if [ -z "$DEV_PATH" ]; then
   cd $(dirname $BASH_SOURCE)
@@ -26,6 +27,20 @@ fi
 function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" != "$1"; }
 
 function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" == "$1"; }
+
+function check_gcc() {
+  CURRENT_GCC_VERSION_STR="$(gcc --version)"
+  array=(${CURRENT_GCC_VERSION_STR//,/ })
+  CURRENT_GCC_VERSION=${array[2]}
+  if version_lt $CURRENT_GCC_VERSION $GCC_MIN_VERSION; then
+    if [ ! -f "$DEV_PATH/thirdparty/gcc7/bin/gcc" ]; then
+      source $DEV_PATH/prepare_oap_env.sh
+      install_gcc7
+    fi
+    export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
+    export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
+  fi
+}
 
 function prepare_maven() {
   echo "Check maven version......"
@@ -220,11 +235,7 @@ function prepare_intel_arrow() {
   fi
   current_arrow_path=$(pwd)
   mkdir -p cpp/release-build
-
-  if [ ! -d "$DEV_PATH/thirdparty/gcc7" ]; then
-    install_gcc7
-  fi
-  export DEV_PATH=/home/qyao/gitspace/myoap/master/OAP/dev
+  check_gcc
   export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
   export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
 
@@ -253,9 +264,7 @@ function prepare_native_sql_cpp() {
   cd ../oap-native-sql/cpp
   mkdir -p build
   cd build/
-  if [ ! -d "$DEV_PATH/thirdparty/gcc7" ]; then
-    install_gcc7
-  fi
+  check_gcc
   export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
   export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
   cmake .. -DTESTS=OFF
@@ -378,7 +387,7 @@ function oap_build_help() {
     echo " prepare_maven           = function to install Maven"
     echo " prepare_memkind         = function to install Memkind"
     echo " prepare_cmake           = function to install Cmake"
-    echo " prepare_gcc7            = function to install GCC 7.3.0"
+    echo " install_gcc7            = function to install GCC 7.3.0"
     echo " prepare_vmemcache       = function to install Vmemcache"
     echo " prepare_intel_arrow     = function to install intel Arrow"
     echo " prepare_HPNL            = function to install intel HPNL"
