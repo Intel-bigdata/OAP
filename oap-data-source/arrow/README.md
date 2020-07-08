@@ -48,7 +48,7 @@ mvn clean install -P arrow-jni -am -Darrow.cpp.build.dir=../cpp/build/release
 mvn clean package
 
 // check built jar library
-readlink -f target/spark-arrow-datasource-0.9.0-SNAPSHOT-jar-with-dependencies.jar
+readlink -f standard/target/spark-arrow-datasource-standard-0.9.0-jar-with-dependencies.jar
 ```
 
 ### Download Spark 3.0.0
@@ -66,7 +66,7 @@ If you are new to Apache Spark, please go though [Spark's official deploying gui
 ## Get started
 ### Add extra class pathes to Spark
 
-To enable ArrowDataSource, the previous built jar `spark-arrow-datasource-0.9.0-SNAPSHOT-jar-with-dependencies.jar` should be added to Spark configuration. Typically the options are:
+To enable ArrowDataSource, the previous built jar `spark-arrow-datasource-standard-0.9.0-jar-with-dependencies.jar` should be added to Spark configuration. Typically the options are:
 
 * `spark.driver.extraClassPath`
 * `spark.executor.extraClassPath`
