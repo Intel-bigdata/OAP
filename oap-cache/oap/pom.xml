@@ -22,7 +22,7 @@
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
-  <artifactId>oap-cache-oap</artifactId>
+  <artifactId>oap-cache</artifactId>
   <packaging>jar</packaging>
 
   <name>OAP Project Cache</name>
