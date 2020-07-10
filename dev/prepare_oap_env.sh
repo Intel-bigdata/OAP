@@ -39,6 +39,7 @@ function check_gcc() {
     fi
     export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
     export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
+    export LD_LIBRARY_PATH=$DEV_PATH/thirdparty/gcc7/lib64:$LD_LIBRARY_PATH
   fi
 }
 
@@ -205,13 +206,7 @@ function prepare_llvm() {
   mkdir -p build
   cd build
 
-  if [ ! -d "$DEV_PATH/thirdparty/gcc7" ]; then
-    install_gcc7
-  fi
-
-  export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
-  export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
-  export LD_LIBRARY_PATH=$DEV_PATH/thirdparty/gcc7/lib64:$LD_LIBRARY_PATH
+  check_gcc
 
   cmake -DCMAKE_BUILD_TYPE=Release ..
   cmake --build .
