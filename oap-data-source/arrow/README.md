@@ -85,3 +85,21 @@ val df = spark.read
 df.createOrReplaceTempView("my_temp_view")
 spark.sql("SELECT * FROM my_temp_view LIMIT 10").show(10)
 ```
+
+## Work together with ParquetDataSource (experimental)
+
+We provide a customized replacement of Spark's built-in ParquetFileFormat. By so users don't have
+to change existing Parquet-based SQL/code and will be able to read Arrow data from Parquet directly.
+More importantly, sometimes the feature could be extremely helpful to make ArrowDataSource work correctly
+with some 3rd-party storage tools (e.g. [Delta Lake](https://github.com/delta-io/delta)) that are built on top of ParquetDataSource.
+
+To replace built-in ParquetDataSource, the only thing has to be done is to place compiled jar `spark-arrow-datasource-parquet-0.9.0.jar` into
+Spark's library folder.
+
+If you'd like to verify that ParquetDataSource is successfully overwritten by the jar, run following code 
+before executing SQL job:
+```
+ServiceLoaderUtil.ensureParquetFileFormatOverwritten();
+```
+
+Note the whole feature is currently **experimental** and only DataSource v1 is supported. V2 support is being planned.
