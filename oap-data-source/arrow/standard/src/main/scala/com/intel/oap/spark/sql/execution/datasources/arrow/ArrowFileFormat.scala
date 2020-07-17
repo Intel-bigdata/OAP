@@ -77,11 +77,16 @@ class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializab
 
     (file: PartitionedFile) => {
       val taskMemoryManager = ArrowUtils.getTaskMemoryManager()
+      // Not under Spark's management for now. DataSourceV1 doesn't provide a way
+      // to close unused reader. As a result spark will report mem leak when session is stopped.
+      //
+      // val listener = new ExecutionMemoryAllocationListener(taskMemoryManager)
+      val listener = AllocationListener.NOOP
       val factory = ArrowUtils.makeArrowDiscovery(
         URLDecoder.decode(file.filePath, "UTF-8"), new ArrowOptions(
           new CaseInsensitiveStringMap(
             options.asJava).asScala.toMap),
-        new ExecutionMemoryAllocationListener(taskMemoryManager))
+        listener)
 
       // todo predicate validation / pushdown
       val dataset = factory.finish();
