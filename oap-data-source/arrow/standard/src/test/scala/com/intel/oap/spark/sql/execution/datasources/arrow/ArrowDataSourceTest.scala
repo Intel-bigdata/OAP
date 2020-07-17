@@ -111,6 +111,22 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
         .arrow(path))
   }
 
+  test("create catalog table") {
+    val path = ArrowDataSourceTest.locateResourcePath(parquetFile1)
+    spark.catalog.createTable("ptab", path, "arrow")
+    val sql = "select * from ptab"
+    spark.sql(sql).explain()
+    verifyParquet(spark.sql(sql))
+  }
+
+  test("create table statement") {
+    spark.sql("drop table if exists ptab")
+    spark.sql("create table ptab (col1 varchar(14), col2 bigint, col3 bigint) " +
+      "using arrow " +
+      "partitioned by (col1)")
+    spark.sql("select * from ptab")
+  }
+
   test("simple SQL query on parquet file - 1") {
     val path = ArrowDataSourceTest.locateResourcePath(parquetFile1)
     val frame = spark.read
@@ -170,27 +186,27 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
     assert(rows.length === 1)
   }
 
-  test("dynamic partition pruning") {
+  ignore("dynamic partition pruning") {
     withSQLConf(SQLConf.DYNAMIC_PARTITION_PRUNING_ENABLED.key -> "true",
       SQLConf.DYNAMIC_PARTITION_PRUNING_REUSE_BROADCAST_ONLY.key -> "false",
       SQLConf.EXCHANGE_REUSE_ENABLED.key -> "false",
-      SQLConf.USE_V1_SOURCE_LIST.key -> "arrow") {
+      SQLConf.USE_V1_SOURCE_LIST.key -> "arrow",
+      SQLConf.CBO_ENABLED.key -> "true") {
 
-      var path = ArrowDataSourceTest.locateResourcePath(parquetFile4)
-      var frame = spark.read
-        .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
-        .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
-        .arrow(path)
-      frame.createOrReplaceTempView("df1")
-
+      var path: String = null
+      path = ArrowDataSourceTest.locateResourcePath(parquetFile4)
+      spark.catalog.createTable("df1", path, "arrow")
       path = ArrowDataSourceTest.locateResourcePath(parquetFile5)
-      frame = spark.read
-        .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
-        .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
-        .arrow(path)
-      frame.createOrReplaceTempView("df2")
+      spark.catalog.createTable("df2", path, "arrow")
 
-      val df = sql("SELECT df1.id, df2.k FROM df1 JOIN df2 ON df1.k = df2.k AND df2.id < 2")
+      sql("ALTER TABLE df1 RECOVER PARTITIONS")
+      sql("ALTER TABLE df2 RECOVER PARTITIONS")
+
+      sql("ANALYZE TABLE df1 COMPUTE STATISTICS FOR COLUMNS id")
+      sql("ANALYZE TABLE df2 COMPUTE STATISTICS FOR COLUMNS id")
+
+      val df = sql("SELECT df1.id, df2.k FROM df1 " +
+        "JOIN df2 ON df1.k = df2.k AND df2.id < 2")
       assert(df.queryExecution.executedPlan.toString().contains("dynamicpruningexpression"))
       checkAnswer(df, Row(0, 0) :: Row(1, 1) :: Nil)
     }
