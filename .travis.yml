@@ -73,9 +73,9 @@ jobs:
       - export |grep JAVA_HOME
       install:
       - # Download spark 3.0
-      - "[ -f spark ] || mkdir spark && cd spark && wget http://archive.apache.org/dist/spark/spark-3.0.0-preview2/spark-3.0.0-preview2-bin-hadoop2.7.tgz && cd .."
-      - "tar -xf ./spark/spark-3.0.0-preview2-bin-hadoop2.7.tgz"
-      - "export SPARK_HOME=`pwd`/spark-3.0.0-preview2-bin-hadoop2.7"
+      - "[ -f spark ] || mkdir spark && cd spark && wget http://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0-bin-hadoop2.7.tgz && cd .."
+      - "tar -xf ./spark/spark-3.0.0-bin-hadoop2.7.tgz"
+      - "export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7"
       before_script:
       - cd /tmp
       #libfabric   
