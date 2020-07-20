@@ -43,7 +43,7 @@
     <scalatest.version>3.0.3</scalatest.version>
     <scalacheck.version>1.14.2</scalacheck.version>
     <parquet.version>1.10.1</parquet.version>
-    <jetty.version>9.3.24.v20180605</jetty.version>
+    <jetty.version>9.4.18.v20190429</jetty.version>
     <maven-antrun-plugin.version>1.8</maven-antrun-plugin.version>
     <!--diff: Spark-2.4.4 use orc 1.5.5 -->
     <orc.version>1.5.10</orc.version>
@@ -413,12 +413,24 @@
               <include>com.intel:oap-common</include>
               <include>org.spark-project.spark:unused</include>
               <include>com.google.guava:guava</include>
-              <include>org.apache.parquet:*</include>
               <include>org.apache.orc:*</include>
               <include>io.airlift:*</include>
               <include>org.reflections:reflections</include>
             </includes>
           </artifactSet>
+          <filters>
+            <filter>
+              <artifact>org.apache.parquet:*</artifact>
+              <includes>
+                <include>*:*</include>
+              </includes>
+              <excludes>
+                <exclude>org.codehaus.jackson:jackson-mapper-asl</exclude>
+                <exclude>org.codehaus.jackson:jackson-core-asl</exclude>
+                <exclude>org.apache.thrift:libthrift</exclude>
+              </excludes>
+            </filter>
+          </filters>
           <relocations>
             <relocation>
               <pattern>org.eclipse.jetty</pattern>
