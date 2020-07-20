@@ -33,3 +33,52 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_setNumericTabl
 
 }
 
+JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIterator
+  (JNIEnv *env, jobject,jlong numTableAddr, jobject jiter) {
+    
+    jclass iterClass = env->FindClass("java/util/Iterator");
+    jmethodID hasNext = env->GetMethodID(iterClass,
+                                          "hasNext", "()Z");
+    jmethodID next = env->GetMethodID(iterClass,
+                                       "next", "()Ljava/lang/Object;");
+
+    HomogenNumericTable<double> *nt = static_cast<HomogenNumericTable<double> *>(
+                ((SerializationIfacePtr *)numTableAddr)->get());
+    int totalRows = 0;
+    while (env->CallBooleanMethod(jiter, hasNext)) {
+         jobject batch = env->CallObjectMethod(jiter, next);
+		 
+         jclass batchClass = env->GetObjectClass(batch);
+         jlongArray joffset = (jlongArray)env->GetObjectField(
+              batch, env->GetFieldID(batchClass, "rowOffset", "[J"));
+         jdoubleArray jvalue = (jdoubleArray)env->GetObjectField(
+              batch, env->GetFieldID(batchClass, "values", "[D"));
+         jint jcols = env->GetIntField(
+              batch, env->GetFieldID(batchClass, "numCols", "I"));
+
+         long numRows = env->GetArrayLength(joffset);
+
+         jlong* rowOffset = env->GetLongArrayElements(joffset, 0);
+		 
+		 jdouble* values = env->GetDoubleArrayElements(jvalue, 0);
+
+         long numValues = env->GetArrayLength(jvalue);
+         for (int i = 0; i < numRows; i ++){
+              jlong curRow = rowOffset[i] + totalRows;
+            for(int j = 0; j < jcols; j ++) {
+
+                (*nt)[curRow][j] = values[rowOffset[i] * jcols + j];
+            }
+         }
+         totalRows += numRows;
+         env->ReleaseLongArrayElements(joffset, rowOffset, 0);
+         env->DeleteLocalRef(joffset);
+         env->ReleaseDoubleArrayElements(jvalue, values, 0);
+         env->DeleteLocalRef(jvalue);
+         env->DeleteLocalRef(batch);
+         env->DeleteLocalRef(batchClass);
+  }
+  env->DeleteLocalRef(iterClass);
+
+  }
+

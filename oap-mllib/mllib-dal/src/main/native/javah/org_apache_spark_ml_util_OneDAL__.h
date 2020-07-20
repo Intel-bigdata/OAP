@@ -14,6 +14,9 @@ extern "C" {
  */
 JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_setNumericTableValue
   (JNIEnv *, jobject, jlong, jint, jint, jdouble);
+  
+JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIterator
+  (JNIEnv *env, jobject,jlong numTableAddr, jobject jiter);
 
 #ifdef __cplusplus
 }

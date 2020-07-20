@@ -61,15 +61,15 @@ class KMeansDALImpl (
     LibLoader.loadLibrary()
 
     println(s"KMeansDALImpl: Start data conversion")
+    import scala.collection.JavaConverters._
 
     val start = System.nanoTime
-    it.zipWithIndex.foreach {
-      case (v, rowIndex) =>
-        for (colIndex <- 0 until numCols)
-          // TODO: Add matrix.set API in DAL to replace this
-          // matrix.set(rowIndex, colIndex, row.getString(colIndex).toDouble)
-          OneDAL.setNumericTableValue(localData.getCNumericTable, rowIndex, colIndex, v(colIndex))
+    val iter = it.map{
+                curVector => curVector.toArray
     }
+    val batchSize = 8 << 10;
+    val batchIter = new DataBatch.BatchIterator(iter.asJava, batchSize)
+    OneDAL.cSetDoubleIterator(localData.getCNumericTable, batchIter)
 
     val duration = (System.nanoTime - start) / 1E9
 
