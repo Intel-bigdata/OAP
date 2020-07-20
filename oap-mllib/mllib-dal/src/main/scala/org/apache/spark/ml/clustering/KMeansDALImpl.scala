@@ -91,7 +91,8 @@ class KMeansDALImpl (
           table.unpack(context)
           table.getCNumericTable}
     }).cache()
-
+    
+    inputRDD.foreachPartition(() => _)
     inputRDD.count()
 	
     val coalescedrdd = inputRDD.coalesce(1,
@@ -136,6 +137,11 @@ class KMeansDALImpl (
 
       ret
     }.collect()
+
+    // release the native memory allocated by NumericTable.
+    numericTables.mapPartitions( (tables: Iterator[HomogenNumericTable]) =>
+        tables.map (_.freeDataMemory())
+    )
 
     // Make sure there is only one result from rank 0
     assert(results.length == 1)
