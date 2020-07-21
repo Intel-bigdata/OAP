@@ -9,7 +9,8 @@ requirements:
   run:
     - vmemcache
     - memkind
-    - intel-arrow-cpp
+    - arrow-cpp  0.17.0
     - hpnl
+
 about:
   summary: Optimized Analytics Packages for Spark is a project to optimize Spark by providing optimized implmentation of packages in various aspects including cache, shuffle, and so on.

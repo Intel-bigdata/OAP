@@ -1,9 +1,9 @@
 package:
-  name: memkind
+  name: libfabric
   version: 1.0
 
 source:
-  path: ../../../thirdparty/memkind/
+  path: ../../../thirdparty/libfabric/
 
 requirements:
   build:

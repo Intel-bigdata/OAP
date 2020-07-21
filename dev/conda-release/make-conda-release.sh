@@ -48,19 +48,16 @@ function conda_build_vmemcache() {
 function conda_build_arrow() {
   mkdir -p $DEV_PATH/thirdparty
   cd $DEV_PATH/thirdparty
-  arrow_repo=" https://github.com/Intel-bigdata/arrow.git"
+  arrow_repo="https://github.com/Intel-bigdata/arrow.git"
   if [ ! -d "arrow" ]; then
-    git clone arrow_repo -b oap-master
+    git clone $arrow_repo -b branch-0.17.0-oap-0.9
   fi
   cd arrow
   git pull
-  cp $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/.ci_support/linux_python3.7.yaml $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/arrow-cpp/
-  cd $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/arrow-cpp
-  mv linux_python3.7.yaml conda_build_config.yaml
   cp $RECIPES_PATH/intel-arrow/build.sh $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/arrow-cpp/
   cp $RECIPES_PATH/intel-arrow/meta.yaml $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/arrow-cpp/
-  echo "ARROW_VERSION:" >> conda_build_config.yaml
-  echo "- 0.17.0" >> conda_build_config.yaml
+  cp $RECIPES_PATH/intel-arrow/conda_build_config.yaml $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/arrow-cpp/
+  cd $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/arrow-cpp
   conda build .
 }
 

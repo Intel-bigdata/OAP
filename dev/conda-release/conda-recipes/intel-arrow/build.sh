@@ -5,7 +5,6 @@ set -x
 
 mkdir cpp/build
 pushd cpp/build
-export CXXFLAGS="${CXXFLAGS} -I${PREFIX}/x86_64-conda_cos7-linux-gnu/sysroot/usr/include -L${PREFIX}/x86_64-conda_cos7-linux-gnu/sysroot/usr/lib64 -L${PREFIX}/lib64"
 
 EXTRA_CMAKE_ARGS=""
 
@@ -14,9 +13,7 @@ if [ "$(uname)" == "Linux" ]; then
   SYSTEM_INCLUDES=$(echo | ${CXX} -E -Wp,-v -xc++ - 2>&1 | grep '^ ' | awk '{print "-isystem;" substr($1, 1)}' | tr '\n' ';')
   EXTRA_CMAKE_ARGS=" -DARROW_GANDIVA_PC_CXX_FLAGS=${SYSTEM_INCLUDES}"
 fi
-echo "-----"
-echo $EXTRA_CMAKE_ARGS
-echo "----"
+
 cmake \
     -DARROW_BOOST_USE_SHARED=ON \
     -DARROW_BUILD_BENCHMARKS=OFF \
@@ -51,13 +48,21 @@ cmake \
     -DARROW_WITH_ZSTD=ON \
     -DCMAKE_AR=${AR} \
     -DCMAKE_BUILD_TYPE=release \
-    -DCMAKE_INSTALL_LIBDIR=$PREFIX/lib \
+    -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_INSTALL_PREFIX=$PREFIX \
     -DCMAKE_RANLIB=${RANLIB} \
     -DLLVM_TOOLS_BINARY_DIR=$PREFIX/bin \
     -GNinja \
     ${EXTRA_CMAKE_ARGS} \
     ..
-ninja install
+if [ "$(uname -m)" = "ppc64le" ]; then
+    # Decrease parallelism a bit as we will otherwise get out-of-memory problems
+    echo "Using $(grep -c ^processor /proc/cpuinfo) CPUs"
+    CPU_COUNT=$(grep -c ^processor /proc/cpuinfo)
+    CPU_COUNT=$((CPU_COUNT / 4))
+    ninja install -j${CPU_COUNT}
+else
+    ninja install
+fi
 
 popd

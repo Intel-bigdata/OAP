@@ -12,7 +12,4 @@ requirements:
     - cmake 3.11.*
     - libfabric 1.0
   run:
-    - libgcc [linux]
     - libfabric 1.0
-    - gcc   [linux]
-    - sysroot_linux-64 2.17

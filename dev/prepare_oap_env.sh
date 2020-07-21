@@ -162,14 +162,17 @@ function install_gcc7() {
   $INSTALL_TOOL -y install gmp-devel
   $INSTALL_TOOL -y install mpfr-devel
   $INSTALL_TOOL -y install libmpc-devel
+  $INSTALL_TOOL -y install wget
 
   cd $DEV_PATH/thirdparty
 
   if [ ! -d "gcc-7.3.0" ]; then
-    if [ ! -f "gcc-7.3.0.tar.xz" ]; then
-      wget https://bigsearcher.com/mirrors/gcc/releases/gcc-7.3.0/gcc-7.3.0.tar.xz
+    if [ ! -f "gcc-7.3.0.tar" ]; then
+      if [ ! -f "gcc-7.3.0.tar.xz" ]; then
+        wget https://bigsearcher.com/mirrors/gcc/releases/gcc-7.3.0/gcc-7.3.0.tar.xz
+      fi
+      xz -d gcc-7.3.0.tar.xz
     fi
-    xz -d gcc-7.3.0.tar.xz
     tar -xvf gcc-7.3.0.tar
   fi
 
@@ -225,7 +228,7 @@ function prepare_intel_arrow() {
   cd $DEV_PATH/thirdparty/
   intel_arrow_repo="https://github.com/Intel-bigdata/arrow.git"
   if [ ! -d "arrow" ]; then
-    git clone $intel_arrow_repo -b oap-master
+    git clone $intel_arrow_repo -b branch-0.17.0-oap-0.9
     cd arrow
   else
     cd arrow
@@ -234,15 +237,13 @@ function prepare_intel_arrow() {
   current_arrow_path=$(pwd)
   mkdir -p cpp/release-build
   check_gcc
-  export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
-  export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
 
   cd cpp/release-build
   cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-g -O3" -DCMAKE_CXX_FLAGS="-g -O3"  -DARROW_PLASMA_JAVA_CLIENT=on -DARROW_PLASMA=on -DARROW_DEPENDENCY_SOURCE=BUNDLED -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_WITH_SNAPPY=ON -DARROW_FILESYSTEM=ON -DARROW_JSON=ON -DARROW_WITH_PROTOBUF=ON -DARROW_DATASET=ON ..
   make -j
   make install
   cd ../../java
-  mvn clean install -q -P arrow-jni -am -Darrow.cpp.build.dir=../cpp/release-build/release/ -DskipTests -Dcheckstyle.skip
+  mvn clean install -q -P arrow-jni -am -Darrow.cpp.build.dir=$current_arrow_path/cpp/release-build/release/ -DskipTests -Dcheckstyle.skip
 }
 
 
@@ -343,10 +344,17 @@ function prepare_PMoF() {
   prepare_libcuckoo
   cd $DEV_PATH
   cd ../oap-shuffle/RPMem-shuffle
-  export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
-  export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
+  check_gcc
   mvn package -DskipTests
 }
+
+function prepare_oneAPI() {
+  cd $DEV_PATH/
+  cd ..
+  sudo sh oap-mllib/dev/install-build-deps-centos.sh
+}
+
+
 
 function  prepare_all() {
   prepare_maven
@@ -355,6 +363,7 @@ function  prepare_all() {
   prepare_vmemcache
   prepare_intel_arrow
   prepare_PMoF
+  prepare_oneAPI
 }
 
 function oap_build_help() {

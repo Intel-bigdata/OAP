@@ -10,5 +10,3 @@ requirements:
     - gcc   [linux]
     - libgcc [linux]
     - cmake 3.11.*
-  run:
-    - libgcc [linux]
