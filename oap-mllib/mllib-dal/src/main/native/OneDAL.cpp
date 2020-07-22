@@ -62,7 +62,6 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIter
 		 
 		 jdouble* values = env->GetDoubleArrayElements(jvalue, 0);
 
-         long numValues = env->GetArrayLength(jvalue);
          for (int i = 0; i < numRows; i ++){
               jlong curRow = rowOffset[i] + totalRows;
             for(int j = 0; j < jcols; j ++) {
