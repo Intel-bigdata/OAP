@@ -22,6 +22,7 @@ package org.apache.spark.sql
 
 import sys.process._
 import org.apache.spark._
+import org.apache.spark.sql.oap.OapRuntime
 
 trait OapPerfSuiteContext {
 
@@ -82,6 +83,7 @@ trait OapPerfSuiteContext {
   def afterAll(): Unit = {
     if (_spark != null) {
       SparkSession.clearActiveSession()
+      OapRuntime.stop()
       _spark.stop()
       _spark = null
       assert(("rm -f ./metastore_db/db.lck" !) == 0)
