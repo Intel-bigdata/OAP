@@ -18,6 +18,9 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_setNumericTabl
 JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIterator
   (JNIEnv *env, jobject,jlong numTableAddr, jobject jiter);
 
+JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cAddNumericTable
+	  (JNIEnv *, jobject, jlong, jlong);
+
 #ifdef __cplusplus
 }
 #endif

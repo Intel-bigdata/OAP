@@ -424,15 +424,14 @@ class KMeans @Since("1.5.0") (
     val strInitMode = $(initMode)
     logInfo(f"Initialization with $strInitMode took $initTimeInSeconds%.3f seconds.")
 
-    // Repartition and convert to RDD[HomogenNumericTable]
-    val repartitioned = instances.map {
+    val inputData = instances.map {
       case (point: Vector, weight: Double) => point
-    }.repartition(executor_num).setName("Repartitioned for conversion").cache()
+    }
 
     val kmeansDAL = new KMeansDALImpl(getK, getMaxIter, getTol,
       DistanceMeasure.EUCLIDEAN, centers, executor_num, executor_cores)
 
-    val parentModel = kmeansDAL.runWithRDDVector(repartitioned, Option(instr))
+    val parentModel = kmeansDAL.runWithRDDVector(inputData, Option(instr))
 
     val model = copyValues(new KMeansModel(uid, parentModel).setParent(this))
 

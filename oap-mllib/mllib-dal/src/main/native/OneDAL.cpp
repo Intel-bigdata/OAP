@@ -82,3 +82,11 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIter
 
   }
 
+JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cAddNumericTable
+  (JNIEnv *, jobject,  jlong rowMergedNumericTableAddr, jlong numericTableAddr) {
+    
+    data_management::RowMergedNumericTablePtr pRowMergedNumericTable = (*(data_management::RowMergedNumericTablePtr *)rowMergedNumericTableAddr); 
+    data_management::NumericTablePtr pNumericTable = (*(data_management::NumericTablePtr *)numericTableAddr);
+    pRowMergedNumericTable->addNumericTable(pNumericTable);
+
+  }
