@@ -22,8 +22,7 @@ import java.net.URLDecoder
 import scala.collection.JavaConverters._
 
 import com.intel.oap.spark.sql.execution.datasources.arrow.ArrowFileFormat.UnsafeItr
-import com.intel.oap.spark.sql.execution.datasources.v2.arrow.{ArrowFilters, ArrowOptions, ExecutionMemoryAllocationListener}
-import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowPartitionReaderFactory.ColumnarBatchRetainer
+import com.intel.oap.spark.sql.execution.datasources.v2.arrow.{ArrowFilters, ArrowOptions}
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowSQLConf._
 import org.apache.arrow.dataset.scanner.{ScanOptions, ScanTask}
 import org.apache.arrow.memory.AllocationListener
@@ -41,8 +40,6 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.sql.vectorized.ColumnarBatch;
 
 class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializable {
-
-  val batchSize = 4096
 
   def convert(files: Seq[FileStatus], options: Map[String, String]): Option[StructType] = {
     ArrowUtils.readSchema(files, new CaseInsensitiveStringMap(options.asJava))
@@ -73,6 +70,7 @@ class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializab
       options: Map[String, String],
       hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
     val sqlConf = sparkSession.sessionState.conf;
+    val batchSize = sqlConf.parquetVectorizedReaderBatchSize
     val enableFilterPushDown = sqlConf.arrowFilterPushDown
 
     (file: PartitionedFile) => {
