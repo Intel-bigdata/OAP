@@ -89,7 +89,7 @@ class ColumnarHashAggregateExec(
   val numInputBatches = longMetric("numInputBatches")
   val aggTime = longMetric("aggTime")
   val calcTime = longMetric("aggTime")
-  val elapseTime = longMetric("elapseTime")
+  val totalTime = longMetric("totalTime")
   numOutputRows.set(0)
   numOutputBatches.set(0)
   numInputBatches.set(0)
@@ -184,7 +184,7 @@ class ColumnarHashAggregateExec(
             numOutputBatches,
             numOutputRows,
             aggTime,
-            caclTime,
+            calcTime,
             totalTime,
             sparkConf)
           TaskContext

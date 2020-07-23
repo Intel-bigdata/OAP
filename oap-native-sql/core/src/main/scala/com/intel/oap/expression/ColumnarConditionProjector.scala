@@ -183,7 +183,7 @@ class ColumnarConditionProjector(
     if (projector != null) {
       projector.close()
     }
-    procTime.set(TimeUnit.NANOSECONDS.toMillis(proc_time))
+    procTime.set(proc_time)
   }
 
   def createIterator(cbIterator: Iterator[ColumnarBatch]): Iterator[ColumnarBatch] = {
@@ -197,7 +197,7 @@ class ColumnarConditionProjector(
           return true
         }
         nextCalled = false
-        val beforeEval: Long = 0
+        var beforeEval: Long = 0
         var numRows = 0
         var input : ArrowRecordBatch = null
         var selectionVector : SelectionVectorInt16 = null

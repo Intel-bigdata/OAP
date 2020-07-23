@@ -155,7 +155,8 @@ class ColumnarShuffledHashJoin(
       probe_iterator.close()
       probe_iterator = null
     }
-    totalTime.set(buildTime + joinTime)
+    totalTime.merge(buildTime)
+    totalTime.merge(joinTime)
   }
 }
 
@@ -178,10 +179,12 @@ object ColumnarShuffledHashJoin extends Logging {
       right: SparkPlan,
       _buildTime: SQLMetric,
       _joinTime: SQLMetric,
+      _totalTime: SQLMetric,
       _numOutputRows: SQLMetric,
       _sparkConf: SparkConf): Unit = {
     val buildTime = _buildTime
     val joinTime = _joinTime
+    val totalTime = _totalTime
     val numOutputRows = _numOutputRows
     val sparkConf = _sparkConf
     ColumnarPluginConfig.getConf(sparkConf)
