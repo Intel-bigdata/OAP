@@ -53,7 +53,7 @@ class ColumnarSortExec(
 
   override lazy val metrics = Map(
     "totalSortTime" -> SQLMetrics
-      .createTimingMetric(sparkContext, "time in sort + shuffle process"),
+      .createTimingMetric(sparkContext, "totaltime_sort"),
     "sortTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in sort process"),
     "shuffleTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in shuffle process"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),

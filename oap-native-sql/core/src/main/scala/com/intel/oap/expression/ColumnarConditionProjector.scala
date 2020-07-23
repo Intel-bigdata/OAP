@@ -56,6 +56,7 @@ class ColumnarConditionProjector(
   procTime: SQLMetric)
   extends Logging {
   logInfo(s"originalInputAttributes is ${originalInputAttributes}, \nCondition is ${condExpr}, \nProjection is ${projectList}")
+  var proc_time :Long = 0
   var elapseTime_make: Long = 0
   val start_make: Long = System.nanoTime()
   var skip = false
@@ -182,6 +183,7 @@ class ColumnarConditionProjector(
     if (projector != null) {
       projector.close()
     }
+    procTime.set(TimeUnit.NANOSECONDS.toMillis(proc_time))
   }
 
   def createIterator(cbIterator: Iterator[ColumnarBatch]): Iterator[ColumnarBatch] = {
@@ -195,7 +197,7 @@ class ColumnarConditionProjector(
           return true
         }
         nextCalled = false
-        val beforeEval: Long = System.nanoTime()
+        val beforeEval: Long = 0
         var numRows = 0
         var input : ArrowRecordBatch = null
         var selectionVector : SelectionVectorInt16 = null
@@ -209,7 +211,7 @@ class ColumnarConditionProjector(
             logInfo(s"has no next, return false")
             return false
           }
-
+          beforeEval = System.nanoTime()
           numRows = columnarBatch.numRows()
           if (numRows > 0) {
             if (skip == true){
@@ -266,7 +268,7 @@ class ColumnarConditionProjector(
   
         ConverterUtils.releaseArrowRecordBatch(input)
         val outputBatch = new ColumnarBatch(resultColumnVectors.map(_.asInstanceOf[ColumnVector]), numRows)
-        procTime += ((System.nanoTime() - beforeEval) / (1000 * 1000))
+        proc_time += ((System.nanoTime() - beforeEval) / (1000 * 1000))
         resColumnarBatch = outputBatch
         true
       }

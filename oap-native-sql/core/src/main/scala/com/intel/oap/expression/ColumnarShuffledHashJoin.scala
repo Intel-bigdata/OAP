@@ -63,6 +63,7 @@ class ColumnarShuffledHashJoin(
     resultSchema: StructType,
     buildTime: SQLMetric,
     joinTime: SQLMetric,
+    totalTime: SQLMetric,
     totalOutputNumRows: SQLMetric,
     sparkConf: SparkConf)
     extends Logging {
@@ -154,6 +155,7 @@ class ColumnarShuffledHashJoin(
       probe_iterator.close()
       probe_iterator = null
     }
+    totalTime.set(buildTime + joinTime)
   }
 }
 
@@ -365,6 +367,7 @@ object ColumnarShuffledHashJoin extends Logging {
       right: SparkPlan,
       buildTime: SQLMetric,
       joinTime: SQLMetric,
+      totalTime: SQLMetric,
       numOutputRows: SQLMetric,
       sparkConf: SparkConf): String = synchronized {
     init(
@@ -378,6 +381,7 @@ object ColumnarShuffledHashJoin extends Logging {
       right,
       buildTime,
       joinTime,
+      totalTime,
       numOutputRows,
       sparkConf)
 
@@ -403,6 +407,7 @@ object ColumnarShuffledHashJoin extends Logging {
       listJars: Seq[String],
       buildTime: SQLMetric,
       joinTime: SQLMetric,
+      totalTime: SQLMetric,
       numOutputRows: SQLMetric,
       sparkConf: SparkConf): ColumnarShuffledHashJoin = synchronized {
     init(
@@ -416,6 +421,7 @@ object ColumnarShuffledHashJoin extends Logging {
       right,
       buildTime,
       joinTime,
+      totalTime,
       numOutputRows,
       sparkConf)
 
@@ -432,6 +438,7 @@ object ColumnarShuffledHashJoin extends Logging {
       resultSchema,
       buildTime,
       joinTime,
+      totalTime,
       numOutputRows,
       sparkConf)
   }

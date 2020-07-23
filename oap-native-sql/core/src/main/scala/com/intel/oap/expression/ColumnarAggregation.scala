@@ -70,7 +70,8 @@ class ColumnarAggregation(
     numOutputBatches: SQLMetric,
     numOutputRows: SQLMetric,
     aggrTime: SQLMetric,
-    elapseTime: SQLMetric,
+    calcTime: SQLMetric,
+    totalTime: SQLMetric,
     sparkConf: SparkConf)
     extends Logging {
   // build gandiva projection here.
@@ -210,6 +211,7 @@ class ColumnarAggregation(
       result_iterator.close()
       result_iterator = null
     }
+    totalTime.set(aggrTime + calcTime)
   }
 
   def getAttrForAggregateExpr(aggregateExpressions: Seq[AggregateExpression]): List[Attribute] = {
@@ -348,18 +350,18 @@ class ColumnarAggregation(
 
         nextCalled = false
         if (data_loaded == false) {
-          val beforeAgg = System.nanoTime()
           while (cbIterator.hasNext) {
             cb = cbIterator.next()
   
             if (cb.numRows > 0) {
+              val beforeAgg = System.nanoTime()
               updateAggregationResult(cb)
+              val elapse = System.nanoTime() - beforeAgg
+              calcTime += NANOSECONDS.toMillis(elapse)
               processedNumRows += cb.numRows
             }
             numInputBatches += 1
           }
-          val elapse = System.nanoTime() - beforeAgg
-          elapseTime += NANOSECONDS.toMillis(elapse)
           if (groupingFieldList.size > 0) {
             result_iterator = aggregator.finishByIterator()
           }
@@ -410,7 +412,8 @@ object ColumnarAggregation {
       numOutputBatches: SQLMetric,
       numOutputRows: SQLMetric,
       aggrTime: SQLMetric,
-      elapseTime: SQLMetric,
+      calcTime: SQLMetric,
+      totalTime: SQLMetric,
       sparkConf: SparkConf): ColumnarAggregation = synchronized {
     columnarAggregation = new ColumnarAggregation(
       partIndex,
@@ -424,7 +427,8 @@ object ColumnarAggregation {
       numOutputBatches,
       numOutputRows,
       aggrTime,
-      elapseTime,
+      calcTime,
+      totalTime,
       sparkConf)
     columnarAggregation
   }

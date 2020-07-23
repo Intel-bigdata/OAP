@@ -71,12 +71,14 @@ class ColumnarShuffledHashJoinExec(
   val sparkConf = sparkContext.getConf
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
+    "totalTime" -> SQLMetrics.createTimingMetric(sparkContext, "totaltime_hashjoin"),
     "joinTime" -> SQLMetrics.createTimingMetric(sparkContext, "join time"),
     "buildTime" -> SQLMetrics.createTimingMetric(sparkContext, "time to build hash map"))
 
   override def supportsColumnar = true
 
   val numOutputRows = longMetric("numOutputRows")
+  val totalTime = longMetric("totalTime")
   val joinTime = longMetric("joinTime")
   val buildTime = longMetric("buildTime")
   val resultSchema = this.schema
@@ -102,6 +104,7 @@ class ColumnarShuffledHashJoinExec(
         right,
         buildTime,
         joinTime,
+        totalTime,
         numOutputRows,
         sparkConf)
     } else {
@@ -150,6 +153,7 @@ class ColumnarShuffledHashJoinExec(
           jarList,
           buildTime,
           joinTime,
+          totalTime,
           numOutputRows,
           sparkConf)
         TaskContext
