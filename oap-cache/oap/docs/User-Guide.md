@@ -230,6 +230,12 @@ The following are required to configure OAP to use DCPMM cache.
 
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
 
+- Besides, with below BIOS configuration settings, Optane PMem could get noticeable performance gain, especially on cross socket write code path.
+
+```
+Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
+Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
+``` 
 
 - For cache solution guava/non-evict, make sure [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/libmemkind.so.0) for x86_64 bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. Build and install step can refer to [build and install memkind](./Developer-Guide.md#build-and-install-memkind)
 
