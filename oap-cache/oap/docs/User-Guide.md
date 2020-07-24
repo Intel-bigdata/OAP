@@ -230,7 +230,7 @@ The following are required to configure OAP to use DCPMM cache.
 
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
 
-- Besides, with below BIOS configuration settings, Optane PMem could get noticeable performance gain, especially on cross socket write code path.
+- Besides, with below BIOS configuration settings, Optane PMem could get noticeable performance gain, especially on cross socket write path.
 
 ```
 Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
