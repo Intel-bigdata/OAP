@@ -198,6 +198,7 @@ class ColumnarConditionProjector(
         }
         nextCalled = false
         var beforeEval: Long = 0
+        var afterEval: Long = 0
         var numRows = 0
         var input : ArrowRecordBatch = null
         var selectionVector : SelectionVectorInt16 = null
@@ -232,6 +233,8 @@ class ColumnarConditionProjector(
               val cols = conditionOrdinalList.map(i => {
                 columnarBatch.column(i).asInstanceOf[ArrowWritableColumnVector].getValueVector()
               })
+              afterEval = System.nanoTime()
+              proc_time += ((System.nanoTime() - beforeEval) / (1000 * 1000))
               input = ConverterUtils.createArrowRecordBatch(numRows, cols)
               conditioner.evaluate(input, selectionVector)
               ConverterUtils.releaseArrowRecordBatch(input)
@@ -251,6 +254,7 @@ class ColumnarConditionProjector(
   
         // for now, we either filter one columnarBatch who has valid rows or we only need to do project
         // either scenario we will need to output one columnarBatch.
+        beforeEval = System.nanoTime()
         val resultColumnVectors = ArrowWritableColumnVector.allocateColumns(numRows, resultSchema).toArray
         val outputVectors = resultColumnVectors.map(columnVector => {
           columnVector.getValueVector()
