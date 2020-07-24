@@ -42,6 +42,7 @@ function gather() {
   cp ../oap-shuffle/remote-shuffle/target/*.jar $target_path
   cp ../oap-shuffle/RPMem-shuffle/core/target/*.jar $target_path
   cp ../oap-spark/target/*.jar $target_path
+  cp ../oap-mllib/mllib-dal/target/*.jar $target_path
   find $target_path -name "*test*"|xargs rm -rf
   cd $target_path
   rm -f oap-cache-$OAP_VERSION.jar
@@ -52,5 +53,7 @@ function gather() {
 
 cd $OAP_HOME
 check_gcc
+source /opt/intel/inteloneapi/setvars.sh
+source /tmp/oneCCL/build/_install/env/setvars.sh
 mvn clean  -Ppersistent-memory -Pvmemcache -DskipTests package
 gather

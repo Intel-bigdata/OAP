@@ -3,12 +3,15 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.intel.oap</groupId>
+    <parent>
+        <groupId>com.intel.oap</groupId>
+        <artifactId>oap-parent</artifactId>
+        <version>0.9.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
     <artifactId>oap-mllib</artifactId>
-    <version>0.9.0-with-spark-3.0.0</version>
     <packaging>jar</packaging>
-
-    <name>oap-mllib</name>
+    <name>OAP Project ML Library</name>
     <url>https://github.com/Intel-bigdata/OAP</url>
 
     <properties>
@@ -79,6 +82,7 @@
     </dependencies>
 
     <build>
+        <finalName>${project.artifactId}-${project.version}-with-spark-${spark.version}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.scala-tools</groupId>

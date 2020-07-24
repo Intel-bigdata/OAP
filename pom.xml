@@ -38,6 +38,7 @@
 
     <modules>
         <module>oap-common</module>
+        <module>oap-mllib/mllib-dal</module>
         <module>oap-cache/oap</module>
         <module>oap-native-sql/core</module>
         <module>oap-spark</module>
