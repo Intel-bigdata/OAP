@@ -70,7 +70,6 @@ class ColumnarAggregation(
     numOutputBatches: SQLMetric,
     numOutputRows: SQLMetric,
     aggrTime: SQLMetric,
-    calcTime: SQLMetric,
     elapseTime: SQLMetric,
     sparkConf: SparkConf)
     extends Logging {
@@ -211,6 +210,8 @@ class ColumnarAggregation(
       result_iterator.close()
       result_iterator = null
     }
+
+    elapseTime.merge(aggrTime)
   }
 
   def getAttrForAggregateExpr(aggregateExpressions: Seq[AggregateExpression]): List[Attribute] = {
@@ -338,6 +339,7 @@ class ColumnarAggregation(
       var resultColumnarBatch: ColumnarBatch = null
       var data_loaded = false
       var nextBatch = true
+      var eval_elapse: Long = 0
 
       override def hasNext: Boolean = {
         if (nextCalled == false && resultColumnarBatch != null) {
@@ -349,26 +351,28 @@ class ColumnarAggregation(
 
         nextCalled = false
         if (data_loaded == false) {
-          val beforeAgg = System.nanoTime()
           while (cbIterator.hasNext) {
             cb = cbIterator.next()
   
             if (cb.numRows > 0) {
+              val beforeEval = System.nanoTime()
               updateAggregationResult(cb)
+              eval_elapse += System.nanoTime() - beforeEval
               processedNumRows += cb.numRows
             }
             numInputBatches += 1
           }
-          val elapse = System.nanoTime() - beforeAgg
-          elapseTime += NANOSECONDS.toMillis(elapse)
           if (groupingFieldList.size > 0) {
+            val beforeFinish = System.nanoTime()
             result_iterator = aggregator.finishByIterator()
+            eval_elapse += System.nanoTime() - beforeFinish
           }
           data_loaded = true
+          aggrTime += NANOSECONDS.toMillis(eval_elapse)
         }
         val beforeEval = System.nanoTime()
         resultColumnarBatch = getAggregationResult(result_iterator)
-        val eval_elapse = System.nanoTime() - beforeEval
+        eval_elapse += System.nanoTime() - beforeEval
         aggrTime += NANOSECONDS.toMillis(eval_elapse)
         if (resultColumnarBatch.numRows == 0) {
           resultColumnarBatch.close()
@@ -411,7 +415,6 @@ object ColumnarAggregation {
       numOutputBatches: SQLMetric,
       numOutputRows: SQLMetric,
       aggrTime: SQLMetric,
-      calcTime: SQLMetric,
       elapseTime: SQLMetric,
       sparkConf: SparkConf): ColumnarAggregation = synchronized {
     columnarAggregation = new ColumnarAggregation(
@@ -426,7 +429,6 @@ object ColumnarAggregation {
       numOutputBatches,
       numOutputRows,
       aggrTime,
-      calcTime,
       elapseTime,
       sparkConf)
     columnarAggregation

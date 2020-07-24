@@ -68,7 +68,6 @@ class ColumnarGroupbyHashAggregation(
     numOutputBatches: SQLMetric,
     numOutputRows: SQLMetric,
     aggrTime: SQLMetric,
-    calcTime: SQLMetric,
     totalTime: SQLMetric,
     sparkConf: SparkConf)
     extends Logging {
@@ -133,7 +132,6 @@ class ColumnarGroupbyHashAggregation(
       aggregator_iterator.close()
       aggregator_iterator = null
     }
-    totalTime.merge(calcTime)
     totalTime.merge(aggrTime)
   }
 
@@ -145,7 +143,6 @@ class ColumnarGroupbyHashAggregation(
       var data_loaded = false
       var nextBatch = true
       var eval_elapse: Long = 0
-      var beforeAgg: Long = 0
 
       override def hasNext: Boolean = {
         if (nextCalled == false && resultColumnarBatch != null) {
@@ -160,15 +157,12 @@ class ColumnarGroupbyHashAggregation(
           while (cbIterator.hasNext) {
             cb = cbIterator.next()
 
-            beforeAgg = System.nanoTime()
             if (cb.numRows > 0) {
               val beforeEval = System.nanoTime()
               updateAggregationResult(cb)
               eval_elapse += System.nanoTime() - beforeEval
               processedNumRows += cb.numRows
             }
-            val elapse = System.nanoTime - beforeAgg
-            calcTime += NANOSECONDS.toMillis(elapse)
             numInputBatches += 1
           }
           val beforeFinish = System.nanoTime()
@@ -229,14 +223,12 @@ object ColumnarGroupbyHashAggregation extends Logging {
       _numOutputBatches: SQLMetric,
       _numOutputRows: SQLMetric,
       _aggrTime: SQLMetric,
-      _calcTime: SQLMetric,
       _totalTime: SQLMetric,
       _sparkConf: SparkConf): Unit = {
     val numInputBatches = _numInputBatches
     val numOutputBatches = _numOutputBatches
     val numOutputRows = _numOutputRows
     val aggrTime = _aggrTime
-    val calcTime = _calcTime
     val totalTime = _totalTime
     val sparkConf = _sparkConf
 
@@ -470,7 +462,6 @@ object ColumnarGroupbyHashAggregation extends Logging {
       numOutputBatches: SQLMetric,
       numOutputRows: SQLMetric,
       aggrTime: SQLMetric,
-      calcTime: SQLMetric,
       totalTime: SQLMetric,
       sparkConf: SparkConf): String = synchronized {
     init(
@@ -484,7 +475,6 @@ object ColumnarGroupbyHashAggregation extends Logging {
       numOutputBatches,
       numOutputRows,
       aggrTime,
-      calcTime,
       totalTime,
       sparkConf)
     aggregator = new ExpressionEvaluator()
@@ -509,7 +499,6 @@ object ColumnarGroupbyHashAggregation extends Logging {
       numOutputBatches: SQLMetric,
       numOutputRows: SQLMetric,
       aggrTime: SQLMetric,
-      calcTime: SQLMetric,
       totalTime: SQLMetric,
       sparkConf: SparkConf): ColumnarGroupbyHashAggregation = synchronized {
     init(
@@ -523,7 +512,6 @@ object ColumnarGroupbyHashAggregation extends Logging {
       numOutputBatches,
       numOutputRows,
       aggrTime,
-      calcTime,
       totalTime,
       sparkConf)
     aggregator = new ExpressionEvaluator(listJars.toList.asJava)
@@ -542,7 +530,6 @@ object ColumnarGroupbyHashAggregation extends Logging {
       numOutputBatches,
       numOutputRows,
       aggrTime,
-      calcTime,
       totalTime,
       sparkConf)
   }
