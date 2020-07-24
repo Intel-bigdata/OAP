@@ -43,7 +43,7 @@ public final class LibLoader {
      * Load MLlibDAL lib, it depends TBB libs that are loaded by oneDAL,
      * so this function should be called after oneDAL loadLibrary
      */
-    public static void loadLibrary() throws IOException {
+    public static synchronized void loadLibrary() throws IOException {
         // Load oneCCL libs in dependency order
         loadFromJar(subDir, "libpmi.so.1");
         loadFromJar(subDir, "libresizable_pmi.so.1");
