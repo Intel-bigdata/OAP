@@ -21,6 +21,7 @@ jobs:
       - ./install_memkind.sh
       script:
       - cd ${TRAVIS_BUILD_DIR}
+      - export ONEAPI_ROOT=/tmp/
       - mvn clean test -pl oap-cache/oap -q -Ppersistent-memory  -Pvmemcache  -am
       
     - name: oap-native-sql
@@ -115,5 +116,6 @@ jobs:
         - cd ${TRAVIS_BUILD_DIR}/dev
         - ./install_memkind.sh
       script:
+        - export ONEAPI_ROOT=/tmp/
         - cd ${TRAVIS_BUILD_DIR}
         - mvn clean package -pl oap-spark -q -Ppersistent-memory -am
