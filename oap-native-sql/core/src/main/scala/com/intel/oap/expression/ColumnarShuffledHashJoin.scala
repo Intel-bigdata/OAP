@@ -77,18 +77,19 @@ class ColumnarShuffledHashJoin(
       streamIter: Iterator[ColumnarBatch],
       buildIter: Iterator[ColumnarBatch]): Iterator[ColumnarBatch] = {
 
-    val beforeBuild = System.nanoTime()
 
     while (buildIter.hasNext) {
       if (build_cb != null) {
         build_cb = null
       }
       build_cb = buildIter.next()
+      val beforeBuild = System.nanoTime()
       val build_rb = ConverterUtils.createArrowRecordBatch(build_cb)
       (0 until build_cb.numCols).toList.foreach(i =>
         build_cb.column(i).asInstanceOf[ArrowWritableColumnVector].retain())
       inputBatchHolder += build_cb
       prober.evaluate(build_rb)
+      buildTime += NANOSECONDS.toMillis(System.nanoTime() - beforeBuild)
       ConverterUtils.releaseArrowRecordBatch(build_rb)
     }
     if (build_cb != null) {
@@ -111,7 +112,6 @@ class ColumnarShuffledHashJoin(
 
     // there will be different when condition is null or not null
     probe_iterator = prober.finishByIterator()
-    buildTime += NANOSECONDS.toMillis(System.nanoTime() - beforeBuild)
 
     new Iterator[ColumnarBatch] {
       override def hasNext: Boolean = {

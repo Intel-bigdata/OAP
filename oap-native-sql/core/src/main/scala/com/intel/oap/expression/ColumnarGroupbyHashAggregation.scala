@@ -157,16 +157,18 @@ class ColumnarGroupbyHashAggregation(
 
         nextCalled = false
         if (data_loaded == false) {
-          beforeAgg = System.nanoTime()
           while (cbIterator.hasNext) {
             cb = cbIterator.next()
 
+            beforeAgg = System.nanoTime()
             if (cb.numRows > 0) {
               val beforeEval = System.nanoTime()
               updateAggregationResult(cb)
               eval_elapse += System.nanoTime() - beforeEval
               processedNumRows += cb.numRows
             }
+            val elapse = System.nanoTime - beforeAgg
+            calcTime += NANOSECONDS.toMillis(elapse)
             numInputBatches += 1
           }
           val beforeFinish = System.nanoTime()
@@ -180,8 +182,6 @@ class ColumnarGroupbyHashAggregation(
         aggrTime += NANOSECONDS.toMillis(System.nanoTime() - beforeResultFetch)
         if (resultColumnarBatch.numRows == 0) {
           resultColumnarBatch.close()
-          val elapse = System.nanoTime - beforeAgg
-          calcTime += NANOSECONDS.toMillis(elapse)
           logInfo(
             s"Aggregation completed, total output ${numOutputRows} rows, ${numOutputBatches} batches")
           return false
