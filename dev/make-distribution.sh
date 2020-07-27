@@ -4,7 +4,7 @@ set -e
 OAP_HOME="$(cd "`dirname "$0"`/.."; pwd)"
 DEV_PATH=$OAP_HOME/dev
 
-OAP_VERSION=0.8.1
+OAP_VERSION=0.8.2
 SPARK_VERSION=2.4.4
 
 GCC_MIN_VERSION=7.0

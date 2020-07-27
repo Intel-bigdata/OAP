@@ -430,7 +430,7 @@ mkdir build
 cd build
 cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_EXAMPLES=1 -DBUILD_TESTS=1 ..
 make all && make install
-git clone -b v0.8.1-spark-2.4.4 https://github.com/intel-bigdata/OAP.git
+git clone -b v0.8.2-spark-2.4.4 https://github.com/intel-bigdata/OAP.git
 cd OAP/oap-shuffle/RPMem-shuffle
 mvn install -DskipTests
 
@@ -459,9 +459,9 @@ pmempool rm ${device_name}
 
 #### Enable RPMemShuffle
 ```bash
-spark.shuffle.manager						 org.apache.spark.shuffle.pmof.PmofShuffleManager
-spark.driver.extraClassPath                                 /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-0.8.2-jar-with-dependencies.jar
-spark.executor.extraClassPath                               /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-0.8.2-jar-with-dependencies.jar
+spark.shuffle.manager		      org.apache.spark.shuffle.pmof.PmofShuffleManager
+spark.driver.extraClassPath           /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
+spark.executor.extraClassPath         /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
 
 ```
 #### Switch On/Off PMem and RDMA
@@ -724,8 +724,8 @@ spark.driver.memory    10g
 spark.yarn.driver.memoryOverhead 5g
 
 spark.io.compression.codec                                  snappy
-spark.driver.extraClassPath                                 /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-0.8.2-jar-with-dependencies.jar
-spark.executor.extraClassPath                               /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-0.8.2-jar-with-dependencies.jar
+spark.driver.extraClassPath                                 /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
+spark.executor.extraClassPath                               /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
 spark.shuffle.manager                                       org.apache.spark.shuffle.pmof.PmofShuffleManager
 spark.shuffle.pmof.enable_rdma                              true
 spark.shuffle.pmof.enable_pmem                              true
