@@ -17,22 +17,22 @@ SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with 
 
 ### Building
 
-Download our pre-built jar [oap-0.8.1-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/oap-0.8.1-bin-spark-2.4.4.tar.gz) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the `oap-common-0.8.1-with-spark-2.4.4.jar` to the directory `$SPARK_HOME/jars/`. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+Download our pre-built jar [oap-0.8.2-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/oap-0.8.2-bin-spark-2.4.4.tar.gz) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the `oap-common-0.8.2-with-spark-2.4.4.jar` to the directory `$SPARK_HOME/jars/`. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 
 ### Spark Configurations
 
 Users usually test and run Spark SQL or Scala scripts in Spark Shell,  which launches Spark applications on YRAN with ***client*** mode. In this section, we will start with Spark Shell then introduce other use scenarios. 
 
-Before you run ` . $SPARK_HOME/bin/spark-shell `, you need to configure Spark for integration. You need to add or update the following configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
+Before you run ` . $SPARK_HOME/bin/spark-shell `, make sure `oap-common-0.8.2-with-spark-2.4.4.jar` has already been put into the directory `$SPARK_HOME/jars/`, then you need to configure Spark for integration. You need to add or update the following configurations in the Spark configuration file `$SPARK_HOME/conf/spark-defaults.conf` on your working node.
 
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
 # absolute path of the jar on your working node
-spark.files                       /home/oap/jars/oap-cache-0.8.1-with-spark-2.4.4.jar
+spark.files                       /home/oap/jars/oap-cache-0.8.2-with-spark-2.4.4.jar
 # relative path of the jar
-spark.executor.extraClassPath     ./oap-cache-0.8.1-with-spark-2.4.4.jar
+spark.executor.extraClassPath     ./oap-cache-0.8.2-with-spark-2.4.4.jar
 # absolute path of the jar on your working node
-spark.driver.extraClassPath       /home/oap/jars/oap-cache-0.8.1-with-spark-2.4.4.jar
+spark.driver.extraClassPath       /home/oap/jars/oap-cache-0.8.2-with-spark-2.4.4.jar
 ```
 ### Verify Integration 
 
@@ -71,11 +71,11 @@ Add the following OAP configuration settings to `$SPARK_HOME/conf/spark-defaults
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
 # absolute path on your working node
-spark.files                       /home/oap/jars/oap-cache-0.8.1-with-spark-2.4.4.jar
+spark.files                       /home/oap/jars/oap-cache-0.8.2-with-spark-2.4.4.jar
 # relative path    
-spark.executor.extraClassPath     ./oap-cache-0.8.1-with-spark-2.4.4.jar
+spark.executor.extraClassPath     ./oap-cache-0.8.2-with-spark-2.4.4.jar
 # relative path 
-spark.driver.extraClassPath       ./oap-cache-0.8.1-with-spark-2.4.4.jar
+spark.driver.extraClassPath       ./oap-cache-0.8.2-with-spark-2.4.4.jar
 ```
 
 ## Configuration for Spark Standalone Mode
@@ -87,9 +87,9 @@ In addition to running on the YARN cluster manager, Spark also provides a simple
 ```
 spark.sql.extensions               org.apache.spark.sql.OapExtensions
 # absolute path on worker nodes
-spark.executor.extraClassPath      /home/oap/jars/oap-cache-0.8.1-with-spark-2.4.4.jar
+spark.executor.extraClassPath      /home/oap/jars/oap-cache-0.8.2-with-spark-2.4.4.jar
 # absolute path on worker nodes
-spark.driver.extraClassPath        /home/oap/jars/oap-cache-0.8.1-with-spark-2.4.4.jar
+spark.driver.extraClassPath        /home/oap/jars/oap-cache-0.8.2-with-spark-2.4.4.jar
 ```
 
 ## Working with SQL Index
@@ -306,7 +306,7 @@ Optimize your environment by choosing a DCPMM caching strategy (guava, non-evict
 
 Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and memkind library correctly. Then follow bellow configurations.
 
-For Parquet data format, add these conf options:
+For Parquet file format, add these conf options:
 ```
 spark.sql.oap.parquet.data.cache.enable           true
 spark.sql.oap.fiberCache.memory.manager           pm 
@@ -314,7 +314,7 @@ spark.oap.cache.strategy                          guava
 spark.sql.oap.fiberCache.persistent.memory.initial.size    *g
 spark.sql.extensions                              org.apache.spark.sql.OapExtensions
 ```
-For Orc data format, add these conf options:
+For Orc file format, add these conf options:
 ```
 spark.sql.orc.copyBatchToSpark                   true
 spark.sql.oap.orc.data.cache.enable              true
@@ -338,13 +338,13 @@ The non-evictable cache strategy is also supported in OAP based on the memkind l
 
 To apply Non-evictable cache strategy in your workload, please follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and memkind library correctly. Then follow bellow configurations.
 
-For Parquet data format, add these conf options:
+For Parquet file format, add these conf options:
 ```
 spark.sql.oap.parquet.data.cache.enable                  true 
 spark.oap.cache.strategy                                 noevict 
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
 ```
-For Orc data format, add these conf options:
+For Orc file format, add these conf options:
 ```
 spark.sql.orc.copyBatchToSpark                           true 
 spark.sql.oap.orc.data.cache.enable                      true 
@@ -357,7 +357,7 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
 The vmemcache cache strategy is based on libvmemcache (buffer based LRU cache), which provides a key-value store API. Follow these steps to enable vmemcache support in Data Source Cache.
 To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and vmemcache library correctly, then refer below configurations to apply vmemcache cache strategy in your workload.
 
-For Parquet data format, add these conf options:
+For Parquet file format, add these conf options:
 
 ```
 spark.sql.oap.parquet.data.cache.enable                    true 
@@ -367,7 +367,7 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size    256g
 spark.sql.oap.cache.guardian.memory.size                   10g
 ```
 
-For Orc data format, provides following conf options:
+For Orc file format, provides following conf options:
 
 ```
 spark.sql.orc.copyBatchToSpark                             true 
@@ -383,7 +383,7 @@ Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks 
 
 External cache strategy is implemented based on arrow/plasma library. To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware. Then install arrow rpm package which include plasma library and executable file and copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer below configurations to apply external cache strategy and start plasma service on each node and start your workload.
 
-For Parquet data format, add these conf options:
+For Parquet file format, add these conf options:
 
 ```
 spark.sql.oap.parquet.data.cache.enable                    true 
@@ -393,7 +393,7 @@ spark.sql.oap.cache.guardian.memory.size                   10g
 spark.sql.oap.cache.external.client.pool.size              10
 ```
 
-For Orc data format, add these conf options:
+For Orc file format, add these conf options:
 
 ```
 spark.sql.orc.copyBatchToSpark                             true 
