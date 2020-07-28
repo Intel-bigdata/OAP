@@ -35,6 +35,7 @@ import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
 import org.apache.spark.sql.execution.exchange.{ReusedExchangeExec, ShuffleExchangeExec}
+import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.joins.ShuffledHashJoinExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
@@ -44,6 +45,11 @@ case class ColumnarPreOverrides(conf: SparkConf) extends Rule[SparkPlan] {
   val columnarConf = ColumnarPluginConfig.getConf(conf)
 
   def replaceWithColumnarPlan(plan: SparkPlan): SparkPlan = plan match {
+    case plan: FileSourceScanExec =>
+      logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
+      plan
+      new ColumnarFileSourceScanExec(plan.relation, plan.output, plan.requiredSchema, plan.partitionFilters, plan.optionalBucketSet,
+    plan.dataFilters, plan.tableIdentifier)
     case plan: BatchScanExec =>
       logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
       new ColumnarBatchScanExec(plan.output, plan.scan)
