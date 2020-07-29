@@ -21,7 +21,7 @@ SQL Index and Data Source Cache are designed to leverage user defined indices an
 
 ### Usage Scenario 1 -- Interactive queries
 
-Most customers adopt Spark SQL as a batch processing engine. Unfortunately, customers would discover that it is too hard to separate batch processing and interactive use cases. Interactive queries need to return the data in seconds or even sub-seconds instead of the minutes or hours of batch processing. This is a difficult challenge for the current Spark SQL implementation.
+Most customers adopt Spark SQL as a batch processing engine. Unfortunately, customers would find it hard to separate batch processing and interactive use cases. Interactive queries need to return the data in seconds or even sub-seconds instead of the minutes or hours of batch processing. This is a big challenge for the current Spark SQL implementation.
 
 For example, the following interactive query attempts to filter out a very small result set from a huge fact table.
 
@@ -85,7 +85,7 @@ Users can use SQL DDL(create/drop/refresh/check/show index) to use indexing. Onc
 
 Caching is another core feature of OAP. It is also transparent to users. Data Source Cache can automatically load frequently queried (hot) data, and evict data automatically according to the LRU policy when cache is full. Data Source Cache has the following characteristics:
 
-- Off-Heap memory. The Data Source Cache uses off-heap memory and avoids the JVM GC. It can also use [DCPMM](https://www.intel.com/content/www/us/en/architecture-and-technology/optane-dc-persistent-memory.html) as high-performance, high-capacity, low-cost memory
+- Off-Heap memory. The Data Source Cache uses off-heap memory and avoids the JVM GC. It can also use [DCPMM](https://www.intel.com/content/www/us/en/architecture-and-technology/optane-dc-persistent-memory.html) as high-performance, high-capacity, low-cost memory 
 - Cache-Locality. Data Source Cache can schedule computing tasks to the executor which holds needed data in cache, by implementing a cache aware mechanism based on Spark driver and executors communication.
 - Cache granularity. A column in one RowGroup (equivalent to Stripe in ORC) of a column-oriented storage format file is loaded into a basic cache unit which is called a "Fiber" in OAP.
 - Cache Eviction. Data Source Cache cache eviction uses LRU policy, and automatically caches and evicts data transparently to end user.

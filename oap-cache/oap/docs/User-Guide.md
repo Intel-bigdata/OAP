@@ -65,7 +65,7 @@ This test creates an index for a table and then shows it. If there are no errors
 
 ## Configuration for YARN Cluster Mode
 
-Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client*** mode. While Spark Submit tool can run Spark application in ***client*** or ***cluster*** mode deciding by --deploy-mode parameter. [Getting Started](#Getting-Started) session has shown the configurations needed for ***client*** mode. If you are running Spark Submit tool in ***cluster*** mode, you need to follow the below configuration steps instead.
+Spark Shell, Spark SQL CLI and Thrift Sever run Spark application in ***client*** mode. While Spark Submit tool can run Spark application in ***client*** or ***cluster*** mode, which is decided by `--deploy-mode` parameter. [Getting Started](#Getting-Started) session has shown the configurations needed for ***client*** mode. If you are running Spark Submit tool in ***cluster*** mode, you need to follow the below configuration steps instead.
 
 Add the following OAP configuration settings to `$SPARK_HOME/conf/spark-defaults.conf` on your working node before running `spark-submit` in ***cluster*** mode.
 ```
@@ -83,7 +83,7 @@ spark.driver.extraClassPath       ./oap-cache-<version>-with-spark-<version>.jar
 In addition to running on the YARN cluster manager, Spark also provides a simple standalone deploy mode. If you are using Spark in Spark Standalone mode:
 
 1. Copy the OAP `.jar` to **all** the worker nodes. 
-2. Add the following configuration settings to “$SPARK_HOME/conf/spark-defaults” on the working node.
+2. Add the following configuration settings to `$SPARK_HOME/conf/spark-defaults.conf` to the working node.
 ```
 spark.sql.extensions               org.apache.spark.sql.OapExtensions
 # absolute path on worker nodes
@@ -131,7 +131,7 @@ Use DROP OINDEX command to drop a named index.
 ```
 > spark.sql("drop oindex index1 on oap_test")
 ```
-## Working with Data Source Cache
+## Working with SQL Data Source Cache
 
 Data Source Cache can provide input data cache functionality to the executor. When using the cache data among different SQL queries, configure cache to allow different SQL queries to use the same executor process. Do this by running your queries through the Spark ThriftServer as shown below. For cache media, we support both DRAM and Intel DCPMM which means you can choose to cache data in DRAM or Intel DCPMM if you have DCPMM configured in hardware.
 
@@ -284,7 +284,7 @@ spark.sql.oap.fiberCache.persistent.memory.reserved.size   50g
 spark.sql.extensions                  org.apache.spark.sql.OapExtensions
 ```
 
-***Add OAP absolute path to `.jar` file in `spark.executor.extraClassPath` and` spark.driver.extraClassPath`.***
+***According to [Getting Started](#Getting-Started),  add OAP `.jar` file path to `spark.executor.extraClassPath` and` spark.driver.extraClassPath` ***
 
 Change the values of `spark.executor.instances`, `spark.sql.oap.fiberCache.persistent.memory.initial.size`, and `spark.sql.oap.fiberCache.persistent.memory.reserved.size` to match your environment. 
 
@@ -294,8 +294,8 @@ Change the values of `spark.executor.instances`, `spark.sql.oap.fiberCache.persi
 
 #### Choose additional configuration options
 
-Optimize your environment by choosing a DCPMM caching strategy (guava, non-evictable, vmemcache, external cache using plasma). Following table shows features of each cache.
-| guava | non-evictable | vmemcache | external cache |
+Optimize your environment by choosing a DCPMM caching strategy (guava, noevict, vmemcache, external cache using plasma). Following table shows features of each cache.
+| guava | noevict | vmemcache | external cache |
 | :----- | :----- | :----- | :-----|
 | Use memkind lib to operate on PMem and guava cache strategy when data eviction happens. | Use memkind lib to operate on PMem and doesn't allow data eviction. | Use vmemache lib to operate on PMem and LRU cache strategy when data eviction happens. | Use vmemache lib to operate on PMem and LRU cache strategy when data eviction happens. |
 | Need numa patch in Spark for better performance. | Need numa patch in Spark for better performance. | Need numa patch in Spark for better performance. | Doesn't need numa patch. |
@@ -332,11 +332,11 @@ Please note that DAX KMEM mode need kernel version 5.x and memkind version 1.10 
 spark.sql.oap.fiberCache.memory.manager           kmem
 ```
 
-#### Non-evictable cache
+#### Noevict cache
 
-The non-evictable cache strategy is also supported in OAP based on the memkind library for DCPMM.
+The noevict cache strategy is also supported in OAP based on the memkind library for DCPMM.
 
-To apply Non-evictable cache strategy in your workload, please follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and memkind library correctly. Then follow bellow configurations.
+To apply noevict cache strategy in your workload, please follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and memkind library correctly. Then follow bellow configurations.
 
 For Parquet file format, add these conf options:
 ```
@@ -485,7 +485,7 @@ Run ```yarn app -destroy plasma-store-service```to destroy it.
 Data Source Cache now supports different cache strategies for DRAM and DCPMM. To optimize the cache media utilization, you can enable cache separation of data and index with same or different cache media. When Sharing same media, data cache and index cache will use different fiber cache ratio.
 
 Here we list 4 different kinds of configs for index/cache separation, if you choose one of them, please add corresponding configs to `spark-defaults.conf`.
-1. DRAM(`offheap`) as cache media, `guava` strategy as index, and data cache back end. 
+1. DRAM as cache media, `guava` strategy as index & data cache backend. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enable        true
@@ -494,44 +494,17 @@ spark.sql.oap.fiberCache.memory.manager                 offheap
 ```
 The rest configurations can refer to the configurations of  [Use DRAM Cache](#use-dram-cache) 
 
-2. DCPMM(`pm`) as cache media, `guava` strategy as index, and data cache back end. 
+2. DCPMM as cache media, `vmem` strategy as index & data cache backend. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enable        true
 spark.oap.cache.strategy                                mix
-spark.sql.oap.fiberCache.memory.manager                 pm
+spark.sql.oap.mix.data.cache.backend                    vmem
+
 ```
 The rest configurations can refer to the configurations of [DCPMM Cache](#use-dcpmm-cache) and  [Guava cache](#guava-cache)
 
-3. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`pm`)/`guava` as `data` cache media and backend. 
-
-```
-spark.sql.oap.index.data.cache.separation.enable         true
-spark.oap.cache.strategy                                 mix
-spark.sql.oap.fiberCache.memory.manager                  mix 
-
-# 2x number of your worker nodes
-spark.executor.instances                                 6
-# enable numa
-spark.yarn.numa.enabled                                  true
-spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
-spark.memory.offHeap.enabled                             false
-# DCPMM capacity per executor
-spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
-# Reserved space per executor
-spark.sql.oap.fiberCache.persistent.memory.reserved.size 50g
-
-# equal to the size of executor.memoryOverhead
-spark.sql.oap.fiberCache.offheap.memory.size   50g
-# according to the resource of cluster
-spark.executor.memoryOverhead                  50g
-# for ORC file format
-spark.sql.orc.copyBatchToSpark                 true
-spark.sql.oap.orc.data.cache.enable            true
-# for Parquet file format
-spark.sql.oap.parquet.data.cache.enable        true
-```
-4. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`tmp`)/`vmem` as `data` cache media and backend. 
+3. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`tmp`)/`vmem` as `data` cache media and backend. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enable         true
@@ -561,6 +534,35 @@ spark.sql.oap.orc.data.cache.enable            true
 spark.sql.oap.parquet.data.cache.enable        true
 ```
 
+4. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`pm`)/`guava` as `data` cache media and backend. 
+
+```
+spark.sql.oap.index.data.cache.separation.enable         true
+spark.oap.cache.strategy                                 mix
+spark.sql.oap.fiberCache.memory.manager                  mix 
+
+# 2x number of your worker nodes
+spark.executor.instances                                 6
+# enable numa
+spark.yarn.numa.enabled                                  true
+spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
+spark.memory.offHeap.enabled                             false
+# DCPMM capacity per executor
+spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
+# Reserved space per executor
+spark.sql.oap.fiberCache.persistent.memory.reserved.size 50g
+
+# equal to the size of executor.memoryOverhead
+spark.sql.oap.fiberCache.offheap.memory.size   50g
+# according to the resource of cluster
+spark.executor.memoryOverhead                  50g
+# for ORC file format
+spark.sql.orc.copyBatchToSpark                 true
+spark.sql.oap.orc.data.cache.enable            true
+# for Parquet file format
+spark.sql.oap.parquet.data.cache.enable        true
+```
+
 ### Binary cache 
 
 A binary cache is available for both Parquet and ORC file format to improve cache space utilization compared to ColumnVector cache. When enabling binary cache, you should change following configs in `spark-defaults.conf`.
@@ -576,13 +578,26 @@ spark.sql.oap.orc.data.cache.enable             false
 ```
 The rest configurations can follow above part according to different cache media and strategies.
 
+### Cache Hot Tables
+
+Data Source Cache also supports caching specific tables by configuring items according to actual situations, these tables are usually hot tables.
+
+To enable caching specific hot tables, you can add below configurations to `spark-defaults.conf`.
+```
+# enable table lists fiberCache
+spark.sql.oap.fiberCache.table.list.enable      true
+# Table lists using fiberCache actively
+spark.sql.oap.fiberCache.table.list             <databasename>.<tablename1>;<databasename>.<tablename2>
+```
+
 #### Verify DCPMM cache functionality
 
 After finishing configuration, restart Spark Thrift Server for the configuration changes to take effect. Start at step 2 of the [Use DRAM Cache](#use-dram-cache) guide to verify that cache is working correctly.
 
 Verify NUMA binding status by confirming keywords like `numactl --cpubind=1 --membind=1` contained in executor launch command.
 
-Check DCPMM cache size by checking disk space with `df -h`. For Guava/Non-evictable strategies, the command will show disk space usage increases along with workload execution. For vmemcache strategy, disk usage will reach the initial cache size once the DCPMM cache is initialized and will not change during workload execution.
+Check DCPMM cache size by checking disk space with `df -h`. For `Guava/Noevict` strategies, the command will show disk space usage increases along with workload execution. For `vmemcache` strategy, disk usage will reach the initial cache size once the DCPMM cache is initialized and will not change during workload execution.
+
 
 ## Run TPC-DS Benchmark
 
@@ -644,8 +659,9 @@ Normally, you need to update the following configuration values to cache to DCPM
 - --driver-memory
 - --executor-memory
 - --executor-cores
+- --conf spark.oap.cache.strategy
+- --conf spark.sql.oap.cache.guardian.memory.size
 - --conf spark.sql.oap.fiberCache.persistent.memory.initial.size
-- --conf spark.sql.oap.fiberCache.persistent.memory.reserved.size
 
 These settings will override the values specified in Spark configuration file ( `spark-defaults.conf`). After the configuration is done, you can execute the following command to start Thrift Server.
 

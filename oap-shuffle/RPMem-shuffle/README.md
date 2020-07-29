@@ -430,7 +430,7 @@ mkdir build
 cd build
 cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_EXAMPLES=1 -DBUILD_TESTS=1 ..
 make all && make install
-git clone -b v0.8.2-spark-2.4.4 https://github.com/intel-bigdata/OAP.git
+git clone -b <tag-version> https://github.com/intel-bigdata/OAP.git
 cd OAP/oap-shuffle/RPMem-shuffle
 mvn install -DskipTests
 

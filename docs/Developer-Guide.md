@@ -10,7 +10,7 @@
 
 To clone OAP project, use
 ```shell script
-git clone -b branch-0.8-spark-2.4.x  https://github.com/Intel-bigdata/OAP.git
+git clone -b <tag-version> https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
