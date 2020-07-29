@@ -33,6 +33,14 @@ import org.apache.spark.util.SerializableConfiguration
 
 private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
 
+  override def shortName(): String = "OAP_Parquet"
+
+  override def toString: String = "OAP_Parquet"
+
+  override def hashCode(): Int = getClass.hashCode()
+
+  override def equals(other: Any): Boolean = other.isInstanceOf[OptimizedParquetFileFormat]
+
   override def prepareWrite(
       sparkSession: SparkSession,
       job: Job,

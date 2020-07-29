@@ -230,6 +230,12 @@ The following are required to configure OAP to use DCPMM cache.
 
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
 
+- Besides, with below BIOS configuration settings, Optane PMem could get noticeable performance gain, especially on cross socket write path.
+
+```
+Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
+Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
+``` 
 
 - For cache solution guava/non-evict, make sure [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/libmemkind.so.0) for x86_64 bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. Build and install step can refer to [build and install memkind](./Developer-Guide.md#build-and-install-memkind)
 
@@ -383,13 +389,35 @@ Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks 
 
 External cache strategy is implemented based on arrow/plasma library. To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware. Then install arrow rpm package which include plasma library and executable file and copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer below configurations to apply external cache strategy and start plasma service on each node and start your workload.
 
-For Parquet file format, add these conf options:
+
+It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma. You can follow these command to create or destroy interleaved PMem device:
+
+```
+# create interleaved PMem device
+umount /mnt/pmem0
+umount /mnt/pmem1
+echo -e "0 $(( `sudo blockdev --getsz /dev/pmem0` + `sudo blockdev --getsz /dev/pmem0` )) striped 2 4096 /dev/pmem0 0 /dev/pmem1 0" | sudo dmsetup create striped-pmem
+mkfs.ext4 -b 4096 -E stride=512 -F /dev/mapper/striped-pmem
+mkdir -p /mnt/pmem
+mount -o dax /dev/mapper/striped-pmem /mnt/pmem
+
+# destroy interleaved PMem device
+umount /mnt/pmem
+dmsetup remove striped-pmem
+mkfs.ext4 /dev/pmem0
+mkfs.ext4 /dev/pmem1
+mount -o dax /dev/pmem0 /mnt/pmem0
+mount -o dax /dev/pmem1 /mnt/pmem1
+```
+
+For Parquet data format, add these conf options:
+
 
 ```
 spark.sql.oap.parquet.data.cache.enable                    true 
 spark.oap.cache.strategy                                   external
-# according to your cluster
-spark.sql.oap.cache.guardian.memory.size                   10g
+spark.sql.oap.dcpmm.free.wait.threshold                    50000000000
+# according to your executor core number
 spark.sql.oap.cache.external.client.pool.size              10
 ```
 
@@ -399,8 +427,8 @@ For Orc file format, add these conf options:
 spark.sql.orc.copyBatchToSpark                             true 
 spark.sql.oap.orc.data.cache.enable                        true 
 spark.oap.cache.strategy                                   external
-# according to your cluster 
-spark.sql.oap.cache.guardian.memory.size                   10g
+spark.sql.oap.dcpmm.free.wait.threshold                    50000000000
+# according to your executor core number
 spark.sql.oap.cache.external.client.pool.size              10
 ```
 
@@ -410,47 +438,14 @@ plasma config parameters:
  ```
  -m  how much Bytes share memory plasma will use
  -s  Unix Domain sockcet path
- -e  using external store
-     vmemcache: using vmemcahe as external store
-     propertyFilePath: It's recommended to use propertyFilePath to pass parameters.
-     Or you can write these parameters directly in your starting command. Use "?" to seperate different numaNodes.
+ -d  Pmem directory
  ```
 
 You can start plasma service on each node as following command, and then you can run your workload.
 
 ```
-plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://propertyFilePath:/tmp/persistent-memory.properties  
+plasma-store-server -m 15000000000 -s /tmp/plasmaStore -d /mnt/pmem  
 ```
-or 
-``` 
-plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://totalNumaNodeNum:2,\
-numaNodeId1:1,initialPath1:/mnt/pmem0,requiredSize1:15000000,readPoolSize1:12,writePoolSize1:12\
-?numaNodeId2:2,initialPath2:/mnt/pmem1,requiredSize2:15000000,readPoolSize2:12,writePoolSize2:12
-```
-
-An example persistent-memory.properties:
-
-```
-  # Example
-  totalNumaNodeNum = 2
-    
-  numaNodeId1 = 1
-  initialPath1 = /mnt/pmem0
-  requiredSize1 = 15000000
-  readPoolSize1 = 12 
-  writePoolSize1 = 12
-    
-  numaNodeId2 = 2
-  initialPath2 = /mnt/pmem1
-  requiredSize2 = 15000000
-  readPoolSize2 = 12 
-  writePoolSize2 = 12
-```
-
-```requiredSize readPoolSize writePoolSize``` is optional,will use default value if you don't pass these three parameters.
-But please remember to pass ```totalNumaNodeNum``` and ```initialPath```.
-
-*Please note that parameters in the command will cover parameters in persistent-memory.properties.*
 
  Remember to kill `plasma-store-server` process if you no longer need cache, and you should delete `/tmp/plasmaStore` which is a Unix domain socket.  
   
@@ -465,7 +460,7 @@ We can use yarn(hadoop version >= 3.1) to start plasma service, you should provi
    {
      "name": "plasma-store-service",
      "number_of_containers": 3,
-     "launch_command": "plasma-store-server -m 15000000000 -s /tmp/plasmaStore -e vmemcache://propertyFilePath:/tmp/persistent-memory.properties ",
+     "launch_command": "plasma-store-server -m 15000000000 -s /tmp/plasmaStore -d /mnt/pmem",
      "resource": {
        "cpus": 1,
        "memory": 512

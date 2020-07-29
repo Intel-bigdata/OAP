@@ -163,11 +163,12 @@ class OapMetricsSuite extends QueryTest with SharedOapContext with BeforeAndAfte
     checkAnswer(df, Row(1, "this is row 1") :: Nil)
 
     // rowsRead = 2 && rowsSkipped = 2 * 99
+    // ReuseExchange optimization
     val fileFormats = getOapFileFormat(df.queryExecution.sparkPlan)
     fileFormats.foreach(f => assert(f.orNull != null))
     assertAccumulators(fileFormats,
-      Some(RowMetrics(2 * 100, 0, 2 * 1, 2 * 99, 0, 0)),
-      Some(TaskMetrics(2 * 3, 0, 2 * 3, 0, 0)))
+      Some(RowMetrics(100, 0, 1, 99, 0, 0)),
+      Some(TaskMetrics(3, 0, 3, 0, 0)))
 
     sql("drop oindex idx1 on parquet_test")
   }

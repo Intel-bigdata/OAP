@@ -40,7 +40,7 @@ private[ui] class FiberCacheManagerPage(parent: OapTab) extends WebUIPage("") wi
         }
       </div>
 
-    UIUtils.headerSparkPage(request, "FiberCacheManager", content, parent, useDataTables = true)
+    UIUtils.headerSparkPage(request, "OAP Cache Metrics", content, parent, useDataTables = true)
   }
 
 }
