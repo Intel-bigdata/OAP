@@ -1,9 +1,9 @@
 package:
   name: oap
-  version: 0.1.0
+  version: 0.0.0
 
 build:
-  number: 3
+  number: 0
 
 requirements:
   run:
@@ -14,3 +14,7 @@ requirements:
 
 about:
   summary: Optimized Analytics Packages for Spark is a project to optimize Spark by providing optimized implmentation of packages in various aspects including cache, shuffle, and so on.
+  home: https://github.com/Intel-bigdata/OAP
+  license:  Apache License 2.0
+  license_file:
+    - LICENSE.txt
