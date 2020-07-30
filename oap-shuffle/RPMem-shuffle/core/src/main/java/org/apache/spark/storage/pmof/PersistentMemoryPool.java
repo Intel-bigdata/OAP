@@ -12,6 +12,7 @@ public class PersistentMemoryPool {
     private static native void nativeDeleteBlock(long deviceHandler, String key);
     private static native long nativeGetRoot(long deviceHandler);
     private static native int nativeCloseDevice(long deviceHandler);
+    private static native long nativeRemoveBlock(long deviceHandler, String key);
   
     private static final long DEFAULT_PMPOOL_SIZE = 0L;
 
@@ -39,6 +40,10 @@ public class PersistentMemoryPool {
 
     public void deletePartition(String key) {
       nativeDeleteBlock(this.deviceHandler, key);
+    }
+
+    public long removeBlock(String key) {
+        return nativeRemoveBlock(this.deviceHandler, key);
     }
 
     public long getRootAddr() {

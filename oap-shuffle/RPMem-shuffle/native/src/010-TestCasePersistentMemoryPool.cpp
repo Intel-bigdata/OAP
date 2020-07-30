@@ -108,6 +108,80 @@ TEST_CASE("pmemkv operations", "[pmemkv]") {
     delete kv;
   }
 
+  SECTION("test remove element from an empty list"){
+    std::string key = "remove-element-from-empty-list";
+    pmemkv* kv = new pmemkv("/dev/dax0.0");
+    int result = kv->remove(key);
+    REQUIRE(result == -1);
+    kv->free_all();
+    delete kv;
+  }
+
+  SECTION("test remove an non-existed element"){
+    std::string key = "key";
+    pmemkv* kv = new pmemkv("/dev/dax0.0");
+    int length = 5;
+    kv->put(key, "first", length);
+    string non_existed_key = "non-exist-key";
+    int result = kv->remove(non_existed_key);
+    REQUIRE(result == -1);
+    kv->free_all();
+    delete kv;
+  }
+
+  SECTION("test remove an element from a single node list"){
+    std::string key = "key-single";
+    pmemkv* kv = new pmemkv("/dev/dax0.0");
+    int length = 5;
+    kv->put(key, "first", length);
+    std::cout<<"Before remove a single node, dump all: "<<std::endl;
+    kv->dump_all();
+    int result = kv->remove(key);
+    std::cout<<"After remove a single node, dump all: "<<std::endl;
+    kv->dump_all();
+    REQUIRE(result == 0);
+    kv->free_all();
+    delete kv;
+  }
+
+  SECTION("test remove an element from a middle of a list"){
+    pmemkv* kv = new pmemkv("/dev/dax0.0");
+    std::string key1 = "first-key";
+    int length1 = 5;
+    kv->put(key1, "first", length1);
+
+    std::string key2 = "second-key";
+    int length2 = 6;
+    kv->put(key2, "second", length2);
+
+    std::string key3 = "third-key";
+    int length3 = 5;
+    kv->put(key3, "third", length3);
+
+    std::string key4 = "forth-key";
+    int length4 = 5;
+    kv->put(key4, "forth", length4);
+
+    kv->dump_all();
+    long r1 = kv->remove(key4);
+    std::cout<<"The forth is removed, dump:"<<std::endl;
+    kv->dump_all();
+
+    long r2 = kv->remove(key2);
+    std::cout<<"The second is removed, dump:"<<std::endl;
+    kv->dump_all();
+    long r3 = kv->remove(key1);
+    std::cout<<"The first is removed, dump:"<<std::endl;
+    kv->dump_all();
+    long r4 = kv->remove(key3);
+    std::cout<<"The third is removed, dump:"<<std::endl;
+    kv->dump_all();
+    REQUIRE((r1 + r2 + r3 + r4) == 0);
+
+    kv->free_all();
+    delete kv;
+  }
+/**
   SECTION("test multithreaded put and get") {
     std::vector<std::thread> threads;
     pmemkv* kv = new pmemkv("/dev/dax0.0");
@@ -193,4 +267,5 @@ TEST_CASE("pmemkv operations", "[pmemkv]") {
     kv->free_all();
     delete kv;
   }
+  **/
 }
