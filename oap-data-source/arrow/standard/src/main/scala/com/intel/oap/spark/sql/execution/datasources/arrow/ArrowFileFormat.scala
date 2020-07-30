@@ -22,14 +22,14 @@ import java.net.URLDecoder
 import scala.collection.JavaConverters._
 
 import com.intel.oap.spark.sql.execution.datasources.arrow.ArrowFileFormat.UnsafeItr
-import com.intel.oap.spark.sql.execution.datasources.v2.arrow.{ArrowFilters, ArrowOptions}
+import com.intel.oap.spark.sql.execution.datasources.v2.arrow.{ArrowFilters, ArrowOptions, ExecutionMemoryAllocationListener}
 import com.intel.oap.spark.sql.execution.datasources.v2.arrow.ArrowSQLConf._
-import org.apache.arrow.dataset.scanner.{ScanOptions, ScanTask}
-import org.apache.arrow.memory.AllocationListener
+import org.apache.arrow.dataset.scanner.ScanOptions
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileStatus
 import org.apache.hadoop.mapreduce.Job
 
+import org.apache.spark.TaskContext
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.{FileFormat, OutputWriterFactory, PartitionedFile}
@@ -75,11 +75,7 @@ class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializab
 
     (file: PartitionedFile) => {
       val taskMemoryManager = ArrowUtils.getTaskMemoryManager()
-      // Not under Spark's management for now. DataSourceV1 doesn't provide a way
-      // to close unused reader. As a result spark will report mem leak when session is stopped.
-      //
-      // val listener = new ExecutionMemoryAllocationListener(taskMemoryManager)
-      val listener = AllocationListener.NOOP
+      val listener = new ExecutionMemoryAllocationListener(taskMemoryManager)
       val factory = ArrowUtils.makeArrowDiscovery(
         URLDecoder.decode(file.filePath, "UTF-8"), new ArrowOptions(
           new CaseInsensitiveStringMap(
@@ -98,19 +94,29 @@ class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializab
       val scanOptions = new ScanOptions(requiredSchema.map(f => f.name).toArray,
         filter, batchSize)
       val scanner = dataset.newScan(scanOptions)
-      val itrList = scanner
-        .scan()
-        .iterator()
-        .asScala
+
+      val taskList = scanner
+          .scan()
+          .iterator()
+          .asScala
+          .toList
+      val itrList = taskList
         .map(task => task.scan())
-        .toList
+
+      Option(TaskContext.get()).foreach(_.addTaskCompletionListener[Unit](_ => {
+        itrList.foreach(_.close())
+        taskList.foreach(_.close())
+        scanner.close()
+        dataset.close()
+        factory.close()
+      }))
 
       val itr = itrList
         .toIterator
         .flatMap(itr => itr.asScala)
         .map(vsr => ArrowUtils.loadVectors(vsr, file.partitionValues, partitionSchema,
           requiredSchema))
-      new UnsafeItr(itr, itrList).asInstanceOf[Iterator[InternalRow]]
+      new UnsafeItr(itr).asInstanceOf[Iterator[InternalRow]]
     }
   }
 
@@ -118,20 +124,13 @@ class ArrowFileFormat extends FileFormat with DataSourceRegister with Serializab
 }
 
 object ArrowFileFormat {
-  class UnsafeItr[T](delegate: Iterator[ColumnarBatch], itrList: List[ScanTask.Itr])
+  class UnsafeItr[T](delegate: Iterator[ColumnarBatch])
     extends Iterator[ColumnarBatch] {
     val holder = new ColumnarBatchRetainer()
-
-    def close(): Unit = {
-      itrList.foreach(itr => itr.close())
-    }
 
     override def hasNext: Boolean = {
       holder.release()
       val hasNext = delegate.hasNext
-      if (!hasNext) {
-        close()
-      }
       hasNext
     }
 

@@ -234,6 +234,24 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
     assert(fdGrowth < 100)
   }
 
+  test("file descriptor leak - v1") {
+    val path = ArrowDataSourceTest.locateResourcePath(parquetFile1)
+    spark.catalog.createTable("ptab2", path, "arrow")
+
+    def getFdCount: Long = {
+      ManagementFactory.getOperatingSystemMXBean
+          .asInstanceOf[UnixOperatingSystemMXBean]
+          .getOpenFileDescriptorCount
+    }
+
+    val initialFdCount = getFdCount
+    for (_ <- 0 until 100) {
+      verifyParquet(spark.sql("select * from ptab2"))
+    }
+    val fdGrowth = getFdCount - initialFdCount
+    assert(fdGrowth < 100)
+  }
+
   // csv cases: not implemented
   private val csvFile = "cars.csv"
 
