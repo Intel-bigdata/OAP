@@ -234,7 +234,7 @@ Then you can use following command to get the device name.
 
 #### B. Enable PFC (Priority Flow Control) to guarantee stable performance (optional) 
 
-Then you can use following command to gett he device name
+Then you can use following command to get the device name
 
 If you’re using Mellanox NIC, PFC is a must to guarantee stable
 performance.
