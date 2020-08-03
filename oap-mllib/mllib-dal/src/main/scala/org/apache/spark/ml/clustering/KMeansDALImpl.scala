@@ -45,6 +45,10 @@ class KMeansDALImpl (
 
     val partitionDims = Utils.getPartitionDims(data)
     val executorIPAddress = Utils.sparkFirstExecutorIP(data.sparkContext)
+	
+    if (data.getNumPartitions < executorNum) {
+	data.repartition(executorNum).setName("Repartitioned for conversion").cache()
+    }
     
     // convert RDD[Vector] to RDD[HomogenNumericTable]
     val numericTables = data.mapPartitionsWithIndex { (index: Int, it: Iterator[Vector]) =>
@@ -79,9 +83,9 @@ class KMeansDALImpl (
       val duration = (System.nanoTime - start) / 1E9
 
       println(s"KMeansDALImpl: Data conversion takes $duration seconds")
-      matrix.pack()
       tables += matrix
-      
+      matrix.pack()
+ 
       context.dispose()
       tables.iterator
     }.cache()
@@ -93,7 +97,7 @@ class KMeansDALImpl (
           table.getCNumericTable}
     }).cache()
     
-    inputRDD.foreachPartition(() => _)
+   // inputRDD.foreachPartition(() => _)
     inputRDD.count()
 	
     val coalescedrdd = inputRDD.coalesce(1,
