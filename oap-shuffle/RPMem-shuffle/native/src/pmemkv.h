@@ -47,6 +47,7 @@ struct block_meta {
   uint64_t off;
   uint64_t size;
   block_entry* bep;
+  PMEMoid beo;
 };
 
 struct block_meta_list {
@@ -164,7 +165,7 @@ class pmemkv {
       (void) pmemobj_tx_end();
 
       // update in-memory index
-      if (update_meta(bep)) {
+      if (update_meta(bep, beo)) {
         return -1;
       }
       return 0;
@@ -195,6 +196,7 @@ class pmemkv {
     }
 
     int remove(std::string &key){
+      std::lock_guard<std::mutex> l(mtx);
       xxh::hash64_t key_i = xxh::xxhash<64>(key);
       if (!index_map.contains(key_i)){
         std::cout<<"Data with key="<<key_i<<" doesn't exist"<<std::endl;
@@ -220,11 +222,11 @@ class pmemkv {
       struct block_meta_list* bml;
       index_map.find(key_i, bml);
 
-      struct block_meta *next = bml->head;
+      struct block_meta* cur = bml->head;
+
       //Delete block_entry in bml one by one
-      while (next != nullptr) {
-        //pmemobj_free((PMEMoid*)next->off);
-        block_entry* bep = next->bep;
+      while (cur != nullptr) {
+        block_entry* bep = cur->bep;
         //Node to be deleted is at the head
         if(bep == (struct block_entry*)pmemobj_direct(bp->head)){
             if (pmemobj_direct(bep->hdr.next) == nullptr){
@@ -233,7 +235,12 @@ class pmemkv {
                 bp->tail = OID_NULL;
                 bp->bytes_written = bp->bytes_written - bep->hdr.size;
                 pmemobj_free(&bep->data);
-                next = next->next;
+                pmemobj_free(&cur->beo);
+                struct block_meta *next = cur->next;
+                cur->next = nullptr;
+                std::free(cur);
+                cur = next;
+                bytes_allocated -= sizeof(block_meta);
                 continue;
             }
 
@@ -241,7 +248,12 @@ class pmemkv {
             bp->head = bep->hdr.next;
             bp->bytes_written = bp->bytes_written - bep->hdr.size;
             pmemobj_free(&bep->data);
-            next = next->next;
+            pmemobj_free(&cur->beo);
+            struct block_meta *next = cur->next;
+            cur->next = nullptr;
+            std::free(cur);
+            cur = next;
+            bytes_allocated -= sizeof(block_meta);
             continue;
         }
         //Node to be deleted is at the tail
@@ -252,7 +264,12 @@ class pmemkv {
             prebep->hdr.next = OID_NULL;
             bp->bytes_written = bp->bytes_written - bep->hdr.size;
             pmemobj_free(&bep->data);
-            next = next->next;
+            pmemobj_free(&cur->beo);
+            struct block_meta *next = cur->next;
+            cur->next = nullptr;
+            std::free(cur);
+            cur = next;
+            bytes_allocated -= sizeof(block_meta);
             continue;
         }
 
@@ -261,8 +278,16 @@ class pmemkv {
         prebep->hdr.next = bep->hdr.next;
         bp->bytes_written = bp->bytes_written - bep->hdr.size;
         pmemobj_free(&bep->data);
-        next = next->next;
+        pmemobj_free(&cur->beo);
+        struct block_meta *next = cur->next;
+        cur->next = nullptr;
+        std::free(cur);
+        cur = next;
+        bytes_allocated -= sizeof(block_meta);
       }
+
+      bytes_allocated -= sizeof(block_meta_list);
+      std::free(bml);
       index_map.erase(key_i);
       pmemobj_tx_commit();
       (void) pmemobj_tx_end();
@@ -409,11 +434,13 @@ class pmemkv {
       bo = pmemobj_root(pmem_pool, sizeof(struct base));
       bp = (struct base*)pmemobj_direct(bo);
       struct block_entry *next = (struct block_entry*)pmemobj_direct(bp->head);
+      PMEMoid next_beo = bp->head;
       while (next != nullptr) {
-        if (update_meta(next)) {
+        if (update_meta(next, next_beo)) {
           return -1;
         }
-        next = (struct block_entry*)pmemobj_direct(next->hdr.next);
+        next_beo = next->hdr.next;
+        next = (struct block_entry*)pmemobj_direct(next_beo);
       }
       return 0;
     }
@@ -442,11 +469,11 @@ class pmemkv {
         bml = nullptr;
       }
       locked_index_map.clear();
-      //assert(bytes_allocated == 0);
+      assert(bytes_allocated == 0);
       return 0;
     }
 
-    int update_meta(struct block_entry* bep) {
+    int update_meta(struct block_entry* bep, PMEMoid beo) {
       std::lock_guard<std::mutex> l(mtx);
       if (!index_map.contains(bep->hdr.key)) {  // allocate new block_meta_list
         struct block_meta* bm = (struct block_meta*)std::malloc(sizeof(block_meta));
@@ -459,6 +486,7 @@ class pmemkv {
         bm->size = bep->hdr.size;
         bm->next = nullptr;
         bm->bep = bep;
+        bm->beo = beo;
         struct block_meta_list* bml = (struct block_meta_list*)std::malloc(sizeof(block_meta_list));
         if (!bml) {
           perror("malloc error in pmemkv update_meta");
@@ -485,6 +513,7 @@ class pmemkv {
         bm->size = bep->hdr.size;
         bm->next = nullptr;
         bm->bep = bep;
+        bm->beo = beo;
         bml->tail->next = bm;
         bml->tail = bm;
         bml->total_size += bm->size;
