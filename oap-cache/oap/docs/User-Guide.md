@@ -664,7 +664,7 @@ These settings will override the values specified in Spark configuration file ( 
 cd OAP-TPCDS-TOOL
 sh ./scripts/spark_thrift_server_yarn_with_DCPMM.sh start
 ```
-In this script, we use `guava` as cache strategy for ColumerVecor cache. you can alter to Binary cache. Or you can use `vmem` as cache strategy for ColumnVector or Binary cache, then follow above corresponding instructions to config rightly.
+In this script, we use `vmem` as cache strategy for ColumnVector cache. you can alter to Binary cache. Or you can use other cache strategies for ColumnVector or Binary cache, then follow above corresponding instructions to config rightly.
 
 #### Use DRAM as Cache Media 
 
