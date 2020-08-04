@@ -30,7 +30,7 @@ spark.sql.extensions              org.apache.spark.sql.OapExtensions
 # absolute path of the jar on your working node
 spark.files                       /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar,/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
 # relative path of the jar
-spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./home/oap/jars/oap-common-<version>-with-spark-<version>.jar
+spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
 # absolute path of the jar on your working node
 spark.driver.extraClassPath       /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar:/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
 ```
@@ -71,7 +71,7 @@ Add the following OAP configuration settings to `$SPARK_HOME/conf/spark-defaults
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
 # absolute path on your working node
-spark.files                       /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar:/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
+spark.files                       /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar,/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
 # relative path    
 spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
 # relative path 
@@ -162,7 +162,7 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
    
    The rest of this section will show you how to do a quick verification of cache functionality. It will reuse the database metastore created in the [Working with Data Source Cache Index](#Working-with-SQL-Index) section, which creates the `oap_test` table definition. In production, Spark Thrift Server will have its own metastore database directory or metastore service and use DDL's through Beeline for creating your tables.
 
-   When you run ```spark-shell``` to create the `oap_test` table, `metastore_db` will be created in the directory where you ran '$SPARK_HOME/bin/spark-shell'. Go to that directory and execute the following command to launch Thrift JDBC server.
+   When you run ```spark-shell``` to create the `oap_test` table, `metastore_db` will be created in the directory where you ran '$SPARK_HOME/bin/spark-shell'. ***Go to that directory*** and execute the following command to launch Thrift JDBC server and run queries.
 
    ```
    . $SPARK_HOME/sbin/start-thriftserver.sh
@@ -171,7 +171,7 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
 3. Use Beeline and connect to the Thrift JDBC server, replacing the hostname (mythriftserver) with your own Thrift Server hostname.
 
    ```
-   ./beeline -u jdbc:hive2://mythriftserver:10000       
+   . $SPARK_HOME/bin/beeline -u jdbc:hive2://<mythriftserver>:10000       
    ```
 
    After the connection is established, execute the following commands to check the metastore is initialized correctly.
@@ -338,7 +338,7 @@ Please note that DAX KMEM mode need kernel version 5.x and memkind version 1.10 
 spark.sql.oap.fiberCache.memory.manager           kmem
 ```
 
-#### Noevict cache
+##### Noevict cache
 
 The noevict cache strategy is also supported in OAP based on the memkind library for DCPMM.
 
@@ -358,7 +358,7 @@ spark.oap.cache.strategy                                 noevict
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
 ```
 
-#### Vmemcache cache
+##### Vmemcache cache
 
 The vmemcache cache strategy is based on libvmemcache (buffer based LRU cache), which provides a key-value store API. Follow these steps to enable vmemcache support in Data Source Cache.
 To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and vmemcache library correctly, then refer below configurations to apply vmemcache cache strategy in your workload.
@@ -385,7 +385,7 @@ spark.sql.oap.cache.guardian.memory.size                   10g
 ```
 Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks fail with "cache guardian use too much memory" error, set `spark.sql.oap.cache.guardian.memory.size ` to a larger number as the default size is 10GB. The user could also increase `spark.sql.oap.cache.guardian.free.thread.nums` or decrease `spark.sql.oap.cache.dispose.timeout.ms` to free memory more quickly.
 
-#### External cache using plasma
+##### External cache using plasma
 
 External cache strategy is implemented based on arrow/plasma library. To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware. Then install arrow rpm package which include plasma library and executable file and copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer below configurations to apply external cache strategy and start plasma service on each node and start your workload.
 
@@ -494,10 +494,12 @@ The rest configurations can refer to the configurations of  [Use DRAM Cache](#us
 ```
 spark.sql.oap.index.data.cache.separation.enable        true
 spark.oap.cache.strategy                                mix
+spark.sql.oap.fiberCache.memory.manager                 tmp
 spark.sql.oap.mix.data.cache.backend                    vmem
+spark.sql.oap.mix.index.cache.backend                   vmem
 
 ```
-The rest configurations can refer to the configurations of [DCPMM Cache](#use-dcpmm-cache) and  [Guava cache](#guava-cache)
+The rest configurations can refer to the configurations of [DCPMM Cache](#use-dcpmm-cache) and  [Vmemcache cache](#vmemcache-cache)
 
 3. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`tmp`)/`vmem` as `data` cache media and backend. 
 
@@ -585,7 +587,7 @@ spark.sql.oap.fiberCache.table.list.enable      true
 spark.sql.oap.fiberCache.table.list             <databasename>.<tablename1>;<databasename>.<tablename2>
 ```
 
-#### Verify DCPMM cache functionality
+### Verify DCPMM cache functionality
 
 After finishing configuration, restart Spark Thrift Server for the configuration changes to take effect. Start at step 2 of the [Use DRAM Cache](#use-dram-cache) guide to verify that cache is working correctly.
 

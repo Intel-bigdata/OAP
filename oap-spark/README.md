@@ -1,5 +1,4 @@
 # RDD Cache PMem Extension
-Please add feature description here.
 
 ## Contents
 - [Introduction](#introduction)
