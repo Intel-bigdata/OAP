@@ -15,6 +15,7 @@
 *******************************************************************************/
 
 #include <daal.h>
+#include <iostream>
 #include "org_apache_spark_ml_util_OneDAL__.h"
 
 using namespace daal;
@@ -34,7 +35,7 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_setNumericTabl
 }
 
 JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIterator
-  (JNIEnv *env, jobject,jlong numTableAddr, jobject jiter) {
+  (JNIEnv *env, jobject,jlong numTableAddr, jobject jiter, jint curRows) {
     
     jclass iterClass = env->FindClass("java/util/Iterator");
     jmethodID hasNext = env->GetMethodID(iterClass,
@@ -44,7 +45,7 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIter
 
     HomogenNumericTable<double> *nt = static_cast<HomogenNumericTable<double> *>(
                 ((SerializationIfacePtr *)numTableAddr)->get());
-    int totalRows = 0;
+    
     while (env->CallBooleanMethod(jiter, hasNext)) {
          jobject batch = env->CallObjectMethod(jiter, next);
 		 
@@ -63,13 +64,12 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIter
 		 jdouble* values = env->GetDoubleArrayElements(jvalue, 0);
 
          for (int i = 0; i < numRows; i ++){
-              jlong curRow = rowOffset[i] + totalRows;
+            jlong curRow = rowOffset[i] + curRows;
             for(int j = 0; j < jcols; j ++) {
-
                 (*nt)[curRow][j] = values[rowOffset[i] * jcols + j];
             }
          }
-         totalRows += numRows;
+        
          env->ReleaseLongArrayElements(joffset, rowOffset, 0);
          env->DeleteLocalRef(joffset);
          env->ReleaseDoubleArrayElements(jvalue, values, 0);
