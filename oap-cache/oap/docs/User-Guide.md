@@ -7,6 +7,7 @@
 * [Working with SQL Index](#Working-with-SQL-Index)
 * [Working with SQL Data Source Cache](#Working-with-SQL-Data-Source-Cache)
 * [Run TPC-DS Benchmark](#Run-TPC-DS-Benchmark)
+* [Other DCPMM Cache Usage Strategy](#Other-DCPMM-Cache-Usage-Strategy)
 
 
 ## Prerequisites
@@ -200,21 +201,20 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
 
 #### Prerequisites
 
-The following are required to configure OAP to use DCPMM cache.
-- DCPMM hardware is successfully deployed on each node in cluster.
-- Directories exposing DCPMM hardware on each socket. For example, on a two socket system the mounted DCPMM directories should appear as `/mnt/pmem0` and `/mnt/pmem1`. Correctly installed DCPMM must be formatted and mounted on every cluster worker node.
+- DCPMM hardwares are installed, formatted and mounted correctly on every cluster worker node. You will get a mounted directory to use if you have done this. Usually, the DCPMM on each socket will be mounted as a directory. For example, on a two sockets system, we may get two mounted directories named `/mnt/pmem0` and `/mnt/pmem1`.
+
 
    ```
-   // use ipmctl command to show topology and dimm info of DCPM
+   // use ipmctl command to show topology and dimm info of DCPMM
    ipmctl show -topology
    ipmctl show -dimm
-   // provision dcpm in app direct mode
+   // provision dcpmm in app direct mode
    ipmctl create -goal PersistentMemoryType=AppDirect
    // reboot system to make configuration take affect
    reboot
    // check capacity provisioned for app direct mode(AppDirectCapacity)
    ipmctl show -memoryresources
-   // show the DCPM region information
+   // show the DCPMM region information
    ipmctl show -region
    // create namespace based on the region, multi namespaces can be created on a single region
    ndctl create-namespace -m fsdax -r region0
@@ -229,13 +229,15 @@ The following are required to configure OAP to use DCPMM cache.
    ```
 
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
-
+   For more information you can refer to [Quick Start Guide: Provision Intel® Optane™ DC Persistent Memory](https://software.intel.com/content/www/us/en/develop/articles/quick-start-guide-configure-intel-optane-dc-persistent-memory-on-linux.html)
 - Besides, with below BIOS configuration settings, Optane PMem could get noticeable performance gain, especially on cross socket write path.
 
 ```
 Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
 Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
 ``` 
+- Make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for DCPMM cache. You can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
+
 
 #### Configure for NUMA
 
@@ -273,6 +275,7 @@ spark.executor.instances                                   6
 spark.yarn.numa.enabled                                    true
 # Enable OAP jar in Spark
 spark.sql.extensions                  org.apache.spark.sql.OapExtensions
+
 # absolute path of the jar on your working node, when in Yarn client mode
 spark.files                       /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar,/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
 # relative path of the jar, when in Yarn client mode
@@ -292,10 +295,10 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size    256g
 spark.sql.oap.cache.guardian.memory.size                   10g
 ```
 The `vmem` cache strategy is based on libvmemcache (buffer based LRU cache), which provides a key-value store API. Follow these steps to enable vmemcache support in Data Source Cache.
-To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and vmemcache library correctly, then refer below configurations to apply vmemcache cache strategy in your workload.
 
 - `spark.executor.instances`: We suggest setting the value to 2X the number of worker nodes when NUMA binding is enabled. Each worker node runs two executors, each executor is bound to one of the two sockets, and accesses the corresponding DCPMM device on that socket.
 - `spark.sql.oap.fiberCache.persistent.memory.initial.size`: It is configured to the available DCPMM capacity to be used as data cache per exectutor.
+ 
 *NOTE*: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks fail with "cache guardian use too much memory" error, set `spark.sql.oap.cache.guardian.memory.size ` to a larger number as the default size is 10GB. The user could also increase `spark.sql.oap.cache.guardian.free.thread.nums` or decrease `spark.sql.oap.cache.dispose.timeout.ms` to free memory more quickly.
 
 ### Verify DCPMM cache functionality
