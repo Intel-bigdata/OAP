@@ -68,6 +68,20 @@ object ColumnarExpressionConverter extends Logging {
         replaceWithColumnarExpression(b.left, attributeSeq),
         replaceWithColumnarExpression(b.right, attributeSeq),
         expr)
+    case b: ShiftLeft =>
+      check_if_no_calculation = false
+      logInfo(s"${expr.getClass} ${expr} is supported, no_cal is $check_if_no_calculation.")
+      ColumnarBinaryOperator.create(
+        replaceWithColumnarExpression(b.left, attributeSeq),
+        replaceWithColumnarExpression(b.right, attributeSeq),
+        expr)
+    case b: ShiftRight =>
+      check_if_no_calculation = false
+      logInfo(s"${expr.getClass} ${expr} is supported, no_cal is $check_if_no_calculation.")
+      ColumnarBinaryOperator.create(
+        replaceWithColumnarExpression(b.left, attributeSeq),
+        replaceWithColumnarExpression(b.right, attributeSeq),
+        expr)
     case sp: StringPredicate =>
       check_if_no_calculation = false
       logInfo(s"${expr.getClass} ${expr} is supported, no_cal is $check_if_no_calculation.")

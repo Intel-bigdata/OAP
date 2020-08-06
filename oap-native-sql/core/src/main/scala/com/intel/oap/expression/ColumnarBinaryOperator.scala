@@ -18,14 +18,13 @@
 package com.intel.oap.expression
 
 import com.google.common.collect.Lists
-
 import org.apache.arrow.gandiva.evaluator._
 import org.apache.arrow.gandiva.exceptions.GandivaException
 import org.apache.arrow.gandiva.expression._
 import org.apache.arrow.vector.types.pojo.ArrowType
 import org.apache.arrow.vector.types.pojo.Field
 import org.apache.arrow.vector.types.DateUnit
-
+import org.apache.arrow.vector.types.pojo.ArrowType.ArrowTypeID
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
@@ -315,6 +314,50 @@ class ColumnarGreaterThanOrEqual(left: Expression, right: Expression, original: 
   }
 }
 
+class ColumnarShiftLeft(left: Expression, right: Expression, original: Expression)
+    extends ShiftLeft(left: Expression, right: Expression)
+        with ColumnarExpression
+        with Logging {
+  override def doColumnarCodeGen(args: Object): (TreeNode, ArrowType) = {
+    var (left_node, left_type): (TreeNode, ArrowType) =
+      left.asInstanceOf[ColumnarExpression].doColumnarCodeGen(args)
+    var (right_node, right_type): (TreeNode, ArrowType) =
+      right.asInstanceOf[ColumnarExpression].doColumnarCodeGen(args)
+
+    if (right_type.getTypeID != ArrowTypeID.Int) {
+      throw new IllegalArgumentException("shiftleft requires for int type on second parameter")
+    }
+    val resultType = left_type
+    val funcNode = TreeBuilder.makeFunction(
+      "shift_left",
+      Lists.newArrayList(left_node, right_node),
+      resultType)
+    (funcNode, resultType)
+  }
+}
+
+class ColumnarShiftRight(left: Expression, right: Expression, original: Expression)
+    extends ShiftRight(left: Expression, right: Expression)
+        with ColumnarExpression
+        with Logging {
+  override def doColumnarCodeGen(args: Object): (TreeNode, ArrowType) = {
+    var (left_node, left_type): (TreeNode, ArrowType) =
+      left.asInstanceOf[ColumnarExpression].doColumnarCodeGen(args)
+    var (right_node, right_type): (TreeNode, ArrowType) =
+      right.asInstanceOf[ColumnarExpression].doColumnarCodeGen(args)
+
+    if (right_type.getTypeID != ArrowTypeID.Int) {
+      throw new IllegalArgumentException("shiftright requires for int type on second parameter")
+    }
+    val resultType = left_type
+    val funcNode = TreeBuilder.makeFunction(
+      "shift_right",
+      Lists.newArrayList(left_node, right_node),
+      resultType)
+    (funcNode, resultType)
+  }
+}
+
 object ColumnarBinaryOperator {
 
   def create(left: Expression, right: Expression, original: Expression): Expression =
@@ -343,6 +386,10 @@ object ColumnarBinaryOperator {
         new ColumnarContains(left, right, c)
       case l: Like =>
         new ColumnarLike(left, right, l)
+      case s: ShiftLeft =>
+        new ColumnarShiftLeft(left, right, s)
+      case s: ShiftRight =>
+        new ColumnarShiftRight(left, right, s)
       case other =>
         throw new UnsupportedOperationException(s"not currently supported: $other.")
     }
