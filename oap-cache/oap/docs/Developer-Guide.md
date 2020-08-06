@@ -167,14 +167,14 @@ The following files need to be checked/compared for changes:
 
 #### Rebuild Spark packages with NUMA binding patch 
 
-When using DCPMM as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.4.numa.patch](./Spark.2.4.4.numa.patch) to Spark source code for best performance.
+When using DCPMM as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-2.4.4.patch](./numa-binding-spark-2.4.4.patch) to Spark source code for best performance.
 
 1. Download src for [Spark-2.4.4](https://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4.tgz) and clone the src from github.
 
 2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) the Spark package.
 
 ```
-git apply  Spark.2.4.4.numa.patch
+git apply  numa-binding-spark-2.4.4.patch
 ```
 
 3. Add these configuration items to the Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable NUMA binding.
