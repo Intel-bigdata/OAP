@@ -195,11 +195,24 @@ class pmemkv {
       return 0;
     }
 
+    int removeBlocks(uint64_t shuffleId, uint64_t mapId, uint64_t partitionId){
+        for (int i = 0; i < partitionId; i++){
+            std::string key = "shuffle_" + std::to_string(shuffleId) + "_" + std::to_string(mapId) + "_" + std::to_string(i);
+            //std::cout<<"key="<<key<<std::endl;
+            remove(key);
+        }
+        return 0;
+    }
+
+    int getBytesWritten(){
+        return bp->bytes_written;
+    }
+
     int remove(std::string &key){
       std::lock_guard<std::mutex> l(mtx);
       xxh::hash64_t key_i = xxh::xxhash<64>(key);
       if (!index_map.contains(key_i)){
-        std::cout<<"Data with key="<<key_i<<" doesn't exist"<<std::endl;
+        //std::cout<<"Data with key="<<key_i<<" doesn't exist"<<std::endl;
         return -1;
       }
 
@@ -241,11 +254,14 @@ class pmemkv {
                 std::free(cur);
                 cur = next;
                 bytes_allocated -= sizeof(block_meta);
+                std::cout<<"Only key in head is removed. key="<<key<<std::endl;
                 continue;
             }
 
             //There are two or more block_entry
             bp->head = bep->hdr.next;
+            block_entry* new_head_pointer = (struct block_entry*)pmemobj_direct(bp->head);
+            new_head_pointer->hdr.pre = OID_NULL;
             bp->bytes_written = bp->bytes_written - bep->hdr.size;
             pmemobj_free(&bep->data);
             pmemobj_free(&cur->beo);
@@ -254,12 +270,16 @@ class pmemkv {
             std::free(cur);
             cur = next;
             bytes_allocated -= sizeof(block_meta);
+            std::cout<<"Key in head is removed. key="<<key<<std::endl;
             continue;
         }
         //Node to be deleted is at the tail
         if (pmemobj_direct(bep->hdr.next) == nullptr){
             //The one node scenario is already covered in head judgement, there are two or more nodes here
             bp->tail = bep->hdr.pre;
+            if((struct block_entry*)pmemobj_direct(bp->tail) == nullptr){
+                std::cout<<"Error. The bp->tail should not be nullptr"<<std::endl;
+            }
             struct block_entry* prebep = (struct block_entry*)pmemobj_direct(bep->hdr.pre);
             prebep->hdr.next = OID_NULL;
             bp->bytes_written = bp->bytes_written - bep->hdr.size;
@@ -270,6 +290,7 @@ class pmemkv {
             std::free(cur);
             cur = next;
             bytes_allocated -= sizeof(block_meta);
+            std::cout<<"Key in tail is removed. key="<<key<<std::endl;
             continue;
         }
 
@@ -284,6 +305,7 @@ class pmemkv {
         std::free(cur);
         cur = next;
         bytes_allocated -= sizeof(block_meta);
+        std::cout<<"Key neither in head nor in tail is removed. key="<<key<<std::endl;
       }
 
       bytes_allocated -= sizeof(block_meta_list);
@@ -359,6 +381,25 @@ class pmemkv {
       return 0; 
     }
 
+    int reverse_dump_all() {
+      if (pmemobj_rwlock_rdlock(pmem_pool, &bp->rwlock) != 0) {
+            return -1;
+      }
+      struct block_entry* next_bep = (struct block_entry*)pmemobj_direct(bp->tail);
+      uint64_t read_offset = 0;
+      while (next_bep != nullptr) {
+        char* pmem_data = (char*)pmemobj_direct(next_bep->data);
+        char* tmp = (char*)std::malloc(next_bep->hdr.size);
+        memcpy(tmp, pmem_data, next_bep->hdr.size);
+        std::cout << "key " << next_bep->hdr.key << " value " << pmem_data << std::endl;
+        read_offset += next_bep->hdr.size;
+        std::free(tmp);
+        next_bep = (struct block_entry*)pmemobj_direct(next_bep->hdr.pre);
+      }
+      pmemobj_rwlock_unlock(pmem_pool, &bp->rwlock);
+      return 0;
+    }
+
     int dump_meta() {
       std::cout << "pmemkv total bytes written " << bp->bytes_written << std::endl;
       std::lock_guard<std::mutex> l(mtx);
@@ -373,6 +414,7 @@ class pmemkv {
     }
 
     int free_all() {
+      //std::cout<<"free's begining: bp->bytes_written: "<<bp->bytes_written<<std::endl;
       // don't implement transaction here, if any issue happens, we need to rebuild the pmem pool.
       PMEMoid next_beo = bp->head;
       struct block_entry* next_bep = (struct block_entry*)pmemobj_direct(next_beo);
@@ -389,6 +431,7 @@ class pmemkv {
       // add root block to undo log
       bp->head = OID_NULL;
       bp->tail = OID_NULL;
+      //std::cout<<"free: bp->bytes_written: "<<bp->bytes_written<<std::endl;
       assert(bp->bytes_written == 0);
 
       // free metadata

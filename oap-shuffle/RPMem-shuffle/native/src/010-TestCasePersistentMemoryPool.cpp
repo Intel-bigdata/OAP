@@ -21,6 +21,12 @@ int test_multithread_put(uint64_t index, pmemkv* kv) {
   return 0;
 }
 
+int test_multithread_remove(uint64_t index, pmemkv* kv) {
+  std::string key = std::to_string(index);
+  kv->remove(key);
+  return 0;
+}
+
 TEST_CASE( "PmemBuffer operations", "[PmemBuffer]" ) {
   char data[LENGTH] = {};
   memset(data, 'a', LENGTH);
@@ -52,7 +58,8 @@ TEST_CASE( "PmemBuffer operations", "[PmemBuffer]" ) {
     for (char c = 'a'; c < 'f'; c++) {
       memset(data + (c - 'a') * 3, c, 3);
     }
-    /*data should be "aaabbbcccdddeee"*/
+
+    //data should be "aaabbbcccdddeee"
     buf.write(data, 15);
 
     char* firstTime = buf.getDataForFlush(buf.getRemaining());
@@ -65,6 +72,7 @@ TEST_CASE( "PmemBuffer operations", "[PmemBuffer]" ) {
     REQUIRE(secondTime == nullptr);
   }
 }
+
 
 TEST_CASE("pmemkv operations", "[pmemkv]") {
   SECTION("test open and close") {
@@ -100,7 +108,7 @@ TEST_CASE("pmemkv operations", "[pmemkv]") {
     uint64_t value_size = 0;
     for (int i = 0; i < size; i++) {
       value_size += mm->meta[i*2+1];
-    }
+     }
     REQUIRE(value_size == 11);
     std::free(mm->meta);
     std::free(mm);
@@ -116,6 +124,7 @@ TEST_CASE("pmemkv operations", "[pmemkv]") {
     kv->free_all();
     delete kv;
   }
+
 
   SECTION("test remove an non-existed element"){
     std::string key = "key";
@@ -147,7 +156,7 @@ TEST_CASE("pmemkv operations", "[pmemkv]") {
   SECTION("test remove an element from a middle of a list"){
     pmemkv* kv = new pmemkv("/dev/dax0.0");
     std::string key1 = "first-key";
-    int length1 = 5;
+    int length1 = 5 ;
     kv->put(key1, "first", length1);
 
     std::string key2 = "second-key";
@@ -162,26 +171,120 @@ TEST_CASE("pmemkv operations", "[pmemkv]") {
     int length4 = 5;
     kv->put(key4, "forth", length4);
 
-    kv->dump_all();
+    kv->reverse_dump_all();
     long r1 = kv->remove(key4);
     std::cout<<"The forth is removed, dump:"<<std::endl;
-    kv->dump_all();
+    kv->reverse_dump_all();
 
     long r2 = kv->remove(key2);
     std::cout<<"The second is removed, dump:"<<std::endl;
-    kv->dump_all();
+    kv->reverse_dump_all();
     long r3 = kv->remove(key1);
     std::cout<<"The first is removed, dump:"<<std::endl;
-    kv->dump_all();
+    kv->reverse_dump_all();
     long r4 = kv->remove(key3);
     std::cout<<"The third is removed, dump:"<<std::endl;
-    kv->dump_all();
+    kv->reverse_dump_all();
     REQUIRE((r1 + r2 + r3 + r4) == 0);
 
     kv->free_all();
     delete kv;
   }
-/**
+
+SECTION("test put and remove multiple elements with same key"){
+  pmemkv* kv = new pmemkv("/dev/dax0.0");
+  std::string key = "key-multiple-objects";
+  int size = 1000000;
+  int length = 5;
+  for(int i = 0; i < size; i++){
+      kv->put(key, "first", length);
+  }
+
+  int bytes_written = kv->getBytesWritten();
+  assert(bytes_written == size * length);
+  kv->dump_all();
+
+  kv->remove(key);
+  std::cout<<"The key with " << size << " objects is removed, dump:"<<std::endl;
+  kv->dump_all();
+
+  assert(kv->getBytesWritten() == 0);
+
+  kv->free_all();
+  delete kv;
+}
+
+  SECTION("test multithreaded remove") {
+    std::vector<std::thread> threads;
+    pmemkv* kv = new pmemkv("/dev/dax0.0");
+    int size = 5;
+    for (uint64_t i = 0; i < size; i++) {
+      threads.emplace_back(test_multithread_put, i, kv);
+    }
+    for (uint64_t i = 0; i < size; i++) {
+      threads[i].join();
+    }
+
+    std::cout<<"mark1. kv->getBytesWritten()="<<kv->getBytesWritten()<<std::endl;
+    assert(kv->getBytesWritten() != 0);
+    kv->dump_all();
+
+    for (uint64_t i = 0; i < size; i++){
+        std::string key = std::to_string(i);
+        kv->remove(key);
+    }
+    std::cout<<"mark2. kv->getBytesWritten()="<<kv->getBytesWritten()<<std::endl;
+    kv->dump_all();
+
+    std::vector<std::thread> removeThreads;
+    for (uint64_t i = 0; i < 20; i++) {
+      removeThreads.emplace_back(test_multithread_remove, i, kv);
+    }
+    for (uint64_t i = 0; i < 20; i++) {
+      removeThreads[i].join();
+    }
+
+    std::cout<<"mark2. kv->getBytesWritten()="<<kv->getBytesWritten()<<std::endl;
+    assert(kv->getBytesWritten() == 0);
+    kv->dump_all();
+
+    kv->free_all();
+    delete kv;
+    threads.clear();
+  }
+
+SECTION("test remove an element in specific sequence"){
+  pmemkv* kv = new pmemkv("/dev/dax0.0");
+  std::string key1 = "first-key";
+  int length1 = 5;
+  kv->put(key1, "first", length1);
+
+  std::string key2 = "second-key";
+  int length2 = 6;
+  kv->put(key2, "second", length2);
+
+  std::string key3 = "third-key";
+  int length3 = 5;
+  kv->put(key3, "third", length3);
+
+  long r1 = kv->remove(key2);
+  std::cout<<"The second is removed, dump:"<<std::endl;
+  kv->dump_all();
+
+  long r2 = kv->remove(key3);
+  std::cout<<"The third is removed, dump:"<<std::endl;
+  kv->dump_all();
+
+  long r3 = kv->remove(key1);
+  std::cout<<"The first is removed, dump:"<<std::endl;
+  kv->dump_all();
+
+  REQUIRE((r1 + r2 + r3) == 0);
+
+  kv->free_all();
+  delete kv;
+}
+
   SECTION("test multithreaded put and get") {
     std::vector<std::thread> threads;
     pmemkv* kv = new pmemkv("/dev/dax0.0");
@@ -267,5 +370,4 @@ TEST_CASE("pmemkv operations", "[pmemkv]") {
     kv->free_all();
     delete kv;
   }
-  **/
 }
