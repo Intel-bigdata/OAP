@@ -1,5 +1,5 @@
 # OAP Installation Guide
-This document provides information for guiding you how to compile OAP and its dependencies, and install them on your cluster nodes. Some steps needs to compile and install specicic libraries to your system which requires root access.
+This document is to provide you information on how to compile OAP and its dependencies, and install them on your cluster nodes. Some steps include compiling and installing specific libraries to your system, which requires **root** access.
 
 ## Contents
   - [Prerequisites](#prerequisites)
@@ -10,21 +10,21 @@ This document provides information for guiding you how to compile OAP and its de
 ## Prerequisites 
 
 - **OS Requirements**  
-We have tested OAP on Fedora 29 and CentOS 7.6. We remmend you use Fedora 29 and CentOS 7.6 or above.
+We have tested OAP on Fedora 29 and CentOS 7.6. We recommend you use **Fedora 29 CentOS 7.6 kernel 3.10 or above**.
 
 - **Requirements for Shuffle Remote PMem Extension**  
-If you want to use Shuffle Remote PMem Extension, you need to configure and validate RDMA before this installation steps. You can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md#4-configure-and-validate-rdma) for the details of configuring and validating RDMA.
+If you want to use Shuffle Remote PMem Extension, you need to configure and validate RDMA before these installation steps. You can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md#4-configure-and-validate-rdma) for the details of configuring and validating RDMA.
 
-###  Install prerequisites 
-Some dependencies required by OAP listed below, to use OAP, you must compile and install these libraries on every cluster nodes. We provide a script desbired below to help you to compile and install all these libraries. 
+### Installation prerequisites 
+
+Dependencies below are required by OAP, you must compile and install them on each cluster node. We also provide shell scripts to help quickly compile and install all these libraries.
+
 - [Cmake](https://help.directadmin.com/item.php?id=494)
 - [Memkind](https://github.com/Intel-bigdata/memkind)
 - [Vmemcache](https://github.com/pmem/vmemcache)
 - [HPNL](https://github.com/Intel-bigdata/HPNL)
 - [PMDK](https://github.com/pmem/pmdk)  
 - [GCC > 7](https://gcc.gnu.org/wiki/InstallingGCC)  
-
-If you are an expert on compiling and installing c/C++ libraies, you can refer to the corresponding documents of these libraries to install by yourself. If you are not an expert, we provided a shell script named prepare_oap_env.sh to help you to complete compling and installing all these dependencies if your system is Fedora 29 or Centos 7.6 or above.
 
 Clone the OAP to your local directory:
 
@@ -48,12 +48,12 @@ export ENABLE_RDMA=false
 source ./dev/prepare_oap_env.sh
 prepare_all
 ```
-If you only want to use specified module of OAP, you can refer to the compling and installing steps in the feature user guide. Some functions to install prerequisites for OAP have been integrated into this prepare_oap_env.sh, you can use command like prepare_cmake to install the specified dependencies after executing the command "source prepare_oap_env.sh". Use the following command to learn more.  
+Some functions to install prerequisites for OAP have been integrated into this `prepare_oap_env.sh`, you can use command like `prepare_cmake` to install the specified dependencies after executing the command `source prepare_oap_env.sh`. Use the following command to learn more.  
 
 ```shell script
 oap_build_help
 ```
-If there are any problems during the above preparing process, we recommend you to refer to the library documentation listed above, and install it by yourself.
+If there are any problems during the above preparing process, we recommend you refer to the library documentation listed above, and install it by yourself.
 
 
 ## Compiling OAP
@@ -61,7 +61,7 @@ If you have installed all prerequisites, you can download our pre-built package 
 ```shell script
 sh ./dev/make-distribution.sh
 ``````
-If you only want to build specified module of OAP, you can use the command like the following, and then you should find the jar under the dictionary of the module.
+If you only want to build specified OAP module, you can use the command like the following, and then you will find the jars under the module's `target` directory.
 ```shell script
 # build SQL Index & Data Source Cache module
 mvn clean -pl com.intel.oap:oap-cache -am package 
@@ -83,6 +83,6 @@ mvn clean -pl com.intel.oap:oap-remote-shuffle -am package
 ```
 
 ##  Configuration
-After you have successfully completed the installation of prerequisites and compiled OAP, you can follow the corresponding feature documents for how to use these features.
+After you have successfully completed the installation of prerequisites and compiled OAP, you can follow the corresponding feature documents on how to use these features.
 
 * [OAP User Guide](../README.md#user-guide)
