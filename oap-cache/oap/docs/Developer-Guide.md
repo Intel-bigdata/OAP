@@ -139,8 +139,6 @@ In this case check whether the OAP changes to Spark internals will conflict with
 The following files need to be checked/compared for changes:
 
 ```
-•	org/apache/spark/scheduler/DAGScheduler.scala           
-		Add the oap cache location to aware task scheduling.
 •	org/apache/spark/sql/execution/DataSourceScanExec.scala   
 		Add the metrics info to OapMetricsManager and schedule the task to read from the cached 
 •	org/apache/spark/sql/execution/datasources/FileFormatDataWriter.scala
@@ -151,8 +149,6 @@ The following files need to be checked/compared for changes:
 		Add new API to support return the result of write task to driver.
 •	org/apache/spark/status/api/v1/OneApplicationResource.scala    
 		Update the metric data to spark web UI.
-•	org/apache/spark/SparkEnv.scala
-		Add OapRuntime.stop() to stop OapRuntime instance.
 •	org/apache/spark/sql/execution/datasources/parquet/VectorizedColumnReader.java
 		Change the private access of variable to protected
 •	org/apache/spark/sql/execution/datasources/parquet/VectorizedPlainValuesReader.java
