@@ -13,7 +13,7 @@ Build with using [Apache Maven\*](http://maven.apache.org/).
 Clone the OAP project:
 
 ```
-git clone -b branch-0.8-spark-2.4.x  https://github.com/Intel-bigdata/OAP.git
+git clone -b <tag-version>  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
@@ -139,8 +139,6 @@ In this case check whether the OAP changes to Spark internals will conflict with
 The following files need to be checked/compared for changes:
 
 ```
-•	org/apache/spark/scheduler/DAGScheduler.scala           
-		Add the oap cache location to aware task scheduling.
 •	org/apache/spark/sql/execution/DataSourceScanExec.scala   
 		Add the metrics info to OapMetricsManager and schedule the task to read from the cached 
 •	org/apache/spark/sql/execution/datasources/FileFormatDataWriter.scala
@@ -151,8 +149,6 @@ The following files need to be checked/compared for changes:
 		Add new API to support return the result of write task to driver.
 •	org/apache/spark/status/api/v1/OneApplicationResource.scala    
 		Update the metric data to spark web UI.
-•	org/apache/spark/SparkEnv.scala
-		Add OapRuntime.stop() to stop OapRuntime instance.
 •	org/apache/spark/sql/execution/datasources/parquet/VectorizedColumnReader.java
 		Change the private access of variable to protected
 •	org/apache/spark/sql/execution/datasources/parquet/VectorizedPlainValuesReader.java
@@ -167,14 +163,14 @@ The following files need to be checked/compared for changes:
 
 #### Rebuild Spark packages with NUMA binding patch 
 
-When using DCPMM as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.4.numa.patch](./Spark.2.4.4.numa.patch) to Spark source code for best performance.
+When using DCPMM as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-2.4.4.patch](./numa-binding-spark-2.4.4.patch) to Spark source code for best performance.
 
 1. Download src for [Spark-2.4.4](https://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4.tgz) and clone the src from github.
 
 2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) the Spark package.
 
 ```
-git apply  Spark.2.4.4.numa.patch
+git apply  numa-binding-spark-2.4.4.patch
 ```
 
 3. Add these configuration items to the Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable NUMA binding.

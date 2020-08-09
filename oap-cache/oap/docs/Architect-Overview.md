@@ -21,7 +21,7 @@ SQL Index and Data Source Cache are designed to leverage user defined indices an
 
 ### Usage Scenario 1 -- Interactive queries
 
-Most customers adopt Spark SQL as a batch processing engine. Unfortunately, customers would discover that it is too hard to separate batch processing and interactive use cases. Interactive queries need to return the data in seconds or even sub-seconds instead of the minutes or hours of batch processing. This is a difficult challenge for the current Spark SQL implementation.
+Most customers adopt Spark SQL as a batch processing engine. Unfortunately, customers would find it hard to separate batch processing and interactive use cases. Interactive queries need to return the data in seconds or even sub-seconds instead of the minutes or hours of batch processing. This is a big challenge for the current Spark SQL implementation.
 
 For example, the following interactive query attempts to filter out a very small result set from a huge fact table.
 

@@ -1,5 +1,4 @@
 # RDD Cache PMem Extension
-Please add feature description here.
 
 ## Contents
 - [Introduction](#introduction)
@@ -48,7 +47,7 @@ The following are required to configure OAP to use DCPMM cache in AppDirect mode
 
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
 
-- Make sure [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/libmemkind.so.0) for x86 64bit CentOS Linux in the `/lib64/`directory of each worker node in cluster.
+- Make sure [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/libmemkind.so.0) for x86 64bit CentOS Linux in the `/lib64/`directory of each worker node in cluster.
    The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system.
    Build the latest memkind lib from source:
 
@@ -95,9 +94,9 @@ spark.yarn.numa.enabled true
 spark.yarn.numa.num [Your numa node number]
 spark.memory.pmem.mode [AppDirect | KMemDax]
 
-spark.files                       file://${{PATH_TO_OAP_SPARK_JAR}/oap-spark-0.8.1-with-spark-2.4.4.jar,file://${{PATH_TO_OAP_COMMON_JAR}/oap-common-0.8.1-with-spark-2.4.4.jar
-spark.executor.extraClassPath     ./oap-spark-0.8.1-with-spark-2.4.4.jar:./oap-common-0.8.1-with-spark-2.4.4.jar
-spark.driver.extraClassPath       file://${{PATH_TO_OAP_SPARK_JAR}/oap-spark-0.8.1-with-spark-2.4.4.jar:file://${{PATH_TO_OAP_COMMON_JAR}/oap-common-0.8.1-with-spark-2.4.4.jar
+spark.files                       file://${PATH_TO_OAP_SPARK_JAR}/oap-spark-<version>-with-spark-<version>.jar,file://${{PATH_TO_OAP_COMMON_JAR}/oap-common-<version>-with-spark-<version>.jar
+spark.executor.extraClassPath     ./oap-spark-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
+spark.driver.extraClassPath       file://${PATH_TO_OAP_SPARK_JAR}/oap-spark-<version>-with-spark-<version>.jar:file://${{PATH_TO_OAP_COMMON_JAR}/oap-common-<version>-with-spark-<version>.jar
 ```
 
 ### Use Optane PMem to cache data

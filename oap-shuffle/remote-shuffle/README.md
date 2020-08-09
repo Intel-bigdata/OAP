@@ -12,7 +12,7 @@ This is an essential part of enabling Spark on disaggregated compute and storage
 ## Developer Guide
 ### Build and Deploy
 If you have completed all steps in installation guide,  you needn't do anything in this section.
-Build this module using the following command in oap-shuffle/remote-shuffle folder or download the pre-built ` oap-remote-shuffle-0.8.1-with-spark-2.4.4.jar ` from  [oap-0.8.1-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.1-spark-2.4.4/oap-0.8.1-bin-spark-2.4.4.tar.gz) This file needs to be deployed on every compute node that runs Spark. Manually place it on all nodes or let resource manager do the work.
+Build this module using the following command in oap-shuffle/remote-shuffle folder or download the pre-built ` oap-remote-shuffle-<version>-with-spark-<version>.jar ` from  [oap-0.8.2-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/oap-0.8.2-bin-spark-2.4.4.tar.gz) This file needs to be deployed on every compute node that runs Spark. Manually place it on all nodes or let resource manager do the work.
 
 ```
     mvn -DskipTests clean package 
@@ -26,8 +26,8 @@ following configurations in spark-defaults.conf or Spark submit command line arg
 Note: For DAOS users, DAOS Hadoop/Java API jars should also be included in the classpath as we leverage DAOS Hadoop filesystem.
     
 ```
-    spark.executor.extraClassPath              /<path-to-remote-shuffle-dir>/remote-shuffle-<version>.jar
-    spark.driver.extraClassPath                /<path-to-remote-shuffle-dir>/remote-shuffle-<version>.jar
+    spark.executor.extraClassPath          /<path-to-oap-remote-shuffle-dir>/oap-remote-shuffle-<version>-with-spark-<version>.jar
+    spark.driver.extraClassPath            /<path-to-oap-remote-shuffle-dir>/oap-remote-shuffle-<version>-with-spark-<version>.jar
 ```
 
 Enable the remote shuffle manager and specify the Hadoop storage system URI holding shuffle data.
