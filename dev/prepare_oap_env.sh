@@ -2,7 +2,7 @@
 
 # set -e
 MAVEN_TARGET_VERSION=3.6.3
-
+MAVEN_MIN_VERSION=3.3
 CMAKE_TARGET_VERSION=3.7.1
 CMAKE_MIN_VERSION=3.3
 TARGET_CMAKE_SOURCE_URL=https://cmake.org/files/v3.7/cmake-3.7.1.tar.gz
@@ -27,22 +27,42 @@ function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)"
 
 function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" == "$1"; }
 
+function check_maven() {
+  CURRENT_MAVEN_VERSION_STR="$(mvn --version)"
+  array=(${CURRENT_MAVEN_VERSION_STR//,/ })
+  CURRENT_MAVEN_VERSION=${array[2]}
+  echo $CURRENT_MAVEN_VERSION
+  if version_lt $CURRENT_MAVEN_VERSION $MAVEN_MIN_VERSION; then
+    echo "11111111111111"
+  fi
+}
+function install_maven() {
+  $INSTALL_TOOL -y install wget
+  cd $DEV_PATH/thirdparty
+  wget https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
+  mkdir -p /usr/local/maven
+  tar -xzvf apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
+  mv apache-maven-$MAVEN_TARGET_VERSION/* /usr/local/maven
+  echo 'export MAVEN_HOME=/usr/local/maven' >> ~/.bashrc
+  echo 'export PATH=$MAVEN_HOME/bin:$PATH' >> ~/.bashrc
+  source ~/.bashrc
+  rm -rf apache-maven*
+  cd $DEV_PATH/thirdparty
+}
 function prepare_maven() {
   echo "Check maven version......"
   CURRENT_MAVEN_VERSION_STR="$(mvn --version)"
   if [[ "$CURRENT_MAVEN_VERSION_STR" == "Apache Maven"* ]]; then
     echo "mvn is installed"
+    array=(${CURRENT_MAVEN_VERSION_STR//,/ })
+    CURRENT_MAVEN_VERSION=${array[2]}
+    echo $CURRENT_MAVEN_VERSION
+    if version_lt $CURRENT_MAVEN_VERSION $MAVEN_MIN_VERSION; then
+      install_maven
+    fi
   else
     echo "mvn is not installed"
-    $INSTALL_TOOL -y install wget
-    wget https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
-    mkdir -p /usr/local/maven
-    tar -xzvf apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
-    mv apache-maven-$MAVEN_TARGET_VERSION/* /usr/local/maven
-    echo 'export MAVEN_HOME=/usr/local/maven' >> ~/.bashrc
-    echo 'export PATH=$MAVEN_HOME/bin:$PATH' >> ~/.bashrc
-    source ~/.bashrc
-    rm -rf apache-maven*
+    install_maven
   fi
 }
 

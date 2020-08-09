@@ -43,6 +43,11 @@ prepare_all
 
 #### Building
 
+If you use "prepare_oap_env.sh" to install GCC, or your GCC is not installed in the default path, please export CC (and CXX) before calling maven.
+```shell script
+export CXX=$OAPHOME/dev/thirdparty/gcc7/bin/g++
+export CC=$OAPHOME/dev/thirdparty/gcc7/bin/gcc
+```
 
 To build OAP package, use
 ```shell script

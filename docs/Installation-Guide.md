@@ -61,7 +61,12 @@ If you have installed all prerequisites, you can download our pre-built package 
 ```shell script
 sh ./dev/make-distribution.sh
 ``````
-If you only want to build specified module of OAP, you can use the command like the following, and then you should find the jar under the dictionary of the module.
+If you only want to build specified module of OAP, you can use the command like the following, and then you should find the jar under the dictionary of the module.If you use "prepare_oap_env.sh" to install GCC, or your GCC is not installed in the default path, please export CC (and CXX) before calling maven.
+```shell script
+export CXX=$OAPHOME/dev/thirdparty/gcc7/bin/g++
+export CC=$OAPHOME/dev/thirdparty/gcc7/bin/gcc
+```
+
 ```shell script
 # build SQL Index & Data Source Cache module
 mvn clean -pl com.intel.oap:oap-cache -am package 
