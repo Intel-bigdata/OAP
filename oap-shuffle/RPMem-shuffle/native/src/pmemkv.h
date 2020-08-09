@@ -254,7 +254,7 @@ class pmemkv {
                 std::free(cur);
                 cur = next;
                 bytes_allocated -= sizeof(block_meta);
-                std::cout<<"Only key in head is removed. key="<<key<<std::endl;
+                //std::cout<<"Only key in head is removed. key="<<key<<std::endl;
                 continue;
             }
 
@@ -270,18 +270,18 @@ class pmemkv {
             std::free(cur);
             cur = next;
             bytes_allocated -= sizeof(block_meta);
-            std::cout<<"Key in head is removed. key="<<key<<std::endl;
+            //std::cout<<"Key in head is removed. key="<<key<<std::endl;
             continue;
         }
         //Node to be deleted is at the tail
         if (pmemobj_direct(bep->hdr.next) == nullptr){
             //The one node scenario is already covered in head judgement, there are two or more nodes here
+            struct block_entry* prebep = (struct block_entry*)pmemobj_direct(bep->hdr.pre);
+            prebep->hdr.next = OID_NULL;
             bp->tail = bep->hdr.pre;
             if((struct block_entry*)pmemobj_direct(bp->tail) == nullptr){
                 std::cout<<"Error. The bp->tail should not be nullptr"<<std::endl;
             }
-            struct block_entry* prebep = (struct block_entry*)pmemobj_direct(bep->hdr.pre);
-            prebep->hdr.next = OID_NULL;
             bp->bytes_written = bp->bytes_written - bep->hdr.size;
             pmemobj_free(&bep->data);
             pmemobj_free(&cur->beo);
@@ -290,13 +290,15 @@ class pmemkv {
             std::free(cur);
             cur = next;
             bytes_allocated -= sizeof(block_meta);
-            std::cout<<"Key in tail is removed. key="<<key<<std::endl;
+            //std::cout<<"Key in tail is removed. key="<<key<<std::endl;
             continue;
         }
 
         //Node to be deleted is at the middle, no head or tail, there are at least three nodes
         struct block_entry* prebep = (struct block_entry*)pmemobj_direct(bep->hdr.pre);
         prebep->hdr.next = bep->hdr.next;
+        struct block_entry* nextbep = (struct block_entry*)pmemobj_direct(bep->hdr.next);
+        nextbep->hdr.pre = bep->hdr.pre;
         bp->bytes_written = bp->bytes_written - bep->hdr.size;
         pmemobj_free(&bep->data);
         pmemobj_free(&cur->beo);
@@ -305,7 +307,7 @@ class pmemkv {
         std::free(cur);
         cur = next;
         bytes_allocated -= sizeof(block_meta);
-        std::cout<<"Key neither in head nor in tail is removed. key="<<key<<std::endl;
+        //std::cout<<"Key neither in head nor in tail is removed. key="<<key<<std::endl;
       }
 
       bytes_allocated -= sizeof(block_meta_list);

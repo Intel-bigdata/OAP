@@ -75,6 +75,7 @@ TEST_CASE( "PmemBuffer operations", "[PmemBuffer]" ) {
 
 
 TEST_CASE("pmemkv operations", "[pmemkv]") {
+
   SECTION("test open and close") {
     std::string key = "1";
     pmemkv* kv = new pmemkv("/dev/dax0.0");
@@ -194,7 +195,7 @@ TEST_CASE("pmemkv operations", "[pmemkv]") {
 SECTION("test put and remove multiple elements with same key"){
   pmemkv* kv = new pmemkv("/dev/dax0.0");
   std::string key = "key-multiple-objects";
-  int size = 1000000;
+  int size = 100;
   int length = 5;
   for(int i = 0; i < size; i++){
       kv->put(key, "first", length);
@@ -217,7 +218,7 @@ SECTION("test put and remove multiple elements with same key"){
   SECTION("test multithreaded remove") {
     std::vector<std::thread> threads;
     pmemkv* kv = new pmemkv("/dev/dax0.0");
-    int size = 5;
+    int size = 10;
     for (uint64_t i = 0; i < size; i++) {
       threads.emplace_back(test_multithread_put, i, kv);
     }
@@ -229,21 +230,13 @@ SECTION("test put and remove multiple elements with same key"){
     assert(kv->getBytesWritten() != 0);
     kv->dump_all();
 
-    for (uint64_t i = 0; i < size; i++){
-        std::string key = std::to_string(i);
-        kv->remove(key);
-    }
-    std::cout<<"mark2. kv->getBytesWritten()="<<kv->getBytesWritten()<<std::endl;
-    kv->dump_all();
-
     std::vector<std::thread> removeThreads;
-    for (uint64_t i = 0; i < 20; i++) {
+    for (uint64_t i = 0; i < size; i++) {
       removeThreads.emplace_back(test_multithread_remove, i, kv);
     }
-    for (uint64_t i = 0; i < 20; i++) {
+    for (uint64_t i = 0; i < size; i++) {
       removeThreads[i].join();
     }
-
     std::cout<<"mark2. kv->getBytesWritten()="<<kv->getBytesWritten()<<std::endl;
     assert(kv->getBytesWritten() == 0);
     kv->dump_all();
