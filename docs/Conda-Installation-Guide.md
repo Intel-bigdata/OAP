@@ -36,6 +36,7 @@ To enable OAP MLlib, you need to install oneDAL and oneCLL, they can be download
 We provide a shell script named `prepare_oap_env.sh` to help you to completely compile and install these dependencies if your system is Fedora 29 or CentOS 7.6 or above.
 
 ```
+cd OAP/
 export ENABLE_RDMA=true
 source ./dev/prepare_oap_env.sh
 prepare_PMDK
@@ -51,6 +52,7 @@ Some dependencies required by OAP listed below. to use OAP, you must conda insta
 - [OAP](https://anaconda.org/intel-bigdata/oap)
 
 ```bash
+conda activate oapenv
 conda install -c intel memkind 
 conda install -c intel vmemcache
 conda install -c intel hpnl
@@ -67,6 +69,8 @@ After installing prerequisites of OAP successfully, to make sure libraries insta
 spark.executorEnv.LD_LIBRARY_PATH /root/miniconda2/envs/oapenv/lib/
 spark.executor.extraLibraryPath /root/miniconda2/envs/oapenv/lib/
 spark.driver.extraLibraryPath /root/miniconda2/envs/oapenv/lib/
+spark.executor.extraClassPath      /root/miniconda2/envs/oapenv/oap_jars/$OAP_FEATURE.jar
+spark.driver.extraClassPath      /root/miniconda2/envs/oapenv/oap_jars/$OAP_FEATURE.jar
 ```
 
 And then you can follow the corresponding feature documents for using them.
