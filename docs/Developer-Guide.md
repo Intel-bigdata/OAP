@@ -71,14 +71,14 @@ mvn clean test
 mvn clean -pl com.intel.oap:oap-cache -am test
 ```
 
-#### OAP Building with DCPMM
+#### OAP Building with PMem
 
-##### Prerequisites for building with DCPMM support
+##### Prerequisites for building with PMem support
 
-If you want to use OAP-CACHE with DCPMM,  you must finish steps of "Prerequisites for building" to ensure all dependencies have been installed .
+If you want to use OAP-CACHE with PMem,  you must finish steps of "Prerequisites for building" to ensure all dependencies have been installed .
 
 ##### Building package
-You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache stratege, you need to build with -Ppersistent-memory also.
+You need to add `-Ppersistent-memory` to build with PMem support. For `noevict` cache strategy, you also need to build with `-Ppersistent-memory` parameter.
 ```shell script
 mvn clean -q -Ppersistent-memory -DskipTests package
 ```

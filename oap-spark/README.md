@@ -17,21 +17,21 @@ Large capacity and high I/O performance of PMem shows better performance than ti
 ## User Guide
 ### Prerequisites
 
-The following are required to configure OAP to use DCPMM cache in AppDirect mode.
-- DCPMM hardware is successfully deployed on each node in cluster.
-- Directories exposing DCPMM hardware on each socket. For example, on a two socket system the mounted DCPMM directories should appear as `/mnt/pmem0` and `/mnt/pmem1`. Correctly installed DCPMM must be formatted and mounted on every cluster worker node.
+The following are required to configure OAP to use PMem cache in AppDirect mode.
+- PMem hardware is successfully deployed on each node in cluster.
+- Directories exposing PMem hardware on each socket. For example, on a two socket system the mounted PMem directories should appear as `/mnt/pmem0` and `/mnt/pmem1`. Correctly installed PMem must be formatted and mounted on every cluster worker node.
 
    ```
-   // use ipmctl command to show topology and dimm info of DCPM
+   // use ipmctl command to show topology and dimm info of PMem
    ipmctl show -topology
    ipmctl show -dimm
-   // provision dcpm in app direct mode
+   // provision PMem in app direct mode
    ipmctl create -goal PersistentMemoryType=AppDirect
    // reboot system to make configuration take affect
    reboot
    // check capacity provisioned for app direct mode(AppDirectCapacity)
    ipmctl show -memoryresources
-   // show the DCPM region information
+   // show the PMem region information
    ipmctl show -region
    // create namespace based on the region, multi namespaces can be created on a single region
    ndctl create-namespace -m fsdax -r region0
@@ -118,7 +118,7 @@ HiBench/conf/hibench.conf
 HiBench/conf/spark.conf
 HiBench/conf/workloads/ml/kmeans.conf
 ```
-Note that you need add `hibench.kmeans.storage.level  PMEM_AND_DISK` to `kmeans.conf`, which can enable both DCPMM and Disk to cache data.
+Note that you need add `hibench.kmeans.storage.level  PMEM_AND_DISK` to `kmeans.conf`, which can enable both PMem and Disk to cache data.
 Then you can run the following 2 commands to run K-means workloads:
 ```
 bin/workloads/ml/kmeans/prepare/prepare.sh

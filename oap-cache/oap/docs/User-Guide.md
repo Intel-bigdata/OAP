@@ -7,7 +7,7 @@
 * [Working with SQL Index](#Working-with-SQL-Index)
 * [Working with SQL Data Source Cache](#Working-with-SQL-Data-Source-Cache)
 * [Run TPC-DS Benchmark](#Run-TPC-DS-Benchmark)
-* [Advanced Configurations Scenarios](#Advanced-Configurations-Scenarios])
+* [Configuration for Advanced Scenarios](#Configuration-for-Advanced-Scenarios])
 
 
 ## Prerequisites
@@ -134,7 +134,7 @@ Use DROP OINDEX command to drop a named index.
 ```
 ## Working with SQL Data Source Cache
 
-Data Source Cache can provide input data cache functionality to the executor. When using the cache data among different SQL queries, configure cache to allow different SQL queries to use the same executor process. Do this by running your queries through the Spark ThriftServer as shown below. For cache media, we support both DRAM and Intel DCPMM which means you can choose to cache data in DRAM or Intel DCPMM if you have DCPMM configured in hardware.
+Data Source Cache can provide input data cache functionality to the executor. When using the cache data among different SQL queries, configure cache to allow different SQL queries to use the same executor process. Do this by running your queries through the Spark ThriftServer as shown below. For cache media, we support both DRAM and Intel PMem which means you can choose to cache data in DRAM or Intel PMem if you have PMem configured in hardware.
 
 ### Use DRAM Cache 
 
@@ -142,17 +142,16 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
 
    ```
    spark.memory.offHeap.enabled                   false
+   spark.oap.cache.strategy                       guava
    spark.sql.oap.fiberCache.memory.manager        offheap
    # equal to the size of executor.memoryOverhead
    spark.sql.oap.fiberCache.offheap.memory.size   50g
    # according to the resource of cluster
    spark.executor.memoryOverhead                  50g
-   # for parquet fileformat
+   # for parquet fileformat, enable binary cache
    spark.sql.oap.parquet.data.cache.enable        true
-   # for orc fileformat
-   spark.sql.oap.orc.data.cache.enable            true
-   # for orc fileformat
-   spark.sql.orc.copyBatchToSpark                 true
+   # for orc fileformat, enable binary cache
+   spark.sql.oap.orc.binary.cache.enable          true
    ```
 
    Change `spark.sql.oap.fiberCache.offheap.memory.size` based on the availability of DRAM capacity to cache data.
@@ -197,26 +196,26 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
    ![webUI](./image/webUI.png)
 
 
-### Use DCPMM Cache 
+### Use PMem Cache 
 
 #### Prerequisites
-The following are required to configure OAP to use DCPMM cache.
+The following are required to configure OAP to use PMem cache.
 
-- DCPMM hardware is successfully deployed on each node in cluster.
+- PMem hardware is successfully deployed on each node in cluster.
 
-- Directories exposing DCPMM hardware on each socket. For example, on a two socket system the mounted DCPMM directories should appear as `/mnt/pmem0` and `/mnt/pmem1`. Correctly installed DCPMM must be formatted and mounted on every cluster worker node.
+- Directories exposing PMem hardware on each socket. For example, on a two socket system the mounted PMem directories should appear as `/mnt/pmem0` and `/mnt/pmem1`. Correctly installed PMem must be formatted and mounted on every cluster worker node.
 
    ```
-   // use ipmctl command to show topology and dimm info of DCPMM
+   // use ipmctl command to show topology and dimm info of PMem
    ipmctl show -topology
    ipmctl show -dimm
-   // provision dcpmm in app direct mode
+   // provision PMem in app direct mode
    ipmctl create -goal PersistentMemoryType=AppDirect
    // reboot system to make configuration take affect
    reboot
    // check capacity provisioned for app direct mode(AppDirectCapacity)
    ipmctl show -memoryresources
-   // show the DCPMM region information
+   // show the PMem region information
    ipmctl show -region
    // create namespace based on the region, multi namespaces can be created on a single region
    ndctl create-namespace -m fsdax -r region0
@@ -239,20 +238,20 @@ The following are required to configure OAP to use DCPMM cache.
 Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
 Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
 ``` 
-- Make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for DCPMM cache. You can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
+- Make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. You can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
 
 
 #### Configure for NUMA
 
-1. Install `numactl` to bind the executor to the DCPMM device on the same NUMA node. 
+1. Install `numactl` to bind the executor to the PMem device on the same NUMA node. 
 
    ```yum install numactl -y ```
 
-2. Build Spark from source to enable numa-binding support. Refer to [enable-numa-binding-for-dcpmm-in-spark](./Developer-Guide.md#enable-numa-binding-for-dcpmm-in-spark).
+2. Build Spark from source to enable numa-binding support. Refer to [enable-numa-binding-for-PMem-in-spark](./Developer-Guide.md#enable-numa-binding-for-pmem-in-spark).
 
-#### Configure for DCPMM 
+#### Configure for PMem 
 
-Create `persistent-memory.xml` in `$SPARK_HOME/conf/` if it doesn't exist. Use the following template and change the `initialPath` to your mounted paths for DCPMM devices. 
+Create `persistent-memory.xml` in `$SPARK_HOME/conf/` if it doesn't exist. Use the following template and change the `initialPath` to your mounted paths for PMem devices. 
 
 ```
 <persistentMemoryPool>
@@ -267,7 +266,7 @@ Create `persistent-memory.xml` in `$SPARK_HOME/conf/` if it doesn't exist. Use t
 </persistentMemoryPool>
 ```
 
-#### Configure to enable DCPMM cache
+#### Configure to enable PMem cache
 
 Make the following configuration changes in `$SPARK_HOME/conf/spark-defaults.conf`.
 
@@ -290,8 +289,6 @@ spark.driver.extraClassPath       /home/oap/jars/oap-cache-<version>-with-spark-
 spark.sql.oap.parquet.binary.cache.enabled      true
 # for ORC file format, enable binary cache
 spark.sql.oap.orc.binary.cache.enable           true
-# for ORC file format, disable ColumnVector cache
-spark.sql.oap.orc.data.cache.enable             false
 spark.oap.cache.strategy                                   vmem 
 spark.sql.oap.fiberCache.persistent.memory.initial.size    256g 
 # according to your cluster
@@ -299,18 +296,18 @@ spark.sql.oap.cache.guardian.memory.size                   10g
 ```
 The `vmem` cache strategy is based on libvmemcache (buffer based LRU cache), which provides a key-value store API. Follow these steps to enable vmemcache support in Data Source Cache.
 
-- `spark.executor.instances`: We suggest setting the value to 2X the number of worker nodes when NUMA binding is enabled. Each worker node runs two executors, each executor is bound to one of the two sockets, and accesses the corresponding DCPMM device on that socket.
-- `spark.sql.oap.fiberCache.persistent.memory.initial.size`: It is configured to the available DCPMM capacity to be used as data cache per exectutor.
+- `spark.executor.instances`: We suggest setting the value to 2X the number of worker nodes when NUMA binding is enabled. Each worker node runs two executors, each executor is bound to one of the two sockets, and accesses the corresponding PMem device on that socket.
+- `spark.sql.oap.fiberCache.persistent.memory.initial.size`: It is configured to the available PMem capacity to be used as data cache per exectutor.
  
 **NOTE**: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks fail with "cache guardian use too much memory" error, set `spark.sql.oap.cache.guardian.memory.size ` to a larger number as the default size is 10GB. The user could also increase `spark.sql.oap.cache.guardian.free.thread.nums` or decrease `spark.sql.oap.cache.dispose.timeout.ms` to free memory more quickly.
 
-### Verify DCPMM cache functionality
+### Verify PMem cache functionality
 
 - After finishing configuration, restart Spark Thrift Server for the configuration changes to take effect. Start at step 2 of the [Use DRAM Cache](#use-dram-cache) guide to verify that cache is working correctly.
 
 - Verify NUMA binding status by confirming keywords like `numactl --cpubind=1 --membind=1` contained in executor launch command.
 
-- Check DCPMM cache size by checking disk space with `df -h`.For `vmemcache` strategy, disk usage will reach the initial cache size once the DCPMM cache is initialized and will not change during workload execution. For `Guava/Noevict` strategies, the command will show disk space usage increases along with workload execution. 
+- Check PMem cache size by checking disk space with `df -h`.For `vmemcache` strategy, disk usage will reach the initial cache size once the PMem cache is initialized and will not change during workload execution. For `Guava/Noevict` strategies, the command will show disk space usage increases along with workload execution. 
 
 
 ## Run TPC-DS Benchmark
@@ -363,12 +360,12 @@ sh ./scripts/run_gen_data.sh
 
 ### Start Spark Thrift Server
 
-Start the Thrift Server in the tool root folder, which is the same folder you run data generation scripts. Use either the DCPMM or DRAM scrip to start the Thrift Server.
+Start the Thrift Server in the tool root folder, which is the same folder you run data generation scripts. Use either the PMem or DRAM scrip to start the Thrift Server.
 
-#### Use DCPMM as Cache Media
+#### Use PMem as Cache Media
 
-Update the configuration values in `scripts/spark_thrift_server_yarn_with_DCPMM.sh` to reflect your environment. 
-Normally, you need to update the following configuration values to cache to DCPMM.
+Update the configuration values in `scripts/spark_thrift_server_yarn_with_PMem.sh` to reflect your environment. 
+Normally, you need to update the following configuration values to cache to PMem.
 
 - --driver-memory
 - --executor-memory
@@ -381,9 +378,9 @@ These settings will override the values specified in Spark configuration file ( 
 
 ```
 cd OAP-TPCDS-TOOL
-sh ./scripts/spark_thrift_server_yarn_with_DCPMM.sh start
+sh ./scripts/spark_thrift_server_yarn_with_PMem.sh start
 ```
-In this script, we use `vmem` as cache strategy for ColumnVector cache. you can alter to Binary cache. Or you can use other cache strategies for ColumnVector or Binary cache, then follow above corresponding instructions to config rightly.
+In this script, we use `vmem` as cache strategy for Parquet Binary data cache. 
 
 #### Use DRAM as Cache Media 
 
@@ -413,15 +410,17 @@ sh ./scripts/run_tpcds.sh
 
 When all the queries are done, you will see the `result.json` file in the current directory.
 
-## Advanced Configurations Scenarios
+## Configuration for Advanced Scenarios
 
-### caching strategy
-In addition to Vmemcache, Datasource Cache Also has three other caching strategies : guava, noevict , vmemcache , external cache 
+- In addition to vmemcache strategy, Data Source Cache also supports 3 other cache strategies: **guava**, **noevict**  and **external cache**. 
+- To optimize the cache media utilization, Data Source Cache support cache separation of data and index, by using same or different cache media with DRAM and PMem.
+- Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
 
 
-### Choose additional configuration options
+### Additional Cache Strategies
 
-Optimize your environment by choosing a DCPMM caching strategy (guava, noevict, vmemcache, external cache using plasma). Following table shows features of each cache.
+Following table shows features of 4 cache strategies on PMem.
+
 | guava | noevict | vmemcache | external cache |
 | :----- | :----- | :----- | :-----|
 | Use memkind lib to operate on PMem and guava cache strategy when data eviction happens. | Use memkind lib to operate on PMem and doesn't allow data eviction. | Use vmemcache lib to operate on PMem and LRU cache strategy when data eviction happens. | Use vmemcache lib to operate on PMem and LRU cache strategy when data eviction happens. |
@@ -432,23 +431,24 @@ Optimize your environment by choosing a DCPMM caching strategy (guava, noevict, 
 
 - For cache solution `guava/noevict`, make sure [Memkind](http://memkind.github.io/memkind/) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/libmemkind.so.0) for x86_64 bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. Build and install step can refer to [build and install memkind](./Developer-Guide.md#build-and-install-memkind)
 
-- For cache solution `vmemcahe/external` cache, make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for DCPMM cache. You can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
+- For cache solution `vmemcahe/external` cache, make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. You can follow the build/install steps from vmemcache website and make sure `libvmemcache.so` exist in `/lib64` directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
 
-- Data Source Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support DCPMM, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. Build and install step can refer to [build and install plasma](./Developer-Guide.md#build-and-install-plasma)
+- Data Source Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. Build and install step can refer to [build and install plasma](./Developer-Guide.md#build-and-install-plasma)
  
 Or you can refer to [Developer-Guide](../../../docs/Developer-Guide.md), there is a shell script to help you install these dependencies automatically.
+
 #### Guava cache
 
-Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and memkind library correctly. Then follow bellow configurations.
+Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](#prerequisites-1) to set up PMem hardware and memkind library correctly. Then follow bellow configurations.
 
-**NOTE**: `spark.sql.oap.fiberCache.persistent.memory.reserved.size`: When we use DCPMM as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available DCPMM capacity to avoid memory allocation failure. But even with an allocation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
+**NOTE**: `spark.sql.oap.fiberCache.persistent.memory.reserved.size`: When we use PMem as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available PMem capacity to avoid memory allocation failure. But even with an allocation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
 
 For Parquet file format, add these conf options:
 ```
-spark.sql.oap.parquet.data.cache.enable           true
+spark.sql.oap.parquet.binary.cache.enable         true
 spark.sql.oap.fiberCache.memory.manager           pm 
 spark.oap.cache.strategy                          guava
-# DCPMM capacity per executor, according to your cluster
+# PMem capacity per executor, according to your cluster
 spark.sql.oap.fiberCache.persistent.memory.initial.size    256g
 # Reserved space per executor
 spark.sql.oap.fiberCache.persistent.memory.reserved.size   50g
@@ -456,12 +456,11 @@ spark.sql.extensions                              org.apache.spark.sql.OapExtens
 ```
 For Orc file format, add these conf options:
 ```
-spark.sql.orc.copyBatchToSpark                   true
-spark.sql.oap.orc.data.cache.enable              true
+spark.sql.oap.orc.binary.cache.enable            true
 spark.sql.oap.orc.enable                         true
 spark.sql.oap.fiberCache.memory.manager          pm 
 spark.oap.cache.strategy                         guava
-# DCPMM capacity per executor, according to your cluster
+# PMem capacity per executor, according to your cluster
 spark.sql.oap.fiberCache.persistent.memory.initial.size    256g
 # Reserved space per executor
 spark.sql.oap.fiberCache.persistent.memory.reserved.size   50g
@@ -477,27 +476,26 @@ spark.sql.oap.fiberCache.memory.manager           kmem
 
 #### Noevict cache
 
-The noevict cache strategy is also supported in OAP based on the memkind library for DCPMM.
+The noevict cache strategy is also supported in OAP based on the memkind library for PMem.
 
-To apply noevict cache strategy in your workload, please follow [prerequisites](#prerequisites-1) to set up DCPMM hardware and memkind library correctly. Then follow bellow configurations.
+To apply noevict cache strategy in your workload, please follow [prerequisites](#prerequisites-1) to set up PMem hardware and memkind library correctly. Then follow bellow configurations.
 
 For Parquet file format, add these conf options:
 ```
-spark.sql.oap.parquet.data.cache.enable                  true 
+spark.sql.oap.parquet.binary.cache.enable                true 
 spark.oap.cache.strategy                                 noevict 
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
 ```
 For Orc file format, add these conf options:
 ```
-spark.sql.orc.copyBatchToSpark                           true 
-spark.sql.oap.orc.data.cache.enable                      true 
+spark.sql.oap.orc.binary.cache.enable                    true 
 spark.oap.cache.strategy                                 noevict 
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
 ```
 
 #### External cache using plasma
 
-External cache strategy is implemented based on arrow/plasma library. To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware. Then install arrow rpm package which include plasma library and executable file and copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer below configurations to apply external cache strategy and start plasma service on each node and start your workload.
+External cache strategy is implemented based on arrow/plasma library. To use this strategy, follow [prerequisites](#prerequisites-1) to set up PMem hardware. Then install arrow rpm package which include plasma library and executable file and copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer below configurations to apply external cache strategy and start plasma service on each node and start your workload.
 
 
 It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma. You can follow these command to create or destroy interleaved PMem device:
@@ -524,7 +522,7 @@ For Parquet data format, add these conf options:
 
 
 ```
-spark.sql.oap.parquet.data.cache.enable                    true 
+spark.sql.oap.parquet.binary.cache.enable                  true 
 spark.oap.cache.strategy                                   external
 spark.sql.oap.dcpmm.free.wait.threshold                    50000000000
 # according to your executor core number
@@ -534,8 +532,7 @@ spark.sql.oap.cache.external.client.pool.size              10
 For Orc file format, add these conf options:
 
 ```
-spark.sql.orc.copyBatchToSpark                             true 
-spark.sql.oap.orc.data.cache.enable                        true 
+spark.sql.oap.orc.binary.cache.enable                      true 
 spark.oap.cache.strategy                                   external
 spark.sql.oap.dcpmm.free.wait.threshold                    50000000000
 # according to your executor core number
@@ -584,10 +581,10 @@ Run command  ```yarn app -launch plasma-store-service /tmp/plasmaLaunch.json``` 
 Run ```yarn app -stop plasma-store-service``` to stop it.  
 Run ```yarn app -destroy plasma-store-service```to destroy it.
 
-### DataSource Cache advance usages and configurations
+### Advanced Data Source Cache Usages
 #### Index/Data cache separation
 
-Data Source Cache now supports different cache strategies for DRAM and DCPMM. To optimize the cache media utilization, you can enable cache separation of data and index with same or different cache media. When Sharing same media, data cache and index cache will use different fiber cache ratio.
+Data Source Cache now supports different cache strategies for DRAM and PMem. To optimize the cache media utilization, you can enable cache separation of data and index with same or different cache media. When Sharing same media, data cache and index cache will use different fiber cache ratio.
 
 Here we list 4 different kinds of configs for index/cache separation, if you choose one of them, please add corresponding configs to `spark-defaults.conf`.
 1. DRAM as cache media, `guava` strategy as index & data cache backend. 
@@ -599,7 +596,7 @@ spark.sql.oap.fiberCache.memory.manager                 offheap
 ```
 The rest configurations can refer to the configurations of  [Use DRAM Cache](#use-dram-cache) 
 
-2. DCPMM as cache media, `vmem` strategy as index & data cache backend. 
+2. PMem as cache media, `vmem` strategy as index & data cache backend. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enable        true
@@ -609,9 +606,9 @@ spark.sql.oap.mix.data.cache.backend                    vmem
 spark.sql.oap.mix.index.cache.backend                   vmem
 
 ```
-The rest configurations can refer to the configurations of [DCPMM Cache](#use-dcpmm-cache) and  [Vmemcache cache](#vmemcache-cache)
+The rest configurations can refer to the configurations of [PMem Cache](#use-pmem-cache) and  [Vmemcache cache](#vmemcache-cache)
 
-3. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`tmp`)/`vmem` as `data` cache media and backend. 
+3. DRAM(`offheap`)/`guava` as `index` cache media and backend, PMem(`tmp`)/`vmem` as `data` cache media and backend. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enable         true
@@ -624,7 +621,7 @@ spark.executor.instances                                 6
 # enable numa
 spark.yarn.numa.enabled                                  true
 spark.memory.offHeap.enabled                             false
-# DCPMM capacity per executor
+# PMem capacity per executor
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
 # according to your cluster
 spark.sql.oap.cache.guardian.memory.size                 10g
@@ -635,13 +632,12 @@ spark.sql.oap.fiberCache.offheap.memory.size   50g
 spark.executor.memoryOverhead                  50g
 
 # for orc file format
-spark.sql.orc.copyBatchToSpark                 true
-spark.sql.oap.orc.data.cache.enable            true
+spark.sql.oap.orc.binary.cache.enable            true
 # for Parquet file format
-spark.sql.oap.parquet.data.cache.enable        true
+spark.sql.oap.parquet.binary.cache.enable        true
 ```
 
-4. DRAM(`offheap`)/`guava` as `index` cache media and backend, DCPMM(`pm`)/`guava` as `data` cache media and backend. 
+4. DRAM(`offheap`)/`guava` as `index` cache media and backend, PMem(`pm`)/`guava` as `data` cache media and backend. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enable         true
@@ -654,7 +650,7 @@ spark.executor.instances                                 6
 spark.yarn.numa.enabled                                  true
 spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
 spark.memory.offHeap.enabled                             false
-# DCPMM capacity per executor
+# PMem capacity per executor
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
 # Reserved space per executor
 spark.sql.oap.fiberCache.persistent.memory.reserved.size 50g
@@ -664,26 +660,10 @@ spark.sql.oap.fiberCache.offheap.memory.size   50g
 # according to the resource of cluster
 spark.executor.memoryOverhead                  50g
 # for ORC file format
-spark.sql.orc.copyBatchToSpark                 true
-spark.sql.oap.orc.data.cache.enable            true
+spark.sql.oap.orc.binary.cache.enable          true
 # for Parquet file format
 spark.sql.oap.parquet.data.cache.enable        true
 ```
-
-#### Binary cache 
-
-A binary cache is available for both Parquet and ORC file format to improve cache space utilization compared to ColumnVector cache. When enabling binary cache, you should change following configs in `spark-defaults.conf`.
-```
-# for parquet file format, enable binary cache
-spark.sql.oap.parquet.binary.cache.enabled      true
-# for parquet file format, disable ColumnVector cache
-spark.sql.oap.parquet.data.cache.enable         false
-# for ORC file format, enable binary cache
-spark.sql.oap.orc.binary.cache.enable           true
-# for ORC file format, disable ColumnVector cache
-spark.sql.oap.orc.data.cache.enable             false
-```
-The rest configurations can follow above part according to different cache media and strategies.
 
 #### Cache Hot Tables
 

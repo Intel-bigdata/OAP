@@ -2,7 +2,7 @@
 
 * [Build](#Build)
 * [Integrate with Spark\*](#integrate-with-spark)
-* [Enable NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enable-numa-binding-for-dcpmm-in-spark)
+* [Enable NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enable-numa-binding-for-pmem-in-spark)
 
 ## Build
 
@@ -39,7 +39,7 @@ mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite 
 
 Follow these steps:
 
-##### Prerequisites for building with DCPMM support
+##### Prerequisites for building with PMem support
 
 Install the required packages on the build system:
 
@@ -108,7 +108,7 @@ mvn clean -q -pl plasma -DskipTests install
 
 
 ##### Build the package
-You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache strategy, you need to build with -Ppersistent-memory also.
+You need to add `-Ppersistent-memory` to build with PMem support. For `noevict` cache strategy, you also need to build with `-Ppersistent-memory` parameter.
 ```
 mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -DskipTests package
 ```
@@ -159,11 +159,11 @@ The following files need to be checked/compared for changes:
 		Add the get and set method for the changed protected variable.
 ```
 
-## Enable NUMA binding for DCPMM in Spark
+## Enable NUMA binding for PMem in Spark
 
 #### Rebuild Spark packages with NUMA binding patch 
 
-When using DCPMM as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-2.4.4.patch](./numa-binding-spark-2.4.4.patch) to Spark source code for best performance.
+When using PMem as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-2.4.4.patch](./numa-binding-spark-2.4.4.patch) to Spark source code for best performance.
 
 1. Download src for [Spark-2.4.4](https://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4.tgz) and clone the src from github.
 

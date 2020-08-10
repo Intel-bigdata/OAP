@@ -52,7 +52,7 @@ You can run with the following example using spark shell for testing simple inde
 If you want to run OAP with cache function, you need add the following 
 configurations in the 
 “$SPARK_HOME/conf/spark-defaults.conf” file and then run by sbin/start-thriftserver.sh. After start the 
-thriftserver service, you can find the cache metric with OAP tab in the spark history Web UI. OAP provide two medias to cache the hot data: DRAM and DCPMM.
+thriftserver service, you can find the cache metric with OAP tab in the spark history Web UI. OAP provide two medias to cache the hot data: DRAM and PMem.
 
 DRAM Cache Configuration in $SPARK_HOME/conf/spark-defaults.conf
 ```
@@ -62,7 +62,7 @@ spark.memory.offHeap.size
 spark.sql.oap.parquet.data.cache.enable true (for parquet fileformat)
 spark.sql.oap.orc.data.cache.enable true (for orc fileformat)
 ```
-DCPMM Cache configuration in $SPARK_HOME/conf/spark-defaults.conf
+PMem Cache configuration in $SPARK_HOME/conf/spark-defaults.conf
 ```
 spark.sql.extensions org.apache.spark.sql.OapExtensions
 spark.sql.oap.fiberCache.memory.manager pm
