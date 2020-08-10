@@ -7,7 +7,7 @@
 * [Working with SQL Index](#Working-with-SQL-Index)
 * [Working with SQL Data Source Cache](#Working-with-SQL-Data-Source-Cache)
 * [Run TPC-DS Benchmark](#Run-TPC-DS-Benchmark)
-* [Configuration for Advanced Scenarios](#Configuration-for-Advanced-Scenarios])
+* [Configuration for Advanced Scenarios](#Configuration-for-Advanced-Scenarios)
 
 
 ## Prerequisites
@@ -360,7 +360,7 @@ sh ./scripts/run_gen_data.sh
 
 ### Start Spark Thrift Server
 
-Start the Thrift Server in the tool root folder, which is the same folder you run data generation scripts. Use either the PMem or DRAM scrip to start the Thrift Server.
+Start the Thrift Server in the tool root folder, which is the same folder you run data generation scripts. Use either the PMem or DRAM script to start the Thrift Server.
 
 #### Use PMem as Cache Media
 
@@ -662,7 +662,7 @@ spark.executor.memoryOverhead                  50g
 # for ORC file format
 spark.sql.oap.orc.binary.cache.enable          true
 # for Parquet file format
-spark.sql.oap.parquet.data.cache.enable        true
+spark.sql.oap.parquet.binary.cache.enable      true
 ```
 
 #### Cache Hot Tables
