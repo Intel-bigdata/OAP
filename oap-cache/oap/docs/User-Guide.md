@@ -496,9 +496,7 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
 #### External cache using plasma
 
 
-External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched spark 3.0. To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware. Then install arrow rpm package which include plasma library and executable file and copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer below configurations to apply external cache strategy and start plasma service on each node and start your workload.
-
-
+External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched spark 2.4.4. To use this strategy, follow [prerequisites](#prerequisites-1) to set up PMem hardware. Then install arrow rpm package which includes plasma library and executable file, copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer to below configurations to apply external cache strategy and start plasma service on each node and start your workload. (Currently web UI cannot display accurately, this is a known [issue](https://github.com/Intel-bigdata/OAP/issues/1579))
 
 It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma. You can follow these command to create or destroy interleaved PMem device:
 
