@@ -10,7 +10,7 @@ This document is to provide you information on how to compile OAP and its depend
 ## Prerequisites 
 
 - **OS Requirements**  
-We have tested OAP on Fedora 29 and CentOS 7.6. We recommend you use **Fedora 29 CentOS 7.6 or above**. Besides, for [Memkind](https://github.com/Intel-bigdata/memkind) we recommend you use **kernel above 3.10**.
+We have tested OAP on Fedora 29 and CentOS 7.6. We recommend you use **Fedora 29 CentOS 7.6 or above**. Besides, for [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2) we recommend you use **kernel above 3.10**.
 
 - **Requirements for Shuffle Remote PMem Extension**  
 If you want to use Shuffle Remote PMem Extension, you need to configure and validate RDMA before these installation steps. You can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md#4-configure-and-validate-rdma) for the details of configuring and validating RDMA.
@@ -20,7 +20,7 @@ If you want to use Shuffle Remote PMem Extension, you need to configure and vali
 Dependencies below are required by OAP, you must compile and install them on each cluster node. We also provide shell scripts to help quickly compile and install all these libraries.
 
 - [Cmake](https://help.directadmin.com/item.php?id=494)
-- [Memkind](https://github.com/Intel-bigdata/memkind)
+- [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
 - [Vmemcache](https://github.com/pmem/vmemcache)
 - [HPNL](https://github.com/Intel-bigdata/HPNL)
 - [PMDK](https://github.com/pmem/pmdk)  

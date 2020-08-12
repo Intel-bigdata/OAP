@@ -134,7 +134,7 @@ function install_gcc7() {
 }
 
 function prepare_memkind() {
-  memkind_repo="https://github.com/Intel-bigdata/memkind.git"
+  memkind_repo="https://github.com/memkind/memkind.git"
   echo $memkind_repo
 
   mkdir -p $DEV_PATH/thirdparty
@@ -144,7 +144,7 @@ function prepare_memkind() {
   fi
   cd memkind/
   git pull
-  git checkout v1.10.0-oap-0.7
+  git checkout v1.10.1-rc2
 
   $INSTALL_TOOL -y install autoconf
   $INSTALL_TOOL -y install automake

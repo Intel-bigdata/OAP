@@ -18,7 +18,7 @@ cd OAP
 OAP is built using [Apache Maven](http://maven.apache.org/). You need to install the required packages on the build system listed below. To enable Shuffle Remote PMem extension, you must configure and validate RDMA in advance, you can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md) for more details.
 
 - [Cmake](https://help.directadmin.com/item.php?id=494)
-- [Memkind](https://github.com/Intel-bigdata/memkind)
+- [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
 - [Vmemcache](https://github.com/pmem/vmemcache)
 - [HPNL](https://github.com/Intel-bigdata/HPNL)
 - [PMDK](https://github.com/pmem/pmdk)  

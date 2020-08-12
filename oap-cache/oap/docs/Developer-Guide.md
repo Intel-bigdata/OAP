@@ -45,7 +45,7 @@ Install the required packages on the build system:
 
 - gcc-c++
 - [cmake](https://help.directadmin.com/item.php?id=494)
-- [Memkind](https://github.com/Intel-bigdata/memkind)
+- [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
 - [vmemcache](https://github.com/pmem/vmemcache)
 
 ##### build and install memkind
@@ -53,7 +53,7 @@ Install the required packages on the build system:
    Build the latest memkind lib from source:
 
 ```
-git clone https://github.com/memkind/memkind
+git clone -b v1.10.1-rc2 https://github.com/memkind/memkind
 cd memkind
 ./autogen.sh
 ./configure
