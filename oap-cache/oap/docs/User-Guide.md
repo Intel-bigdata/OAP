@@ -423,7 +423,7 @@ Following table shows features of 4 cache strategies on PMem.
 
 | guava | noevict | vmemcache | external cache |
 | :----- | :----- | :----- | :-----|
-| Use memkind lib to operate on PMem and guava cache strategy when data eviction happens. | Use memkind lib to operate on PMem and doesn't allow data eviction. | Use vmemcache lib to operate on PMem and LRU cache strategy when data eviction happens. | Use vmemcache lib to operate on PMem and LRU cache strategy when data eviction happens. |
+| Use memkind lib to operate on PMem and guava cache strategy when data eviction happens. | Use memkind lib to operate on PMem and doesn't allow data eviction. | Use vmemcache lib to operate on PMem and LRU cache strategy when data eviction happens. | Use Plasma/dlmalloc to operate on PMem and LRU cache strategy when data eviction happens. |
 | Need numa patch in Spark for better performance. | Need numa patch in Spark for better performance. | Need numa patch in Spark for better performance. | Doesn't need numa patch. |
 | Suggest using 2 executors one node to keep aligned with PMem paths and numa nodes number. | Suggest using 2 executors one node to keep aligned with PMem paths and numa nodes number. | Suggest using 2 executors one node to keep aligned with PMem paths and numa nodes number. | Node-level cache so there are no limitation for executor number. |
 | Cache data cleaned once executors exited. | Cache data cleaned once executors exited. | Cache data cleaned once executors exited. | No data loss when executors exit thus is friendly to dynamic allocation. But currently it has performance overhead than other cache solutions. |
@@ -495,7 +495,9 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
 
 #### External cache using plasma
 
-External cache strategy is implemented based on arrow/plasma library. To use this strategy, follow [prerequisites](#prerequisites-1) to set up PMem hardware. Then install arrow rpm package which include plasma library and executable file and copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer below configurations to apply external cache strategy and start plasma service on each node and start your workload.
+
+External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched spark 3.0. To use this strategy, follow [prerequisites](#prerequisites-1) to set up DCPMM hardware. Then install arrow rpm package which include plasma library and executable file and copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer below configurations to apply external cache strategy and start plasma service on each node and start your workload.
+
 
 
 It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma. You can follow these command to create or destroy interleaved PMem device:
@@ -584,6 +586,7 @@ Run ```yarn app -destroy plasma-store-service```to destroy it.
 ### Index and Data Cache Separation
 
 Data Source Cache now supports different cache strategies for DRAM and PMem. To optimize the cache media utilization, you can enable cache separation of data and index with same or different cache media. When Sharing same media, data cache and index cache will use different fiber cache ratio.
+
 
 Here we list 4 different kinds of configs for index/cache separation, if you choose one of them, please add corresponding configs to `spark-defaults.conf`.
 1. DRAM as cache media, `guava` strategy as index & data cache backend. 
