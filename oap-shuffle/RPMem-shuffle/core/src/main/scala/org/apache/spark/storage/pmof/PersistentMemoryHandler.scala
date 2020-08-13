@@ -75,6 +75,10 @@ private[spark] class PersistentMemoryHandler(
     pmpool.deletePartition(blockId)
   }
 
+  def removeBlock(blockId: String): Long = {
+    pmpool.removeBlock(blockId)
+  }
+
   def getPartitionManagedBuffer(blockId: String): ManagedBuffer = {
     new PmemManagedBuffer(this, blockId)
   }
