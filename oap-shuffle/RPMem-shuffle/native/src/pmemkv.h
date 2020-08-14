@@ -21,23 +21,24 @@
 
 // block header stored in pmem
 struct block_hdr {
-	PMEMoid next;
+  PMEMoid next;
+  PMEMoid pre;
   uint64_t key;
-	uint64_t size;
+  uint64_t size;
 };
 
 // block data entry stored in pmem
 struct block_entry {
-	struct block_hdr hdr;
+  struct block_hdr hdr;
   PMEMoid data;
 };
 
 // pmem root entry
 struct base {
-	PMEMoid head;
-	PMEMoid tail;
-	PMEMrwlock rwlock;
-	uint64_t bytes_written;
+  PMEMoid head;
+  PMEMoid tail;
+  PMEMrwlock rwlock;
+  uint64_t bytes_written;
 };
 
 // block metadata stored in memory
@@ -45,6 +46,8 @@ struct block_meta {
   block_meta* next;
   uint64_t off;
   uint64_t size;
+  block_entry* bep;
+  PMEMoid beo;
 };
 
 struct block_meta_list {
@@ -140,6 +143,7 @@ class pmemkv {
       }
       char* pmem_data = (char*)pmemobj_direct(bep->data);
       memcpy(pmem_data, buf, count);
+      bep->hdr.pre = bp->tail;
       bep->hdr.next = OID_NULL;
       bep->hdr.key = key_i;
       bep->hdr.size = count;
@@ -161,7 +165,7 @@ class pmemkv {
       (void) pmemobj_tx_end();
 
       // update in-memory index
-      if (update_meta(bep)) {
+      if (update_meta(bep, beo)) {
         return -1;
       }
       return 0;
@@ -188,6 +192,129 @@ class pmemkv {
         bm = bm->next;
       }
       pmemobj_rwlock_unlock(pmem_pool, &bp->rwlock);
+      return 0;
+    }
+
+    int removeBlocks(uint64_t shuffleId, uint64_t mapId, uint64_t partitionId){
+        for (int i = 0; i < partitionId; i++){
+            std::string key = "shuffle_" + std::to_string(shuffleId) + "_" + std::to_string(mapId) + "_" + std::to_string(i);
+            //std::cout<<"key="<<key<<std::endl;
+            remove(key);
+        }
+        return 0;
+    }
+
+    int getBytesWritten(){
+        return bp->bytes_written;
+    }
+
+    int remove(std::string &key){
+      std::lock_guard<std::mutex> l(mtx);
+      xxh::hash64_t key_i = xxh::xxhash<64>(key);
+      if (!index_map.contains(key_i)){
+        //std::cout<<"Data with key="<<key_i<<" doesn't exist"<<std::endl;
+        return -1;
+      }
+
+      // set the return point
+      jmp_buf env;
+      if (setjmp(env)) {
+        // end the transaction
+        (void) pmemobj_tx_end();
+        return -1;
+      }
+
+      // begin a transaction, also acquiring the write lock for the data
+      if (pmemobj_tx_begin(pmem_pool, env, TX_PARAM_RWLOCK, &bp->rwlock,TX_PARAM_NONE)) {
+        std::cout<<"pmemobj_tx_begin failed in pmemkv put"<<std::endl;
+        perror("pmemobj_tx_begin failed in pmemkv put");
+        return -1;
+      }
+
+      // Remove data by block meta list
+      struct block_meta_list* bml;
+      index_map.find(key_i, bml);
+
+      struct block_meta* cur = bml->head;
+
+      //Delete block_entry in bml one by one
+      while (cur != nullptr) {
+        block_entry* bep = cur->bep;
+        //Node to be deleted is at the head
+        if(bep == (struct block_entry*)pmemobj_direct(bp->head)){
+            if (pmemobj_direct(bep->hdr.next) == nullptr){
+                //There is only one block_entry
+                bp->head = OID_NULL;
+                bp->tail = OID_NULL;
+                bp->bytes_written = bp->bytes_written - bep->hdr.size;
+                pmemobj_free(&bep->data);
+                pmemobj_free(&cur->beo);
+                struct block_meta *next = cur->next;
+                cur->next = nullptr;
+                std::free(cur);
+                cur = next;
+                bytes_allocated -= sizeof(block_meta);
+                //std::cout<<"Only key in head is removed. key="<<key<<std::endl;
+                continue;
+            }
+
+            //There are two or more block_entry
+            bp->head = bep->hdr.next;
+            block_entry* new_head_pointer = (struct block_entry*)pmemobj_direct(bp->head);
+            new_head_pointer->hdr.pre = OID_NULL;
+            bp->bytes_written = bp->bytes_written - bep->hdr.size;
+            pmemobj_free(&bep->data);
+            pmemobj_free(&cur->beo);
+            struct block_meta *next = cur->next;
+            cur->next = nullptr;
+            std::free(cur);
+            cur = next;
+            bytes_allocated -= sizeof(block_meta);
+            //std::cout<<"Key in head is removed. key="<<key<<std::endl;
+            continue;
+        }
+        //Node to be deleted is at the tail
+        if (pmemobj_direct(bep->hdr.next) == nullptr){
+            //The one node scenario is already covered in head judgement, there are two or more nodes here
+            struct block_entry* prebep = (struct block_entry*)pmemobj_direct(bep->hdr.pre);
+            prebep->hdr.next = OID_NULL;
+            bp->tail = bep->hdr.pre;
+            if((struct block_entry*)pmemobj_direct(bp->tail) == nullptr){
+                std::cout<<"Error. The bp->tail should not be nullptr"<<std::endl;
+            }
+            bp->bytes_written = bp->bytes_written - bep->hdr.size;
+            pmemobj_free(&bep->data);
+            pmemobj_free(&cur->beo);
+            struct block_meta *next = cur->next;
+            cur->next = nullptr;
+            std::free(cur);
+            cur = next;
+            bytes_allocated -= sizeof(block_meta);
+            //std::cout<<"Key in tail is removed. key="<<key<<std::endl;
+            continue;
+        }
+
+        //Node to be deleted is at the middle, no head or tail, there are at least three nodes
+        struct block_entry* prebep = (struct block_entry*)pmemobj_direct(bep->hdr.pre);
+        prebep->hdr.next = bep->hdr.next;
+        struct block_entry* nextbep = (struct block_entry*)pmemobj_direct(bep->hdr.next);
+        nextbep->hdr.pre = bep->hdr.pre;
+        bp->bytes_written = bp->bytes_written - bep->hdr.size;
+        pmemobj_free(&bep->data);
+        pmemobj_free(&cur->beo);
+        struct block_meta *next = cur->next;
+        cur->next = nullptr;
+        std::free(cur);
+        cur = next;
+        bytes_allocated -= sizeof(block_meta);
+        //std::cout<<"Key neither in head nor in tail is removed. key="<<key<<std::endl;
+      }
+
+      bytes_allocated -= sizeof(block_meta_list);
+      std::free(bml);
+      index_map.erase(key_i);
+      pmemobj_tx_commit();
+      (void) pmemobj_tx_end();
       return 0;
     }
 
@@ -256,6 +383,25 @@ class pmemkv {
       return 0; 
     }
 
+    int reverse_dump_all() {
+      if (pmemobj_rwlock_rdlock(pmem_pool, &bp->rwlock) != 0) {
+            return -1;
+      }
+      struct block_entry* next_bep = (struct block_entry*)pmemobj_direct(bp->tail);
+      uint64_t read_offset = 0;
+      while (next_bep != nullptr) {
+        char* pmem_data = (char*)pmemobj_direct(next_bep->data);
+        char* tmp = (char*)std::malloc(next_bep->hdr.size);
+        memcpy(tmp, pmem_data, next_bep->hdr.size);
+        std::cout << "key " << next_bep->hdr.key << " value " << pmem_data << std::endl;
+        read_offset += next_bep->hdr.size;
+        std::free(tmp);
+        next_bep = (struct block_entry*)pmemobj_direct(next_bep->hdr.pre);
+      }
+      pmemobj_rwlock_unlock(pmem_pool, &bp->rwlock);
+      return 0;
+    }
+
     int dump_meta() {
       std::cout << "pmemkv total bytes written " << bp->bytes_written << std::endl;
       std::lock_guard<std::mutex> l(mtx);
@@ -270,6 +416,7 @@ class pmemkv {
     }
 
     int free_all() {
+      //std::cout<<"free's begining: bp->bytes_written: "<<bp->bytes_written<<std::endl;
       // don't implement transaction here, if any issue happens, we need to rebuild the pmem pool.
       PMEMoid next_beo = bp->head;
       struct block_entry* next_bep = (struct block_entry*)pmemobj_direct(next_beo);
@@ -286,6 +433,7 @@ class pmemkv {
       // add root block to undo log
       bp->head = OID_NULL;
       bp->tail = OID_NULL;
+      //std::cout<<"free: bp->bytes_written: "<<bp->bytes_written<<std::endl;
       assert(bp->bytes_written == 0);
 
       // free metadata
@@ -331,11 +479,13 @@ class pmemkv {
       bo = pmemobj_root(pmem_pool, sizeof(struct base));
       bp = (struct base*)pmemobj_direct(bo);
       struct block_entry *next = (struct block_entry*)pmemobj_direct(bp->head);
+      PMEMoid next_beo = bp->head;
       while (next != nullptr) {
-        if (update_meta(next)) {
+        if (update_meta(next, next_beo)) {
           return -1;
         }
-        next = (struct block_entry*)pmemobj_direct(next->hdr.next);
+        next_beo = next->hdr.next;
+        next = (struct block_entry*)pmemobj_direct(next_beo);
       }
       return 0;
     }
@@ -368,7 +518,7 @@ class pmemkv {
       return 0;
     }
 
-    int update_meta(struct block_entry* bep) {
+    int update_meta(struct block_entry* bep, PMEMoid beo) {
       std::lock_guard<std::mutex> l(mtx);
       if (!index_map.contains(bep->hdr.key)) {  // allocate new block_meta_list
         struct block_meta* bm = (struct block_meta*)std::malloc(sizeof(block_meta));
@@ -380,6 +530,8 @@ class pmemkv {
         bm->off = (uint64_t)pmemobj_direct(bep->data);
         bm->size = bep->hdr.size;
         bm->next = nullptr;
+        bm->bep = bep;
+        bm->beo = beo;
         struct block_meta_list* bml = (struct block_meta_list*)std::malloc(sizeof(block_meta_list));
         if (!bml) {
           perror("malloc error in pmemkv update_meta");
@@ -405,6 +557,8 @@ class pmemkv {
         bm->off = (uint64_t)pmemobj_direct(bep->data);
         bm->size = bep->hdr.size;
         bm->next = nullptr;
+        bm->bep = bep;
+        bm->beo = beo;
         bml->tail->next = bm;
         bml->tail = bm;
         bml->total_size += bm->size;

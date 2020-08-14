@@ -49,6 +49,14 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 
 /*
  * Class:     lib_jni_pmdk
+ * Method:    nativeRemoveBlock
+ * Signature: (JLjava/lang/String;)J
+ */
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeRemoveBlock
+  (JNIEnv *, jclass, jlong, jstring);
+
+/*
+ * Class:     lib_jni_pmdk
  * Method:    nativeGetRoot
  * Signature: (J)J
  */
