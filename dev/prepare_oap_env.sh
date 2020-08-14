@@ -287,6 +287,7 @@ function  prepare_all() {
   prepare_cmake
   prepare_vmemcache
   prepare_PMoF
+  install_gcc7
 }
 
 function oap_build_help() {
