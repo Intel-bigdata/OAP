@@ -31,8 +31,9 @@ function check_gcc() {
 
 function gather() {
   cd  $DEV_PATH
-  package_name=oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION
+  package_name=oap-$OAP_VERSION-bin-spark-$SPARK_VERSION
   target_path=$DEV_PATH/release-package/$package_name/jars
+  rm -rf $target_path
   mkdir -p $target_path
   cp ../oap-cache/oap/target/*.jar $target_path
   cp ../oap-shuffle/remote-shuffle/target/*.jar $target_path
