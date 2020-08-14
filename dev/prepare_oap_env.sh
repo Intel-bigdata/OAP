@@ -5,6 +5,7 @@ MAVEN_TARGET_VERSION=3.6.3
 MAVEN_MIN_VERSION=3.3
 CMAKE_TARGET_VERSION=3.7.1
 CMAKE_MIN_VERSION=3.3
+GCC_MIN_VERSION=7.0
 TARGET_CMAKE_SOURCE_URL=https://cmake.org/files/v3.7/cmake-3.7.1.tar.gz
 
 if [ -z "$DEV_PATH" ]; then
@@ -27,13 +28,27 @@ function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)"
 
 function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" == "$1"; }
 
+function check_gcc() {
+  CURRENT_GCC_VERSION_STR="$(gcc --version)"
+  array=(${CURRENT_GCC_VERSION_STR//,/ })
+  CURRENT_GCC_VERSION=${array[2]}
+  if version_lt $CURRENT_GCC_VERSION $GCC_MIN_VERSION; then
+    if [ ! -f "$DEV_PATH/thirdparty/gcc7/bin/gcc" ]; then
+      source $DEV_PATH/prepare_oap_env.sh
+      install_gcc7
+    fi
+    export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
+    export CC=$DEV_PATH/thirdparty/gcc7/bin/gcc
+  fi
+}
+
 function check_maven() {
   CURRENT_MAVEN_VERSION_STR="$(mvn --version)"
   array=(${CURRENT_MAVEN_VERSION_STR//,/ })
   CURRENT_MAVEN_VERSION=${array[2]}
   echo $CURRENT_MAVEN_VERSION
   if version_lt $CURRENT_MAVEN_VERSION $MAVEN_MIN_VERSION; then
-    echo "11111111111111"
+    install_maven
   fi
 }
 function install_maven() {
@@ -287,6 +302,7 @@ function  prepare_all() {
   prepare_cmake
   prepare_vmemcache
   prepare_PMoF
+  check_gcc
 }
 
 function oap_build_help() {
