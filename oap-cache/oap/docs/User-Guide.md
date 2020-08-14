@@ -7,7 +7,7 @@
 * [Working with SQL Index](#Working-with-SQL-Index)
 * [Working with SQL Data Source Cache](#Working-with-SQL-Data-Source-Cache)
 * [Run TPC-DS Benchmark](#Run-TPC-DS-Benchmark)
-* [Configuration for Advanced Scenarios](#Configuration-for-Advanced-Scenarios)
+* [Advanced Configuration](#Advanced-Configuration)
 
 
 ## Prerequisites
@@ -314,7 +314,7 @@ The `vmem` cache strategy is based on libvmemcache (buffer based LRU cache), whi
 
 This section provides instructions and tools for running TPC-DS queries to evaluate the cache performance of various configurations. The TPC-DS suite has many queries and we select 9 I/O intensive queries to simplify performance evaluation.
 
-We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/OAP-TPCDS-TOOL.zip) to simplify running the workload. If you are already familiar with TPC-DS data generation and running a TPC-DS tool suite, skip our tool and use the TPC-DS tool suite directly.
+We created some tool scripts [oap-benchmark-tool.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/oap-benchmark-tool.zip) to simplify running the workload. If you are already familiar with TPC-DS data generation and running a TPC-DS tool suite, skip our tool and use the TPC-DS tool suite directly.
 
 ### Prerequisites
 
@@ -322,12 +322,12 @@ We created some tool scripts [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigda
 
 ### Prepare the Tool
 
-1. Download [OAP-TPCDS-TOOL.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/OAP-TPCDS-TOOL.zip) and unzip to a folder (for example, `OAP-TPCDS-TOOL` folder) on your working node. 
-2. Copy `OAP-TPCDS-TOOL/tools/tpcds-kits` to ALL worker nodes under the same folder (for example, `/home/oap/tpcds-kits`).
+1. Download [oap-benchmark-tool.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/oap-benchmark-tool.zip) and unzip to a folder (for example, `oap-benchmark-tool` folder) on your working node. 
+2. Copy `oap-benchmark-tool/tools/tpcds-kits` to ALL worker nodes under the same folder (for example, `/home/oap/tpcds-kits`).
 
 ### Generate TPC-DS Data
 
-1. Update the values for the following variables in `OAP-TPCDS-TOOL/scripts/tool.conf` based on your environment and needs.
+1. Update the values for the following variables in `oap-benchmark-tool/scripts/tool.conf` based on your environment and needs.
 
    - SPARK_HOME: Point to the Spark home directory of your Spark setup.
    - TPCDS_KITS_DIR: The tpcds-kits directory you coped to the worker nodes in the above prepare process. For example, /home/oap/tpcds-kits
@@ -349,10 +349,10 @@ export DATA_FORMAT=parquet
 
 2. Start data generation.
 
-   In the root directory of this tool (`OAP-TPCDS-TOOL`), run `scripts/run_gen_data.sh` to start the data generation process. 
+   In the root directory of this tool (`oap-benchmark-tool`), run `scripts/run_gen_data.sh` to start the data generation process. 
 
 ```
-cd OAP-TPCDS-TOOL
+cd oap-benchmark-tool
 sh ./scripts/run_gen_data.sh
 ```
 
@@ -377,7 +377,7 @@ Normally, you need to update the following configuration values to cache to PMem
 These settings will override the values specified in Spark configuration file ( `spark-defaults.conf`). After the configuration is done, you can execute the following command to start Thrift Server.
 
 ```
-cd OAP-TPCDS-TOOL
+cd oap-benchmark-tool
 sh ./scripts/spark_thrift_server_yarn_with_PMem.sh start
 ```
 In this script, we use `vmem` as cache strategy for Parquet Binary data cache. 
@@ -395,7 +395,7 @@ Update the configuration values in `scripts/spark_thrift_server_yarn_with_DRAM.s
 These settings will override the values specified in Spark configuration file (`spark-defaults.conf`). After the configuration is done, you can execute the following command to start Thrift Server.
 
 ```
-cd OAP-TPCDS-TOOL
+cd oap-benchmark-tool
 sh ./scripts/spark_thrift_server_yarn_with_DRAM.sh  start
 ```
 
@@ -404,13 +404,13 @@ sh ./scripts/spark_thrift_server_yarn_with_DRAM.sh  start
 Execute the following command to start to run queries.
 
 ```
-cd OAP-TPCDS-TOOL
+cd oap-benchmark-tool
 sh ./scripts/run_tpcds.sh
 ```
 
 When all the queries are done, you will see the `result.json` file in the current directory.
 
-## Configuration for Advanced Scenarios
+## Advanced Configuration
 
 - [Additional Cache Strategies](#Additional-Cache-Strategies)  In addition to **vmem** cache strategy, Data Source Cache also supports 3 other cache strategies: **guava**, **noevict**  and **external cache**.
 - [Index and Data Cache Separation](#Index-and-Data-Cache-Separation)  To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
