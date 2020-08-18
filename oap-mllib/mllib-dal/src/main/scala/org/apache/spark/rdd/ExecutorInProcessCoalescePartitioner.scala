@@ -43,6 +43,8 @@ class ExecutorInProcessCoalescePartitioner
         val partValue = map.getOrElse(execLoc, new mutable.HashSet[Partition]())
         partValue.add(p)
         map.put(execLoc, partValue)
+      case loc : TaskLocation =>
+        println("Invalid location !!!")
 
       }
     })

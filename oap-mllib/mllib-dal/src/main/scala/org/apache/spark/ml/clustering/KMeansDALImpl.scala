@@ -43,22 +43,29 @@ class KMeansDALImpl (
     instr.foreach(_.logInfo(s"Processing partitions with $executorNum executors"))
 
     val partitionDims = Utils.getPartitionDims(data)
+	
     val executorIPAddress = Utils.sparkFirstExecutorIP(data.sparkContext)
 
     // repartition to executorNum if not enough partitions
     val dataForConversion = if (data.getNumPartitions < executorNum) {
-	    data.repartition(executorNum).setName("Repartitioned for conversion").cache()
+	  data.repartition(executorNum).setName("Repartitioned for conversion").cache()
     } else {
       data
     }
+
+    // filter the empty partitions
+    val partRows = data.mapPartitionsWithIndex { (index: Int, it: Iterator[Vector]) =>
+      Iterator(Tuple3(partitionDims(index)._1, index, it))
+    }
+    val nonEmptyPart = partRows.filter{entry => { entry._1 > 0 }}
     
     // convert RDD[Vector] to RDD[HomogenNumericTable]
-    val numericTables = dataForConversion.mapPartitionsWithIndex { (index: Int, it: Iterator[Vector]) =>
-      val tables = new ArrayBuffer[HomogenNumericTable]()
-
-      val numRows = partitionDims(index)._1
+    val numericTables = nonEmptyPart.map { entry =>
+      val numRows = entry._1
+      val index = entry._2
+      val it = entry._3
       val numCols = partitionDims(index)._2
-
+	  
       println(s"KMeansDALImpl: Partition index: $index, numCols: $numCols, numRows: $numRows")
 
       // Build DALMatrix, this will load libJavaAPI, libtbb, libtbbmalloc
@@ -70,55 +77,37 @@ class KMeansDALImpl (
       // oneDAL libs should be loaded by now, extract libMLlibDAL.so to temp file and load
       LibLoader.loadLibrary()
 
-
       import scala.collection.JavaConverters._
-      
-      val dataArray = new ArrayBuffer[Array[Double]]()
-      val batchSize = 8 << 10
-      var i = 0
-      var count = 0
-	
+
+      var dalRow = 0
+         
       it.foreach { curVector =>
-        dataArray += curVector.toArray
-        i += 1
-		
-        if (i == batchSize || (!it.hasNext)) {
-          val batchIter = new DataBatch.BatchIterator(dataArray.toIterator.asJava, batchSize)
-          OneDAL.cSetDoubleIterator(matrix.getCNumericTable, batchIter, count * batchSize)
-		  
-          i = 0
-          dataArray.clear()
-          count += 1
-        }
+        val rowarr = curVector.toArray
+        OneDAL.cSetDoubleBatch(matrix.getCNumericTable, dalRow, rowarr, 1, numCols)
+        dalRow += 1
       }
 
-      tables += matrix
-      matrix.pack()
- 
-      context.dispose()
-      tables.iterator
+      Iterator(matrix.getCNumericTable)
+
     }.cache()
     
-    val inputRDD = numericTables.mapPartitions( (tables: Iterator[HomogenNumericTable]) => {
-      val context = new DaalContext()
-      tables.map { table =>
-          table.unpack(context)
-          table.getCNumericTable}
-    }).cache()
-    
-    inputRDD.foreachPartition(() => _)
-    inputRDD.count()
+    numericTables.foreachPartition(() => _)
+    numericTables.count()
+
+    val cachedrdds = data.sparkContext.getPersistentRDDs
+    cachedrdds.filter(r => r._2.name=="instancesRDD").foreach (r => r._2.unpersist())
 	
-    val coalescedrdd = inputRDD.coalesce(1,
+    val coalescedrdd = numericTables.coalesce(1,
       partitionCoalescer = Some(new ExecutorInProcessCoalescePartitioner()))
 
     val coalescedTables = coalescedrdd.mapPartitions { iter =>
-      val matcharr = iter.toArray
       val context = new DaalContext()
       val mergedData = new RowMergedNumericTable(context)
 	  
-      matcharr.foreach(OneDAL.cAddNumericTable(mergedData.getCNumericTable, _))
-      
+      iter.foreach{ curIter =>
+        val address = curIter.next()
+        OneDAL.cAddNumericTable(mergedData.getCNumericTable, address )
+      } 
       Iterator(mergedData.getCNumericTable)
     
     }.cache()
@@ -153,8 +142,10 @@ class KMeansDALImpl (
     }.collect()
 
     // Release the native memory allocated by NumericTable.
-    numericTables.mapPartitions( (tables: Iterator[HomogenNumericTable]) =>
-        tables.map (_.freeDataMemory())
+    numericTables.foreach( tables =>
+      tables.foreach { address =>
+        OneDAL.cFreeDataMemory(address)
+      }
     )
 
     // Make sure there is only one result from rank 0

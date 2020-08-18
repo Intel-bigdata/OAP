@@ -14,12 +14,18 @@ extern "C" {
  */
 JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_setNumericTableValue
   (JNIEnv *, jobject, jlong, jint, jint, jdouble);
-  
+
+JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleBatch
+  (JNIEnv *env, jobject, jlong numTableAddr, jint curRows, jdoubleArray batch, jint numRows, jint numCols);
+
 JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIterator
   (JNIEnv *env, jobject,jlong numTableAddr, jobject jiter, jint curRows);
 
 JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cAddNumericTable
 	  (JNIEnv *, jobject, jlong, jlong);
+
+JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cFreeDataMemory
+          (JNIEnv *, jobject, jlong);
 
 #ifdef __cplusplus
 }

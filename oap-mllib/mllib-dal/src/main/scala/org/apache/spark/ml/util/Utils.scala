@@ -21,8 +21,12 @@ object Utils {
     var numCols: Int = 0
     // Collect the numRows and numCols
     val collected = data.mapPartitionsWithIndex { (index: Int, it: Iterator[Vector]) =>
-      val numCols = it.next().size
-      Iterator((index, it.size + 1, numCols))
+      if (it.hasNext) {
+        numCols = it.next().size
+        Iterator((index, it.size + 1, numCols))
+      } else {
+        Iterator((index, 0, numCols))
+      }
     }.collect
 
     var ret = Map[Int, (Int, Int)]()

@@ -16,6 +16,7 @@
 
 #include <daal.h>
 #include <iostream>
+#include <cstring>
 #include "org_apache_spark_ml_util_OneDAL__.h"
 
 using namespace daal;
@@ -33,6 +34,17 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_setNumericTabl
   (*nt)[row][column]               = (double)value;
 
 }
+
+JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleBatch
+  (JNIEnv *env, jobject, jlong numTableAddr, jint curRows, jdoubleArray batch, jint numRows, jint numCols) {
+
+    HomogenNumericTable<double> *nt = static_cast<HomogenNumericTable<double> *>(
+                ((SerializationIfacePtr *)numTableAddr)->get());
+    jdouble* values = (jdouble*)env->GetPrimitiveArrayCritical(batch, 0);
+    std::memcpy((*nt)[curRows],values, numRows * numCols * sizeof(double));
+    env->ReleasePrimitiveArrayCritical(batch, values, JNI_ABORT);
+  }
+
 
 JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIterator
   (JNIEnv *env, jobject,jlong numTableAddr, jobject jiter, jint curRows) {
@@ -88,4 +100,12 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cAddNumericTab
     data_management::NumericTablePtr pNumericTable = (*(data_management::NumericTablePtr *)numericTableAddr);
     pRowMergedNumericTable->addNumericTable(pNumericTable);
 
+  }
+
+JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cFreeDataMemory
+  (JNIEnv *, jobject, jlong numericTableAddr) {
+
+    data_management::NumericTablePtr pNumericTable = (*(data_management::NumericTablePtr *)numericTableAddr);
+    pNumericTable->freeDataMemory();
+   
   }
