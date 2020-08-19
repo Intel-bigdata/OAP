@@ -2,7 +2,7 @@
 
 * [Build](#Build)
 * [Integrate with Spark\*](#integrate-with-spark)
-* [Enable NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enable-numa-binding-for-dcpmm-in-spark)
+* [Enable NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enable-numa-binding-for-pmem-in-spark)
 
 ## Build
 
@@ -13,7 +13,7 @@ Build with using [Apache Maven\*](http://maven.apache.org/).
 Clone the OAP project:
 
 ```
-git clone -b branch-0.8-spark-2.4.x  https://github.com/Intel-bigdata/OAP.git
+git clone -b <tag-version>  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
@@ -39,13 +39,13 @@ mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite 
 
 Follow these steps:
 
-##### Prerequisites for building with DCPMM support
+##### Prerequisites for building with PMem support
 
 Install the required packages on the build system:
 
 - gcc-c++
 - [cmake](https://help.directadmin.com/item.php?id=494)
-- [Memkind](https://github.com/Intel-bigdata/memkind)
+- [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
 - [vmemcache](https://github.com/pmem/vmemcache)
 
 ##### build and install memkind
@@ -53,7 +53,7 @@ Install the required packages on the build system:
    Build the latest memkind lib from source:
 
 ```
-git clone https://github.com/memkind/memkind
+git clone -b v1.10.1-rc2 https://github.com/memkind/memkind
 cd memkind
 ./autogen.sh
 ./configure
@@ -108,7 +108,7 @@ mvn clean -q -pl plasma -DskipTests install
 
 
 ##### Build the package
-You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache strategy, you need to build with -Ppersistent-memory also.
+You need to add `-Ppersistent-memory` to build with PMem support. For `noevict` cache strategy, you also need to build with `-Ppersistent-memory` parameter.
 ```
 mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -DskipTests package
 ```
@@ -139,8 +139,6 @@ In this case check whether the OAP changes to Spark internals will conflict with
 The following files need to be checked/compared for changes:
 
 ```
-•	org/apache/spark/scheduler/DAGScheduler.scala           
-		Add the oap cache location to aware task scheduling.
 •	org/apache/spark/sql/execution/DataSourceScanExec.scala   
 		Add the metrics info to OapMetricsManager and schedule the task to read from the cached 
 •	org/apache/spark/sql/execution/datasources/FileFormatDataWriter.scala
@@ -151,8 +149,6 @@ The following files need to be checked/compared for changes:
 		Add new API to support return the result of write task to driver.
 •	org/apache/spark/status/api/v1/OneApplicationResource.scala    
 		Update the metric data to spark web UI.
-•	org/apache/spark/SparkEnv.scala
-		Add OapRuntime.stop() to stop OapRuntime instance.
 •	org/apache/spark/sql/execution/datasources/parquet/VectorizedColumnReader.java
 		Change the private access of variable to protected
 •	org/apache/spark/sql/execution/datasources/parquet/VectorizedPlainValuesReader.java
@@ -163,18 +159,18 @@ The following files need to be checked/compared for changes:
 		Add the get and set method for the changed protected variable.
 ```
 
-## Enable NUMA binding for DCPMM in Spark
+## Enable NUMA binding for PMem in Spark
 
 #### Rebuild Spark packages with NUMA binding patch 
 
-When using DCPMM as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [Spark.2.4.4.numa.patch](./Spark.2.4.4.numa.patch) to Spark source code for best performance.
+When using PMem as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-2.4.4.patch](./numa-binding-spark-2.4.4.patch) to Spark source code for best performance.
 
 1. Download src for [Spark-2.4.4](https://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4.tgz) and clone the src from github.
 
 2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) the Spark package.
 
 ```
-git apply  Spark.2.4.4.numa.patch
+git apply  numa-binding-spark-2.4.4.patch
 ```
 
 3. Add these configuration items to the Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable NUMA binding.
@@ -187,6 +183,6 @@ spark.yarn.numa.enabled true
 
 #### Use pre-built patched Spark packages 
 
-If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.tgz](https://github.com/Intel-bigdata/spark/releases/download/v2.4.4-intel-oap-0.8/spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.tgz) with the patch applied.
+If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.tgz](https://github.com/Intel-bigdata/spark/releases/download/v2.4.4-intel-oap-0.8.2/spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.2.tgz) with the patch applied.
 
-\*Other names and brands may be claimed as the property of others.
+###### \*Other names and brands may be claimed as the property of others.
