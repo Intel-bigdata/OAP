@@ -8,4 +8,4 @@ Please refer to these documents for more information:
 * [User Guide](oap/docs/User-Guide.md)
 * [Developer Guide](oap/docs/Developer-Guide.md)
 
-\*Other names and brands may be claimed as the property of others.
+###### \*Other names and brands may be claimed as the property of others.
