@@ -75,8 +75,6 @@ object OneDAL {
   @native def cAddNumericTable(cObject: Long, numericTableAddr: Long)
 
   @native def cSetDoubleBatch(numTableAddr: Long, curRows: Int, batch: Array[Double], numRows: Int, numCols: Int)
-  
-  @native def cSetDoubleBatchDirect(numTableAddr: Long, curRows: Int, batch: java.nio.ByteBuffer, numRows: Int, numCols: Int)
  
   @native def cSetDoubleIterator(numTableAddr: Long, iter: java.util.Iterator[DataBatch], curRows: Int)
   

@@ -44,7 +44,7 @@ class ExecutorInProcessCoalescePartitioner
         partValue.add(p)
         map.put(execLoc, partValue)
       case loc : TaskLocation =>
-        println("Invalid location !!!")
+	    throw new SparkException("Invalid location !!!")
 
       }
     })

@@ -363,11 +363,11 @@ class KMeans @Since("1.5.0") (
       maxIter, seed, tol, weightCol)
 
     val model = if (useKMeansDAL) {
-      val offheapenabled=instances.sparkContext.getConf.getBoolean("spark.memory.offHeap.enabled", false)
-      if (offheapenabled) {
-        instances.setName("instancesRDD").persist(StorageLevel(true, true, true, false, 1))
+      val offheapEnabled=instances.sparkContext.getConf.getBoolean("spark.memory.offHeap.enabled", false)
+      if (offheapEnabled) {
+        instances.setName("instancesRDD").persist(StorageLevel.OFF_HEAP)
       } else {
-        instances.setName("instancesRDD").persist(StorageLevel(true, true, false,true, 1))
+        instances.setName("instancesRDD").persist(StorageLevel.MEMORY_AND_DISK)
       }
       trainWithDAL(instances)
     } else {

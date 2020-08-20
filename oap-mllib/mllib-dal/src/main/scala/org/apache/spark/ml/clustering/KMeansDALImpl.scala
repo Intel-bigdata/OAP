@@ -91,16 +91,17 @@ class KMeansDALImpl (
 
     }.cache()
     
+	// workaroud to fix the bug of multi executors handling same partition.
     numericTables.foreachPartition(() => _)
     numericTables.count()
 
-    val cachedrdds = data.sparkContext.getPersistentRDDs
-    cachedrdds.filter(r => r._2.name=="instancesRDD").foreach (r => r._2.unpersist())
+    val cachedRdds = data.sparkContext.getPersistentRDDs
+    cachedRdds.filter(r => r._2.name=="instancesRDD").foreach (r => r._2.unpersist())
 	
-    val coalescedrdd = numericTables.coalesce(1,
+    val coalescedRdd = numericTables.coalesce(1,
       partitionCoalescer = Some(new ExecutorInProcessCoalescePartitioner()))
 
-    val coalescedTables = coalescedrdd.mapPartitions { iter =>
+    val coalescedTables = coalescedRdd.mapPartitions { iter =>
       val context = new DaalContext()
       val mergedData = new RowMergedNumericTable(context)
 	  

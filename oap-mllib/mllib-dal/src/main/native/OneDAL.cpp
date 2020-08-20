@@ -41,13 +41,13 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleBatc
     HomogenNumericTable<double> *nt = static_cast<HomogenNumericTable<double> *>(
                 ((SerializationIfacePtr *)numTableAddr)->get());
     jdouble* values = (jdouble*)env->GetPrimitiveArrayCritical(batch, 0);
-    std::memcpy((*nt)[curRows],values, numRows * numCols * sizeof(double));
+    std::memcpy((*nt)[curRows], values, numRows * numCols * sizeof(double));
     env->ReleasePrimitiveArrayCritical(batch, values, JNI_ABORT);
   }
 
 
 JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIterator
-  (JNIEnv *env, jobject,jlong numTableAddr, jobject jiter, jint curRows) {
+  (JNIEnv *env, jobject, jlong numTableAddr, jobject jiter, jint curRows) {
     
     jclass iterClass = env->FindClass("java/util/Iterator");
     jmethodID hasNext = env->GetMethodID(iterClass,
