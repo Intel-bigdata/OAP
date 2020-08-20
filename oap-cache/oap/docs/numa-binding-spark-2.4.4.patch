@@ -1,5 +1,5 @@
 diff --git a/core/src/main/scala/org/apache/spark/executor/CoarseGrainedExecutorBackend.scala b/core/src/main/scala/org/apache/spark/executor/CoarseGrainedExecutorBackend.scala
-index 48d3630..c001191 100644
+index 48d3630abd..246e8497ce 100644
 --- a/core/src/main/scala/org/apache/spark/executor/CoarseGrainedExecutorBackend.scala
 +++ b/core/src/main/scala/org/apache/spark/executor/CoarseGrainedExecutorBackend.scala
 @@ -41,6 +41,7 @@ private[spark] class CoarseGrainedExecutorBackend(
@@ -18,7 +18,15 @@ index 48d3630..c001191 100644
        hostname: String,
        cores: Int,
        appId: String,
-@@ -221,8 +223,10 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
+@@ -213,6 +215,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
+           driverConf.set(key, value)
+         }
+       }
++      driverConf.set("spark.executor.numa.id", s"${numaNodeId.getOrElse(-1)}")
+
+       cfg.hadoopDelegationCreds.foreach { tokens =>
+         SparkHadoopUtil.get.addDelegationTokens(tokens, driverConf)
+@@ -221,8 +224,10 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
        val env = SparkEnv.createExecutorEnv(
          driverConf, executorId, hostname, cores, cfg.ioEncryptionKey, isLocal = false)
  
@@ -30,7 +38,7 @@ index 48d3630..c001191 100644
        workerUrl.foreach { url =>
          env.rpcEnv.setupEndpoint("WorkerWatcher", new WorkerWatcher(env.rpcEnv, url))
        }
-@@ -233,6 +237,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
+@@ -233,6 +238,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
    def main(args: Array[String]) {
      var driverUrl: String = null
      var executorId: String = null
@@ -38,7 +46,7 @@ index 48d3630..c001191 100644
      var hostname: String = null
      var cores: Int = 0
      var appId: String = null
-@@ -257,6 +262,9 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
+@@ -257,6 +263,9 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
          case ("--app-id") :: value :: tail =>
            appId = value
            argv = tail
@@ -48,7 +56,7 @@ index 48d3630..c001191 100644
          case ("--worker-url") :: value :: tail =>
            // Worker url is used in spark standalone mode to enforce fate-sharing with worker
            workerUrl = Some(value)
-@@ -278,7 +286,8 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
+@@ -278,7 +287,8 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
        printUsageAndExit()
      }
  
@@ -58,7 +66,7 @@ index 48d3630..c001191 100644
      System.exit(0)
    }
  
-@@ -291,6 +300,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
+@@ -291,6 +301,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
        | Options are:
        |   --driver-url <driverUrl>
        |   --executor-id <executorId>
@@ -67,7 +75,7 @@ index 48d3630..c001191 100644
        |   --cores <cores>
        |   --app-id <appid>
 diff --git a/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/ApplicationMaster.scala b/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/ApplicationMaster.scala
-index 5ff826a..954849a 100644
+index 5ff826a2e1..954849ae27 100644
 --- a/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/ApplicationMaster.scala
 +++ b/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/ApplicationMaster.scala
 @@ -428,7 +428,7 @@ private[spark] class ApplicationMaster(args: ApplicationMasterArguments) extends
@@ -80,7 +88,7 @@ index 5ff826a..954849a 100644
      }
  
 diff --git a/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/ExecutorRunnable.scala b/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/ExecutorRunnable.scala
-index 49a0b93..cf66363 100644
+index 49a0b93aa5..cf66363e8e 100644
 --- a/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/ExecutorRunnable.scala
 +++ b/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/ExecutorRunnable.scala
 @@ -36,6 +36,7 @@ import org.apache.hadoop.yarn.ipc.YarnRPC
@@ -139,7 +147,7 @@ index 49a0b93..cf66363 100644
      commands.map(s => if (s == null) "null" else s).toList
    }
 diff --git a/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/YarnAllocator.scala b/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/YarnAllocator.scala
-index 96bc1c7..de9ef6b 100644
+index 96bc1c7889..de9ef6bef1 100644
 --- a/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/YarnAllocator.scala
 +++ b/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/YarnAllocator.scala
 @@ -171,6 +171,13 @@ private[yarn] class YarnAllocator(
@@ -210,7 +218,7 @@ index 96bc1c7..de9ef6b 100644
            case ContainerExitStatus.SUCCESS =>
              (false, s"Executor for container $containerId exited because of a YARN event (e.g., " +
 diff --git a/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/config.scala b/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/config.scala
-index ab8273b..d5203a7 100644
+index ab8273bd63..d5203a7cde 100644
 --- a/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/config.scala
 +++ b/resource-managers/yarn/src/main/scala/org/apache/spark/deploy/yarn/config.scala
 @@ -129,6 +129,17 @@ package object config {

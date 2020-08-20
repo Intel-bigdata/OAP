@@ -10,7 +10,7 @@
 
 To clone OAP project, use
 ```shell script
-git clone -b branch-0.8-spark-2.4.x  https://github.com/Intel-bigdata/OAP.git
+git clone -b <tag-version> https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
@@ -18,7 +18,7 @@ cd OAP
 OAP is built using [Apache Maven](http://maven.apache.org/). You need to install the required packages on the build system listed below. To enable Shuffle Remote PMem extension, you must configure and validate RDMA in advance, you can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md) for more details.
 
 - [Cmake](https://help.directadmin.com/item.php?id=494)
-- [Memkind](https://github.com/Intel-bigdata/memkind)
+- [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
 - [Vmemcache](https://github.com/pmem/vmemcache)
 - [HPNL](https://github.com/Intel-bigdata/HPNL)
 - [PMDK](https://github.com/pmem/pmdk)  
@@ -43,6 +43,11 @@ prepare_all
 
 #### Building
 
+If you use "prepare_oap_env.sh" to install GCC, or your GCC is not installed in the default path, please export CC (and CXX) before calling maven.
+```shell script
+export CXX=$OAPHOME/dev/thirdparty/gcc7/bin/g++
+export CC=$OAPHOME/dev/thirdparty/gcc7/bin/gcc
+```
 
 To build OAP package, use
 ```shell script
@@ -66,14 +71,14 @@ mvn clean test
 mvn clean -pl com.intel.oap:oap-cache -am test
 ```
 
-#### OAP Building with DCPMM
+#### OAP Building with PMem
 
-##### Prerequisites for building with DCPMM support
+##### Prerequisites for building with PMem support
 
-If you want to use OAP-CACHE with DCPMM,  you must finish steps of "Prerequisites for building" to ensure all dependencies have been installed .
+If you want to use OAP-CACHE with PMem,  you must finish steps of "Prerequisites for building" to ensure all dependencies have been installed .
 
 ##### Building package
-You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache stratege, you need to build with -Ppersistent-memory also.
+You need to add `-Ppersistent-memory` to build with PMem support. For `noevict` cache strategy, you also need to build with `-Ppersistent-memory` parameter.
 ```shell script
 mvn clean -q -Ppersistent-memory -DskipTests package
 ```

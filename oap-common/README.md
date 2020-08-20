@@ -1,6 +1,6 @@
 # OAP Common
 
-OAP commoan package includes native libraries and JNI interface for Intel Optane PMem.
+OAP common package includes native libraries and JNI interface for Intel Optane PMem.
 
 ## Prerequisites
 Below libraries need to be installed in the machine

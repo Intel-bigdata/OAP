@@ -119,9 +119,9 @@ installation/enabling or FW installation is out of the scope of this guide.
 4)  Run *ndctl list -R*, you will see **region0** and **region1**. 
 5)  Assume you have 4x PMEM installed on 1 node.  
     a.  Run *ndctl create-namespace -m devdax -r region0 -s 120g*  
-    b.  Run *ndctl create-namespace -m devdax -r region0 –s 120g*  
-    c.  Run *ndctl create-namespace -m devdax -r region1 –s 120g*  
-    d.  Run *ndctl create-namespace -m devdax -r region1 –s 120g*  
+    b.  Run *ndctl create-namespace -m devdax -r region0 -s 120g*  
+    c.  Run *ndctl create-namespace -m devdax -r region1 -s 120g*  
+    d.  Run *ndctl create-namespace -m devdax -r region1 -s 120g*  
     This will create four namespaces, namely /dev/dax0.0, /dev/dax0.1, /dev/dax1.0,
         /dev/dax1.1 in that node, and it will be used as Shuffle Remote PMem Extension media. 
 
@@ -234,7 +234,7 @@ Then you can use following command to get the device name.
 
 #### B. Enable PFC (Priority Flow Control) to guarantee stable performance (optional) 
 
-Then you can use following command to gett he device name
+Then you can use following command to get the device name
 
 If you’re using Mellanox NIC, PFC is a must to guarantee stable
 performance.
@@ -430,7 +430,7 @@ mkdir build
 cd build
 cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_EXAMPLES=1 -DBUILD_TESTS=1 ..
 make all && make install
-git clone -b v0.8.1-spark-2.4.4 https://github.com/intel-bigdata/OAP.git
+git clone -b <tag-version> https://github.com/intel-bigdata/OAP.git
 cd OAP/oap-shuffle/RPMem-shuffle
 mvn install -DskipTests
 
@@ -459,9 +459,9 @@ pmempool rm ${device_name}
 
 #### Enable RPMemShuffle
 ```bash
-spark.shuffle.manager						 org.apache.spark.shuffle.pmof.PmofShuffleManager
-spark.driver.extraClassPath                                 /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-0.8.1-jar-with-dependencies.jar
-spark.executor.extraClassPath                               /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-0.8.1-jar-with-dependencies.jar
+spark.shuffle.manager		      org.apache.spark.shuffle.pmof.PmofShuffleManager
+spark.driver.extraClassPath           /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
+spark.executor.extraClassPath         /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
 
 ```
 #### Switch On/Off PMem and RDMA
@@ -571,7 +571,7 @@ Please check script below as a sample.
 
 ``` scala 
 import com.databricks.spark.sql.perf.tpcds.TPCDSTables
-import org.apache.spark.sql.\_
+import org.apache.spark.sql._
 // Set:
 val rootDir: String = "hdfs://${ip}:9000/tpcds_1T" 		// root directory of location to create data in.
 val databaseName: String = "tpcds_1T" 				// name of database to create.
@@ -603,7 +603,7 @@ tables.createExternalTables(rootDir, "parquet", databaseName, overwrite = true, 
 #### 7.1.4 Run the benchmark
 
 Launch DECISION SUPPORT WORKLOADS queries on generated data, check
-*benchmark.scale* below as a sample, it runs query64.
+*benchmark.scala* below as a sample, it runs query64.
 ``` scala 
 import com.databricks.spark.sql.perf.tpcds.TPCDS
 import org.apache.spark.sql._
@@ -724,8 +724,8 @@ spark.driver.memory    10g
 spark.yarn.driver.memoryOverhead 5g
 
 spark.io.compression.codec                                  snappy
-spark.driver.extraClassPath                                 /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-0.8.1-jar-with-dependencies.jar
-spark.executor.extraClassPath                               /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-0.8.1-jar-with-dependencies.jar
+spark.driver.extraClassPath                                 /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
+spark.executor.extraClassPath                               /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
 spark.shuffle.manager                                       org.apache.spark.shuffle.pmof.PmofShuffleManager
 spark.shuffle.pmof.enable_rdma                              true
 spark.shuffle.pmof.enable_pmem                              true

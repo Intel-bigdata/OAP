@@ -6,6 +6,6 @@ Please refer to these documents for more information:
 
 * [Architecture Overview](docs/Architect-Overview.md)
 * [User Guide](docs/User-Guide.md)
-* [Developer Guide](./docs/Developer-Guide.md)
+* [Developer Guide](docs/Developer-Guide.md)
 
-\*Other names and brands may be claimed as the property of others.
+###### \*Other names and brands may be claimed as the property of others.
