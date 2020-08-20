@@ -97,3 +97,19 @@ If you want to generate a release package after you mvn package all modules, use
 ```shell script
 sh make-distribution.sh
 ```
+## Contributing
+This session includes what is required before submitting a code change.
+
+- We continue to use the Github **issue** to track the new features/tasks/issues.​
+
+- For every commit, we need an issue id for the commit. ​
+
+- Format the log message as following: **[OAP-issueId][optional:ModuleName] detailed message**​ 
+
+  like [OAP-1406][rpmem-shuffle]Add shuffle block removing operation within one Spark context 
+
+- Always merge your pull request as a single commit and the commit message follow the above format.​
+
+- The formal features names in 0.9 are: **SQL Index**, **SQL Data Source Cache**, **Native SQL Engine**, **Unified Arrow Data Source**, **RDD Cache PMem Extension**, **RPMem Shuffle**, **Remote Shuffle**, **Intel MLlib**.
+
+We don’t strictly request the module id the same as the feature name. Please align in the feature members to use a consistent name in the log message.​
