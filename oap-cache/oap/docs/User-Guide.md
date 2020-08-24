@@ -415,10 +415,13 @@ When all the queries are done, you will see the `result.json` file in the curren
 - [Additional Cache Strategies](./Advanced-Configuration.md#Additional-Cache-Strategies)  
   In addition to **vmem** cache strategy, SQL Data Source Cache also supports 3 other cache strategies: **guava**, **noevict**  and **external cache**.
 - [Index and Data Cache Separation](./Advanced-Configuration.md#Index-and-Data-Cache-Separation)
+
   To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
 - [Cache Hot Tables](./Advanced-Configuration.md#Cache-Hot-Tables)
+
   Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
 - [Column Vector Cache](./Advanced-Configuration.md#Column-Vector-Cache)
+
   This document above use **binary** cache as example, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache to spare computation time.
 
-For more information and configuration details, please refer to [Advanced_Configuration](Advanced-Configuration.md)
+For more information and configuration details, please refer to [Advanced Configuration](Advanced-Configuration.md)
