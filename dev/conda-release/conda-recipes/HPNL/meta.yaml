@@ -10,6 +10,12 @@ requirements:
     - gcc   [linux]
     - libgcc [linux]
     - cmake 3.11.*
-    - libfabric 1.0
-  run:
-    - libfabric 1.0
+
+
+about:
+  home: https://github.com/Intel-bigdata/HPNL
+  license: https://github.com/Intel-bigdata/HPNL/blob/master/LICENSE.txt
+  license_file:
+    - LICENSE.txt
+  summary: HPNL is a light-weight network library built on Libfabric for big data application.
+
