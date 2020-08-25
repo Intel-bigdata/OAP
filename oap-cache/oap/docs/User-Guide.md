@@ -18,7 +18,7 @@ SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with 
 
 ### Building
 
-Download our pre-built jar [oap-0.8.2-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/oap-0.8.2-bin-spark-2.4.4.tar.gz) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+We provided a Conda package which will automatically install most dependencies, you can refer to [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md) for more information. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 
 ### Spark Configurations
 

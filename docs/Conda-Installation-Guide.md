@@ -24,7 +24,6 @@ bash Miniconda2-latest-Linux-x86_64.sh
 conda create -n oapenv python=3.7
 conda activate oapenv
 conda config --add channels conda-forge
-conda config --add channels intel
 ```
 
 - **Requirements for Shuffle Remote PMem Extension**  
@@ -53,11 +52,7 @@ Some dependencies required by OAP listed below. to use OAP, you must conda insta
 
 ```bash
 conda activate oapenv
-conda install -c intel memkind 
-conda install -c intel vmemcache
-conda install -c intel hpnl
-conda install -c intel arrow-cpp=0.17.0.oap.0.9
-conda install -c intel oap
+conda install -c intel -c conda-forge oap=0.9
 ```
 
 
