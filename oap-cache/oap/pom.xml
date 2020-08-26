@@ -413,7 +413,7 @@
               <include>com.intel:oap-common</include>
               <include>org.spark-project.spark:unused</include>
               <include>com.google.guava:guava</include>
-	      <include>org.apache.parquet:*</include>
+              <include>org.apache.parquet:*</include>
               <include>org.apache.orc:*</include>
               <include>io.airlift:*</include>
               <include>org.reflections:reflections</include>
