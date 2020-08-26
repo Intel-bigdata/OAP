@@ -53,7 +53,9 @@ function gather() {
 
 cd $OAP_HOME
 check_gcc
-source /opt/intel/inteloneapi/setvars.sh
+export ONEAPI_ROOT=/opt/intel/inteloneapi
+source /opt/intel/inteloneapi/daal/2021.1-beta07/env/vars.sh
+source /opt/intel/inteloneapi/tbb/2021.1-beta07/env/vars.sh
 source /tmp/oneCCL/build/_install/env/setvars.sh
 mvn clean  -Ppersistent-memory -Pvmemcache -DskipTests package
 gather

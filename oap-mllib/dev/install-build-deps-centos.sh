@@ -17,8 +17,9 @@ sudo yum install intel-oneapi-daal-devel-2021.1-beta07 intel-oneapi-tbb-devel-20
 echo "Building oneCCL ..."
 cd /tmp
 git clone https://github.com/oneapi-src/oneCCL
+cd oneCCL
 git checkout -b 2021.1-beta07-1 origin/2021.1-beta07-1
-cd oneCCL && mkdir build && cd build
+mkdir -p build && cd build
 cmake ..
 make -j 2 install
 
