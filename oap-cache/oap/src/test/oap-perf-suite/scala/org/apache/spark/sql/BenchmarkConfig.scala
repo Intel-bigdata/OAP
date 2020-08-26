@@ -214,7 +214,7 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
           .setBenchmarkConfName("parquet w/ index oap binary cache enabled")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
           .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
-          .setSparkConf("spark.sql.oap.parquet.binary.cache.enable", "true"),
+          .setSparkConf("spark.sql.oap.parquet.binary.cache.enabled", "true"),
         new BenchmarkConfig()
           .setBenchmarkConfName("parquet w/o index")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
@@ -228,7 +228,7 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
           .setBenchmarkConfName("parquet w/o index oap binary cache enabled")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
           .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false")
-          .setSparkConf("spark.sql.oap.parquet.binary.cache.enable", "true"),
+          .setSparkConf("spark.sql.oap.parquet.binary.cache.enabled", "true"),
         new BenchmarkConfig()
           .setBenchmarkConfName("parquet w/ index data cache separation same medium enabled")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
@@ -240,7 +240,7 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
           .setBenchmarkConfName("parquet w/ index binary data cache separation same medium enabled")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
           .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
-          .setSparkConf("spark.sql.oap.parquet.binary.cache.enable", "true")
+          .setSparkConf("spark.sql.oap.parquet.binary.cache.enabled", "true")
           .setSparkConf("spark.sql.oap.index.data.cache.separation.enable", "true")
           .setSparkConf("spark.oap.cache.strategy", "mix")
       )
@@ -292,7 +292,7 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
           .setBenchmarkConfName("parquet w/ index oap binary cache enabled")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
           .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
-          .setSparkConf("spark.sql.oap.parquet.binary.cache.enable", "true"),
+          .setSparkConf("spark.sql.oap.parquet.binary.cache.enabled", "true"),
         new BenchmarkConfig()
           .setBenchmarkConfName("parquet w/o index")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
@@ -306,7 +306,7 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
           .setBenchmarkConfName("parquet w/o index oap binary cache enabled")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
           .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "false")
-          .setSparkConf("spark.sql.oap.parquet.binary.cache.enable", "true"),
+          .setSparkConf("spark.sql.oap.parquet.binary.cache.enabled", "true"),
         new BenchmarkConfig()
           .setBenchmarkConfName("parquet w/ index data cache separation same medium enabled")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
@@ -318,7 +318,7 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
           .setBenchmarkConfName("parquet w/ index binary data cache separation same medium enabled")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
           .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
-          .setSparkConf("spark.sql.oap.parquet.binary.cache.enable", "true")
+          .setSparkConf("spark.sql.oap.parquet.binary.cache.enabled", "true")
           .setSparkConf("spark.sql.oap.index.data.cache.separation.enable", "true")
           .setSparkConf("spark.oap.cache.strategy", "mix"),
         new BenchmarkConfig()
@@ -333,7 +333,7 @@ trait ParquetVsOrcConfigSet extends BenchmarkConfigSelector{
           .setBenchmarkConfName("parquet w/ index binary cache separation different medium enabled")
           .setBenchmarkConf(BenchmarkConfig.FILE_FORMAT, "parquet")
           .setBenchmarkConf(BenchmarkConfig.INDEX_ENABLE, "true")
-          .setSparkConf("spark.sql.oap.parquet.binary.cache.enable", "true")
+          .setSparkConf("spark.sql.oap.parquet.binary.cache.enabled", "true")
           .setSparkConf("spark.sql.oap.index.data.cache.separation.enable", "true")
           .setSparkConf("spark.sql.oap.fiberCache.memory.manager", "mix")
           .setSparkConf("spark.oap.cache.strategy", "mix")

@@ -32,7 +32,7 @@ Guava cache is based on memkind library, built on top of jemalloc and provides m
 
 For Parquet file format, add these conf options:
 ```
-spark.sql.oap.parquet.binary.cache.enable         true
+spark.sql.oap.parquet.binary.cache.enabled        true
 spark.sql.oap.fiberCache.memory.manager           pm 
 spark.oap.cache.strategy                          guava
 # PMem capacity per executor, according to your cluster
@@ -69,7 +69,7 @@ To apply noevict cache strategy in your workload, please follow [prerequisites](
 
 For Parquet file format, add these conf options:
 ```
-spark.sql.oap.parquet.binary.cache.enable                true 
+spark.sql.oap.parquet.binary.cache.enabled               true 
 spark.oap.cache.strategy                                 noevict 
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
 ```
@@ -109,7 +109,7 @@ For Parquet data format, add these conf options:
 
 
 ```
-spark.sql.oap.parquet.binary.cache.enable                  true 
+spark.sql.oap.parquet.binary.cache.enabled                 true 
 spark.oap.cache.strategy                                   external
 spark.sql.oap.dcpmm.free.wait.threshold                    50000000000
 # according to your executor core number
@@ -221,7 +221,7 @@ spark.executor.memoryOverhead                  50g
 # for orc file format
 spark.sql.oap.orc.binary.cache.enable            true
 # for Parquet file format
-spark.sql.oap.parquet.binary.cache.enable        true
+spark.sql.oap.parquet.binary.cache.enabled       true
 ```
 
 4. DRAM(`offheap`)/`guava` as `index` cache media and backend, PMem(`pm`)/`guava` as `data` cache media and backend. 
@@ -249,7 +249,7 @@ spark.executor.memoryOverhead                  50g
 # for ORC file format
 spark.sql.oap.orc.binary.cache.enable          true
 # for Parquet file format
-spark.sql.oap.parquet.binary.cache.enable      true
+spark.sql.oap.parquet.binary.cache.enabled      true
 ```
 
 ## Cache Hot Tables
@@ -266,19 +266,14 @@ spark.sql.oap.fiberCache.table.list             <databasename>.<tablename1>;<dat
 
 ## Column Vector Cache
 
-This document above use **binary** cache as example, cause binary cache can improve cache space utilization compared to ColumnVector cache. When your cluster memory resources are abundant enough, you can choose ColumnVector cache to spare computation time. 
+This document above use **binary** cache for Parquet as example, cause binary cache can improve cache space utilization compared to ColumnVector cache. When your cluster memory resources are abundant enough, you can choose ColumnVector cache to spare computation time. 
 
-To enable ColumnVector data cache, you should add below configurations to `spark-defaults.conf`.
+To enable ColumnVector data cache for Parquet file format, you should add below configurations to `spark-defaults.conf`.
 
 ```
 # for parquet file format, disable binary cache
 spark.sql.oap.parquet.binary.cache.enabled      false
 # for parquet file format, enable ColumnVector cache
 spark.sql.oap.parquet.data.cache.enable         true
-# for ORC file format, disable binary cache
-spark.sql.oap.orc.binary.cache.enable           false
-# for ORC file format, enable ColumnVector cache
-spark.sql.oap.orc.data.cache.enable             true
-spark.sql.orc.copyBatchToSpark                  true
 ```
 

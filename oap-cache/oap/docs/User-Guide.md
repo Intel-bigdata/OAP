@@ -149,7 +149,7 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
    # according to the resource of cluster
    spark.executor.memoryOverhead                  50g
    # for parquet fileformat, enable binary cache
-   spark.sql.oap.parquet.data.cache.enable        true
+   spark.sql.oap.parquet.binary.cache.enabled        true
    # for orc fileformat, enable binary cache
    spark.sql.oap.orc.binary.cache.enable          true
    ```
@@ -339,7 +339,7 @@ We created some tool scripts [oap-benchmark-tool.zip](https://github.com/Intel-b
    For example:
 
 ```
-export SPARK_HOME=/home/oap/spark-2.4.4
+export SPARK_HOME=/home/oap/spark-3.0.0
 export TPCDS_KITS_DIR=/home/oap/tpcds-kits
 export NAMENODE_ADDRESS=mynamenode:9000
 export THRIFT_SERVER_ADDRESS=mythriftserver
@@ -423,6 +423,6 @@ When all the queries are done, you will see the `result.json` file in the curren
   Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
 - [Column Vector Cache](./Advanced-Configuration.md#Column-Vector-Cache) 
 
-  This document above use **binary** cache as example, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache to spare computation time.
+  This document above use **binary** cache as example for Parquet file format, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache for Parquet to spare computation time.
 
 For more information and configuration details, please refer to [Advanced Configuration](Advanced-Configuration.md).
