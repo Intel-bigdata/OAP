@@ -93,7 +93,7 @@ mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
 
 
 #### OAP Packaging 
-If you want to generate a release package after you mvn package all modules, use the following command under the directory dev, then you can find a tarball named oap-product-$VERSION-bin-spark-2.4.4.tar.gz in dev/release-package dictionary.
+If you want to generate a release package after you mvn package all modules, use the following command under the directory dev, then you can find a tarball named oap-product-$VERSION-bin-spark-3.0.0.tar.gz in dev/release-package dictionary.
 ```shell script
 sh make-distribution.sh
 ```

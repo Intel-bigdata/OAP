@@ -163,14 +163,14 @@ The following files need to be checked/compared for changes:
 
 #### Rebuild Spark packages with NUMA binding patch 
 
-When using PMem as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-2.4.4.patch](./numa-binding-spark-2.4.4.patch) to Spark source code for best performance.
+When using PMem as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-3.0.0.patch](./numa-binding-spark-3.0.0.patch) to Spark source code for best performance.
 
-1. Download src for [Spark-2.4.4](https://archive.apache.org/dist/spark/spark-2.4.4/spark-2.4.4.tgz) and clone the src from github.
+1. Download src for [spark-3.0.0](https://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0.tgz) and clone the src from github.
 
 2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) the Spark package.
 
 ```
-git apply  numa-binding-spark-2.4.4.patch
+git apply  numa-binding-spark-3.0.0.patch
 ```
 
 3. Add these configuration items to the Spark configuration file $SPARK_HOME/conf/spark-defaults.conf to enable NUMA binding.
@@ -183,6 +183,6 @@ spark.yarn.numa.enabled true
 
 #### Use pre-built patched Spark packages 
 
-If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.tgz](https://github.com/Intel-bigdata/spark/releases/download/v2.4.4-intel-oap-0.8.2/spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.2.tgz) with the patch applied.
+If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-3.0.0-bin-hadoop2.7-intel-oap-0.8.tgz](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.tgz) with the patch applied.
 
 ###### \*Other names and brands may be claimed as the property of others.
