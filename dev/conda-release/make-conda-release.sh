@@ -50,7 +50,7 @@ function conda_build_arrow() {
   cd $DEV_PATH/thirdparty
   arrow_repo="https://github.com/Intel-bigdata/arrow.git"
   if [ ! -d "arrow" ]; then
-    git clone $arrow_repo -b branch-0.17.0-oap-0.9.0
+    git clone $arrow_repo -b branch-0.17.0-oap-0.9
   fi
   cd arrow
   git pull
