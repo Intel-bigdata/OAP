@@ -57,7 +57,7 @@ If there are any problems during the above preparing process, we recommend you r
 
 
 ## Compiling OAP
-If you have installed all prerequisites, you can download our pre-built package [oap-0.9-bin-spark-3.0.0.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-3.0.0/oap-0.9-bin-spark-3.0.0.tar.gz)  to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the `oap-common-0.8.2-with-spark-3.0.0.jar` to the directory `$SPARK_HOME/jars/`. If you’d like to build from source code,  you can use make-distribution.sh to generate all jars under the dictionary ./dev/release-package in OAP home.
+If you have installed all prerequisites, you can download our pre-built package [oap-0.9-bin-spark-3.0.0.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/0.9-spark-3.0.0/oap-0.9-bin-spark-3.0.0.tar.gz)  to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`, and put the `oap-common-0.9-with-spark-3.0.0.jar` to the directory `$SPARK_HOME/jars/`. If you’d like to build from source code,  you can use make-distribution.sh to generate all jars under the dictionary ./dev/release-package in OAP home.
 ```shell script
 sh ./dev/make-distribution.sh
 ``````

@@ -3,7 +3,7 @@
 - [Additional Cache Strategies](#Additional-Cache-Strategies)  In addition to **vmem** cache strategy, Data Source Cache also supports 3 other cache strategies: **guava**, **noevict**  and **external cache**.
 - [Index and Data Cache Separation](#Index-and-Data-Cache-Separation)  To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
 - [Cache Hot Tables](#Cache-Hot-Tables)  Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
-- [Column Vector Cache](#Column-Vector-Cache)  This document above use **binary** cache as example, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache to spare computation time.
+- [Column Vector Cache](#Column-Vector-Cache)  This document above use **binary** cache as example for Parquet file format, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache for Parquet to spare computation time.
 
 ## Additional Cache Strategies
 Following table shows features of 4 cache strategies on PMem.
@@ -83,7 +83,7 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
 ### External cache using plasma
 
 
-External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched spark 2.4.4. To use this strategy, follow [prerequisites](#prerequisites-1) to set up PMem hardware. Then install arrow rpm package which includes plasma library and executable file, copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer to below configurations to apply external cache strategy and start plasma service on each node and start your workload. (Currently web UI cannot display accurately, this is a known [issue](https://github.com/Intel-bigdata/OAP/issues/1579))
+External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched spark 3.0.0. To use this strategy, follow [prerequisites](#prerequisites-1) to set up PMem hardware. Then install arrow rpm package which includes plasma library and executable file, copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer to below configurations to apply external cache strategy and start plasma service on each node and start your workload. (Currently web UI cannot display accurately, this is a known [issue](https://github.com/Intel-bigdata/OAP/issues/1579))
 
 It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma. You can follow these command to create or destroy interleaved PMem device:
 
