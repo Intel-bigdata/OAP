@@ -183,6 +183,6 @@ spark.yarn.numa.enabled true
 
 #### Use pre-built patched Spark packages 
 
-If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.tgz](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.tgz) with the patch applied.
+If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz) with the patch applied.
 
 ###### \*Other names and brands may be claimed as the property of others.

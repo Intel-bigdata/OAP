@@ -12,13 +12,13 @@
 
 ## Prerequisites
 
-SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support. If you don't want to build Spark by yourself, we have pre-built [spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.tgz ).
+SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support. If you don't want to build Spark by yourself, we have pre-built [spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz ).
 
 ## Getting Started
 
 ### Building
 
-Download our pre-built jar [oap-0.9-bin-spark-3.0.0.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.9-spark-3.0.0/oap-0.9-bin-spark-3.0.0.tar.gz) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+Download our pre-built jar [oap-0.9.0-bin-spark-3.0.0.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.9-spark-3.0.0/oap-0.9.0-bin-spark-3.0.0.tar.gz) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 
 ### Spark Configurations
 

@@ -228,7 +228,7 @@ function prepare_intel_arrow() {
   cd $DEV_PATH/thirdparty/
   intel_arrow_repo="https://github.com/Intel-bigdata/arrow.git"
   if [ ! -d "arrow" ]; then
-    git clone $intel_arrow_repo -b branch-0.17.0-oap-0.9
+    git clone $intel_arrow_repo -b branch-0.17.0-oap-0.9.0
     cd arrow
   else
     cd arrow
