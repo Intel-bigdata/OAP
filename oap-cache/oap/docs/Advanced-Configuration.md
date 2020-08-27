@@ -193,7 +193,7 @@ spark.sql.oap.mix.data.cache.backend                    vmem
 spark.sql.oap.mix.index.cache.backend                   vmem
 
 ```
-The rest configurations can refer to the configurations of [PMem Cache](./User-Guide.md#use-pmem-cache) and  [Vmemcache cache](./User-Guide.md#configure_to_enable_pmem_cache)
+The rest configurations can refer to the configurations of [PMem Cache](./User-Guide.md#use-pmem-cache) and  [Vmemcache cache](./User-Guide.md#configure-to-enable-pmem-cache)
 
 3. DRAM(`offheap`)/`guava` as `index` cache media and backend, PMem(`tmp`)/`vmem` as `data` cache media and backend. 
 
