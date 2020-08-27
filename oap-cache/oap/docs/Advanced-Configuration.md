@@ -26,7 +26,7 @@ Or you can refer to [Developer-Guide](../../../docs/Developer-Guide.md), there i
 
 ### Guava cache
 
-Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](#prerequisites-1) to set up PMem hardware and memkind library correctly. Then follow bellow configurations.
+Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware and memkind library correctly. Then follow bellow configurations.
 
 **NOTE**: `spark.sql.oap.fiberCache.persistent.memory.reserved.size`: When we use PMem as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available PMem capacity to avoid memory allocation failure. But even with an allocation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
 
@@ -65,7 +65,7 @@ spark.sql.oap.fiberCache.memory.manager           kmem
 
 The noevict cache strategy is also supported in OAP based on the memkind library for PMem.
 
-To apply noevict cache strategy in your workload, please follow [prerequisites](#prerequisites-1) to set up PMem hardware and memkind library correctly. Then follow bellow configurations.
+To apply noevict cache strategy in your workload, please follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware and memkind library correctly. Then follow bellow configurations.
 
 For Parquet file format, add these conf options:
 ```
@@ -83,7 +83,7 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
 ### External cache using plasma
 
 
-External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched spark 3.0.0. To use this strategy, follow [prerequisites](#prerequisites-1) to set up PMem hardware. Then install arrow rpm package which includes plasma library and executable file, copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer to below configurations to apply external cache strategy and start plasma service on each node and start your workload. (Currently web UI cannot display accurately, this is a known [issue](https://github.com/Intel-bigdata/OAP/issues/1579))
+External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched spark 3.0.0. To use this strategy, follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware. Then install arrow rpm package which includes plasma library and executable file, copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer to below configurations to apply external cache strategy and start plasma service on each node and start your workload. (Currently web UI cannot display accurately, this is a known [issue](https://github.com/Intel-bigdata/OAP/issues/1579))
 
 It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma. You can follow these command to create or destroy interleaved PMem device:
 
@@ -181,7 +181,7 @@ spark.sql.oap.index.data.cache.separation.enable        true
 spark.oap.cache.strategy                                mix
 spark.sql.oap.fiberCache.memory.manager                 offheap
 ```
-The rest configurations can refer to the configurations of  [Use DRAM Cache](#use-dram-cache) 
+The rest configurations can refer to the configurations of  [Use DRAM Cache](./User-Guide.md#use-dram-cache) 
 
 2. PMem as cache media, `vmem` strategy as index & data cache backend. 
 
@@ -193,7 +193,7 @@ spark.sql.oap.mix.data.cache.backend                    vmem
 spark.sql.oap.mix.index.cache.backend                   vmem
 
 ```
-The rest configurations can refer to the configurations of [PMem Cache](#use-pmem-cache) and  [Vmemcache cache](#vmemcache-cache)
+The rest configurations can refer to the configurations of [PMem Cache](./User-Guide.md#use-pmem-cache) and  [Vmemcache cache](./User-Guide.md#vmemcache-cache)
 
 3. DRAM(`offheap`)/`guava` as `index` cache media and backend, PMem(`tmp`)/`vmem` as `data` cache media and backend. 
 
