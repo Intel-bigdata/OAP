@@ -42,8 +42,6 @@ class KMeansDALImpl (
 
     instr.foreach(_.logInfo(s"Processing partitions with $executorNum executors"))
 
-    val partitionDims = Utils.getPartitionDims(data)
-	
     val executorIPAddress = Utils.sparkFirstExecutorIP(data.sparkContext)
 
     // repartition to executorNum if not enough partitions
@@ -53,8 +51,10 @@ class KMeansDALImpl (
       data
     }
 
+    val partitionDims = Utils.getPartitionDims(dataForConversion)
+
     // filter the empty partitions
-    val partRows = data.mapPartitionsWithIndex { (index: Int, it: Iterator[Vector]) =>
+    val partRows = dataForConversion.mapPartitionsWithIndex { (index: Int, it: Iterator[Vector]) =>
       Iterator(Tuple3(partitionDims(index)._1, index, it))
     }
     val nonEmptyPart = partRows.filter{entry => { entry._1 > 0 }}
