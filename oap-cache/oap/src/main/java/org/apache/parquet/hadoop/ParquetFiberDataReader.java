@@ -28,8 +28,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.HadoopReadOptions;
-import org.apache.parquet.ParquetReadOptions;
 import org.apache.parquet.Preconditions;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.column.ColumnDescriptor;
@@ -38,7 +36,6 @@ import org.apache.parquet.column.page.DataPageV1;
 import org.apache.parquet.column.page.DataPageV2;
 import org.apache.parquet.column.page.DictionaryPage;
 import org.apache.parquet.column.page.PageReadStore;
-import org.apache.parquet.compression.CompressionCodecFactory;
 import org.apache.parquet.format.DataPageHeader;
 import org.apache.parquet.format.DataPageHeaderV2;
 import org.apache.parquet.format.DictionaryPageHeader;
@@ -72,7 +69,7 @@ public class ParquetFiberDataReader implements Closeable {
   private final FileStatus fileStatus;
   private final ParquetMetadataConverter converter;
   private final SeekableInputStream f;
-  private final ParquetReadOptions options;
+  private final CodecFactory codecFactory;
   // TODO Is ParquetFooter enough？If true, we can save the object transformation.
   private ParquetMetadata footer;
 
@@ -93,7 +90,7 @@ public class ParquetFiberDataReader implements Closeable {
     this.footer = footer;
     this.f = HadoopStreams.wrap(fs.open(file));
     this.fileMetaData = footer.getFileMetaData();
-    this.options = HadoopReadOptions.builder(conf).build();
+    this.codecFactory = new CodecFactory(conf);
   }
 
   /**
@@ -133,7 +130,9 @@ public class ParquetFiberDataReader implements Closeable {
         f.close();
       }
     } finally {
-     options.getCodecFactory().release();
+      if (codecFactory != null) {
+        codecFactory.release();
+      }
     }
   }
 
@@ -303,8 +302,8 @@ public class ParquetFiberDataReader implements Closeable {
           pagesInChunk.size(),
           pos);
       }
-      CompressionCodecFactory.BytesInputDecompressor decompressor = options.getCodecFactory()
-        .getDecompressor(descriptor.metadata.getCodec());
+      CodecFactory.BytesDecompressor decompressor = codecFactory.getDecompressor(
+              descriptor.metadata.getCodec());
       return new ColumnChunkPageReadStore
         .ColumnChunkPageReader(decompressor, pagesInChunk, dictionaryPage);
     }

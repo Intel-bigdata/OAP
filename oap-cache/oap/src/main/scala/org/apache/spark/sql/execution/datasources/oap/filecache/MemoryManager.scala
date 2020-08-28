@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong
 import scala.util.Success
 
 import com.intel.oap.common.unsafe.PersistentMemoryPlatform
+import org.apache.arrow.plasma.PlasmaClient
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
@@ -55,7 +56,9 @@ case class MemoryBlockHolder(
                               baseOffset: Long,
                               length: Long,
                               occupiedSize: Long,
-                              source: SourceEnum.SourceEnum)
+                              source: SourceEnum.SourceEnum,
+                              obejctId: Array[Byte] = null,
+                              client: PlasmaClient = null)
 
 private[sql] abstract class MemoryManager {
   /**
@@ -130,6 +133,7 @@ private[sql] object MemoryManager extends Logging {
       case "hybrid" => new HybridMemoryManager(sparkEnv)
       case "tmp" => new TmpDramMemoryManager(sparkEnv)
       case "kmem" => new DaxKmemMemoryManager(sparkEnv)
+      case "plasma" => new PlasmaMemoryManager(sparkEnv)
       case _ => throw new UnsupportedOperationException(
         s"The memory manager: ${memoryManagerOpt} is not supported now")
     }
@@ -149,7 +153,7 @@ private[sql] object MemoryManager extends Logging {
       case "guava" => apply(sparkEnv, memoryManagerOpt)
       case "noevict" => new HybridMemoryManager(sparkEnv)
       case "vmem" => new TmpDramMemoryManager(sparkEnv)
-      case "external" => new TmpDramMemoryManager(sparkEnv)
+      case "external" => new PlasmaMemoryManager(sparkEnv)
       case "mix" =>
         if (!memoryManagerOpt.equals("mix")) {
           apply(sparkEnv, memoryManagerOpt)
@@ -404,6 +408,23 @@ private[filecache] class DaxKmemMemoryManager(sparkEnv: SparkEnv)
 
   override def memorySize: Long = _memorySize
 
+}
+
+private[filecache] class PlasmaMemoryManager(sparkEnv: SparkEnv)
+  extends MemoryManager with Logging {
+  override private[filecache] def allocate(size: Long) = {
+    throw new OapException("Unsupported Exception!!")
+  }
+
+  override private[filecache] def free(block: MemoryBlockHolder): Unit = {
+    block.client.release(block.obejctId)
+  }
+
+  override def isDcpmmUsed(): Boolean = true
+
+  override def memorySize: Long = 0
+
+  override def memoryUsed: Long = 0
 }
 
 private[filecache] class HybridMemoryManager(sparkEnv: SparkEnv)

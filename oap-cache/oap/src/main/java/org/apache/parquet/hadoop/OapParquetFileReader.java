@@ -35,16 +35,16 @@ import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FI
 
 public class OapParquetFileReader implements Closeable {
 
-  private ParquetCacheableFileReader reader;
+  private ParquetFileReader reader;
   private int currentBlock = 0;
 
-  private OapParquetFileReader(ParquetCacheableFileReader reader) {
+  private OapParquetFileReader(ParquetFileReader reader) {
     this.reader = reader;
   }
 
   public static OapParquetFileReader open(Configuration conf, Path file, ParquetMetadata footer)
           throws IOException {
-    return new OapParquetFileReader(new ParquetCacheableFileReader(conf, file, footer));
+    return new OapParquetFileReader(new ParquetFileReader(conf, file, footer));
   }
 
   public RowGroupDataAndRowIds readNextRowGroupAndRowIds() throws IOException {

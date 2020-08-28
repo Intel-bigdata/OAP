@@ -1617,7 +1617,7 @@ class ParquetFiberDataLoaderSuite extends ParquetDataFileSuite {
   private def loadSingleColumn(requiredId: Array[Int]): FiberCache = {
     val conf = new Configuration(configuration)
     addRequestSchemaToConf(conf, requiredId)
-    ParquetFiberDataLoader(conf, reader, 0).loadSingleColumn
+    ParquetFiberDataLoader(conf, reader, 0).loadSingleColumn()
   }
 
   test("test loadSingleColumn with reuse reader") {

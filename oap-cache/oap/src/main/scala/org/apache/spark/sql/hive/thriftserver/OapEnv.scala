@@ -36,6 +36,8 @@ private[spark] object OapEnv extends Logging {
 
   var initialized: Boolean = false
   var sparkSession: SparkSession = _
+  var sqlContext: SQLContext = _
+  var sparkContext: SparkContext = _
 
   // This is to enable certain OAP features, like UI, even
   // in non-Spark SQL CLI/ThriftServer conditions
@@ -47,5 +49,46 @@ private[spark] object OapEnv extends Logging {
       sc.ui.foreach(new OapTab(_))
       initialized = true
     }
+  }
+
+  def init(): Unit = synchronized {
+    if (!initialized && !Utils.isTesting) {
+      if (sqlContext == null) {
+        val sparkConf = new SparkConf(loadDefaults = true)
+        // If user doesn't specify the appName, we want to get [SparkSQL::localHostName] instead of
+        // the default appName [SparkSQLCLIDriver] in cli or beeline.
+        val maybeAppName = sparkConf
+          .getOption("spark.app.name")
+          .filterNot(_ == classOf[SparkSQLCLIDriver].getName)
+          .filterNot(_ == classOf[HiveThriftServer2].getName)
+
+        sparkConf.setAppName(maybeAppName.getOrElse(s"SparkSQL::${Utils.localHostName()}"))
+
+        val sparkSession = SparkSession.builder.config(sparkConf).enableHiveSupport().getOrCreate()
+        sparkContext = sparkSession.sparkContext
+        sqlContext = sparkSession.sqlContext
+
+        val metadataHive = sparkSession
+          .sharedState.externalCatalog.asInstanceOf[HiveExternalCatalog]
+          .client.newSession()
+        metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
+        metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))
+        metadataHive.setError(new PrintStream(System.err, true, "UTF-8"))
+        sparkSession.conf.set("spark.sql.hive.version", HiveUtils.builtinHiveVersion)
+      }
+
+      sparkContext.addSparkListener(new OapListener)
+
+      SparkSQLEnv.sparkContext = sparkContext
+      SparkSQLEnv.sqlContext = sqlContext
+      this.sparkSession = sqlContext.sparkSession
+
+      sparkContext.ui.foreach(new OapTab(_))
+      initialized = true
+    }
+  }
+
+  def stop() {
+    SparkSQLEnv.stop()
   }
 }

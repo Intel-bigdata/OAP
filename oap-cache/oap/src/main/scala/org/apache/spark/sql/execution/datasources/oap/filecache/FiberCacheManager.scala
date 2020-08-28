@@ -84,7 +84,8 @@ private[sql] class FiberCacheManager(
     } else if (cacheName.equals(VMEM_CACHE)) {
       new VMemCache(FiberType.DATA)
     } else if (cacheName.equals(EXTERNAL_CACHE)) {
-      new ExternalCache(FiberType.DATA)
+      val cache = new ExternalCache(FiberType.DATA)
+      cache
     } else if (cacheName.equals(MIX_CACHE)) {
       val separateCache = sparkEnv.conf.getBoolean(
         OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
@@ -204,6 +205,10 @@ private[sql] class FiberCacheManager(
     FiberCache(FiberType.DATA, allocateFiberMemory(FiberType.DATA, length))
   }
 
+  def getEmptyDataFiberCache(length: Long, fiberId: FiberId = null): FiberCache = {
+    cacheBackend.getEmptyFiber(length, fiberId)
+  }
+
   def releaseIndexCache(indexName: String): Unit = {
     logDebug(s"Going to remove all index cache of $indexName")
     val fiberToBeRemoved = cacheBackend.getFibers.filter {
@@ -223,6 +228,9 @@ private[sql] class FiberCacheManager(
     cacheAllocator.isDcpmmUsed()
   }
 
+  // TODO: for multithreadCacheGuardian, we need refactor releaseFiberCache method,
+  // dead lock will happen in some case. For now, we can increase dcpmmWaitingThreshold
+  // here
   def isNeedWaitForFree(): Boolean = {
     logDebug(
       s"dcpmm wait threshold: " +

@@ -45,7 +45,7 @@ object FilterHelper {
         // Collects all converted Parquet filter predicates. Notice that not all predicates can be
         // converted (`ParquetFilters.createFilter` returns an `Option`). That's why a `flatMap`
         // is used here.
-        .flatMap(ParquetFiltersWrapper.createFilter(conf, requiredSchema, _))
+        .flatMap(ParquetFiltersWrapper.createFilter(requiredSchema, _))
         .reduceOption(FilterApi.and)
     } else {
       None

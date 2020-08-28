@@ -1,0 +1,47 @@
+diff --git a/src/main/spark2.3.2/scala/org/apache/spark/SparkEnv.scala b/src/main/spark2.3.2/scala/org/apache/spark/SparkEnv.scala
+index f681aa1..48d6051 100644
+--- a/src/main/spark2.3.2/scala/org/apache/spark/SparkEnv.scala
++++ b/src/main/spark2.3.2/scala/org/apache/spark/SparkEnv.scala
+@@ -177,6 +177,7 @@ object SparkEnv extends Logging {
+     create(
+       conf,
+       SparkContext.DRIVER_IDENTIFIER,
++      None,
+       bindAddress,
+       advertiseAddress,
+       Option(port),
+@@ -195,6 +196,7 @@ object SparkEnv extends Logging {
+   private[spark] def createExecutorEnv(
+       conf: SparkConf,
+       executorId: String,
++      numaNodeId: Option[String],
+       hostname: String,
+       numCores: Int,
+       ioEncryptionKey: Option[Array[Byte]],
+@@ -202,6 +204,7 @@ object SparkEnv extends Logging {
+     val env = create(
+       conf,
+       executorId,
++      numaNodeId,
+       hostname,
+       hostname,
+       None,
+@@ -220,6 +223,7 @@ object SparkEnv extends Logging {
+   private def create(
+       conf: SparkConf,
+       executorId: String,
++      numaNodeId: Option[String],
+       bindAddress: String,
+       advertiseAddress: String,
+       port: Option[Int],
+@@ -229,6 +233,10 @@ object SparkEnv extends Logging {
+       listenerBus: LiveListenerBus = null,
+       mockOutputCommitCoordinator: Option[OutputCommitCoordinator] = None): SparkEnv = {
+ 
++    // scalastyInt
++    // set numa node id through SparkConf
++    conf.set("spark.executor.numa.id", numaNodeId.getOrElse("-1"))
++
+     val isDriver = executorId == SparkContext.DRIVER_IDENTIFIER
+ 
+     // Listener bus is only used on the driver

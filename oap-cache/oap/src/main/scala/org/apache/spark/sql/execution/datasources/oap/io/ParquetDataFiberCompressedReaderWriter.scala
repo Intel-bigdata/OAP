@@ -53,7 +53,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
   val compressionCodec = SparkCompressionCodec.createCodec(new SparkConf(), codecName)
 
   def dumpToCache(reader: VectorizedColumnReader,
-      total: Int, dataType: DataType): FiberCache = {
+      total: Int, dataType: DataType, fiberId: FiberId = null): FiberCache = {
     // For the dictionary case, the column vector occurs some batch has dictionary
     // and some no dictionary. Therefore we still read the total value to cv instead of batch.
     // TODO: Next can split the read to column vector from total to batch?

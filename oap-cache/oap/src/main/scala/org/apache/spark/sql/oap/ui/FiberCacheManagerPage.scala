@@ -33,6 +33,7 @@ private[ui] class FiberCacheManagerPage(parent: OapTab) extends WebUIPage("") wi
       <div>
         {
         <div id="active-cms"></div> ++
+          <div id="active-cms"></div> ++
           <script src={UIUtils.prependBaseUri(request, parent.basePath,
             "/static/utils.js")}></script> ++
           <script src={UIUtils.prependBaseUri(request, parent.basePath,
@@ -47,29 +48,29 @@ private[ui] class FiberCacheManagerPage(parent: OapTab) extends WebUIPage("") wi
 
 
 class FiberCacheManagerSummary private[spark](
-    val id: String,
-    val hostPort: String,
-    val isActive: Boolean,
-    val indexDataCacheSeparationEnable: Boolean,
-    val memoryUsed: Long,
-    val maxMemory: Long,
-    val cacheSize: Long,
-    val cacheCount: Long,
-    val backendCacheSize: Long,
-    val backendCacheCount: Long,
-    val dataFiberSize: Long,
-    val dataFiberCount: Long,
-    val indexFiberSize: Long,
-    val indexFiberCount: Long,
-    val pendingFiberSize: Long,
-    val pendingFiberCount: Long,
-    val dataFiberHitCount: Long,
-    val dataFiberMissCount: Long,
-    val dataFiberLoadCount: Long,
-    val dataTotalLoadTime: Long,
-    val dataEvictionCount: Long,
-    val indexFiberHitCount: Long,
-    val indexFiberMissCount: Long,
-    val indexFiberLoadCount: Long,
-    val indexTotalLoadTime: Long,
-    val indexEvictionCount: Long)
+                                               val id: String,
+                                               val hostPort: String,
+                                               val isActive: Boolean,
+                                               val indexDataCacheSeparationEnable: Boolean,
+                                               val memoryUsed: Long,
+                                               val maxMemory: Long,
+                                               val cacheSize: Long,
+                                               val cacheCount: Long,
+                                               val backendCacheSize: Long,
+                                               val backendCacheCount: Long,
+                                               val dataFiberSize: Long,
+                                               val dataFiberCount: Long,
+                                               val indexFiberSize: Long,
+                                               val indexFiberCount: Long,
+                                               val pendingFiberSize: Long,
+                                               val pendingFiberCount: Long,
+                                               val dataFiberHitCount: Long,
+                                               val dataFiberMissCount: Long,
+                                               val dataFiberLoadCount: Long,
+                                               val dataTotalLoadTime: Long,
+                                               val dataEvictionCount: Long,
+                                               val indexFiberHitCount: Long,
+                                               val indexFiberMissCount: Long,
+                                               val indexFiberLoadCount: Long,
+                                               val indexTotalLoadTime: Long,
+                                               val indexEvictionCount: Long)

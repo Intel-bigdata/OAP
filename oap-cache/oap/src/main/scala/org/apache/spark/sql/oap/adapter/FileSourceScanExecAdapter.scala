@@ -22,7 +22,6 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression}
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.HadoopFsRelation
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.util.collection.BitSet
 
 object FileSourceScanExecAdapter {
   def createFileSourceScanExec(
@@ -30,7 +29,6 @@ object FileSourceScanExecAdapter {
       output: Seq[Attribute],
       requiredSchema: StructType,
       partitionFilters: Seq[Expression],
-      optionalBucketSets: Option[BitSet],
       dataFilters: Seq[Expression],
       metastoreTableIdentifier: Option[TableIdentifier]): FileSourceScanExec = {
     FileSourceScanExec(
@@ -38,7 +36,6 @@ object FileSourceScanExecAdapter {
       output,
       requiredSchema,
       partitionFilters,
-      optionalBucketSets,
       dataFilters,
       metastoreTableIdentifier)
   }

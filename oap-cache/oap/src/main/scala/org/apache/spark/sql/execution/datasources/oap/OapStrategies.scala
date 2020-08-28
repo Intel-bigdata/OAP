@@ -136,7 +136,6 @@ trait OapStrategy extends Strategy with Logging {
             outputAttributes,
             outputSchema,
             partitionKeyFilters.toSeq,
-            None, // TODO in the future we need to consider the bucketSet parameter
             dataFilters,
             table.map(_.identifier))
 
