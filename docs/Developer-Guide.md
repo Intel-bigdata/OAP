@@ -100,11 +100,11 @@ sh make-distribution.sh
 ## Contributing
 This session includes what is required before submitting a code change.
 
-- We continue to use the Github **issue** to track the new features/tasks/issues.​
+- We continue to use the Github **Issues** to track the new features/tasks/issues.​
 
 - For every commit, we need an issue id for the commit. ​
 
-- Format the log message as following: **[OAP-issueId][optional:ModuleName] detailed message**​ 
+- Format the log message as following: **[OAP-IssuesId][optional:ModuleName] detailed message**​ 
 
   like [OAP-1406][rpmem-shuffle]Add shuffle block removing operation within one Spark context 
 
