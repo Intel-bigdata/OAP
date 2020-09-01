@@ -34,7 +34,7 @@
     <dependency>
       <groupId>org.apache.mahout</groupId>
       <artifactId>mahout-hdfs</artifactId>
-      <version>0.13.0</version>
+      <version>14.1</version>
     </dependency>
 
     <dependency>
