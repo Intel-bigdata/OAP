@@ -4,6 +4,11 @@ A Spark DataSouce implementation for reading files into Arrow compatible columna
 ## Note
 The development of this library is still in progress. As a result some of the functionality may not be constantly stable for being used in production environments that have not been fully considered due to the limited testing capabilities so far.
 
+
+## Installation
+We provided a Conda package which will automatically install most dependencies, you can refer to [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md), you needn't  follow the build steps.
+
+
 ## Build
 ### Install libhdfs3 library
 

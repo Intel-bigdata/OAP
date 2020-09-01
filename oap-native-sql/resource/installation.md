@@ -12,6 +12,10 @@ tar -xf ./spark-3.0.0-bin-hadoop2.7.tgz
 export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7
 ```
 
+## Install by Conda 
+We provided a Conda package which will automatically install most dependencies, you can refer to [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md), you needn't  follow the build steps.
+
+
 ## Install arrow 0.17.0 dependencies
 
 ```
@@ -31,7 +35,7 @@ conda create -y -n pyarrow-dev -c conda-forge \
 conda activate pyarrow-dev
 ```
 
-## Install arrow 0.17.0
+### Install arrow 0.17.0
 
 Please refer this doc to install Apache Arrow and Gandiva.
 [Apache Arrow Installation](/oap-native-sql/resource/ApacheArrowInstallation.md)

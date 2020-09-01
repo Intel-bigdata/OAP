@@ -29,21 +29,16 @@ conda config --add channels conda-forge
 - **Requirements for Shuffle Remote PMem Extension**  
 If you want to use Shuffle Remote PMem Extension with RDMA, you need to configure and validate RDMA before these installation steps. Shuffle Remote PMem Extension also need to install library [PMDK](https://github.com/pmem/pmdk) which we haven't provided a Conda package. You can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md#4-configure-and-validate-rdma) for the details of configuring, validating RDMA and install PMDK. 
 
-- **Requirements for OAP MLlib**  
-To enable OAP MLlib, you need to install oneDAL and oneCLL, they can be downloaded and install from [here](https://software.intel.com/content/www/us/en/develop/tools/oneapi.html). 
-
-We provide a shell script named `prepare_oap_env.sh` to help you to completely compile and install these dependencies if your system is Fedora 29 or CentOS 7.6 or above.
 
 ```
 cd OAP/
 export ENABLE_RDMA=true
 source ./dev/prepare_oap_env.sh
 prepare_PMDK
-prepare_oneAPI
 ```
 
 ###  Install prerequisites
-Some dependencies required by OAP listed below. to use OAP, you must conda install these libraries on all nodes of your cluster. Ensure you have  activated environment which you create in the previous step.
+Some dependencies required by OAP listed below. All of them are included by OAP Conda package, they will be automatically installed in your environment when you conda install OAP. Ensure you have  activated environment which you create in the previous step.
 - [Memkind](https://anaconda.org/intel-bigdata/memkind)
 - [Vmemcache](https://anaconda.org/intel-bigdata/vmemcache)
 - [HPNL](https://anaconda.org/intel-bigdata//hpnl)

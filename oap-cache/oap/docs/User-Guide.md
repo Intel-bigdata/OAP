@@ -16,9 +16,11 @@ SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with 
 
 ## Getting Started
 
-### Building
+### Installation
+We provided a Conda package which will automatically install most dependencies, you can refer to [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md), you needn't  follow the build steps.
 
-We provided a Conda package which will automatically install most dependencies, you can refer to [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md) for more information. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+### Building
+If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 
 ### Spark Configurations
 
