@@ -115,6 +115,13 @@ spark.oap.cache.strategy                                   external
 spark.sql.oap.dcpmm.free.wait.threshold                    50000000000
 # according to your executor core number
 spark.sql.oap.cache.external.client.pool.size              10
+# absolute path of the jar on your working node
+spark.files                       /root/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,/root/miniconda2/envs/oapenv/oap_jars/arrow-plasma-0.17.0.jar,/root/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
+# relative path of the jar
+spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar:./arrow-plasma-0.17.0.jar
+# absolute path of the jar on your working node
+spark.driver.extraClassPath       /root/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:/root/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar:/root/miniconda2/envs/oapenv/oap_jars/arrow-plasma-0.17.0.jar
+
 ```
 
 For Orc file format, add these conf options:

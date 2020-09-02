@@ -31,11 +31,11 @@ Before you run ` . $SPARK_HOME/bin/spark-shell `, you need to configure Spark fo
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
 # absolute path of the jar on your working node
-spark.files                       /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar,/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
+spark.files                       /root/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,/root/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
 # relative path of the jar
 spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
 # absolute path of the jar on your working node
-spark.driver.extraClassPath       /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar:/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
+spark.driver.extraClassPath       /root/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:/root/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
 ```
 ### Verify Integration 
 
@@ -74,7 +74,7 @@ Add the following OAP configuration settings to `$SPARK_HOME/conf/spark-defaults
 ```
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
 # absolute path on your working node
-spark.files                       /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar,/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
+spark.files                       /root/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,/root/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
 # relative path    
 spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
 # relative path 
@@ -90,9 +90,9 @@ In addition to running on the YARN cluster manager, Spark also provides a simple
 ```
 spark.sql.extensions               org.apache.spark.sql.OapExtensions
 # absolute path on worker nodes
-spark.executor.extraClassPath      /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar:/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
+spark.executor.extraClassPath      /root/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:/root/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
 # absolute path on worker nodes
-spark.driver.extraClassPath        /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar:/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
+spark.driver.extraClassPath        /root/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:/root/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
 ```
 
 ## Working with SQL Index
@@ -282,11 +282,11 @@ spark.yarn.numa.enabled                                    true
 spark.sql.extensions                  org.apache.spark.sql.OapExtensions
 
 # absolute path of the jar on your working node, when in Yarn client mode
-spark.files                       /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar,/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
+spark.files                       /root/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,/root/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
 # relative path of the jar, when in Yarn client mode
 spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
 # absolute path of the jar on your working node,when in Yarn client mode
-spark.driver.extraClassPath       /home/oap/jars/oap-cache-<version>-with-spark-<version>.jar:/home/oap/jars/oap-common-<version>-with-spark-<version>.jar
+spark.driver.extraClassPath       /root/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:/root/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
 
 # for parquet file format, enable binary cache
 spark.sql.oap.parquet.binary.cache.enabled      true
