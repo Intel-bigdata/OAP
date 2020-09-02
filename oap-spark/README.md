@@ -15,6 +15,10 @@ Using PMem library to access Optane PMem can help to avoid the overhead from dis
 Large capacity and high I/O performance of PMem shows better performance than tied DRAM and disk solution under the same cost.
 
 ## User Guide
+
+### Installation
+We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md),you needn't compile and install Memkind, and you can find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`.
+
 ### Prerequisites
 
 The following are required to configure OAP to use PMem cache in AppDirect mode.
@@ -46,6 +50,7 @@ The following are required to configure OAP to use PMem cache in AppDirect mode.
    ```
 
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
+
 
 - Make sure [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/libmemkind.so.0) for x86 64bit CentOS Linux in the `/lib64/`directory of each worker node in cluster.
    The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system.

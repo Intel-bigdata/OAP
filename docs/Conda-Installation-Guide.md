@@ -1,5 +1,5 @@
 # OAP Installation Guide
-This document tells you how to install OAP and its dependencies on your cluster nodes. For some steps, specific libraries need to be compiled and installed to your system, the course of which requires root access. 
+This document tells you how to install OAP and its dependencies by Conda on your cluster nodes. For some steps, specific libraries need to be compiled and installed to your system, the course of which requires root access. 
 
 ## Contents
   - [Prerequisites](#prerequisites)
@@ -49,7 +49,7 @@ Some dependencies required by OAP listed below. All of them are included by OAP 
 conda activate oapenv
 conda install -c intel -c conda-forge oap=0.9
 ```
-
+After install OAP package, you can find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`
 
 
 ##  Configuration

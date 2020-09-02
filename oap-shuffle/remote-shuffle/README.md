@@ -9,6 +9,10 @@ Remote Shuffle is a Spark* ShuffleManager plugin, shuffling data through a remot
 
 This is an essential part of enabling Spark on disaggregated compute and storage architecture.
 
+
+### Installation
+We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md), you can find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`.
+
 ## Developer Guide
 ### Build and Deploy
 If you have completed all steps in installation guide,  you needn't do anything in this section.
