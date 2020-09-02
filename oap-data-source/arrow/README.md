@@ -6,7 +6,7 @@ The development of this library is still in progress. As a result some of the fu
 
 
 ## Installation
-We provided a Conda package which will automatically install most dependencies, you can refer to [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md), you needn't  follow the build steps.
+We provided a Conda package which will automatically install most dependencies, you can refer to [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md), you needn't  follow the build steps.
 
 
 ## Build
@@ -34,7 +34,7 @@ Then add following Spark configuration options before running the DataSource to 
 
 ```
 // build arrow-cpp
-git clone --branch native-sql-engine-clean https://github.com/Intel-bigdata/arrow.git
+git clone --branch branch-0.17.0-oap-0.9 https://github.com/Intel-bigdata/arrow.git
 cd arrow/cpp
 mkdir build
 cd build

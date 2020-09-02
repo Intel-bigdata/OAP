@@ -13,7 +13,7 @@ export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7
 ```
 
 ## Install by Conda 
-We provided a Conda package which will automatically install most dependencies, you can refer to [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md), you needn't  follow the build steps.
+We have provided a Conda package which will automatically install most dependencies, you can refer to [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md), you needn't  follow the build steps, you can jump to [Configuration](#spark-configurations-for-native-sql-engine).
 
 
 ## Install arrow 0.17.0 dependencies
@@ -53,7 +53,7 @@ yum install gmock
 
 ``` shell
 git clone https://github.com/Intel-bigdata/OAP.git
-cd OAP && git checkout branch-nativesql-spark-3.0.0
+cd OAP && git checkout branch-0.17.0-oap-0.9
 cd oap-native-sql
 cd cpp/
 mkdir build/
@@ -90,6 +90,8 @@ spark.executor.extraClassPath ${PATH_TO_OAP_NATIVE_SQL}/core/target/spark-column
 
 ######
 ```
+If you have finished [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md), you needn't change the spark.driver.extraClassPath and spark.executor.extraClassPath configurations  like above.
+                                                                                                     
 Verify if native sql engine works with scala script or jupyter notebook:
 ```
 val orders = spark.read.format("arrow").load("hdfs:////user/root/date_tpch_10/orders")
