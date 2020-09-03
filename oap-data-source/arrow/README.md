@@ -6,7 +6,7 @@ The development of this library is still in progress. As a result some of the fu
 
 
 ## Installation
-We have provided a Conda package which will automatically install most dependencies, you can refer to [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md), you needn't  follow the build steps,and you can find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`.
+We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md), you needn't  follow the build steps,and you can find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`.
 
 
 ## Build

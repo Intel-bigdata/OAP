@@ -14,8 +14,8 @@ Please refer to the corresponding documents below for the introduction and how t
 * [Shuffle Remote PMem Extension](./oap-shuffle/RPMem-shuffle/README.md)
 * [Remote Shuffle](./oap-shuffle/remote-shuffle/README.md)
 * [Intel MLlib](./oap-mllib/README.md)
-* [ArrowDataSource for Apache Spark](./oap-data-source/README.md)
-* [Spark Native SQL Engine](./oap-native-sql/README.md)
+* [Unified Arrow Data Source](./oap-data-source/arrow/README.md)
+* [Native SQL Engine](./oap-native-sql/README.md)
 
 ## Developer Guide
 Please follow the below link for the guide for developers.
