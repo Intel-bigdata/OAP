@@ -12,14 +12,13 @@
 
 ## Prerequisites
 
-SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support. If you don't want to build Spark by yourself, we have pre-built [spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz ).
+SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support. If you don't want to build Spark by yourself, we have pre-built [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz ).
 
 ## Getting Started
 
-### Installation
-We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md), you needn't  follow the build steps, you can find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`.
-
 ### Building
+We have provided a Conda package which will automatically install dependencies and build OAP jars, please follow [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md) and you can find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/` once finished the installation.
+
 If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 
 ### Spark Configurations
@@ -146,17 +145,17 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
    spark.memory.offHeap.enabled                   false
    spark.oap.cache.strategy                       guava
    spark.sql.oap.fiberCache.memory.manager        offheap
-   # equal to the size of executor.memoryOverhead
-   spark.sql.oap.fiberCache.offheap.memory.size   50g
    # according to the resource of cluster
    spark.executor.memoryOverhead                  50g
+   # equal to the size of executor.memoryOverhead
+   spark.sql.oap.fiberCache.offheap.memory.size   50g
    # for parquet fileformat, enable binary cache
-   spark.sql.oap.parquet.binary.cache.enabled        true
+   spark.sql.oap.parquet.binary.cache.enabled     true
    # for orc fileformat, enable binary cache
    spark.sql.oap.orc.binary.cache.enable          true
    ```
 
-   Change `spark.sql.oap.fiberCache.offheap.memory.size` based on the availability of DRAM capacity to cache data.
+   ***NOTE***: Change `spark.sql.oap.fiberCache.offheap.memory.size` based on the availability of DRAM capacity to cache data, and its size is equal to `spark.executor.memoryOverhead`
 
 2. Launch Spark ***ThriftServer***
 
@@ -234,14 +233,10 @@ The following are required to configure OAP to use PMem cache.
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
    
    For more information you can refer to [Quick Start Guide: Provision Intel® Optane™ DC Persistent Memory](https://software.intel.com/content/www/us/en/develop/articles/quick-start-guide-configure-intel-optane-dc-persistent-memory-on-linux.html)
-- Besides, with below BIOS configuration settings, Optane PMem could get noticeable performance gain, especially on cross socket write path.
 
-```
-Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
-Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
-``` 
-
-- Make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. If you have finished [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md), Vmemcache will be installed by Conda.Or you can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
+- Make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), vmemcache library will be automatically installed by Conda.
+  
+  Or you can follow the build/install steps from vmemcache website and make sure `libvmemcache.so` exist in `/lib64` directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
 
 
 #### Configure for NUMA
@@ -250,7 +245,7 @@ Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disable
 
    ```yum install numactl -y ```
 
-2. Build Spark from source to enable numa-binding support. Refer to [enable-numa-binding-for-PMem-in-spark](./Developer-Guide.md#enable-numa-binding-for-pmem-in-spark).
+2. Build Spark from source to enable numa-binding support, refer to [enable-numa-binding-for-PMem-in-spark](./Developer-Guide.md#enable-numa-binding-for-pmem-in-spark). Or you can just download our pre-built numa-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz).
 
 #### Configure for PMem 
 

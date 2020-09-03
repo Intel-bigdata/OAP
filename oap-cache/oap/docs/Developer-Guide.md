@@ -1,14 +1,14 @@
 # Developer Guide
 
-* [Build](#Build)
-* [Integrate with Spark\*](#integrate-with-spark)
-* [Enable NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enable-numa-binding-for-pmem-in-spark)
+* [Building](#Building)
+* [Integrating with Spark\*](#integrating-with-spark)
+* [Enabling NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enabling-numa-binding-for-pmem-in-spark)
 
-## Build
+## Building
 
-#### Build
+### Building
 
-Build with using [Apache Maven\*](http://maven.apache.org/).
+Building with [Apache Maven\*](http://maven.apache.org/).
 
 Clone the OAP project:
 
@@ -23,7 +23,7 @@ Build the package:
 mvn clean -pl com.intel.oap:oap-cache -am package
 ```
 
-#### Run Tests
+### Run Tests
 
 Run all the tests:
 ```
@@ -35,11 +35,11 @@ mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite 
 ```
 **NOTE**: Log level of unit tests currently default to ERROR, please override oap-cache/oap/src/test/resources/log4j.properties if needed.
 
-#### Build with Intel® Optane™ DC Persistent Memory Module
+### Build with Intel® Optane™ DC Persistent Memory Module
 
 Follow these steps:
 
-##### Prerequisites for building with PMem support
+#### Prerequisites for building with PMem support
 
 Install the required packages on the build system:
 
@@ -48,7 +48,7 @@ Install the required packages on the build system:
 - [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
 - [vmemcache](https://github.com/pmem/vmemcache)
 
-##### build and install memkind
+#### build and install memkind
  The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. 
    Build the latest memkind lib from source:
 
@@ -60,7 +60,7 @@ cd memkind
 make
 make install
    ``` 
-##### build and install vmemcache
+#### build and install vmemcache
 
 To build vmemcache lib from source, you can (for RPM-based linux as example):
 ```
@@ -72,7 +72,7 @@ cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
 make package
 sudo rpm -i libvmemcache*.rpm
 ```
-##### build and install plasma
+#### build and install plasma
 To use optimized Plasma cache with OAP, you need following components:  
     (1) libarrow.so, libplasma.so, libplasma_jni.so: dynamic libraries, will be used in plasma client.   
     (2) plasma-store-server: executable file, plasma cache service.  
@@ -107,7 +107,7 @@ mvn clean -q -pl plasma -DskipTests install
 ```
 
 
-##### Build the package
+#### Build the package
 You need to add `-Ppersistent-memory` to build with PMem support. For `noevict` cache strategy, you also need to build with `-Ppersistent-memory` parameter.
 ```
 mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -DskipTests package
@@ -121,11 +121,11 @@ Build with this command to use all of them:
 mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -Pvmemcache -DskipTests package
 ```
 
-## Integrate with Spark
+## Integrating with Spark
 
 Although SQL Index and Data Source Cache act as a plug-in JAR to Spark, there are still a few tricks to note when integrating with Spark. The OAP team explored using the Spark extension & data source API to deliver its core functionality. However, the limits of the Spark extension and data source API meant that we had to make some changes to Spark internals. As a result you must check whether your installation is an unmodified Community Spark or a customized Spark.
 
-#### Integrate with Community Spark
+### Integrating with Community Spark
 
 If you are running a Community Spark, things will be much simpler. Refer to [User Guide](User-Guide.md) to configure and setup Spark to work with OAP.
 
@@ -159,9 +159,9 @@ The following files need to be checked/compared for changes:
 		Add the get and set method for the changed protected variable.
 ```
 
-## Enable NUMA binding for PMem in Spark
+## Enabling NUMA binding for PMem in Spark
 
-#### Rebuild Spark packages with NUMA binding patch 
+### Rebuild Spark packages with NUMA binding patch 
 
 When using PMem as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-3.0.0.patch](./numa-binding-spark-3.0.0.patch) to Spark source code for best performance.
 
@@ -181,7 +181,7 @@ spark.yarn.numa.enabled true
 ```
 **NOTE**: If you are using a customized Spark, you will need to manually resolve the conflicts.
 
-#### Use pre-built patched Spark packages 
+### Use pre-built patched Spark packages 
 
 If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz) with the patch applied.
 

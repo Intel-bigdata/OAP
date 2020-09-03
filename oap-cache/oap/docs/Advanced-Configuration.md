@@ -1,5 +1,8 @@
 # Advanced Configuration
 
+In addition to information provided in [User Guide](User-Guide.md), we provide more strategies for SQL data source cache in this section.
+Their dependencies can be automatically installed when following [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), corresponding feature jars can be found under `/root/miniconda2/envs/oapenv/oap_jars/`.
+
 - [Additional Cache Strategies](#Additional-Cache-Strategies)  In addition to **vmem** cache strategy, Data Source Cache also supports 3 other cache strategies: **guava**, **noevict**  and **external cache**.
 - [Index and Data Cache Separation](#Index-and-Data-Cache-Separation)  To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
 - [Cache Hot Tables](#Cache-Hot-Tables)  Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
@@ -15,7 +18,7 @@ Following table shows features of 4 cache strategies on PMem.
 | Suggest using 2 executors one node to keep aligned with PMem paths and numa nodes number. | Suggest using 2 executors one node to keep aligned with PMem paths and numa nodes number. | Suggest using 2 executors one node to keep aligned with PMem paths and numa nodes number. | Node-level cache so there are no limitation for executor number. |
 | Cache data cleaned once executors exited. | Cache data cleaned once executors exited. | Cache data cleaned once executors exited. | No data loss when executors exit thus is friendly to dynamic allocation. But currently it has performance overhead than other cache solutions. |
 
-- We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md) for more information. If you have finished [Conda-Installation-Guide](../../../docs/Conda-Installation-Guide.md), you needn't  install Memkind ,Vmemcache and Plasma.
+- We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md), you needn't  install Memkind ,Vmemcache and Plasma.
 
 - For cache solution `guava/noevict`, make sure [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-3.0.0/libmemkind.so.0) for x86_64 bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. Build and install step can refer to [build and install memkind](./Developer-Guide.md#build-and-install-memkind)
 
@@ -84,9 +87,21 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
 ### External cache using plasma
 
 
-External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched spark 3.0.0. To use this strategy, follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware. Then install arrow rpm package which includes plasma library and executable file, copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer to below configurations to apply external cache strategy and start plasma service on each node and start your workload. (Currently web UI cannot display accurately, this is a known [issue](https://github.com/Intel-bigdata/OAP/issues/1579))
+External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched Spark-3.0.0. 
 
-It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma. You can follow these command to create or destroy interleaved PMem device:
+To use this strategy, follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware. 
+
+Besides, with BIOS configuration settings below, PMem could get noticeable performance gain, especially on cross socket write path.
+
+```
+Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
+Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
+``` 
+
+
+It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma.
+
+You can follow these command to create or destroy interleaved PMem device:
 
 ```
 # create interleaved PMem device
@@ -105,6 +120,7 @@ mkfs.ext4 /dev/pmem1
 mount -o dax /dev/pmem0 /mnt/pmem0
 mount -o dax /dev/pmem1 /mnt/pmem1
 ```
+Then copy `arrow-plasma-0.17.0.jar` to your ***$SPARK_HOME/jars*** directory. Refer to configurations below to apply external cache strategy and start plasma service on each node and start your workload. (Currently web UI cannot display accurately, this is a known [issue](https://github.com/Intel-bigdata/OAP/issues/1579))
 
 For Parquet data format, add these conf options:
 

@@ -14,9 +14,9 @@ export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7
 
 ## Install arrow 0.17.0 &  Native-SQL 
 
-We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md) for more information. Once finished, you will get arrow 0.17.0 dependencies installed by Conda, and the compiled `spark-columnar-core jar` will be put into dir `/root/miniconda2/envs/${YOUR_ENV_NAME}/oap_jars/`
+We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) for more information. Once finished, you will get arrow 0.17.0 dependencies installed by Conda, and the compiled `spark-columnar-core jar` will be put into dir `/root/miniconda2/envs/${YOUR_ENV_NAME}/oap_jars/`
 
-When you finish [Conda-Installation-Guide](../../docs/Conda-Installation-Guide.md) , just jump to [Spark Configurations for Native SQL Engine](#spark-configurations-for-native-sql-engine).
+When you finish [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) , just jump to [Spark Configurations for Native SQL Engine](#spark-configurations-for-native-sql-engine).
 
 ### Manully Install arrow 0.17.0 
 Step 1. Install arrow 0.17.0 dependencies

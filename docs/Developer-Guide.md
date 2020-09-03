@@ -5,7 +5,9 @@
 * [RDD Cache PMem Extension](../oap-spark/README.md#compiling)
 * [Shuffle Remote PMem Extension](../oap-shuffle/RPMem-shuffle/README.md#5-install-dependencies-for-shuffle-remote-pmem-extension)
 * [Remote Shuffle](../oap-shuffle/remote-shuffle/README.md#build-and-deploy)
-
+* [Intel MLlib](../oap-mllib/README.md)
+* [Unified Arrow Data Source](../oap-data-source/arrow/README.md)
+* [Native SQL Engine](../oap-native-sql/README.md)
 ## OAP Building
 
 To clone OAP project, use
@@ -15,13 +17,17 @@ cd OAP
 ```
 
 #### Prerequisites for Building
-OAP is built using [Apache Maven](http://maven.apache.org/). You need to install the required packages on the build system listed below. To enable Shuffle Remote PMem extension, you must configure and validate RDMA in advance, you can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md) for more details.
-
+OAP is built using [Apache Maven](http://maven.apache.org/). You need to install the required packages on the build system listed below. 
+- **Requirements for Shuffle Remote PMem Extension**  
+To enable Shuffle Remote PMem extension, you must configure and validate RDMA in advance, you can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md) for more details.
+- **Requirements for OAP MLlib**  
+To enable OAP MLlib, you need to install oneDAL and oneCLL, they can be downloaded and install from [here](https://software.intel.com/content/www/us/en/develop/tools/oneapi.html). 
 - [Cmake](https://help.directadmin.com/item.php?id=494)
 - [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
 - [Vmemcache](https://github.com/pmem/vmemcache)
 - [HPNL](https://github.com/Intel-bigdata/HPNL)
 - [PMDK](https://github.com/pmem/pmdk)  
+- [Arrow](https://github.com/Intel-bigdata/arrow)
 - [GCC > 7](https://gcc.gnu.org/wiki/InstallingGCC)
 
 You can use the following command under the folder dev to automatically install these dependencies.
