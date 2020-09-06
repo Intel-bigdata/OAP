@@ -100,7 +100,7 @@ function conda_build_oap_arrow_lib() {
 
 function conda_build_oap() {
   OAP_VERSION=0.9.0
-  SPARK_VERSION=2.4.4
+  SPARK_VERSION=3.0.0
   sh $DEV_PATH/make-distribution.sh
   cd $DEV_PATH/release-package/
   tar -xzvf oap-$version.tar.gz

@@ -161,7 +161,7 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
 
    Launch Spark Thrift Server, and use the Beeline command line tool to connect to the Thrift Server to execute DDL or DML operations. The data cache will automatically take effect for Parquet or ORC file sources. 
    
-   The rest of this section will show you how to do a quick verification of cache functionality. It will reuse the database metastore created in the [Working with Data Source Cache Index](#Working-with-SQL-Index) section, which creates the `oap_test` table definition. In production, Spark Thrift Server will have its own metastore database directory or metastore service and use DDL's through Beeline for creating your tables.
+   The rest of this section will show you how to do a quick verification of cache functionality. It will reuse the database metastore created in the [Working with SQL Index](#Working-with-SQL-Index) section, which creates the `oap_test` table definition. In production, Spark Thrift Server will have its own metastore database directory or metastore service and use DDL's through Beeline for creating your tables.
 
    When you run ```spark-shell``` to create the `oap_test` table, `metastore_db` will be created in the directory where you ran '$SPARK_HOME/bin/spark-shell'. ***Go to that directory*** and execute the following command to launch Thrift JDBC server and run queries.
 
@@ -192,7 +192,7 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
    ...
    ```
 
-5. Open the Spark History Web UI and go to the OAP tab page to see verify the cache metrics. The following picture is an example.
+5. Open the Spark History Web UI and go to the OAP tab page to verify the cache metrics. The following picture is an example.
 
    ![webUI](./image/webUI.png)
 

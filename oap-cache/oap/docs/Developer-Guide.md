@@ -17,7 +17,7 @@ git clone -b <tag-version>  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
-Build the package:
+Build the `oap-cache` package:
 
 ```
 mvn clean -pl com.intel.oap:oap-cache -am package

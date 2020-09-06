@@ -1,7 +1,8 @@
 # Advanced Configuration
 
-In addition to information provided in [User Guide](User-Guide.md), we provide more strategies for SQL data source cache in this section.
-Their dependencies can be automatically installed when following [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), corresponding feature jars can be found under `/root/miniconda2/envs/oapenv/oap_jars/`.
+In addition to usage information provided in [User Guide](User-Guide.md), we provide more strategies for SQL index and data source cache in this section.
+
+Their needed dependencies like ***Memkind*** ,***Vmemcache*** and ***Plasma*** can be automatically installed when following [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), corresponding feature jars can be found under `/root/miniconda2/envs/oapenv/oap_jars/`.
 
 - [Additional Cache Strategies](#Additional-Cache-Strategies)  In addition to **vmem** cache strategy, Data Source Cache also supports 3 other cache strategies: **guava**, **noevict**  and **external cache**.
 - [Index and Data Cache Separation](#Index-and-Data-Cache-Separation)  To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
@@ -18,19 +19,18 @@ Following table shows features of 4 cache strategies on PMem.
 | Suggest using 2 executors one node to keep aligned with PMem paths and numa nodes number. | Suggest using 2 executors one node to keep aligned with PMem paths and numa nodes number. | Suggest using 2 executors one node to keep aligned with PMem paths and numa nodes number. | Node-level cache so there are no limitation for executor number. |
 | Cache data cleaned once executors exited. | Cache data cleaned once executors exited. | Cache data cleaned once executors exited. | No data loss when executors exit thus is friendly to dynamic allocation. But currently it has performance overhead than other cache solutions. |
 
-- We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md), you needn't  install Memkind ,Vmemcache and Plasma.
+- For cache solution `guava/noevict`, make sure [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/libmemkind.so.0) for x86_64 bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. Build and install step can refer to [build and install memkind](./Developer-Guide.md#build-and-install-memkind)
 
-- For cache solution `guava/noevict`, make sure [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-3.0.0/libmemkind.so.0) for x86_64 bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. Build and install step can refer to [build and install memkind](./Developer-Guide.md#build-and-install-memkind)
+- For cache solution `vmemcahe/external` cache, make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. You can follow the build/install steps from vmemcache website and make sure `libvmemcache.so` exist in `/lib64` directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
 
-- For cache solution `vmemcahe/external` cache, make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. You can follow the build/install steps from vmemcache website and make sure `libvmemcache.so` exist in `/lib64` directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-3.0.0/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
+- Data Source Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/branch-0.17.0-oap-0.9) repo. Build and install step can refer to [build and install plasma](./Developer-Guide.md#build-and-install-plasma)
 
-- Data Source Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. Build and install step can refer to [build and install plasma](./Developer-Guide.md#build-and-install-plasma)
- 
+If you have followed [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), ***Memkind*** ,***Vmemcache*** and ***Plasma*** will be automatically installed. 
 Or you can refer to [Developer-Guide](../../../docs/Developer-Guide.md), there is a shell script to help you install these dependencies automatically.
 
 ### Guava cache
 
-Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware and memkind library correctly. Then follow bellow configurations.
+Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware correctly, also make sure memkind library installed. Then follow configurations below.
 
 **NOTE**: `spark.sql.oap.fiberCache.persistent.memory.reserved.size`: When we use PMem as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available PMem capacity to avoid memory allocation failure. But even with an allocation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
 
@@ -69,7 +69,7 @@ spark.sql.oap.fiberCache.memory.manager           kmem
 
 The noevict cache strategy is also supported in OAP based on the memkind library for PMem.
 
-To apply noevict cache strategy in your workload, please follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware and memkind library correctly. Then follow bellow configurations.
+To apply noevict cache strategy in your workload, please follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware correctly, also make sure memkind library installed. Then follow configurations below.
 
 For Parquet file format, add these conf options:
 ```
@@ -101,7 +101,7 @@ Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disable
 
 It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma.
 
-You can follow these command to create or destroy interleaved PMem device:
+You can follow these commands to create or destroy interleaved PMem device:
 
 ```
 # create interleaved PMem device

@@ -82,7 +82,7 @@ Master node can be co-located with one of the Hadoop data nodes.
 - Please refer to section 4.2 for configurations
 **Software:**
 -   Hadoop 2.7
--   Spark 2.4.4
+-   Spark 3.0.0
 -   Fedora 29 with ww08.2019 BKC
 
 ### 2.2. Recommended RDMA NIC
@@ -339,10 +339,9 @@ ping data: rdma-ping-3: DEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstu
 Please refer to your NIC manuual for detail instructions on how to validate RDMA works. 
 
 ## <a id="install-dependencies-for-shuffle-remote-pmem-extension"></a>5. Install dependencies for Shuffle Remote PMem Extension
----------------------------
-If you have completed all steps in installation guide,  you can ignore this section and refer to [6. Install Shuffle Remote PMem Extension for Spark](#6-install-shuffle-remote-pmem-extension-for-spark).   
+--------------------------- 
 
-We have provided a Conda package which will automatically install dependencies except PMDK, you can refer to [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), you  needn't  install HPNL and RPMem extension, and you can find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`.
+We have provided a Conda package which will automatically install HPNL and RPMem extension, refer to [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), you can skip 5.1 and 5.2 below, and find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`.
 
 ### 5.1 Install HPNL (<https://github.com/Intel-bigdata/HPNL>)
 
@@ -444,7 +443,7 @@ mvn install -DskipTests
 --------------------------------------------------------
 
 Shuffle Remote PMem Extension for spark shuffle is designed as a plugin to Spark.
-Currently the plugin supports Spark 2.4.4 and works well on various
+Currently the plugin supports Spark 3.0.0 and works well on various
 Network fabrics, including Socket, RDMA and Omni-Path. There are several
 configurations files needs to be modified in order to run Shuffle Remote PMem Extension. 
 

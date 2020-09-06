@@ -4,7 +4,7 @@ Follow steps below on ***every node*** of your cluster to set right environment 
 
 ## Contents
   - [Prerequisites](#prerequisites)
-  - [Compiling OAP](#compiling-oap)
+  - [Installing OAP](#installing-oap)
   - [Configuration](#configuration)
 
 ## Prerequisites 
@@ -28,15 +28,14 @@ conda activate oapenv
 conda config --add channels conda-forge
 ```
 
-## Compiling OAP
+## Installing OAP
 
 Dependencies below are required by OAP and all of them are included in OAP Conda package, they will be automatically installed in your cluster when you conda install OAP. Ensure you have activated environment which you create in the previous steps.
 
-- [Memkind](https://anaconda.org/intel-bigdata/memkind)
-- [Vmemcache](https://anaconda.org/intel-bigdata/vmemcache)
-- [HPNL](https://anaconda.org/intel-bigdata//hpnl)
-- [Arrow-cpp](https://anaconda.org/intel-bigdata/arrow-cpp)  
-- [OAP](https://anaconda.org/intel-bigdata/oap)
+- [Memkind](https://anaconda.org/intel/memkind)
+- [Vmemcache](https://anaconda.org/intel/vmemcache)
+- [HPNL](https://anaconda.org/intel//hpnl)
+- [Arrow-cpp](https://anaconda.org/intel/arrow-cpp)  
 
 ```bash
 conda activate oapenv
@@ -69,7 +68,7 @@ prepare_PMDK
 ```
 
 ##  Configuration
-Once finished steps above, make sure libraries installed by Conda can be linked by Spark, please add the following configuration settings to "$SPARK_HOME/conf/spark-defaults" on the working node.
+Once finished steps above, make sure libraries installed by Conda can be linked by Spark, please add the following configuration settings to `$SPARK_HOME/conf/spark-defaults` on the working node.
 
 ```
 spark.executorEnv.LD_LIBRARY_PATH /root/miniconda2/envs/oapenv/lib/

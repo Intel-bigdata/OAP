@@ -106,7 +106,7 @@ When the backend storage is HDFS, we contact http://$host:$port/conf to fetch co
 
 #### Inherited Spark Shuffle Configurations
 
-These configurations are inherited from upstream Spark, they are still supported in remote shuffle. More explanations can be found in [Spark core docs](https://spark.apache.org/docs/2.4.4/configuration.html#shuffle-behavior) and [Spark SQL docs](https://spark.apache.org/docs/2.4.4/sql-performance-tuning.html).
+These configurations are inherited from upstream Spark, they are still supported in remote shuffle. More explanations can be found in [Spark core docs](https://spark.apache.org/docs/3.0.0/configuration.html#shuffle-behavior) and [Spark SQL docs](https://spark.apache.org/docs/2.4.4/sql-performance-tuning.html).
 ```
     spark.reducer.maxSizeInFlight
     spark.reducer.maxReqsInFlight
