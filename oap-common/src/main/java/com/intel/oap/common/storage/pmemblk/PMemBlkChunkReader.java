@@ -20,10 +20,11 @@ public class PMemBlkChunkReader extends ChunkReader {
     protected int readFromPMem(PMemPhysicalAddress pMemPhysicalAddress, ByteBuffer data) {
         PMemBlkPhysicalAddress pMemBlkPhysicalAddress = (PMemBlkPhysicalAddress) pMemPhysicalAddress;
         int index = pMemBlkPhysicalAddress.getIndex();
+        int length = pMemBlkPhysicalAddress.getLength();
         byte[] buffer = new byte[chunkSize];
         PMemBlockPlatform.read(buffer, index);
         data.put(buffer);
-        return chunkSize;
+        return length;
     }
 
     @Override

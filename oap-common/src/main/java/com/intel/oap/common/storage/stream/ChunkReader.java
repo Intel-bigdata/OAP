@@ -8,6 +8,7 @@ public abstract class ChunkReader {
     protected PMemManager pMemManager;
     protected byte[] logicalID;
     private int chunkID = 0;
+    private int chunkSize = 0;
     private ByteBuffer remainingBuffer;
     private MetaData metaData;
     private FileInputStream inputStream = null;
@@ -15,28 +16,53 @@ public abstract class ChunkReader {
     public ChunkReader(byte[] logicalID, PMemManager pMemManager){
         this.logicalID = logicalID;
         this.pMemManager = pMemManager;
-        this.remainingBuffer = ByteBuffer.wrap(new byte[pMemManager.getChunkSize()]);
+        this.chunkSize = pMemManager.getChunkSize();
+        this.remainingBuffer = ByteBuffer.wrap(new byte[chunkSize]);
+        remainingBuffer.flip();
         this.metaData = pMemManager.getpMemMetaStore().getMetaFooter(logicalID);
     }
 
+    public int read() throws IOException {
+        while (true) {
+            if (remainingBuffer.hasRemaining()) {
+                return remainingBuffer.get();
+            }
+            remainingBuffer.clear();
+            int size = loadData();
+            remainingBuffer.limit(size);
+            remainingBuffer.flip();
+
+            if (!remainingBuffer.hasRemaining()) {
+                return -1;
+            }
+        }
+    }
+
     public int read(byte b[]) throws IOException {
-        int i = 0;
-        remainingBuffer.clear();
-        int remainingSize = loadData();
-        remainingBuffer.flip();
-        while (remainingSize > 0 && i < b.length) {
-            b[i] = remainingBuffer.get();
-            i++;
-            remainingSize--;
-            // when current chunk finished read but byte array is not full-filled, switch to next chunk
-            if (remainingSize == 0 && i < b.length) {
+        return read(b, 0, b.length);
+    }
+
+    public int read(byte b[], int off, int len) throws IOException {
+        int read = 0;
+        while (len > 0) {
+            if (remainingBuffer.hasRemaining()) {
+                int length = Math.min(len, remainingBuffer.remaining());
+                remainingBuffer.get(b, off, length);
+                off += length;
+                len -= length;
+                read += length;
+            } else {
                 remainingBuffer.clear();
-                remainingSize = loadData();
+//                remainingBuffer.limit(chunkSize);
+                int size = loadData();
+                remainingBuffer.limit(size);
+                if (remainingBuffer.position() == 0) {
+                    break;
+                }
                 remainingBuffer.flip();
             }
         }
-
-        return i;
+        return read == 0 ? -1 : read;
     }
 
     private int loadData() throws IOException {

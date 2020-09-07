@@ -53,10 +53,10 @@ public class ChunkStreamAPITest {
         String fileName = "target/test.file";
         PersistentMemoryPlatform.initialize("target/tmp/", 16 * 1024 *1024, 0);
         byte[] readData = new byte[data.length];
-        ChunkOutputStream chunkoutputStream = new ChunkOutputStream(fileName, dataStore);
+        ChunkOutputStream chunkoutputStream = new ChunkOutputStream(fileName.getBytes(), dataStore);
         chunkoutputStream.write(data);
         chunkoutputStream.close();
-        ChunkInputStream chunkInputStream = new ChunkInputStream(fileName, dataStore);
+        ChunkInputStream chunkInputStream = new ChunkInputStream(fileName.getBytes(), dataStore);
         chunkInputStream.read(readData);
         chunkInputStream.close();
         MetaData metaData = pMemManager.getpMemMetaStore().getMetaFooter(fileName.getBytes());
@@ -78,7 +78,7 @@ public class ChunkStreamAPITest {
         PMemManager pMemManager = new PMemManager(p);
         dataStore = new DataStore(pMemManager, p);
         String fileName = "target/test.file";
-        ChunkOutputStream chunkOutputStream = new ChunkOutputStream(fileName, dataStore);
+        ChunkOutputStream chunkOutputStream = new ChunkOutputStream(fileName.getBytes(), dataStore);
         chunkOutputStream.close();
         MetaData metaData = pMemManager.getpMemMetaStore().getMetaFooter(fileName.getBytes());
         assert(metaData.getTotalChunk() == 0);

@@ -21,30 +21,28 @@ public abstract class ChunkWriter {
         remainingBuffer = ByteBuffer.wrap(new byte[pMemManager.getChunkSize()]);
     }
 
-
-    public void write(byte[] bytes) throws IOException {
-        // FIXME optimize this by avoiding one-by-one add. A new data structure can used like simple array
-        if (bytes == null || bytes.length == 0) {
-            return;
-        }
-        int i = 0, j = 0;
-        while (i < bytes.length) {
-            if (j == pMemManager.getChunkSize()) {
-                j = 0;
-                // Flush buffer through chunk writer
+    public void write(final byte[] bytes, int off, int len) throws IOException {
+        while (len > 0) {
+            int length = Math.min(len, remainingBuffer.remaining());
+            remainingBuffer.put(bytes, off, length);
+            if (!remainingBuffer.hasRemaining()) {
                 flushBufferByChunk(remainingBuffer);
-                // clear content of remainingBuffer
-                remainingBuffer.clear();
             }
-            remainingBuffer.put(bytes[i]);
-            i++;
-            j++;
+            len -= length;
+            off += length;
         }
-        if(j == pMemManager.getChunkSize()){
-            // Flush buffer through chunk writer
+        // TODO： do not flush immediately to avoid wasting space of last chunk
+        if (remainingBuffer.position() > 0) {
             flushBufferByChunk(remainingBuffer);
-            remainingBuffer.clear();
         }
+    }
+
+    public void write(final byte[] bytes) throws IOException {
+        write(bytes, 0, bytes.length);
+    }
+
+    public void write(final int b) throws IOException {
+        write(new byte[] { (byte)b}, 0, 1);
     }
 
     private void flushBufferByChunk(ByteBuffer byteBuffer) throws IOException {
@@ -63,6 +61,7 @@ public abstract class ChunkWriter {
         } else {
             flushToDisk(byteBuffer);
         }
+        byteBuffer.clear();
     }
 
     private void flushToDisk(ByteBuffer byteBuffer) throws IOException {
@@ -72,7 +71,6 @@ public abstract class ChunkWriter {
             fallbackTriggered = true;
         }
         outputStream.write(byteBuffer.array());
-        byteBuffer.clear();
     }
 
     public void close() throws IOException {
