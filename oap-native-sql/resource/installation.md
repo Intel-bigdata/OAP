@@ -21,7 +21,7 @@ When you finish [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) ,
 ### Manully Install arrow 0.17.0 
 Step 1. Install arrow 0.17.0 dependencies
 ```
-git clone https://github.com/apache/arrow && cd arrow & git checkout arrow-0.17.0
+git clone https://github.com/intel-bigdata/arrow && cd arrow & git checkout branch-0.17.0-oap-0.9
 vim ci/conda_env_gandiva.yml 
 clangdev=7
 llvmdev=7
@@ -32,8 +32,8 @@ conda create -y -n pyarrow-dev -c conda-forge \
     --file ci/conda_env_python.yml \
     --file ci/conda_env_gandiva.yml \
     compilers \
-    python=3.7 \
-    pandas
+    python=3.7
+
 conda activate pyarrow-dev
 ```
 Step2. Install arrow 0.17.0

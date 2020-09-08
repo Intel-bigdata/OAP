@@ -39,7 +39,7 @@ cmake version 3.15.0-rc4
 apache arrow
 ``` shell
 git clone https://github.com/Intel-bigdata/arrow.git
-cd arrow && git checkout native-sql-engine-clean
+cd arrow && git checkout branch-0.17.0-oap-0.9
 mkdir -p arrow/cpp/release-build
 cd arrow/cpp/release-build
 cmake -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_WITH_SNAPPY=ON -DARROW_WITH_LZ4=ON -DARROW_FILESYSTEM=ON -DARROW_JSON=ON ..
