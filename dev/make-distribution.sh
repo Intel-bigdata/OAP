@@ -15,13 +15,39 @@ function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)"
 
 function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" == "$1"; }
 
+
+function install_gcc7() {
+  #for gcc7
+  yum -y install gmp-devel
+  yum -y install mpfr-devel
+  yum -y install libmpc-devel
+  yum -y install wget
+
+  cd $DEV_PATH/thirdparty
+
+  if [ ! -d "gcc-7.3.0" ]; then
+    if [ ! -f "gcc-7.3.0.tar" ]; then
+      if [ ! -f "gcc-7.3.0.tar.xz" ]; then
+        wget https://bigsearcher.com/mirrors/gcc/releases/gcc-7.3.0/gcc-7.3.0.tar.xz
+      fi
+      xz -d gcc-7.3.0.tar.xz
+    fi
+    tar -xvf gcc-7.3.0.tar
+  fi
+
+  cd gcc-7.3.0/
+  mkdir -p $DEV_PATH/thirdparty/gcc7
+  ./configure --prefix=$DEV_PATH/thirdparty/gcc7 --disable-multilib
+  make -j
+  make install
+}
+
 function check_gcc() {
   CURRENT_GCC_VERSION_STR="$(gcc --version)"
   array=(${CURRENT_GCC_VERSION_STR//,/ })
   CURRENT_GCC_VERSION=${array[2]}
   if version_lt $CURRENT_GCC_VERSION $GCC_MIN_VERSION; then
     if [ ! -f "$DEV_PATH/thirdparty/gcc7/bin/gcc" ]; then
-      source $DEV_PATH/prepare_oap_env.sh
       install_gcc7
     fi
     export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
@@ -31,7 +57,7 @@ function check_gcc() {
 
 function gather() {
   cd  $DEV_PATH
-  package_name=oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION
+  package_name=oap-$OAP_VERSION-bin-spark-$SPARK_VERSION
   rm -rf $DEV_PATH/release-package/*
   target_path=$DEV_PATH/release-package/$package_name/jars/
   mkdir -p $target_path

@@ -2,27 +2,20 @@
 
 # set -e
 MAVEN_TARGET_VERSION=3.6.3
-
+MAVEN_MIN_VERSION=3.3
 CMAKE_TARGET_VERSION=3.11.1
 CMAKE_MIN_VERSION=3.11
 TARGET_CMAKE_SOURCE_URL=https://cmake.org/files/v3.11/cmake-3.11.1.tar.gz
 GCC_MIN_VERSION=7.0
+LLVM_MIN_VERSION=7.0
 
 if [ -z "$DEV_PATH" ]; then
   cd $(dirname $BASH_SOURCE)
   DEV_PATH=`echo $(pwd)`
-  echo $DEV_PATH
   cd -
 fi
 
-if [[ ! -z $(which yum) ]]; then
-    INSTALL_TOOL="yum "
-elif [[ ! -z $(which apt-get) ]]; then
-    INSTALL_TOOL="apt-get "
-else
-    echo "error can't install package $PACKAGE"
-    exit 1;
-fi
+
 
 function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" != "$1"; }
 
@@ -34,7 +27,6 @@ function check_gcc() {
   CURRENT_GCC_VERSION=${array[2]}
   if version_lt $CURRENT_GCC_VERSION $GCC_MIN_VERSION; then
     if [ ! -f "$DEV_PATH/thirdparty/gcc7/bin/gcc" ]; then
-      source $DEV_PATH/prepare_oap_env.sh
       install_gcc7
     fi
     export CXX=$DEV_PATH/thirdparty/gcc7/bin/g++
@@ -43,21 +35,43 @@ function check_gcc() {
   fi
 }
 
+function check_maven() {
+  CURRENT_MAVEN_VERSION_STR="$(mvn --version)"
+  array=(${CURRENT_MAVEN_VERSION_STR//,/ })
+  CURRENT_MAVEN_VERSION=${array[2]}
+  echo $CURRENT_MAVEN_VERSION
+  if version_lt $CURRENT_MAVEN_VERSION $MAVEN_MIN_VERSION; then
+    install_maven
+  fi
+}
+
+function install_maven() {
+  yum -y install wget
+  cd $DEV_PATH/thirdparty
+  wget https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
+  mkdir -p /usr/local/maven
+  tar -xzvf apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
+  mv apache-maven-$MAVEN_TARGET_VERSION/* /usr/local/maven
+  echo 'export MAVEN_HOME=/usr/local/maven' >> ~/.bashrc
+  echo 'export PATH=$MAVEN_HOME/bin:$PATH' >> ~/.bashrc
+  source ~/.bashrc
+  rm -rf apache-maven*
+  cd $DEV_PATH/thirdparty
+}
+
 function prepare_maven() {
   echo "Check maven version......"
   CURRENT_MAVEN_VERSION_STR="$(mvn --version)"
   if [[ "$CURRENT_MAVEN_VERSION_STR" == "Apache Maven"* ]]; then
     echo "mvn is installed"
+    array=(${CURRENT_MAVEN_VERSION_STR//,/ })
+    CURRENT_MAVEN_VERSION=${array[2]}
+    if version_lt $CURRENT_MAVEN_VERSION $MAVEN_MIN_VERSION; then
+      install_maven
+    fi
   else
     echo "mvn is not installed"
-    wget https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
-    mkdir -p /usr/local/maven
-    tar -xzvf apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
-    mv apache-maven-$MAVEN_TARGET_VERSION/* /usr/local/maven
-    echo 'export MAVEN_HOME=/usr/local/maven' >> ~/.bashrc
-    echo 'export PATH=$MAVEN_HOME/bin:$PATH' >> ~/.bashrc
-    source ~/.bashrc
-    rm -rf apache-maven*
+    install_maven
   fi
 }
 
@@ -65,7 +79,6 @@ function prepare_cmake() {
   CURRENT_CMAKE_VERSION_STR="$(cmake --version)"
   cd  $DEV_PATH
 
-  # echo ${CURRENT_CMAKE_VERSION_STR}
   if [[ "$CURRENT_CMAKE_VERSION_STR" == "cmake version"* ]]; then
     echo "cmake is installed"
     array=(${CURRENT_CMAKE_VERSION_STR//,/ })
@@ -83,7 +96,7 @@ function prepare_cmake() {
       ./bootstrap
       gmake
       gmake install
-      $INSTALL_TOOL remove cmake -y
+      yum remove cmake -y
       ln -s /usr/local/bin/cmake /usr/bin/
       cd  $DEV_PATH
     fi
@@ -106,7 +119,7 @@ function prepare_cmake() {
 }
 
 function prepare_memkind() {
-  memkind_repo="https://github.com/Intel-bigdata/memkind.git"
+  memkind_repo="https://github.com/memkind/memkind.git"
   echo $memkind_repo
 
   mkdir -p $DEV_PATH/thirdparty
@@ -116,15 +129,15 @@ function prepare_memkind() {
   fi
   cd memkind/
   git pull
-  git checkout v1.10.0-oap-0.7
+  git checkout v1.10.1-rc2
 
-  $INSTALL_TOOL -y install autoconf
-  $INSTALL_TOOL -y install automake
-  $INSTALL_TOOL -y install gcc-c++
-  $INSTALL_TOOL -y install libtool
-  $INSTALL_TOOL -y install numactl-devel
-  $INSTALL_TOOL -y install unzip
-  $INSTALL_TOOL -y install libnuma-devel
+  yum -y install autoconf
+  yum -y install automake
+  yum -y install gcc-c++
+  yum -y install libtool
+  yum -y install numactl-devel
+  yum -y install unzip
+  yum -y install libnuma-devel
 
   ./autogen.sh
   ./configure
@@ -151,7 +164,7 @@ function prepare_vmemcache() {
   git pull
   mkdir -p build
   cd build
-  $INSTALL_TOOL -y install rpm-build
+  yum -y install rpm-build
   cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
   make package
   sudo rpm -i libvmemcache*.rpm
@@ -159,10 +172,10 @@ function prepare_vmemcache() {
 
 function install_gcc7() {
   #for gcc7
-  $INSTALL_TOOL -y install gmp-devel
-  $INSTALL_TOOL -y install mpfr-devel
-  $INSTALL_TOOL -y install libmpc-devel
-  $INSTALL_TOOL -y install wget
+  yum -y install gmp-devel
+  yum -y install mpfr-devel
+  yum -y install libmpc-devel
+  yum -y install wget
 
   cd $DEV_PATH/thirdparty
 
@@ -184,7 +197,10 @@ function install_gcc7() {
 }
 
 function prepare_llvm() {
-
+  CURRENT_LLVM_VERSION_STR="$(llvm-config --version)"
+  if version_ge $CURRENT_LLVM_VERSION_STR $LLVM_MIN_VERSION; then
+      return
+  fi
   cd $DEV_PATH
   mkdir -p $DEV_PATH/thirdparty/llvm
   cd $DEV_PATH/thirdparty/llvm
@@ -220,9 +236,9 @@ function prepare_llvm() {
 function prepare_intel_arrow() {
   prepare_cmake
   prepare_llvm
-  $INSTALL_TOOL -y install libgsasl
-  $INSTALL_TOOL -y install libidn-devel.x86_64
-  $INSTALL_TOOL -y install libntlm.x86_64
+  yum -y install libgsasl
+  yum -y install libidn-devel.x86_64
+  yum -y install libntlm.x86_64
   cd $DEV_PATH
   mkdir -p $DEV_PATH/thirdparty/
   cd $DEV_PATH/thirdparty/
@@ -274,7 +290,7 @@ function prepare_libfabric() {
 
 function prepare_HPNL(){
   prepare_libfabric
-  $INSTALL_TOOL -y install cmake boost-devel boost-system
+  yum -y install cmake boost-devel boost-system
   mkdir -p $DEV_PATH/thirdparty
   cd $DEV_PATH/thirdparty
   if [ ! -d "HPNL" ]; then
@@ -292,8 +308,8 @@ function prepare_HPNL(){
 }
 
 function prepare_ndctl() {
-  $INSTALL_TOOL install -y autoconf asciidoctor kmod-devel.x86_64 libudev-devel libuuid-devel json-c-devel jemalloc-devel
-  $INSTALL_TOOL groupinstall -y "Development Tools"
+  yum install -y autoconf asciidoctor kmod-devel.x86_64 libudev-devel libuuid-devel json-c-devel jemalloc-devel
+  yum groupinstall -y "Development Tools"
   mkdir -p $DEV_PATH/thirdparty
   cd $DEV_PATH/thirdparty
   if [ ! -d "ndctl" ]; then
@@ -310,7 +326,7 @@ function prepare_ndctl() {
 
 function prepare_PMDK() {
   prepare_ndctl
-  $INSTALL_TOOL install -y pandoc
+  yum install -y pandoc
   mkdir -p $DEV_PATH/thirdparty
   cd $DEV_PATH/thirdparty
   if [ ! -d "pmdk" ]; then
@@ -367,14 +383,85 @@ function  prepare_all() {
 }
 
 function oap_build_help() {
-    echo " prepare_maven           = function to install Maven"
-    echo " prepare_memkind         = function to install Memkind"
-    echo " prepare_cmake           = function to install Cmake"
-    echo " install_gcc7            = function to install GCC 7.3.0"
-    echo " prepare_vmemcache       = function to install Vmemcache"
-    echo " prepare_intel_arrow     = function to install intel Arrow"
-    echo " prepare_HPNL            = function to install intel HPNL"
-    echo " prepare_PMDK            = function to install PMDK "
-    echo " prepare_PMoF            = function to install PMoF"
-    echo " prepare_all             = function to install all the above"
+    echo " --prepare_maven            function to install Maven"
+    echo " --prepare_memkind          function to install Memkind"
+    echo " --prepare_cmake            function to install Cmake"
+    echo " --install_gcc7             function to install GCC 7.3.0"
+    echo " --prepare_vmemcache        function to install Vmemcache"
+    echo " --prepare_intel_arrow      function to install intel Arrow"
+    echo " --prepare_HPNL             function to install intel HPNL"
+    echo " --prepare_PMDK             function to install PMDK "
+    echo " --prepare_PMoF             function to install PMoF"
+    echo " --prepare_all              function to install all the above"
 }
+
+
+while [[ $# -gt 0 ]]
+do
+key="$1"
+case $key in
+    --prepare_all)
+    shift 1 
+    echo "Start to install all compile-time dependencies for OAP ..."
+    prepare_all
+    exit 1
+    ;;
+    --prepare_maven)
+    shift 1 
+    prepare_maven
+    exit 1
+    ;;
+    --prepare_memkind)
+    shift 1 
+    prepare_memkind
+    exit 1
+    ;;
+    --prepare_cmake)
+    shift 1 
+    prepare_cmake
+    exit 1
+    ;;
+    --install_gcc7)
+    shift 1 
+    install_gcc7
+    exit 1
+    ;;
+    --prepare_vmemcache)
+    shift 1 
+    prepare_vmemcache
+    exit 1
+    ;;
+    --prepare_intel_arrow)
+    shift 1 
+    prepare_intel_arrow
+    exit 1
+    ;;
+    --prepare_HPNL)
+    shift 1 
+    prepare_HPNL
+    exit 1
+    ;;
+    --prepare_PMDK)
+    shift 1 
+    prepare_PMDK
+    exit 1
+    ;;
+    --prepare_PMoF)
+    shift 1 
+    prepare_PMoF
+    exit 1
+    ;;
+    --prepare_llvm)
+    shift 1 
+    prepare_llvm
+    exit 1
+    ;;
+    *)    # unknown option
+    echo "Unknown option "
+    echo "usage: ./prepare_oap_env.sh [options]"
+    echo "Options: "
+    oap_build_help
+    exit 1
+    ;;
+esac
+done

@@ -16,16 +16,15 @@ if [ -z "$RECIPES_PATH" ]; then
 fi
 
 function conda_build_memkind() {
-  memkind_repo="https://github.com/Intel-bigdata/memkind.git"
+  memkind_repo="https://github.com/memkind/memkind.git"
   mkdir -p $DEV_PATH/thirdparty
   cd $DEV_PATH/thirdparty
   if [ ! -d "memkind" ]; then
     git clone $memkind_repo
   fi
   cd memkind/
-  git checkout v1.10.0-oap-0.7
+  git checkout v1.10.1-rc2
   cp $RECIPES_PATH/memkind/configure.ac $DEV_PATH/thirdparty/memkind/
-
   cd $RECIPES_PATH/memkind/
   conda build .
 }
@@ -36,30 +35,15 @@ function conda_build_vmemcache() {
   cd $DEV_PATH/thirdparty
   vmemcache_repo="https://github.com/pmem/vmemcache.git"
   if [ ! -d "vmemcache" ]; then
-    git clone vmemcache_repo
+    git clone $vmemcache_repo
   fi
   cd vmemcache/
   git pull
-
   cd $RECIPES_PATH/vmemcache/
   conda build .
 }
 
-function conda_build_arrow() {
-  mkdir -p $DEV_PATH/thirdparty
-  cd $DEV_PATH/thirdparty
-  arrow_repo="https://github.com/Intel-bigdata/arrow.git"
-  if [ ! -d "arrow" ]; then
-    git clone $arrow_repo -b branch-0.17.0-oap-0.9
-  fi
-  cd arrow
-  git pull
-  cp $RECIPES_PATH/intel-arrow/build.sh $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/arrow-cpp/
-  cp $RECIPES_PATH/intel-arrow/meta.yaml $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/arrow-cpp/
-  cp $RECIPES_PATH/intel-arrow/conda_build_config.yaml $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/arrow-cpp/
-  cd $DEV_PATH/thirdparty/arrow/dev/tasks/conda-recipes/arrow-cpp
-  conda build .
-}
+
 
 function conda_build_libfabric() {
   mkdir -p $DEV_PATH/thirdparty
@@ -87,24 +71,38 @@ function conda_build_hpnl() {
   conda build .
 }
 
-
-function conda_build_oap_arrow_lib() {
-  cp -L $DEV_PATH/thirdparty/arrow/cpp/release-build/release/libarrow.so cp $RECIPES_PATH/oap-arrow-lib/
-  cp -L $DEV_PATH/thirdparty/arrow/cpp/release-build/release/libgandiva.so $RECIPES_PATH/oap-arrow-lib/
-  cp -L $DEV_PATH/thirdparty/arrow/cpp/release-build/release/libplasma.so $RECIPES_PATH/oap-arrow-lib/
-  cp -L $DEV_PATH/thirdparty/arrow/cpp/release-build/release/libplasma_java.so $RECIPES_PATH/oap-arrow-lib/
-  cp $DEV_PATH/thirdparty/arrow/cpp/release-build/release/plasma-store-server $RECIPES_PATH/oap-arrow-lib/
-  cd $RECIPES_PATH/oap-arrow-lib/
-  conda build .
+function prepare_libfabric() {
+  mkdir -p $DEV_PATH/thirdparty
+  yum install -y libibverbs-devel  librdmacm-devel
+  cd $DEV_PATH/thirdparty
+  if [ ! -d "libfabric" ]; then
+    git clone https://github.com/ofiwg/libfabric.git
+  fi
+  cd libfabric
+  git checkout v1.6.0
+  ./autogen.sh
+  mkdir -p $DEV_PATH/thirdparty/libfabric/release
+  ./configure --disable-sockets --enable-verbs --disable-mlx --prefix=$DEV_PATH/thirdparty/libfabric/release
+  make -j &&  make install
+  cp $DEV_PATH/thirdparty/libfabric/release/lib/* $DEV_PATH/thirdparty/arrow/oap/libfabric
 }
 
 function conda_build_oap() {
   OAP_VERSION=0.9.0
   SPARK_VERSION=3.0.0
   sh $DEV_PATH/make-distribution.sh
-  cd $DEV_PATH/release-package/
-  tar -xzvf oap-$version.tar.gz
-  cp $DEV_PATH/release-package/oap-product-$OAP_VERSION-bin-spark-$SPARK_VERSION/jars/* $RECIPES_PATH/oap/
+  mkdir -p $DEV_PATH/thirdparty
+  cd $DEV_PATH/thirdparty
+  arrow_repo="https://github.com/Intel-bigdata/arrow.git"
+  if [ ! -d "arrow" ]; then
+    git clone $arrow_repo -b branch-0.17.0-oap-0.9
+  fi
+  cd arrow
+  git pull
+
+  mkdir -p $DEV_PATH/thirdparty/arrow/oap
+  cp $DEV_PATH/release-package/oap-$OAP_VERSION-bin-spark-$SPARK_VERSION/jars/* $DEV_PATH/thirdparty/arrow/oap
+
   cd $RECIPES_PATH/oap/
   conda build .
 }
@@ -112,10 +110,8 @@ function conda_build_oap() {
 function conda_build_all() {
   conda_build_memkind
   conda_build_vmemcache
-  conda_build_arrow
-  conda_build_libfabric
   conda_build_hpnl
   conda_build_oap
 }
 
-
+conda_build_all

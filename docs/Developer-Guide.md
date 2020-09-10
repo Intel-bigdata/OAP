@@ -33,18 +33,18 @@ To enable OAP MLlib, you need to install oneDAL and oneCLL, they can be download
 You can use the following command under the folder dev to automatically install these dependencies.
 
 ```shell script
-source $OAP_HOME/dev/prepare_oap_env.sh
-prepare_maven
+sh $OAP_HOME/dev/prepare_oap_env.sh --prepare_maven
+
 ```
-You can also use command like prepare_cmake to install the specified dependencies after executing the command "source prepare_oap_env.sh". Use the following command to learn more.
+You can also use command like prepare_cmake to install the specified dependencies by the script `prepare_oap_env.sh`. Use the following command to learn more.
 
 ```shell script
-oap_build_help
+sh $OAP_HOME/dev/prepare_oap_env.sh --help
 ```
 
 If you want to automatically install all dependencies,use:
 ```shell script
-prepare_all
+sh $OAP_HOME/dev/prepare_oap_env.sh --prepare_all
 ```
 
 #### Building

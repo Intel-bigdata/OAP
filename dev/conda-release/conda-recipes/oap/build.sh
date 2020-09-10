@@ -2,14 +2,10 @@
 
 set -e
 set -x
-mkdir -p $PREFIX/oap_jars
-cp $RECIPE_DIR/*.jar $PREFIX/oap_jars/
-cp $RECIPE_DIR/libfabric/* $PREFIX/lib/
 export http_proxy=http://child-prc.intel.com:913
 export https_proxy=http://child-prc.intel.com:913
 mkdir cpp/build
 pushd cpp/build
-#export CXXFLAGS="${CXXFLAGS} -I${PREFIX}/x86_64-conda_cos7-linux-gnu/sysroot/usr/include -L${PREFIX}/x86_64-conda_cos7-linux-gnu/sysroot/usr/lib64 -L${PREFIX}/lib64"
 
 EXTRA_CMAKE_ARGS=""
 
@@ -61,7 +57,7 @@ cmake \
     ${EXTRA_CMAKE_ARGS} \
     ..
 ninja install
-mkdir -p $PREFIX/oap_jars
-cp $RECIPE_DIR/*.jar $PREFIX/oap_jars/
-cp $RECIPE_DIR/libfabric/* $PREFIX/lib/
 popd
+mkdir -p $PREFIX/oap_jars
+cp $SRC_DIR/oap/*.jar $PREFIX/oap_jars/
+cp $SRC_DIR/oap/libfabric/* $PREFIX/lib/
