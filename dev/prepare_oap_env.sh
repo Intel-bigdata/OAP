@@ -337,8 +337,7 @@ function prepare_PMDK() {
   make -j && make install
   export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH
   echo 'export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH' > /etc/profile.d/pmdk.sh
-  echo 'export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH' >> ~/.bashrc
-  source ~/.bashrc
+  source /etc/profile
 }
 
 function prepare_libcuckoo() {
