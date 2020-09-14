@@ -63,8 +63,7 @@ Then run commands below to enable RDMA and PMDK:
 git clone -b <tag-version> https://github.com/Intel-bigdata/OAP.git
 cd OAP/
 export ENABLE_RDMA=true
-source ./dev/prepare_oap_env.sh
-prepare_PMDK
+sh dev/prepare_oap_env.sh --prepare_PMDK
 ```
 
 ##  Configuration

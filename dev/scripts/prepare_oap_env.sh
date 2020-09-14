@@ -10,10 +10,11 @@ GCC_MIN_VERSION=7.0
 LLVM_MIN_VERSION=7.0
 
 if [ -z "$DEV_PATH" ]; then
-  cd $(dirname $BASH_SOURCE)
-  DEV_PATH=`echo $(pwd)`
-  cd -
+  OAP_HOME="$(cd "`dirname "$0"`/../.."; pwd)"
+  DEV_PATH=$OAP_HOME/dev/
 fi
+
+
 
 
 
@@ -308,6 +309,7 @@ function prepare_HPNL(){
 }
 
 function prepare_ndctl() {
+  yum install -y epel-release
   yum install -y autoconf asciidoctor kmod-devel.x86_64 libudev-devel libuuid-devel json-c-devel jemalloc-devel
   yum groupinstall -y "Development Tools"
   mkdir -p $DEV_PATH/thirdparty
@@ -369,6 +371,9 @@ function prepare_oneAPI() {
   sudo sh install-build-deps-centos.sh
 }
 
+function prepare_test() {
+    echo $ENABLE_RDMA
+}
 
 
 function  prepare_all() {
@@ -403,57 +408,69 @@ case $key in
     shift 1 
     echo "Start to install all compile-time dependencies for OAP ..."
     prepare_all
-    exit 1
+
+    exit 0
+    ;;
+    --prepare_test)
+    shift 1
+    echo "Test ..."
+    prepare_test
+    exit 0
     ;;
     --prepare_maven)
     shift 1 
     prepare_maven
-    exit 1
+    exit 0
     ;;
     --prepare_memkind)
     shift 1 
     prepare_memkind
-    exit 1
+    exit 0
     ;;
     --prepare_cmake)
     shift 1 
     prepare_cmake
-    exit 1
+    exit 0
     ;;
     --install_gcc7)
     shift 1 
     install_gcc7
-    exit 1
+    exit 0
     ;;
     --prepare_vmemcache)
     shift 1 
     prepare_vmemcache
-    exit 1
+    exit 0
     ;;
     --prepare_intel_arrow)
     shift 1 
     prepare_intel_arrow
-    exit 1
+    exit 0
     ;;
     --prepare_HPNL)
     shift 1 
     prepare_HPNL
-    exit 1
+    exit 0
     ;;
     --prepare_PMDK)
     shift 1 
     prepare_PMDK
-    exit 1
+    exit 0
     ;;
     --prepare_PMoF)
     shift 1 
     prepare_PMoF
-    exit 1
+    exit 0
     ;;
     --prepare_llvm)
     shift 1 
     prepare_llvm
-    exit 1
+    exit 0
+    ;;
+    --prepare_llvm)
+    shift 1
+    prepare_llvm
+    exit 0
     ;;
     *)    # unknown option
     echo "Unknown option "

@@ -77,11 +77,68 @@ function gather() {
   echo "Please check the result in  $DEV_PATH/release-package!"
 }
 
-cd $OAP_HOME
 check_gcc
-export ONEAPI_ROOT=/opt/intel/inteloneapi
-source /opt/intel/inteloneapi/daal/2021.1-beta07/env/vars.sh
-source /opt/intel/inteloneapi/tbb/2021.1-beta07/env/vars.sh
-source /tmp/oneCCL/build/_install/env/setvars.sh
-mvn clean  -Ppersistent-memory -Pvmemcache -DskipTests package
-gather
+cd $OAP_HOME
+while [[ $# -ge 0 ]]
+do
+key="$1"
+case $key in
+    "")
+    shift 1
+    echo "Start to compile all modules of OAP ..."
+    cd $OAP_HOME
+    export ONEAPI_ROOT=/opt/intel/inteloneapi
+    source /opt/intel/inteloneapi/daal/2021.1-beta07/env/vars.sh
+    source /opt/intel/inteloneapi/tbb/2021.1-beta07/env/vars.sh
+    source /tmp/oneCCL/build/_install/env/setvars.sh
+    mvn clean  -Ppersistent-memory -Pvmemcache -DskipTests package
+    gather
+    exit 0
+    ;;
+    --spark-arrow-datasource)
+    shift 1
+    export ONEAPI_ROOT=/tmp/
+    mvn clean package -pl com.intel.oap:spark-arrow-datasource  -am
+    exit 0
+    ;;
+    --oap-mllib )
+    shift 1
+    export ONEAPI_ROOT=/opt/intel/inteloneapi
+    source /opt/intel/inteloneapi/daal/2021.1-beta07/env/vars.sh
+    source /opt/intel/inteloneapi/tbb/2021.1-beta07/env/vars.sh
+    source /tmp/oneCCL/build/_install/env/setvars.sh
+    mvn clean package -pl com.intel.oap:oap-mllib  -am
+    exit 0
+    ;;
+    --spark-columnar-core)
+    shift 1
+    export ONEAPI_ROOT=/tmp/
+    mvn clean package -pl com.intel.oap:spark-columnar-core  -am
+    exit 0
+    ;;
+    --remote-shuffle)
+    shift 1
+    export ONEAPI_ROOT=/tmp/
+    mvn clean package -pl com.intel.oap:remote-shuffle  -am
+    exit 0
+    ;;
+    --oap-rpmem-shuffle)
+    shift 1
+    export ONEAPI_ROOT=/tmp/
+    mvn clean package -pl com.intel.oap:oap-rpmem-shuffle -am
+    exit 0
+    ;;
+    --oap-spark)
+    shift 1
+    export ONEAPI_ROOT=/tmp/
+    mvn clean package -pl com.intel.oap:oap-spark -Ppersistent-memory  -am
+    exit 0
+    ;;
+    *)    # unknown option
+    echo "Unknown option "
+    exit 1
+    ;;
+esac
+done
+
+
