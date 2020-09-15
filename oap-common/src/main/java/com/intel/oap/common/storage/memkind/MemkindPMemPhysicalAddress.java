@@ -18,4 +18,8 @@ public class MemkindPMemPhysicalAddress implements PMemPhysicalAddress {
     public int getOffset() {
         return this.offset;
     }
+
+    public void setOffset(int offset) {
+        this.offset = offset;
+    }
 }

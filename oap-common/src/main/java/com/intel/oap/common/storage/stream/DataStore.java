@@ -19,7 +19,12 @@ public class DataStore {
 
     public DataStore(PMemManager pMemManager, Properties properties) {
         this.pMemManager = pMemManager;
-        storeType = StoreType.valueOf(properties.getProperty("storetype").toUpperCase());
+        storeType = StoreType.valueOf(properties.getProperty("dataStore").toUpperCase());
+    }
+
+    public DataStore(PMemManager pMemManager, String dataStore) {
+        this.pMemManager = pMemManager;
+        storeType = StoreType.valueOf(dataStore.toUpperCase());
     }
 
     public ChunkWriter getChunkWriter(byte[] logicalID) {

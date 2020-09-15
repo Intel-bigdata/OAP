@@ -87,7 +87,7 @@ class WriteThread implements Runnable {
     public void run() {
         for (int i = 0; i < executeNumPerThread; i++) {
             try {
-                chunkWriter.write(bytes);
+                chunkWriter.write(bytes, bytes.length);
             } catch (IOException e) {
                 e.printStackTrace();
             }

@@ -5,6 +5,7 @@ import com.intel.oap.common.storage.stream.PMemManager;
 import com.intel.oap.common.storage.stream.PMemPhysicalAddress;
 import com.intel.oap.common.unsafe.PMemBlockPlatform;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class PMemBlkChunkWriter extends ChunkWriter {
@@ -26,6 +27,15 @@ public class PMemBlkChunkWriter extends ChunkWriter {
 
     @Override
     protected void closeInternal() {
+    }
 
+
+    @Override
+    protected void truncate(long size) throws IOException {
+    }
+
+    @Override
+    public long position() {
+        return 0L;
     }
 }

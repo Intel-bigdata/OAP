@@ -2,6 +2,8 @@ package com.intel.oap.common.storage.stream;
 
 import com.intel.oap.common.storage.memkind.MemkindMetaStore;
 import com.intel.oap.common.storage.pmemblk.PMemBlkMetaStore;
+import com.intel.oap.common.unsafe.PersistentMemoryPlatform;
+
 
 import java.util.Properties;
 
@@ -24,13 +26,28 @@ public class PMemManager {
         return pMemMetaStore;
     }
 
-    private static class PMemManagerInstance{
-        private static final PMemManager instance = new PMemManager();
+    private static PMemManager pMemManager;
+    public static PMemManager getPMemManagerInstance() {
+        if(pMemManager == null) {
+            synchronized (PMemManager.class) {
+                if(pMemManager == null) {
+                    pMemManager = new PMemManager();
+                }
+            }
+        }
+        return pMemManager;
     }
 
     private PMemManager(){
-        setStats(new MemoryStats(100));
-//        pMemDataStore = new MemKindDataStoreImpl(stats);
+        // for test
+        Properties p = new Properties();
+        p.setProperty("totalSize", String.valueOf(1024L * 1024 * 5 * 1024));
+        p.setProperty("chunkSize", String.valueOf(27286092));
+        PersistentMemoryPlatform.initialize("/mnt/tmp0", 1024L * 1024 * 6 * 1024 , 0);
+        chunkSize = Integer.valueOf(p.getProperty("chunkSize"));
+        long totalSize = Long.valueOf(p.getProperty("totalSize"));
+        stats = new MemoryStats(totalSize);
+        pMemMetaStore = new MemkindMetaStore();
     }
 
     public PMemManager(Properties properties){
@@ -38,6 +55,10 @@ public class PMemManager {
         chunkSize = Integer.valueOf(properties.getProperty("chunkSize"));
         long totalSize = Long.valueOf(properties.getProperty("totalSize"));
         String metaStore = properties.getProperty("metaStore");
+        String initialPath = properties.getProperty("initialPath");
+        long initialSize = Long.valueOf(properties.getProperty("initialSize"));
+        System.out.println(chunkSize + " " + totalSize + " " + metaStore + " " + initialPath);
+        PersistentMemoryPlatform.initialize(initialPath, initialSize , 0);
         stats = new MemoryStats(totalSize);
 
         switch (metaStore) {
@@ -53,11 +74,6 @@ public class PMemManager {
     public void close(){
 //        pMemMetaStore.release();
     }
-
-    public static PMemManager getInstance(){
-        return PMemManagerInstance.instance;
-    }
-
 
     public int getChunkSize(){
         return chunkSize; //TODO get from configuration
