@@ -31,7 +31,7 @@ jobs:
       - sudo ldconfig /usr/lib
       script:
       - cd ${TRAVIS_BUILD_DIR}
-      - mvn clean test -pl oap-cache/oap-common -q -Ppersistent-memory -Pvmemcache -Plibpmemblk -am
+      - mvn clean test -pl oap-common -q -Ppersistent-memory -Pvmemcache -Plibpmemblk -am
       - mvn clean test -pl oap-cache/oap -q -Ppersistent-memory  -Pvmemcache  -am
       
     - name: oap-native-sql
