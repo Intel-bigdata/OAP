@@ -51,8 +51,7 @@ If you use one of OAP features -- [Shuffle Remote PMem Extension](../oap-shuffle
 ```
 git clone -b <tag-version> https://github.com/Intel-bigdata/OAP.git
 cd OAP/
-export ENABLE_RDMA=false
-sh dev/prepare_oap_env.sh --prepare_PMDK
+sh dev/install-runtime-dependencies.sh 
 
 ```
 2. If you also want to use Shuffle Remote PMem Extension with **RDMA**, you need to configure and validate RDMA, please refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md#4-configure-and-validate-rdma) for the details.
@@ -62,8 +61,7 @@ Then run commands below to enable RDMA and PMDK:
 ```
 git clone -b <tag-version> https://github.com/Intel-bigdata/OAP.git
 cd OAP/
-export ENABLE_RDMA=true
-sh dev/prepare_oap_env.sh --prepare_PMDK
+sh dev/install-runtime-dependencies.sh --with-rdma
 ```
 
 ##  Configuration

@@ -33,18 +33,18 @@ To enable OAP MLlib, you need to install oneDAL and oneCLL, they can be download
 You can use the following command under the folder dev to automatically install these dependencies.
 
 ```shell script
-sh $OAP_HOME/dev/prepare_oap_env.sh --prepare_maven
+sh $OAP_HOME/dev/scripts/prepare_oap_env.sh --prepare_maven
 
 ```
 You can also use command like prepare_cmake to install the specified dependencies by the script `prepare_oap_env.sh`. Use the following command to learn more.
 
 ```shell script
-sh $OAP_HOME/dev/prepare_oap_env.sh --help
+sh $OAP_HOME/dev/scripts/prepare_oap_env.sh --help
 ```
 
 If you want to automatically install all dependencies,use:
 ```shell script
-sh $OAP_HOME/dev/prepare_oap_env.sh --prepare_all
+sh $OAP_HOME/dev/install-compile-time-dependencies.sh
 ```
 
 #### Building
@@ -57,11 +57,15 @@ export CC=$OAPHOME/dev/thirdparty/gcc7/bin/gcc
 
 To build OAP package, use
 ```shell script
+sh $OAPHOME/dev/compile-oap.sh
+#or
 mvn clean -DskipTests package
 ```
 
 #### Building Specified Module
 ```shell script
+sh $OAPHOME/dev/compile-oap.sh --oap-cache
+#or
 mvn clean -pl com.intel.oap:oap-cache -am package
 ```
 
@@ -75,6 +79,7 @@ mvn clean test
 #### Running Specified Test
 ```shell script
 mvn clean -pl com.intel.oap:oap-cache -am test
+
 ```
 
 #### OAP Building with PMem

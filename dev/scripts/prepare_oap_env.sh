@@ -49,7 +49,7 @@ function check_maven() {
 function install_maven() {
   yum -y install wget
   cd $DEV_PATH/thirdparty
-  wget https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
+  wget --no-check-certificate https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
   mkdir -p /usr/local/maven
   tar -xzvf apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
   mv apache-maven-$MAVEN_TARGET_VERSION/* /usr/local/maven
@@ -90,7 +90,7 @@ function prepare_cmake() {
       cd $DEV_PATH/thirdparty
       echo " $DEV_PATH/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz"
       if [ ! -f " $DEV_PATH/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz" ]; then
-        wget $TARGET_CMAKE_SOURCE_URL
+        wget --no-check-certificate $TARGET_CMAKE_SOURCE_URL
       fi
       tar xvf cmake-$CMAKE_TARGET_VERSION.tar.gz
       cd cmake-$CMAKE_TARGET_VERSION/
@@ -107,7 +107,7 @@ function prepare_cmake() {
     cd $DEV_PATH/thirdparty
     echo " $DEV_PATH/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz"
     if [ ! -f "cmake-$CMAKE_TARGET_VERSION.tar.gz" ]; then
-      wget $TARGET_CMAKE_SOURCE_URL
+      wget --no-check-certificate $TARGET_CMAKE_SOURCE_URL
     fi
 
     tar xvf cmake-$CMAKE_TARGET_VERSION.tar.gz
@@ -138,7 +138,6 @@ function prepare_memkind() {
   yum -y install libtool
   yum -y install numactl-devel
   yum -y install unzip
-  yum -y install libnuma-devel
 
   ./autogen.sh
   ./configure
@@ -183,7 +182,7 @@ function install_gcc7() {
   if [ ! -d "gcc-7.3.0" ]; then
     if [ ! -f "gcc-7.3.0.tar" ]; then
       if [ ! -f "gcc-7.3.0.tar.xz" ]; then
-        wget https://bigsearcher.com/mirrors/gcc/releases/gcc-7.3.0/gcc-7.3.0.tar.xz
+        wget  --no-check-certificate https://bigsearcher.com/mirrors/gcc/releases/gcc-7.3.0/gcc-7.3.0.tar.xz
       fi
       xz -d gcc-7.3.0.tar.xz
     fi
@@ -207,7 +206,7 @@ function prepare_llvm() {
   cd $DEV_PATH/thirdparty/llvm
   if [ ! -d "llvm-7.0.1.src" ]; then
     if [ ! -f "llvm-7.0.1.src.tar.xz" ]; then
-      wget http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
+      wget --no-check-certificate http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
     fi
     tar xf llvm-7.0.1.src.tar.xz
   fi
@@ -217,7 +216,7 @@ function prepare_llvm() {
 
   if [ ! -d "clang" ]; then
     if [ ! -f "cfe-7.0.1.src.tar.xz" ]; then
-      wget http://releases.llvm.org/7.0.1/cfe-7.0.1.src.tar.xz
+      wget --no-check-certificate http://releases.llvm.org/7.0.1/cfe-7.0.1.src.tar.xz
       tar xf cfe-7.0.1.src.tar.xz
     fi
     mv cfe-7.0.1.src clang
@@ -371,10 +370,6 @@ function prepare_oneAPI() {
   sudo sh install-build-deps-centos.sh
 }
 
-function prepare_test() {
-    echo $ENABLE_RDMA
-}
-
 
 function  prepare_all() {
   prepare_maven
@@ -408,13 +403,6 @@ case $key in
     shift 1 
     echo "Start to install all compile-time dependencies for OAP ..."
     prepare_all
-
-    exit 0
-    ;;
-    --prepare_test)
-    shift 1
-    echo "Test ..."
-    prepare_test
     exit 0
     ;;
     --prepare_maven)
@@ -474,7 +462,7 @@ case $key in
     ;;
     *)    # unknown option
     echo "Unknown option "
-    echo "usage: ./prepare_oap_env.sh [options]"
+    echo "usage: sh prepare_oap_env.sh [options]"
     echo "Options: "
     oap_build_help
     exit 1

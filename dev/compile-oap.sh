@@ -95,10 +95,16 @@ case $key in
     gather
     exit 0
     ;;
+    --oap-cache)
+    shift 1
+    export ONEAPI_ROOT=/tmp/
+    mvn clean package -pl com.intel.oap:oap-cache -am -Ppersistent-memory -Pvmemcache -DskipTests
+    exit 0
+    ;;
     --spark-arrow-datasource)
     shift 1
     export ONEAPI_ROOT=/tmp/
-    mvn clean package -pl com.intel.oap:spark-arrow-datasource  -am
+    mvn clean package -pl com.intel.oap:spark-arrow-datasource  -am -DskipTests
     exit 0
     ;;
     --oap-mllib )
@@ -107,31 +113,31 @@ case $key in
     source /opt/intel/inteloneapi/daal/2021.1-beta07/env/vars.sh
     source /opt/intel/inteloneapi/tbb/2021.1-beta07/env/vars.sh
     source /tmp/oneCCL/build/_install/env/setvars.sh
-    mvn clean package -pl com.intel.oap:oap-mllib  -am
+    mvn clean package -pl com.intel.oap:oap-mllib  -am -DskipTests
     exit 0
     ;;
     --spark-columnar-core)
     shift 1
     export ONEAPI_ROOT=/tmp/
-    mvn clean package -pl com.intel.oap:spark-columnar-core  -am
+    mvn clean package -pl com.intel.oap:spark-columnar-core  -am -DskipTests
     exit 0
     ;;
     --remote-shuffle)
     shift 1
     export ONEAPI_ROOT=/tmp/
-    mvn clean package -pl com.intel.oap:remote-shuffle  -am
+    mvn clean package -pl com.intel.oap:remote-shuffle  -am -DskipTests
     exit 0
     ;;
     --oap-rpmem-shuffle)
     shift 1
     export ONEAPI_ROOT=/tmp/
-    mvn clean package -pl com.intel.oap:oap-rpmem-shuffle -am
+    mvn clean package -pl com.intel.oap:oap-rpmem-shuffle -am -DskipTests
     exit 0
     ;;
     --oap-spark)
     shift 1
     export ONEAPI_ROOT=/tmp/
-    mvn clean package -pl com.intel.oap:oap-spark -Ppersistent-memory  -am
+    mvn clean package -pl com.intel.oap:oap-spark -Ppersistent-memory  -am -DskipTests
     exit 0
     ;;
     *)    # unknown option
