@@ -49,9 +49,13 @@ function check_maven() {
 function install_maven() {
   yum -y install wget
   cd $DEV_PATH/thirdparty
-  wget --no-check-certificate https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
+  if [ ! -f " $DEV_PATH/thirdparty/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz" ]; then
+        wget --no-check-certificate https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
+  fi
+  rm -rf /usr/local/maven
   mkdir -p /usr/local/maven
   tar -xzvf apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
+
   mv apache-maven-$MAVEN_TARGET_VERSION/* /usr/local/maven
   echo 'export MAVEN_HOME=/usr/local/maven' >> ~/.bashrc
   echo 'export PATH=$MAVEN_HOME/bin:$PATH' >> ~/.bashrc
@@ -138,6 +142,7 @@ function prepare_memkind() {
   yum -y install libtool
   yum -y install numactl-devel
   yum -y install unzip
+  yum -y install make
 
   ./autogen.sh
   ./configure
@@ -167,7 +172,7 @@ function prepare_vmemcache() {
   yum -y install rpm-build
   cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
   make package
-  sudo rpm -i libvmemcache*.rpm
+  rpm -i libvmemcache*.rpm
 }
 
 function install_gcc7() {

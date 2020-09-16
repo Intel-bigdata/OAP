@@ -36,9 +36,9 @@ requirements:
     - numpy 1.16.*
     - orc  # [unix]
     - rapidjson
-    - re2  2020.07.06
+    - re2  2020.08.01
     - snappy
-    - thrift-cpp 0.11.0
+    - thrift-cpp 0.13.0
     - zlib
     - zstd
 
@@ -52,7 +52,7 @@ requirements:
     - glog
     - grpc-cpp
     - lz4-c
-    - re2  2020.07.06
+    - re2  2020.08.01
     - snappy
     - zlib
     - zstd
