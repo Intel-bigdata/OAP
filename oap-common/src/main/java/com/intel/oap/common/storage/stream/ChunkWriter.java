@@ -17,7 +17,6 @@ public abstract class ChunkWriter {
         this.logicalID = logicalID;
         this.pMemManager = pMemManager;
         this.pMemMetaStore = pMemManager.getpMemMetaStore();
-//        this.remainingBuffer = ByteBuffer.allocateDirect(pMemManager.getChunkSize());
         remainingBuffer = ByteBuffer.wrap(new byte[pMemManager.getChunkSize()]);
     }
 
