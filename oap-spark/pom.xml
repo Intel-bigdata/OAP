@@ -33,13 +33,13 @@
         <dependency>
             <groupId>com.intel.oap</groupId>
             <artifactId>oap-common</artifactId>
-	    <version>${project.version}</version>
+            <version>${project.version}</version>
             <exclusions>
-	       <exclusion>
-	 	  <groupId>io.pmem</groupId>
-                  <artifactId>libpmemkv-jni</artifactId>
-               </exclusion>
-             </exclusions>
+                <exclusion>
+                    <groupId>io.pmem</groupId>
+                    <artifactId>libpmemkv-jni</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
