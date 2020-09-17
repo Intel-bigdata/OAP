@@ -13,17 +13,17 @@ Follow steps below on ***every node*** of your cluster to set right environment 
 We have tested OAP on Fedora 29 and CentOS 7.6 (kernel-4.18.16). We recommend you use **Fedora 29 CentOS 7.6 or above**. Besides, for [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2) we recommend you use **kernel above 3.10**.
 
 - **Conda Requirements**   
-Install Conda on your cluster nodes with below commands:
-
+Install Conda on your cluster nodes with below commands and follow the prompts on the installer screens.:
 ```bash
 wget -c https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh
 chmod 777 Miniconda2-latest-Linux-x86_64.sh 
 bash Miniconda2-latest-Linux-x86_64.sh 
 ```
-For changes to take effect, close and re-open your current shell, then go to the same directory and create a conda environment to install OAP Conda package.
+For changes to take effect, close and re-open your current shell.To test your installation,  run the command `conda list` in your terminal window. A list of installed packages appears if it has been installed correctly.
+Then go to the same directory and create a conda environment to install OAP Conda package.
 
 ```bash
-conda create -n oapenv python=3.7
+conda create -n oapenv -y python=3.7
 conda activate oapenv
 conda config --add channels conda-forge
 ```
@@ -35,11 +35,10 @@ Dependencies below are required by OAP and all of them are included in OAP Conda
 - [Memkind](https://anaconda.org/intel/memkind)
 - [Vmemcache](https://anaconda.org/intel/vmemcache)
 - [HPNL](https://anaconda.org/intel//hpnl)
-- [Arrow-cpp](https://anaconda.org/intel/arrow-cpp)  
 
 ```bash
 conda activate oapenv
-conda install -c intel -c conda-forge oap=0.9
+conda install -c intel -c conda-forge -y oap=0.9
 ```
 Once finished steps above, you have completed OAP dependencies installation and OAP building, and will find built OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`
 
@@ -56,13 +55,6 @@ sh dev/install-runtime-dependencies.sh
 ```
 2. If you also want to use Shuffle Remote PMem Extension with **RDMA**, you need to configure and validate RDMA, please refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md#4-configure-and-validate-rdma) for the details.
 
-Then run commands below to enable RDMA and PMDK:
-
-```
-git clone -b <tag-version> https://github.com/Intel-bigdata/OAP.git
-cd OAP/
-sh dev/install-runtime-dependencies.sh --with-rdma
-```
 
 ##  Configuration
 Once finished steps above, make sure libraries installed by Conda can be linked by Spark, please add the following configuration settings to `$SPARK_HOME/conf/spark-defaults` on the working node.

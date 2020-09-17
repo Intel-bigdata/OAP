@@ -8,15 +8,19 @@ CMAKE_MIN_VERSION=3.11
 TARGET_CMAKE_SOURCE_URL=https://cmake.org/files/v3.11/cmake-3.11.1.tar.gz
 GCC_MIN_VERSION=7.0
 LLVM_MIN_VERSION=7.0
+rx='^([0-9]+\.){0,2}(\*|[0-9]+)$'
 
 if [ -z "$DEV_PATH" ]; then
   OAP_HOME="$(cd "`dirname "$0"`/../.."; pwd)"
   DEV_PATH=$OAP_HOME/dev/
 fi
 
-
-
-
+function check_jdk() {
+  if [ -z "$JAVA_HOME" ]; then
+    echo "To run this script, you must make sure that Java is installed in your environment and set JAVA_HOME"
+    exit 1
+  fi
+}
 
 function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" != "$1"; }
 
@@ -52,12 +56,21 @@ function install_maven() {
   if [ ! -f " $DEV_PATH/thirdparty/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz" ]; then
         wget --no-check-certificate https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
   fi
-  rm -rf /usr/local/maven
-  mkdir -p /usr/local/maven
-  tar -xzvf apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
 
-  mv apache-maven-$MAVEN_TARGET_VERSION/* /usr/local/maven
-  echo 'export MAVEN_HOME=/usr/local/maven' >> ~/.bashrc
+  cd /usr/local/
+  if [ ! -d "maven" ]; then
+    rm -rf /usr/local/maven
+    mkdir -p /usr/local/maven
+    INSTALL_PATH=/usr/local/maven
+  else
+    rm -rf /usr/local/maven_oap
+    mkdir -p /usr/local/maven_oap
+    INSTALL_PATH=/usr/local/maven_oap
+  fi
+  cd $DEV_PATH/thirdparty
+  tar -xzvf apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
+  mv apache-maven-$MAVEN_TARGET_VERSION/* $INSTALL_PATH
+  echo 'export MAVEN_HOME='$INSTALL_PATH >> ~/.bashrc
   echo 'export PATH=$MAVEN_HOME/bin:$PATH' >> ~/.bashrc
   source ~/.bashrc
   rm -rf apache-maven*
@@ -203,9 +216,13 @@ function install_gcc7() {
 
 function prepare_llvm() {
   CURRENT_LLVM_VERSION_STR="$(llvm-config --version)"
-  if version_ge $CURRENT_LLVM_VERSION_STR $LLVM_MIN_VERSION; then
+  if [[ "CURRENT_LLVM_VERSION_STR" =~ $rx  ]]; then
+    if version_ge $CURRENT_LLVM_VERSION_STR $LLVM_MIN_VERSION; then
+      echo "llvm is installed"
       return
+    fi
   fi
+  echo "Start to build and install llvm7....."
   cd $DEV_PATH
   mkdir -p $DEV_PATH/thirdparty/llvm
   cd $DEV_PATH/thirdparty/llvm
@@ -313,7 +330,7 @@ function prepare_HPNL(){
 }
 
 function prepare_ndctl() {
-  yum install -y epel-release
+  yum install -y epel-release which bash-completion
   yum install -y autoconf asciidoctor kmod-devel.x86_64 libudev-devel libuuid-devel json-c-devel jemalloc-devel
   yum groupinstall -y "Development Tools"
   mkdir -p $DEV_PATH/thirdparty
@@ -399,7 +416,7 @@ function oap_build_help() {
     echo " --prepare_all              function to install all the above"
 }
 
-
+check_jdk
 while [[ $# -gt 0 ]]
 do
 key="$1"

@@ -90,7 +90,7 @@ function prepare_libfabric() {
 function conda_build_oap() {
   OAP_VERSION=0.9.0
   SPARK_VERSION=3.0.0
-  sh $DEV_PATH/make-distribution.sh
+  sh $DEV_PATH/compile-oap.sh
   mkdir -p $DEV_PATH/thirdparty
   cd $DEV_PATH/thirdparty
   arrow_repo="https://github.com/Intel-bigdata/arrow.git"
