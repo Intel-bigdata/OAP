@@ -341,7 +341,7 @@ Please refer to your NIC manuual for detail instructions on how to validate RDMA
 ## <a id="install-dependencies-for-shuffle-remote-pmem-extension"></a>5. Install dependencies for Shuffle Remote PMem Extension
 --------------------------- 
 
-We have provided a Conda package which will automatically install HPNL and RPMem extension, refer to [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), you can skip 5.1 and 5.2 below, and find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`.
+We have provided a Conda package which will automatically install dependencies needed for Shuffle Remote PMem Extension, refer to [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), you can find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`,  and skip this session and jump to [6.Install Shuffle Remote PMem Extension for Spark](#6.-Install-Shuffle-Remote-PMem-Extension-for-Spark)
 
 ### 5.1 Install HPNL (<https://github.com/Intel-bigdata/HPNL>)
 

@@ -36,6 +36,9 @@ Guava cache is based on memkind library, built on top of jemalloc and provides m
 
 For Parquet file format, add these conf options:
 ```
+# enable numa
+spark.yarn.numa.enabled                           true
+spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND      1
 spark.sql.oap.parquet.binary.cache.enabled        true
 spark.sql.oap.fiberCache.memory.manager           pm 
 spark.oap.cache.strategy                          guava
@@ -47,6 +50,9 @@ spark.sql.extensions                              org.apache.spark.sql.OapExtens
 ```
 For Orc file format, add these conf options:
 ```
+# enable numa
+spark.yarn.numa.enabled                           true
+spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND      1
 spark.sql.oap.orc.binary.cache.enable            true
 spark.sql.oap.orc.enable                         true
 spark.sql.oap.fiberCache.memory.manager          pm 
@@ -73,12 +79,18 @@ To apply noevict cache strategy in your workload, please follow [prerequisites](
 
 For Parquet file format, add these conf options:
 ```
+# enable numa
+spark.yarn.numa.enabled                                  true
+spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
 spark.sql.oap.parquet.binary.cache.enabled               true 
 spark.oap.cache.strategy                                 noevict 
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
 ```
 For Orc file format, add these conf options:
 ```
+# enable numa
+spark.yarn.numa.enabled                                  true
+spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
 spark.sql.oap.orc.binary.cache.enable                    true 
 spark.oap.cache.strategy                                 noevict 
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
@@ -162,7 +174,7 @@ plasma config parameters:
 You can start plasma service on each node as following command, and then you can run your workload. If you install OAP by Conda, you can find plasma-store-server in the path **/root/miniconda2/envs/oapenv/bin/**.
 
 ```
-plasma-store-server -m 15000000000 -s /tmp/plasmaStore -d /mnt/pmem  
+./plasma-store-server -m 15000000000 -s /tmp/plasmaStore -d /mnt/pmem  
 ```
 
  Remember to kill `plasma-store-server` process if you no longer need cache, and you should delete `/tmp/plasmaStore` which is a Unix domain socket.  

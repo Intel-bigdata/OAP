@@ -6,7 +6,7 @@
 
 ## Introduciton
 
-OAP Spark support RDD Cache with Optane PMem. Spark has various storage levels serving for different purposes including memory and disk.
+OAP Spark supports RDD Cache with Optane PMem. Spark has various storage levels serving for different purposes including memory and disk.
 
 PMem storage level is added to support a new tier for storage level besides memory and disk.
 
@@ -124,6 +124,14 @@ HiBench/conf/spark.conf
 HiBench/conf/workloads/ml/kmeans.conf
 ```
 Note that you need add `hibench.kmeans.storage.level  PMEM_AND_DISK` to `kmeans.conf`, which can enable both PMem and Disk to cache data.
+If you completed [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md), you also need add the following configs to `spark.conf`
+```
+spark.executorEnv.LD_LIBRARY_PATH /root/miniconda2/envs/oapenv/lib/
+spark.executor.extraLibraryPath /root/miniconda2/envs/oapenv/lib/
+spark.driver.extraLibraryPath /root/miniconda2/envs/oapenv/lib/
+
+```
+ 
 Then you can run the following 2 commands to run K-means workloads:
 ```
 bin/workloads/ml/kmeans/prepare/prepare.sh
