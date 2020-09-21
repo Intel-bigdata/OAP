@@ -11,9 +11,9 @@ For those algorithms that are not accelerated by Intel MLlib, the original Spark
 
 ## Getting Started
 
-You can use a pre-built JAR package to get started, it can be downloaded from [here](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/oap-mllib-0.9.0-with-spark-3.0.0.jar).
+You can use a pre-built JAR to get started, if you have finished [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib jar `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`.
 
-After downloaded, you can refer to the following [Running](#Running) section to try out.
+Then you can refer to the following [Running](#Running) section to try out.
 
 You can also build the package from source code, please refer to [Building](#Building) section.
 
@@ -27,10 +27,10 @@ You can also build the package from source code, please refer to [Building](#Bui
 
 Generally, our common system requirements are the same with Intel® oneAPI Toolkit, please refer to [here](https://software.intel.com/content/www/us/en/develop/articles/intel-oneapi-base-toolkit-system-requirements.html) for details.
 
-Intel® oneAPI Toolkits (Beta) components used by the project are already included into JAR package mentioned above.  There is no extra installs for cluster nodes.
+Intel® oneAPI Toolkits (Beta) components used by the project are already included into JAR package mentioned above. 
 
-### Installation
-We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md), you can find compiled OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`.
+If you have finished [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib jar `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`, then there is ***no extra installations*** for cluster nodes.
+
 
 ### Spark Configuration
 
@@ -38,9 +38,9 @@ Users usually run Spark application on __YARN__ with __client__ mode. In that ca
 
 ```
 # absolute path of the jar for uploading
-spark.files                       /path/to/oap-mllib-x.x.x-with-spark-x.x.x.jar
+spark.files                       /root/miniconda2/envs/oapenv/oap_jars/oap-mllib-x.x.x-with-spark-x.x.x.jar
 # absolute path of the jar for driver class path
-spark.driver.extraClassPath       /path/to/oap-mllib-x.x.x-with-spark-x.x.x.jar
+spark.driver.extraClassPath       /root/miniconda2/envs/oapenv/oap_jars/oap-mllib-x.x.x-with-spark-x.x.x.jar
 # relative path of the jar for executor class path
 spark.executor.extraClassPath     ./oap-mllib-x.x.x-with-spark-x.x.x.jar
 ```
@@ -55,7 +55,7 @@ To use K-means example for sanity check, you need to upload a data file to your 
 ```
 
 ### Benchmark with HiBench
-Use HiBench to generate dataset with various profiles, and change related variables in `run-XXX.sh` script when applicable.  Then run the following commands:
+Use ***HiBench*** to generate dataset with various profiles, and change related variables in `run-XXX.sh` script when applicable.  Then run the following commands:
 ```
     $ cd OAP/oap-mllib/examples/kmeans-hibench
     $ ./build.sh
@@ -95,8 +95,9 @@ Scala and Java dependency descriptions are already included in Maven POM file.
 To clone and build from open source oneCCL, run the following commands:
 ```
 	$ git clone https://github.com/oneapi-src/oneCCL
+        $ cd oneCCL
         $ git checkout -b 2021.1-beta07-1 origin/2021.1-beta07-1
-	$ cd oneCCL && mkdir build && cd build
+	$ mkdir build && cd build
 	$ cmake ..
 	$ make -j install
 ```

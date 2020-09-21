@@ -245,7 +245,9 @@ The following are required to configure OAP to use PMem cache.
 
    ```yum install numactl -y ```
 
-2. Build Spark from source to enable numa-binding support, refer to [enable-numa-binding-for-PMem-in-spark](./Developer-Guide.md#enable-numa-binding-for-pmem-in-spark). Or you can just download our pre-built numa-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz).
+2. We strongly recommand you use numa-patched Spark to achieve better performance gain.
+   
+   Build Spark from source to enable numa-binding support, refer to [enable-numa-binding-for-PMem-in-spark](./Developer-Guide.md#Enabling-NUMA-binding-for-PMem-in-Spark). Or you can just download our pre-built numa-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz).
 
 #### Configure for PMem 
 
