@@ -12,7 +12,7 @@
 
 ## Prerequisites
 
-SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support. We provide pre-built [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz) based on hadoop-2.7 whith numa patch applied to accelerate performance. If you use a different hadoop version, you should build it from source [here](https://github.com/Intel-bigdata/spark/releases/tag/v3.0.0-intel-oap-0.9.0).
+SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support. We provide pre-built [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz) based on hadoop-2.7 with numa patch applied to accelerate performance. If you use a different hadoop version, you should build it from source [here](https://github.com/Intel-bigdata/spark/releases/tag/v3.0.0-intel-oap-0.9.0).
 
 ## Getting Started
 

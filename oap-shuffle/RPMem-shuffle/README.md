@@ -709,29 +709,29 @@ history server by *\$SPARK\_HOME/sbin/start-history-server.sh*)
 
 ### RPMemShuffle Spark configuration
 ---------------------------------
-```bash 
-Before running Spark workload, add following contents in
-spark-defaults.conf.
 
-Yarn.executor.num    4                                      // same as PMem devices number
-Yarn.executor.cores  18                                     // total core number divide executor number
-spark.executor.memory  15g                                  // 2MB * numPartition(200) * 18 * 2
-spark.yarn.executor.memoryOverhead 5g                       // 30% of  spark.executor.memory
+Before running Spark workload, add following contents in `spark-defaults.conf`.
+```bash 
+spark.executor.instances  4                                 // same as total PMem namespace numbers of your cluster
+spark.executor.cores  18                                    // total core number divide executor number
+spark.executor.memory  70g                                  // 4~5G * spark.executor.cores
+spark.executor.memoryOverhead 15g                           // 30% of  spark.executor.memory
 spark.shuffle.pmof.shuffle_block_size   2096128             // 2MB – 1024 Bytes
 spark.shuffle.pmof.spill_throttle       2096128             // 2MB – 1024 Bytes
 
 spark.driver.memory    10g
 spark.yarn.driver.memoryOverhead 5g
 
+spark.shuffle.compress                                      true
 spark.io.compression.codec                                  snappy
-spark.driver.extraClassPath                                 /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
-spark.executor.extraClassPath                               /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
+spark.driver.extraClassPath                                 /root/miniconda2/envs/oapenv/oap_jars/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
+spark.executor.extraClassPath                               /root/miniconda2/envs/oapenv/oap_jars/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
 spark.shuffle.manager                                       org.apache.spark.shuffle.pmof.PmofShuffleManager
 spark.shuffle.pmof.enable_rdma                              true
 spark.shuffle.pmof.enable_pmem                              true
 spark.shuffle.pmof.pmem_capacity                            126833655808 // size should be same as pmem size
-spark.shuffle.pmof.pmem_list                                /dev/dax0.0, /dev/dax0.1, /dev/dax0.2, /dev/dax0.3, /dev/dax1.0,/dev/dax1.1, /dev/dax1.2,/dev/dax1.3
-spark.shuffle.pmof.dev_core_set                             dax0.0:0-17,dax0.1:0-17,dax0.2:36-53,dax0.3:36-53,dax1.0:18-35, dax1.1:18-35,dax1.2:54-71,dax1.3:54-71
+spark.shuffle.pmof.pmem_list                                /dev/dax0.0,/dev/dax0.1,/dev/dax1.0,/dev/dax1.1
+spark.shuffle.pmof.dev_core_set                             dax0.0:0-71,dax0.1:0-71,dax1.0:0-71,dax1.1:0-71
 spark.shuffle.pmof.server_buffer_nums                       64
 spark.shuffle.pmof.client_buffer_nums                       64
 spark.shuffle.pmof.map_serializer_buffer_size               262144
@@ -742,6 +742,7 @@ spark.shuffle.pmof.client_pool_size                         3
 spark.shuffle.pmof.node                                     $host1-$IP1,$host2-$IP2//HOST-IP Pair, seperate with ","
 spark.driver.rhost                                          $IP //change to your host
 spark.driver.rport                                          61000
+
 ```
 ### Reference guides (without BKC access)
 -----------------------------------

@@ -11,7 +11,7 @@ For those algorithms that are not accelerated by Intel MLlib, the original Spark
 
 ## Getting Started
 
-You can use a pre-built JAR to get started, if you have finished [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib jar `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`.
+You can use a pre-built JAR to get started, if you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib jar `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`.
 
 Then you can refer to the following [Running](#Running) section to try out.
 
@@ -29,7 +29,7 @@ Generally, our common system requirements are the same with Intel® oneAPI Toolk
 
 Intel® oneAPI Toolkits (Beta) components used by the project are already included into JAR package mentioned above. 
 
-If you have finished [OAP-Installation-Guide](../../../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib jar `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`, then there is ***no extra installations*** for cluster nodes.
+If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib jar `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`, then there is ***no extra installations*** for cluster nodes.
 
 
 ### Spark Configuration
@@ -55,7 +55,7 @@ To use K-means example for sanity check, you need to upload a data file to your 
 ```
 
 ### Benchmark with HiBench
-Use ***HiBench*** to generate dataset with various profiles, and change related variables in `run-XXX.sh` script when applicable.  Then run the following commands:
+Use [Hibench](https://github.com/Intel-bigdata/HiBench) to generate dataset with various profiles, and change related variables in `run-XXX.sh` script when applicable.  Then run the following commands:
 ```
     $ cd OAP/oap-mllib/examples/kmeans-hibench
     $ ./build.sh

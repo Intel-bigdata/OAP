@@ -1,4 +1,4 @@
-# ArrowDataSource for Apache Spark
+# Unified Arrow Data Source
 A Spark DataSouce implementation for reading files into Arrow compatible columnar vectors.
 
 ## Note
