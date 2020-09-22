@@ -833,7 +833,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
       dataPagesIterator.remove();
       freePage(dataPage);
     }
-    assert (dataPages.isEmpty());
+    assert(dataPages.isEmpty());
 
     deleteSpillFiles();
   }
