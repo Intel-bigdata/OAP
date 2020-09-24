@@ -1,4 +1,4 @@
-{% set OAP_VERSION = "0.9" %}
+{% set OAP_VERSION = "0.9.0" %}
 package:
   name: oap
   version: {{ OAP_VERSION }}
@@ -8,7 +8,7 @@ source:
 
 build:
   build:
-  number: 0
+  number: 3
   skip: true  # [win and vc<14]
   run_exports:
     - {{ pin_subpackage("oap", max_pin="x.x") }}
@@ -21,30 +21,30 @@ requirements:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
   host:
-    - aws-sdk-cpp
-    - boost-cpp
+    - aws-sdk-cpp 1.7.164
+    - boost-cpp >=1.68.0
     - brotli
     - bzip2
     - c-ares
     - gflags
     - glog
-    - grpc-cpp
+    - grpc-cpp >=1.21.4
     - libprotobuf
-    - clangdev 8.*
-    - llvmdev 8.*
+    - clangdev 7
+    - llvmdev 7
     - lz4-c
-    - numpy 1.16.*
+    - numpy >=1.14
     - orc  # [unix]
     - rapidjson
-    - re2  2020.08.01
+    - re2
     - snappy
-    - thrift-cpp 0.13.0
+    - thrift-cpp >=0.11.0
     - zlib
     - zstd
 
   run:
-    - {{ pin_compatible('numpy', lower_bound='1.16') }}
-    - aws-sdk-cpp
+    - numpy >=1.14
+    - aws-sdk-cpp 1.7.164
     - boost-cpp
     - brotli
     - c-ares
@@ -52,20 +52,19 @@ requirements:
     - glog
     - grpc-cpp
     - lz4-c
-    - re2  2020.08.01
+    - re2
     - snappy
     - zlib
     - zstd
     - libhdfs3
     - vmemcache 0.8
-    - memkind 1.10.1-rc2
+    - memkind 1.10.1.rc2
     - hpnl 1.0
 
 test:
   commands:
     # headers
     - test -f $PREFIX/include/arrow/api.h              # [unix]
-    - test -f $PREFIX/include/arrow/flight/types.h     # [unix]
     - test -f $PREFIX/include/plasma/client.h          # [unix]
     - test -f $PREFIX/include/gandiva/engine.h         # [unix]
     - test -f $PREFIX/include/parquet/api/reader.h     # [unix]
@@ -76,8 +75,6 @@ test:
     # shared
     - test -f $PREFIX/lib/libarrow.so            # [linux]
     - test -f $PREFIX/lib/libarrow_dataset.so    # [linux]
-    - test -f $PREFIX/lib/libarrow_flight.so     # [linux]
-    - test -f $PREFIX/lib/libarrow_python.so     # [linux]
     - test -f $PREFIX/lib/libparquet.so          # [linux]
     - test -f $PREFIX/lib/libgandiva.so          # [linux]
     - test -f $PREFIX/lib/libplasma.so           # [linux]
@@ -119,5 +116,15 @@ about:
   license:  Apache License 2.0
   license_file:
     - LICENSE.txt
-
+    - TPP.txt
+  description:
+    '<strong>LEGAL NOTICE: Use of this software package is subject to the software license agreement (as set forth above, in
+      the license section of the installed Conda package and/or the README file) and all notices, disclaimers or license terms
+      for third party or open source software included in or with the software.</strong>
+      <br/><br/>
+      EULA: <a href="https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/LICENSE.txt" target="_blank">Apache License 2.0</a><br/>
+      Third Party Programs: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/TPP.txt
+      <br/><br/>'
+  dev_url: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/docs/Developer-Guide.md
+  doc_url: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/docs/OAP-Installation-Guide.md
 

@@ -21,7 +21,7 @@ When you finish [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) ,
 ### Manully Install arrow 0.17.0 
 Step 1. Install arrow 0.17.0 dependencies
 ```
-git clone https://github.com/intel-bigdata/arrow && cd arrow & git checkout branch-0.17.0-oap-0.9
+git clone https://github.com/intel-bigdata/arrow && cd arrow && git checkout branch-0.17.0-oap-0.9
 vim ci/conda_env_gandiva.yml 
 clangdev=7
 llvmdev=7
@@ -86,8 +86,8 @@ spark.sql.extensions com.intel.oap.ColumnarPlugin
 spark.shuffle.manager org.apache.spark.shuffle.sort.ColumnarShuffleManager
 
 # note native sql engine depends on arrow data source
-spark.driver.extraClassPath /root/miniconda2/envs/${YOUR_ENV_NAME}/oap_jars/spark-columnar-core-0.9.0-jar-with-dependencies.jar:/root/miniconda2/envs/${YOUR_ENV_NAME}/oap_jars/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar
-spark.executor.extraClassPath /root/miniconda2/envs/${YOUR_ENV_NAME}/oap_jars/spark-columnar-core-0.9.0-jar-with-dependencies.jar:/root/miniconda2/envs/${YOUR_ENV_NAME}/oap_jars/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar
+spark.driver.extraClassPath /root/miniconda2/envs/oapenv/oap_jars/spark-columnar-core-0.9.0-jar-with-dependencies.jar:/root/miniconda2/envs/oapenv/oap_jars/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar
+spark.executor.extraClassPath /root/miniconda2/envs/oapenv/oap_jars/spark-columnar-core-0.9.0-jar-with-dependencies.jar:/root/miniconda2/envs/oapenv/oap_jars/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar
 
 ######
 ```

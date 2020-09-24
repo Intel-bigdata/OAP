@@ -125,13 +125,15 @@ case $key in
     --remote-shuffle)
     shift 1
     export ONEAPI_ROOT=/tmp/
-    mvn clean package -pl com.intel.oap:remote-shuffle  -am -DskipTests
+    mvn clean package -pl com.intel.oap:oap-remote-shuffle  -am -DskipTests
     exit 0
     ;;
     --oap-rpmem-shuffle)
     shift 1
     export ONEAPI_ROOT=/tmp/
-    mvn clean package -pl com.intel.oap:oap-rpmem-shuffle -am -DskipTests
+    cd $OAP_HOME/oap-shuffle/RPMem-shuffle
+    mvn clean package -DskipTests
+    cd $OAP_HOME
     exit 0
     ;;
     --oap-spark)
