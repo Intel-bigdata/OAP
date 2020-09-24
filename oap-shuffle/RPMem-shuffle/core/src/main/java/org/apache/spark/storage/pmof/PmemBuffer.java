@@ -1,9 +1,10 @@
 package org.apache.spark.storage.pmof;
 
+import org.apache.spark.jni.pmof.JniUtils;
+
+import java.io.IOException;
+
 public class PmemBuffer {
-    static {
-        System.load("/usr/local/lib/libjnipmdk.so");
-    }
     private native long nativeNewPmemBuffer();
     private native long nativeNewPmemBufferBySize(long len);
     private native int nativeLoadPmemBuffer(long pmBuffer, long addr, int len);
@@ -21,10 +22,11 @@ public class PmemBuffer {
       pmBuffer = nativeNewPmemBuffer();
     }
 
-    PmemBuffer(long len) {
-      this.len = len;
-      NettyByteBufferPool.unpooledInc(len);
-      pmBuffer = nativeNewPmemBufferBySize(len);
+    PmemBuffer(long len) throws IOException {
+        JniUtils.getInstance("jnipmdk");
+        this.len = len;
+        NettyByteBufferPool.unpooledInc(len);
+        pmBuffer = nativeNewPmemBufferBySize(len);
     }
 
     void load(long addr, int len) {
