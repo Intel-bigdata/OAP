@@ -45,6 +45,8 @@ The following are required to configure OAP to use PMem cache in AppDirect mode.
    // create and mount file system
    echo y | mkfs.ext4 /dev/pmem0
    echo y | mkfs.ext4 /dev/pmem1
+   mkdir -p /mnt/pmem0
+   mkdir -p /mnt/pmem1 
    mount -o dax /dev/pmem0 /mnt/pmem0
    mount -o dax /dev/pmem1 /mnt/pmem1
    ```

@@ -147,7 +147,7 @@ function prepare_memkind() {
   fi
   cd memkind/
   git pull
-  git checkout v1.10.1
+  git checkout v1.10.1-rc2
 
   yum -y install autoconf
   yum -y install automake
