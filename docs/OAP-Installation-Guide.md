@@ -20,13 +20,6 @@ chmod 777 Miniconda2-latest-Linux-x86_64.sh
 bash Miniconda2-latest-Linux-x86_64.sh 
 ```
 For changes to take effect, close and re-open your current shell.To test your installation,  run the command `conda list` in your terminal window. A list of installed packages appears if it has been installed correctly.
-Then go to the same directory and create a conda environment to install OAP Conda package.
-
-```bash
-conda create -n oapenv -y python=3.7
-conda activate oapenv
-conda config --add channels conda-forge
-```
 
 ## Installing OAP
 
@@ -36,7 +29,9 @@ Dependencies below are required by OAP and all of them are included in OAP Conda
 - [Vmemcache](https://anaconda.org/intel/vmemcache)
 - [HPNL](https://anaconda.org/intel/hpnl)
 
+Create a conda environment and install OAP Conda package.
 ```bash
+conda create -n oapenv -y python=3.7
 conda activate oapenv
 conda install -c conda-forge -c intel -y oap=0.9.0
 ```
