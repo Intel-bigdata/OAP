@@ -326,7 +326,7 @@ We created some tool scripts [oap-benchmark-tool.zip](https://github.com/Intel-b
 ### Prepare the Tool
 
 1. Download [oap-benchmark-tool.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/oap-benchmark-tool.zip) and unzip to a folder (for example, `oap-benchmark-tool` folder) on your working node. 
-2. Copy `oap-benchmark-tool/tools/tpcds-kits` to ALL worker nodes under the same folder (for example, `/home/oap/tpcds-kits`).
+2. Copy `oap-benchmark-tool/tools/tpcds-kits` to ***ALL*** worker nodes under the same folder (for example, `/home/oap/tpcds-kits`).
 
 ### Generate TPC-DS Data
 
@@ -346,7 +346,7 @@ export SPARK_HOME=/home/oap/spark-3.0.0
 export TPCDS_KITS_DIR=/home/oap/tpcds-kits
 export NAMENODE_ADDRESS=mynamenode:9000
 export THRIFT_SERVER_ADDRESS=mythriftserver
-export DATA_SCALE=2
+export DATA_SCALE=1024
 export DATA_FORMAT=parquet
 ```
 
