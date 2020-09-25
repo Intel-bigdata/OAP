@@ -92,7 +92,7 @@ spark.executor.extraClassPath /root/miniconda2/envs/oapenv/oap_jars/spark-column
 ######
 ```
 About spark-arrow-datasource.jar, you can refer [Unified Arrow Data Source ](../../oap-data-source/arrow/README.md).                                                                                         
-Here's one example to verify if native sql engine works. We could do a simple projection on one parquet table.
+Here's one example to verify if native sql engine works, make sure you have TPC-H dataset.  We could do a simple projection on one parquet table. For detailed testing scripts, please refer to [solution guide](https://github.com/Intel-bigdata/Solution_navigator/tree/master/nativesql).
 ```
 val orders = spark.read.format("arrow").load("hdfs:////user/root/date_tpch_10/orders")
 orders.createOrReplaceTempView("orders")
