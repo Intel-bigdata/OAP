@@ -381,9 +381,6 @@ function prepare_PMoF() {
   prepare_PMDK
   prepare_libcuckoo
   cd $DEV_PATH
-  cd ../oap-shuffle/RPMem-shuffle
-  check_gcc
-  mvn package -DskipTests
 }
 
 function prepare_oneAPI() {

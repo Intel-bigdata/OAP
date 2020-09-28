@@ -7,14 +7,14 @@
     <parent>
       <groupId>com.intel.oap</groupId>
       <artifactId>oap-rpmem-shuffle</artifactId>
-      <version>0.8.2</version>
+      <version>0.8.3</version>
       <relativePath>../pom.xml</relativePath>
     </parent>
     <packaging>jar</packaging>
 
     <artifactId>oap-rpmem-shuffle-java</artifactId>
     <name>OAP Project RPMem Shuffle</name>
-    <version>0.8.2</version>
+    <version>0.8.3</version>
 
     <dependencies>
         <dependency>

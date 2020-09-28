@@ -15,7 +15,7 @@ cd OAP
 ```
 
 #### Prerequisites for Building
-OAP is built using [Apache Maven](http://maven.apache.org/). You need to install the required packages on the build system listed below. To enable Shuffle Remote PMem extension, you must configure and validate RDMA in advance, you can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md) for more details.
+OAP is built using [Apache Maven](http://maven.apache.org/) and Java8. You need to install the required packages on the build system listed below. 
 
 - [Cmake](https://help.directadmin.com/item.php?id=494)
 - [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
@@ -23,12 +23,14 @@ OAP is built using [Apache Maven](http://maven.apache.org/). You need to install
 - [HPNL](https://github.com/Intel-bigdata/HPNL)
 - [PMDK](https://github.com/pmem/pmdk)  
 - [GCC > 7](https://gcc.gnu.org/wiki/InstallingGCC)
+- **Requirements for Shuffle Remote PMem Extension**  
+If enable Shuffle Remote PMem extension with RDMA, you can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md) to configure and validate RDMA in advance.  
 
 We provide scripts to help automatically install all dependencies except RDMA, run:
 ```shell script
 sh $OAP_HOME/dev/install-oap-dependencies.sh
 ```
-If you want to use Shuffle Remote PMem Extension feature and have completed the RDMA configuring and validating steps, execute the following commands to run the preparing process:
+If you want to use Shuffle Remote PMem Extension feature with RDMA and have completed the RDMA configuring and validating steps, execute the following commands to run the preparing process:
 ```shell script
 sh $OAP_HOME/dev/install-oap-dependencies.sh --with-rdma
 ```
@@ -82,10 +84,9 @@ mvn clean -pl com.intel.oap:oap-cache -am test
 
 #### OAP Building with PMem
 
-##### Prerequisites for building with PMem support
+#### Prerequisites for building with PMem support
 
-If you want to use OAP-CACHE with PMem,  you must finish steps of "Prerequisites for building" to ensure all dependencies have been installed .
-
+When use SQL Index and Data Source Cache with PMem, finish steps of [Prerequisites for building](#Prerequisites-for-building) to ensure needed dependencies have been installed.
 ##### Building package
 You need to add `-Ppersistent-memory` to build with PMem support. For `noevict` cache strategy, you also need to build with `-Ppersistent-memory` parameter.
 ```shell script
