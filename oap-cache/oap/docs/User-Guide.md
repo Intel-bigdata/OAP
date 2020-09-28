@@ -494,7 +494,7 @@ spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
 #### External cache using plasma
 
 
-External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched spark 2.4.4. To use this strategy, follow [prerequisites](#prerequisites-1) to set up PMem hardware. Then install arrow rpm package which includes plasma library and executable file, copy arrow-plasma.jar to your ***SPARK_HOME/jars*** directory. Refer to below configurations to apply external cache strategy and start plasma service on each node and start your workload. (Currently web UI cannot display accurately, this is a known [issue](https://github.com/Intel-bigdata/OAP/issues/1579))
+External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched spark 2.4.4. 
 
 To use this strategy, follow [prerequisites](#prerequisites-1) to set up PMem hardware. 
 
@@ -524,6 +524,9 @@ mkfs.ext4 /dev/pmem1
 mount -o dax /dev/pmem0 /mnt/pmem0
 mount -o dax /dev/pmem1 /mnt/pmem1
 ```
+Then download [arrow-plasma-0.17.0.jar](https://repo1.maven.org/maven2/com/intel/arrow/arrow-plasma/0.17.0/arrow-plasma-0.17.0.jar) and copy it to `$SPARK_HOME/jars` dir.
+
+Add configurations below to `spark-defaults.conf` to apply external cache strategy and start plasma service on each node and start your workload. (Currently web UI cannot display accurately, this is a known [issue](https://github.com/Intel-bigdata/OAP/issues/1579))
 
 For Parquet data format, add these conf options:
 
