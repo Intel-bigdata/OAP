@@ -416,7 +416,7 @@ When all the queries are done, you will see the `result.json` file in the curren
 - [Index and Data Cache Separation](#Index-and-Data-Cache-Separation)  To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
 - [Cache Hot Tables](#Cache-Hot-Tables)  Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
 - [Column Vector Cache](#Column-Vector-Cache)  This document above use **binary** cache as example, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache to spare computation time.
-- [DisableCache in Runtime](#Disable-Cache-in-Runtime) Data Source Cache also supports disabling Cache in Runtime.
+- [Disable Cache in Runtime](#Disable-Cache-in-Runtime) Data Source Cache also supports disabling Cache in Runtime.
 ### Additional Cache Strategies
 
 Following table shows features of 4 cache strategies on PMem.
