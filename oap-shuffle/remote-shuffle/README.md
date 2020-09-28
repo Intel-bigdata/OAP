@@ -12,7 +12,7 @@ This is an essential part of enabling Spark on disaggregated compute and storage
 ## Developer Guide
 ### Build and Deploy
 If you have completed all steps in installation guide,  you needn't do anything in this section.
-Build this module using the following command in oap-shuffle/remote-shuffle folder or download the pre-built ` oap-remote-shuffle-<version>-with-spark-<version>.jar ` from  [oap-0.8.2-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/oap-0.8.2-bin-spark-2.4.4.tar.gz) This file needs to be deployed on every compute node that runs Spark. Manually place it on all nodes or let resource manager do the work.
+Build this module using the following command in oap-shuffle/remote-shuffle folder or download the pre-built ` oap-remote-shuffle-<version>-with-spark-<version>.jar ` from  [oap-0.8.3-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.3-spark-2.4.4/oap-0.8.3-bin-spark-2.4.4.tar.gz) This file needs to be deployed on every compute node that runs Spark. Manually place it on all nodes or let resource manager do the work.
 
 ```
     mvn -DskipTests clean package 

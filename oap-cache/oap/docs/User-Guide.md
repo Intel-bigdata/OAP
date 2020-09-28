@@ -18,7 +18,7 @@ SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with 
 
 ### Building
 
-Download our pre-built jar [oap-0.8.2-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/oap-0.8.2-bin-spark-2.4.4.tar.gz) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
+Download our pre-built jar [oap-0.8.3-bin-spark-2.4.4.tar.gz](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.3-spark-2.4.4/oap-0.8.3-bin-spark-2.4.4.tar.gz) to your working node, unzip it and put the jars to your working directory such as `/home/oap/jars/`. If you’d like to build from source code, please refer to [Developer Guide](Developer-Guide.md) for the detailed steps.
 
 ### Spark Configurations
 
@@ -154,7 +154,7 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
    spark.sql.oap.orc.binary.cache.enable          true
    ```
 
-   Change `spark.sql.oap.fiberCache.offheap.memory.size` based on the availability of DRAM capacity to cache data.
+    ***NOTE***: Change `spark.sql.oap.fiberCache.offheap.memory.size` based on the availability of DRAM capacity to cache data, and its size is equal to `spark.executor.memoryOverhead`.
 
 2. Launch Spark ***ThriftServer***
 
@@ -225,6 +225,8 @@ The following are required to configure OAP to use PMem cache.
    // create and mount file system
    echo y | mkfs.ext4 /dev/pmem0
    echo y | mkfs.ext4 /dev/pmem1
+   mkdir -p /mnt/pmem0
+   mkdir -p /mnt/pmem1 
    mount -o dax /dev/pmem0 /mnt/pmem0
    mount -o dax /dev/pmem1 /mnt/pmem1
    ```
@@ -232,14 +234,10 @@ The following are required to configure OAP to use PMem cache.
    In this case file systems are generated for 2 numa nodes, which can be checked by "numactl --hardware". For a different number of numa nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to numa nodes.
    
    For more information you can refer to [Quick Start Guide: Provision Intel® Optane™ DC Persistent Memory](https://software.intel.com/content/www/us/en/develop/articles/quick-start-guide-configure-intel-optane-dc-persistent-memory-on-linux.html)
-- Besides, with below BIOS configuration settings, Optane PMem could get noticeable performance gain, especially on cross socket write path.
 
-```
-Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
-Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
-``` 
-- Make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. You can follow the build/install steps from vmemcache website and make sure libvmemcache.so exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
+- Make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. You can follow the build/install steps from vmemcache website and make sure `libvmemcache.so` exist in '/lib64' directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.3-spark-2.4.4/libvmemcache-0.8.rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
 
+- Currently, using Community Spark occasionally has the problem of two executors being bound to the same PMem path, so we recommend you use our pre-built numa-patched [Spark-2.4.4](https://github.com/Intel-bigdata/spark/releases/download/v2.4.4-intel-oap-0.8.2/spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.2.tgz), which can not only improve performance, but also solve this problem.
 
 #### Configure for NUMA
 
@@ -247,7 +245,9 @@ Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disable
 
    ```yum install numactl -y ```
 
-2. Build Spark from source to enable numa-binding support. Refer to [enable-numa-binding-for-PMem-in-spark](./Developer-Guide.md#enable-numa-binding-for-pmem-in-spark).
+2. We strongly recommend you use numa-patched Spark to achieve better performance gain.
+   
+   Build Spark from source to enable numa-binding support. Refer to [enable-numa-binding-for-PMem-in-spark](./Developer-Guide.md#enable-numa-binding-for-pmem-in-spark).Or you can just download our pre-built numa-patched [Spark-2.4.4](https://github.com/Intel-bigdata/spark/releases/download/v2.4.4-intel-oap-0.8.2/spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.2.tgz).
 
 #### Configure for PMem 
 
@@ -309,22 +309,12 @@ The `vmem` cache strategy is based on libvmemcache (buffer based LRU cache), whi
 
 - Check PMem cache size by checking disk space with `df -h`.For `vmemcache` strategy, disk usage will reach the initial cache size once the PMem cache is initialized and will not change during workload execution. For `Guava/Noevict` strategies, the command will show disk space usage increases along with workload execution. 
 
-### Disable Cache feature in runtime
-
-If user find some queries have performance degradation with data source cache, user could disable this feature for these queries by set `spark.sql.oap.cache.enabled` to `false` in runtime, which will use default Spark implementation to guarantee performance. If you are using spark-shell, it would like below, the second query will not use cache:  
-```
-spark.sql("SELECT column_A FROM table_A")
-spark.sql("SET spark.sql.oap.cache.enabled=false")
-spark.sql("SELECT column_B FROM table_B")
-spark.sql("SET spark.sql.oap.cache.enabled=true")
-spark.sql("SELECT column_C FROM table_C")
-```
 
 ## Run TPC-DS Benchmark
 
 This section provides instructions and tools for running TPC-DS queries to evaluate the cache performance of various configurations. The TPC-DS suite has many queries and we select 9 I/O intensive queries to simplify performance evaluation.
 
-We created some tool scripts [oap-benchmark-tool.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/oap-benchmark-tool.zip) to simplify running the workload. If you are already familiar with TPC-DS data generation and running a TPC-DS tool suite, skip our tool and use the TPC-DS tool suite directly.
+We created some tool scripts [oap-benchmark-tool.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.3-spark-2.4.4/oap-benchmark-tool.zip) to simplify running the workload. If you are already familiar with TPC-DS data generation and running a TPC-DS tool suite, skip our tool and use the TPC-DS tool suite directly.
 
 ### Prerequisites
 
@@ -332,7 +322,7 @@ We created some tool scripts [oap-benchmark-tool.zip](https://github.com/Intel-b
 
 ### Prepare the Tool
 
-1. Download [oap-benchmark-tool.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/oap-benchmark-tool.zip) and unzip to a folder (for example, `oap-benchmark-tool` folder) on your working node. 
+1. Download [oap-benchmark-tool.zip](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.3-spark-2.4.4/oap-benchmark-tool.zip) and unzip to a folder (for example, `oap-benchmark-tool` folder) on your working node. 
 2. Copy `oap-benchmark-tool/tools/tpcds-kits` to ***ALL*** worker nodes under the same folder (for example, `/home/oap/tpcds-kits`).
 
 ### Generate TPC-DS Data
@@ -426,7 +416,7 @@ When all the queries are done, you will see the `result.json` file in the curren
 - [Index and Data Cache Separation](#Index-and-Data-Cache-Separation)  To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
 - [Cache Hot Tables](#Cache-Hot-Tables)  Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
 - [Column Vector Cache](#Column-Vector-Cache)  This document above use **binary** cache as example, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache to spare computation time.
-
+- [DisableCache in Runtime](#Disable-Cache-in-Runtime) Data Source Cache also supports disabling Cache in Runtime.
 ### Additional Cache Strategies
 
 Following table shows features of 4 cache strategies on PMem.
@@ -439,9 +429,7 @@ Following table shows features of 4 cache strategies on PMem.
 | Cache data cleaned once executors exited. | Cache data cleaned once executors exited. | Cache data cleaned once executors exited. | No data loss when executors exit thus is friendly to dynamic allocation. But currently it has performance overhead than other cache solutions. |
 
 
-- For cache solution `guava/noevict`, make sure [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/libmemkind.so.0) for x86_64 bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. Build and install step can refer to [build and install memkind](./Developer-Guide.md#build-and-install-memkind)
-
-- For cache solution `vmemcahe/external` cache, make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. You can follow the build/install steps from vmemcache website and make sure `libvmemcache.so` exist in `/lib64` directory in each worker node. You can download [vmemcache RPM package](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.2-spark-2.4.4/libvmemcache-0.8..rpm), and install it by running `rpm -i libvmemcache*.rpm`. Build and install step can refer to [build and install vmemcache](./Developer-Guide.md#build-and-install-vmemcache)
+- For cache solution `guava/noevict`, make sure [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2) library installed on every cluster worker node. Compile Memkind based on your system or directly place our pre-built binary of [libmemkind.so.0](https://github.com/Intel-bigdata/OAP/releases/download/v0.8.3-spark-2.4.4/libmemkind.so.0) for x86_64 bit CentOS Linux in the `/lib64/`directory of each worker node in cluster. Build and install step can refer to [build and install memkind](./Developer-Guide.md#build-and-install-memkind)
 
 - Data Source Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/oap-master) repo. Build and install step can refer to [build and install plasma](./Developer-Guide.md#build-and-install-plasma)
  
@@ -561,7 +549,7 @@ plasma config parameters:
 You can start plasma service on each node as following command, and then you can run your workload.
 
 ```
-plasma-store-server -m 15000000000 -s /tmp/plasmaStore -d /mnt/pmem  
+./plasma-store-server -m 15000000000 -s /tmp/plasmaStore -d /mnt/pmem  
 ```
 
  Remember to kill `plasma-store-server` process if you no longer need cache, and you should delete `/tmp/plasmaStore` which is a Unix domain socket.  
@@ -703,4 +691,15 @@ spark.sql.oap.orc.binary.cache.enable           false
 # for ORC file format, enable ColumnVector cache
 spark.sql.oap.orc.data.cache.enable             true
 spark.sql.orc.copyBatchToSpark                  true
+```
+
+### Disable Cache in Runtime
+
+If you find some queries have performance degradation with data source cache, you can disable this feature for these queries by set `spark.sql.oap.cache.enabled` to `false` in runtime, which will use default Spark implementation to guarantee performance. If you are using spark-shell, it would be like below, the second query will not use cache:  
+```
+spark.sql("SELECT column_A FROM table_A")
+spark.sql("SET spark.sql.oap.cache.enabled=false")
+spark.sql("SELECT column_B FROM table_B")
+spark.sql("SET spark.sql.oap.cache.enabled=true")
+spark.sql("SELECT column_C FROM table_C")
 ```
