@@ -1,6 +1,9 @@
 package:
   name: memkind
-  version: 1.0
+  version: 1.10.1.rc2
+
+build:
+  number: 0
 
 source:
   path: ../../../thirdparty/memkind/
@@ -11,5 +14,19 @@ requirements:
     - autoconf
     - automake
     - libtool
-  run:
-    - libgcc [linux]
+
+
+about:
+  home: https://github.com/memkind/memkind
+  license: https://github.com/memkind/memkind/blob/v1.10.1.rc2/COPYING
+  license_file:
+    - COPYING
+  summary: The memkind library is a user extensible heap manager built on top of jemalloc which enables control of memory characteristics and a partitioning of the heap between kinds of memory.
+  description:
+    '<strong>LEGAL NOTICE: Use of this software package is subject to the software license agreement (as set forth above, in
+    the license section of the installed Conda package and/or the README file) and all notices, disclaimers or license terms
+    for third party or open source software included in or with the software.</strong>
+    <br/><br/>
+    EULA: <a href="https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/LICENSE.txt" target="_blank">Apache License 2.0</a><br/>
+    Third Party Programs: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/TPP.txt
+    <br/><br/>'

@@ -1,0 +1,14 @@
+c_compiler:
+- gcc
+c_compiler_version:
+- '7'
+channel_sources:
+- intel-bigdata,conda-forge
+channel_targets:
+- conda-forge main
+cxx_compiler:
+- gxx
+cxx_compiler_version:
+- '7'
+
+

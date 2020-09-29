@@ -10,9 +10,19 @@ requirements:
     - gcc   [linux]
     - libgcc [linux]
     - cmake 3.11.*
-    - libfabric 1.0
-  run:
-    - libgcc [linux]
-    - libfabric 1.0
-    - gcc   [linux]
-    - sysroot_linux-64 2.17
+
+
+about:
+  home: https://github.com/Intel-bigdata/HPNL
+  license: https://github.com/Intel-bigdata/HPNL/blob/master/LICENSE.txt
+  license_file:
+    - LICENSE.txt
+  summary: HPNL is a light-weight network library built on Libfabric for big data application.
+  description:
+    '<strong>LEGAL NOTICE: Use of this software package is subject to the software license agreement (as set forth above, in
+    the license section of the installed Conda package and/or the README file) and all notices, disclaimers or license terms
+    for third party or open source software included in or with the software.</strong>
+    <br/><br/>
+    EULA: <a href="https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/LICENSE.txt" target="_blank">Apache License 2.0</a><br/>
+    Third Party Programs: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/TPP.txt
+    <br/><br/>'

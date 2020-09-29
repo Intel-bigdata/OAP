@@ -1,54 +1,50 @@
+{% set ARROW_VERSION = "3.1" %}
 package:
-  name: intel-arrow-cpp
+  name: arrow
   version: {{ ARROW_VERSION }}
 
 source:
-  path: ../../../../
+  path: ../../../thirdparty/arrow/
 
 build:
   build:
   number: 0
   skip: true  # [win and vc<14]
   run_exports:
-    - {{ pin_subpackage("intel-arrow-cpp", max_pin="x.x") }}
+    - {{ pin_subpackage("arrow", max_pin="x.x") }}
 
 requirements:
   build:
     - cmake 3.16.*
     - autoconf  # [unix]
     - ninja
-    - numactl-devel-cos7-x86_64 2.0.12
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
   host:
-    - aws-sdk-cpp
-    - boost-cpp
+    - aws-sdk-cpp 1.7.164
+    - boost-cpp >=1.68.0
     - brotli
-    - numactl-devel-cos7-x86_64 2.0.12
-    - vmemcache 1.0
-    - sysroot_linux-64 2.17
     - bzip2
     - c-ares
     - gflags
     - glog
-    - grpc-cpp
+    - grpc-cpp >=1.21.4
     - libprotobuf
-    - clangdev 8.*
-    - llvmdev 8.*
+    - clangdev 7
+    - llvmdev 7
     - lz4-c
-    - numpy 1.16.*
+    - numpy >=1.14
     - orc  # [unix]
-    - python
     - rapidjson
     - re2
     - snappy
-    - thrift-cpp >=0.11
+    - thrift-cpp >=0.11.0
     - zlib
     - zstd
 
   run:
-    - {{ pin_compatible('numpy', lower_bound='1.16') }}
-    - aws-sdk-cpp
+    - numpy >=1.14
+    - aws-sdk-cpp 1.7.164
     - boost-cpp
     - brotli
     - c-ares
@@ -56,19 +52,21 @@ requirements:
     - glog
     - grpc-cpp
     - lz4-c
-    - python
     - re2
     - snappy
     - zlib
     - zstd
+    - libhdfs3
+    - vmemcache 0.8
+    - memkind 1.10.1-rc2
+    - hpnl 1.0
 
 test:
   commands:
-    # headers
+    # headers1
     - test -f $PREFIX/include/arrow/api.h              # [unix]
-    - test -f $PREFIX/include/arrow/flight/types.h     # [unix]
     - test -f $PREFIX/include/plasma/client.h          # [unix]
-    - test -f $PREFIX/include/gandiva/engine.h         # [unix]
+#    - test -f $PREFIX/include/gandiva/engine.h         # [unix]
     - test -f $PREFIX/include/parquet/api/reader.h     # [unix]
     - if not exist %LIBRARY_INC%\\arrow\\api.h exit 1            # [win]
     - if not exist %LIBRARY_INC%\\gandiva\\engine.h exit 1       # [win]
@@ -77,14 +75,12 @@ test:
     # shared
     - test -f $PREFIX/lib/libarrow.so            # [linux]
     - test -f $PREFIX/lib/libarrow_dataset.so    # [linux]
-    - test -f $PREFIX/lib/libarrow_flight.so     # [linux]
-    - test -f $PREFIX/lib/libarrow_python.so     # [linux]
     - test -f $PREFIX/lib/libparquet.so          # [linux]
     - test -f $PREFIX/lib/libgandiva.so          # [linux]
     - test -f $PREFIX/lib/libplasma.so           # [linux]
     - test -f $PREFIX/lib/libarrow.dylib         # [osx]
     - test -f $PREFIX/lib/libarrow_dataset.dylib # [osx]
-    - test -f $PREFIX/lib/libarrow_python.dylib  # [osx]
+    - test -f $PREFIX/lib/libarrow_python.dylib 1 # [osx]
     - test -f $PREFIX/lib/libgandiva.dylib       # [osx]
     - test -f $PREFIX/lib/libparquet.dylib       # [osx]
     - test -f $PREFIX/lib/libplasma.dylib        # [osx]
@@ -103,34 +99,33 @@ test:
 #    - test ! -f $PREFIX/lib/libplasma.a        # [unix]
 #    - test ! -f $PREFIX/lib/libparquet.a       # [unix]
 #    - test ! -f $PREFIX/lib/libgandiva.a       # [unix]
-    - if exist %PREFIX%\\Library\\lib\\arrow_static.lib exit 1         # [win]
-    - if exist %PREFIX%\\Library\\lib\\arrow_dataset_static.lib exit 1 # [win]
-    - if exist %PREFIX%\\Library\\lib\\arrow_flight_static.lib exit 1  # [win]
-    - if exist %PREFIX%\\Library\\lib\\arrow_python_static.lib exit 1  # [win]
-    - if exist %PREFIX%\\Library\\lib\\parquet_static.lib exit 1       # [win]
-    - if exist %PREFIX%\\Library\\lib\\gandiva_static.lib exit 1       # [win]
+#    - if exist %PREFIX%\\Library\\lib\\arrow_static.lib exit 1         # [win]
+#    - if exist %PREFIX%\\Library\\lib\\arrow_dataset_static.lib exit 1 # [win]
+#    - if exist %PREFIX%\\Library\\lib\\arrow_flight_static.lib exit 1  # [win]
+#    - if exist %PREFIX%\\Library\\lib\\arrow_python_static.lib exit 1  # [win]
+#    - if exist %PREFIX%\\Library\\lib\\parquet_static.lib exit 1       # [win]
+#    - if exist %PREFIX%\\Library\\lib\\gandiva_static.lib exit 1       # [win]
 
     # conda tools
     - conda inspect linkages -p $PREFIX $PKG_NAME  # [not win]
     - conda inspect objects -p $PREFIX $PKG_NAME   # [osx]
 
 about:
-  home: http://github.com/apache/arrow
-  license: Apache 2.0
+  summary: Optimized Analytics Packages for Spark is a project to optimize Spark by providing optimized implmentation of packages in various aspects including cache, shuffle, and so on.
+  home: https://github.com/Intel-bigdata/OAP
+  license:  Apache License 2.0
   license_file:
     - LICENSE.txt
-  summary: 'C++ libraries for Apache Arrow'
+    - TPP.txt
+  description:
+    '<strong>LEGAL NOTICE: Use of this software package is subject to the software license agreement (as set forth above, in
+      the license section of the installed Conda package and/or the README file) and all notices, disclaimers or license terms
+      for third party or open source software included in or with the software.</strong>
+      <br/><br/>
+      EULA: <a href="https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/LICENSE.txt" target="_blank">Apache License 2.0</a><br/>
+      Third Party Programs: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/TPP.txt
+      <br/><br/>'
+  dev_url: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/docs/Developer-Guide.md
+  doc_url: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/docs/OAP-Installation-Guide.md
 
-extra:
-  recipe-maintainers:
-    - wesm
-    - xhochy
-    - leifwalsh
-    - jreback
-    - cpcloud
-    - pcmoritz
-    - robertnishihara
-    - siddharthteotia
-    - kou
-    - kszucs
-    - pitrou
+

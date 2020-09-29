@@ -1,15 +1,130 @@
+{% set OAP_VERSION = "0.9.0" %}
 package:
   name: oap
-  version: 0.1.0
+  version: {{ OAP_VERSION }}
+
+source:
+  path: ../../../thirdparty/arrow/
 
 build:
+  build:
   number: 3
+  skip: true  # [win and vc<14]
+  run_exports:
+    - {{ pin_subpackage("oap", max_pin="x.x") }}
 
 requirements:
+  build:
+    - cmake 3.16.*
+    - autoconf  # [unix]
+    - ninja
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+  host:
+    - aws-sdk-cpp 1.7.164
+    - boost-cpp >=1.68.0
+    - brotli
+    - bzip2
+    - c-ares
+    - gflags
+    - glog
+    - grpc-cpp >=1.21.4
+    - libprotobuf
+    - clangdev 7
+    - llvmdev 7
+    - lz4-c
+    - numpy >=1.14
+    - orc  # [unix]
+    - rapidjson
+    - re2
+    - snappy
+    - thrift-cpp >=0.11.0
+    - zlib
+    - zstd
+
   run:
-    - vmemcache
-    - memkind
-    - intel-arrow-cpp
-    - hpnl
+    - numpy >=1.14
+    - aws-sdk-cpp 1.7.164
+    - boost-cpp
+    - brotli
+    - c-ares
+    - gflags
+    - glog
+    - grpc-cpp
+    - lz4-c
+    - re2
+    - snappy
+    - zlib
+    - zstd
+    - libhdfs3
+    - vmemcache 0.8
+    - memkind 1.10.1.rc2
+    - hpnl 1.0
+
+test:
+  commands:
+    # headers
+    - test -f $PREFIX/include/arrow/api.h              # [unix]
+    - test -f $PREFIX/include/plasma/client.h          # [unix]
+    - test -f $PREFIX/include/gandiva/engine.h         # [unix]
+    - test -f $PREFIX/include/parquet/api/reader.h     # [unix]
+    - if not exist %LIBRARY_INC%\\arrow\\api.h exit 1            # [win]
+    - if not exist %LIBRARY_INC%\\gandiva\\engine.h exit 1       # [win]
+    - if not exist %LIBRARY_INC%\\parquet\\api\\reader.h exit 1  # [win]
+
+    # shared
+    - test -f $PREFIX/lib/libarrow.so            # [linux]
+    - test -f $PREFIX/lib/libarrow_dataset.so    # [linux]
+    - test -f $PREFIX/lib/libparquet.so          # [linux]
+    - test -f $PREFIX/lib/libgandiva.so          # [linux]
+    - test -f $PREFIX/lib/libplasma.so           # [linux]
+    - test -f $PREFIX/lib/libarrow.dylib         # [osx]
+    - test -f $PREFIX/lib/libarrow_dataset.dylib # [osx]
+    - test -f $PREFIX/lib/libarrow_python.dylib  # [osx]
+    - test -f $PREFIX/lib/libgandiva.dylib       # [osx]
+    - test -f $PREFIX/lib/libparquet.dylib       # [osx]
+    - test -f $PREFIX/lib/libplasma.dylib        # [osx]
+    - if not exist %PREFIX%\\Library\\bin\\arrow.dll exit 1         # [win]
+    - if not exist %PREFIX%\\Library\\bin\\arrow_dataset.dll exit 1 # [win]
+    - if not exist %PREFIX%\\Library\\bin\\arrow_flight.dll exit 1  # [win]
+    - if not exist %PREFIX%\\Library\\bin\\arrow_python.dll exit 1  # [win]
+    - if not exist %PREFIX%\\Library\\bin\\parquet.dll exit 1       # [win]
+    - if not exist %PREFIX%\\Library\\bin\\gandiva.dll exit 1       # [win]
+
+    # absence of static libraries
+#    - test ! -f $PREFIX/lib/libarrow.a         # [unix]
+#    - test ! -f $PREFIX/lib/libarrow_dataset.a # [unix]
+#    - test ! -f $PREFIX/lib/libarrow_flight.a  # [unix]
+#    - test ! -f $PREFIX/lib/libarrow_python.a  # [unix]
+#    - test ! -f $PREFIX/lib/libplasma.a        # [unix]
+#    - test ! -f $PREFIX/lib/libparquet.a       # [unix]
+#    - test ! -f $PREFIX/lib/libgandiva.a       # [unix]
+#    - if exist %PREFIX%\\Library\\lib\\arrow_static.lib exit 1         # [win]
+#    - if exist %PREFIX%\\Library\\lib\\arrow_dataset_static.lib exit 1 # [win]
+#    - if exist %PREFIX%\\Library\\lib\\arrow_flight_static.lib exit 1  # [win]
+#    - if exist %PREFIX%\\Library\\lib\\arrow_python_static.lib exit 1  # [win]
+#    - if exist %PREFIX%\\Library\\lib\\parquet_static.lib exit 1       # [win]
+#    - if exist %PREFIX%\\Library\\lib\\gandiva_static.lib exit 1       # [win]
+
+    # conda tools
+    - conda inspect linkages -p $PREFIX $PKG_NAME  # [not win]
+    - conda inspect objects -p $PREFIX $PKG_NAME   # [osx]
+
 about:
   summary: Optimized Analytics Packages for Spark is a project to optimize Spark by providing optimized implmentation of packages in various aspects including cache, shuffle, and so on.
+  home: https://github.com/Intel-bigdata/OAP
+  license:  Apache License 2.0
+  license_file:
+    - LICENSE.txt
+    - TPP.txt
+  description:
+    '<strong>LEGAL NOTICE: Use of this software package is subject to the software license agreement (as set forth above, in
+      the license section of the installed Conda package and/or the README file) and all notices, disclaimers or license terms
+      for third party or open source software included in or with the software.</strong>
+      <br/><br/>
+      EULA: <a href="https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/LICENSE.txt" target="_blank">Apache License 2.0</a><br/>
+      Third Party Programs: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/TPP.txt
+      <br/><br/>'
+  dev_url: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/docs/Developer-Guide.md
+  doc_url: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/docs/OAP-Installation-Guide.md
+

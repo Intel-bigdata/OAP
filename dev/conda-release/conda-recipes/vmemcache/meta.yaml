@@ -1,6 +1,6 @@
 package:
   name: vmemcache
-  version: 1.0
+  version: 0.8
 
 source:
   path: ../../../thirdparty/vmemcache/
@@ -10,5 +10,20 @@ requirements:
     - gcc   [linux]
     - libgcc [linux]
     - cmake 3.11.*
-  run:
-    - libgcc [linux]
+
+about:
+  home: https://github.com/pmem/vmemcache
+  license: Intel Simplified Software License
+  license_file:
+    - LICENSE
+  summary: Libvmemcache is an embeddable and lightweight in-memory caching solution.
+  description:
+    '<strong>LEGAL NOTICE: Use of this software package is subject to the software license agreement (as set forth above, in
+    the license section of the installed Conda package and/or the README file) and all notices, disclaimers or license terms
+    for third party or open source software included in or with the software.</strong>
+    <br/><br/>
+    EULA: <a href="https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/LICENSE.txt" target="_blank">Apache License 2.0</a><br/>
+    Third Party Programs: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/TPP.txt
+    <br/><br/>'
+  dev_url: https://github.com/pmem/vmemcache.git
+  doc_url: https://github.com/pmem/vmemcache.git
