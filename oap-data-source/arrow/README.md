@@ -10,27 +10,93 @@ We have provided a Conda package which will automatically install dependencies n
 
 
 ## Build
-### Install libhdfs3 library
+### Prerequisite
+
+There are some requirements before you build the project.
+Please make sure you have already installed the software in your system.
+
+1. java8 OpenJDK -> yum install java-1.8.0-openjdk
+2. cmake 3.2 or higher version
+3. maven 3.1.1 or higher version
+4. Hadoop 2.7.5 or higher version
+5. Spark 3.0.0 or higher version
+
+### cmake installation
+
+If you are facing some trouble when installing cmake, please follow below steps to install cmake.
+
+```
+// installing cmake 3.2
+sudo yum install cmake3
+
+// If you have an existing cmake, you can use below command to set it as an option within alternatives command
+sudo alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake 10 --slave /usr/local/bin/ctest ctest /usr/bin/ctest --slave /usr/local/bin/cpack cpack /usr/bin/cpack --slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake --family cmake
+
+// Set cmake3 as an option within alternatives command
+sudo alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake3 20 --slave /usr/local/bin/ctest ctest /usr/bin/ctest3 --slave /usr/local/bin/cpack cpack /usr/bin/cpack3 --slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake3 --family cmake
+
+// Use alternatives to choose cmake version
+sudo alternatives --config cmake
+```
+
+### maven installation
+
+If you are facing some trouble when installing maven, please follow below steps to install maven
+
+```
+// installing maven 3.6.3
+Go to https://maven.apache.org/download.cgi and download the specific version of maven
+
+// Below command use maven 3.6.3 as an example
+wget htps://ftp.wayne.edu/apache/maven/maven-3/3.6.3/binaries/apache-maven-3.6.3-bin.tar.gz
+tar xzf apache-maven-3.6.3-bin.tar.gz
+mkdir /usr/local/maven
+mv apache-maven-3.6.3/ /usr/local/maven/
+
+// Set maven 3.6.3 as an option within alternatives command
+sudo alternatives --install /usr/bin/mvn mvn /usr/local/maven/apache-maven-3.6.3/bin/mvn 1
+
+// Use alternatives to choose mvn version
+sudo alternatives --config mvn
+```
+
+### Hadoop Native Library(Default)
+
+Please make sure you have set up Hadoop directory properly with Hadoop Native Libraries
+In your $HADOOP_HOME/lib/native directory, there are libhadoop.so and libhdfs.so existing.
+By default, arrow would scan your $HADOOP_HOME and find the native Hadoop library to be used for Hadoop connection.
+
+For more information for Hadoop Native Library, please read the official Hadoop website [documentation](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/NativeLibraries.html)
+
+### Use libhdfs3 library for better performance(Optional)
 
 For better performance ArrowDataSource reads HDFS files using the third-party library libhdfs3. The library should be pre-installed 
 on machines Spark Executor nodes are running on.
 
-To install the library, use of [Conda](https://docs.conda.io/en/latest/) is recommended.
+There are two ways to set up libhdfs3 library
+Option1: Overwrite soft link for libhdfs.so
+You can find libhdfs3.so in $OAP_DIR/oap-native-sql/cpp/src/resources/libhdfs3.so
+To install libhdfs3.so, you have to create a soft link for libhdfs.so in $HADOOP_HOME/lib/native directory.
 
 ```
-// installing libhdfs3
-conda install -c conda-forge libhdfs3
-
-// check the installed library file
-ls -l ~/miniconda/envs/${YOUR_ENV_NAME}/lib/libhdfs3.so/lib/libhdfs3.so
+ln -f -s libhdfs3.so libhdfs.so
 ```
 
-Then add following Spark configuration options before running the DataSource to make the library to be recognized:
+Option2:
+Add env variable to the system
+```
+export ARROW_LIBHDFS3_DIR="PATH_TO_LIBHDFS3_DIR/"
+```
 
-* `spark.executorEnv.ARROW_LIBHDFS3_DIR = "~/miniconda/envs/${YOUR_ENV_NAME}/lib/"`
-* `spark.executorEnv.LD_LIBRARY_PATH = "~/miniconda/envs/${YOUR_ENV_NAME}/lib/"`
+Add following Spark configuration options before running the DataSource to make the library to be recognized:
+* `spark.executorEnv.ARROW_LIBHDFS3_DIR = "PATH_TO_LIBHDFS3_DIR/"`
+* `spark.executorEnv.LD_LIBRARY_PATH = "PATH_TO_LIBHDFS3_DEPENDENCIES_DIR/"`
 
-### Build and install Intel® optimized Arrow with Datasets Java API
+
+Please notes: If you choose to use libhdfs3.so, there are some other dependency libraries you have to installed such as libprotobuf or libcrypto.
+
+### Build and install Intel® Optimized Arrow with Datasets Java API
+You have to use a cusotmized Arrow to support for our datasets Java API.
 
 ```
 // build arrow-cpp
@@ -43,12 +109,18 @@ make
 
 // build and install arrow jvm library
 cd ../../java
-mvn clean install -P arrow-jni -am -Darrow.cpp.build.dir=../cpp/build/release
+mvn clean install -P arrow-jni -am -Darrow.cpp.build.dir=$PATH_TO_ARROW_SOURCE_CODE/arrow/cpp/build/release
 ```
 
-### Build this library
+### Build OAP Data Source Library
 
 ```
+// Download OAP Source Code
+git clone --branch branch-0.9-spark-3.x https://github.com/Intel-bigdata/OAP.git
+
+// Go to the directory
+cd $PATH_TO_OAP_DIR/oap-data-source/arrow
+
 // build
 mvn clean package
 
@@ -75,6 +147,27 @@ To enable ArrowDataSource, the previous built jar `spark-arrow-datasource-0.9.0-
 
 * `spark.driver.extraClassPath`
 * `spark.executor.extraClassPath`
+
+Example to run Spark Shell with ArrowDataSource jar file
+```
+${SPARK_HOME}/bin/spark-shell \
+        --verbose \
+        --master yarn \
+        --driver-memory 10G \
+        --conf spark.driver.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar \
+        --conf spark.executor.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar \
+        --conf spark.driver.cores=1 \
+        --conf spark.executor.instances=12 \
+        --conf spark.executor.cores=6 \
+        --conf spark.executor.memory=20G \
+        --conf spark.memory.offHeap.size=80G \
+        --conf spark.task.cpus=1 \
+        --conf spark.locality.wait=0s \
+        --conf spark.sql.shuffle.partitions=72 \
+        --conf spark.executorEnv.ARROW_LIBHDFS3_DIR="$PATH_TO_LIBHDFS3_DIR/" \
+        --conf spark.executorEnv.LD_LIBRARY_PATH="$PATH_TO_LIBHDFS3_DEPENDENCIES_DIR" \
+        --jars ${NATIVE_SQL_DATASOURCE_JAR}
+```
 
 For more information about these options, please read the official Spark [documentation](https://spark.apache.org/docs/latest/configuration.html#runtime-environment).
 
