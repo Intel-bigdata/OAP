@@ -218,6 +218,12 @@ private[filecache] object OapCache extends Logging {
                           fallBackRes: Boolean = true): Boolean = {
     if (fallBackEnabled == false && fallBackRes == true) return true
     if (fallBackEnabled == false && fallBackRes == false) return false
+    var detectPmemShPath = System.getProperty("user.dir") + "/dev/detect_pmem.sh"
+    val detectPmem = detectPmemShPath.!!
+    if(detectPmem.length  == 0) {
+      logWarning("no pmem detected on this device.")
+      return false
+    }
     val conf = sparkEnv.conf
     var numaId = conf.getInt("spark.executor.numa.id", -1)
     val executorIdStr = sparkEnv.executorId

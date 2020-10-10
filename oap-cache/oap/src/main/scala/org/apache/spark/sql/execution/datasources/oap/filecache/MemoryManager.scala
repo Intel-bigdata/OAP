@@ -127,6 +127,12 @@ private[sql] object MemoryManager extends Logging {
 
 
   def apply(sparkEnv: SparkEnv, memoryManagerOpt: String): MemoryManager = {
+    var detectPmemShPath = System.getProperty("user.dir") + "/dev/detect_pmem.sh"
+    val detectPmem = detectPmemShPath.!!
+    if(detectPmem.length  == 0) {
+      logWarning("no pmem detected on this device.")
+      return new OffHeapMemoryManager(sparkEnv)
+    }
     memoryManagerOpt match {
       case "offheap" => new OffHeapMemoryManager(sparkEnv)
       case "pm" => new PersistentMemoryManager(sparkEnv)
