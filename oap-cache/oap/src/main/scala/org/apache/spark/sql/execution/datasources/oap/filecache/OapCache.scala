@@ -213,17 +213,20 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
 private[filecache] object OapCache extends Logging {
   val PMemRelatedCacheBackend = Array("guava", "vmem", "noevict", "external")
+  def detectPlasmaServer():Boolean = {
+        val plasmaServerStatus = "ps -ef " #| "grep plasma"
+        if (plasmaServerStatus.indexOf("plasma-store-server") == -1) {
+          logWarning("Plasama server has not been set up")
+          return false
+        }else{
+          return true
+        }
+  }
   def cacheFallBackDetect(sparkEnv: SparkEnv,
                           fallBackEnabled: Boolean = true,
                           fallBackRes: Boolean = true): Boolean = {
     if (fallBackEnabled == false && fallBackRes == true) return true
     if (fallBackEnabled == false && fallBackRes == false) return false
-    var detectPmemShPath = System.getProperty("user.dir") + "/dev/detect_pmem.sh"
-    val detectPmem = detectPmemShPath.!!
-    if(detectPmem.length  == 0) {
-      logWarning("no pmem detected on this device.")
-      return false
-    }
     val conf = sparkEnv.conf
     var numaId = conf.getInt("spark.executor.numa.id", -1)
     val executorIdStr = sparkEnv.executorId
@@ -286,7 +289,7 @@ private[filecache] object OapCache extends Logging {
           case "guava" => new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
           case "vmem" => new VMemCache(fiberType)
           case "noevict" => new NoEvictPMCache(cacheMemory, cacheGuardianMemory, fiberType)
-          case "external" => new ExternalCache(fiberType)
+          case "external" => {if (detectPlasmaServer() == true) new ExternalCache(fiberType) else new SimpleOapCache()}
           case _ => throw new UnsupportedOperationException(
             s"The cache backend: ${oapCacheOpt} is not supported now")
         }

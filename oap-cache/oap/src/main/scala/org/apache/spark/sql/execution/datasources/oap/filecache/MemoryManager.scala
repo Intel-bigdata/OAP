@@ -17,14 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
-import java.io.File
-import java.util.concurrent.atomic.AtomicLong
-
-import scala.util.Success
-
-import com.intel.oap.common.unsafe.PersistentMemoryPlatform
 import org.apache.arrow.plasma.PlasmaClient
-
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config.ConfigEntry
@@ -127,19 +120,13 @@ private[sql] object MemoryManager extends Logging {
 
 
   def apply(sparkEnv: SparkEnv, memoryManagerOpt: String): MemoryManager = {
-    var detectPmemShPath = System.getProperty("user.dir") + "/dev/detect_pmem.sh"
-    val detectPmem = detectPmemShPath.!!
-    if(detectPmem.length  == 0) {
-      logWarning("no pmem detected on this device.")
-      return new OffHeapMemoryManager(sparkEnv)
-    }
     memoryManagerOpt match {
       case "offheap" => new OffHeapMemoryManager(sparkEnv)
       case "pm" => new PersistentMemoryManager(sparkEnv)
       case "hybrid" => new HybridMemoryManager(sparkEnv)
       case "tmp" => new TmpDramMemoryManager(sparkEnv)
       case "kmem" => new DaxKmemMemoryManager(sparkEnv)
-      case "plasma" => new PlasmaMemoryManager(sparkEnv)
+      case "plasma" => {if (detectPlasmaServer() == true) new PlasmaMemoryManager(sparkEnv) else new OffHeapMemoryManager(sparkEnv)}
       case _ => throw new UnsupportedOperationException(
         s"The memory manager: ${memoryManagerOpt} is not supported now")
     }
