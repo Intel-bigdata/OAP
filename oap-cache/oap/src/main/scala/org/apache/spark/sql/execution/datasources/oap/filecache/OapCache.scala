@@ -25,6 +25,7 @@ import java.util.concurrent.locks.{Condition, ReentrantLock}
 
 import scala.collection.JavaConverters._
 import scala.util.Success
+import sys.process._
 
 import com.google.common.cache._
 import com.google.common.hash._
@@ -213,14 +214,15 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
 private[filecache] object OapCache extends Logging {
   val PMemRelatedCacheBackend = Array("guava", "vmem", "noevict", "external")
-  def detectPlasmaServer():Boolean = {
-        val plasmaServerStatus = "ps -ef " #| "grep plasma"
-        if (plasmaServerStatus.indexOf("plasma-store-server") == -1) {
-          logWarning("Plasama server has not been set up")
-          return false
-        }else{
-          return true
-        }
+  def detectPlasmaServer(): Boolean = {
+    val detectPlasmaServer = "ps -ef " #| "grep plasma"
+    val plasmaServerStatus = detectPlasmaServer.!!
+    if (plasmaServerStatus.indexOf("plasma-store-server") == -1) {
+      logWarning("Plasama server has not been set up")
+      false
+    } else {
+      true
+    }
   }
   def cacheFallBackDetect(sparkEnv: SparkEnv,
                           fallBackEnabled: Boolean = true,
@@ -285,11 +287,12 @@ private[filecache] object OapCache extends Logging {
         new SimpleOapCache()
       }
       else {
+        if ((oapCacheOpt.equals("external")) && !detectPlasmaServer()) return new SimpleOapCache()
         oapCacheOpt match {
           case "guava" => new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
           case "vmem" => new VMemCache(fiberType)
+          case "external" => new ExternalCache(fiberType)
           case "noevict" => new NoEvictPMCache(cacheMemory, cacheGuardianMemory, fiberType)
-          case "external" => {if (detectPlasmaServer() == true) new ExternalCache(fiberType) else new SimpleOapCache()}
           case _ => throw new UnsupportedOperationException(
             s"The cache backend: ${oapCacheOpt} is not supported now")
         }

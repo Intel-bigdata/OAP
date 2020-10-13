@@ -111,4 +111,18 @@ class OapCacheSuite extends SharedOapContext with Logging{
       cacheMemory, cacheGuardianMemory, fiberType)
     assert(noevictCache.isInstanceOf[NoEvictPMCache])
   }
+
+  test("external cache strategy and offheap memory manager -- " +
+    "return SimpleOapCache if no Plasma server") {
+    val sparkenv = SparkEnv.get
+    sparkenv.conf.set("spark.oap.cache.strategy", "external")
+    sparkenv.conf.set("spark.sql.oap.fiberCache.memory.manager", "offheap")
+    sparkenv.conf.set("spark.oap.cache.backend.fallback.enabled", "true")
+    sparkenv.conf.set("spark.oap.test.cache.backend.fallback.res", "true")
+    val cacheMemory: Long = 100000
+    val cacheGuardianMemory: Long = 20000
+    val fiberType: FiberType = FiberType.DATA
+    val externalCache: OapCache = OapCache(sparkenv, cacheMemory, cacheGuardianMemory, fiberType)
+    assert(externalCache.isInstanceOf[SimpleOapCache])
+  }
 }

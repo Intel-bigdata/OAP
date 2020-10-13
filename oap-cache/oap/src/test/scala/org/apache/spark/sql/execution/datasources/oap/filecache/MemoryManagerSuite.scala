@@ -53,4 +53,12 @@ class MemoryManagerSuite extends SharedOapContext with Logging{
       OapConf.OAP_FIBERCACHE_STRATEGY, FiberType.INDEX)
     assert(indexMemoryManager.isInstanceOf[OffHeapMemoryManager])
   }
+
+  test("external cache with plasma memory manager when no plasma server") {
+    val sparkEnv = SparkEnv.get
+    sparkEnv.conf.set("spark.oap.cache.strategy", "external")
+    sparkEnv.conf.set("spark.sql.oap.fiberCache.memory.manager", "offheap")
+    val memoryManager = MemoryManager(sparkEnv)
+    assert(memoryManager.isInstanceOf[OffHeapMemoryManager])
+  }
 }

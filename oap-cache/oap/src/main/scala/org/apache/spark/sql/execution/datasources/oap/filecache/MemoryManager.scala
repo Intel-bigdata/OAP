@@ -17,6 +17,11 @@
 
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
+import java.io.File
+import java.util.concurrent.atomic.AtomicLong
+
+import scala.util.Success
+import com.intel.oap.common.unsafe.PersistentMemoryPlatform
 import org.apache.arrow.plasma.PlasmaClient
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
@@ -24,6 +29,7 @@ import org.apache.spark.internal.config.ConfigEntry
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberType.FiberType
+import org.apache.spark.sql.execution.datasources.oap.filecache.OapCache.detectPlasmaServer
 import org.apache.spark.sql.execution.datasources.oap.utils.PersistentMemoryConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.storage.{BlockManager, TestBlockId}
@@ -118,15 +124,16 @@ private[sql] object MemoryManager extends Logging {
     apply(sparkEnv, OapConf.OAP_FIBERCACHE_STRATEGY, FiberType.DATA)
   }
 
-
   def apply(sparkEnv: SparkEnv, memoryManagerOpt: String): MemoryManager = {
+    if ((memoryManagerOpt.equals("plasma")) && detectPlasmaServer()) {
+      new PlasmaMemoryManager(sparkEnv)
+    } else new OffHeapMemoryManager(sparkEnv)
     memoryManagerOpt match {
       case "offheap" => new OffHeapMemoryManager(sparkEnv)
       case "pm" => new PersistentMemoryManager(sparkEnv)
       case "hybrid" => new HybridMemoryManager(sparkEnv)
       case "tmp" => new TmpDramMemoryManager(sparkEnv)
       case "kmem" => new DaxKmemMemoryManager(sparkEnv)
-      case "plasma" => {if (detectPlasmaServer() == true) new PlasmaMemoryManager(sparkEnv) else new OffHeapMemoryManager(sparkEnv)}
       case _ => throw new UnsupportedOperationException(
         s"The memory manager: ${memoryManagerOpt} is not supported now")
     }
@@ -142,6 +149,9 @@ private[sql] object MemoryManager extends Logging {
     val memoryManagerOpt =
       conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
     checkConfCompatibility(cacheStrategyOpt, memoryManagerOpt)
+    if ((cacheStrategyOpt.equals("external")) && !detectPlasmaServer()) {
+      return new OffHeapMemoryManager(sparkEnv)
+    }
     cacheStrategyOpt match {
       case "guava" => apply(sparkEnv, memoryManagerOpt)
       case "noevict" => new HybridMemoryManager(sparkEnv)
