@@ -125,15 +125,16 @@ private[sql] object MemoryManager extends Logging {
   }
 
   def apply(sparkEnv: SparkEnv, memoryManagerOpt: String): MemoryManager = {
-    if ((memoryManagerOpt.equals("plasma")) && detectPlasmaServer()) {
-      new PlasmaMemoryManager(sparkEnv)
-    } else new OffHeapMemoryManager(sparkEnv)
+    if ((memoryManagerOpt.equals("plasma")) && !detectPlasmaServer()) {
+      return new OffHeapMemoryManager(sparkEnv)
+    }
     memoryManagerOpt match {
       case "offheap" => new OffHeapMemoryManager(sparkEnv)
       case "pm" => new PersistentMemoryManager(sparkEnv)
       case "hybrid" => new HybridMemoryManager(sparkEnv)
       case "tmp" => new TmpDramMemoryManager(sparkEnv)
       case "kmem" => new DaxKmemMemoryManager(sparkEnv)
+      case "plasma" => new PlasmaMemoryManager(sparkEnv)
       case _ => throw new UnsupportedOperationException(
         s"The memory manager: ${memoryManagerOpt} is not supported now")
     }
