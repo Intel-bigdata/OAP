@@ -39,7 +39,7 @@ Generally, our common system requirements are the same with Intel® oneAPI Toolk
 
 Intel® oneAPI Toolkits (Beta) components used by the project are already included into JAR package mentioned above. 
 
-If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib jar `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`, then there is ***no extra installations*** for cluster nodes.
+**NOTE:** If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib jar `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`, or you have downloaded MLlib jar from [OAP-jars-tarball](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/oap-0.9.0-bin-spark-3.0.0.tar.gz),  then there are ***no extra installations*** for cluster nodes to build Mllib jar.
 
 
 ### Spark Configuration
