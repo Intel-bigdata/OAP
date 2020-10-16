@@ -48,9 +48,9 @@ Users usually run Spark application on __YARN__ with __client__ mode. In that ca
 
 ```
 # absolute path of the jar for uploading
-spark.files                       /root/miniconda2/envs/oapenv/oap_jars/oap-mllib-x.x.x-with-spark-x.x.x.jar
+spark.files                       /path/to/oap-mllib-x.x.x-with-spark-x.x.x.jar
 # absolute path of the jar for driver class path
-spark.driver.extraClassPath       /root/miniconda2/envs/oapenv/oap_jars/oap-mllib-x.x.x-with-spark-x.x.x.jar
+spark.driver.extraClassPath       /path/to/oap-mllib-x.x.x-with-spark-x.x.x.jar
 # relative path of the jar for executor class path
 spark.executor.extraClassPath     ./oap-mllib-x.x.x-with-spark-x.x.x.jar
 ```
