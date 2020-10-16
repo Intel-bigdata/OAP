@@ -13,7 +13,7 @@ For those algorithms that are not accelerated by Intel MLlib, the original Spark
 
 ### Java/Scala Users Preferred
 
-Use a pre-built Intel MLlib JAR to get started. You can firstly download OAP package from [OAP-JARs-Tarball](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/oap-0.9.0-bin-spark-3.0.0.tar.gz) and extract this Tarball to get `oap-mllib-x.x.x-with-spark-x.x.x.jar` under `oap-0.9.0-bin-spark-3.0.0/jars/`
+Use a pre-built Intel MLlib JAR to get started. You can firstly download OAP package from [OAP-JARs-Tarball](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/oap-0.9.0-bin-spark-3.0.0.tar.gz) and extract this Tarball to get `oap-mllib-x.x.x-with-spark-x.x.x.jar` under `oap-0.9.0-bin-spark-3.0.0/jars`.
 
 Then you can refer to the following [Running](#Running) section to try out.
 
