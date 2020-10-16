@@ -199,4 +199,4 @@ spark.sql("SELECT * FROM my_temp_view LIMIT 10").show(10)
 
 To validate if ArrowDataSource works, you can go to the DAG to check if ArrowScan has been used from the above example query. 
 
-![Image of ArrowDataSource Validation](https://github.com/Intel-bigdata/OAP/tree/branch-0.9-spark-3.x/oap-data-source/arrow/resource/arrowdatasource_validation.png)
+![Image of ArrowDataSource Validation](/oap-data-source/arrow/resource/arrowdatasource_validation.png)
