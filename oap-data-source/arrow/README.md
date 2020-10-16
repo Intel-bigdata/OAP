@@ -63,20 +63,33 @@ sudo alternatives --config mvn
 ### Hadoop Native Library(Default)
 
 Please make sure you have set up Hadoop directory properly with Hadoop Native Libraries
-In your $HADOOP_HOME/lib/native directory, there are libhadoop.so and libhdfs.so existing.
-By default, arrow would scan your $HADOOP_HOME and find the native Hadoop library to be used for Hadoop connection.
+By default, Apache Arrow would scan `$HADOOP_HOME` and find the native Hadoop library `libhdfs.so`(under `$HADOOP_HOME/lib/native` directory) to be used for Hadoop client.
 
-For more information for Hadoop Native Library, please read the official Hadoop website [documentation](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/NativeLibraries.html)
+You can also use `ARROW_LIBHDFS_DIR` to configure the location of `libhdfs.so` if it is installed in other directory than `$HADOOP_HOME/lib/native`
+
+If your SPARK and HADOOP are separated in different nodes, please find `libhdfs.so` in your Hadoop cluster and copy it to SPARK cluster, then use one of the above methods to set it properly.
+
+For more information, please check
+Arrow HDFS interface [documentation](https://github.com/apache/arrow/blob/master/cpp/apidoc/HDFS.md)
+Hadoop Native Library, please read the official Hadoop website [documentation](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/NativeLibraries.html)
 
 ### Use libhdfs3 library for better performance(Optional)
 
-For better performance ArrowDataSource reads HDFS files using the third-party library libhdfs3. The library should be pre-installed 
-on machines Spark Executor nodes are running on.
+For better performance ArrowDataSource reads HDFS files using the third-party library `libhdfs3`. The library must be pre-installed on machines Spark Executor nodes are running on.
 
-There are two ways to set up libhdfs3 library
-Option1: Overwrite soft link for libhdfs.so
-You can find libhdfs3.so in $OAP_DIR/oap-native-sql/cpp/src/resources/libhdfs3.so
-To install libhdfs3.so, you have to create a soft link for libhdfs.so in $HADOOP_HOME/lib/native directory.
+To install the library, use of [Conda](https://docs.conda.io/en/latest/) is recommended.
+
+```
+// installing libhdfs3
+conda install -c conda-forge libhdfs3
+
+// check the installed library file
+ls -l ~/miniconda/envs/$(YOUR_ENV_NAME)/lib/libhdfs3.so/lib/libhdfs3.so
+```
+
+To set up libhdfs3, there are two different ways:
+Option1: Overwrite the soft link for libhdfs.so
+To install libhdfs3.so, you have to create a soft link for libhdfs.so in your Hadoop directory(`$HADOOP_HOME/lib/native` by default).
 
 ```
 ln -f -s libhdfs3.so libhdfs.so
@@ -91,7 +104,6 @@ export ARROW_LIBHDFS3_DIR="PATH_TO_LIBHDFS3_DIR/"
 Add following Spark configuration options before running the DataSource to make the library to be recognized:
 * `spark.executorEnv.ARROW_LIBHDFS3_DIR = "PATH_TO_LIBHDFS3_DIR/"`
 * `spark.executorEnv.LD_LIBRARY_PATH = "PATH_TO_LIBHDFS3_DEPENDENCIES_DIR/"`
-
 
 Please notes: If you choose to use libhdfs3.so, there are some other dependency libraries you have to installed such as libprotobuf or libcrypto.
 
@@ -165,13 +177,12 @@ ${SPARK_HOME}/bin/spark-shell \
         --conf spark.locality.wait=0s \
         --conf spark.sql.shuffle.partitions=72 \
         --conf spark.executorEnv.ARROW_LIBHDFS3_DIR="$PATH_TO_LIBHDFS3_DIR/" \
-        --conf spark.executorEnv.LD_LIBRARY_PATH="$PATH_TO_LIBHDFS3_DEPENDENCIES_DIR" \
-        --jars ${NATIVE_SQL_DATASOURCE_JAR}
+        --conf spark.executorEnv.LD_LIBRARY_PATH="$PATH_TO_LIBHDFS3_DEPENDENCIES_DIR"
 ```
 
 For more information about these options, please read the official Spark [documentation](https://spark.apache.org/docs/latest/configuration.html#runtime-environment).
 
-### Run a query (Scala)
+### Run a query with ArrowDataSource (Scala)
 
 ```scala
 val path = "${PATH_TO_YOUR_PARQUET_FILE}"
@@ -183,3 +194,9 @@ val df = spark.read
 df.createOrReplaceTempView("my_temp_view")
 spark.sql("SELECT * FROM my_temp_view LIMIT 10").show(10)
 ```
+
+### To validate if ArrowDataSource works properly
+
+To validate if ArrowDataSource works, you can go to the DAG to check if ArrowScan has been used from the above example query. 
+
+![Image of ArrowDataSource Validation](https://github.com/Intel-bigdata/OAP/tree/branch-0.9-spark-3.x/oap-data-source/arrow/resource/arrowdatasource_validation.png)
