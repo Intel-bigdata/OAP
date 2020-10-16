@@ -13,17 +13,17 @@ For those algorithms that are not accelerated by Intel MLlib, the original Spark
 
 ### Java/Scala Users Preferred
 
-You can get a pre-built intel MLlib jar to get started, the jar can be downloaded from [OAP-jars-tarball](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/oap-0.9.0-bin-spark-3.0.0.tar.gz) then extracting this tarball. 
+Use a pre-built Intel MLlib JAR to get started. You can firstly download OAP package from [OAP-JARs-Tarball](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/oap-0.9.0-bin-spark-3.0.0.tar.gz) and extract this Tarball to get `oap-mllib-x.x.x-with-spark-x.x.x.jar` under `oap-0.9.0-bin-spark-3.0.0/jars/`
 
 Then you can refer to the following [Running](#Running) section to try out.
-
-You can also build the package from source code, please refer to [Building](#Building) section.
 
 ### Python/PySpark Users Preferred
 
-You can use a pre-built JAR to get started, if you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib jar `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`.
+Use a pre-built JAR to get started. If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib JAR `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`.
 
 Then you can refer to the following [Running](#Running) section to try out.
+
+### Building From Scratch
 
 You can also build the package from source code, please refer to [Building](#Building) section.
 
@@ -148,7 +148,7 @@ To build, run the following commands:
     $ ./build.sh
 ```
 
-The built jar package will be placed in `target` directory with the name `oap-mllib-x.x.x-with-spark-x.x.x.jar`.
+The built JAR package will be placed in `target` directory with the name `oap-mllib-x.x.x-with-spark-x.x.x.jar`.
 
 ## Examples
 
