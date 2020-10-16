@@ -19,7 +19,7 @@ Then you can refer to the following [Running](#Running) section to try out.
 
 ### Python/PySpark Users Preferred
 
-Use a pre-built JAR to get started. If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib JAR `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `/root/miniconda2/envs/oapenv/oap_jars/`.
+Use a pre-built JAR to get started. If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib JAR `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `$HOME/miniconda2/envs/oapenv/oap_jars/`.
 
 Then you can refer to the following [Running](#Running) section to try out.
 

@@ -1,5 +1,5 @@
 # OAP Installation Guide
-This document introduces how to install OAP and its dependencies on your cluster nodes by **Conda** . Certain libraries need to be compiled and installed on your system using ***root*** account. 
+This document introduces how to install OAP and its dependencies on your cluster nodes by **Conda**. 
 Follow steps below on ***every node*** of your cluster to set right environment for each machine.
 
 ## Contents
@@ -35,12 +35,14 @@ conda create -n oapenv -y python=3.7
 conda activate oapenv
 conda install -c conda-forge -c intel -y oap=0.9.0
 ```
-Once finished steps above, you have completed OAP dependencies installation and OAP building, and will find built OAP jars in `/root/miniconda2/envs/oapenv/oap_jars/`
+Once finished steps above, you have completed OAP dependencies installation and OAP building, and will find built OAP jars in `$HOME/miniconda2/envs/oapenv/oap_jars/`
 
 ***NOTE***: **Shuffle Remote PMem Extension**  
 If you use one of OAP features -- [Shuffle Remote PMem Extension](../oap-shuffle/RPMem-shuffle/README.md), there are 2 points to note.
  
 1. Shuffle Remote PMem Extension needs to install library [PMDK](https://github.com/pmem/pmdk) which we haven't provided a Conda package, so you can run commands below to enable PMDK.
+
+NOTE:Certain libraries need to be compiled and installed on your system using ***root*** account, so you need change to `root` account to run the following commands. 
 
 ```
 git clone -b <tag-version> https://github.com/Intel-bigdata/OAP.git
@@ -55,11 +57,11 @@ sh dev/install-runtime-dependencies.sh
 Once finished steps above, make sure libraries installed by Conda can be linked by Spark, please add the following configuration settings to `$SPARK_HOME/conf/spark-defaults` on the working node.
 
 ```
-spark.executorEnv.LD_LIBRARY_PATH /root/miniconda2/envs/oapenv/lib/
-spark.executor.extraLibraryPath /root/miniconda2/envs/oapenv/lib/
-spark.driver.extraLibraryPath /root/miniconda2/envs/oapenv/lib/
-spark.executor.extraClassPath      /root/miniconda2/envs/oapenv/oap_jars/$OAP_FEATURE.jar
-spark.driver.extraClassPath      /root/miniconda2/envs/oapenv/oap_jars/$OAP_FEATURE.jar
+spark.executorEnv.LD_LIBRARY_PATH $HOME/miniconda2/envs/oapenv/lib/
+spark.executor.extraLibraryPath $HOME/miniconda2/envs/oapenv/lib/
+spark.driver.extraLibraryPath $HOME/miniconda2/envs/oapenv/lib/
+spark.executor.extraClassPath      $HOME/miniconda2/envs/oapenv/oap_jars/$OAP_FEATURE.jar
+spark.driver.extraClassPath      $HOME/miniconda2/envs/oapenv/oap_jars/$OAP_FEATURE.jar
 ```
 
 And then you can follow the corresponding feature documents for more details to use them.
