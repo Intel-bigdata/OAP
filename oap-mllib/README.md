@@ -37,7 +37,7 @@ You can also build the package from source code, please refer to [Building](#Bui
 
 Generally, our common system requirements are the same with Intel® oneAPI Toolkit, please refer to [here](https://software.intel.com/content/www/us/en/develop/articles/intel-oneapi-base-toolkit-system-requirements.html) for details.
 
-Intel® oneAPI Toolkits (Beta) components used by the project are already included into JAR package mentioned above. 
+Intel® oneAPI Toolkits (Beta) components used by the project are already included into JAR package mentioned above. There are no extra installations for cluster nodes.
 
 ### Spark Configuration
 
