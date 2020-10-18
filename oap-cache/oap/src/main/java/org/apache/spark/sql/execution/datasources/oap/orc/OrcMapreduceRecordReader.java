@@ -64,7 +64,8 @@ public class OrcMapreduceRecordReader<V extends WritableComparable>
         fileReader, 0, length);
 
     boolean binaryCacheEnabled = conf
-      .getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLED().key(), false);
+      .getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLED().key(), false) ||
+            conf.getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLE().key(), false);
     if (binaryCacheEnabled) {
       Boolean zeroCopy = options.getUseZeroCopy();
       if (zeroCopy == null) {

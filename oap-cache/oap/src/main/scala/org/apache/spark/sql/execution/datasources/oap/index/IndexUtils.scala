@@ -388,7 +388,8 @@ private[oap] object IndexUtils extends  Logging {
       case LogicalRelation(
           _fsRelation @ HadoopFsRelation(f, _, s, _, _: ParquetFileFormat, _),
           attributes, id, _) =>
-        if (!sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED)) {
+        if (!(sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) ||
+          sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLE))) {
           throw new OapException(s"turn on ${
             OapConf.OAP_PARQUET_ENABLED.key
           } to allow index operation on parquet files")
@@ -404,7 +405,9 @@ private[oap] object IndexUtils extends  Logging {
           _fsRelation @ HadoopFsRelation(f, _, s, _, format, _), attributes, id, _)
         if format.isInstanceOf[org.apache.spark.sql.hive.orc.OrcFileFormat] ||
           format.isInstanceOf[org.apache.spark.sql.execution.datasources.orc.OrcFileFormat] =>
-        if (!sparkSession.conf.get(OapConf.OAP_ORC_ENABLED)) {
+        if (!(sparkSession.conf.get(OapConf.OAP_ORC_ENABLED) ||
+          sparkSession.conf.get(OapConf.OAP_ORC_ENABLE)))
+        {
           throw new OapException(s"turn on ${
             OapConf.OAP_ORC_ENABLED.key
           } to allow index building on orc files")

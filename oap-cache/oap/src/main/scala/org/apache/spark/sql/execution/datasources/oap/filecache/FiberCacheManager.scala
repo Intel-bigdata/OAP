@@ -46,7 +46,8 @@ class FiberCacheManager(
   private val DEFAULT_CACHE_STRATEGY = GUAVA_CACHE
 
   private var _dataCacheCompressEnable = sparkEnv.conf.get(
-    OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION)
+    OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION) ||
+    sparkEnv.conf.get(OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION_BK)
   private var _dataCacheCompressionCodec = sparkEnv.conf.get(
     OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_CODEC)
   private val _dataCacheCompressionSize = sparkEnv.conf.get(
@@ -89,6 +90,9 @@ class FiberCacheManager(
       val separateCache = sparkEnv.conf.getBoolean(
         OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
         OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get
+      ) || sparkEnv.conf.getBoolean(
+        OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED.key,
+        OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED.defaultValue.get
       )
       new MixCache(dataCacheMemorySize, indexCacheMemorySize, dataCacheGuardianMemorySize,
         indexCacheGuardianMemorySize, separateCache, sparkEnv)

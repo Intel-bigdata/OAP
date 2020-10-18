@@ -91,7 +91,10 @@ private[v1] class AbstractApplicationResource extends BaseAppResource {
           getOrDefault(executorSummary.id, CacheStats())
         val indexDataCacheSeparationEnable = SparkEnv.get.conf.getBoolean(
           OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
-          OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get)
+          OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get) ||
+          SparkEnv.get.conf.getBoolean(
+            OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED.key,
+            OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED.defaultValue.get)
 
         new FiberCacheManagerSummary(
           executorSummary.id,

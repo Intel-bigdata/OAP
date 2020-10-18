@@ -40,10 +40,16 @@ object OapFileSourceStrategy extends Strategy with Logging {
      * Classified discussion the 4 scenarios and assemble a new [[SparkPlan]] if can optimized.
      */
     def tryOptimize(head: SparkPlan): SparkPlan = {
-      val tableEnbale = SparkSession.getActiveSession.get.conf
-        .get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
+      val tableEnbale =
+        SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLED) ||
+        SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
       val cacheTablelists =
-        SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS).split(";")
+        if (SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS) !=
+          OapConf.OAP_CACHE_TABLE_LISTS.defaultValue.get) {
+          SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS).split(";")
+        } else {
+          SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_BK).split(";")
+        }
 
       head match {
         // ProjectExec -> FilterExec -> FileSourceScanExec

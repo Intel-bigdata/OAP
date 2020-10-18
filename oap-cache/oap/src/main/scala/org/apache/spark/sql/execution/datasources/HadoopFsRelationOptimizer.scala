@@ -59,7 +59,8 @@ object HadoopFsRelationOptimizer extends Logging {
       // 2. canUseIndex: OAP_PARQUET_ENABLED is true and hasAvailableIndex.
       // Other scenarios still use ParquetFileFormat.
       case _: ParquetFileFormat
-        if relation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) =>
+        if relation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) ||
+          relation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLE) =>
 
         val optimizedParquetFileFormat = new OptimizedParquetFileFormat
         optimizedParquetFileFormat
@@ -70,7 +71,8 @@ object HadoopFsRelationOptimizer extends Logging {
         def checkParquetDataCacheConfig(): Unit = {
           val runtimeConf = relation.sparkSession.conf
           val binaryCacheEnabled = runtimeConf.get(OapConf.OAP_PARQUET_BINARY_DATA_CACHE_ENABLED)
-          val vectorCacheEnabled = runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
+          val vectorCacheEnabled = runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED) ||
+            runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLE)
           assert(!(binaryCacheEnabled && vectorCacheEnabled),
             "Current version cannot enabled both binary Cache and vector Cache")
         }
@@ -88,7 +90,8 @@ object HadoopFsRelationOptimizer extends Logging {
 
         def canUseVectorCache: Boolean = {
           val runtimeConf = relation.sparkSession.conf
-          val cacheEnabled = runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED)
+          val cacheEnabled = runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED) ||
+            runtimeConf.get(OapConf.OAP_PARQUET_DATA_CACHE_ENABLE)
           logDebug(s"config - ${OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key} is $cacheEnabled")
           val ret = cacheEnabled && runtimeConf.get(SQLConf.PARQUET_VECTORIZED_READER_ENABLED) &&
             runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
@@ -101,7 +104,8 @@ object HadoopFsRelationOptimizer extends Logging {
         }
 
         def canUseIndex: Boolean = {
-          val indexEnabled = relation.sparkSession.conf.get(OapConf.OAP_PARQUET_INDEX_ENABLED)
+          val indexEnabled = relation.sparkSession.conf.get(OapConf.OAP_PARQUET_INDEX_ENABLED) ||
+            relation.sparkSession.conf.get(OapConf.OAP_PARQUET_INDEX_ENABLE)
           logDebug(s"config - ${OapConf.OAP_PARQUET_INDEX_ENABLED.key} is $indexEnabled")
           val ret = indexEnabled && optimizedParquetFileFormat.hasAvailableIndex(dataFilters)
           if (ret) {
@@ -119,7 +123,8 @@ object HadoopFsRelationOptimizer extends Logging {
           (relation, false)
         }
 
-      case a if relation.sparkSession.conf.get(OapConf.OAP_ORC_ENABLED) &&
+      case a if (relation.sparkSession.conf.get(OapConf.OAP_ORC_ENABLED) ||
+        relation.sparkSession.conf.get(OapConf.OAP_ORC_ENABLE)) &&
         (a.isInstanceOf[org.apache.spark.sql.hive.orc.OrcFileFormat] ||
           a.isInstanceOf[org.apache.spark.sql.execution.datasources.orc.OrcFileFormat]) =>
         val optimizedOrcFileFormat = new OptimizedOrcFileFormat
@@ -127,7 +132,6 @@ object HadoopFsRelationOptimizer extends Logging {
           .init(relation.sparkSession,
             relation.options,
             selectedPartitions.flatMap(p => p.files))
-
         def canUseCache: Boolean = {
           val runtimeConf = relation.sparkSession.conf
           var vectorCacheEnabled = runtimeConf.get(OapConf.OAP_ORC_DATA_CACHE_ENABLED)
@@ -137,7 +141,8 @@ object HadoopFsRelationOptimizer extends Logging {
             runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
             // runtimeConf.get(SQLConf.ORC_COPY_BATCH_TO_SPARK) &&
             outputSchema.forall(_.dataType.isInstanceOf[AtomicType])
-          val binaryCacheEnabled = runtimeConf.get(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED)
+          val binaryCacheEnabled = runtimeConf.get(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED) ||
+            runtimeConf.get(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLE)
           logDebug(s"config - ${OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key}" +
             s"is $binaryCacheEnabled")
           val ret = vectorCacheEnabled || binaryCacheEnabled
