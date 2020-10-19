@@ -16,14 +16,14 @@ We have tested OAP on Fedora 29 and CentOS 7.6 (kernel-4.18.16). We recommend yo
 Install Conda on your cluster nodes with below commands and follow the prompts on the installer screens.:
 ```bash
 $ wget -c https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh
-$ chmod 777 Miniconda2-latest-Linux-x86_64.sh 
+$ chmod +x Miniconda2-latest-Linux-x86_64.sh 
 $ bash Miniconda2-latest-Linux-x86_64.sh 
 ```
-For changes to take effect, close and re-open your current shell.To test your installation,  run the command `conda list` in your terminal window. A list of installed packages appears if it has been installed correctly.
+For changes to take effect, close and re-open your current shell. To test your installation,  run the command `conda list` in your terminal window. A list of installed packages appears if it has been installed correctly.
 
 ## Installing OAP
 
-Dependencies below are required by OAP and all of them are included in OAP Conda package, they will be automatically installed in your cluster when you conda install OAP. Ensure you have activated environment which you create in the previous steps.
+Dependencies below are required by OAP and all of them are included in OAP Conda package, they will be automatically installed in your cluster when you Conda install OAP. Ensure you have activated environment which you created in the previous steps.
 
 - [Memkind](https://anaconda.org/intel/memkind)
 - [Vmemcache](https://anaconda.org/intel/vmemcache)

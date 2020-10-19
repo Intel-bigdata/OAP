@@ -4,7 +4,7 @@
 
 ##### \* Optimized Analytics Package for Spark* Platform is under Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
 
-OAP is a project to optimize Spark by providing optimized implementation of packages for various aspects including cache, shuffle, native sql engine, Mllib and so on. In this version, OAP contains the optimized implementations of SQL Index and Data Source Cache supporting DRAM and PMem, RDD Cache PMem Extension, Shuffle Remote PMem Extension,
+OAP is a project to optimize Spark by providing optimized implementation of packages for various aspects including cache, shuffle, native SQL engine, Mllib and so on. In this version, OAP contains the optimized implementations of SQL Index and Data Source Cache supporting DRAM and PMem, RDD Cache PMem Extension, Shuffle Remote PMem Extension,
 Remote Shuffle, Intel MLlib, Unified Arrow Data Source and Native SQL Engine.
 
 ## Installation Guide
