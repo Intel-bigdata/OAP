@@ -1,22 +1,22 @@
 # Spark Native SQL Engine
 
-A Native Engine for Spark SQL with vectorze SIMD optimizations
+A Native Engine for Spark SQL with vectorized SIMD optimizations
 
 ## Introduction
 
 ![Overview](/oap-native-sql/resource/nativesql_arch.png)
 
-Spark SQL works very well with structured row-based data. It used WholeStageCodeGen to improve the performance by Java JIT code. However Java JIT is usually not working very well on utilizing latest SIMD instructions, espeically under complicated queries. [Apache Arrow](https://arrow.apache.org/) provided CPU-cahce friendly columnar in-memory layout, its SIMD optimized kernels and LLVM based SQL engine Gandiva are also very efficient. Native SQL Engine used these technoligies and brought better performance to Spark SQL.
+Spark SQL works very well with structured row-based data. It used WholeStageCodeGen to improve the performance by Java JIT code. However Java JIT is usually not working very well on utilizing latest SIMD instructions, especially under complicated queries. [Apache Arrow](https://arrow.apache.org/) provided CPU-cache friendly columnar in-memory layout, its SIMD optimized kernels and LLVM based SQL engine Gandiva are also very efficient. Native SQL Engine used these technoligies and brought better performance to Spark SQL.
 
 ## Key Features
 
-### Apache Arrow formated intermediate data among Spark operator
+### Apache Arrow formatted intermediate data among Spark operator
 
 ![Overview](/oap-native-sql/resource/columnar.png)
 
-With [Spark 27396](https://issues.apache.org/jira/browse/SPARK-27396) its possible to pass a RDD of Columnarbatch to operators. We implementd this API with Arrow columnar format.
+With [Spark 27396](https://issues.apache.org/jira/browse/SPARK-27396) its possible to pass a RDD of Columnarbatch to operators. We implemented this API with Arrow columnar format.
 
-### Apache Arrow based Native Readers for Paruqet and other formats
+### Apache Arrow based Native Readers for Parquet and other formats
 
 ![Overview](/oap-native-sql/resource/dataset.png)
 
@@ -26,7 +26,7 @@ A native parquet reader was developed to speed up the data loading. it's based o
 
 ![Overview](/oap-native-sql/resource/kernel.png)
 
-We implemented common operatos based on Apache Arrow Compute and Gandiva. The SQL expression was compiled to one expression tree with protobuf and passed to native kernels. The native kernels will then evaluate the these expressions based on the input columnar batch.
+We implemented common operators based on Apache Arrow Compute and Gandiva. The SQL expression was compiled to one expression tree with protobuf and passed to native kernels. The native kernels will then evaluate the these expressions based on the input columnar batch.
 
 ### Native Columnar Shuffle Operator with efficient compression support
 

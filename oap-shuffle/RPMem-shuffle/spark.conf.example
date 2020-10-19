@@ -1,4 +1,4 @@
-spark.driver.extraClassPath   /root/haodong/SSO/target/sso-0.1-jar-with-dependencies.jar
+spark.driver.extraClassPath   $HOME/haodong/SSO/target/sso-0.1-jar-with-dependencies.jar
 spark.driver.extraJavaOptions -Djava.library.path=/root/haodong/SSO/src/main/cpp
 spark.executor.extraClassPath /root/haodong/SSO/target/sso-0.1-jar-with-dependencies.jar
 spark.executor.extraJavaOptions -Djava.library.path=/root/haodong/SSO/src/main/cpp

@@ -82,7 +82,7 @@ Master node can be co-located with one of the Hadoop data nodes.
 - Please refer to section 4.2 for configurations
 **Software:**
 -   Hadoop 2.7
--   Spark 2.4.4
+-   Spark 3.0.0
 -   Fedora 29 with ww08.2019 BKC
 
 ### 2.2. Recommended RDMA NIC
@@ -339,9 +339,9 @@ ping data: rdma-ping-3: DEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstu
 Please refer to your NIC manuual for detail instructions on how to validate RDMA works. 
 
 ## <a id="install-dependencies-for-shuffle-remote-pmem-extension"></a>5. Install dependencies for Shuffle Remote PMem Extension
----------------------------
+--------------------------- 
 
-If you have completed all steps in installation guide,  you can ignore this section and refer to [6. Install Shuffle Remote PMem Extension for Spark](#6-install-shuffle-remote-pmem-extension-for-spark).
+We have provided a Conda package which will automatically install dependencies needed for Shuffle Remote PMem Extension, refer to [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), you can find compiled OAP jars in `$HOME/miniconda2/envs/oapenv/oap_jars/`,  and skip this session and jump to [6.Install Shuffle Remote PMem Extension for Spark](#install-shuffle-remote-pmem-extension-for-spark)
 
 ### 5.1 Install HPNL (<https://github.com/Intel-bigdata/HPNL>)
 
@@ -443,7 +443,7 @@ mvn install -DskipTests
 --------------------------------------------------------
 
 Shuffle Remote PMem Extension for spark shuffle is designed as a plugin to Spark.
-Currently the plugin supports Spark 2.4.4 and works well on various
+Currently the plugin supports Spark 3.0.0 and works well on various
 Network fabrics, including Socket, RDMA and Omni-Path. There are several
 configurations files needs to be modified in order to run Shuffle Remote PMem Extension. 
 
@@ -498,7 +498,7 @@ spark.io.compression.codec                  			snappy
 ```
 #### Memory configuration suggestion
 
-Suitable for any release before OAP 0.8. In OAP 0.8 release, the memory footprint of each core is reduced dramatically and the formula below is not applicable any more.  
+Suitable for any release before OAP 0.8. In OAP 0.8 and later release, the memory footprint of each core is reduced dramatically and the formula below is not applicable any more.  
 
 Spark.executor.memory must be greater than shuffle\_block\_size \*
 numPartitions \* numCores \* 2 (for both shuffle and external sort), for example, default HiBench Terasort
@@ -709,29 +709,29 @@ history server by *\$SPARK\_HOME/sbin/start-history-server.sh*)
 
 ### RPMemShuffle Spark configuration
 ---------------------------------
-```bash 
-Before running Spark workload, add following contents in
-spark-defaults.conf.
 
-Yarn.executor.num    4                                      // same as PMem devices number
-Yarn.executor.cores  18                                     // total core number divide executor number
-spark.executor.memory  15g                                  // 2MB * numPartition(200) * 18 * 2
-spark.yarn.executor.memoryOverhead 5g                       // 30% of  spark.executor.memory
+Before running Spark workload, add following contents in `spark-defaults.conf`.
+```bash 
+spark.executor.instances  4                                 // same as total PMem namespace numbers of your cluster
+spark.executor.cores  18                                    // total core number divide executor number
+spark.executor.memory  70g                                  // 4~5G * spark.executor.cores
+spark.executor.memoryOverhead 15g                           // 30% of  spark.executor.memory
 spark.shuffle.pmof.shuffle_block_size   2096128             // 2MB – 1024 Bytes
 spark.shuffle.pmof.spill_throttle       2096128             // 2MB – 1024 Bytes
 
 spark.driver.memory    10g
 spark.yarn.driver.memoryOverhead 5g
 
+spark.shuffle.compress                                      true
 spark.io.compression.codec                                  snappy
-spark.driver.extraClassPath                                 /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
-spark.executor.extraClassPath                               /$path/oap-shuffle/RPMem-shuffle/core/target/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
+spark.driver.extraClassPath                                 $HOME/miniconda2/envs/oapenv/oap_jars/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
+spark.executor.extraClassPath                               $HOME/miniconda2/envs/oapenv/oap_jars/oap-rpmem-shuffle-java-<version>-jar-with-dependencies.jar
 spark.shuffle.manager                                       org.apache.spark.shuffle.pmof.PmofShuffleManager
 spark.shuffle.pmof.enable_rdma                              true
 spark.shuffle.pmof.enable_pmem                              true
 spark.shuffle.pmof.pmem_capacity                            126833655808 // size should be same as pmem size
-spark.shuffle.pmof.pmem_list                                /dev/dax0.0, /dev/dax0.1, /dev/dax0.2, /dev/dax0.3, /dev/dax1.0,/dev/dax1.1, /dev/dax1.2,/dev/dax1.3
-spark.shuffle.pmof.dev_core_set                             dax0.0:0-17,dax0.1:0-17,dax0.2:36-53,dax0.3:36-53,dax1.0:18-35, dax1.1:18-35,dax1.2:54-71,dax1.3:54-71
+spark.shuffle.pmof.pmem_list                                /dev/dax0.0,/dev/dax0.1,/dev/dax1.0,/dev/dax1.1
+spark.shuffle.pmof.dev_core_set                             dax0.0:0-71,dax0.1:0-71,dax1.0:0-71,dax1.1:0-71
 spark.shuffle.pmof.server_buffer_nums                       64
 spark.shuffle.pmof.client_buffer_nums                       64
 spark.shuffle.pmof.map_serializer_buffer_size               262144
@@ -742,6 +742,7 @@ spark.shuffle.pmof.client_pool_size                         3
 spark.shuffle.pmof.node                                     $host1-$IP1,$host2-$IP2//HOST-IP Pair, seperate with ","
 spark.driver.rhost                                          $IP //change to your host
 spark.driver.rport                                          61000
+
 ```
 ### Reference guides (without BKC access)
 -----------------------------------

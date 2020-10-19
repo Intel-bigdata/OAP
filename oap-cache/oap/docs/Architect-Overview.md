@@ -26,9 +26,9 @@ Most customers adopt Spark SQL as a batch processing engine. Unfortunately, cust
 For example, the following interactive query attempts to filter out a very small result set from a huge fact table.
 
 ```
-select ss_sold_date_sk, ss_sold_time_sk, ss_item_sk, ss_cdemo_sk, ss_store_sk, ss_ticket_number, ss_ext_discount_amt, ss_ext_wholesale_cost, ss_ext_tax
-	from fact.store_sales
-	where (date='20200801' and store_customer='xxx' and ss_item_sk='806486’)
+select ss_sold_date_sk, ss_sold_time_sk, ss_item_sk, ss_cdemo_sk, ss_store_sk, ss_ticket_number, 	ss_ext_discount_amt, ss_ext_wholesale_cost, ss_ext_tax
+	from fact.ss_sales
+	where (date='20200801' and ss_customer='xxx' and ss_item_sk='806486’)
 	limit 10
 ```
 

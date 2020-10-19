@@ -1,14 +1,14 @@
 # Developer Guide
 
-* [Build](#Build)
-* [Integrate with Spark\*](#integrate-with-spark)
-* [Enable NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enable-numa-binding-for-pmem-in-spark)
+* [Building](#Building)
+* [Integrating with Spark\*](#integrating-with-spark)
+* [Enabling NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enabling-numa-binding-for-pmem-in-spark)
 
-## Build
+## Building
 
-#### Build
+### Building
 
-Build with using [Apache Maven\*](http://maven.apache.org/).
+Building with [Apache Maven\*](http://maven.apache.org/).
 
 Clone the OAP project:
 
@@ -17,13 +17,13 @@ git clone -b <tag-version>  https://github.com/Intel-bigdata/OAP.git
 cd OAP
 ```
 
-Build the package:
+Build the `oap-cache` package:
 
 ```
 mvn clean -pl com.intel.oap:oap-cache -am package
 ```
 
-#### Run Tests
+### Run Tests
 
 Run all the tests:
 ```
@@ -35,11 +35,11 @@ mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite 
 ```
 **NOTE**: Log level of unit tests currently default to ERROR, please override oap-cache/oap/src/test/resources/log4j.properties if needed.
 
-#### Build with Intel® Optane™ DC Persistent Memory Module
+### Build with Intel® Optane™ DC Persistent Memory Module
 
 Follow these steps:
 
-##### Prerequisites for building with PMem support
+#### Prerequisites for building with PMem support
 
 Install the required packages on the build system:
 
@@ -48,7 +48,7 @@ Install the required packages on the build system:
 - [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
 - [vmemcache](https://github.com/pmem/vmemcache)
 
-##### build and install memkind
+#### build and install memkind
  The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. 
    Build the latest memkind lib from source:
 
@@ -60,7 +60,7 @@ cd memkind
 make
 make install
    ``` 
-##### build and install vmemcache
+#### build and install vmemcache
 
 To build vmemcache lib from source, you can (for RPM-based linux as example):
 ```
@@ -72,23 +72,20 @@ cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
 make package
 sudo rpm -i libvmemcache*.rpm
 ```
-##### build and install plasma
+#### build and install plasma
+#### build and install plasma
 To use optimized Plasma cache with OAP, you need following components:  
     (1) libarrow.so, libplasma.so, libplasma_jni.so: dynamic libraries, will be used in plasma client.   
     (2) plasma-store-server: executable file, plasma cache service.  
     (3) arrow-plasma-0.17.0.jar: will be used when compile oap and spark runtime also need it. 
-    
-(1) and (2) will be provided as rpm package, we provide [Fedora 29](https://github.com/Intel-bigdata/arrow/releases/download/apache-arrow-0.17.0-intel-oap-0.8/arrow-plasma-intel-libs-0.17.0-1.fc29.x86_64.rpm) and [Cent OS 7.6](https://github.com/Intel-bigdata/arrow/releases/download/apache-arrow-0.17.0-intel-oap-0.8/arrow-plasma-intel-libs-0.17.0-1.el7.x86_64.rpm) rpm package, you can download it on release page.
-Run `rpm -ivh arrow-plasma-intel-libs-0.17.0-1*x86_64.rpm` to install it.   
-(3) will be provided in maven central repo. You need to download [it](https://repo1.maven.org/maven2/com/intel/arrow/arrow-plasma/0.17.0/arrow-plasma-0.17.0.jar) and copy to `$SPARK_HOME/jars` dir.
 
 - so file and binary file  
-  clone code from Intel-arrow repo and run following commands, this will install libplasma.so, libarrow.so, libplasma_jni.so and plasma-store-server to your system path(/usr/lib64 by default). And if you are using spark in a cluster environment, you can copy these files to all nodes in your cluster if os or distribution are same, otherwise, you need compile it on each node.
+  Clone code from Intel-arrow repo and run following commands, this will install libplasma.so, libarrow.so, libplasma_jni.so and plasma-store-server to your system path(/usr/lib64 by default). And if you are using spark in a cluster environment, you can copy these files to all nodes in your cluster if os or distribution are same, otherwise, you need compile it on each node.
   
 ```
 cd /tmp
 git clone https://github.com/Intel-bigdata/arrow.git
-cd arrow && git checkout oap-master
+cd arrow && git checkout apache-arrow-0.17.0-intel-oap-0.9
 cd cpp
 mkdir release
 cd release
@@ -97,9 +94,9 @@ cmake -DCMAKE_INSTALL_PREFIX=/usr/ -DCMAKE_BUILD_TYPE=Release -DARROW_BUILD_TEST
 make -j$(nproc)
 sudo make install -j$(nproc)
 ```
-
 - arrow-plasma-0.17.0.jar  
-   change to arrow repo java direction, run following command, this will install arrow jars to your local maven repo, and you can compile oap-cache module package now. Beisdes, you need copy arrow-plasma-0.17.0.jar to `$SPARK_HOME/jars/` dir, cause this jar is needed when using external cache.
+   arrow-plasma-0.17.0.jar is provided in maven central repo, you can download [it](https://repo1.maven.org/maven2/com/intel/arrow/arrow-plasma/0.17.0/arrow-plasma-0.17.0.jar) and copy to `$SPARK_HOME/jars` dir.
+   Or you can manually install it, change to arrow repo java direction, run following command, this will install arrow jars to your local maven repo, and you can compile oap-cache module package now. Beisdes, you need copy arrow-plasma-0.17.0.jar to `$SPARK_HOME/jars/` dir, cause this jar is needed when using external cache.
    
 ```
 cd $ARROW_REPO_DIR/java
@@ -107,7 +104,7 @@ mvn clean -q -pl plasma -DskipTests install
 ```
 
 
-##### Build the package
+#### Build the package
 You need to add `-Ppersistent-memory` to build with PMem support. For `noevict` cache strategy, you also need to build with `-Ppersistent-memory` parameter.
 ```
 mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -DskipTests package
@@ -121,11 +118,11 @@ Build with this command to use all of them:
 mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -Pvmemcache -DskipTests package
 ```
 
-## Integrate with Spark
+## Integrating with Spark
 
 Although SQL Index and Data Source Cache act as a plug-in JAR to Spark, there are still a few tricks to note when integrating with Spark. The OAP team explored using the Spark extension & data source API to deliver its core functionality. However, the limits of the Spark extension and data source API meant that we had to make some changes to Spark internals. As a result you must check whether your installation is an unmodified Community Spark or a customized Spark.
 
-#### Integrate with Community Spark
+### Integrating with Community Spark
 
 If you are running a Community Spark, things will be much simpler. Refer to [User Guide](User-Guide.md) to configure and setup Spark to work with OAP.
 
@@ -159,9 +156,9 @@ The following files need to be checked/compared for changes:
 		Add the get and set method for the changed protected variable.
 ```
 
-## Enable NUMA binding for PMem in Spark
+## Enabling NUMA binding for PMem in Spark
 
-#### Rebuild Spark packages with NUMA binding patch 
+### Rebuild Spark packages with NUMA binding patch 
 
 When using PMem as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-3.0.0.patch](./numa-binding-spark-3.0.0.patch) to Spark source code for best performance.
 
@@ -181,7 +178,7 @@ spark.yarn.numa.enabled true
 ```
 **NOTE**: If you are using a customized Spark, you will need to manually resolve the conflicts.
 
-#### Use pre-built patched Spark packages 
+### Use pre-built patched Spark packages 
 
 If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz) with the patch applied.
 
