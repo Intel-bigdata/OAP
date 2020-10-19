@@ -181,7 +181,7 @@ private[spark] class BlockManager(
   private[spark] val externalShuffleServiceEnabled: Boolean = externalBlockStoreClient.isDefined
 
   val isDriver = executorId == SparkContext.DRIVER_IDENTIFIER
-  var memExtensionEnabled = conf.getBoolean("spark.memory.pmem.extension.enable", false)
+  var memExtensionEnabled = conf.getBoolean("spark.memory.pmem.extension.enabled", false)
 
   var numaNodeId = conf.getInt("spark.executor.numa.id", -1)
   val pmemInitialPaths = conf.get("spark.memory.pmem.initial.path", "").split(",")

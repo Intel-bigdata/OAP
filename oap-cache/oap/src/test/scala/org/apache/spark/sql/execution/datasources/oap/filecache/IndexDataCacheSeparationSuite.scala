@@ -42,7 +42,7 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     fiberGroupId
   }
 
-  oapSparkConf.set("spark.sql.oap.index.data.cache.separation.enable", "true")
+  oapSparkConf.set("spark.sql.oap.index.data.cache.separation.enabled", "true")
   oapSparkConf.set("spark.oap.cache.strategy", "mix")
   oapSparkConf.set("spark.sql.oap.mix.data.memory.manager", "offheap")
 
@@ -59,7 +59,7 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     // restore oapSparkConf to default
     oapSparkConf.set("spark.oap.cache.strategy", "guava")
     oapSparkConf.set("spark.sql.oap.fiberCache.memory.manager", "offheap")
-    oapSparkConf.set("spark.sql.oap.index.data.cache.separation.enable", "false")
+    oapSparkConf.set("spark.sql.oap.index.data.cache.separation.enabled", "false")
     oapSparkConf.set("spark.sql.oap.mix.data.memory.manager", "pm")
   }
 
