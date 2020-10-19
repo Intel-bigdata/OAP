@@ -11,9 +11,19 @@ For those algorithms that are not accelerated by Intel MLlib, the original Spark
 
 ## Getting Started
 
-You can use a pre-built JAR package to get started, it can be downloaded from [here](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/oap-mllib-0.9.0-with-spark-3.0.0.jar).
+### Java/Scala Users Preferred
 
-After downloaded, you can refer to the following [Running](#Running) section to try out.
+Use a pre-built Intel MLlib JAR to get started. You can firstly download OAP package from [OAP-JARs-Tarball](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/oap-0.9.0-bin-spark-3.0.0.tar.gz) and extract this Tarball to get `oap-mllib-x.x.x-with-spark-x.x.x.jar` under `oap-0.9.0-bin-spark-3.0.0/jars`.
+
+Then you can refer to the following [Running](#Running) section to try out.
+
+### Python/PySpark Users Preferred
+
+Use a pre-built JAR to get started. If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find compiled Intel MLlib JAR `oap-mllib-x.x.x-with-spark-x.x.x.jar` in `$HOME/miniconda2/envs/oapenv/oap_jars/`.
+
+Then you can refer to the following [Running](#Running) section to try out.
+
+### Building From Scratch
 
 You can also build the package from source code, please refer to [Building](#Building) section.
 
@@ -27,7 +37,7 @@ You can also build the package from source code, please refer to [Building](#Bui
 
 Generally, our common system requirements are the same with Intel® oneAPI Toolkit, please refer to [here](https://software.intel.com/content/www/us/en/develop/articles/intel-oneapi-base-toolkit-system-requirements.html) for details.
 
-Intel® oneAPI Toolkits (Beta) components used by the project are already included into JAR package mentioned above.  There is no extra installs for cluster nodes.
+Intel® oneAPI Toolkits (Beta) components used by the project are already included into JAR package mentioned above. There are no extra installations for cluster nodes.
 
 ### Spark Configuration
 
@@ -52,7 +62,7 @@ To use K-means example for sanity check, you need to upload a data file to your 
 ```
 
 ### Benchmark with HiBench
-Use HiBench to generate dataset with various profiles, and change related variables in `run-XXX.sh` script when applicable.  Then run the following commands:
+Use [Hibench](https://github.com/Intel-bigdata/HiBench) to generate dataset with various profiles, and change related variables in `run-XXX.sh` script when applicable.  Then run the following commands:
 ```
     $ cd OAP/oap-mllib/examples/kmeans-hibench
     $ ./build.sh
@@ -92,8 +102,9 @@ Scala and Java dependency descriptions are already included in Maven POM file.
 To clone and build from open source oneCCL, run the following commands:
 ```
 	$ git clone https://github.com/oneapi-src/oneCCL
+        $ cd oneCCL
         $ git checkout -b 2021.1-beta07-1 origin/2021.1-beta07-1
-	$ cd oneCCL && mkdir build && cd build
+	$ mkdir build && cd build
 	$ cmake ..
 	$ make -j install
 ```
@@ -137,7 +148,7 @@ To build, run the following commands:
     $ ./build.sh
 ```
 
-The built jar package will be placed in `target` directory with the name `oap-mllib-x.x.x-with-spark-x.x.x.jar`.
+The built JAR package will be placed in `target` directory with the name `oap-mllib-x.x.x-with-spark-x.x.x.jar`.
 
 ## Examples
 

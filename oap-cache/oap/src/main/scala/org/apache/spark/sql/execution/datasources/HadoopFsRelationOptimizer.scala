@@ -128,19 +128,24 @@ object HadoopFsRelationOptimizer extends Logging {
             relation.options,
             selectedPartitions.flatMap(p => p.files))
 
+  /**
+   * Spark-3.0 has removed internal ORC configuration "spark.sql.orc.copyBatchToSpark"
+   * to simplify the code path, so it won't copy the ORC columnar batch to Spark columnar batch
+   * in the vectorized ORC reader. Then OAP does not support orc columnVectorCache for now
+   */
         def canUseCache: Boolean = {
           val runtimeConf = relation.sparkSession.conf
-          var vectorCacheEnabled = runtimeConf.get(OapConf.OAP_ORC_DATA_CACHE_ENABLED)
-          logDebug(s"config - ${OapConf.OAP_ORC_DATA_CACHE_ENABLED.key} is $vectorCacheEnabled")
-          vectorCacheEnabled = vectorCacheEnabled &&
-            runtimeConf.get(SQLConf.ORC_VECTORIZED_READER_ENABLED) &&
-            runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
-            // runtimeConf.get(SQLConf.ORC_COPY_BATCH_TO_SPARK) &&
-            outputSchema.forall(_.dataType.isInstanceOf[AtomicType])
+//          var vectorCacheEnabled = runtimeConf.get(OapConf.OAP_ORC_DATA_CACHE_ENABLED)
+//          logDebug(s"config - ${OapConf.OAP_ORC_DATA_CACHE_ENABLED.key} is $vectorCacheEnabled")
+//          vectorCacheEnabled = vectorCacheEnabled &&
+//            runtimeConf.get(SQLConf.ORC_VECTORIZED_READER_ENABLED) &&
+//            runtimeConf.get(SQLConf.WHOLESTAGE_CODEGEN_ENABLED) &&
+//            runtimeConf.get(SQLConf.ORC_COPY_BATCH_TO_SPARK) &&
+//            outputSchema.forall(_.dataType.isInstanceOf[AtomicType])
           val binaryCacheEnabled = runtimeConf.get(OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED)
           logDebug(s"config - ${OapConf.OAP_ORC_BINARY_DATA_CACHE_ENABLED.key}" +
             s"is $binaryCacheEnabled")
-          val ret = vectorCacheEnabled || binaryCacheEnabled
+          val ret = binaryCacheEnabled
           if (ret) {
             logInfo("data cache enable and suitable for use , " +
               "will replace with optimizedOrcFileFormat.")
