@@ -685,7 +685,7 @@ object OapConf {
   val OAP_PARQUET_BINARY_DATA_CACHE_ENABLED =
     SqlConfAdapter.buildConf("spark.sql.oap.parquet.binary.cache.enabled")
       .internal()
-      .doc("To indicate if enable parquet binary data cache, defalt false")
+      .doc("To indicate if enable parquet binary data cache, default false")
       .booleanConf
       .createWithDefault(false)
 
@@ -712,10 +712,10 @@ object OapConf {
       .intConf
       .createWithDefault(2)
 
-  val OAP_EXTERNAL_CACHE_METADB_ENABLE = {
-    SqlConfAdapter.buildConf("spark.sql.oap.external.cache.metaDB.enable")
+  val OAP_EXTERNAL_CACHE_METADB_ENABLED = {
+    SqlConfAdapter.buildConf("spark.sql.oap.external.cache.metaDB.enabled")
       .internal()
-      .doc("external cachemeta db enable")
+      .doc("Whether to enable external cachemeta db")
       .booleanConf
       .createWithDefault(false)
   }

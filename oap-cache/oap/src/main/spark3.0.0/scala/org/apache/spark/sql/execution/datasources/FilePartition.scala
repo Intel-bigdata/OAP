@@ -47,7 +47,7 @@ case class FilePartition(index: Int, files: Array[PartitionedFile])
       case (host, numBytes) => host
     }.toArray
 
-    if (SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLE) == true) {
+    if (SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED) == true) {
       CachedPartitionedFilePreferredLocs.getPreferredLocsByCache(files)
         .++(hdfsPreLocs)
         .take(3)
