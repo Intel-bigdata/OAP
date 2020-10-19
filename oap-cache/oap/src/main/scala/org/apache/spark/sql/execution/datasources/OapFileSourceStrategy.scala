@@ -44,8 +44,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
         SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLED) ||
         SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
       val cacheTablelists =
-        if (SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS) !=
-          OapConf.OAP_CACHE_TABLE_LISTS.defaultValue.get) {
+        if (!SparkSession.getActiveSession.get.conf.getOption(OapConf.OAP_CACHE_TABLE_LISTS.key).isEmpty) {
           SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS).split(";")
         } else {
           SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_BK).split(";")

@@ -254,8 +254,7 @@ private[filecache] object OapCache extends Logging {
     }
     val initialPath = map.get(numaId).get
     val initialSizeStr =
-      if (conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim !=
-        OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE.defaultValue.get.trim) {
+      if (!conf.getOption(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE.key).isEmpty) {
         conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim
       } else {
         conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE_BK).trim
@@ -285,8 +284,7 @@ private[filecache] object OapCache extends Logging {
       configEntry.key,
       configEntry.defaultValue.get).toLowerCase
     val memoryManagerOpt =
-      if (sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER) !=
-        OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.defaultValue.get) {
+      if (!sparkEnv.conf.getOption(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key).isEmpty) {
         sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
       } else {
         sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER_BK.key, "offheap").toLowerCase
@@ -528,8 +526,7 @@ class VMemCache(fiberType: FiberType) extends OapCache with Logging {
   private val lock = new Object
   private val conf = SparkEnv.get.conf
   private val initialSizeStr =
-    if (conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim !=
-      OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE.defaultValue.get.trim) {
+    if (!conf.getOption(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE.key).isEmpty) {
       conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE).trim
     } else {
       conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE_BK).trim
@@ -984,8 +981,7 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
   val cacheReadOnlyEnbale = conf.get(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLE) ||
     conf.get(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLED)
   val clientPoolSize =
-    if (conf.get(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE) !=
-      OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE.defaultValue.get) {
+    if (!conf.get(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE.key).isEmpty) {
       conf.get(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE)
     } else {
       conf.get(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE_BK)
