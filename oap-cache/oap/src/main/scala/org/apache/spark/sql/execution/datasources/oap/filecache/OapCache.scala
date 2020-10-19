@@ -24,6 +24,9 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.concurrent.locks.{Condition, ReentrantLock}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
+import scala.language.postfixOps
+import scala.sys.process._
 import scala.util.Success
 
 import com.google.common.cache._
@@ -36,7 +39,7 @@ import sun.nio.ch.DirectBuffer
 import org.apache.spark.{SparkEnv, SparkException}
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config.ConfigEntry
-import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.datasources.{CacheMetaInfoValue, ExternalDBClient, ExternalDBClientFactory, OapException, StoreCacheMetaInfo}
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberType.FiberType
 import org.apache.spark.sql.execution.datasources.oap.utils.PersistentMemoryConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
@@ -212,12 +215,20 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 }
 
 private[filecache] object OapCache extends Logging {
-  val PMemRelatedCacheBackend = Array("guava", "vmem", "noevict", "external")
+  def plasmaServerDetect(): Boolean = {
+    val command = "ps -ef" #| "grep plasma"
+    val plasmaServerStatus = command.!!
+    if (plasmaServerStatus.indexOf("plasma-store-server") == -1) {
+      logWarning("External cache strategy requires plasma-store-server launched, " +
+        "failed to detect plasma-store-server, will fallback to simpleCache.")
+      return false
+    }
+    true
+  }
   def cacheFallBackDetect(sparkEnv: SparkEnv,
                           fallBackEnabled: Boolean = true,
                           fallBackRes: Boolean = true): Boolean = {
-    if (fallBackEnabled == false && fallBackRes == true) return true
-    if (fallBackEnabled == false && fallBackRes == false) return false
+    if (fallBackEnabled == false) return fallBackRes
     val conf = sparkEnv.conf
     var numaId = conf.getInt("spark.executor.numa.id", -1)
     val executorIdStr = sparkEnv.executorId
@@ -228,7 +239,14 @@ private[filecache] object OapCache extends Logging {
         return false
     }
     val executorId = executorIdStr.toInt
-    val map = PersistentMemoryConfigUtils.parseConfig(conf)
+    var map: mutable.HashMap[Int, String] = mutable.HashMap.empty
+    try {
+      map = PersistentMemoryConfigUtils.parseConfig(conf)
+    } catch {
+      case e: OapException =>
+        logWarning("cacheFallBackDetect: execption when parse config" + e.getMessage)
+        return false
+    }
     if (numaId == -1) {
       logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +
         s"executor with NUMA when cache data to Intel Optane DC persistent memory.")
@@ -278,29 +296,34 @@ private[filecache] object OapCache extends Logging {
       "true").toLowerCase
     val fallBackRes = conf.get(OapConf.OAP_TEST_CACHE_BACKEND_FALLBACK_RES.key,
       "true").toLowerCase
-    if (PMemRelatedCacheBackend.contains(oapCacheOpt)) {
-      if (!cacheFallBackDetect(sparkEnv, fallBackEnabled.toBoolean, fallBackRes.toBoolean)) {
-        if (oapCacheOpt.equals("guava") && memoryManagerOpt.equals("offheap")) {
-          return new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
+
+    oapCacheOpt match {
+      case "external" =>
+        if (plasmaServerDetect()) new ExternalCache(fiberType)
+        else new SimpleOapCache()
+      case "guava" =>
+        if (cacheFallBackDetect(sparkEnv, fallBackEnabled.toBoolean, fallBackRes.toBoolean)) {
+          new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
         }
-        logWarning(s"There is no Optane PMem DIMMs detected," +
-          s"has to fall back to simple cache implementation")
-        new SimpleOapCache()
-      }
-      else {
-        oapCacheOpt match {
-          case "guava" => new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
-          case "vmem" => new VMemCache(fiberType)
-          case "noevict" => new NoEvictPMCache(cacheMemory, cacheGuardianMemory, fiberType)
-          case "external" => new ExternalCache(fiberType)
-          case _ => throw new UnsupportedOperationException(
-            s"The cache backend: ${oapCacheOpt} is not supported now")
+        else {
+          if (oapCacheOpt.equals("guava") && memoryManagerOpt.equals("offheap")) {
+            new GuavaOapCache(cacheMemory, cacheGuardianMemory, fiberType)
+          }
+          else new SimpleOapCache()
         }
-      }
-    }
-    else {
-      throw new UnsupportedOperationException(
-        s"The cache backend: ${oapCacheOpt} is not supported now")
+      case "noevict" =>
+        if (cacheFallBackDetect(sparkEnv, fallBackEnabled.toBoolean, fallBackRes.toBoolean)) {
+          new NoEvictPMCache(cacheMemory, cacheGuardianMemory, fiberType)
+        }
+        else new SimpleOapCache()
+      case "vmem" =>
+        if (cacheFallBackDetect(sparkEnv, fallBackEnabled.toBoolean, fallBackRes.toBoolean)) {
+          new VMemCache(fiberType)
+        }
+        else new SimpleOapCache()
+      case _ =>
+        throw new UnsupportedOperationException(
+          s"The cache backend: ${oapCacheOpt} is not supported now")
     }
   }
 }
@@ -352,7 +375,8 @@ trait OapCache {
     val cache = fiber match {
       case binary: BinaryDataFiberId => binary.doCache()
       case orcChunk: OrcBinaryFiberId => orcChunk.doCache()
-      case VectorDataFiberId(file, columnIndex, rowGroupId) => file.cache(rowGroupId, columnIndex)
+      case VectorDataFiberId(file, columnIndex, rowGroupId) =>
+        file.cache(rowGroupId, columnIndex, fiber)
       case BTreeFiberId(getFiberData, _, _, _) => getFiberData.apply()
       case BitmapFiberId(getFiberData, _, _, _) => getFiberData.apply()
       case TestDataFiberId(getFiberData, _) => getFiberData.apply()
@@ -927,6 +951,12 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
   private val conf = SparkEnv.get.conf
   private val externalStoreCacheSocket: String = "/tmp/plasmaStore"
   private var cacheInit: Boolean = false
+  private var externalDBClient: ExternalDBClient = null
+
+  if (SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLE) == true) {
+    externalDBClient = ExternalDBClientFactory.getDBClientInstance(SparkEnv.get)
+  }
+
   def init(): Unit = {
     if (!cacheInit) {
       try {
@@ -1037,6 +1067,19 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
     }
   }
 
+  def reportCacheMeta(fiberId: FiberId): Unit = {
+    fiberId match {
+      case binary: BinaryDataFiberId => binary
+        .doReport(SparkEnv.get.blockManager.blockManagerId.host, externalDBClient)
+      case vectorData: VectorDataFiberId => vectorData
+        .doReport(SparkEnv.get.blockManager.blockManagerId.host, externalDBClient)
+      case bitMapData: BitmapFiberId =>
+        logWarning("Index cache is not support to report cache to external DB.")
+      case bTreeData: BTreeFiberId =>
+        logWarning("Index cache is not support to report cache to external DB.")
+    }
+  }
+
   override def cache(fiberId: FiberId): FiberCache = {
     val fiber = super.cache(fiberId)
 
@@ -1052,6 +1095,9 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
       } catch {
         case e: DuplicateObjectException => logWarning(e.getMessage)
       }
+    }
+    if (SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLE) == true) {
+      reportCacheMeta(fiberId)
     }
     fiber
   }

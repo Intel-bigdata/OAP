@@ -103,14 +103,14 @@ public class ParquetFiberDataReader implements Closeable {
    */
   public PageReadStore readFiberData(
       BlockMetaData block,
-      ColumnDescriptor columnDescriptor) throws IOException {
+      ColumnDescriptor columnDescriptor,
+      ColumnChunkMetaData mc) throws IOException {
     Preconditions.checkNotNull(block, "block must not null");
     Preconditions.checkNotNull(columnDescriptor, "columnDescriptor must not null");
     if (block.getRowCount() == 0) {
       throw new IllegalArgumentException("Illegal row group of 0 rows");
     }
     ColumnChunkPageReadStore rowGroup = new ColumnChunkPageReadStore(block.getRowCount());
-    ColumnChunkMetaData mc = findColumnMeta(block, columnDescriptor);
 
     DataFiberDescriptor descriptor =
       new DataFiberDescriptor(
@@ -160,7 +160,7 @@ public class ParquetFiberDataReader implements Closeable {
 
 
   // TODO Use stream api if we use Java 8+.
-  private ColumnChunkMetaData findColumnMeta(
+  public ColumnChunkMetaData findColumnMeta(
       BlockMetaData block,
       ColumnDescriptor columnDescriptor) throws IOException {
     ColumnPath columnPath = ColumnPath.get(columnDescriptor.getPath());

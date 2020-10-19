@@ -4,6 +4,7 @@
 - [Index and Data Cache Separation](#Index-and-Data-Cache-Separation)  To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
 - [Cache Hot Tables](#Cache-Hot-Tables)  Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
 - [Column Vector Cache](#Column-Vector-Cache)  This document above use **binary** cache as example for Parquet file format, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache for Parquet to spare computation time.
+- [Large Scale and Heterogeneous cluster support](#Large Scale and Heterogeneous cluster support)
 
 ## Additional Cache Strategies
 Following table shows features of 4 cache strategies on PMem.
@@ -277,3 +278,18 @@ spark.sql.oap.parquet.binary.cache.enabled      false
 spark.sql.oap.parquet.data.cache.enable         true
 ```
 
+### Large Scale and Heterogeneous cluster support
+***NOTE:*** Only works with `external cache`
+
+OAP influences Spark to schedule tasks according cache locality info. These info could be of large amount in a ***large scale cluster*** and how to schedule tasks in a ***heterogeneous cluster*** (some nodes with Optane? DC Persistent Memory, some without) could also be challenging.
+
+We introduce an external DB to store cache locality info. If there's no cache available, spark will fallback to schedule respecting HDFS locality.
+Currently we support [Redis]("https://redis.io/") as external DB service. Please [download and launch a redis-server]("https://redis.io/download") before running spark with OAP.
+
+Please add following configuration to `spark-defaults.conf`.
+```
+spark.sql.oap.external.cache.metaDB.enable             true
+# Redis-server address
+spark.sql.oap.external.cache.metaDB.address            10.1.2.12
+spark.sql.oap.external.cache.metaDB.impl               org.apache.spark.sql.execution.datasources.RedisClient
+```

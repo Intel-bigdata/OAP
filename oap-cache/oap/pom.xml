@@ -114,6 +114,16 @@
 
   <dependencies>
     <dependency>
+        <groupId>redis.clients</groupId>
+        <artifactId>jedis</artifactId>
+        <version>3.1.0</version>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-pool2</artifactId>
+        <version>2.6.2</version>
+    </dependency>
+    <dependency>
       <groupId>com.intel.oap</groupId>
       <artifactId>oap-common</artifactId>
       <version>${project.version}</version>
@@ -707,7 +717,7 @@
                     <source>src/test/oap-perf-suite</source>
                 </sources>
             </configuration>
-          </execution>  
+          </execution>
         </executions>
       </plugin>
       <plugin>

@@ -18,12 +18,13 @@
 package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.parquet.column.{Dictionary, Encoding}
+import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData
 import org.apache.parquet.io.api.Binary
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
+import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, FiberId, VectorDataFiberId}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetDictionaryWrapper
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
 import org.apache.spark.sql.oap.OapRuntime
@@ -41,10 +42,15 @@ import org.apache.spark.unsafe.Platform
  */
 object ParquetDataFiberWriter extends Logging {
 
-  def dumpToCache(column: OnHeapColumnVector, total: Int): FiberCache = {
+  def dumpToCache(column: OnHeapColumnVector, total: Int, fiberId: FiberId = null,
+                  path: String = null, mc: ColumnChunkMetaData = null): FiberCache = {
     val header = ParquetDataFiberHeader(column, total)
     logDebug(s"will dump column to data fiber dataType = ${column.dataType()}, " +
       s"total = $total, header is $header")
+    if (fiberId != null) {
+      fiberId.asInstanceOf[VectorDataFiberId]
+        .setProperty(path, mc.getStartingPos, mc.getTotalSize)
+    }
     header match {
       case ParquetDataFiberHeader(true, false, 0) =>
         val length = fiberLength(column, total, 0 )

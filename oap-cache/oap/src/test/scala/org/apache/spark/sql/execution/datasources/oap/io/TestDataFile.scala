@@ -18,7 +18,7 @@ package org.apache.spark.sql.execution.datasources.oap.io
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
+import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, FiberId}
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 
@@ -41,6 +41,6 @@ private[oap] case class TestDataFile(path: String, schema: StructType, configura
   override def getDataFileMeta(): DataFileMeta =
     throw new UnsupportedOperationException
 
-  override def cache(groupId: Int, fiberId: Int): FiberCache =
+  override def cache(groupId: Int, fiberId: Int, fiber: FiberId = null): FiberCache =
     throw new UnsupportedOperationException
 }

@@ -28,7 +28,7 @@ import org.apache.hadoop.fs.FSDataInputStream
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.{OapException, RecordReader}
-import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
+import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, FiberId}
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
@@ -46,7 +46,7 @@ abstract class DataFile {
   def totalRows(): Long
 
   def getDataFileMeta(): DataFileMeta
-  def cache(groupId: Int, fiberId: Int): FiberCache
+  def cache(groupId: Int, fiberId: Int, fiber: FiberId = null): FiberCache
   override def hashCode(): Int = path.hashCode
   override def equals(other: Any): Boolean = other match {
     case df: DataFile => path.equals(df.path)

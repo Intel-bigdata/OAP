@@ -76,17 +76,7 @@ class FiberCacheManager(
     }
 
     val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
-    if (cacheName.equals(GUAVA_CACHE)) {
-      new GuavaOapCache(dataCacheMemorySize, dataCacheGuardianMemorySize, FiberType.DATA)
-    } else if (cacheName.equals(SIMPLE_CACHE)) {
-      new SimpleOapCache()
-    } else if (cacheName.equals(NO_EVICT_CACHE)) {
-      new NoEvictPMCache(dataCacheMemorySize, dataCacheGuardianMemorySize, FiberType.DATA)
-    } else if (cacheName.equals(VMEM_CACHE)) {
-      new VMemCache(FiberType.DATA)
-    } else if (cacheName.equals(EXTERNAL_CACHE)) {
-      new ExternalCache(FiberType.DATA)
-    } else if (cacheName.equals(MIX_CACHE)) {
+    if (cacheName.equals(MIX_CACHE)) {
       val separateCache = sparkEnv.conf.getBoolean(
         OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
         OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get
@@ -97,7 +87,8 @@ class FiberCacheManager(
       new MixCache(dataCacheMemorySize, indexCacheMemorySize, dataCacheGuardianMemorySize,
         indexCacheGuardianMemorySize, separateCache, sparkEnv)
     } else {
-      throw new OapException(s"Unsupported cache strategy $cacheName")
+      OapCache(sparkEnv, OapConf.OAP_FIBERCACHE_STRATEGY,
+        dataCacheMemorySize, dataCacheGuardianMemorySize, FiberType.DATA)
     }
   }
 
@@ -204,7 +195,7 @@ class FiberCacheManager(
     toFiberCache(FiberType.DATA, bytes)
   }
 
-  def getEmptyDataFiberCache(length: Long): FiberCache = {
+  def getEmptyDataFiberCache(length: Long, fiberId: FiberId = null): FiberCache = {
     FiberCache(FiberType.DATA, allocateFiberMemory(FiberType.DATA, length))
   }
 

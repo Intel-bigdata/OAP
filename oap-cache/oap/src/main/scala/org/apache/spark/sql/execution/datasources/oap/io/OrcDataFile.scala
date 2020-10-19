@@ -213,7 +213,7 @@ private[oap] case class OrcDataFile(
   override def getDataFileMeta(): DataFileMeta =
     new OrcDataFileMeta(filePath, configuration)
 
-  override def cache(groupId: Int, fiberId: Int): FiberCache = {
+  override def cache(groupId: Int, fiberId: Int, fiber: FiberId = null): FiberCache = {
     val fileSchema = fileReader.getSchema
     val columnTypeDesc = TypeDescription.createStruct()
       .addField(fileSchema.getFieldNames.get(fiberId), fileSchema.getChildren.get(fiberId))
@@ -238,6 +238,6 @@ private[oap] case class OrcDataFile(
     else {
       OrcCacheReader.putValues(rowCount, field, fromColumn, toColumn)
     }
-    ParquetDataFiberWriter.dumpToCache(toColumn, rowCount)
+    OrcDataFiberWriter.orcDumpToCache(toColumn, rowCount, fiber)
   }
 }

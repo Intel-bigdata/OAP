@@ -42,11 +42,11 @@
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.27.2</version>
+            <version>3.32.3</version>
         </dependency>
         <dependency>
             <groupId>org.scalatest</groupId>
-            <artifactId>scalatest_2.11</artifactId>
+            <artifactId>scalatest_2.12</artifactId>
             <version>3.0.3</version>
             <scope>test</scope>
         </dependency>
@@ -105,24 +105,38 @@
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.0.0</version>
-                <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                </configuration>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.1.0</version>
                 <executions>
                     <execution>
-                        <id>make-assembly</id>
                         <phase>package</phase>
                         <goals>
-                            <goal>single</goal>
+                            <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/native/linux32/libleveldbjni.so</exclude>
+                                        <exclude>META-INF/native/linux64/libleveldbjni.so</exclude>
+                                        <exclude>META-INF/native/windows32/leveldbjni.dll</exclude>
+                                        <exclude>META-INF/native/windows64/leveldbjni.dll</exclude>
+                                        <exclude>META-INF/native/osx/libleveldbjni.jnilib</exclude>
+                                        <exclude>org/sqlite/native/DragonFlyBSD/x86_64/libsqlitejdbc.so</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <groupId>org.scalastyle</groupId>
                 <artifactId>scalastyle-maven-plugin</artifactId>
@@ -157,7 +171,7 @@
         <plugin>
           <groupId>org.scalatest</groupId>
           <artifactId>scalatest-maven-plugin</artifactId>
-          <version>1.0</version>
+          <version>2.0.0</version>
           <!-- Note config is repeated in surefire config -->
           <configuration>
             <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
@@ -172,7 +186,7 @@
               -->
               <SPARK_DIST_CLASSPATH>${test_classpath}</SPARK_DIST_CLASSPATH>
               <SPARK_PREPEND_CLASSES>1</SPARK_PREPEND_CLASSES>
-              <SPARK_SCALA_VERSION>2.11</SPARK_SCALA_VERSION>
+              <SPARK_SCALA_VERSION>2.12</SPARK_SCALA_VERSION>
               <SPARK_TESTING>1</SPARK_TESTING>
               <JAVA_HOME>${test.java.home}</JAVA_HOME>
             </environmentVariables>
