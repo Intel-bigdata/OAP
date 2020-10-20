@@ -189,6 +189,12 @@ val df = spark.read
 df.createOrReplaceTempView("my_temp_view")
 spark.sql("SELECT * FROM my_temp_view LIMIT 10").show(10)
 ```
+### To validate if ArrowDataSource works properly
+
+To validate if ArrowDataSource works, you can go to the DAG to check if ArrowScan has been used from the above example query.
+
+![Image of ArrowDataSource Validation](/oap-data-source/arrow/resource/arrowdatasource_validation.png)
+
 
 ## Work together with ParquetDataSource (experimental)
 
@@ -207,9 +213,3 @@ ServiceLoaderUtil.ensureParquetFileFormatOverwritten();
 ```
 
 Note the whole feature is currently **experimental** and only DataSource v1 is supported. V2 support is being planned.
-=======
-### To validate if ArrowDataSource works properly
-
-To validate if ArrowDataSource works, you can go to the DAG to check if ArrowScan has been used from the above example query. 
-
-![Image of ArrowDataSource Validation](/oap-data-source/arrow/resource/arrowdatasource_validation.png)
