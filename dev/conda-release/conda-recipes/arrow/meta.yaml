@@ -4,7 +4,7 @@ package:
   version: {{ ARROW_VERSION }}
 
 source:
-  path: ../../../../../arrow
+  path: ../../../../../../arrow
 
 build:
   build:
