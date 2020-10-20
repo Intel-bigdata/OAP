@@ -128,9 +128,9 @@ HiBench/conf/workloads/ml/kmeans.conf
 Note that you need add `hibench.kmeans.storage.level  PMEM_AND_DISK` to `kmeans.conf`, which can enable both PMem and Disk to cache data.
 If you completed [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you also need add the following configs to `spark.conf`
 ```
-spark.executorEnv.LD_LIBRARY_PATH $HOME/miniconda2/envs/oapenv/lib/
-spark.executor.extraLibraryPath $HOME/miniconda2/envs/oapenv/lib/
-spark.driver.extraLibraryPath $HOME/miniconda2/envs/oapenv/lib/
+spark.executorEnv.LD_LIBRARY_PATH   $HOME/miniconda2/envs/oapenv/lib/
+spark.executor.extraLibraryPath     $HOME/miniconda2/envs/oapenv/lib/
+spark.driver.extraLibraryPath       $HOME/miniconda2/envs/oapenv/lib/
 
 ```
  
