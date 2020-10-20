@@ -29,8 +29,13 @@ jobs:
           conda install -y anaconda-client conda-build
           echo "Y"|anaconda login  --username '${{ secrets.USR }}' --password '${{ secrets.PWD }}'
           conda list
+          cd dev
+          mkdir -p thirdparty
+          cd thirdparty
           git clone https://github.com/Intel-bigdata/arrow.git -b branch-0.17.0-oap-0.9
-          cd dev/conda-release/conda-recipes/arrow
+          pwd
+          cd ../conda-release/conda-recipes/arrow
+          pwd
           conda config --add channels intel
           conda config --add channels conda-forge
           conda config --set anaconda_upload yes
