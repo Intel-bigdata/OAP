@@ -250,7 +250,7 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 private[filecache] class TmpDramMemoryManager(sparkEnv: SparkEnv)
   extends MemoryManager with Logging {
   val cacheGuardianMemorySizeStr =
-    if (!sparkEnv.conf.get(OapConf.OAP_CACHE_GUARDIAN_MEMORY_SIZE.key).isEmpty) {
+    if (!sparkEnv.conf.getOption(OapConf.OAP_CACHE_GUARDIAN_MEMORY_SIZE.key).isEmpty) {
       sparkEnv.conf.get(OapConf.OAP_CACHE_GUARDIAN_MEMORY_SIZE)
     } else {
       sparkEnv.conf.get(OapConf.OAP_CACHE_GUARDIAN_MEMORY_SIZE_BK)

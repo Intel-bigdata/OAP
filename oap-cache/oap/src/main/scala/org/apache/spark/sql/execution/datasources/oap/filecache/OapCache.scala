@@ -981,7 +981,7 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
   val cacheReadOnlyEnbale = conf.get(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLE) ||
     conf.get(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLED)
   val clientPoolSize =
-    if (!conf.get(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE.key).isEmpty) {
+    if (!conf.getOption(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE.key).isEmpty) {
       conf.get(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE)
     } else {
       conf.get(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE_BK)
