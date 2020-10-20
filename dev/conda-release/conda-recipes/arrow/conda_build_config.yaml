@@ -3,7 +3,7 @@ c_compiler:
 c_compiler_version:
 - '7'
 channel_sources:
-- intel-bigdata,conda-forge
+- intel,conda-forge
 channel_targets:
 - conda-forge main
 cxx_compiler:

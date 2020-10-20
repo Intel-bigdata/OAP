@@ -1,0 +1,37 @@
+name: 'Arrow-cpp build'
+on:
+  push:
+    branches: [ master ]
+  schedule:
+    - cron: |
+        */15 * * * *
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+      - uses: conda-incubator/setup-miniconda@v1
+        with:
+          miniconda-version: "latest"
+          auto-activate-base: true
+      - name: build
+        shell: bash -l {0}
+        env:
+          USER: ${{ secrets.USR }}
+          PWD: ${{ secrets.PWD }}
+        run: |
+          sudo apt-get install -y openjdk-8-jdk
+          env
+          conda activate base
+          conda info
+          conda install -y anaconda-client conda-build
+          echo "Y"|anaconda login  --username '${{ secrets.USR }}' --password '${{ secrets.PWD }}'
+          conda list
+          git clone https://github.com/Intel-bigdata/arrow.git -b branch-0.17.0-oap-0.9
+          cd dev/conda-release/conda-recipes/arrow
+          conda config --add channels intel
+          conda config --add channels conda-forge
+          conda config --set anaconda_upload yes
+          conda build .
