@@ -1,7 +1,7 @@
 # OAP Developer Guide
 
-This document contains the instructions on installing necessary dependencies for building OAP and provides scripts to build&install these needed tools and OAP project. You can get more detailed information from OAP each
-module blew.
+This document contains the instructions & scripts on installing necessary dependencies and building OAP. 
+You can get more detailed information from OAP each module blew.
 
 * [SQL Index and Data Source Cache](../oap-cache/oap/docs/Developer-Guide.md)
 * [RDD Cache PMem Extension](../oap-spark/README.md#compiling)
@@ -15,7 +15,7 @@ module blew.
 
 ### Prerequisites for Building
 
-OAP is built with [Apache Maven](http://maven.apache.org/) and Oracle Java 8, and mainly required tools to install are listed below.
+OAP is built with [Apache Maven](http://maven.apache.org/) and Oracle Java 8, and mainly required tools to install on your cluster are listed below.
 
 - [Cmake](https://help.directadmin.com/item.php?id=494)
 - [GCC > 7](https://gcc.gnu.org/wiki/InstallingGCC)
@@ -23,65 +23,65 @@ OAP is built with [Apache Maven](http://maven.apache.org/) and Oracle Java 8, an
 - [Vmemcache](https://github.com/pmem/vmemcache)
 - [HPNL](https://github.com/Intel-bigdata/HPNL)
 - [PMDK](https://github.com/pmem/pmdk)  
-- [OneAPI]((https://software.intel.com/content/www/us/en/develop/tools/oneapi.html))
+- [OneAPI](https://software.intel.com/content/www/us/en/develop/tools/oneapi.html)
 - [Arrow](https://github.com/Intel-bigdata/arrow)
 
 - **Requirements for Shuffle Remote PMem Extension**  
 If enable Shuffle Remote PMem extension with RDMA, you can refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md) to configure and validate RDMA in advance.
 
-We provide scripts below to help automatically install dependencies above **except RDMA**, run:
+We provide scripts below to help automatically install dependencies above **except RDMA**, need change to **root** account, run:
 
 ```shell script
-git clone -b <tag-version> https://github.com/Intel-bigdata/OAP.git
-cd OAP
-sh dev/install-compile-time-dependencies.sh
+# git clone -b <tag-version> https://github.com/Intel-bigdata/OAP.git
+# cd OAP
+# sh dev/install-compile-time-dependencies.sh
 ```
 
 Run the following command to learn more.
 
 ```shell script
-sh $OAP_HOME/dev/scripts/prepare_oap_env.sh --help
+# sh $OAP_HOME/dev/scripts/prepare_oap_env.sh --help
 ```
 
 Run the following command to automatically install specific dependency such as Maven.
 
 ```shell script
-sh $OAP_HOME/dev/scripts/prepare_oap_env.sh --prepare_maven
+# sh $OAP_HOME/dev/scripts/prepare_oap_env.sh --prepare_maven
 ```
 
 ***NOTE:*** If you use `install-compile-time-dependencies.sh` or `prepare_oap_env.sh` to install GCC, or your GCC is not installed in the default path, please ensure you have exported `CC` (and `CXX`) before calling maven.
 ```shell script
-export CXX=$OAPHOME/dev/thirdparty/gcc7/bin/g++
-export CC=$OAPHOME/dev/thirdparty/gcc7/bin/gcc
+# export CXX=$OAPHOME/dev/thirdparty/gcc7/bin/g++
+# export CC=$OAPHOME/dev/thirdparty/gcc7/bin/gcc
 ```
 
 ### Building
 
 To build OAP package, use
 ```shell script
-sh $OAPHOME/dev/compile-oap.sh
+$ sh $OAP_HOME/dev/compile-oap.sh
 #or
-mvn clean -DskipTests package
+$ mvn clean -DskipTests package
 ```
 
 ### Building Specified Module
 ```shell script
-sh $OAPHOME/dev/compile-oap.sh --oap-cache
+$ sh $OAP_HOME/dev/compile-oap.sh --oap-cache
 #or
-mvn clean -pl com.intel.oap:oap-cache -am package
+$ mvn clean -pl com.intel.oap:oap-cache -am package
 ```
 
 ### Running Test
 
 To run all the tests, use
 ```shell script
-mvn clean test
+$ mvn clean test
 ```
 
 ### Running Specified Module Test
 
 ```shell script
-mvn clean -pl com.intel.oap:oap-cache -am test
+$ mvn clean -pl com.intel.oap:oap-cache -am test
 
 ```
 
@@ -96,15 +96,15 @@ When use SQL Index and Data Source Cache with PMem, finish steps of [Prerequisit
 Add `-Ppersistent-memory` to build OAP with PMem support.
  
 ```shell script
-mvn clean -q -Ppersistent-memory -DskipTests package
+$ mvn clean -q -Ppersistent-memory -DskipTests package
 ```
 For `vmemcache` strategy, build OAP with command :
 ```shell script
-mvn clean -q -Pvmemcache -DskipTests package
+$ mvn clean -q -Pvmemcache -DskipTests package
 ```
 You can build OAP with command below to use all of them:
 ```shell script
-mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
+$ mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
 ```
 
 
@@ -113,7 +113,7 @@ mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
 If you want to generate a release package after you mvn package all modules, use the following command, then you can find a tarball named `oap-$VERSION-bin-spark-3.0.0.tar.gz` under directory `OAP/dev/release-package `.
 
 ```shell script
-sh $OAP_HOME/dev/compile-oap.sh
+$ sh $OAP_HOME/dev/compile-oap.sh
 ```
 
 ## Contributing

@@ -6,7 +6,7 @@
 
 ## Building
 
-### Building
+### Building SQL Index and  Data Source Cache 
 
 Building with [Apache Maven\*](http://maven.apache.org/).
 
@@ -23,7 +23,7 @@ Build the `oap-cache` package:
 mvn clean -pl com.intel.oap:oap-cache -am package
 ```
 
-### Run Tests
+### Running Tests
 
 Run all the tests:
 ```
@@ -43,12 +43,11 @@ Follow these steps:
 
 Install the required packages on the build system:
 
-- gcc-c++
 - [cmake](https://help.directadmin.com/item.php?id=494)
 - [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
 - [vmemcache](https://github.com/pmem/vmemcache)
 
-#### build and install memkind
+#### installing memkind
  The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. 
    Build the latest memkind lib from source:
 
@@ -60,9 +59,9 @@ cd memkind
 make
 make install
    ``` 
-#### build and install vmemcache
+#### installing vmemcache
 
-To build vmemcache lib from source, you can (for RPM-based linux as example):
+To build vmemcache library from source, you can (for RPM-based linux as example):
 ```
 git clone https://github.com/pmem/vmemcache
 cd vmemcache
@@ -72,15 +71,16 @@ cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
 make package
 sudo rpm -i libvmemcache*.rpm
 ```
-#### build and install plasma
-#### build and install plasma
+#### installing Plasma
+
 To use optimized Plasma cache with OAP, you need following components:  
-    (1) libarrow.so, libplasma.so, libplasma_jni.so: dynamic libraries, will be used in plasma client.   
-    (2) plasma-store-server: executable file, plasma cache service.  
-    (3) arrow-plasma-0.17.0.jar: will be used when compile oap and spark runtime also need it. 
+
+    (1) `libarrow.so`, `libplasma.so`, `libplasma_jni.so`: dynamic libraries, will be used in Plasma client.   
+    (2) `plasma-store-server`: executable file, Plasma cache service.  
+    (3) `arrow-plasma-0.17.0.jar`: will be used when compile oap and spark runtime also need it. 
 
 - so file and binary file  
-  Clone code from Intel-arrow repo and run following commands, this will install libplasma.so, libarrow.so, libplasma_jni.so and plasma-store-server to your system path(/usr/lib64 by default). And if you are using spark in a cluster environment, you can copy these files to all nodes in your cluster if os or distribution are same, otherwise, you need compile it on each node.
+  Clone code from Intel-arrow repo and run following commands, this will install `libplasma.so`, `libarrow.so`, `libplasma_jni.so` and `plasma-store-server` to your system path(`/usr/lib64` by default). And if you are using Spark in a cluster environment, you can copy these files to all nodes in your cluster if the OS or distribution are same, otherwise, you need compile it on each node.
   
 ```
 cd /tmp
@@ -94,6 +94,7 @@ cmake -DCMAKE_INSTALL_PREFIX=/usr/ -DCMAKE_BUILD_TYPE=Release -DARROW_BUILD_TEST
 make -j$(nproc)
 sudo make install -j$(nproc)
 ```
+
 - arrow-plasma-0.17.0.jar  
    arrow-plasma-0.17.0.jar is provided in maven central repo, you can download [it](https://repo1.maven.org/maven2/com/intel/arrow/arrow-plasma/0.17.0/arrow-plasma-0.17.0.jar) and copy to `$SPARK_HOME/jars` dir.
    Or you can manually install it, change to arrow repo java direction, run following command, this will install arrow jars to your local maven repo, and you can compile oap-cache module package now. Beisdes, you need copy arrow-plasma-0.17.0.jar to `$SPARK_HOME/jars/` dir, cause this jar is needed when using external cache.
@@ -162,7 +163,7 @@ The following files need to be checked/compared for changes:
 
 When using PMem as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-3.0.0.patch](./numa-binding-spark-3.0.0.patch) to Spark source code for best performance.
 
-1. Download src for [spark-3.0.0](https://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0.tgz) and clone the src from github.
+1. Download src for [Spark-3.0.0](https://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0.tgz) and clone the src from github.
 
 2. Apply this patch and [rebuild](https://spark.apache.org/docs/latest/building-spark.html) the Spark package.
 
