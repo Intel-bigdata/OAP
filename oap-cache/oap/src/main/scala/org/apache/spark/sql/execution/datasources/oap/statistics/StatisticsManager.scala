@@ -57,7 +57,7 @@ class StatisticsWriteManager {
   // which is created from `SparkUtils`, hence containing all spark config values.
   def initialize(indexType: OapIndexType, s: StructType, conf: Configuration): Unit = {
     _isExternalSorterEnable = conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLED.key,
-      OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLED.defaultValue.get) ||
+      OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLED.defaultValue.get) &&
       conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.key,
       OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.defaultValue.get) &&
         indexType.toString.equals(BTreeIndexType.toString)

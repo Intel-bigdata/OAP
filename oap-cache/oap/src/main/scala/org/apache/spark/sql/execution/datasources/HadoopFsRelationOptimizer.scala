@@ -59,7 +59,7 @@ object HadoopFsRelationOptimizer extends Logging {
       // 2. canUseIndex: OAP_PARQUET_ENABLED is true and hasAvailableIndex.
       // Other scenarios still use ParquetFileFormat.
       case _: ParquetFileFormat
-        if relation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) ||
+        if relation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLED) &&
           relation.sparkSession.conf.get(OapConf.OAP_PARQUET_ENABLE) =>
 
         val optimizedParquetFileFormat = new OptimizedParquetFileFormat
@@ -104,7 +104,7 @@ object HadoopFsRelationOptimizer extends Logging {
         }
 
         def canUseIndex: Boolean = {
-          val indexEnabled = relation.sparkSession.conf.get(OapConf.OAP_PARQUET_INDEX_ENABLED) ||
+          val indexEnabled = relation.sparkSession.conf.get(OapConf.OAP_PARQUET_INDEX_ENABLED) &&
             relation.sparkSession.conf.get(OapConf.OAP_PARQUET_INDEX_ENABLE)
           logDebug(s"config - ${OapConf.OAP_PARQUET_INDEX_ENABLED.key} is $indexEnabled")
           val ret = indexEnabled && optimizedParquetFileFormat.hasAvailableIndex(dataFilters)
@@ -123,7 +123,7 @@ object HadoopFsRelationOptimizer extends Logging {
           (relation, false)
         }
 
-      case a if (relation.sparkSession.conf.get(OapConf.OAP_ORC_ENABLED) ||
+      case a if (relation.sparkSession.conf.get(OapConf.OAP_ORC_ENABLED) &&
         relation.sparkSession.conf.get(OapConf.OAP_ORC_ENABLE)) &&
         (a.isInstanceOf[org.apache.spark.sql.hive.orc.OrcFileFormat] ||
           a.isInstanceOf[org.apache.spark.sql.execution.datasources.orc.OrcFileFormat]) =>

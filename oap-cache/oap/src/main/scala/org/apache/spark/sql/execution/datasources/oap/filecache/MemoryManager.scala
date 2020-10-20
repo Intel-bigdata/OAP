@@ -352,7 +352,7 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     val reservedSize = Utils.byteStringAsBytes(reservedSizeStr)
 
     val enableConservative = conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.key,
-      OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.defaultValue.get) ||
+      OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.defaultValue.get) &&
       conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.key,
         OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.defaultValue.get)
     val memkindPattern = if (enableConservative) 1 else 0
@@ -502,7 +502,7 @@ private[filecache] class HybridMemoryManager(sparkEnv: SparkEnv)
     val reservedPMSize = Utils.byteStringAsBytes(reservedSizeStr)
     val fullPath = Utils.createTempDir(initialPath + File.separator + executorId)
     val enableConservative = conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.key,
-      OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.defaultValue.get) ||
+      OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.defaultValue.get) &&
       conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.key,
         OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.defaultValue.get)
     val memkindPattern = if (enableConservative) 1 else 0
