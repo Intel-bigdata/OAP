@@ -37,7 +37,8 @@ object OapConf {
   val OAP_ORC_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.orc.enable")
       .internal()
-      .doc("Equal to 'spark.sql.oap.orc.enabled', compatible to OAP versions before 1.0" +
+      .doc("Equivalent to OAP_ORC_ENABLED, it is reserved for compatibility with versions before OAP 1.0" +
+        "this older key name is still accepted, but take lower precedence." +
         "Whether enable oap file format when encountering orc files")
       .booleanConf
       .createWithDefault(true)
@@ -52,8 +53,9 @@ object OapConf {
   val OAP_PARQUET_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.parquet.enable")
       .internal()
-      .doc("Equal to 'spark.sql.oap.parquet.enabled', compatible with OAP verisions before 1.0." +
-        " Whether enable oap file format when encountering parquet files")
+      .doc("Equivalent to OAP_PARQUET_ENABLED, it is reserved for compatibility with versions before" +
+        "OAP 1.0, this older key name is still accepted, but take lower precedence." +
+        "Whether enable oap file format when encountering parquet files")
       .booleanConf
       .createWithDefault(true)
 
@@ -131,7 +133,8 @@ object OapConf {
   val OAP_FIBERCACHE_USE_OFFHEAP_RATIO_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.use.offheap.ratio")
       .internal()
-      .doc("Compatible with OAP versions before 1.0. Equal to 'spark.sql.oap.offheap.cache.ratio'" +
+      .doc("Equivalent to OAP_FIBERCACHE_USE_OFFHEAP_RATIO, it is reserved for compatibility with" +
+        "versions before OAP 1.0, this older key name is still accepted, but take lower precedence." +
         "Define the ratio of fiber cache use 'spark.memory.offHeap.size' ratio.")
       .doubleConf
       .createWithDefault(0.7)
@@ -149,7 +152,8 @@ object OapConf {
   val OAP_DATAFIBER_USE_FIBERCACHE_RATIO_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.dataCache.use.fiberCache.ratio")
       .internal()
-      .doc("Compatible with OAP versions before 1.0. Equal to 'spark.sql.oap.cache.dataCache.ratio'" +
+      .doc("Equivalent to OAP_DATAFIBER_USE_FIBERCACHE_RATIO, it is reserved for compatibility with" +
+        "versions before OAP 1.0, this older key name is still accepted, but take lower precedence." +
         "Define the ratio of data cache use fiber cache ratio " +
         "when enable cache separation for single physical storage. " +
         "This is not available under mix mode because the index and data " +
@@ -160,7 +164,7 @@ object OapConf {
   val OAP_INDEX_DATA_SEPARATION_ENABLED =
     SqlConfAdapter.buildConf("spark.sql.oap.index.data.cache.separation.enabled")
       .internal()
-      .doc("This is to enable index data cache separation feature including mix memory manager" +
+      .doc("Whether enable index and data cache separation feature including mix memory manager" +
         "and mix cache backend")
       .booleanConf
       .createWithDefault(false)
@@ -168,8 +172,9 @@ object OapConf {
   val OAP_INDEX_DATA_SEPARATION_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.index.data.cache.separation.enable")
       .internal()
-      .doc("Equal to 'spark.sql.oap.index.data.cache.separation.enabled', compatible to OAP version" +
-        "before 1.0. This is to enable index data cache separation feature including mix memory manager" +
+      .doc("Equivalent to OAP_INDEX_DATA_SEPARATION_ENABLED, it is reserved for compatibility with" +
+        "versions before OAP 1.0, this older key name is still accepted, but take lower precedence." +
+        "Whether enable index and data cache separation feature including mix memory manager" +
         "and mix cache backend")
       .booleanConf
       .createWithDefault(false)
@@ -177,15 +182,16 @@ object OapConf {
   val OAP_CACHE_TABLE_LISTS_ENABLED =
     SqlConfAdapter.buildConf("spark.sql.oap.cache.table.list.enabled")
       .internal()
-      .doc("This is to enable table lists fiberCache")
+      .doc("Whether enable table lists fiberCache")
       .booleanConf
       .createWithDefault(false)
 
   val OAP_CACHE_TABLE_LISTS_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.table.list.enable")
       .internal()
-      .doc("Compatible with OAP versions before 1.0. Equal to " +
-        "'spark.sql.oap.fiberCache.table.list.enable'. This is to enable table lists fiberCache")
+      .doc("Equivalent to OAP_CACHE_TABLE_LISTS_ENABLED, it is reserved for compatibility with" +
+        "versions before OAP 1.0; this older key name is still accepted, but take lower precedence." +
+        "Whether enable table lists fiberCache")
       .booleanConf
       .createWithDefault(false)
 
@@ -200,31 +206,33 @@ object OapConf {
   val OAP_CACHE_TABLE_LISTS_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.table.list")
       .internal()
-      .doc("Compatible with OAP versions before 1.0. Equal to 'spark.sql.oap.cache.table.list'" +
+      .doc("Equivalent to OAP_CACHE_TABLE_LISTS, it is reserved for compatibility with versions" +
+        "before OAP 1.0; this older key name is still accepted, but take lower precedence." +
         "Table lists using fiberCache actively, format: {database}.{table}" +
         "Separator is semicolon. For example: default.table1;default.table2 ." +
         "This conf item only takes effect when spark.sql.oap.cache.table.list.enabled=true")
       .stringConf
       .createWithDefault("default.xx;default.xx")
-
+,
   val OAP_FIBERCACHE_MEMORY_MANAGER =
     SqlConfAdapter.buildConf("spark.sql.oap.cache.memory.manager")
       .internal()
       .doc("Sets the implement of memory manager, it currently supports offheap(DRAM OFF_HEAP), " +
         "pm(Intel Optane DC persistent memory) and mix(A combination of offheap and pm)." +
         "To enable mix mode, you need to set " +
-        "spark.sql.oap.index.data.cache.separation.enable to true")
+        "spark.sql.oap.index.data.cache.separation.enabled to true")
       .stringConf
       .createWithDefault("offheap")
 
   val OAP_FIBERCACHE_MEMORY_MANAGER_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.memory.manager")
       .internal()
-      .doc("Compatible with OAP versions before 1.0. Equal to 'spark.sql.oap.cache.memory.manager'" +
-        "Sets the implement of memory manager, it currently supports offheap(DRAM OFF_HEAP), " +
+      .doc("Equivalent to OAP_FIBERCACHE_MEMORY_MANAGER, it is reserved for compatibility with" +
+        "versions before OAP 1.0; this older key name is still accepted, but take lower precedence." +
+        "Set the implementation of memory manager, it currently supports offheap(DRAM OFF_HEAP), " +
         "pm(Intel Optane DC persistent memory) and mix(A combination of offheap and pm)." +
         "To enable mix mode, you need to set " +
-        "spark.sql.oap.index.data.cache.separation.enable to true")
+        "spark.sql.oap.index.data.cache.separation.enabled to true")
       .stringConf
       .createWithDefault("offheap")
 
@@ -234,7 +242,7 @@ object OapConf {
       .doc("Sets the implement of cache strategy, it currently supports guava(Guava Cache), " +
         "vmem(VMemCache), simple, noevict." +
         "To enable mix mode, you need to set " +
-        "spark.sql.oap.index.data.cache.separation.enable to true")
+        "spark.sql.oap.index.data.cache.separation.enabled to true")
       .stringConf
       .createWithDefault("guava")
 
@@ -258,8 +266,9 @@ object OapConf {
   val OAP_FIBERCACHE_OFFHEAP_MEMORY_SIZE_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.offheap.memory.size")
       .internal()
-      .doc("Compatible with OAP versions before 1.0. Used to set available memory size " +
-        "for fiberCache for each executor.")
+      .doc("Equivalent to OAP_FIBERCACHE_OFFHEAP_MEMORY_SIZE, it is reserved for compatibility with" +
+        "versions before OAP 1.0; this older key name is still accepted, but take lower precedence." +
+        "Used to set available memory size for fiberCache for each executor.")
       .stringConf
       .createWithDefault("100m")
 
@@ -298,8 +307,9 @@ object OapConf {
   val OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.config.file")
       .internal()
-      .doc("Equal to 'spark.sql.oap.cache.persistent.memory.config.file', compatible with " +
-        "OAP versions before 1.0. A config file used to config the Intel Optane DC persistent memory" +
+      .doc("Equivalent to OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE, it is reserved for compatibility" +
+        "with versions before OAP 1.0, this older key name is still accepted, but take lower precedence." +
+        "A config file used to config the Intel Optane DC persistent memory" +
         "initial path, and mapping with NUMA node.")
       .stringConf
       .createWithDefault("persistent-memory.xml")
@@ -315,9 +325,9 @@ object OapConf {
   val OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.initial.size")
       .internal()
-      .doc("Equal to 'spark.executor.sql.oap.cache.persistent.memory.initial.size', " +
-        "compatible with OAP versions before 1.0. Used to set the initial size of" +
-        "Intel Optane DC persistent memory. The size is " +
+      .doc("Equivalent to OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE, it is reserved for compatibility" +
+        "with versions before OAP 1.0; this older key name is still accepted, but take lower precedence." +
+        "Used to set the initial size of Intel Optane DC persistent memory. The size is " +
         "used to control the maximum available persistent memory size used for each executor.")
       .stringConf
       .createWithDefault("0b")
@@ -336,8 +346,9 @@ object OapConf {
   val OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.reserved.size")
       .internal()
-      .doc("Compatible with OAP versions before 1.0. Used to set the reserved size of " +
-        "Intel Optane DC persistent memory. Because the " +
+      .doc("Equivalent to OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE, it is reserved for compatibility" +
+        "with versions before OAP 1.0; this older key name is still accepted, but take lower precedence." +
+        "Used to set the reserved size of Intel Optane DC persistent memory. Because the " +
         "heap management of Intel Optane DC persistent memory are based on jemalloc, so we " +
         "can't full use the total initial size memory. The reserved size should smaller than" +
         " initial size. Too small reserved size could result in OOM, too big size could reduce" +
@@ -497,8 +508,9 @@ object OapConf {
   val OAP_PARQUET_DATA_CACHE_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.parquet.data.cache.enable")
       .internal()
-      .doc("Compatible with OAP versions before 1.0, to indicate if enable parquet data cache," +
-        " default false. same as 'spark.sql.oap.parquet.data.cache.enabled'")
+      .doc("Equivalent to OAP_PARQUET_DATA_CACHE_ENABLED, it is reserved for compatibility with" +
+        "versions before OAP 1.0; this older key name is still accepted, but take lower precedence." +
+        "To indicate if enable parquet data cache, default false.")
       .booleanConf
       .createWithDefault(false)
 
@@ -512,7 +524,9 @@ object OapConf {
   val OAP_ORC_DATA_CACHE_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.orc.data.cache.enable")
       .internal()
-      .doc("To indicate if enable orc data cache, default false")
+      .doc("Equivalent to OAP_ORC_DATA_CACHE_ENABLED, it is reserved for compatibility with" +
+        "versions before OAP 1.0, this older key name is still accepted, but take lower precedence." +
+        "To indicate if enable orc data cache, default false")
       .booleanConf
       .createWithDefault(false)
 
@@ -526,8 +540,8 @@ object OapConf {
   val OAP_ORC_BINARY_DATA_CACHE_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.orc.binary.cache.enable")
       .internal()
-      .doc("Equal to 'spark.sql.oap.orc.binary.cache.enabled', compatible to " +
-        "OAP version before 1.0." +
+      .doc("Equivalent to OAP_ORC_BINARY_DATA_CACHE_ENABLED, it is reserved for compatibility with" +
+        "versions before OAP 1.0, this older key name is still accepted, but take lower precedence." +
         "To indicate if enable orc binary data cache, default false")
       .booleanConf
       .createWithDefault(false)
@@ -542,8 +556,9 @@ object OapConf {
   val OAP_PARQUET_INDEX_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.parquet.index.enable")
       .internal()
-      .doc("Equal to 'spark.sql.oap.parquet.index.enabled', compatible to OAP versions" +
-        "before 1.0. To indicate if enable parquet index, default true")
+      .doc("Equivalent to OAP_PARQUET_INDEX_ENABLED, it is reserved for compatibility with versions" +
+        "before OAP 1.0; this older key name is still accepted, but take lower precedence." +
+        "To indicate if enable parquet index, default true")
       .booleanConf
       .createWithDefault(true)
 
@@ -564,7 +579,9 @@ object OapConf {
   val OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.cache.external.client.pool.size")
       .internal()
-      .doc("Compatible with OAP versions before 1.0, client pool for external cache")
+      .doc("Equivalent to OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE, it is reserved for compatibility with" +
+        "versions before OAP 1.0; this older key name is still accepted, but take lower precedence." +
+        "client pool for external cache")
       .intConf
       .createWithDefault(1)
 
@@ -578,8 +595,9 @@ object OapConf {
   val OAP_EXTERNAL_CACHE_READ_ONLY_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.cache.external.read.only.enable")
     .internal()
-    .doc("Equal to 'spark.sql.oap.cache.external.read.only.enabled', compatible to" +
-      "OAP versions before 1.0, whether we need cache data")
+    .doc("Equivalent to OAP_EXTERNAL_CACHE_READ_ONLY_ENABLED, it is reserved for compatibility with" +
+      "versions before OAP 1.0, this older key name is still accepted, but take lower precedence." +
+      "Whether we need cache data")
     .booleanConf
     .createWithDefault(true)
 
@@ -600,8 +618,9 @@ object OapConf {
   val OAP_CACHE_GUARDIAN_MEMORY_SIZE_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.cache.guardian.memory.size")
       .internal()
-      .doc("Compatible with OAP versions before 1.0, total cache guardian memory size per executor, " +
-        "same as 'spark.executor.sql.oap.cache.guardian.memory.size'")
+      .doc("Equivalent to OAP_CACHE_GUARDIAN_MEMORY_SIZE, it is reserved for compatibility with versions " +
+        "before OAP 1.0; this older key name is still accepted, but take lower precedence." +
+        "total cache guardian memory size per executor")
       .stringConf
       .createWithDefault("10g")
 
@@ -622,8 +641,8 @@ object OapConf {
   val OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.index.statistic.externalsorter.enable")
       .internal()
-      .doc("Equal to 'spark.sql.oap.index.statistic.externalsorter.enabled', compatible to" +
-        "OAP versions before 1.0." +
+      .doc("Equivalent to OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLED, it is reserved for compatibility with" +
+        "versions before OAP 1.0, this older key name is still accepted, but take lower precedence." +
         "To indicate if to enable externalsorter for statistic calculation")
       .booleanConf
       .createWithDefault(true)
@@ -638,8 +657,9 @@ object OapConf {
   val OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.data.fiber.cache.compress.enable")
       .internal()
-      .doc("Equal to 'spark.sql.oap.data.fiber.cache.compress.enabled', compatible to OAP verisons" +
-        "before 1.0. To indicate if enable/disable data fiber cache compression")
+      .doc("Equivalent to OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION, it is reserved for compatibility with" +
+        "versions before OAP 1.0; this older key name is still accepted, but take lower precedence." +
+        "To indicate if enable/disable data fiber cache compression")
       .booleanConf
       .createWithDefault(false)
 
@@ -677,8 +697,9 @@ object OapConf {
   val OAP_ENABLE_MEMKIND_CONSERVATIVE_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.memkind.conservative.enable")
       .internal()
-      .doc("Equal to 'spark.sql.oap.memkind.conservative.enabled', compatible to " +
-        "OAP versions before 1.0. To enable memkind conservative pattern")
+      .doc("Equivalent to OAP_ENABLE_MEMKIND_CONSERVATIVE, it is reserved for compatibility" +
+        "with versions before OAP 1.0, this older key name is still accepted, but take lower precedence." +
+        "To enable memkind conservative pattern")
       .booleanConf
       .createWithDefault(true)
 

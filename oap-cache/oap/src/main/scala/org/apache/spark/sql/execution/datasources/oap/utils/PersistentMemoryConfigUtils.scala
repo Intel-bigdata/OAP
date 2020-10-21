@@ -40,7 +40,7 @@ object PersistentMemoryConfigUtils extends Logging {
   private val numaToPMProperty = new mutable.HashMap[Int, String]()
 
   def parseConfig(conf: SparkConf): mutable.HashMap[Int, String] = {
-    val configFile = if (!conf.getOption(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE.key).isEmpty) {
+    val configFile = if (conf.getOption(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE.key).isDefined) {
       conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE.key,
         DEFAULT_PERSISTENT_MEMORY_CONFIG_FILE) } else {
       conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE_BK.key,
