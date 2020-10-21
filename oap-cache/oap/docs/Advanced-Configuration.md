@@ -55,8 +55,8 @@ spark.yarn.numa.enabled                           true
 spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND      1
 spark.sql.oap.orc.binary.cache.enabled            true
 spark.sql.oap.orc.enabled                         true
-spark.sql.oap.fiberCache.memory.manager          pm 
-spark.oap.cache.strategy                         guava
+spark.sql.oap.fiberCache.memory.manager           pm 
+spark.oap.cache.strategy                          guava
 # PMem capacity per executor, according to your cluster
 spark.sql.oap.fiberCache.persistent.memory.initial.size    256g
 # Reserved space per executor
@@ -91,7 +91,7 @@ For Orc file format, add these conf options:
 # enable numa
 spark.yarn.numa.enabled                                  true
 spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
-spark.sql.oap.orc.binary.cache.enabled                    true 
+spark.sql.oap.orc.binary.cache.enabled                   true 
 spark.oap.cache.strategy                                 noevict 
 spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
 ```
@@ -324,7 +324,7 @@ Currently we support [Redis]("https://redis.io/") as external DB service. Please
 
 Please add following configuration to `spark-defaults.conf`.
 ```
-spark.sql.oap.external.cache.metaDB.enable             true
+spark.sql.oap.external.cache.metaDB.enabled             true
 # Redis-server address
 spark.sql.oap.external.cache.metaDB.address            10.1.2.12
 spark.sql.oap.external.cache.metaDB.impl               org.apache.spark.sql.execution.datasources.RedisClient

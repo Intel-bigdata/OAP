@@ -75,9 +75,9 @@ sudo rpm -i libvmemcache*.rpm
 
 To use optimized Plasma cache with OAP, you need following components:  
 
-    (1) `libarrow.so`, `libplasma.so`, `libplasma_jni.so`: dynamic libraries, will be used in Plasma client.   
-    (2) `plasma-store-server`: executable file, Plasma cache service.  
-    (3) `arrow-plasma-0.17.0.jar`: will be used when compile oap and spark runtime also need it. 
+   (1) `libarrow.so`, `libplasma.so`, `libplasma_jni.so`: dynamic libraries, will be used in Plasma client.   
+   (2) `plasma-store-server`: executable file, Plasma cache service.  
+   (3) `arrow-plasma-0.17.0.jar`: will be used when compile oap and spark runtime also need it. 
 
 - so file and binary file  
   Clone code from Intel-arrow repo and run following commands, this will install `libplasma.so`, `libarrow.so`, `libplasma_jni.so` and `plasma-store-server` to your system path(`/usr/lib64` by default). And if you are using Spark in a cluster environment, you can copy these files to all nodes in your cluster if the OS or distribution are same, otherwise, you need compile it on each node.
