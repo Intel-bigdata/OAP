@@ -34,9 +34,9 @@ We implemented common operatos based on Apache Arrow Compute and Gandiva. The SQ
 
 We implemented columnar shuffle to improve the shuffle performance. With the columnar layout we could do very efficient data compression for different data format.
 
-## Testing
+## Installation and Test
 
-Check out the detailed [installation/testing guide](/oap-native-sql/resource/installation.md) for quick testing
+[Installation Guide](/oap-native-sql/resource/Spark%20Native%20SQL%20Engine%20Installation%20Guide.md)
 
 ## Contact
 

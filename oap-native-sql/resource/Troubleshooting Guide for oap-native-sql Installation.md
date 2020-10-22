@@ -1,4 +1,7 @@
-### Notes for Installation Issues
+# Troubleshooting Guide
+
+#### for Spark Native SQL Engine Installation
+
 * Before the Installation, if you have installed other version of oap-native-sql, remove all installed lib and include from system path: libarrow* libgandiva* libspark-columnar-jni*
 
 * libgandiva_jni.so was not found inside JAR
