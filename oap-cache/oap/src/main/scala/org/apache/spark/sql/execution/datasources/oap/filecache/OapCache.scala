@@ -284,7 +284,7 @@ private[filecache] object OapCache extends Logging {
       configEntry.key,
       configEntry.defaultValue.get).toLowerCase
     val memoryManagerOpt =
-      if (!sparkEnv.conf.getOption(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key).isEmpty) {
+      if (sparkEnv.conf.getOption(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key).isDefined) {
         sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
       } else {
         sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER_BK.key, "offheap").toLowerCase

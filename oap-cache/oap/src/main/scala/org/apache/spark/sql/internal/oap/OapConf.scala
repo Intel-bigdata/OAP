@@ -203,6 +203,7 @@ object OapConf {
         "This conf item only takes effect when spark.sql.oap.cache.table.list.enabled = true")
       .stringConf
       .createWithDefault("default.xx;default.xx")
+
   val OAP_CACHE_TABLE_LISTS_BK =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.table.list")
       .internal()
@@ -213,7 +214,7 @@ object OapConf {
         "This conf item only takes effect when spark.sql.oap.cache.table.list.enabled=true")
       .stringConf
       .createWithDefault("default.xx;default.xx")
-,
+
   val OAP_FIBERCACHE_MEMORY_MANAGER =
     SqlConfAdapter.buildConf("spark.sql.oap.cache.memory.manager")
       .internal()
