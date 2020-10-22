@@ -35,21 +35,20 @@ mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite 
 ```
 **NOTE**: Log level of unit tests currently default to ERROR, please override oap-cache/oap/src/test/resources/log4j.properties if needed.
 
-### Build with Intel® Optane™ DC Persistent Memory Module
-
-Follow these steps:
+### Building with Intel® Optane™ DC Persistent Memory Module
 
 #### Prerequisites for building with PMem support
 
 Install the required packages on the build system:
 
 - [cmake](https://help.directadmin.com/item.php?id=494)
-- [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
+- [memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
 - [vmemcache](https://github.com/pmem/vmemcache)
+- [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/)
 
-#### installing memkind
- The Memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. 
-   Build the latest memkind lib from source:
+####  memkind installation
+
+The memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. Build the latest memkind lib from source:
 
 ```
 git clone -b v1.10.1-rc2 https://github.com/memkind/memkind
@@ -59,7 +58,7 @@ cd memkind
 make
 make install
    ``` 
-#### installing vmemcache
+#### vmemcache installation
 
 To build vmemcache library from source, you can (for RPM-based linux as example):
 ```
@@ -71,7 +70,7 @@ cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=rpm
 make package
 sudo rpm -i libvmemcache*.rpm
 ```
-#### installing Plasma
+#### Plasma installation
 
 To use optimized Plasma cache with OAP, you need following components:  
 
@@ -105,7 +104,7 @@ mvn clean -q -pl plasma -DskipTests install
 ```
 
 
-#### Build the package
+#### Building the package
 You need to add `-Ppersistent-memory` to build with PMem support. For `noevict` cache strategy, you also need to build with `-Ppersistent-memory` parameter.
 ```
 mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -DskipTests package
@@ -127,7 +126,7 @@ Although SQL Index and Data Source Cache act as a plug-in JAR to Spark, there ar
 
 If you are running a Community Spark, things will be much simpler. Refer to [User Guide](User-Guide.md) to configure and setup Spark to work with OAP.
 
-#### Integrate with customized Spark
+### Integrate with Customized Spark
 
 In this case check whether the OAP changes to Spark internals will conflict with or override your private changes. 
 
@@ -159,7 +158,7 @@ The following files need to be checked/compared for changes:
 
 ## Enabling NUMA binding for PMem in Spark
 
-### Rebuild Spark packages with NUMA binding patch 
+### Rebuilding Spark packages with NUMA binding patch 
 
 When using PMem as a cache medium apply the [NUMA](https://www.kernel.org/doc/html/v4.18/vm/numa.html) binding patch [numa-binding-spark-3.0.0.patch](./numa-binding-spark-3.0.0.patch) to Spark source code for best performance.
 
@@ -179,7 +178,7 @@ spark.yarn.numa.enabled true
 ```
 **NOTE**: If you are using a customized Spark, you will need to manually resolve the conflicts.
 
-### Use pre-built patched Spark packages 
+### Using pre-built patched Spark packages 
 
 If you think it is cumbersome to apply patches, we have a pre-built Spark [spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz) with the patch applied.
 

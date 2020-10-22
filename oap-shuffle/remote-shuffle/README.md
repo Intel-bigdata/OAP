@@ -16,7 +16,7 @@ We have provided a Conda package which will automatically install dependencies n
 ## Developer Guide
 ### Build and Deploy
 
-We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), you can find compiled remote shuffle jars under `$HOME/miniconda2/envs/oapenv/oap_jars/`.
+We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), you can find compiled remote shuffle jars under `$HOME/miniconda2/envs/oapenv/oap_jars`.
 Then just skip this section and jump to [User Guide](#User-Guide).
 
 Build this module using the following command in `OAP/oap-shuffle/remote-shuffle` folder. This file needs to be deployed on every compute node that runs Spark. Manually place it on all nodes or let resource manager do the work.

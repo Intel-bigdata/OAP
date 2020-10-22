@@ -2,13 +2,13 @@
 
 In addition to usage information provided in [User Guide](User-Guide.md), we provide more strategies for SQL index and data source cache in this section.
 
-Their needed dependencies like ***Memkind*** ,***Vmemcache*** and ***Plasma*** can be automatically installed when following [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), corresponding feature jars can be found under `$HOME/miniconda2/envs/oapenv/oap_jars/`.
+Their needed dependencies like ***Memkind*** ,***Vmemcache*** and ***Plasma*** can be automatically installed when following [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), corresponding feature jars can be found under `$HOME/miniconda2/envs/oapenv/oap_jars`.
 
 - [Additional Cache Strategies](#Additional-Cache-Strategies)  In addition to **vmem** cache strategy, Data Source Cache also supports 3 other cache strategies: **guava**, **noevict**  and **external cache**.
 - [Index and Data Cache Separation](#Index-and-Data-Cache-Separation)  To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
 - [Cache Hot Tables](#Cache-Hot-Tables)  Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
 - [Column Vector Cache](#Column-Vector-Cache)  This document above use **binary** cache as example for Parquet file format, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache for Parquet to spare computation time.
-- [Large Scale and Heterogeneous Cluster Support](#Large-Scale-and-Heterogeneous-Cluster-Support)
+- [Large Scale and Heterogeneous Cluster Support](#Large-Scale-and-Heterogeneous-Cluster-Support) Introduce an external database to store cache locality info to support large-scale and heterogeneous clusters.
 ## Additional Cache Strategies
 Following table shows features of 4 cache strategies on PMem.
 
@@ -32,7 +32,7 @@ Or you can refer to [Developer-Guide](../../../docs/Developer-Guide.md), there i
 
 Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware correctly, also make sure memkind library installed. Then follow configurations below.
 
-**NOTE**: `spark.sql.oap.fiberCache.persistent.memory.reserved.size`: When we use PMem as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available PMem capacity to avoid memory allocation failure. But even with an allocation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
+**NOTE**: `spark.executor.sql.oap.cache.persistent.memory.reserved.size`: When we use PMem as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available PMem capacity to avoid memory allocation failure. But even with an allocation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
 
 For Parquet file format, add these conf options:
 ```
@@ -40,12 +40,12 @@ For Parquet file format, add these conf options:
 spark.yarn.numa.enabled                           true
 spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND      1
 spark.sql.oap.parquet.binary.cache.enabled        true
-spark.sql.oap.fiberCache.memory.manager           pm 
+spark.sql.oap.cache.memory.manager                pm 
 spark.oap.cache.strategy                          guava
 # PMem capacity per executor, according to your cluster
-spark.sql.oap.fiberCache.persistent.memory.initial.size    256g
+spark.executor.sql.oap.cache.persistent.memory.initial.size    256g
 # Reserved space per executor
-spark.sql.oap.fiberCache.persistent.memory.reserved.size   50g
+spark.executor.sql.oap.cache.persistent.memory.reserved.size   50g
 spark.sql.extensions                              org.apache.spark.sql.OapExtensions
 ```
 For Orc file format, add these conf options:
@@ -55,12 +55,12 @@ spark.yarn.numa.enabled                           true
 spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND      1
 spark.sql.oap.orc.binary.cache.enabled            true
 spark.sql.oap.orc.enabled                         true
-spark.sql.oap.fiberCache.memory.manager           pm 
+spark.sql.oap.cache.memory.manager                pm 
 spark.oap.cache.strategy                          guava
 # PMem capacity per executor, according to your cluster
-spark.sql.oap.fiberCache.persistent.memory.initial.size    256g
+spark.executor.sql.oap.cache.persistent.memory.initial.size    256g
 # Reserved space per executor
-spark.sql.oap.fiberCache.persistent.memory.reserved.size   50g
+spark.executor.sql.oap.cache.persistent.memory.reserved.size   50g
 spark.sql.extensions                             org.apache.spark.sql.OapExtensions
 ```
 
@@ -68,7 +68,7 @@ Memkind library also support DAX KMEM mode. Refer [Kernel](https://github.com/me
 
 Please note that DAX KMEM mode need kernel version 5.x and memkind version 1.10 or above. If you choose KMEM mode, change memory manager from `pm` to `kmem` as below.
 ```
-spark.sql.oap.fiberCache.memory.manager           kmem
+spark.sql.oap.cache.memory.manager           kmem
 ```
 
 ### Noevict cache
@@ -84,7 +84,7 @@ spark.yarn.numa.enabled                                  true
 spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
 spark.sql.oap.parquet.binary.cache.enabled               true 
 spark.oap.cache.strategy                                 noevict 
-spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
+spark.executor.sql.oap.cache.persistent.memory.initial.size  256g 
 ```
 For Orc file format, add these conf options:
 ```
@@ -93,7 +93,7 @@ spark.yarn.numa.enabled                                  true
 spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
 spark.sql.oap.orc.binary.cache.enabled                   true 
 spark.oap.cache.strategy                                 noevict 
-spark.sql.oap.fiberCache.persistent.memory.initial.size  256g 
+spark.executor.sql.oap.cache.persistent.memory.initial.size  256g 
 ```
 
 ### External cache using plasma
@@ -142,7 +142,7 @@ spark.sql.oap.parquet.binary.cache.enabled                 true
 spark.oap.cache.strategy                                   external
 spark.sql.oap.dcpmm.free.wait.threshold                    50000000000
 # according to your executor core number
-spark.sql.oap.cache.external.client.pool.size              10
+spark.executor.sql.oap.cache.external.client.pool.size     10
 # absolute path of the jar on your working node
 spark.files                       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,$HOME/miniconda2/envs/oapenv/oap_jars/arrow-plasma-0.17.0.jar,$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
 # relative path of the jar
@@ -159,7 +159,7 @@ spark.sql.oap.orc.binary.cache.enabled                     true
 spark.oap.cache.strategy                                   external
 spark.sql.oap.dcpmm.free.wait.threshold                    50000000000
 # according to your executor core number
-spark.sql.oap.cache.external.client.pool.size              10
+spark.executor.sql.oap.cache.external.client.pool.size     10
 ```
 
 - Start plasma service manually
@@ -179,8 +179,8 @@ You can start plasma service on each node as following command, and then you can
 
  Remember to kill `plasma-store-server` process if you no longer need cache, and you should delete `/tmp/plasmaStore` which is a Unix domain socket.  
   
-- Use yarn to start plamsa service  
-We can use yarn(hadoop version >= 3.1) to start plasma service, you should provide a json file like following.
+- Use yarn to start Plamsa service  
+We can use yarn(hadoop version >= 3.1) to start Plasma service, you should provide a json file like following.
 ```
 {
   "name": "plasma-store-service",
@@ -215,7 +215,7 @@ Here we list 4 different kinds of configs for index/cache separation, if you cho
 ```
 spark.sql.oap.index.data.cache.separation.enabled       true
 spark.oap.cache.strategy                                mix
-spark.sql.oap.fiberCache.memory.manager                 offheap
+spark.sql.oap.cache.memory.manager                      offheap
 ```
 The rest configurations can refer to the configurations of  [Use DRAM Cache](./User-Guide.md#use-dram-cache) 
 
@@ -224,7 +224,7 @@ The rest configurations can refer to the configurations of  [Use DRAM Cache](./U
 ```
 spark.sql.oap.index.data.cache.separation.enabled       true
 spark.oap.cache.strategy                                mix
-spark.sql.oap.fiberCache.memory.manager                 tmp
+spark.sql.oap.cache.memory.manager                      tmp
 spark.sql.oap.mix.data.cache.backend                    vmem
 spark.sql.oap.mix.index.cache.backend                   vmem
 
@@ -234,58 +234,58 @@ The rest configurations can refer to the configurations of [PMem Cache](./User-G
 3. DRAM(`offheap`)/`guava` as `index` cache media and backend, PMem(`tmp`)/`vmem` as `data` cache media and backend. 
 
 ```
-spark.sql.oap.index.data.cache.separation.enabled        true
-spark.oap.cache.strategy                                 mix
-spark.sql.oap.fiberCache.memory.manager                  mix 
-spark.sql.oap.mix.data.cache.backend                     vmem
+spark.sql.oap.index.data.cache.separation.enabled            true
+spark.oap.cache.strategy                                     mix
+spark.sql.oap.cache.memory.manager                           mix 
+spark.sql.oap.mix.data.cache.backend                         vmem
 
 # 2x number of your worker nodes
-spark.executor.instances                                 6
+spark.executor.instances                                     6
 # enable numa
-spark.yarn.numa.enabled                                  true
-spark.memory.offHeap.enabled                             false
+spark.yarn.numa.enabled                                      true
+spark.memory.offHeap.enabled                                 false
 # PMem capacity per executor
-spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
+spark.executor.sql.oap.cache.persistent.memory.initial.size  256g
 # according to your cluster
-spark.sql.oap.cache.guardian.memory.size                 10g
+spark.executor.sql.oap.cache.guardian.memory.size            10g
 
 # equal to the size of executor.memoryOverhead
-spark.sql.oap.fiberCache.offheap.memory.size      50g
+spark.executor.sql.oap.cache.offheap.memory.size             50g
 # according to the resource of cluster
-spark.executor.memoryOverhead                     50g
+spark.executor.memoryOverhead                                50g
 
 # for orc file format
-spark.sql.oap.orc.binary.cache.enabled            true
+spark.sql.oap.orc.binary.cache.enabled                       true
 # for Parquet file format
-spark.sql.oap.parquet.binary.cache.enabled        true
+spark.sql.oap.parquet.binary.cache.enabled                   true
 ```
 
 4. DRAM(`offheap`)/`guava` as `index` cache media and backend, PMem(`pm`)/`guava` as `data` cache media and backend. 
 
 ```
-spark.sql.oap.index.data.cache.separation.enabled         true
-spark.oap.cache.strategy                                  mix
-spark.sql.oap.fiberCache.memory.manager                   mix 
+spark.sql.oap.index.data.cache.separation.enabled            true
+spark.oap.cache.strategy                                     mix
+spark.sql.oap.cache.memory.manager                           mix 
 
 # 2x number of your worker nodes
-spark.executor.instances                                 6
+spark.executor.instances                                     6
 # enable numa
-spark.yarn.numa.enabled                                  true
-spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
-spark.memory.offHeap.enabled                             false
+spark.yarn.numa.enabled                                      true
+spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND                 1
+spark.memory.offHeap.enabled                                 false
 # PMem capacity per executor
-spark.sql.oap.fiberCache.persistent.memory.initial.size  256g
+spark.executor.sql.oap.cache.persistent.memory.initial.size  256g
 # Reserved space per executor
-spark.sql.oap.fiberCache.persistent.memory.reserved.size 50g
+spark.executor.sql.oap.cache.persistent.memory.reserved.size 50g
 
 # equal to the size of executor.memoryOverhead
-spark.sql.oap.fiberCache.offheap.memory.size    50g
+spark.executor.sql.oap.cache.offheap.memory.size             50g
 # according to the resource of cluster
-spark.executor.memoryOverhead                   50g
+spark.executor.memoryOverhead                                50g
 # for ORC file format
-spark.sql.oap.orc.binary.cache.enabled          true
+spark.sql.oap.orc.binary.cache.enabled                       true
 # for Parquet file format
-spark.sql.oap.parquet.binary.cache.enabled      true
+spark.sql.oap.parquet.binary.cache.enabled                   true
 ```
 
 ## Cache Hot Tables
@@ -295,9 +295,9 @@ Data Source Cache also supports caching specific tables by configuring items acc
 To enable caching specific hot tables, you can add below configurations to `spark-defaults.conf`.
 ```
 # enable table lists fiberCache
-spark.sql.oap.fiberCache.table.list.enabled      true
+spark.sql.oap.cache.table.list.enabled          true
 # Table lists using fiberCache actively
-spark.sql.oap.fiberCache.table.list             <databasename>.<tablename1>;<databasename>.<tablename2>
+spark.sql.oap.cache.table.list                  <databasename>.<tablename1>;<databasename>.<tablename2>
 ```
 
 ## Column Vector Cache
@@ -317,14 +317,14 @@ spark.sql.oap.parquet.data.cache.enabled               true
 
 ***NOTE:*** Only works with `external cache`
 
-OAP influences Spark to schedule tasks according cache locality info. These info could be of large amount in a ***large scale cluster*** and how to schedule tasks in a ***heterogeneous cluster*** (some nodes with Optane? DC Persistent Memory, some without) could also be challenging.
+OAP influences Spark to schedule tasks according to cache locality info. This info could be of large amount in a ***large scale cluster***, and how to schedule tasks in a ***heterogeneous cluster*** (some nodes with PMem, some without) could also be challenging.
 
-We introduce an external DB to store cache locality info. If there's no cache available, spark will fallback to schedule respecting HDFS locality.
-Currently we support [Redis]("https://redis.io/") as external DB service. Please [download and launch a redis-server]("https://redis.io/download") before running spark with OAP.
+We introduce an external DB to store cache locality info. If there's no cache available, Spark will fall back to schedule respecting HDFS locality.
+Currently we support [Redis](https://redis.io/) as external DB service. Please [download and launch a redis-server](https://redis.io/download) before running Spark with OAP.
 
-Please add following configuration to `spark-defaults.conf`.
+Please add the following configurations to `spark-defaults.conf`.
 ```
-spark.sql.oap.external.cache.metaDB.enabled             true
+spark.sql.oap.external.cache.metaDB.enabled            true
 # Redis-server address
 spark.sql.oap.external.cache.metaDB.address            10.1.2.12
 spark.sql.oap.external.cache.metaDB.impl               org.apache.spark.sql.execution.datasources.RedisClient
