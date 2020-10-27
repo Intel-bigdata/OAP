@@ -285,6 +285,24 @@ function prepare_intel_arrow() {
 }
 
 
+function prepare_intel_conda_arrow() {
+  cd $DEV_PATH
+  mkdir -p $DEV_PATH/thirdparty/
+  cd $DEV_PATH/thirdparty/
+  intel_arrow_repo="https://github.com/Intel-bigdata/arrow.git"
+  if [ ! -d "arrow" ]; then
+    git clone $intel_arrow_repo -b branch-0.17.0-oap-0.9
+    cd arrow
+  else
+    cd arrow
+    git pull
+  fi
+  current_arrow_path=$(pwd)
+
+  cd java/
+  mvn clean install -q -P arrow-jni -am -Darrow.cpp.build.dir=/root/miniconda2/envs/oapbuild/lib -DskipTests -Dcheckstyle.skip
+}
+
 
 function prepare_libfabric() {
   mkdir -p $DEV_PATH/thirdparty
@@ -389,6 +407,15 @@ function prepare_oneAPI() {
   sudo sh install-build-deps-centos.sh
 }
 
+function  prepare_conda_build() {
+  prepare_maven
+  prepare_memkind
+  prepare_cmake
+  prepare_vmemcache
+  prepare_intel_conda_arrow
+  prepare_PMoF
+  prepare_oneAPI
+}
 
 function  prepare_all() {
   prepare_maven
@@ -422,6 +449,12 @@ case $key in
     shift 1 
     echo "Start to install all compile-time dependencies for OAP ..."
     prepare_all
+    exit 0
+    ;;
+    --prepare_conda_build)
+    shift 1
+    echo "Start to install all conda compile-time dependencies for OAP ..."
+    prepare_conda_build
     exit 0
     ;;
     --prepare_maven)

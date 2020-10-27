@@ -69,9 +69,13 @@ function gather() {
   cp ../oap-shuffle/RPMem-shuffle/core/target/*.jar $target_path
   cp ../oap-spark/target/*.jar $target_path
   cp ../oap-mllib/mllib-dal/target/*.jar $target_path
+  cp ../dev/thirdparty/arrow/java/plasma/target/arrow-plasma-0.17.0.jar $target_path
+
   find $target_path -name "*test*"|xargs rm -rf
   cd $target_path
   rm -f oap-cache-$OAP_VERSION.jar
+  mkdir -p $DEV_PATH/thirdparty/arrow/oap
+  cp $target_path/* $DEV_PATH/thirdparty/arrow/oap/
   cd  $DEV_PATH/release-package
   tar -czf $package_name.tar.gz $package_name/
   echo "Please check the result in  $DEV_PATH/release-package!"

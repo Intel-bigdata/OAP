@@ -1,4 +1,4 @@
-{% set ARROW_VERSION = "3.1" %}
+{% set ARROW_VERSION = "0.17.0" %}
 package:
   name: arrow
   version: {{ ARROW_VERSION }}
