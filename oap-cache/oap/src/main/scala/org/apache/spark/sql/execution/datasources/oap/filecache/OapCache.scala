@@ -1116,9 +1116,8 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
   override def cacheStats: CacheStats = {
     val array = new Array[Long](4)
     // TODO:total size will be incorrect due to it's an external cache
-    // it will influence performance a little.
-    // plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).metrics(array)
-    cacheTotalSize = new AtomicLong(0)
+    plasmaClientPool(clientRoundRobin.getAndAdd(1) % clientPoolSize).metrics(array)
+    cacheTotalSize = new AtomicLong(array(3) + array(1))
     // Memory store and external store used size
 
     if (fiberType == FiberType.INDEX) {
