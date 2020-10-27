@@ -119,22 +119,27 @@ jobs:
       dist: bionic
       jdk:
       - openjdk8
+      cache:
+        directories:
+          - $HOME/.m2
       before_install:
       - echo ${TRAVIS_COMMIT_MESSAGE}
-      - ${TRAVIS_BUILD_DIR}/oap-mllib/dev/install-build-deps-bionic.sh
+      - ${TRAVIS_BUILD_DIR}/oap-mllib/dev/install-build-deps-ubuntu.sh
       install:
-      - # Download spark 3.0
-      - "[ -f spark ] || mkdir spark && cd spark && wget http://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0-bin-hadoop2.7.tgz && cd .."
-      - "tar -xf ./spark/spark-3.0.0-bin-hadoop2.7.tgz"
-      - "export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7"
+      - cd ${TRAVIS_BUILD_DIR}/oap-mllib
+      - ./travis/config-ssh.sh
+      - ./travis/setup-cluster.sh
+      - ./travis/setup-python3-env.sh
       before_script:
       script:
       - cd ${TRAVIS_BUILD_DIR}/oap-mllib/mllib-dal      
       - export ONEAPI_ROOT=/opt/intel/inteloneapi
-      - source /opt/intel/inteloneapi/daal/2021.1-beta07/env/vars.sh
-      - source /opt/intel/inteloneapi/tbb/2021.1-beta07/env/vars.sh
+      - source $ONEAPI_ROOT/daal/2021.1-beta07/env/vars.sh
+      - source $ONEAPI_ROOT/tbb/2021.1-beta07/env/vars.sh
       - source /tmp/oneCCL/build/_install/env/setvars.sh
       - ./build.sh
+      - cd ${TRAVIS_BUILD_DIR}/oap-mllib
+      - ./travis/run-kmeans-pyspark.sh
 
     - name: oap-spark
       before_install:

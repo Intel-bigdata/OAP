@@ -46,7 +46,7 @@ class KMeansDALImpl (
 
     // repartition to executorNum if not enough partitions
     val dataForConversion = if (data.getNumPartitions < executorNum) {
-	  data.repartition(executorNum).setName("Repartitioned for conversion").cache()
+      data.repartition(executorNum).setName("Repartitioned for conversion").cache()
     } else {
       data
     }
