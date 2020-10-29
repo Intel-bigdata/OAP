@@ -39,7 +39,7 @@ class ComplexTypesSuite extends QueryTest with SharedSparkSession {
       .set("spark.oap.sql.columnar.wholestagecodegen", "false")
       .set("spark.sql.columnar.window", "false")
       .set("spark.unsafe.exceptionOnMemoryLeak", "false")
-      .set("spark.sql.columnar.tmp_dir", "/codegen/nativesql/")
+      //.set("spark.sql.columnar.tmp_dir", "/codegen/nativesql/")
       .set("spark.sql.columnar.sort.broadcastJoin", "true")
       .set("spark.oap.sql.columnar.preferColumnar", "true")
 

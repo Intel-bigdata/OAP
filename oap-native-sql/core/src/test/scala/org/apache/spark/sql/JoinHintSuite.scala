@@ -46,7 +46,7 @@ class JoinHintSuite extends PlanTest with SharedSparkSession with AdaptiveSparkP
       .set("spark.oap.sql.columnar.wholestagecodegen", "false")
       .set("spark.sql.columnar.window", "false")
       .set("spark.unsafe.exceptionOnMemoryLeak", "false")
-      .set("spark.sql.columnar.tmp_dir", "/codegen/nativesql/")
+      //.set("spark.sql.columnar.tmp_dir", "/codegen/nativesql/")
       .set("spark.sql.columnar.sort.broadcastJoin", "true")
       .set("spark.oap.sql.columnar.preferColumnar", "true")
 
