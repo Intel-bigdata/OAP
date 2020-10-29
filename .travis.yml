@@ -61,6 +61,7 @@ jobs:
       - mvn clean install -q -P arrow-jni -am -Darrow.cpp.build.dir=/tmp/arrow/cpp/build/release/ -DskipTests -Dcheckstyle.skip
       script:
       - cd ${TRAVIS_BUILD_DIR}/
+      - mvn clean -q test -Dtest=org.apache.spark.sql.*Suite -Dmaven.test.failure.ignore=true -pl oap-native-sql/core -am -DfailIfNoTests=false
       - mvn clean -q package -DskipTests -pl oap-native-sql/core -am  #skip core tests
       - cd ${TRAVIS_BUILD_DIR}/
       - mvn clean -q test -pl oap-data-source/arrow -am

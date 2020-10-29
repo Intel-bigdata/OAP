@@ -123,7 +123,7 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
     super.afterAll()
   }
 
-  test("write empty iterator") {
+  ignore("write empty iterator") {
     val writer = new ColumnarShuffleWriter[Int, ColumnarBatch](
       blockResolver,
       shuffleHandle,
@@ -142,7 +142,7 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
     assert(taskMetrics.memoryBytesSpilled === 0)
   }
 
-  test("write empty column batch") {
+  ignore("write empty column batch") {
     val vectorPid = new IntVector("pid", allocator)
     val vector1 = new IntVector("v1", allocator)
     val vector2 = new IntVector("v2", allocator)
@@ -176,7 +176,7 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
     assert(taskMetrics.memoryBytesSpilled === 0)
   }
 
-  test("write with some empty partitions") {
+  ignore("write with some empty partitions") {
     val numRows = 4
     val vector1 = new IntVector("v1", allocator)
     val vector2 = new IntVector("v2", allocator)

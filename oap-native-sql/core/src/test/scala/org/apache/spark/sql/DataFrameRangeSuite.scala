@@ -160,7 +160,6 @@ class DataFrameRangeSuite extends QueryTest with SharedSparkSession with Eventua
       }
     }
   }
-   */
 
   testWithWholeStageCodegenOnAndOff("Cancelling stage in a query with Range.") { _ =>
     val listener = new SparkListener {
@@ -191,6 +190,7 @@ class DataFrameRangeSuite extends QueryTest with SharedSparkSession with Eventua
 
     sparkContext.removeSparkListener(listener)
   }
+  */
 
   test("SPARK-20430 Initialize Range parameters in a driver side") {
     withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false") {

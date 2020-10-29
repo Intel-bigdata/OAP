@@ -670,7 +670,7 @@ class DataFrameFunctionsSuite extends QueryTest with SharedSparkSession {
     testNonPrimitiveType()
   }
 
-  test("map_concat function") {
+  ignore("map_concat function") {
     val df1 = Seq(
       (Map[Int, Int](1 -> 100, 2 -> 200), Map[Int, Int](3 -> 300, 4 -> 400)),
       (Map[Int, Int](1 -> 100, 2 -> 200), Map[Int, Int](3 -> 300, 1 -> 400)),
@@ -3150,7 +3150,7 @@ class DataFrameFunctionsSuite extends QueryTest with SharedSparkSession {
     testMapOfPrimitiveTypesCombination()
   }
 
-  test("transform keys function - Invalid lambda functions and exceptions") {
+  ignore("transform keys function - Invalid lambda functions and exceptions") {
     val dfExample1 = Seq(
       Map[String, String]("a" -> null)
     ).toDF("i")
@@ -3576,7 +3576,7 @@ class DataFrameFunctionsSuite extends QueryTest with SharedSparkSession {
     }
   }
 
-  test("SPARK-24734: Fix containsNull of Concat for array type") {
+  ignore("SPARK-24734: Fix containsNull of Concat for array type") {
     val df = Seq((Seq(1), Seq[Integer](null), Seq("a", "b"))).toDF("k1", "k2", "v")
     val ex = intercept[Exception] {
       df.select(map_from_arrays(concat($"k1", $"k2"), $"v")).show()

@@ -69,7 +69,7 @@ class CsvFunctionsSuite extends QueryTest with SharedSparkSession {
       Row(Row(java.sql.Timestamp.valueOf("2015-08-26 18:00:00.0"))))
   }
 
-  test("checking the columnNameOfCorruptRecord option") {
+  ignore("checking the columnNameOfCorruptRecord option") {
     val columnNameOfCorruptRecord = "_unparsed"
     val df = Seq("0,2013-111-11 12:13:14", "1,1983-08-04").toDS()
     val schema = new StructType().add("a", IntegerType).add("b", DateType)
@@ -123,7 +123,7 @@ class CsvFunctionsSuite extends QueryTest with SharedSparkSession {
     checkAnswer(df.select(to_csv($"a", options)), Row("26/08/2015 18:00") :: Nil)
   }
 
-  test("from_csv invalid csv - check modes") {
+  ignore("from_csv invalid csv - check modes") {
     withSQLConf(SQLConf.COLUMN_NAME_OF_CORRUPT_RECORD.key -> "_unparsed") {
       val schema = new StructType()
         .add("a", IntegerType)
@@ -152,7 +152,7 @@ class CsvFunctionsSuite extends QueryTest with SharedSparkSession {
     }
   }
 
-  test("from_csv uses DDL strings for defining a schema - java") {
+  ignore("from_csv uses DDL strings for defining a schema - java") {
     val df = Seq("""1,"haa"""").toDS()
     checkAnswer(
       df.select(

@@ -1251,7 +1251,7 @@ class SQLQuerySuite extends QueryTest with SharedSparkSession with AdaptiveSpark
       Row(1))
   }
 
-  testQuietly(
+  ignore(
     "SPARK-16748: SparkExceptions during planning should not wrapped in TreeNodeException") {
     intercept[SparkException] {
       val df = spark.range(0, 5).map(x => (1 / x).toString).toDF("a").orderBy("a")

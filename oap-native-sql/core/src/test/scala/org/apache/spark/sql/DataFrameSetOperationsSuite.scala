@@ -248,7 +248,7 @@ class DataFrameSetOperationsSuite extends QueryTest with SharedSparkSession {
     assert(df4.schema.forall(!_.nullable))
   }
 
-  test("intersectAll") {
+  ignore("intersectAll") {
     checkAnswer(
       lowerCaseDataWithDuplicates.intersectAll(lowerCaseDataWithDuplicates),
       Row(1, "a") ::
@@ -302,7 +302,7 @@ class DataFrameSetOperationsSuite extends QueryTest with SharedSparkSession {
     assert(df4.schema.forall(!_.nullable))
   }
 
-  test("SPARK-10539: Project should not be pushed down through Intersect or Except") {
+  ignore("SPARK-10539: Project should not be pushed down through Intersect or Except") {
     val df1 = (1 to 100).map(Tuple1.apply).toDF("i")
     val df2 = (1 to 30).map(Tuple1.apply).toDF("i")
     val intersect = df1.intersect(df2)
@@ -386,7 +386,7 @@ class DataFrameSetOperationsSuite extends QueryTest with SharedSparkSession {
     }
   }
 
-  test("union all") {
+  ignore("union all") {
     val unionDF = testData.union(testData).union(testData)
       .union(testData).union(testData)
 
@@ -406,7 +406,7 @@ class DataFrameSetOperationsSuite extends QueryTest with SharedSparkSession {
     checkAnswer(unionDF, unionAllDF)
   }
 
-  test("union should union DataFrames with UDTs (SPARK-13410)") {
+  ignore("union should union DataFrames with UDTs (SPARK-13410)") {
     val rowRDD1 = sparkContext.parallelize(Seq(Row(1, new ExamplePoint(1.0, 2.0))))
     val schema1 = StructType(Array(StructField("label", IntegerType, false),
       StructField("point", new ExamplePointUDT(), false)))

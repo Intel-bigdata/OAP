@@ -105,35 +105,35 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
 
   }
 
-  test("single explode") {
+  ignore("single explode") {
     val df = Seq((1, Seq(1, 2, 3))).toDF("a", "intList")
     checkAnswer(
       df.select(explode($"intList")),
       Row(1) :: Row(2) :: Row(3) :: Nil)
   }
 
-  test("single explode_outer") {
+  ignore("single explode_outer") {
     val df = Seq((1, Seq(1, 2, 3)), (2, Seq())).toDF("a", "intList")
     checkAnswer(
       df.select(explode_outer($"intList")),
       Row(1) :: Row(2) :: Row(3) :: Row(null) :: Nil)
   }
 
-  test("single posexplode") {
+  ignore("single posexplode") {
     val df = Seq((1, Seq(1, 2, 3))).toDF("a", "intList")
     checkAnswer(
       df.select(posexplode($"intList")),
       Row(0, 1) :: Row(1, 2) :: Row(2, 3) :: Nil)
   }
 
-  test("single posexplode_outer") {
+  ignore("single posexplode_outer") {
     val df = Seq((1, Seq(1, 2, 3)), (2, Seq())).toDF("a", "intList")
     checkAnswer(
       df.select(posexplode_outer($"intList")),
       Row(0, 1) :: Row(1, 2) :: Row(2, 3) :: Row(null, null) :: Nil)
   }
 
-  test("explode and other columns") {
+  ignore("explode and other columns") {
     val df = Seq((1, Seq(1, 2, 3))).toDF("a", "intList")
 
     checkAnswer(
@@ -149,7 +149,7 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
       Row(1, Seq(1, 2, 3), 3) :: Nil)
   }
 
-  test("explode_outer and other columns") {
+  ignore("explode_outer and other columns") {
     val df = Seq((1, Seq(1, 2, 3)), (2, Seq())).toDF("a", "intList")
 
     checkAnswer(
@@ -169,7 +169,7 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
         Nil)
   }
 
-  test("aliased explode") {
+  ignore("aliased explode") {
     val df = Seq((1, Seq(1, 2, 3))).toDF("a", "intList")
 
     checkAnswer(
@@ -181,7 +181,7 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
       Row(6) :: Nil)
   }
 
-  test("aliased explode_outer") {
+  ignore("aliased explode_outer") {
     val df = Seq((1, Seq(1, 2, 3)), (2, Seq())).toDF("a", "intList")
 
     checkAnswer(
@@ -193,7 +193,7 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
       Row(6) :: Nil)
   }
 
-  test("explode on map") {
+  ignore("explode on map") {
     val df = Seq((1, Map("a" -> "b"))).toDF("a", "map")
 
     checkAnswer(
@@ -201,7 +201,7 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
       Row("a", "b"))
   }
 
-  test("explode_outer on map") {
+  ignore("explode_outer on map") {
     val df = Seq((1, Map("a" -> "b")), (2, Map[String, String]()),
       (3, Map("c" -> "d"))).toDF("a", "map")
 
@@ -210,7 +210,7 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
       Row("a", "b") :: Row(null, null) :: Row("c", "d") :: Nil)
   }
 
-  test("explode on map with aliases") {
+  ignore("explode on map with aliases") {
     val df = Seq((1, Map("a" -> "b"))).toDF("a", "map")
 
     checkAnswer(
@@ -218,7 +218,7 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
       Row("a", "b"))
   }
 
-  test("explode_outer on map with aliases") {
+  ignore("explode_outer on map with aliases") {
     val df = Seq((3, None), (1, Some(Map("a" -> "b")))).toDF("a", "map")
 
     checkAnswer(
@@ -226,7 +226,7 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
       Row("a", "b") :: Row(null, null) :: Nil)
   }
 
-  test("self join explode") {
+  ignore("self join explode") {
     val df = Seq((1, Seq(1, 2, 3))).toDF("a", "intList")
     val exploded = df.select(explode($"intList").as("i"))
 
@@ -330,7 +330,7 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
       Row(1, null) :: Row(2, null) :: Nil)
   }
 
-  test("generator in aggregate expression") {
+  ignore("generator in aggregate expression") {
     withTempView("t1") {
       Seq((1, 1), (1, 2), (2, 3)).toDF("c1", "c2").createTempView("t1")
       checkAnswer(
@@ -372,7 +372,7 @@ class GeneratorFunctionSuite extends QueryTest with SharedSparkSession {
       "but got: explode(explode(v))"))
   }
 
-  test("SPARK-30997: generators in aggregate expressions for dataframe") {
+  ignore("SPARK-30997: generators in aggregate expressions for dataframe") {
     val df = Seq(1, 2, 3).toDF("v")
     checkAnswer(df.select(explode(array(min($"v"), max($"v")))), Row(1) :: Row(3) :: Nil)
   }
