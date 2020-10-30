@@ -20,7 +20,7 @@ class ArrowColumnarBatchSerializerSuite extends SparkFunSuite with SharedSparkSe
       SQLMetrics.createAverageMetric(spark.sparkContext, "test serializer number of output rows")
   }
 
-  ignore("deserialize all null") {
+  test("deserialize all null") {
     val input = getTestResourcePath("test-data/native-splitter-output-all-null")
     val serializer =
       new ArrowColumnarBatchSerializer(avgBatchNumRows, outputNumRows).newInstance()
@@ -48,7 +48,7 @@ class ArrowColumnarBatchSerializerSuite extends SparkFunSuite with SharedSparkSe
     deserializedStream.close()
   }
 
-  ignore("deserialize nullable string") {
+  test("deserialize nullable string") {
     val input = getTestResourcePath("test-data/native-splitter-output-nullable-string")
     val serializer =
       new ArrowColumnarBatchSerializer(avgBatchNumRows, outputNumRows).newInstance()

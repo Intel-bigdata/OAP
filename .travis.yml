@@ -61,7 +61,11 @@ jobs:
       - mvn clean install -q -P arrow-jni -am -Darrow.cpp.build.dir=/tmp/arrow/cpp/build/release/ -DskipTests -Dcheckstyle.skip
       script:
       - cd ${TRAVIS_BUILD_DIR}/
-      - mvn clean -q test -Dtest=org.apache.spark.sql.*Suite -Dmaven.test.failure.ignore=true -pl oap-native-sql/core -am -DfailIfNoTests=false
+      - count=0; while [ $count -le 3 ]; do echo "Elapsed 3 minutes"; sleep 180; let count++; done & # print log each 3 minutes for 3 times to avoid no-log issue
+      - mvn clean test -DmembersOnlySuites=org.apache.spark.sql.travis -pl oap-native-sql/core -am -DfailIfNoTests=false &> log-file.log
+      - echo '#!/bin/bash' > grep.sh
+      - echo "tests_total=0; while read -r line; do num=\$(echo \"\$line\" | grep -o -E '[0-9]+'); tests_total=\$((tests_total+num)); done <<<\"\$(grep \"Total number of tests run:\" log-file.log)\"; succeed_total=0; while read -r line; do [[ \$line =~ [^0-9]*([0-9]+)\, ]]; num=\${BASH_REMATCH[1]}; succeed_total=\$((succeed_total+num)); done <<<\"\$(grep \"succeeded\" log-file.log)\"; if test \$tests_total -eq \$succeed_total; then echo \"All tests succeed\"; else echo \"Tests failed\"; exit 1; fi" >> grep.sh
+      - bash grep.sh
       - mvn clean -q package -DskipTests -pl oap-native-sql/core -am  #skip core tests
       - cd ${TRAVIS_BUILD_DIR}/
       - mvn clean -q test -pl oap-data-source/arrow -am
