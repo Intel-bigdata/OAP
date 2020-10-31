@@ -21,6 +21,7 @@
 #include <arrow/io/memory.h>
 #include <arrow/ipc/api.h>
 #include <arrow/ipc/dictionary.h>
+#include <arrow/memory_pool.h>
 #include <arrow/pretty_print.h>
 #include <arrow/record_batch.h>
 #include <arrow/util/compression.h>
@@ -54,6 +55,14 @@ static jmethodID arrowbuf_builder_constructor;
 
 static jclass split_result_class;
 static jmethodID split_result_constructor;
+
+static jclass native_memory_reservation_class;
+static jclass native_direct_memory_reservation_class;
+static jmethodID reserve__memory_method;
+static jmethodID unreserve__memory_method;
+static jobject memory_reservation_instance;
+
+static arrow::MemoryPool* memory_pool;
 
 using arrow::jni::ConcurrentMap;
 static ConcurrentMap<std::shared_ptr<arrow::Buffer>> buffer_holder_;
@@ -169,6 +178,36 @@ std::shared_ptr<ParquetFileWriter> GetFileWriter(JNIEnv* env, jlong id) {
 extern "C" {
 #endif
 
+class ReserveMemory : public arrow::ReservationListener {
+ public:
+  ReserveMemory(JNIEnv* env, jobject memory_reservation)
+      : env_(env), memory_reservation_(memory_reservation) {}
+
+  arrow::Status OnReservation(int64_t size) override {
+    env_->CallObjectMethod(memory_reservation_, reserve__memory_method, size);
+    if (env_->ExceptionCheck()) {
+      env_->ExceptionDescribe();
+      env_->ExceptionClear();
+      return arrow::Status::Invalid("memory reservation failed in Java");
+    }
+    return arrow::Status::OK();
+  }
+
+  arrow::Status OnRelease(int64_t size) override {
+    env_->CallObjectMethod(memory_reservation_, unreserve__memory_method, size);
+    if (env_->ExceptionCheck()) {
+      env_->ExceptionDescribe();
+      env_->ExceptionClear();
+      return arrow::Status::Invalid("memory unreservation failed in Java");
+    }
+    return arrow::Status::OK();
+  }
+
+ private:
+  JNIEnv* env_;
+  jobject memory_reservation_;
+};
+
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNIEnv* env;
   if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK) {
@@ -204,6 +243,33 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       CreateGlobalClassReference(env, "Lcom/intel/oap/vectorized/SplitResult;");
   split_result_constructor = GetMethodID(env, split_result_class, "<init>", "(JJJJJ[J)V");
 
+
+  native_memory_reservation_class =
+      CreateGlobalClassReference(env,
+                                 "Lorg/apache/arrow/"
+                                 "memory/NativeMemoryReservation;");
+  native_direct_memory_reservation_class =
+      CreateGlobalClassReference(env,
+                                 "Lorg/apache/arrow/"
+                                 "memory/NativeDirectMemoryReservation;");
+
+  reserve__memory_method =
+      GetMethodID(env, native_memory_reservation_class, "reserve", "(J)V");
+  unreserve__memory_method =
+      GetMethodID(env, native_memory_reservation_class, "unreserve", "(J)V");
+
+  jmethodID get_direct_reservation_instance =
+      GetStaticMethodID(env, native_direct_memory_reservation_class, "instance",
+                        "()Lorg/apache/arrow/memory/NativeDirectMemoryReservation;");
+  jobject direct_memory_reservation_local = env->CallStaticObjectMethod(
+      native_direct_memory_reservation_class, get_direct_reservation_instance);
+  memory_reservation_instance = env->NewGlobalRef(direct_memory_reservation_local);
+  env->DeleteLocalRef(direct_memory_reservation_local);
+  std::shared_ptr<arrow::ReservationListener> listener =
+      std::make_shared<ReserveMemory>(env, memory_reservation_instance);
+  memory_pool =
+      new arrow::ReservationListenableMemoryPool(arrow::default_memory_pool(), listener);
+
   return JNI_VERSION;
 }
 
@@ -222,11 +288,27 @@ void JNI_OnUnload(JavaVM* vm, void* reserved) {
   env->DeleteGlobalRef(arrow_record_batch_builder_class);
   env->DeleteGlobalRef(split_result_class);
 
+  env->DeleteGlobalRef(native_memory_reservation_class);
+  env->DeleteGlobalRef(native_direct_memory_reservation_class);
+  env->DeleteGlobalRef(memory_reservation_instance);
+  delete memory_pool;
+
   buffer_holder_.Clear();
   handler_holder_.Clear();
   batch_iterator_holder_.Clear();
   shuffle_splitter_holder_.Clear();
   decompression_schema_holder_.Clear();
+}
+
+JNIEXPORT void JNICALL Java_com_intel_oap_vectorized_NativeMemoryReservation_setGlobal(
+    JNIEnv* env, jclass, jobject reservation) {
+  delete memory_pool;
+  env->DeleteGlobalRef(memory_reservation_instance);
+  memory_reservation_instance = env->NewGlobalRef(reservation);
+  std::shared_ptr<arrow::ReservationListener> listener =
+      std::make_shared<ReserveMemory>(env, memory_reservation_instance);
+  memory_pool =
+      new arrow::ReservationListenableMemoryPool(arrow::default_memory_pool(), listener);
 }
 
 JNIEXPORT void JNICALL

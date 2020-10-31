@@ -89,6 +89,17 @@ jmethodID GetMethodID(JNIEnv* env, jclass this_class, const char* name, const ch
   return ret;
 }
 
+jmethodID GetStaticMethodID(JNIEnv* env, jclass this_class,
+                            const char* name, const char* sig) {
+  jmethodID ret = env->GetStaticMethodID(this_class, name, sig);
+  if (ret == nullptr) {
+    std::string error_message = "Unable to find static method " + std::string(name) +
+        " within signature" + std::string(sig);
+    env->ThrowNew(illegal_access_exception_class, error_message.c_str());
+  }
+  return ret;
+}
+
 arrow::Status MakeRecordBatch(const std::shared_ptr<arrow::Schema>& schema, int num_rows,
                               int64_t* in_buf_addrs, int64_t* in_buf_sizes,
                               int in_bufs_len,

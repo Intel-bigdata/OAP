@@ -25,7 +25,7 @@ import scala.collection.JavaConverters._
 import com.intel.oap.vectorized.ArrowWritableColumnVector
 import org.apache.arrow.dataset.file.{FileSystem, SingleFileDatasetFactory}
 import org.apache.arrow.dataset.scanner.ScanTask
-import org.apache.arrow.memory.AllocationListener
+import org.apache.arrow.memory.{NativeMemoryReservation}
 import org.apache.arrow.vector.FieldVector
 import org.apache.arrow.vector.types.pojo.ArrowType.ArrowTypeID
 import org.apache.arrow.vector.types.pojo.Schema
@@ -39,6 +39,8 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 object ArrowUtils {
+
+  NativeMemoryReservation.setGlobal(NativeSparkManagedMemoryReservation.INSTANCE)
 
   def readSchema(file: FileStatus, options: CaseInsensitiveStringMap): Option[StructType] = {
     val factory: SingleFileDatasetFactory =
