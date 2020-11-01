@@ -26,6 +26,7 @@ anaconda login
 
 ### Build OAP Conda package
 ```$xslt
-cd $OAP_HOME/dev/create-release/conda-recipes/
-sh make-conda-release.sh
+sh $OAP_HOME/dev/make-conda-distribution.sh
+cd $OAP_HOME/dev/conda-release/conda-recipes/oap
+conda build .
 ```
