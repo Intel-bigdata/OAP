@@ -14,6 +14,7 @@ if [ "$(uname)" == "Linux" ]; then
 fi
 
 cmake \
+    -DARROW_WITH_UTF8PROC=OFF \
     -DARROW_PLASMA_JAVA_CLIENT=on \
     -DARROW_PLASMA=ON \
     -DARROW_GANDIVA_JAVA=ON \
