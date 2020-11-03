@@ -40,7 +40,7 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 
 object ArrowUtils {
 
-  NativeMemoryReservation.setGlobal(NativeSparkManagedMemoryReservation.INSTANCE)
+  NativeSparkManagedMemoryReservation.INSTANCE.load()
 
   def readSchema(file: FileStatus, options: CaseInsensitiveStringMap): Option[StructType] = {
     val factory: SingleFileDatasetFactory =

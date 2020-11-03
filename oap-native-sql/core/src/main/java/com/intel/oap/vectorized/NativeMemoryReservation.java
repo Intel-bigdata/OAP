@@ -29,11 +29,11 @@ public abstract class NativeMemoryReservation {
   }
 
   /**
-   * Set a specific instance of NativeMemoryReservation. Note the instance will be globally accessible in
+   * Set as default instance of NativeMemoryReservation. Note the instance will be globally accessible in
    * the current process. All native based datasets will be using this instance as a call back for
    * memory reservation.
    */
-  public static synchronized native void setGlobal(NativeMemoryReservation reservation);
+  public native void load();
 
   /**
    * Reserve bytes.

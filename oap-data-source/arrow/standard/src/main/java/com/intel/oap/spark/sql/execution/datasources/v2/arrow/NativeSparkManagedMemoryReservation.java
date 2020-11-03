@@ -21,6 +21,7 @@ import org.apache.arrow.memory.NativeMemoryReservation;
 import org.apache.arrow.memory.OutOfMemoryException;
 import org.apache.spark.TaskContext;
 import org.apache.spark.memory.MemoryConsumer;
+import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.memory.TaskMemoryManager;
 import org.apache.spark.sql.execution.datasources.v2.arrow.SparkMemoryUtils;
 import scala.Function1;
@@ -99,7 +100,7 @@ public class NativeSparkManagedMemoryReservation extends NativeMemoryReservation
   private static class ConsumerImpl extends MemoryConsumer {
 
     protected ConsumerImpl(TaskMemoryManager taskMemoryManager) {
-      super(taskMemoryManager);
+      super(taskMemoryManager, taskMemoryManager.pageSizeBytes(), MemoryMode.OFF_HEAP);
     }
 
     @Override

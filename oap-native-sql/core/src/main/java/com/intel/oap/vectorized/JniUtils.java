@@ -78,7 +78,7 @@ public class JniUtils {
       } catch (IOException ex) {
         System.loadLibrary(LIBRARY_NAME);
       }
-      NativeMemoryReservation.setGlobal(NativeSparkManagedMemoryReservation.INSTANCE);
+      NativeSparkManagedMemoryReservation.INSTANCE.load();
       isLoaded = true;
     }
   }

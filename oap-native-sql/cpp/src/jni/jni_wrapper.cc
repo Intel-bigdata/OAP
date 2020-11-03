@@ -62,6 +62,8 @@ static jmethodID reserve__memory_method;
 static jmethodID unreserve__memory_method;
 static jobject memory_reservation_instance;
 
+static std::mutex reservation_mutex;
+
 static arrow::MemoryPool* memory_pool;
 
 using arrow::jni::ConcurrentMap;
@@ -178,33 +180,42 @@ std::shared_ptr<ParquetFileWriter> GetFileWriter(JNIEnv* env, jlong id) {
 extern "C" {
 #endif
 
+
 class ReserveMemory : public arrow::ReservationListener {
  public:
-  ReserveMemory(JNIEnv* env, jobject memory_reservation)
-      : env_(env), memory_reservation_(memory_reservation) {}
+  ReserveMemory(JavaVM* vm, jobject memory_reservation)
+      : vm_(vm), memory_reservation_(memory_reservation) {}
 
   arrow::Status OnReservation(int64_t size) override {
-    env_->CallObjectMethod(memory_reservation_, reserve__memory_method, size);
-    if (env_->ExceptionCheck()) {
-      env_->ExceptionDescribe();
-      env_->ExceptionClear();
-      return arrow::Status::Invalid("memory reservation failed in Java");
+    JNIEnv* env;
+    if (vm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK) {
+      return arrow::Status::Invalid("JNIEnv was not attached to current thread");
+    }
+    env->CallObjectMethod(memory_reservation_, reserve__memory_method, size);
+    if (env->ExceptionCheck()) {
+      env->ExceptionDescribe();
+      env->ExceptionClear();
+      return arrow::Status::Invalid("Memory reservation failed in Java");
     }
     return arrow::Status::OK();
   }
 
   arrow::Status OnRelease(int64_t size) override {
-    env_->CallObjectMethod(memory_reservation_, unreserve__memory_method, size);
-    if (env_->ExceptionCheck()) {
-      env_->ExceptionDescribe();
-      env_->ExceptionClear();
-      return arrow::Status::Invalid("memory unreservation failed in Java");
+    JNIEnv* env;
+    if (vm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK) {
+      return arrow::Status::Invalid("JNIEnv was not attached to current thread");
+    }
+    env->CallObjectMethod(memory_reservation_, unreserve__memory_method, size);
+    if (env->ExceptionCheck()) {
+      env->ExceptionDescribe();
+      env->ExceptionClear();
+      return arrow::Status::Invalid("Memory unreservation failed in Java");
     }
     return arrow::Status::OK();
   }
 
  private:
-  JNIEnv* env_;
+  JavaVM* vm_;
   jobject memory_reservation_;
 };
 
@@ -266,7 +277,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   memory_reservation_instance = env->NewGlobalRef(direct_memory_reservation_local);
   env->DeleteLocalRef(direct_memory_reservation_local);
   std::shared_ptr<arrow::ReservationListener> listener =
-      std::make_shared<ReserveMemory>(env, memory_reservation_instance);
+      std::make_shared<ReserveMemory>(vm, memory_reservation_instance);
   memory_pool =
       new arrow::ReservationListenableMemoryPool(arrow::default_memory_pool(), listener);
 
@@ -300,13 +311,19 @@ void JNI_OnUnload(JavaVM* vm, void* reserved) {
   decompression_schema_holder_.Clear();
 }
 
-JNIEXPORT void JNICALL Java_com_intel_oap_vectorized_NativeMemoryReservation_setGlobal(
-    JNIEnv* env, jclass, jobject reservation) {
+JNIEXPORT void JNICALL Java_com_intel_oap_vectorized_NativeMemoryReservation_load(
+    JNIEnv* env, jobject reservation) {
+  std::lock_guard<std::mutex> lock(reservation_mutex);
   delete memory_pool;
   env->DeleteGlobalRef(memory_reservation_instance);
   memory_reservation_instance = env->NewGlobalRef(reservation);
+  JavaVM* vm;
+  if (env->GetJavaVM(&vm) != JNI_OK) {
+    env->ThrowNew(illegal_access_exception_class, "Unable to get JavaVM instance");
+    return;
+  }
   std::shared_ptr<arrow::ReservationListener> listener =
-      std::make_shared<ReserveMemory>(env, memory_reservation_instance);
+      std::make_shared<ReserveMemory>(vm, memory_reservation_instance);
   memory_pool =
       new arrow::ReservationListenableMemoryPool(arrow::default_memory_pool(), listener);
 }
