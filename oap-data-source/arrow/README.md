@@ -10,11 +10,39 @@ The development of this library is still in progress. As a result some of the fu
 There are some requirements before you build the project.
 Please make sure you have already installed the software in your system.
 
-1. java8 OpenJDK -> yum install java-1.8.0-openjdk
-2. cmake 3.2 or higher version
-3. maven 3.1.1 or higher version
-4. Hadoop 2.7.5 or higher version
-5. Spark 3.0.0 or higher version
+1. gcc 7.3.1 or later
+2. java8 OpenJDK -> yum install java-1.8.0-openjdk
+3. cmake 3.2 or higher version
+4. maven 3.1.1 or higher version
+5. Hadoop 2.7.5 or higher version
+6. Spark 3.0.0 or higher version
+
+### gcc installation
+
+// installing gcc 7.3.1 or higher version
+https://gcc.gnu.org/install/index.html
+Follow the above website to download gcc.
+You may have to launch ./contrib/download_prerequisites command to install all the prerequisites for gcc.
+If you are facing downloading issue in download_prerequisites command, you can try to change ftp to http.
+
+//Follow the steps to configure gcc
+https://gcc.gnu.org/install/configure.html
+If you are facing a multilib issue, you can try to add --disable-multilib parameter in ../configure
+
+//Follow the steps to build gcc
+https://gcc.gnu.org/install/build.html
+
+//Follow the steps to install gcc
+https://gcc.gnu.org/install/finalinstall.html
+
+//Set up Environment for new gcc
+export PATH=$YOUR_GCC_INSTALLATION_DIR/bin:$PATH
+export LD_LIBRARY_PATH=$YOUR_GCC_INSTALLATION_DIR/lib64:$LD_LIBRARY_PATH
+Please remember to add and source the setup in your environment files such as /etc/profile or /etc/bashrc
+
+//Verify if gcc has been installation
+Use gcc -v command to verify if your gcc version is correct.(Must larger than 7.3.1)
+
 
 ### cmake installation
 
