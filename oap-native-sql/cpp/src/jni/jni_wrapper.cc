@@ -257,12 +257,11 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 
   native_memory_reservation_class =
       CreateGlobalClassReference(env,
-                                 "Lorg/apache/arrow/"
-                                 "memory/NativeMemoryReservation;");
+                                 "Lcom/intel/oap/vectorized/NativeMemoryReservation;");
   native_direct_memory_reservation_class =
       CreateGlobalClassReference(env,
-                                 "Lorg/apache/arrow/"
-                                 "memory/NativeDirectMemoryReservation;");
+                                 "Lcom/intel/oap/vectorized/"
+                                 "NativeDirectMemoryReservation;");
 
   reserve__memory_method =
       GetMethodID(env, native_memory_reservation_class, "reserve", "(J)V");
@@ -271,7 +270,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 
   jmethodID get_direct_reservation_instance =
       GetStaticMethodID(env, native_direct_memory_reservation_class, "instance",
-                        "()Lorg/apache/arrow/memory/NativeDirectMemoryReservation;");
+                        "()Lcom/intel/oap/vectorized/NativeDirectMemoryReservation;");
   jobject direct_memory_reservation_local = env->CallStaticObjectMethod(
       native_direct_memory_reservation_class, get_direct_reservation_instance);
   memory_reservation_instance = env->NewGlobalRef(direct_memory_reservation_local);

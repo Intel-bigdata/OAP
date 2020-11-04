@@ -17,7 +17,6 @@
 
 package com.intel.oap.vectorized;
 
-import org.apache.arrow.memory.NativeMemoryReservation;
 import org.apache.arrow.util.VisibleForTesting;
 
 import java.lang.reflect.Field;
