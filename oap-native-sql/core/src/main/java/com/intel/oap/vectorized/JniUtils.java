@@ -28,7 +28,6 @@ import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -78,7 +77,6 @@ public class JniUtils {
       } catch (IOException ex) {
         System.loadLibrary(LIBRARY_NAME);
       }
-      NativeSparkManagedMemoryReservation.INSTANCE.load();
       isLoaded = true;
     }
   }

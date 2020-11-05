@@ -19,14 +19,17 @@ package org.apache.spark.sql.execution.datasources.v2.arrow
 
 import java.util.UUID
 
-import org.apache.arrow.memory.{AllocationListener, BaseAllocator, BufferAllocator, OutOfMemoryException}
+import com.intel.oap.spark.sql.execution.datasources.v2.arrow.SparkManagedReservationListener
+import org.apache.arrow.memory.{AllocationListener, BaseAllocator, BufferAllocator, DirectReservationListener, OutOfMemoryException, ReservationListener}
 
-import org.apache.spark.{TaskContext}
+import org.apache.spark.TaskContext
 import org.apache.spark.memory.{MemoryConsumer, MemoryMode, TaskMemoryManager}
 import org.apache.spark.util.TaskCompletionListener
 
 object SparkMemoryUtils {
   private val taskToAllocatorMap = new java.util.IdentityHashMap[TaskContext, BufferAllocator]()
+  private val taskToReservationListenerMap =
+    new java.util.IdentityHashMap[TaskContext, SparkManagedReservationListener]()
 
   private class ExecutionMemoryAllocationListener(mm: TaskMemoryManager)
     extends MemoryConsumer(mm, mm.pageSizeBytes(), MemoryMode.OFF_HEAP) with AllocationListener {
@@ -123,5 +126,38 @@ object SparkMemoryUtils {
    */
   private def softClose(allocator: BufferAllocator): Unit = {
     // do nothing
+  }
+
+  def reservationListener(): ReservationListener = {
+    if (!inSparkTask()) {
+      return DirectReservationListener.instance()
+    }
+    val tc = getLocalTaskContext
+    val listener = taskToReservationListenerMap.synchronized {
+      if (taskToReservationListenerMap.containsKey(tc)) {
+        taskToReservationListenerMap.get(tc)
+      } else {
+        val rl = new SparkManagedReservationListener(getTaskMemoryManager())
+        taskToReservationListenerMap.put(tc, rl)
+        getLocalTaskContext.addTaskCompletionListener(
+          new TaskCompletionListener {
+            override def onTaskCompletion(context: TaskContext): Unit = {
+              taskToReservationListenerMap.synchronized {
+                if (taskToReservationListenerMap.containsKey(context)) {
+                  val rl = taskToReservationListenerMap.get(context)
+                  val allocated = rl.getUsed
+                  if (allocated == 0L) {
+                    taskToReservationListenerMap.remove(context)
+                  } else {
+                    // do nothing
+                  }
+                }
+              }
+            }
+          })
+        rl
+      }
+    }
+    listener
   }
 }
