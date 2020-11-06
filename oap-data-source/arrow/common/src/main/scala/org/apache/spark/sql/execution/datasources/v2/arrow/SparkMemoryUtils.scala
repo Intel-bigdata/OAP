@@ -19,13 +19,17 @@ package org.apache.spark.sql.execution.datasources.v2.arrow
 
 import java.util.UUID
 
-import org.apache.arrow.memory.{AllocationListener, BaseAllocator, BufferAllocator, OutOfMemoryException}
+import org.apache.arrow.memory.{AllocationListener, BaseAllocator, BufferAllocator, ImmutableConfig, OutOfMemoryException, RootAllocator}
 
-import org.apache.spark.{TaskContext}
+import org.apache.spark.TaskContext
 import org.apache.spark.memory.{MemoryConsumer, MemoryMode, TaskMemoryManager}
 import org.apache.spark.util.TaskCompletionListener
 
 object SparkMemoryUtils {
+  private val rootAllocator = new RootAllocator(
+    BaseAllocator.configBuilder()
+      .allocationManagerFactory(UnsafeAllocationManager1.FACTORY)
+      .build())
   private val taskToAllocatorMap = new java.util.IdentityHashMap[TaskContext, BufferAllocator]()
 
   private class ExecutionMemoryAllocationListener(mm: TaskMemoryManager)
@@ -71,7 +75,7 @@ object SparkMemoryUtils {
 
   def arrowAllocator(): BaseAllocator = {
     if (!inSparkTask()) {
-      return org.apache.spark.sql.util.ArrowUtils.rootAllocator
+      return rootAllocator
     }
     val tc = getLocalTaskContext
     val allocator = taskToAllocatorMap.synchronized {
@@ -79,7 +83,7 @@ object SparkMemoryUtils {
         taskToAllocatorMap.get(tc).asInstanceOf[BaseAllocator]
       } else {
         val al = new ExecutionMemoryAllocationListener(getTaskMemoryManager())
-        val parent = org.apache.spark.sql.util.ArrowUtils.rootAllocator
+        val parent = rootAllocator
         val newInstance = parent.newChildAllocator("Spark Managed Allocator - " +
           UUID.randomUUID().toString, al, 0, parent.getLimit).asInstanceOf[BaseAllocator]
         taskToAllocatorMap.put(tc, newInstance)
