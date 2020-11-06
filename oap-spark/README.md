@@ -6,7 +6,7 @@
 
 ## Introduciton
 
-OAP Spark support RDD Cache with Optane PMem. Spark has various storage levels serving for different purposes including memory and disk.
+OAP Spark supports RDD Cache with Optane PMem. Spark has various storage levels serving for different purposes including memory and disk.
 
 PMem storage level is added to support a new tier for storage level besides memory and disk.
 
@@ -15,6 +15,11 @@ Using PMem library to access Optane PMem can help to avoid the overhead from dis
 Large capacity and high I/O performance of PMem shows better performance than tied DRAM and disk solution under the same cost.
 
 ## User Guide
+
+### Installation
+
+We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md),you needn't compile and install Memkind, and you can find compiled OAP jars in `$HOME/miniconda2/envs/oapenv/oap_jars`.
+
 ### Prerequisites
 
 The following are required to configure OAP to use PMem cache in AppDirect mode.
@@ -121,6 +126,14 @@ HiBench/conf/spark.conf
 HiBench/conf/workloads/ml/kmeans.conf
 ```
 Note that you need add `hibench.kmeans.storage.level  PMEM_AND_DISK` to `kmeans.conf`, which can enable both PMem and Disk to cache data.
+If you completed [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you also need add the following configs to `spark.conf`
+```
+spark.executorEnv.LD_LIBRARY_PATH   $HOME/miniconda2/envs/oapenv/lib
+spark.executor.extraLibraryPath     $HOME/miniconda2/envs/oapenv/lib
+spark.driver.extraLibraryPath       $HOME/miniconda2/envs/oapenv/lib
+
+```
+
 Then you can run the following 2 commands to run K-means workloads:
 ```
 bin/workloads/ml/kmeans/prepare/prepare.sh
@@ -154,15 +167,18 @@ For the scenario that data will exceed the block cache capacity. Memkind 1.9.0 a
 
 ### How to contribute
 
-OAP Spark packages includes all Spark changed files. All codes are directly copied from
-https://github.com/Intel-bigdata/Spark. Please make sure all your changes are committed to the
-repository above. Otherwise, your change will be override by others.
+Currently, OAP Spark packages includes all Spark changed files.
+
+* MemoryMode.java
+* MemoryManager.scala
+* StorageMemoryPool.scala
+* UnifiedMemoryManager.scala
+* MemoryStore.scala
+* BlockManager.scala
+* StorageLevel.scala
+* TestMemoryManager
+
+Please make sure your code change in above source code will not break current function.
 
 The files from this package should avoid depending on other OAP module except OAP-Common.
 
-All Spark source code changes are tracked in dev/changes_list/spark_changed_files
-
-All changed files are ordered by file name.
-
-You can execute the script dev/Apply_Spark_changes.sh with the specified Spark source directories
-and OAP source directories accordingly.
