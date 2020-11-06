@@ -39,11 +39,14 @@ object OapFileSourceStrategy extends Strategy with Logging {
      * Classified discussion the 4 scenarios and assemble a new [[SparkPlan]] if can optimized.
      */
     def tryOptimize(head: SparkPlan): SparkPlan = {
-      val tableEnbale =
-        SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLED) ||
-        SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
+      val tableEnable =
+        if (SparkSession.getActiveSession.get.conf.contains(OapConf.OAP_CACHE_TABLE_LISTS_ENABLED.key)) {
+          SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLED)
+        } else {
+          SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
+        }
       val cacheTablelists =
-        if (SparkSession.getActiveSession.get.conf.getOption(OapConf.OAP_CACHE_TABLE_LISTS.key).isDefined) {
+        if (SparkSession.getActiveSession.get.conf.contains(OapConf.OAP_CACHE_TABLE_LISTS.key)) {
           SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS).split(";")
         } else {
           SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_BK).split(";")
@@ -56,7 +59,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
           dataFilters, tableIdentifier))) =>
 
           var canCache = true
-          if(tableEnbale) {
+          if(tableEnable) {
             canCache = false
             tableIdentifier match {
               case Some(table) =>
@@ -88,7 +91,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
           dataFilters, tableIdentifier)) =>
 
           var canCache = true
-          if(tableEnbale) {
+          if(tableEnable) {
             canCache = false
             tableIdentifier match {
               case Some(table) =>
@@ -119,7 +122,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
           partitionFilters, optionalBucketSet, dataFilters, tableIdentifier)) =>
 
           var canCache = true
-          if(tableEnbale) {
+          if(tableEnable) {
             canCache = false
             tableIdentifier match {
               case Some(table) =>
@@ -150,7 +153,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
           dataFilters, tableIdentifier) =>
 
           var canCache = true
-          if(tableEnbale) {
+          if(tableEnable) {
             canCache = false
             tableIdentifier match {
               case Some(table) =>

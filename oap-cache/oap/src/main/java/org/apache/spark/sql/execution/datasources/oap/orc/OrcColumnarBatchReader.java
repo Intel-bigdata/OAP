@@ -136,10 +136,13 @@ public class OrcColumnarBatchReader implements RecordReader<ColumnarBatch> {
         .filesystem(fileSystem));
     Reader.Options options =
       OrcInputFormat.buildOptions(conf, fileReader, 0, length);
-
-    boolean binaryCacheEnabled = conf
-      .getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLED().key(), false)||
-            conf.getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLE().key(), false);
+    boolean binaryCacheEnabled;
+    binaryCacheEnabled =
+            conf.get(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLED().key()) == null ?
+                    conf.getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLE().key(),
+                            false):
+                    conf.getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLED().key(),
+                            false);
     if (binaryCacheEnabled) {
       Boolean zeroCopy = options.getUseZeroCopy();
       if (zeroCopy == null) {

@@ -69,10 +69,13 @@ private[oap] case class OrcDataFile(
   private var context: OrcDataFileContext = _
   private lazy val filePath: Path = new Path(path)
   private lazy val orcDataCacheEnable =
-    configuration.getBoolean(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key,
-      OapConf.OAP_ORC_DATA_CACHE_ENABLED.defaultValue.get) ||
+    if (configuration.get(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key) != null) {
+      configuration.getBoolean(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key,
+        OapConf.OAP_ORC_DATA_CACHE_ENABLED.defaultValue.get)
+    } else {
       configuration.getBoolean(OapConf.OAP_ORC_DATA_CACHE_ENABLE.key,
         OapConf.OAP_ORC_DATA_CACHE_ENABLE.defaultValue.get)
+    }
   lazy val meta =
     OapRuntime.getOrCreate.dataFileMetaCacheManager.get(this).asInstanceOf[OrcDataFileMeta]
 //  meta.getOrcFileReader()
