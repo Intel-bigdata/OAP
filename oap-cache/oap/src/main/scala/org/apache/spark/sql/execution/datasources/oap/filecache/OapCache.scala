@@ -955,7 +955,7 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
   private var cacheInit: Boolean = false
   private var externalDBClient: ExternalDBClient = null
 
-  if (SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED) == true) {
+  if (conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED) == true) {
     externalDBClient = ExternalDBClientFactory.getDBClientInstance(SparkEnv.get)
   }
 
@@ -1101,7 +1101,7 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
         case e: DuplicateObjectException => logWarning(e.getMessage)
       }
     }
-    if (SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED) == true) {
+    if (conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED) == true) {
       reportCacheMeta(fiberId)
     }
     fiber
