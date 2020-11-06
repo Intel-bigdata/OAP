@@ -67,6 +67,7 @@ class OrcDataFileSuite extends QueryTest with SharedOapContext with BeforeAndAft
 
   override def afterEach(): Unit = {
     configuration.unset(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key)
+    configuration.unset(OapConf.OAP_ORC_DATA_CACHE_ENABLE.key)
   }
 
   private val partitionSchema: StructType = new StructType()

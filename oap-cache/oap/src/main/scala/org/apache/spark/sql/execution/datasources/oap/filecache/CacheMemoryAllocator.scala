@@ -34,7 +34,12 @@ private[filecache] class CacheMemoryAllocator(sparkEnv: SparkEnv)
 
   private def checkSeparateMemory(): Boolean = {
     val memoryManagerOpt =
-      sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
+      if (sparkEnv.conf.getOption(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key).isDefined) {
+        sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
+      } else {
+        sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER_BK.key, "offheap").toLowerCase
+      }
+    logInfo(s"${memoryManagerOpt}")
     val cacheName =
       sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_STRATEGY.key, "guava").toLowerCase
 
@@ -54,9 +59,15 @@ private[filecache] class CacheMemoryAllocator(sparkEnv: SparkEnv)
       ((memoryManager.memorySize * 0.9).toLong, (indexMemoryManager.memorySize * 0.9).toLong,
         (memoryManager.memorySize * 0.1).toLong, (indexMemoryManager.memorySize * 0.1).toLong)
     } else {
-      val cacheRatio = sparkEnv.conf.getDouble(
-        OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.key,
-        OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.defaultValue.get)
+      val cacheRatio =
+        if (sparkEnv.conf.getOption(OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.key).isDefined) {
+          sparkEnv.conf.getDouble(OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.key,
+            OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.defaultValue.get)
+        } else {
+          sparkEnv.conf.getDouble(OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO_BK.key,
+            OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO_BK.defaultValue.get)
+        }
+
       require(cacheRatio >= 0 && cacheRatio <= 1,
         "Data and index cache ratio should be between 0 and 1")
 

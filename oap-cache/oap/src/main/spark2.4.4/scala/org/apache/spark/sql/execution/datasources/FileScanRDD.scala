@@ -236,7 +236,7 @@ class FileScanRDD(
       case (host, numBytes) => host
     }
 
-    if (sqlConf.getConf(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLE) == true) {
+    if (sqlConf.getConf(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED) == true) {
       CachedPartitionedFilePreferredLocs.getPreferredLocsByCache(split)
         .++(hdfsPreLocs)
         .take(3)

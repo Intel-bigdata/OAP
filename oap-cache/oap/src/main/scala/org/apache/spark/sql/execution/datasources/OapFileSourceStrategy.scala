@@ -40,17 +40,24 @@ object OapFileSourceStrategy extends Strategy with Logging {
      */
     def tryOptimize(head: SparkPlan): SparkPlan = {
       val runtimeEnable = SparkSession.getActiveSession.get.conf
-        .get(OapConf.OAP_CACHE_RUNTIME_ENABLE)
+        .get(OapConf.OAP_CACHE_RUNTIME_ENABLED)
       if (!runtimeEnable) {
         logInfo("OAP cache is disabled in runtime," +
           " will fall back to default Parquet/ORC file format.")
         return head
       }
-
-      val tableEnbale = SparkSession.getActiveSession.get.conf
-        .get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
+      val tableEnable =
+        if (SparkSession.getActiveSession.get.conf.contains(OapConf.OAP_CACHE_TABLE_LISTS_ENABLED.key)) {
+          SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLED)
+        } else {
+          SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_ENABLE)
+        }
       val cacheTablelists =
-        SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS).split(";")
+        if (SparkSession.getActiveSession.get.conf.contains(OapConf.OAP_CACHE_TABLE_LISTS.key)) {
+          SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS).split(";")
+        } else {
+          SparkSession.getActiveSession.get.conf.get(OapConf.OAP_CACHE_TABLE_LISTS_BK).split(";")
+        }
 
       head match {
         // ProjectExec -> FilterExec -> FileSourceScanExec
@@ -59,7 +66,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
           dataFilters, tableIdentifier))) =>
 
           var canCache = true
-          if(tableEnbale) {
+          if(tableEnable) {
             canCache = false
             tableIdentifier match {
               case Some(table) =>
@@ -91,7 +98,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
           dataFilters, tableIdentifier)) =>
 
           var canCache = true
-          if(tableEnbale) {
+          if(tableEnable) {
             canCache = false
             tableIdentifier match {
               case Some(table) =>
@@ -122,7 +129,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
           partitionFilters, optionalBucketSet, dataFilters, tableIdentifier)) =>
 
           var canCache = true
-          if(tableEnbale) {
+          if(tableEnable) {
             canCache = false
             tableIdentifier match {
               case Some(table) =>
@@ -153,7 +160,7 @@ object OapFileSourceStrategy extends Strategy with Logging {
           dataFilters, tableIdentifier) =>
 
           var canCache = true
-          if(tableEnbale) {
+          if(tableEnable) {
             canCache = false
             tableIdentifier match {
               case Some(table) =>

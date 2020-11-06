@@ -185,7 +185,7 @@ class OapFileSourceStrategyForParquetSuite extends OapFileSourceStrategySuite {
 
   test("Disable Optimized") {
     withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
-      OapConf.OAP_CACHE_RUNTIME_ENABLE.key -> "false") {
+      OapConf.OAP_CACHE_RUNTIME_ENABLED.key -> "false") {
       verifyProjectScan(
         format => format.isInstanceOf[ParquetFileFormat],
         (plan1, plan2) => plan1.sameResult(plan2)
@@ -229,7 +229,7 @@ class OapFileSourceStrategyForOrcSuite extends OapFileSourceStrategySuite {
 
   test("Disable Optimized") {
     withSQLConf(OapConf.OAP_ORC_DATA_CACHE_ENABLED.key -> "true",
-      OapConf.OAP_CACHE_RUNTIME_ENABLE.key -> "false") {
+      OapConf.OAP_CACHE_RUNTIME_ENABLED.key -> "false") {
       verifyProjectScan(
         format => format.isInstanceOf[OrcFileFormat],
         (plan1, plan2) => plan1.sameResult(plan2)

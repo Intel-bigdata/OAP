@@ -40,8 +40,11 @@ object PersistentMemoryConfigUtils extends Logging {
   private val numaToPMProperty = new mutable.HashMap[Int, String]()
 
   def parseConfig(conf: SparkConf): mutable.HashMap[Int, String] = {
-    val configFile = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE.key,
-      DEFAULT_PERSISTENT_MEMORY_CONFIG_FILE)
+    val configFile = if (conf.getOption(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE.key).isDefined) {
+      conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE.key,
+        DEFAULT_PERSISTENT_MEMORY_CONFIG_FILE) } else {
+      conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE_BK.key,
+        DEFAULT_PERSISTENT_MEMORY_CONFIG_FILE) }
     // If already parsed, just return it
     if (numaToPMProperty.size == 0) {
       val is = Utils.getSparkClassLoader.getResourceAsStream(configFile)
@@ -58,7 +61,7 @@ object PersistentMemoryConfigUtils extends Logging {
         val initialPath = (numaNode \ INITIAL_PATH_PROPERTY).text.trim
         numaToPMProperty += ((numaNodeId, initialPath))
       }
-    }
+  }
 
     require(numaToPMProperty.nonEmpty, "The Intel Optane DC persistent memory configuration" +
       "file must not be empty.")

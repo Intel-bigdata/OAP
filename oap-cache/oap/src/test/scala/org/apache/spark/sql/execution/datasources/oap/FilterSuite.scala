@@ -1405,7 +1405,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering parquet in FiberCache") {
-    withSQLConf("spark.sql.oap.parquet.data.cache.enable" -> "true") {
+    withSQLConf("spark.sql.oap.parquet.data.cache.enabled" -> "true") {
       val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
       data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table parquet_test select * from t")
@@ -1436,7 +1436,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
   }
 
   test("filtering parquet in FiberCache with partition") {
-    withSQLConf("spark.sql.oap.parquet.data.cache.enable" -> "true") {
+    withSQLConf("spark.sql.oap.parquet.data.cache.enabled" -> "true") {
       val data: Seq[(Int, Int)] = (1 to 100).map { i => (i, i) }
       data.toDF("key", "value").createOrReplaceTempView("t")
       sql(
@@ -1455,7 +1455,7 @@ class FilterSuite extends QueryTest with SharedOapContext with BeforeAndAfterEac
 
   test("filtering parquet without both code gen and off-heap cache") {
     spark.sqlContext.setConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
-    withSQLConf("spark.sql.oap.parquet.data.cache.enable" -> "false") {
+    withSQLConf("spark.sql.oap.parquet.data.cache.enabled" -> "false") {
       val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
       data.toDF("key", "value").createOrReplaceTempView("t")
       sql("insert overwrite table parquet_test select * from t")

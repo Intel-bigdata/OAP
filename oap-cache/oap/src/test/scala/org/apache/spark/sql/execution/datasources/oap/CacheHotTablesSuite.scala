@@ -151,7 +151,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
 
   test("Project-> Filter -> Scan : Not Optimized, only cache hot Tables") {
     withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
+      OapConf.OAP_CACHE_TABLE_LISTS_ENABLED.key -> "true") {
       verifyProjectFilterScan(
         format => format.isInstanceOf[ParquetFileFormat],
         (plan1, plan2) => plan1.sameResult(plan2)
@@ -161,7 +161,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
 
   test("Project-> Filter -> Scan : Optimized, only cache hot Tables") {
     withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
+      OapConf.OAP_CACHE_TABLE_LISTS_ENABLED.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.parquet_test;xxx") {
       verifyProjectFilterScan(
         format => format.isInstanceOf[OptimizedParquetFileFormat],
@@ -181,7 +181,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
 
   test("Project -> Scan :  Not Optimized, only cache hot Tables") {
     withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true") {
+      OapConf.OAP_CACHE_TABLE_LISTS_ENABLED.key -> "true") {
       verifyProjectScan(
         format => format.isInstanceOf[ParquetFileFormat],
         (plan1, plan2) => plan1.sameResult(plan2)
@@ -191,7 +191,7 @@ class CacheHotTablesForParquetSuite extends CacheHotTablesSuite {
 
   test("Project -> Scan :  Optimized, only cache hot Tables") {
     withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true",
-      OapConf.OAP_CACHE_TABLE_LISTS_ENABLE.key -> "true",
+      OapConf.OAP_CACHE_TABLE_LISTS_ENABLED.key -> "true",
       OapConf.OAP_CACHE_TABLE_LISTS.key -> "default.parquet_test;xxx") {
       verifyProjectScan(
         format => format.isInstanceOf[OptimizedParquetFileFormat],
