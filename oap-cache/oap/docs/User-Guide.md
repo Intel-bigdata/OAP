@@ -243,7 +243,7 @@ The following are required to configure OAP to use PMem cache.
   
   Or you can follow the [build/install](./Developer-Guide.md#build-and-install-vmemcache) steps and make sure `libvmemcache.so` exist in `/lib64` directory in each worker node.
 
-- Currently, using Community Spark occasionally has the problem of two executors being bound to the same PMem path, so we recommend you use our pre-built numa-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz), which can not only improve performance, but also solve this problem.
+- Currently, using Community Spark occasionally has the problem of two executors being bound to the same PMem path, so we recommend you use our pre-built numa-patched [Spark-2.4.4](https://github.com/Intel-bigdata/spark/releases/download/v2.4.4-intel-oap-0.8.2/spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.2.tgz), which can not only improve performance, but also solve this problem.
 
 #### Configure for NUMA
 
@@ -253,7 +253,7 @@ The following are required to configure OAP to use PMem cache.
 
 2. We strongly recommend you use numa-patched Spark to achieve better performance gain.
    
-   Build Spark from source to enable numa-binding support, refer to [enable-numa-binding-for-PMem-in-spark](./Developer-Guide.md#Enabling-NUMA-binding-for-PMem-in-Spark). Or you can just download our pre-built numa-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz).
+   Build Spark from source to enable numa-binding support, refer to [enable-numa-binding-for-PMem-in-spark](./Developer-Guide.md#Enabling-NUMA-binding-for-PMem-in-Spark). Or you can just download our pre-built [Spark-2.4.4](https://github.com/Intel-bigdata/spark/releases/download/v2.4.4-intel-oap-0.8.2/spark-2.4.4-bin-hadoop2.7-intel-oap-0.8.2.tgz).
 
 #### Configure for PMem 
 
@@ -517,7 +517,7 @@ spark.executor.sql.oap.cache.persistent.memory.initial.size  256g
 ### External cache using plasma
 
 
-External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched Spark-3.0.0. 
+External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched Spark-2.4.4. 
 
 To use this strategy, follow [prerequisites](#prerequisites-1) to set up PMem hardware. 
 
