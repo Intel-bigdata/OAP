@@ -82,7 +82,7 @@ class MetadataCacheV1Suite extends MetadataCacheSuite {
       .set("spark.oap.sql.columnar.preferColumnar", "true")
       .set(SQLConf.USE_V1_SOURCE_LIST, "orc")
 
-  ignore("SPARK-16337 temporary view refresh") {
+  test("SPARK-16337 temporary view refresh") {
     withTempView("view_refresh") { withTempPath { (location: File) =>
       // Create an ORC directory
       spark.range(start = 0, end = 100, step = 1, numPartitions = 3)
@@ -109,7 +109,7 @@ class MetadataCacheV1Suite extends MetadataCacheSuite {
     }}
   }
 
-  ignore("case sensitivity support in temporary view refresh") {
+  test("case sensitivity support in temporary view refresh") {
     withSQLConf(SQLConf.CASE_SENSITIVE.key -> "false") {
       withTempView("view_refresh") {
         withTempPath { (location: File) =>

@@ -521,7 +521,7 @@ class DataFrameStatSuite extends QueryTest with SharedSparkSession {
 class DataFrameStatPerfSuite extends QueryTest with SharedSparkSession with Logging {
 
   // Turn on this test if you want to test the performance of approximate quantiles.
-  ignore("computing quantiles should not take much longer than describe()") {
+  test("computing quantiles should not take much longer than describe()") {
     val df = spark.range(5000000L).toDF("col1").cache()
     def seconds(f: => Any): Double = {
       // Do some warmup

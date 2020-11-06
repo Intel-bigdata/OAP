@@ -199,6 +199,18 @@
       <version>2.10.0</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <version>1.4.195</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.scalatestplus</groupId>
+      <artifactId>scalatestplus-mockito_2.12</artifactId>
+      <version>1.0.0-M2</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

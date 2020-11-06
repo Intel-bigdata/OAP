@@ -51,7 +51,7 @@ class StatisticsCollectionSuite extends StatisticsCollectionTestBase with Shared
       .set("spark.sql.extensions", "com.intel.oap.ColumnarPlugin")
       .set("spark.sql.execution.arrow.maxRecordsPerBatch", "4096")
       //.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
-      .set("spark.memory.offHeap.e  nabled", "true")
+      .set("spark.memory.offHeap.enabled", "true")
       .set("spark.memory.offHeap.size", "10m")
       .set("spark.sql.join.preferSortMergeJoin", "false")
       .set("spark.sql.columnar.codegen.hashAggregate", "false")
@@ -136,7 +136,7 @@ class StatisticsCollectionSuite extends StatisticsCollectionTestBase with Shared
     }
   }
 
-  ignore("analyze column command - unsupported types and invalid columns") {
+  test("analyze column command - unsupported types and invalid columns") {
     val tableName = "column_stats_test1"
     withTable(tableName) {
       Seq(ArrayData(Seq(1, 2, 3), Seq(Seq(1, 2, 3)))).toDF().write.saveAsTable(tableName)
@@ -180,7 +180,7 @@ class StatisticsCollectionSuite extends StatisticsCollectionTestBase with Shared
       spark.sessionState.conf.autoBroadcastJoinThreshold)
   }
 
-  ignore("column stats round trip serialization") {
+  test("column stats round trip serialization") {
     // Make sure we serialize and then deserialize and we will get the result data
     val df = data.toDF(stats.keys.toSeq :+ "carray" : _*)
     Seq(stats, statsWithHgms).foreach { s =>

@@ -582,7 +582,7 @@ class JsonFunctionsSuite extends QueryTest with SharedSparkSession {
       Seq(Row(expected)))
   }
 
-  ignore("from_json invalid json - check modes") {
+  test("from_json invalid json - check modes") {
     withSQLConf(SQLConf.COLUMN_NAME_OF_CORRUPT_RECORD.key -> "_unparsed") {
       val schema = new StructType()
         .add("a", IntegerType)

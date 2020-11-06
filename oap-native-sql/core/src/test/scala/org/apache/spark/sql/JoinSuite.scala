@@ -156,7 +156,7 @@ class JoinSuite extends QueryTest with SharedSparkSession with AdaptiveSparkPlan
     }
   }
 
-//  ignore("SortMergeJoin shouldn't work on unsortable columns") {
+//  test("SortMergeJoin shouldn't work on unsortable columns") {
 //    Seq(
 //      ("SELECT * FROM arrayData JOIN complexData ON data = a", classOf[ShuffledHashJoin])
 //    ).foreach { case (query, joinClass) => assertJoin(query, joinClass) }

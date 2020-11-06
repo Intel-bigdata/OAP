@@ -895,7 +895,7 @@ class DataFrameSuite extends QueryTest
     }
   }
 
-  ignore("show") {
+  test("show") {
     // This test case is intended ignored, but to make sure it compiles correctly
     testData.select($"*").show()
     testData.select($"*").show(1000)

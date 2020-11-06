@@ -854,7 +854,7 @@ class DateFunctionsSuite extends QueryTest with SharedSparkSession {
         Row(Timestamp.valueOf("2015-07-24 22:00:00"))))
   }
 
-  ignore("SPARK-30668: use legacy timestamp parser in to_timestamp") {
+  test("SPARK-30668: use legacy timestamp parser in to_timestamp") {
     val confKey = SQLConf.LEGACY_TIME_PARSER_POLICY.key
     val df = Seq("2020-01-27T20:06:11.847-0800").toDF("ts")
     withSQLConf(confKey -> "legacy") {

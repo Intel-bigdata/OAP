@@ -55,7 +55,7 @@ class SQLQuerySuite extends QueryTest with SharedSparkSession with AdaptiveSpark
       .set("spark.sql.extensions", "com.intel.oap.ColumnarPlugin")
       .set("spark.sql.execution.arrow.maxRecordsPerBatch", "4096")
       //.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
-      .set("spark.memory.offHeap.e  nabled", "true")
+      .set("spark.memory.offHeap.enabled", "true")
       .set("spark.memory.offHeap.size", "10m")
       .set("spark.sql.join.preferSortMergeJoin", "false")
       .set("spark.sql.columnar.codegen.hashAggregate", "false")
@@ -1251,7 +1251,7 @@ class SQLQuerySuite extends QueryTest with SharedSparkSession with AdaptiveSpark
       Row(1))
   }
 
-  ignore(
+  test(
     "SPARK-16748: SparkExceptions during planning should not wrapped in TreeNodeException") {
     intercept[SparkException] {
       val df = spark.range(0, 5).map(x => (1 / x).toString).toDF("a").orderBy("a")
@@ -2831,7 +2831,7 @@ class SQLQuerySuite extends QueryTest with SharedSparkSession with AdaptiveSpark
     }
   }
 
-  ignore("SRARK-22266: the same aggregate function was calculated multiple times") {
+  test("SRARK-22266: the same aggregate function was calculated multiple times") {
     val query = "SELECT a, max(b+1), max(b+1) + 1 FROM testData2 GROUP BY a"
     val df = sql(query)
     val physical = df.queryExecution.sparkPlan

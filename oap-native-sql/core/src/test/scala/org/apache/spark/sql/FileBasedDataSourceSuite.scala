@@ -88,11 +88,9 @@ class FileBasedDataSourceSuite extends QueryTest
     }
   }
 
-  //TODO: failed ut
-  /*
   // `TEXT` data source always has a single column whose name is `value`.
   allFileBasedDataSources.filterNot(_ == "text").foreach { format =>
-    test(s"SPARK-23072 Write and read back unicode column names - $format") {
+    ignore(s"SPARK-23072 Write and read back unicode column names - $format") {
       withTempPath { path =>
         val dir = path.getCanonicalPath
 
@@ -112,7 +110,7 @@ class FileBasedDataSourceSuite extends QueryTest
   // Only ORC/Parquet support this. `CSV` and `JSON` returns an empty schema.
   // `TEXT` data source always has a single column whose name is `value`.
   Seq("orc", "parquet").foreach { format =>
-    test(s"SPARK-15474 Write and read back non-empty schema with empty dataframe - $format") {
+    ignore(s"SPARK-15474 Write and read back non-empty schema with empty dataframe - $format") {
       withTempPath { file =>
         val path = file.getCanonicalPath
         val emptyDf = Seq((true, 1, "str")).toDF().limit(0)
@@ -126,7 +124,7 @@ class FileBasedDataSourceSuite extends QueryTest
   }
 
   Seq("orc", "parquet").foreach { format =>
-    test(s"SPARK-23271 empty RDD when saved should write a metadata only file - $format") {
+    ignore(s"SPARK-23271 empty RDD when saved should write a metadata only file - $format") {
       withTempPath { outputPath =>
         val df = spark.emptyDataFrame.select(lit(1).as("i"))
         df.write.format(format).save(outputPath.toString)
@@ -141,7 +139,6 @@ class FileBasedDataSourceSuite extends QueryTest
       }
     }
   }
-   */
 
   allFileBasedDataSources.foreach { format =>
     test(s"SPARK-23372 error while writing empty schema files using $format") {
@@ -170,10 +167,8 @@ class FileBasedDataSourceSuite extends QueryTest
     }
   }
 
-  //TODO: failed ut
-  /*
   allFileBasedDataSources.foreach { format =>
-    test(s"SPARK-22146 read files containing special characters using $format") {
+    ignore(s"SPARK-22146 read files containing special characters using $format") {
       withTempDir { dir =>
         val tmpFile = s"$dir/$nameWithSpecialChars"
         spark.createDataset(Seq("a", "b")).write.format(format).save(tmpFile)
@@ -185,7 +180,7 @@ class FileBasedDataSourceSuite extends QueryTest
 
   // Separate test case for formats that support multiLine as an option.
   Seq("json", "csv").foreach { format =>
-    test("SPARK-23148 read files containing special characters " +
+    ignore("SPARK-23148 read files containing special characters " +
       s"using $format with multiline enabled") {
       withTempDir { dir =>
         val tmpFile = s"$dir/$nameWithSpecialChars"
@@ -198,7 +193,7 @@ class FileBasedDataSourceSuite extends QueryTest
   }
 
   allFileBasedDataSources.foreach { format =>
-    testQuietly(s"Enabling/disabling ignoreMissingFiles using $format") {
+    ignore(s"Enabling/disabling ignoreMissingFiles using $format") {
       def testIgnoreMissingFiles(): Unit = {
         withTempDir { dir =>
           val basePath = dir.getCanonicalPath
@@ -250,7 +245,6 @@ class FileBasedDataSourceSuite extends QueryTest
       }
     }
   }
-   */
 
   // Text file format only supports string type
   test("SPARK-24691 error handling for unsupported types - text") {
@@ -469,10 +463,8 @@ class FileBasedDataSourceSuite extends QueryTest
     }
   }
 
-  //TODO: failed ut
-  /*
   Seq("parquet", "orc").foreach { format =>
-    test(s"Spark native readers should respect spark.sql.caseSensitive - ${format}") {
+    ignore(s"Spark native readers should respect spark.sql.caseSensitive - ${format}") {
       withTempDir { dir =>
         val tableName = s"spark_25132_${format}_native"
         val tableDir = dir.getCanonicalPath + s"/$tableName"
@@ -514,7 +506,6 @@ class FileBasedDataSourceSuite extends QueryTest
       }
     }
   }
-   */
 
   ignore("SPARK-25237 compute correct input metrics in FileScanRDD") {
     // TODO: Test CSV V2 as well after it implements [[SupportsReportStatistics]].
