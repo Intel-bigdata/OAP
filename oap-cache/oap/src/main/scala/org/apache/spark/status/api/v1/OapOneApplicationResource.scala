@@ -47,10 +47,12 @@ private[v1] class OapAbstractApplicationResource extends BaseAppResource {
       {
         val cacheStats = OapRuntime.getOrCreate.fiberSensor.getExecutorToCacheManager.
           getOrDefault(executorSummary.id, CacheStats())
-        val indexDataCacheSeparationEnable = SparkEnv.get.conf.getBoolean(
-          OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
-          OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get)
-
+        val indexDataCacheSeparationEnable =
+          if (SparkEnv.get.conf.getOption(OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED.key).isDefined) {
+            SparkEnv.get.conf.get(OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED)
+          } else {
+            SparkEnv.get.conf.get(OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE)
+          }
         new FiberCacheManagerSummary(
           executorSummary.id,
           executorSummary.hostPort,
