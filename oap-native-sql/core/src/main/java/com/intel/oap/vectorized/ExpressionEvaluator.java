@@ -60,38 +60,45 @@ public class ExpressionEvaluator implements AutoCloseable {
   /** Convert ExpressionTree into native function. */
   public String build(Schema schema, List<ExpressionTree> exprs)
       throws RuntimeException, IOException, GandivaException {
-    nativeHandler = jniWrapper.nativeBuild(getSchemaBytesBuf(schema), getExprListBytesBuf(exprs), null, false);
+    ExpressionMemoryPool pool = ExpressionMemoryPool.forSpark();
+    nativeHandler = jniWrapper.nativeBuild(pool.getNativeInstanceId(), getSchemaBytesBuf(schema),
+        getExprListBytesBuf(exprs), null, false);
     return jniWrapper.nativeGetSignature(nativeHandler);
   }
 
   /** Convert ExpressionTree into native function. */
   public String build(Schema schema, List<ExpressionTree> exprs, boolean finishReturn)
       throws RuntimeException, IOException, GandivaException {
-    nativeHandler = jniWrapper.nativeBuild(getSchemaBytesBuf(schema), getExprListBytesBuf(exprs), null, finishReturn);
+    ExpressionMemoryPool pool = ExpressionMemoryPool.forSpark();
+    nativeHandler = jniWrapper.nativeBuild(pool.getNativeInstanceId(), getSchemaBytesBuf(schema),
+        getExprListBytesBuf(exprs), null, finishReturn);
     return jniWrapper.nativeGetSignature(nativeHandler);
   }
 
   /** Convert ExpressionTree into native function. */
   public String build(Schema schema, List<ExpressionTree> exprs, Schema resSchema)
       throws RuntimeException, IOException, GandivaException {
-    nativeHandler = jniWrapper.nativeBuild(getSchemaBytesBuf(schema), getExprListBytesBuf(exprs),
-        getSchemaBytesBuf(resSchema), false);
+    ExpressionMemoryPool pool = ExpressionMemoryPool.forSpark();
+    nativeHandler = jniWrapper.nativeBuild(pool.getNativeInstanceId(), getSchemaBytesBuf(schema),
+        getExprListBytesBuf(exprs), getSchemaBytesBuf(resSchema), false);
     return jniWrapper.nativeGetSignature(nativeHandler);
   }
 
   /** Convert ExpressionTree into native function. */
   public String build(Schema schema, List<ExpressionTree> exprs, Schema resSchema, boolean finishReturn)
       throws RuntimeException, IOException, GandivaException {
-    nativeHandler = jniWrapper.nativeBuild(getSchemaBytesBuf(schema), getExprListBytesBuf(exprs),
-        getSchemaBytesBuf(resSchema), finishReturn);
+    ExpressionMemoryPool pool = ExpressionMemoryPool.forSpark();
+    nativeHandler = jniWrapper.nativeBuild(pool.getNativeInstanceId(), getSchemaBytesBuf(schema),
+        getExprListBytesBuf(exprs), getSchemaBytesBuf(resSchema), finishReturn);
     return jniWrapper.nativeGetSignature(nativeHandler);
   }
 
   /** Convert ExpressionTree into native function. */
   public String build(Schema schema, List<ExpressionTree> exprs, List<ExpressionTree> finish_exprs)
       throws RuntimeException, IOException, GandivaException {
-    nativeHandler = jniWrapper.nativeBuildWithFinish(getSchemaBytesBuf(schema), getExprListBytesBuf(exprs),
-        getExprListBytesBuf(finish_exprs));
+    ExpressionMemoryPool pool = ExpressionMemoryPool.forSpark();
+    nativeHandler = jniWrapper.nativeBuildWithFinish(pool.getNativeInstanceId(),
+        getSchemaBytesBuf(schema), getExprListBytesBuf(exprs), getExprListBytesBuf(finish_exprs));
     return jniWrapper.nativeGetSignature(nativeHandler);
   }
 

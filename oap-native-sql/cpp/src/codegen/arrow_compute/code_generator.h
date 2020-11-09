@@ -35,6 +35,7 @@ namespace arrowcompute {
 class ArrowComputeCodeGenerator : public CodeGenerator {
  public:
   ArrowComputeCodeGenerator(
+      arrow::MemoryPool* memory_pool,
       std::shared_ptr<arrow::Schema> schema_ptr,
       std::vector<std::shared_ptr<gandiva::Expression>> expr_vector,
       std::vector<std::shared_ptr<arrow::Field>> ret_types, bool return_when_finish,
@@ -49,12 +50,12 @@ class ArrowComputeCodeGenerator : public CodeGenerator {
     for (auto expr : expr_vector) {
       std::shared_ptr<ExprVisitor> root_visitor;
       if (finish_exprs_vector.empty()) {
-        auto visitor = MakeExprVisitor(schema_ptr, expr, ret_types_, &expr_visitor_cache_,
+        auto visitor = MakeExprVisitor(memory_pool, schema_ptr, expr, ret_types_, &expr_visitor_cache_,
                                        &root_visitor);
         auto status = DistinctInsert(root_visitor, &visitor_list_);
       } else {
         auto visitor =
-            MakeExprVisitor(schema_ptr, expr, ret_types_, finish_exprs_vector[i++],
+            MakeExprVisitor(memory_pool, schema_ptr, expr, ret_types_, finish_exprs_vector[i++],
                             &expr_visitor_cache_, &root_visitor);
         auto status = DistinctInsert(root_visitor, &visitor_list_);
       }

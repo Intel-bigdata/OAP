@@ -34,26 +34,28 @@ namespace sparkcolumnarplugin {
 namespace codegen {
 namespace arrowcompute {
 
-arrow::Status MakeExprVisitor(std::shared_ptr<arrow::Schema> schema_ptr,
+arrow::Status MakeExprVisitor(arrow::MemoryPool* memory_pool,
+                              std::shared_ptr<arrow::Schema> schema_ptr,
                               std::shared_ptr<gandiva::Expression> expr,
                               std::vector<std::shared_ptr<arrow::Field>> ret_fields,
                               ExprVisitorMap* expr_visitor_cache,
                               std::shared_ptr<ExprVisitor>* out) {
-  auto visitor = std::make_shared<BuilderVisitor>(schema_ptr, expr->root(), ret_fields,
+  auto visitor = std::make_shared<BuilderVisitor>(memory_pool, schema_ptr, expr->root(), ret_fields,
                                                   expr_visitor_cache);
   RETURN_NOT_OK(visitor->Eval());
   RETURN_NOT_OK(visitor->GetResult(out));
   return arrow::Status::OK();
 }
 
-arrow::Status MakeExprVisitor(std::shared_ptr<arrow::Schema> schema_ptr,
+arrow::Status MakeExprVisitor(arrow::MemoryPool* memory_pool,
+                              std::shared_ptr<arrow::Schema> schema_ptr,
                               std::shared_ptr<gandiva::Expression> expr,
                               std::vector<std::shared_ptr<arrow::Field>> ret_fields,
                               std::shared_ptr<gandiva::Expression> finish_expr,
                               ExprVisitorMap* expr_visitor_cache,
                               std::shared_ptr<ExprVisitor>* out) {
   auto visitor = std::make_shared<BuilderVisitor>(
-      schema_ptr, expr->root(), ret_fields, finish_expr->root(), expr_visitor_cache);
+      memory_pool, schema_ptr, expr->root(), ret_fields, finish_expr->root(), expr_visitor_cache);
   RETURN_NOT_OK(visitor->Eval());
   RETURN_NOT_OK(visitor->GetResult(out));
   return arrow::Status::OK();
@@ -76,26 +78,26 @@ arrow::Status BuilderVisitor::Visit(const gandiva::FunctionNode& node) {
   // we don't need to create expr_visitor for its children.
   if (func_name.compare(0, 17, "wholestagecodegen") == 0) {
     RETURN_NOT_OK(
-        ExprVisitor::Make(std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
+        ExprVisitor::Make(memory_pool_, std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
                           schema_, ret_fields_, &expr_visitor_));
   } else if (func_name.compare("standalone") == 0) {
     RETURN_NOT_OK(
-        ExprVisitor::Make(std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
+        ExprVisitor::Make(memory_pool_, std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
                           schema_, ret_fields_, &expr_visitor_));
   } else if (func_name.compare("HashRelation") == 0) {
     RETURN_NOT_OK(
-        ExprVisitor::Make(std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
+        ExprVisitor::Make(memory_pool_, std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
                           schema_, ret_fields_, &expr_visitor_));
   } else if (func_name.compare(0, 8, "codegen_") == 0) {
     RETURN_NOT_OK(
-        ExprVisitor::Make(std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
+        ExprVisitor::Make(memory_pool_, std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
                           schema_, ret_fields_, &expr_visitor_));
   } else if (func_name == "window") {
-    RETURN_NOT_OK(ExprVisitor::MakeWindow(schema_, ret_fields_, node, &expr_visitor_));
+    RETURN_NOT_OK(ExprVisitor::MakeWindow(memory_pool_, schema_, ret_fields_, node, &expr_visitor_));
   } else {
     for (auto child_node : node.children()) {
-      auto child_visitor = std::make_shared<BuilderVisitor>(
-          schema_, child_node, ret_fields_, expr_visitor_cache_);
+      auto child_visitor = std::make_shared<BuilderVisitor>(memory_pool_,
+                                                            schema_, child_node, ret_fields_, expr_visitor_cache_);
       RETURN_NOT_OK(child_visitor->Eval());
       switch (child_visitor->GetNodeType()) {
         case BuilderVisitorNodeType::FunctionNode: {
@@ -139,10 +141,10 @@ arrow::Status BuilderVisitor::Visit(const gandiva::FunctionNode& node) {
     auto search = expr_visitor_cache_->find(node_id_);
     if (search == expr_visitor_cache_->end()) {
       if (dependency) {
-        RETURN_NOT_OK(ExprVisitor::Make(schema_, node.descriptor()->name(), param_names,
+        RETURN_NOT_OK(ExprVisitor::Make(memory_pool_, schema_, node.descriptor()->name(), param_names,
                                         dependency, finish_func_, &expr_visitor_));
       } else {
-        RETURN_NOT_OK(ExprVisitor::Make(schema_, node.descriptor()->name(), param_names,
+        RETURN_NOT_OK(ExprVisitor::Make(memory_pool_, schema_, node.descriptor()->name(), param_names,
                                         nullptr, finish_func_, &expr_visitor_));
       }
       expr_visitor_cache_->insert(
@@ -175,25 +177,27 @@ arrow::Status BuilderVisitor::GetResult(std::shared_ptr<ExprVisitor>* out) {
 }
 
 //////////////////////// ExprVisitor ////////////////////////
-arrow::Status ExprVisitor::Make(std::shared_ptr<arrow::Schema> schema_ptr,
+arrow::Status ExprVisitor::Make(arrow::MemoryPool* memory_pool,
+                                std::shared_ptr<arrow::Schema> schema_ptr,
                                 std::string func_name,
                                 std::vector<std::string> param_field_names,
                                 std::shared_ptr<ExprVisitor> dependency,
                                 std::shared_ptr<gandiva::Node> finish_func,
                                 std::shared_ptr<ExprVisitor>* out) {
-  auto expr = std::make_shared<ExprVisitor>(schema_ptr, func_name, param_field_names,
-                                            dependency, finish_func);
+  auto expr = std::make_shared<ExprVisitor>(arrow::compute::FunctionContext(memory_pool), schema_ptr, func_name,
+      param_field_names,dependency, finish_func);
   RETURN_NOT_OK(expr->MakeExprVisitorImpl(func_name, expr.get()));
   *out = expr;
   return arrow::Status::OK();
 }
 
-arrow::Status ExprVisitor::Make(const std::shared_ptr<gandiva::FunctionNode>& node,
+arrow::Status ExprVisitor::Make(arrow::MemoryPool* memory_pool,
+                                const std::shared_ptr<gandiva::FunctionNode>& node,
                                 std::shared_ptr<arrow::Schema> schema_ptr,
                                 std::vector<std::shared_ptr<arrow::Field>> ret_fields,
                                 std::shared_ptr<ExprVisitor>* out) {
   auto func_name = node->descriptor()->name();
-  *out = std::make_shared<ExprVisitor>(func_name);
+  *out = std::make_shared<ExprVisitor>(arrow::compute::FunctionContext(memory_pool), func_name);
   if (func_name.compare(0, 17, "wholestagecodegen") == 0) {
     auto function_node =
         std::dynamic_pointer_cast<gandiva::FunctionNode>(node->children()[0]);
@@ -251,7 +255,8 @@ arrow::Status ExprVisitor::Make(const std::shared_ptr<gandiva::FunctionNode>& no
   return arrow::Status::OK();
 }
 
-arrow::Status ExprVisitor::MakeWindow(std::shared_ptr<arrow::Schema> schema_ptr,
+arrow::Status ExprVisitor::MakeWindow(arrow::MemoryPool* memory_pool,
+                                      std::shared_ptr<arrow::Schema> schema_ptr,
                                       std::vector<std::shared_ptr<arrow::Field>> ret_fields,
                                       const gandiva::FunctionNode& node,
                                       std::shared_ptr<ExprVisitor>* out) {
@@ -259,7 +264,7 @@ arrow::Status ExprVisitor::MakeWindow(std::shared_ptr<arrow::Schema> schema_ptr,
   if (func_name != "window") {
     return arrow::Status::Invalid("window's Gandiva function name mismatch");
   }
-  *out = std::make_shared<ExprVisitor>(schema_ptr, func_name);
+  *out = std::make_shared<ExprVisitor>(arrow::compute::FunctionContext(memory_pool), schema_ptr, func_name);
   std::vector<std::shared_ptr<gandiva::FunctionNode>> window_functions;
   std::shared_ptr<gandiva::FunctionNode> partition_spec;
   std::shared_ptr<gandiva::FunctionNode> order_spec;
@@ -292,11 +297,12 @@ arrow::Status ExprVisitor::MakeWindow(std::shared_ptr<arrow::Schema> schema_ptr,
   return arrow::Status::OK();
 }
 
-ExprVisitor::ExprVisitor(std::shared_ptr<arrow::Schema> schema_ptr, std::string func_name,
+ExprVisitor::ExprVisitor(arrow::compute::FunctionContext ctx,
+                         std::shared_ptr<arrow::Schema> schema_ptr, std::string func_name,
                          std::vector<std::string> param_field_names,
                          std::shared_ptr<ExprVisitor> dependency,
                          std::shared_ptr<gandiva::Node> finish_func)
-    : schema_(schema_ptr), func_name_(func_name), param_field_names_(param_field_names) {
+    : ctx_(std::move(ctx)), schema_(schema_ptr), func_name_(func_name), param_field_names_(param_field_names) {
   if (dependency) {
     dependency_ = dependency;
   }
@@ -305,10 +311,12 @@ ExprVisitor::ExprVisitor(std::shared_ptr<arrow::Schema> schema_ptr, std::string 
   }
 }
 
-ExprVisitor::ExprVisitor(std::string func_name) : func_name_(func_name) {}
+ExprVisitor::ExprVisitor(arrow::compute::FunctionContext ctx, std::string func_name)
+    : ctx_(std::move(ctx)), func_name_(func_name) {}
 
-ExprVisitor::ExprVisitor(std::shared_ptr<arrow::Schema> schema_ptr, std::string func_name)
-    : schema_(schema_ptr), func_name_(func_name) {}
+ExprVisitor::ExprVisitor(arrow::compute::FunctionContext ctx,
+                         std::shared_ptr<arrow::Schema> schema_ptr, std::string func_name)
+    : ctx_(std::move(ctx)), schema_(schema_ptr), func_name_(func_name) {}
 
 arrow::Status ExprVisitor::MakeExprVisitorImpl(
     const std::string& func_name, std::shared_ptr<gandiva::FunctionNode> func_node,
@@ -661,7 +669,7 @@ arrow::Status ExprVisitor::Init() {
         std::dynamic_pointer_cast<gandiva::FunctionNode>(finish_func_)
             ->descriptor()
             ->name();
-    RETURN_NOT_OK(ExprVisitor::Make(schema_, finish_func_name, param_field_names_,
+    RETURN_NOT_OK(ExprVisitor::Make(ctx_.memory_pool(), schema_, finish_func_name, param_field_names_,
                                     shared_from_this(), nullptr, &finish_visitor_));
     RETURN_NOT_OK(finish_visitor_->Init());
   }

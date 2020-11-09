@@ -27,6 +27,7 @@
 namespace sparkcolumnarplugin {
 namespace codegen {
 arrow::Status CreateCodeGenerator(
+    arrow::MemoryPool* memory_pool,
     std::shared_ptr<arrow::Schema> schema_ptr,
     std::vector<std::shared_ptr<::gandiva::Expression>> exprs_vector,
     std::vector<std::shared_ptr<arrow::Field>> ret_types,
@@ -39,7 +40,7 @@ arrow::Status CreateCodeGenerator(
   switch (codegen_type) {
     case ARROW_COMPUTE:
       *out = std::make_shared<arrowcompute::ArrowComputeCodeGenerator>(
-          schema_ptr, exprs_vector, ret_types, return_when_finish, finish_exprs_vector);
+          memory_pool, schema_ptr, exprs_vector, ret_types, return_when_finish, finish_exprs_vector);
       break;
     case GANDIVA:
       *out = std::make_shared<gandiva::GandivaCodeGenerator>(

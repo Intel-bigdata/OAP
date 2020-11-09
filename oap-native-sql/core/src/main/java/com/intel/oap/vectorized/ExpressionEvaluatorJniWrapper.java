@@ -56,6 +56,8 @@ public class ExpressionEvaluatorJniWrapper {
          * Generates the projector module to evaluate the expressions with custom
          * configuration.
          *
+         * @param memoryPool   The memoryPool ID of which the pool instance will be
+         *                     used in expression evaluation
          * @param schemaBuf    The schema serialized as a protobuf. See Types.proto to
          *                     see the protobuf specification
          * @param exprListBuf  The serialized protobuf of the expression vector. Each
@@ -67,13 +69,15 @@ public class ExpressionEvaluatorJniWrapper {
          * @return A nativeHandler that is passed to the evaluateProjector() and
          *         closeProjector() methods
          */
-        native long nativeBuild(byte[] schemaBuf, byte[] exprListBuf, byte[] resSchemaBuf, boolean finishReturn)
+        native long nativeBuild( long memoryPool, byte[] schemaBuf, byte[] exprListBuf, byte[] resSchemaBuf, boolean finishReturn)
                         throws RuntimeException, IOException;
 
         /**
          * Generates the projector module to evaluate the expressions with custom
          * configuration.
          *
+         * @param memoryPool        The memoryPool ID of which the pool instance will be
+         *                          used in expression evaluation
          * @param schemaBuf         The schema serialized as a protobuf. See Types.proto
          *                          to see the protobuf specification
          * @param exprListBuf       The serialized protobuf of the expression vector.
@@ -85,7 +89,7 @@ public class ExpressionEvaluatorJniWrapper {
          * @return A nativeHandler that is passed to the evaluateProjector() and
          *         closeProjector() methods
          */
-        native long nativeBuildWithFinish(byte[] schemaBuf, byte[] exprListBuf, byte[] finishExprListBuf)
+        native long nativeBuildWithFinish(long memoryPool, byte[] schemaBuf, byte[] exprListBuf, byte[] finishExprListBuf)
                         throws RuntimeException, IOException;
 
         /**
