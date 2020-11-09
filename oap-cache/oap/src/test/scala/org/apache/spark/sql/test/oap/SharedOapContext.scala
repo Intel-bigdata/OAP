@@ -23,7 +23,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileSystem
 
 import org.apache.spark.sql.{OapExtensions, SparkSession}
-import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, SparkPlan}
+import org.apache.spark.sql.execution.{FilterExec, OapFileSourceScanExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.oap.{IndexType, OapFileFormat}
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.{OapDriverRuntime, OapRuntime}
@@ -78,7 +78,7 @@ trait SharedOapContextBase extends OapSharedSQLContext {
   protected def getOapFileFormat(sparkPlan: SparkPlan): Set[Option[OapFileFormat]] = {
     def getOapFileFormatFromSource(node: SparkPlan): Option[OapFileFormat] = {
       node match {
-        case f: FileSourceScanExec =>
+        case f: OapFileSourceScanExec =>
           f.relation.fileFormat match {
             case format: OapFileFormat =>
               Some(format)

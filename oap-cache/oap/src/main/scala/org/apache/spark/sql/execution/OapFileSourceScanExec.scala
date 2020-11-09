@@ -17,17 +17,14 @@
 
 package org.apache.spark.sql.execution
 
-import scala.collection.mutable.ArrayBuffer
-
-import org.apache.commons.lang3.StringUtils
 import org.apache.hadoop.fs.{BlockLocation, FileStatus, LocatedFileStatus, Path}
+import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
+import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, Expression, SortOrder, UnsafeProjection}
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.execution.datasources._
@@ -35,117 +32,8 @@ import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OapMetrics
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.oap.OapRuntime
-import org.apache.spark.sql.sources.{BaseRelation, Filter}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
-
-trait DataSourceScanExec extends LeafExecNode with CodegenSupport {
-  val relation: BaseRelation
-  val tableIdentifier: Option[TableIdentifier]
-
-  protected val nodeNamePrefix: String = ""
-
-  override val nodeName: String = {
-    s"Scan $relation ${tableIdentifier.map(_.unquotedString).getOrElse("")}"
-  }
-
-  // Metadata that describes more details of this scan.
-  protected def metadata: Map[String, String]
-
-  override def simpleString: String = {
-    val metadataEntries = metadata.toSeq.sorted.map {
-      case (key, value) =>
-        key + ": " + StringUtils.abbreviate(redact(value), 100)
-    }
-    val metadataStr = Utils.truncatedString(metadataEntries, " ", ", ", "")
-    s"$nodeNamePrefix$nodeName${Utils.truncatedString(output, "[", ",", "]")}$metadataStr"
-  }
-
-  override def verboseString: String = redact(super.verboseString)
-
-  override def treeString(verbose: Boolean, addSuffix: Boolean): String = {
-    redact(super.treeString(verbose, addSuffix))
-  }
-
-  /**
-   * Shorthand for calling redactString() without specifying redacting rules
-   */
-  private def redact(text: String): String = {
-    Utils.redact(sqlContext.sessionState.conf.stringRedactionPattern, text)
-  }
-}
-
-/** Physical plan node for scanning data from a relation. */
-case class RowDataSourceScanExec(
-    fullOutput: Seq[Attribute],
-    requiredColumnsIndex: Seq[Int],
-    filters: Set[Filter],
-    handledFilters: Set[Filter],
-    rdd: RDD[InternalRow],
-    @transient relation: BaseRelation,
-    override val tableIdentifier: Option[TableIdentifier])
-  extends DataSourceScanExec {
-
-  def output: Seq[Attribute] = requiredColumnsIndex.map(fullOutput)
-
-  override lazy val metrics =
-    Map("numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"))
-
-  protected override def doExecute(): RDD[InternalRow] = {
-    val numOutputRows = longMetric("numOutputRows")
-
-    rdd.mapPartitionsWithIndexInternal { (index, iter) =>
-      val proj = UnsafeProjection.create(schema)
-      proj.initialize(index)
-      iter.map( r => {
-        numOutputRows += 1
-        proj(r)
-      })
-    }
-  }
-
-  override def inputRDDs(): Seq[RDD[InternalRow]] = {
-    rdd :: Nil
-  }
-
-  override protected def doProduce(ctx: CodegenContext): String = {
-    val numOutputRows = metricTerm(ctx, "numOutputRows")
-    // PhysicalRDD always just has one input
-    val input = ctx.addMutableState("scala.collection.Iterator", "input", v => s"$v = inputs[0];")
-    val exprRows = output.zipWithIndex.map{ case (a, i) =>
-      BoundReference(i, a.dataType, a.nullable)
-    }
-    val row = ctx.freshName("row")
-    ctx.INPUT_ROW = row
-    ctx.currentVars = null
-    val columnsRowInput = exprRows.map(_.genCode(ctx))
-    s"""
-       |while ($input.hasNext()) {
-       |  InternalRow $row = (InternalRow) $input.next();
-       |  $numOutputRows.add(1);
-       |  ${consume(ctx, columnsRowInput).trim}
-       |  if (shouldStop()) return;
-       |}
-     """.stripMargin
-  }
-
-  override val metadata: Map[String, String] = {
-    val markedFilters = for (filter <- filters) yield {
-      if (handledFilters.contains(filter)) s"*$filter" else s"$filter"
-    }
-    Map(
-      "ReadSchema" -> output.toStructType.catalogString,
-      "PushedFilters" -> markedFilters.mkString("[", ", ", "]"))
-  }
-
-  // Don't care about `rdd` and `tableIdentifier` when canonicalizing.
-  override def doCanonicalize(): SparkPlan =
-    copy(
-      fullOutput.map(QueryPlan.normalizeExprId(_, fullOutput)),
-      rdd = null,
-      tableIdentifier = None)
-}
 
 /**
  * Physical plan node for scanning data from HadoopFsRelations.
@@ -158,7 +46,7 @@ case class RowDataSourceScanExec(
  * @param dataFilters Filters on non-partition columns.
  * @param tableIdentifier identifier for the table in the metastore.
  */
-case class FileSourceScanExec(
+case class OapFileSourceScanExec(
     @transient relation: HadoopFsRelation,
     output: Seq[Attribute],
     requiredSchema: StructType,
@@ -444,21 +332,10 @@ case class FileSourceScanExec(
     val splitFiles = selectedPartitions.flatMap { partition =>
       partition.files.flatMap { file =>
         val blockLocations = getBlockLocations(file)
-        if (fsRelation.fileFormat.isSplitable(
-            fsRelation.sparkSession, fsRelation.options, file.getPath)) {
-          (0L until file.getLen by maxSplitBytes).map { offset =>
-            val remaining = file.getLen - offset
-            val size = if (remaining > maxSplitBytes) maxSplitBytes else remaining
-            val hosts = getBlockHosts(blockLocations, offset, size)
-            PartitionedFile(
-              partition.values, file.getPath.toUri.toString, offset, size, hosts)
-          }
-        } else {
-          val cachedHosts = OapRuntime.getOrCreate.fiberSensor.getHosts(file.getPath.toString)
-          val hosts = cachedHosts.toBuffer ++ getBlockHosts(blockLocations, 0, file.getLen)
-          Seq(PartitionedFile(
-            partition.values, file.getPath.toUri.toString, 0, file.getLen, hosts.toArray))
-        }
+        val cachedHosts = OapRuntime.getOrCreate.fiberSensor.getHosts(file.getPath.toString)
+        val hosts = cachedHosts.toBuffer ++ getBlockHosts(blockLocations, 0, file.getLen)
+        Seq(PartitionedFile(partition.values,
+          file.getPath.toUri.toString, 0, file.getLen, hosts.toArray))
       }
     }.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
 
@@ -545,8 +422,8 @@ case class FileSourceScanExec(
       metrics("numFiles") :: metrics("metadataTime") :: Nil)
   }
 
-  override def doCanonicalize(): FileSourceScanExec = {
-    FileSourceScanExec(
+  override def doCanonicalize(): OapFileSourceScanExec = {
+    OapFileSourceScanExec(
       relation,
       output.map(QueryPlan.normalizeExprId(_, output)),
       requiredSchema,

@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.oap.io
 
-import org.apache.spark.sql.execution.vectorized.{Dictionary, OnHeapColumnVector}
+import org.apache.spark.sql.execution.vectorized.{Dictionary, OapOnHeapColumnVector}
 import org.apache.spark.sql.types.BooleanType
 
 /**
@@ -29,45 +29,45 @@ class BooleanTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     throw new UnsupportedOperationException("Boolean Type not support dic encode")
 
   test("no dic no nulls") {
-    val column = new OnHeapColumnVector(total, BooleanType)
+    val column = new OapOnHeapColumnVector(total, BooleanType)
     (0 until total).foreach(i => column.putBoolean(i, i % 2 == 0))
     fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
 
     val address = fiberCache.getBaseOffset
 
     // read use batch api
-    val ret1 = new OnHeapColumnVector(total, BooleanType)
+    val ret1 = new OapOnHeapColumnVector(total, BooleanType)
     val reader = ParquetDataFiberReader(address, BooleanType, total)
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => assert(ret1.getBoolean(i) == (((i + start) % 2) == 0)))
 
     // read use random access api
-    val ret2 = new OnHeapColumnVector(total, BooleanType)
+    val ret2 = new OapOnHeapColumnVector(total, BooleanType)
     reader.readBatch(rowIdList, ret2)
     ints.indices.foreach(i => assert(ret2.getBoolean(i) == ((ints(i) % 2) == 0)))
   }
 
   test("no dic all nulls") {
-    val column = new OnHeapColumnVector(total, BooleanType)
+    val column = new OapOnHeapColumnVector(total, BooleanType)
     column.putNulls(0, total)
     fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
 
     val address = fiberCache.getBaseOffset
 
     // read use batch api
-    val ret1 = new OnHeapColumnVector(total, BooleanType)
+    val ret1 = new OapOnHeapColumnVector(total, BooleanType)
     val reader = ParquetDataFiberReader(address, BooleanType, total)
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => assert(ret1.isNullAt(i)))
 
     // read use random access api
-    val ret2 = new OnHeapColumnVector(total, BooleanType)
+    val ret2 = new OapOnHeapColumnVector(total, BooleanType)
     reader.readBatch(rowIdList, ret2)
     ints.indices.foreach(i => assert(ret2.isNullAt(i)))
   }
 
   test("no dic") {
-    val column = new OnHeapColumnVector(total, BooleanType)
+    val column = new OapOnHeapColumnVector(total, BooleanType)
     (0 until total).foreach(i => {
       if (i % 3 == 0) column.putNull(i)
       else column.putBoolean(i, i % 2 == 0)
@@ -77,7 +77,7 @@ class BooleanTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val address = fiberCache.getBaseOffset
 
     // read use batch api
-    val ret1 = new OnHeapColumnVector(total, BooleanType)
+    val ret1 = new OapOnHeapColumnVector(total, BooleanType)
     val reader = ParquetDataFiberReader(address, BooleanType, total)
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => {
@@ -86,7 +86,7 @@ class BooleanTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     })
 
     // read use random access api
-    val ret2 = new OnHeapColumnVector(total, BooleanType)
+    val ret2 = new OapOnHeapColumnVector(total, BooleanType)
     reader.readBatch(rowIdList, ret2)
     ints.indices.foreach(i => {
       if ((i + start) % 3 == 0) assert(ret2.isNullAt(i))

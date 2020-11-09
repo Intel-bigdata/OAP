@@ -45,8 +45,8 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
-import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportWrapper, SkippableVectorizedColumnReader, VectorizedColumnReader}
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetReadSupportWrapper, SkippableVectorizedColumnReader}
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
@@ -635,7 +635,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(0).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(0).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, IntegerType)
@@ -644,7 +644,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val dataFiberReader = ParquetDataFiberCompressedReader(
       address, IntegerType, rowCount, fiberCache)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
-    val ret1 = new OnHeapColumnVector(num, IntegerType)
+    val ret1 = new OapOnHeapColumnVector(num, IntegerType)
     dataFiberReader.readBatch(0, num, ret1)
     for (i <- 0 until num) {
       if (i % 2 == 0) {
@@ -667,7 +667,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(1).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(1).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, LongType)
@@ -676,7 +676,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val dataFiberReader = ParquetDataFiberCompressedReader(
       address, LongType, rowCount, fiberCache)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
-    val ret1 = new OnHeapColumnVector(num, LongType)
+    val ret1 = new OapOnHeapColumnVector(num, LongType)
 
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- 0 until num) {
@@ -700,7 +700,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(2).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(2).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, BooleanType)
@@ -710,7 +710,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
       address, BooleanType, rowCount, fiberCache)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
 
-    val ret1 = new OnHeapColumnVector(num, BooleanType)
+    val ret1 = new OapOnHeapColumnVector(num, BooleanType)
 
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- 0 until num) {
@@ -734,7 +734,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(3).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(3).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, FloatType)
@@ -744,7 +744,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
       address, FloatType, rowCount, fiberCache)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
 
-    val ret1 = new OnHeapColumnVector(num, FloatType)
+    val ret1 = new OapOnHeapColumnVector(num, FloatType)
 
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- 0 until num) {
@@ -768,7 +768,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(4).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(4).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, DoubleType)
@@ -778,7 +778,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
       address, DoubleType, rowCount, fiberCache)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
 
-    val ret1 = new OnHeapColumnVector(num, DoubleType)
+    val ret1 = new OapOnHeapColumnVector(num, DoubleType)
 
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- 0 until num) {
@@ -802,7 +802,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(5).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(5).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, BinaryType)
@@ -811,7 +811,7 @@ class ParquetCacheDataWithDictionaryWithNullsCompressedSuite extends ParquetData
     val dataFiberReader = ParquetDataFiberCompressedReader(
       address, BinaryType, rowCount, fiberCache)
 
-    val ret1 = new OnHeapColumnVector(rowCount, BinaryType)
+    val ret1 = new OapOnHeapColumnVector(rowCount, BinaryType)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- start until num) {
@@ -873,7 +873,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(0).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(0).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, IntegerType)
@@ -882,7 +882,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val dataFiberReader = ParquetDataFiberCompressedReader(
       address, IntegerType, rowCount, fiberCache)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
-    val ret1 = new OnHeapColumnVector(num, IntegerType)
+    val ret1 = new OapOnHeapColumnVector(num, IntegerType)
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- 0 until num ) {
       assert(2 == ret1.getInt(i))
@@ -903,7 +903,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(1).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(1).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, LongType)
@@ -912,7 +912,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val dataFiberReader = ParquetDataFiberCompressedReader(
       address, LongType, rowCount, fiberCache)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
-    val ret1 = new OnHeapColumnVector(num, LongType)
+    val ret1 = new OapOnHeapColumnVector(num, LongType)
 
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- 0 until num) {
@@ -934,7 +934,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(2).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(2).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, BooleanType)
@@ -944,7 +944,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
       address, BooleanType, rowCount, fiberCache)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
 
-    val ret1 = new OnHeapColumnVector(num, BooleanType)
+    val ret1 = new OapOnHeapColumnVector(num, BooleanType)
 
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- 0 until num) {
@@ -966,7 +966,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(3).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(3).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, FloatType)
@@ -976,7 +976,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
       address, FloatType, rowCount, fiberCache)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
 
-    val ret1 = new OnHeapColumnVector(num, FloatType)
+    val ret1 = new OapOnHeapColumnVector(num, FloatType)
 
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- 0 until num) {
@@ -998,7 +998,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(4).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(4).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, DoubleType)
@@ -1008,7 +1008,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
       address, DoubleType, rowCount, fiberCache)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
 
-    val ret1 = new OnHeapColumnVector(num, DoubleType)
+    val ret1 = new OapOnHeapColumnVector(num, DoubleType)
 
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- 0 until num) {
@@ -1030,7 +1030,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val columnMeta = reader.findColumnMeta(blockMetaData, columnDescriptor)
     val fiberData = reader.readFiberData(blockMetaData, columnDescriptor, columnMeta)
     val columnReader =
-      new VectorizedColumnReader(columnDescriptor, types.get(5).getOriginalType,
+      new SkippableVectorizedColumnReader(columnDescriptor, types.get(5).getOriginalType,
         fiberData.getPageReader(columnDescriptor), TimeZone.getDefault)
     val fiberCache = ParquetDataFiberCompressedWriter.
       dumpToCache(columnReader, rowCount, BinaryType)
@@ -1039,7 +1039,7 @@ class ParquetCacheDataWithDictionaryWithoutNullsCompressedSuite extends ParquetD
     val dataFiberReader = ParquetDataFiberCompressedReader(
       address, BinaryType, rowCount, fiberCache)
 
-    val ret1 = new OnHeapColumnVector(rowCount, BinaryType)
+    val ret1 = new OapOnHeapColumnVector(rowCount, BinaryType)
     val num = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
     dataFiberReader.readBatch(start, num, ret1)
     for (i <- start until num) {

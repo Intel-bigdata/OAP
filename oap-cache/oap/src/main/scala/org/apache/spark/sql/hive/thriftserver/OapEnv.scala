@@ -17,12 +17,9 @@
 
 package org.apache.spark.sql.hive.thriftserver
 
-import java.io.PrintStream
-
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{SparkSession, SQLContext}
-import org.apache.spark.sql.hive.{HiveExternalCatalog, HiveUtils}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.oap.listener.OapListener
 import org.apache.spark.sql.oap.ui.OapTab
 import org.apache.spark.util.Utils

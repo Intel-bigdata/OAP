@@ -29,7 +29,7 @@ import org.apache.spark.unsafe.types.UTF8String;
  * A column backed by an in memory JVM array. This stores the NULLs as a byte per value
  * and a java array for the values.
  */
-public final class OnHeapColumnVector extends WritableColumnVector {
+public final class OapOnHeapColumnVector extends WritableColumnVector {
 
   private static final boolean bigEndianPlatform =
     ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN);
@@ -39,7 +39,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
    * Capacity is the initial capacity of the vector and it will grow as necessary. Capacity is
    * in number of elements, not number of bytes.
    */
-  public static OnHeapColumnVector[] allocateColumns(int capacity, StructType schema) {
+  public static OapOnHeapColumnVector[] allocateColumns(int capacity, StructType schema) {
     return allocateColumns(capacity, schema.fields());
   }
 
@@ -48,10 +48,10 @@ public final class OnHeapColumnVector extends WritableColumnVector {
    * Capacity is the initial capacity of the vector and it will grow as necessary. Capacity is
    * in number of elements, not number of bytes.
    */
-  public static OnHeapColumnVector[] allocateColumns(int capacity, StructField[] fields) {
-    OnHeapColumnVector[] vectors = new OnHeapColumnVector[fields.length];
+  public static OapOnHeapColumnVector[] allocateColumns(int capacity, StructField[] fields) {
+    OapOnHeapColumnVector[] vectors = new OapOnHeapColumnVector[fields.length];
     for (int i = 0; i < fields.length; i++) {
-      vectors[i] = new OnHeapColumnVector(capacity, fields[i].dataType());
+      vectors[i] = new OapOnHeapColumnVector(capacity, fields[i].dataType());
     }
     return vectors;
   }
@@ -74,7 +74,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   private int[] arrayLengths;
   private int[] arrayOffsets;
 
-  public OnHeapColumnVector(int capacity, DataType type) {
+  public OapOnHeapColumnVector(int capacity, DataType type) {
     super(capacity, type);
 
     reserveInternal(capacity);
@@ -625,8 +625,8 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   }
 
   @Override
-  protected OnHeapColumnVector reserveNewColumn(int capacity, DataType type) {
-    return new OnHeapColumnVector(capacity, type);
+  protected OapOnHeapColumnVector reserveNewColumn(int capacity, DataType type) {
+    return new OapOnHeapColumnVector(capacity, type);
   }
 
   public int getCapacity() {

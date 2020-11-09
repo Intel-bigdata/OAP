@@ -11,7 +11,7 @@ public class ColumnVectorAllocator {
     if (memoryMode == MemoryMode.OFF_HEAP) {
       return OffHeapColumnVector.allocateColumns(capacity, schema);
     } else {
-      return OnHeapColumnVector.allocateColumns(capacity, schema);
+      return OapOnHeapColumnVector.allocateColumns(capacity, schema);
     }
   }
 }

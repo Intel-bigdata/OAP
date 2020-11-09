@@ -22,7 +22,7 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.parquet.ParquetDictionaryWrapper
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types.IntegerType
@@ -32,7 +32,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
 
   test("construct no dic no nulls") {
     val total = 10
-    val column = new OnHeapColumnVector(12, IntegerType)
+    val column = new OapOnHeapColumnVector(12, IntegerType)
     val data = (0 until 10).toArray
     column.putInts(0, total, data, 0)
     val header = ParquetDataFiberHeader(column, total)
@@ -52,10 +52,10 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
 
   test("construct with dic no nulls") {
     val total = 10
-    val column = new OnHeapColumnVector(12, IntegerType)
+    val column = new OapOnHeapColumnVector(12, IntegerType)
     val dictionary = IntegerDictionary(Array(3, 7, 9))
     column.setDictionary(new ParquetDictionaryWrapper(dictionary))
-    val dictionaryIds = column.reserveDictionaryIds(total).asInstanceOf[OnHeapColumnVector]
+    val dictionaryIds = column.reserveDictionaryIds(total).asInstanceOf[OapOnHeapColumnVector]
 
     (0 until 10).foreach(i => {
       dictionaryIds.putInt(i, i % 3)
@@ -78,8 +78,8 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
 
   test("construct no dic all nulls") {
     val total = 10
-    val column = new OnHeapColumnVector(12, IntegerType)
-      .asInstanceOf[OnHeapColumnVector]
+    val column = new OapOnHeapColumnVector(12, IntegerType)
+      .asInstanceOf[OapOnHeapColumnVector]
     column.putNulls(0, total)
     val header = ParquetDataFiberHeader(column, total)
     assert(!header.noNulls)
@@ -98,10 +98,10 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
 
   test("construct with dic all nulls") {
     val total = 10
-    val column = new OnHeapColumnVector(12, IntegerType)
+    val column = new OapOnHeapColumnVector(12, IntegerType)
     val dictionary = IntegerDictionary(Array(3, 7, 9))
     column.setDictionary(new ParquetDictionaryWrapper(dictionary))
-    val dictionaryIds = column.reserveDictionaryIds(total).asInstanceOf[OnHeapColumnVector]
+    val dictionaryIds = column.reserveDictionaryIds(total).asInstanceOf[OapOnHeapColumnVector]
     column.putNulls(0, total)
 
     val header = ParquetDataFiberHeader(column, total)
@@ -121,7 +121,7 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
 
   test("construct no dic") {
     val total = 10
-    val column = new OnHeapColumnVector(12, IntegerType)
+    val column = new OapOnHeapColumnVector(12, IntegerType)
     (0 until 10).foreach(i => {
       if (i % 2 == 0) column.putInt(i, i)
       else column.putNull(i)
@@ -143,10 +143,10 @@ class ParquetDataFiberHeaderSuite extends SparkFunSuite with SharedOapContext
 
   test("construct with dic") {
     val total = 10
-    val column = new OnHeapColumnVector(12, IntegerType)
+    val column = new OapOnHeapColumnVector(12, IntegerType)
     val dictionary = IntegerDictionary(Array(3, 7, 9))
     column.setDictionary(new ParquetDictionaryWrapper(dictionary))
-    val dictionaryIds = column.reserveDictionaryIds(total).asInstanceOf[OnHeapColumnVector]
+    val dictionaryIds = column.reserveDictionaryIds(total).asInstanceOf[OapOnHeapColumnVector]
 
     (0 until 10).foreach(i => {
       if (i % 5 != 0) dictionaryIds.putInt(i, i % 3)

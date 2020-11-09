@@ -25,7 +25,7 @@ import scala.collection.mutable
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
@@ -51,7 +51,7 @@ case class FiberCache(fiberType: FiberType.FiberType, fiberData: MemoryBlockHold
   var fiberCompressed: Boolean = false
 
   // This suppose to be used when data cache allocation failed
-  var column: OnHeapColumnVector = null
+  var column: OapOnHeapColumnVector = null
 
   // This suppose to be used when index cache allocation failed
   var originByteArray: Array[Byte] = null
@@ -81,7 +81,7 @@ case class FiberCache(fiberType: FiberType.FiberType, fiberData: MemoryBlockHold
     originByteArray
   }
 
-  def setColumn(column: OnHeapColumnVector): Unit = {
+  def setColumn(column: OapOnHeapColumnVector): Unit = {
     if (isFailedMemoryBlock()) {
       this.column = column;
     } else {
@@ -90,7 +90,7 @@ case class FiberCache(fiberType: FiberType.FiberType, fiberData: MemoryBlockHold
     }
   }
 
-  def getColumn(): OnHeapColumnVector = {
+  def getColumn(): OapOnHeapColumnVector = {
     column
   }
 

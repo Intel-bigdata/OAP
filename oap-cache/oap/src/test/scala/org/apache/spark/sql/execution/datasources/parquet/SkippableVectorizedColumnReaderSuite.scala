@@ -36,7 +36,7 @@ import org.scalatest.BeforeAndAfterEach
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.oap.SharedOapContext
 import org.apache.spark.sql.types._
@@ -903,7 +903,7 @@ class SkippableVectorizedColumnReaderSuite extends SparkFunSuite with SharedOapC
       val timeZone = TimeZone.getDefault
       val columnReader =
         new SkippableVectorizedColumnReader(descriptor, originalType, pageReader, timeZone)
-      val columnVector = new OnHeapColumnVector(unitSize, dataType)
+      val columnVector = new OapOnHeapColumnVector(unitSize, dataType)
       columnReader.skipBatch(unitSize, columnVector.dataType)
       columnVector.reset()
       columnReader.readBatch(unitSize, columnVector)

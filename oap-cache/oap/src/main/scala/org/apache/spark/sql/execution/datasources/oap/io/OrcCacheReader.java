@@ -31,7 +31,7 @@ import org.apache.spark.sql.execution.datasources.orc.OrcColumnVector;
 import org.apache.spark.sql.execution.datasources.orc.OrcColumnVectorAllocator;
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.OffHeapColumnVector;
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.oap.OapRuntime$;
 import org.apache.spark.sql.types.*;
@@ -183,7 +183,7 @@ public class OrcCacheReader
       if (MEMORY_MODE == MemoryMode.OFF_HEAP) {
         columnVectors = OffHeapColumnVector.allocateColumns(CAPACITY, resultSchema);
       } else {
-        columnVectors = OnHeapColumnVector.allocateColumns(CAPACITY, resultSchema);
+        columnVectors = OapOnHeapColumnVector.allocateColumns(CAPACITY, resultSchema);
       }
 
       // Initialize the missing columns once.
@@ -213,7 +213,7 @@ public class OrcCacheReader
         int colId = requestedColIds[i];
         // Initialize the missing columns once.
         if (colId == -1) {
-          OnHeapColumnVector missingCol = new OnHeapColumnVector(CAPACITY, dt);
+          OapOnHeapColumnVector missingCol = new OapOnHeapColumnVector(CAPACITY, dt);
           missingCol.putNulls(0, CAPACITY);
           missingCol.setIsConstant();
           orcVectorWrappers[i] = missingCol;
@@ -226,7 +226,7 @@ public class OrcCacheReader
         int partitionIdx = requiredFields.length;
         for (int i = 0; i < partitionValues.numFields(); i++) {
           DataType dt = partitionSchema.fields()[i].dataType();
-          OnHeapColumnVector partitionCol = new OnHeapColumnVector(CAPACITY, dt);
+          OapOnHeapColumnVector partitionCol = new OapOnHeapColumnVector(CAPACITY, dt);
           ColumnVectorUtils.populate(partitionCol, partitionValues, i);
           partitionCol.setIsConstant();
           orcVectorWrappers[partitionIdx + i] = partitionCol;
@@ -340,7 +340,7 @@ public class OrcCacheReader
 
     for (int i = 0; i < fiberReaders.length; ++i) {
       if (fiberReaders[i] == null) continue;
-      fiberReaders[i].readBatch(currentRowGroupRowsReturned, num, (OnHeapColumnVector)columnVectors[i]);
+      fiberReaders[i].readBatch(currentRowGroupRowsReturned, num, (OapOnHeapColumnVector)columnVectors[i]);
     }
 
     long end = System.nanoTime();

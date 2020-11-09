@@ -28,8 +28,8 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.io.{CompressionCodec => SparkCompressionCodec}
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache._
-import org.apache.spark.sql.execution.datasources.parquet.{ParquetDictionaryWrapper, VectorizedColumnReader}
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetDictionaryWrapper, SkippableVectorizedColumnReader}
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
@@ -52,12 +52,12 @@ object ParquetDataFiberCompressedWriter extends Logging {
   val codecName = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionCodec
   val compressionCodec = SparkCompressionCodec.createCodec(new SparkConf(), codecName)
 
-  def dumpToCache(reader: VectorizedColumnReader,
+  def dumpToCache(reader: SkippableVectorizedColumnReader,
       total: Int, dataType: DataType, fiberId: FiberId = null): FiberCache = {
     // For the dictionary case, the column vector occurs some batch has dictionary
     // and some no dictionary. Therefore we still read the total value to cv instead of batch.
     // TODO: Next can split the read to column vector from total to batch?
-    val column: OnHeapColumnVector = new OnHeapColumnVector(total, dataType)
+    val column: OapOnHeapColumnVector = new OapOnHeapColumnVector(total, dataType)
     reader.readBatch(total, column)
     val dicLength = column.dictionaryLength()
     if (dicLength != 0) {
@@ -70,8 +70,8 @@ object ParquetDataFiberCompressedWriter extends Logging {
   /**
    * Write nulls data to data fiber.
    */
-  private def dumpNullsToFiber(
-      nativeAddress: Long, column: OnHeapColumnVector, total: Int): Long = {
+  private def dumpNullsToFiber(nativeAddress: Long,
+                               column: OapOnHeapColumnVector, total: Int): Long = {
     Platform.copyMemory(column.getNulls,
       Platform.BYTE_ARRAY_OFFSET, null, nativeAddress, total)
     nativeAddress + total
@@ -83,9 +83,9 @@ object ParquetDataFiberCompressedWriter extends Logging {
    * dicLength is 0, needn't calculate dictionary part.
    */
   private def dumpDataToFiber(
-      column: OnHeapColumnVector,
-      total: Int,
-      dataType: DataType): FiberCache = {
+                               column: OapOnHeapColumnVector,
+                               total: Int,
+                               dataType: DataType): FiberCache = {
     val compressedUnitSize = math.ceil(total * 1.0 / compressedLength).toInt
     val arrayBytes: Array[Array[Byte]] = new Array[Array[Byte]](compressedUnitSize)
     val batchCompressed = new Array[Boolean](compressedUnitSize)
@@ -143,7 +143,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
       val arrayLengths = column.getArrayLengths
       val arrayOffsets = column.getArrayOffsets
       val childBytes = column.getChild(0)
-        .asInstanceOf[OnHeapColumnVector].getByteData
+        .asInstanceOf[OapOnHeapColumnVector].getByteData
       val compressedOutBuffer = new ByteArrayOutputStream()
       while (count < compressedUnitSize) {
         val num = Math.min(compressedLength, total - loadedRowCount)
@@ -288,8 +288,8 @@ object ParquetDataFiberCompressedWriter extends Logging {
    * Write dictionaryIds(int array) and Dictionary data to data fiber.
    */
   private def dumpDataAndDicToFiber(
-      column: OnHeapColumnVector, total: Int,
-      dataType: DataType): FiberCache = {
+                                     column: OapOnHeapColumnVector, total: Int,
+                                     dataType: DataType): FiberCache = {
     val compressedUnitSize = math.ceil(total * 1.0 / compressedLength).toInt
     val arrayBytes: Array[Array[Byte]] = new Array[Array[Byte]](compressedUnitSize)
     var compressedSize = 0
@@ -297,7 +297,7 @@ object ParquetDataFiberCompressedWriter extends Logging {
     var loadedRowCount = 0
     val batchCompressed = new Array[Boolean](compressedUnitSize)
 
-    val dictionaryIds = column.getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData
+    val dictionaryIds = column.getDictionaryIds.asInstanceOf[OapOnHeapColumnVector].getIntData
     val compressedOutBuffer = new ByteArrayOutputStream()
     while (count < compressedUnitSize) {
       val num = Math.min(compressedLength, total - loadedRowCount)
@@ -477,7 +477,7 @@ class ParquetDataFiberCompressedReader (
    * @param column target OnHeapColumnVector.
    */
   override def readBatch(
-      start: Int, num: Int, column: OnHeapColumnVector): Unit = {
+      start: Int, num: Int, column: OapOnHeapColumnVector): Unit = {
     // decompress the compressed fiber cache
     val decompressedFiberCache = decompressFiberCache(fiberCache, column, start, num)
     val defaultCapacity = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
@@ -485,7 +485,7 @@ class ParquetDataFiberCompressedReader (
     if (dictionary != null) {
       // Use dictionary encode, value store in dictionaryIds, it's a int array.
       column.setDictionary(dictionary)
-      val dictionaryIds = column.reserveDictionaryIds(num).asInstanceOf[OnHeapColumnVector]
+      val dictionaryIds = column.reserveDictionaryIds(num).asInstanceOf[OapOnHeapColumnVector]
       compressHeader match {
         case ParquetDataFiberCompressedHeader(true, false, _) =>
           if (baseObject != null) {
@@ -638,7 +638,7 @@ class ParquetDataFiberCompressedReader (
    */
   def readBatch(
       decompressedFiberCache: FiberCache, dataNativeAddress: Long,
-      num: Int, column: OnHeapColumnVector): Unit = {
+      num: Int, column: OapOnHeapColumnVector): Unit = {
     val baseObject = decompressedFiberCache.fiberData.baseObject
     def readBinaryToColumnVector(): Unit = {
       Platform.copyMemory(baseObject,
@@ -663,7 +663,7 @@ class ParquetDataFiberCompressedReader (
         Platform.copyMemory(baseObject,
           dataNativeAddress + num * 8 + column.getArrayOffset(firstIndex),
           data, Platform.BYTE_ARRAY_OFFSET, data.length)
-        column.getChild(0).asInstanceOf[OnHeapColumnVector].setByteData(data)
+        column.getChild(0).asInstanceOf[OapOnHeapColumnVector].setByteData(data)
       }
     }
 
@@ -728,9 +728,9 @@ class ParquetDataFiberCompressedReader (
   }
 
   def decompressFiberCache(
-      compressedFiberCache: FiberCache,
-      columnVector: OnHeapColumnVector,
-      start: Int, num: Int): FiberCache = {
+                            compressedFiberCache: FiberCache,
+                            columnVector: OapOnHeapColumnVector,
+                            start: Int, num: Int): FiberCache = {
     val defaultCapacity = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionSize
     val fiberBatchedInfo = compressedFiberCache.fiberBatchedInfo(start / defaultCapacity)
     val codecName = OapRuntime.getOrCreate.fiberCacheManager.dataCacheCompressionCodec
@@ -881,7 +881,7 @@ case class ParquetDataFiberCompressedHeader(noNulls: Boolean, allNulls: Boolean,
  */
 object ParquetDataFiberCompressedHeader {
 
-  def apply(vector: OnHeapColumnVector, total: Int): ParquetDataFiberCompressedHeader = {
+  def apply(vector: OapOnHeapColumnVector, total: Int): ParquetDataFiberCompressedHeader = {
     val numNulls = vector.numNulls
     val allNulls = numNulls == total
     val noNulls = numNulls == 0

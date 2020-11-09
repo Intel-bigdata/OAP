@@ -21,7 +21,7 @@ import org.apache.parquet.io.api.Binary
 
 import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, MemoryBlockHolder, SourceEnum}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetDictionaryWrapper
-import org.apache.spark.sql.execution.vectorized.{Dictionary, OnHeapColumnVector}
+import org.apache.spark.sql.execution.vectorized.{Dictionary, OapOnHeapColumnVector}
 import org.apache.spark.sql.types.BinaryType
 
 
@@ -37,7 +37,7 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
 
   test("no dic no nulls in ParquetDataFaultFiberReader") {
     // write data
-    val column = new OnHeapColumnVector(total, BinaryType)
+    val column = new OapOnHeapColumnVector(total, BinaryType)
     (0 until total).foreach(i => column.putByteArray(i, i.toString.getBytes))
     val fc : FiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
     fiberCache = FiberCache(fc.fiberType, MemoryBlockHolder(
@@ -49,7 +49,7 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val faultReader = ParquetDataFaultFiberReader(fiberCache, BinaryType, total)
 
     // read use batch api
-    val ret1 = new OnHeapColumnVector(total, BinaryType)
+    val ret1 = new OapOnHeapColumnVector(total, BinaryType)
     faultReader.readBatch(start, num, ret1)
     (0 until num).foreach(i => {
       assert(ret1.getBinary(i).sameElements((i + start).toString.getBytes))
@@ -67,7 +67,7 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
 
   test("no dic no nulls") {
     // write data
-    val column = new OnHeapColumnVector(total, BinaryType)
+    val column = new OapOnHeapColumnVector(total, BinaryType)
     (0 until total).foreach(i => column.putByteArray(i, i.toString.getBytes))
     fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
 
@@ -76,14 +76,14 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val reader = ParquetDataFiberReader(address, BinaryType, total)
 
     // read use batch api
-    val ret1 = new OnHeapColumnVector(total, BinaryType)
+    val ret1 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => {
       assert(ret1.getBinary(i).sameElements((i + start).toString.getBytes))
     })
 
     // read use random access api
-    val ret2 = new OnHeapColumnVector(total, BinaryType)
+    val ret2 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(rowIdList, ret2)
     ints.indices.foreach(i => {
       assert(ret2.getBinary(i).sameElements(ints(i).toString.getBytes))
@@ -92,9 +92,9 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
 
   test("with dic no nulls") {
     // write data
-    val column = new OnHeapColumnVector(total, BinaryType)
+    val column = new OapOnHeapColumnVector(total, BinaryType)
     column.reserveDictionaryIds(total)
-    val dictionaryIds = column.getDictionaryIds.asInstanceOf[OnHeapColumnVector]
+    val dictionaryIds = column.getDictionaryIds.asInstanceOf[OapOnHeapColumnVector]
     column.setDictionary(dictionary)
     (0 until total).foreach(i => dictionaryIds.putInt(i, i % column.dictionaryLength ))
     fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
@@ -104,7 +104,7 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val reader = ParquetDataFiberReader(address, BinaryType, total)
 
     // read use batch api
-    val ret1 = new OnHeapColumnVector(total, BinaryType)
+    val ret1 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => {
       val idx = (i + start) % column.dictionaryLength
@@ -112,7 +112,7 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     })
 
     // read use random access api
-    val ret2 = new OnHeapColumnVector(total, BinaryType)
+    val ret2 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(rowIdList, ret2)
     ints.indices.foreach(i => {
       val idx = ints(i) % column.dictionaryLength
@@ -122,7 +122,7 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
 
   test("no dic all nulls") {
     // write data
-    val column = new OnHeapColumnVector(total, BinaryType)
+    val column = new OapOnHeapColumnVector(total, BinaryType)
     column.putNulls(0, total)
     fiberCache = ParquetDataFiberWriter.dumpToCache(column, total)
 
@@ -131,19 +131,19 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val reader = ParquetDataFiberReader(address, BinaryType, total)
 
     // read use batch api
-    val ret1 = new OnHeapColumnVector(total, BinaryType)
+    val ret1 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => assert(ret1.isNullAt(i)))
 
     // read use random access api
-    val ret2 = new OnHeapColumnVector(total, BinaryType)
+    val ret2 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(rowIdList, ret2)
     ints.indices.foreach(i => assert(ret2.isNullAt(i)))
   }
 
   test("with dic all nulls") {
     // write data
-    val column = new OnHeapColumnVector(total, BinaryType)
+    val column = new OapOnHeapColumnVector(total, BinaryType)
     column.reserveDictionaryIds(total)
     column.setDictionary(dictionary)
     column.putNulls(0, total)
@@ -154,19 +154,19 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val reader = ParquetDataFiberReader(address, BinaryType, total)
 
     // read use batch api
-    val ret1 = new OnHeapColumnVector(total, BinaryType)
+    val ret1 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => assert(ret1.isNullAt(i)))
 
     // read use random access api
-    val ret2 = new OnHeapColumnVector(total, BinaryType)
+    val ret2 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(rowIdList, ret2)
     ints.indices.foreach(i => assert(ret2.isNullAt(i)))
   }
 
   test("no dic") {
     // write data
-    val column = new OnHeapColumnVector(total, BinaryType)
+    val column = new OapOnHeapColumnVector(total, BinaryType)
     (0 until total).foreach(i => {
       if (i % 3 == 0) column.putNull(i)
       else column.putByteArray(i, i.toString.getBytes)
@@ -178,7 +178,7 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val reader = ParquetDataFiberReader(address, BinaryType, total)
 
     // read use batch api
-    val ret1 = new OnHeapColumnVector(total, BinaryType)
+    val ret1 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => {
       if ((i + start) % 3 == 0) assert(ret1.isNullAt(i))
@@ -186,7 +186,7 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     })
 
     // read use random access api
-    val ret2 = new OnHeapColumnVector(total, BinaryType)
+    val ret2 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(rowIdList, ret2)
     ints.indices.foreach(i => {
       if ((i + start) % 3 == 0) assert(ret2.isNullAt(i))
@@ -196,9 +196,9 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
 
   test("with dic") {
     // write data
-    val column = new OnHeapColumnVector(total, BinaryType)
+    val column = new OapOnHeapColumnVector(total, BinaryType)
     column.reserveDictionaryIds(total)
-    val dictionaryIds = column.getDictionaryIds.asInstanceOf[OnHeapColumnVector]
+    val dictionaryIds = column.getDictionaryIds.asInstanceOf[OapOnHeapColumnVector]
     column.setDictionary(dictionary)
     (0 until total).foreach(i => {
       if (i % 3 == 0) column.putNull(i)
@@ -211,7 +211,7 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     val reader = ParquetDataFiberReader(address, BinaryType, total)
 
     // read use batch api
-    val ret1 = new OnHeapColumnVector(total, BinaryType)
+    val ret1 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(start, num, ret1)
     (0 until num).foreach(i => {
       if ((i + start) % 3 == 0) assert(ret1.isNullAt(i))
@@ -222,7 +222,7 @@ class BinaryTypeDataFiberReaderWriterSuite extends DataFiberReaderWriterSuite {
     })
 
     // read use random access api
-    val ret2 = new OnHeapColumnVector(total, BinaryType)
+    val ret2 = new OapOnHeapColumnVector(total, BinaryType)
     reader.readBatch(rowIdList, ret2)
     ints.indices.foreach(i => {
       if ((i + start) % 3 == 0) assert(ret2.isNullAt(i))

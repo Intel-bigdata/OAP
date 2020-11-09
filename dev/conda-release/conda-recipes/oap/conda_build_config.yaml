@@ -1,0 +1,11 @@
+c_compiler:
+- gcc
+c_compiler_version:
+- '7'
+channel_sources:
+- conda-forge,intel
+cxx_compiler:
+- gxx
+cxx_compiler_version:
+- '7'
+

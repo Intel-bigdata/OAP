@@ -18,9 +18,8 @@
 package org.apache.spark.sql.oap.adapter
 
 import org.apache.spark.memory.MemoryMode
-import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OnHeapColumnVector, WritableColumnVector}
+import org.apache.spark.sql.execution.vectorized.{OapOnHeapColumnVector, OffHeapColumnVector, WritableColumnVector}
 import org.apache.spark.sql.types.DataType
-import org.apache.spark.sql.vectorized.ColumnVector
 
 object ColumnVectorAdapter {
   /**
@@ -30,7 +29,7 @@ object ColumnVectorAdapter {
     if (memMode == MemoryMode.OFF_HEAP) {
       new OffHeapColumnVector(capacity, dt)
     } else {
-      new OnHeapColumnVector(capacity, dt)
+      new OapOnHeapColumnVector(capacity, dt)
     }
   }
 

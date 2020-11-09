@@ -21,14 +21,14 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache.{FiberCache, FiberId}
 import org.apache.spark.sql.execution.datasources.oap.io.ParquetDataFiberWriter.{dumpDataAndDicToFiber, dumpDataToFiber, dumpNullsToFiber, emptyDataFiber, fiberLength, logDebug}
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType, TimestampType}
 import org.apache.spark.unsafe.Platform
 
 object OrcDataFiberWriter extends Logging{
   // orc dumpToCache
-  def orcDumpToCache(column: OnHeapColumnVector, total: Int,
+  def orcDumpToCache(column: OapOnHeapColumnVector, total: Int,
                      fiberId: FiberId = null): FiberCache = {
     val header = ParquetDataFiberHeader(column, total)
     logDebug(s"will dump column to data fiber dataType = ${column.dataType()}, " +
@@ -105,8 +105,8 @@ object OrcDataFiberWriter extends Logging{
   /**
    * Write nulls data to data fiber.
    */
-  private def dumpNullsToFiber(
-      nativeAddress: Long, column: OnHeapColumnVector, total: Int): Long = {
+  private def dumpNullsToFiber(nativeAddress: Long,
+                               column: OapOnHeapColumnVector, total: Int): Long = {
     Platform.copyMemory(column.getNulls,
       Platform.BYTE_ARRAY_OFFSET, null, nativeAddress, total)
     nativeAddress + total
@@ -117,7 +117,8 @@ object OrcDataFiberWriter extends Logging{
    * allNulls is false, need dump to cache,
    * dicLength is 0, needn't calculate dictionary part.
    */
-  private def dumpDataToFiber(nativeAddress: Long, column: OnHeapColumnVector, total: Int): Unit = {
+  private def dumpDataToFiber(nativeAddress: Long,
+                              column: OapOnHeapColumnVector, total: Int): Unit = {
     column.dataType match {
       case ByteType | BooleanType =>
         Platform.copyMemory(column.getByteData,
@@ -142,7 +143,7 @@ object OrcDataFiberWriter extends Logging{
           Platform.INT_ARRAY_OFFSET, null, nativeAddress, total * 4L)
         Platform.copyMemory(column.getArrayOffsets,
           Platform.INT_ARRAY_OFFSET, null, nativeAddress + total * 4L, total * 4L)
-        val child = column.getChild(0).asInstanceOf[OnHeapColumnVector]
+        val child = column.getChild(0).asInstanceOf[OapOnHeapColumnVector]
         Platform.copyMemory(child.getByteData,
           Platform.BYTE_ARRAY_OFFSET, null, nativeAddress + total * 8L,
           child.getElementsAppended)
@@ -157,7 +158,7 @@ object OrcDataFiberWriter extends Logging{
           Platform.INT_ARRAY_OFFSET, null, nativeAddress, total * 4L)
         Platform.copyMemory(column.getArrayOffsets,
           Platform.INT_ARRAY_OFFSET, null, nativeAddress + total * 4L, total * 4L)
-        val child = column.getChild(0).asInstanceOf[OnHeapColumnVector]
+        val child = column.getChild(0).asInstanceOf[OapOnHeapColumnVector]
         Platform.copyMemory(child.getByteData,
           Platform.BYTE_ARRAY_OFFSET, null, nativeAddress + total * 8L,
           child.getElementsAppended)
@@ -168,10 +169,10 @@ object OrcDataFiberWriter extends Logging{
   /**
    * Write dictionaryIds(int array) and Dictionary data to data fiber.
    */
-  private def dumpDataAndDicToFiber(
-      nativeAddress: Long, column: OnHeapColumnVector, total: Int, dicLength: Int): Unit = {
+  private def dumpDataAndDicToFiber(nativeAddress: Long,
+       column: OapOnHeapColumnVector, total: Int, dicLength: Int): Unit = {
     // dump dictionaryIds to data fiber, it's a int array.
-    val dictionaryIds = column.getDictionaryIds.asInstanceOf[OnHeapColumnVector]
+    val dictionaryIds = column.getDictionaryIds.asInstanceOf[OapOnHeapColumnVector]
     Platform.copyMemory(dictionaryIds.getIntData,
       Platform.INT_ARRAY_OFFSET, null, nativeAddress, total * 4L)
     var dicNativeAddress = nativeAddress + total * 4L
@@ -240,7 +241,7 @@ object OrcDataFiberWriter extends Logging{
    * allNulls is false, need dump to cache,
    * dicLength is 0, needn't calculate dictionary part.
    */
-  private def fiberLength(column: OnHeapColumnVector, total: Int, nullUnitLength: Int): Long =
+  private def fiberLength(column: OapOnHeapColumnVector, total: Int, nullUnitLength: Int): Long =
     if (isFixedLengthDataType(column.dataType())) {
       logDebug(s"dataType ${column.dataType()} is fixed length. ")
       // Fixed length data type fiber length.
@@ -260,8 +261,8 @@ object OrcDataFiberWriter extends Logging{
    * allNulls is false, need dump to cache,
    * dicLength is not, need calculate dictionary part and dictionaryIds is a int array.
    */
-  private def fiberLength(
-      column: OnHeapColumnVector, total: Int, nullUnitLength: Int, dicLength: Int): Long = {
+  private def fiberLength(column: OapOnHeapColumnVector,
+                          total: Int, nullUnitLength: Int, dicLength: Int): Long = {
     val dicPartSize = column.dataType() match {
       case ByteType | ShortType | IntegerType | DateType => dicLength * 4L
       case FloatType => dicLength * 4L

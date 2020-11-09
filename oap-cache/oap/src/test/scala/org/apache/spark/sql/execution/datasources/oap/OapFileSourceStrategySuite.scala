@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.oap
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, ProjectExec, SparkPlan}
+import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, OapFileSourceScanExec, ProjectExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
@@ -47,6 +47,45 @@ abstract class OapFileSourceStrategySuite extends QueryTest with SharedOapContex
 
   override def afterEach(): Unit = {
     sqlContext.dropTempTable(s"$testTableName")
+  }
+
+  protected def verifyOapProjectFilterScan(
+      indexColumn: String,
+      verifyFileFormat: FileFormat => Boolean,
+      verifySparkPlan: (SparkPlan, SparkPlan) => Boolean): Unit = {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql(s"insert overwrite table $testTableName select * from t")
+
+    withIndex(TestIndex(s"$testTableName", "index1")) {
+      sql(s"create oindex index1 on $testTableName ($indexColumn)")
+      val plan =
+        sql(s"SELECT b FROM $testTableName WHERE b = 'this is test 1'")
+          .queryExecution.optimizedPlan
+      val optimizedSparkPlans = OapFileSourceStrategy(plan)
+      assert(optimizedSparkPlans.size == 1)
+
+      val optimizedSparkPlan = optimizedSparkPlans.head
+      assert(optimizedSparkPlan.isInstanceOf[ProjectExec])
+      assert(optimizedSparkPlan.children.nonEmpty)
+      assert(optimizedSparkPlan.children.length == 1)
+
+      val filter = optimizedSparkPlan.children.head
+      assert(filter.isInstanceOf[FilterExec])
+      assert(filter.children.nonEmpty)
+      assert(filter.children.length == 1)
+
+      val scan = filter.children.head
+      assert(scan.isInstanceOf[OapFileSourceScanExec])
+      val relation = scan.asInstanceOf[OapFileSourceScanExec].relation
+      assert(relation.isInstanceOf[HadoopFsRelation])
+      assert(verifyFileFormat(relation.fileFormat))
+
+      val sparkPlans = FileSourceStrategy(plan)
+      assert(sparkPlans.size == 1)
+      val sparkPlan = sparkPlans.head
+      assert(verifySparkPlan(sparkPlan, optimizedSparkPlan))
+    }
   }
 
   protected def verifyProjectFilterScan(
@@ -86,6 +125,34 @@ abstract class OapFileSourceStrategySuite extends QueryTest with SharedOapContex
       val sparkPlan = sparkPlans.head
       assert(verifySparkPlan(sparkPlan, optimizedSparkPlan))
     }
+  }
+
+  protected def verifyOapProjectScan(
+      verifyFileFormat: FileFormat => Boolean,
+      verifySparkPlan: (SparkPlan, SparkPlan) => Boolean): Unit = {
+    val data: Seq[(Int, String)] = (1 to 300).map { i => (i, s"this is test $i") }
+    data.toDF("key", "value").createOrReplaceTempView("t")
+    sql(s"insert overwrite table $testTableName select * from t")
+
+    val plan = sql(s"SELECT a FROM $testTableName").queryExecution.optimizedPlan
+    val optimizedSparkPlans = OapFileSourceStrategy(plan)
+    assert(optimizedSparkPlans.size == 1)
+
+    val optimizedSparkPlan = optimizedSparkPlans.head
+    assert(optimizedSparkPlan.isInstanceOf[ProjectExec])
+    assert(optimizedSparkPlan.children.nonEmpty)
+    assert(optimizedSparkPlan.children.length == 1)
+
+    val scan = optimizedSparkPlan.children.head
+    assert(scan.isInstanceOf[OapFileSourceScanExec])
+    val relation = scan.asInstanceOf[OapFileSourceScanExec].relation
+    assert(relation.isInstanceOf[HadoopFsRelation])
+    assert(verifyFileFormat(relation.fileFormat))
+
+    val sparkPlans = FileSourceStrategy(plan)
+    assert(sparkPlans.size == 1)
+    val sparkPlan = sparkPlans.head
+    assert(verifySparkPlan(sparkPlan, optimizedSparkPlan))
   }
 
   protected def verifyProjectScan(
@@ -145,7 +212,7 @@ class OapFileSourceStrategyForParquetSuite extends OapFileSourceStrategySuite {
   protected def fileFormat: String = "parquet"
 
   test("Project-> Filter -> Scan : Optimized") {
-    verifyProjectFilterScan(
+    verifyOapProjectFilterScan(
       indexColumn = "b",
       format => format.isInstanceOf[OptimizedParquetFileFormat],
       (plan1, plan2) => !plan1.sameResult(plan2)
@@ -162,7 +229,7 @@ class OapFileSourceStrategyForParquetSuite extends OapFileSourceStrategySuite {
 
   test("Project -> Scan : Optimized") {
     withSQLConf(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key -> "true") {
-      verifyProjectScan(
+      verifyOapProjectScan(
         format => format.isInstanceOf[OptimizedParquetFileFormat],
         (plan1, plan2) => !plan1.sameResult(plan2)
       )
@@ -205,7 +272,7 @@ class OapFileSourceStrategyForOrcSuite extends OapFileSourceStrategySuite {
   protected def fileFormat: String = "orc"
 
   test("Project-> Filter -> Scan : Optimized") {
-    verifyProjectFilterScan(
+    verifyOapProjectFilterScan(
       indexColumn = "b",
       format => format.isInstanceOf[OptimizedOrcFileFormat],
       (plan1, plan2) => !plan1.sameResult(plan2)

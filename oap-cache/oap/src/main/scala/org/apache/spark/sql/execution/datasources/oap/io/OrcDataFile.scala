@@ -35,7 +35,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.orc.{OrcMapreduceRecordReader, _}
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.sources.Filter
@@ -233,7 +233,7 @@ private[oap] case class OrcDataFile(
 
     val fromColumn = vectorizedRowBatch.cols(0)
     val field = schema.fields(fiberId)
-    val toColumn = new OnHeapColumnVector(rowCount, field.dataType)
+    val toColumn = new OapOnHeapColumnVector(rowCount, field.dataType)
     if (fromColumn.isRepeating) {
       OrcCacheReader.putRepeatingValues(rowCount, field, fromColumn, toColumn)
     }

@@ -32,8 +32,8 @@ import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.datasources.parquet.SkippableVectorizedColumnReader;
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.OffHeapColumnVector;
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -231,7 +231,7 @@ public class VectorizedOapRecordReader extends SpecificOapRecordReaderBase<Objec
       if (memMode == MemoryMode.OFF_HEAP) {
         columnVectors = OffHeapColumnVector.allocateColumns(CAPACITY, batchSchema);
       } else {
-        columnVectors = OnHeapColumnVector.allocateColumns(CAPACITY, batchSchema);
+        columnVectors = OapOnHeapColumnVector.allocateColumns(CAPACITY, batchSchema);
       }
       columnarBatch = new ColumnarBatch(columnVectors);
 

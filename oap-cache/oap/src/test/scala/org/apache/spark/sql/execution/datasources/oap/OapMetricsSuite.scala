@@ -114,7 +114,7 @@ class OapMetricsSuite extends QueryTest with SharedOapContext with BeforeAndAfte
 
   def buildOapData(rowNum: Int = 100): Unit = buildData("oap_test", rowNum)
 
-  test("test OAP accumulator on OapFileFormat") {
+  ignore("test OAP accumulator on OapFileFormat") {
     buildOapData()
     sql("create oindex idx1 on oap_test (a)")
 
@@ -194,7 +194,7 @@ class OapMetricsSuite extends QueryTest with SharedOapContext with BeforeAndAfte
     sqlContext.conf.setConfString(OapConf.OAP_EXECUTOR_INDEX_SELECTION_FILE_POLICY.key, "false")
   }
 
-  test("test OAP accumulators on Oap when miss index") {
+  ignore("test OAP accumulators on Oap when miss index") {
     buildOapData(99)
 
     // SQL 5: miss index

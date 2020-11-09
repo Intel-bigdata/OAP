@@ -21,7 +21,7 @@ import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList
 
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
+import org.apache.spark.sql.execution.vectorized.OapOnHeapColumnVector
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.Platform
 
@@ -33,13 +33,13 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
   require(fiberCache.getColumn() != null)
 
   override def readBatch(
-    start: Int, num: Int, column: OnHeapColumnVector): Unit = if (dictionary != null) {
+    start: Int, num: Int, column: OapOnHeapColumnVector): Unit = if (dictionary != null) {
     column.setDictionary(dictionary)
-    val dictionaryIds = column.reserveDictionaryIds(num).asInstanceOf[OnHeapColumnVector]
+    val dictionaryIds = column.reserveDictionaryIds(num).asInstanceOf[OapOnHeapColumnVector]
     header match {
       case ParquetDataFiberHeader(true, false, _) =>
         Platform.copyMemory(
-          fiberCache.getColumn().getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData,
+          fiberCache.getColumn().getDictionaryIds.asInstanceOf[OapOnHeapColumnVector].getIntData,
           Platform.INT_ARRAY_OFFSET + start * 4L,
           dictionaryIds.getIntData, Platform.INT_ARRAY_OFFSET, num * 4L)
       case ParquetDataFiberHeader(false, false, _) =>
@@ -47,7 +47,7 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
           fiberCache.getColumn().getNulls,
           Platform.BYTE_ARRAY_OFFSET + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
         Platform.copyMemory(
-          fiberCache.getColumn().getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData,
+          fiberCache.getColumn().getDictionaryIds.asInstanceOf[OapOnHeapColumnVector].getIntData,
           Platform.INT_ARRAY_OFFSET + start * 4L,
           dictionaryIds.getIntData, Platform.INT_ARRAY_OFFSET, num * 4L)
       case ParquetDataFiberHeader(false, true, _) =>
@@ -74,12 +74,12 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
     }
   }
 
-  override def readBatch(rowIdList: IntList, column: OnHeapColumnVector): Unit = {
+  override def readBatch(rowIdList: IntList, column: OapOnHeapColumnVector): Unit = {
     throw new OapException("Read with row id list is not supported.")
   }
 
   private def readBatchFromColumn(
-    start: Int, num: Int, column: OnHeapColumnVector): Unit = {
+    start: Int, num: Int, column: OapOnHeapColumnVector): Unit = {
     val originalColumn = fiberCache.getColumn();
 
     def readBinaryToColumnVector(): Unit = {
@@ -112,11 +112,11 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
           column.getArrayOffset(firstIndex) + column.getArrayLength(lastIndex)
 
         val data = new Array[Byte](length)
-        val child = originalColumn.getChild(0).asInstanceOf[OnHeapColumnVector]
+        val child = originalColumn.getChild(0).asInstanceOf[OapOnHeapColumnVector]
         Platform.copyMemory(child.getByteData,
           Platform.BYTE_ARRAY_OFFSET + startOffset,
           data, Platform.BYTE_ARRAY_OFFSET, data.length)
-        column.getChild(0).asInstanceOf[OnHeapColumnVector].setByteData(data)
+        column.getChild(0).asInstanceOf[OapOnHeapColumnVector].setByteData(data)
       }
     }
 

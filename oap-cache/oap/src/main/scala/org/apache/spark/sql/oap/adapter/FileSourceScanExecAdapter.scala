@@ -19,7 +19,7 @@ package org.apache.spark.sql.oap.adapter
 
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression}
-import org.apache.spark.sql.execution.FileSourceScanExec
+import org.apache.spark.sql.execution.OapFileSourceScanExec
 import org.apache.spark.sql.execution.datasources.HadoopFsRelation
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.collection.BitSet
@@ -32,8 +32,8 @@ object FileSourceScanExecAdapter {
       partitionFilters: Seq[Expression],
       optionalBucketSets: Option[BitSet],
       dataFilters: Seq[Expression],
-      metastoreTableIdentifier: Option[TableIdentifier]): FileSourceScanExec = {
-    FileSourceScanExec(
+      metastoreTableIdentifier: Option[TableIdentifier]): OapFileSourceScanExec = {
+    OapFileSourceScanExec(
       relation,
       output,
       requiredSchema,

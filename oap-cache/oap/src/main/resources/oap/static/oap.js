@@ -88,7 +88,7 @@ function createRESTEndPoint(appId) {
     if (ind > 0) {
         var appId = words[ind + 1];
         var newBaseURI = words.slice(0, ind + 2).join('/');
-        return newBaseURI + "/api/v1/applications/" + appId + "/fibercachemanagers"
+        return newBaseURI + "/api/v1/applications/" + appId + "/oap/fibercachemanagers"
     }
     ind = words.indexOf("history");
     if (ind > 0) {
@@ -96,12 +96,12 @@ function createRESTEndPoint(appId) {
         var attemptId = words[ind + 2];
         var newBaseURI = words.slice(0, ind).join('/');
         if (isNaN(attemptId)) {
-            return newBaseURI + "/api/v1/applications/" + appId + "/fibercachemanagers";
+            return newBaseURI + "/api/v1/applications/" + appId + "/oap/fibercachemanagers";
         } else {
-            return newBaseURI + "/api/v1/applications/" + appId + "/" + attemptId + "/fibercachemanagers";
+            return newBaseURI + "/api/v1/applications/" + appId + "/" + attemptId + "/oap/fibercachemanagers";
         }
     }
-    return location.origin + "/api/v1/applications/" + appId + "/fibercachemanagers";
+    return location.origin + "/api/v1/applications/" + appId + "/oap/fibercachemanagers";
 }
 
 function formatCount(bytes, type) {

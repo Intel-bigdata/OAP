@@ -17,7 +17,7 @@
 
     <groupId>com.intel.oap</groupId>
     <artifactId>oap-parent</artifactId>
-    <version>0.8.3</version>
+    <version>0.8.4</version>
     <packaging>pom</packaging>
 
     <name>OAP Project Parent POM</name>
