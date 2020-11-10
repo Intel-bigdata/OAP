@@ -185,6 +185,7 @@ class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
 
         val prev3 = System.nanoTime()
         val batches = evaluator.finish()
+        SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => evaluator.close())
         val windowFinishCost = System.nanoTime() - prev3
         totalTime += TimeUnit.NANOSECONDS.toMillis(windowFinishCost)
         val itr = batches.zipWithIndex.map { case (recordBatch, i) => {

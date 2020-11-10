@@ -76,7 +76,7 @@ using sparkcolumnarplugin::shuffle::Splitter;
 static arrow::jni::ConcurrentMap<std::shared_ptr<Splitter>> shuffle_splitter_holder_;
 static arrow::jni::ConcurrentMap<std::shared_ptr<arrow::Schema>>
     decompression_schema_holder_;
-static arrow::jni::ConcurrentMap<arrow::MemoryPool*> memory_pool_holder;
+static arrow::jni::ConcurrentMap<arrow::MemoryPool*> memory_pool_holder_;
 
 static int64_t default_memory_pool_id;
 
@@ -271,7 +271,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   unreserve_memory_method =
       GetMethodID(env, native_memory_reservation_class, "unreserve", "(J)V");
 
-  default_memory_pool_id = memory_pool_holder.Insert(arrow::default_memory_pool());
+  default_memory_pool_id = memory_pool_holder_.Insert(arrow::default_memory_pool());
 
   return JNI_VERSION;
 }
@@ -299,7 +299,7 @@ void JNI_OnUnload(JavaVM* vm, void* reserved) {
   batch_iterator_holder_.Clear();
   shuffle_splitter_holder_.Clear();
   decompression_schema_holder_.Clear();
-  memory_pool_holder.Clear();
+  memory_pool_holder_.Clear();
 
   default_memory_pool_id = -1L;
 }
@@ -321,14 +321,14 @@ JNIEXPORT jlong JNICALL Java_com_intel_oap_vectorized_ExpressionMemoryPool_creat
       std::make_shared<ReserveMemory>(vm, jlistener_ref);
   auto memory_pool =
       new arrow::ReservationListenableMemoryPool(arrow::default_memory_pool(), listener);
-  return memory_pool_holder.Insert(memory_pool);
+  return memory_pool_holder_.Insert(memory_pool);
 }
 
 JNIEXPORT void JNICALL Java_com_intel_oap_vectorized_ExpressionMemoryPool_releaseMemoryPool
     (JNIEnv* env, jclass, jlong memory_pool_id) {
   arrow::ReservationListenableMemoryPool* pool =
       dynamic_cast<arrow::ReservationListenableMemoryPool*>(
-          memory_pool_holder.Lookup(memory_pool_id));
+          memory_pool_holder_.Lookup(memory_pool_id));
   if (pool == nullptr) {
     return;
   }
@@ -339,7 +339,7 @@ JNIEXPORT void JNICALL Java_com_intel_oap_vectorized_ExpressionMemoryPool_releas
   }
   env->DeleteGlobalRef(rm->GetMemoryReservation());
 //  delete pool; // fixme
-  memory_pool_holder.Erase(memory_pool_id);
+  memory_pool_holder_.Erase(memory_pool_id);
 }
 
 JNIEXPORT void JNICALL
@@ -397,7 +397,7 @@ Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeBuild(
 
   std::shared_ptr<CodeGenerator> handler;
   try {
-    arrow::MemoryPool* pool = memory_pool_holder.Lookup(memory_pool_id);
+    arrow::MemoryPool* pool = memory_pool_holder_.Lookup(memory_pool_id);
     if (pool == nullptr) {
       env->ThrowNew(illegal_argument_exception_class,
                     "Memory pool does not exist or has been closed");
@@ -462,7 +462,7 @@ Java_com_intel_oap_vectorized_ExpressionEvaluatorJniWrapper_nativeBuildWithFinis
 
   std::shared_ptr<CodeGenerator> handler;
   try {
-    arrow::MemoryPool* pool = memory_pool_holder.Lookup(memory_pool_id);
+    arrow::MemoryPool* pool = memory_pool_holder_.Lookup(memory_pool_id);
     if (pool == nullptr) {
       env->ThrowNew(illegal_argument_exception_class,
                     "Memory pool does not exist or has been closed");
