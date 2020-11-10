@@ -43,4 +43,6 @@ ninja install
 popd
 mkdir -p $PREFIX/oap_jars
 cp $SRC_DIR/oap/*.jar $PREFIX/oap_jars/
-cp $RECIPE_DIR/libfabric/* $PREFIX/lib/
+cp -r $SRC_DIR/pmdk/lib/* $PREFIX/lib/
+mkdir -p $PREFIX/bin
+cp -r $SRC_DIR/pmdk/bin/* $PREFIX/bin/

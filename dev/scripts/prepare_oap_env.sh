@@ -147,7 +147,7 @@ function prepare_memkind() {
   fi
   cd memkind/
   git pull
-  git checkout v1.10.1-rc2
+  git checkout v1.10.1
 
   yum -y install autoconf
   yum -y install automake
@@ -215,6 +215,7 @@ function install_gcc7() {
 }
 
 function prepare_llvm() {
+  check_gcc
   CURRENT_LLVM_VERSION_STR="$(llvm-config --version)"
   if [[ "CURRENT_LLVM_VERSION_STR" =~ $rx  ]]; then
     if version_ge $CURRENT_LLVM_VERSION_STR $LLVM_MIN_VERSION; then
@@ -247,7 +248,6 @@ function prepare_llvm() {
   mkdir -p build
   cd build
 
-  check_gcc
 
   cmake -DCMAKE_BUILD_TYPE=Release ..
   cmake --build .
@@ -300,7 +300,7 @@ function prepare_intel_conda_arrow() {
   current_arrow_path=$(pwd)
 
   cd java/
-  mvn clean install  -P arrow-jni -am -Darrow.cpp.build.dir=/root/miniconda2/envs/oapbuild/lib -DskipTests -Dcheckstyle.skip
+  mvn clean install  -P arrow-jni -am -Darrow.cpp.build.dir=/root/miniconda2/envs/oapbuild/lib/ -DskipTests -Dcheckstyle.skip
 }
 
 
@@ -504,11 +504,6 @@ case $key in
     ;;
     --prepare_llvm)
     shift 1 
-    prepare_llvm
-    exit 0
-    ;;
-    --prepare_llvm)
-    shift 1
     prepare_llvm
     exit 0
     ;;

@@ -31,6 +31,7 @@ jobs:
       - sudo ldconfig /usr/lib
       script:
       - cd ${TRAVIS_BUILD_DIR}
+      - export ONEAPI_ROOT=/tmp/
       - mvn clean test -pl oap-common -q -Ppersistent-memory -Pvmemcache -Plibpmemblk -am
       - mvn clean test -pl oap-cache/oap -q -Ppersistent-memory  -Pvmemcache  -am
       
@@ -60,6 +61,7 @@ jobs:
       - cd ../../java
       - mvn clean install -q -P arrow-jni -am -Darrow.cpp.build.dir=/tmp/arrow/cpp/build/release/ -DskipTests -Dcheckstyle.skip
       script:
+      - export ONEAPI_ROOT=/tmp/
       - cd ${TRAVIS_BUILD_DIR}/
       - mvn clean -q package -DskipTests -pl oap-native-sql/core -am  #skip core tests
       - cd ${TRAVIS_BUILD_DIR}/
@@ -160,5 +162,6 @@ jobs:
         - sudo ldconfig /usr/lib
       script:
         - cd ${TRAVIS_BUILD_DIR}
+        - export ONEAPI_ROOT=/tmp/
         - mvn clean test -pl oap-common -q -Ppersistent-memory -Plibpmemblk -am
         - mvn clean package -pl oap-spark -q -Ppersistent-memory -am

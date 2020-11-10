@@ -9,3 +9,5 @@
 # IDEA config files
 .idea/
 *.iml
+
+dev/thirdparty/
