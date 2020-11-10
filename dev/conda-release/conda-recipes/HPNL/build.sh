@@ -8,3 +8,7 @@ make
 make install
 popd
 
+mkdir -p $PREFIX/bin
+cp $SRC_DIR/pmdk/bin/* $PREFIX/bin/
+mkdir -p $PREFIX/lib
+cp $SRC_DIR/pmdk/lib/* $PREFIX/lib/

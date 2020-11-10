@@ -4,7 +4,8 @@ set -e
 set -x
 mkdir cpp/build
 pushd cpp/build
-
+export http_proxy=http://child-prc.intel.com:913
+export https_proxy=http://child-prc.intel.com:913
 EXTRA_CMAKE_ARGS=""
 
 # Include g++'s system headers
@@ -14,7 +15,6 @@ if [ "$(uname)" == "Linux" ]; then
 fi
 
 cmake \
-    -DARROW_WITH_UTF8PROC=OFF \
     -DARROW_PLASMA_JAVA_CLIENT=on \
     -DARROW_PLASMA=ON \
     -DARROW_GANDIVA_JAVA=ON \

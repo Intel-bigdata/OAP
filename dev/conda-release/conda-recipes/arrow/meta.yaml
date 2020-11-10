@@ -1,6 +1,6 @@
 {% set ARROW_VERSION = "0.17.0" %}
 package:
-  name: arrow
+  name: oap-arrow
   version: {{ ARROW_VERSION }}
 
 source:
@@ -11,7 +11,7 @@ build:
   number: 0
   skip: true  # [win and vc<14]
   run_exports:
-    - {{ pin_subpackage("arrow", max_pin="x.x") }}
+    - {{ pin_subpackage("oap-arrow", max_pin="x.x") }}
 
 requirements:
   build:
@@ -30,8 +30,8 @@ requirements:
     - glog
     - grpc-cpp >=1.21.4
     - libprotobuf
-    - clangdev 9
-    - llvmdev 9
+    - clangdev 7
+    - llvmdev 7
     - lz4-c
     - numpy >=1.14
     - orc  # [unix]
@@ -60,7 +60,10 @@ requirements:
     - vmemcache 0.8
     - memkind 1.10.1-rc2
     - hpnl 1.0
-
+    - gcc_impl_linux-64 7.5.0
+    - gcc_linux-64 7.5.0
+    - gxx_impl_linux-64 7.5.0
+    - gxx_linux-64 7.5.0
 test:
   commands:
     # headers1
