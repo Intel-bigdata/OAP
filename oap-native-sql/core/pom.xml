@@ -211,6 +211,18 @@
       <version>1.0.0-M2</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.scalatestplus</groupId>
+      <artifactId>scalatestplus-scalacheck_2.12</artifactId>
+      <version>3.1.0.0-RC2</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.parquet</groupId>
+      <artifactId>parquet-avro</artifactId>
+      <version>1.11.0</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

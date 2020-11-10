@@ -42,7 +42,7 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
 
   override protected def sparkConf: SparkConf = {
     val conf = super.sparkConf
-    conf.set("spark.memory.offHeap.size", String.valueOf(1 * 1024 * 1024))
+    conf.set("spark.memory.offHeap.size", String.valueOf(10 * 1024 * 1024))
     conf
   }
 
