@@ -2,7 +2,7 @@
 
 echo "Installing oneAPI components ..."
 cd /tmp
-tee > /tmp/oneAPI.repo << EOF
+tee >/tmp/oneAPI.repo <<EOF
 [oneAPI]
 name=Intel(R) oneAPI repository
 baseurl=https://yum.repos.intel.com/oneapi
@@ -16,11 +16,14 @@ yum install -y intel-oneapi-daal-devel-2021.1-beta07 intel-oneapi-tbb-devel-2021
 
 echo "Building oneCCL ..."
 cd /tmp
-source /root/.bashrc
-rm -rf oneCCL
-git clone https://github.com/oneapi-src/oneCCL
-cd oneCCL
-git checkout -b 2021.1-beta07-1 origin/2021.1-beta07-1
+if [ ! -d "oneCCL" ]; then
+  source /root/.bashrc
+  git clone https://github.com/oneapi-src/oneCCL
+  cd oneCCL
+  git checkout -b 2021.1-beta07-1 origin/2021.1-beta07-1
+else
+  cd oneCCL
+fi
 mkdir -p build && cd build
 cmake ..
 make -j 2 install
