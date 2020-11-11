@@ -23,6 +23,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.Channels;
 import java.util.List;
+
+import org.apache.arrow.dataset.jni.NativeMemoryPool;
 import org.apache.arrow.gandiva.evaluator.SelectionVectorInt16;
 import org.apache.arrow.gandiva.exceptions.GandivaException;
 import org.apache.arrow.gandiva.expression.ExpressionTree;
@@ -32,6 +34,7 @@ import org.apache.arrow.vector.ipc.message.ArrowBuffer;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.spark.sql.execution.datasources.v2.arrow.SparkMemoryUtils;
 
 public class ExpressionEvaluator implements AutoCloseable {
   private long nativeHandler = 0;
@@ -60,7 +63,7 @@ public class ExpressionEvaluator implements AutoCloseable {
   /** Convert ExpressionTree into native function. */
   public String build(Schema schema, List<ExpressionTree> exprs)
       throws RuntimeException, IOException, GandivaException {
-    ExpressionMemoryPool pool = ExpressionMemoryPool.forSpark();
+    NativeMemoryPool pool = SparkMemoryUtils.memoryPool();
     nativeHandler = jniWrapper.nativeBuild(pool.getNativeInstanceId(), getSchemaBytesBuf(schema),
         getExprListBytesBuf(exprs), null, false);
     return jniWrapper.nativeGetSignature(nativeHandler);
@@ -69,7 +72,7 @@ public class ExpressionEvaluator implements AutoCloseable {
   /** Convert ExpressionTree into native function. */
   public String build(Schema schema, List<ExpressionTree> exprs, boolean finishReturn)
       throws RuntimeException, IOException, GandivaException {
-    ExpressionMemoryPool pool = ExpressionMemoryPool.forSpark();
+    NativeMemoryPool pool = SparkMemoryUtils.memoryPool();
     nativeHandler = jniWrapper.nativeBuild(pool.getNativeInstanceId(), getSchemaBytesBuf(schema),
         getExprListBytesBuf(exprs), null, finishReturn);
     return jniWrapper.nativeGetSignature(nativeHandler);
@@ -78,7 +81,7 @@ public class ExpressionEvaluator implements AutoCloseable {
   /** Convert ExpressionTree into native function. */
   public String build(Schema schema, List<ExpressionTree> exprs, Schema resSchema)
       throws RuntimeException, IOException, GandivaException {
-    ExpressionMemoryPool pool = ExpressionMemoryPool.forSpark();
+    NativeMemoryPool pool = SparkMemoryUtils.memoryPool();
     nativeHandler = jniWrapper.nativeBuild(pool.getNativeInstanceId(), getSchemaBytesBuf(schema),
         getExprListBytesBuf(exprs), getSchemaBytesBuf(resSchema), false);
     return jniWrapper.nativeGetSignature(nativeHandler);
@@ -87,7 +90,7 @@ public class ExpressionEvaluator implements AutoCloseable {
   /** Convert ExpressionTree into native function. */
   public String build(Schema schema, List<ExpressionTree> exprs, Schema resSchema, boolean finishReturn)
       throws RuntimeException, IOException, GandivaException {
-    ExpressionMemoryPool pool = ExpressionMemoryPool.forSpark();
+    NativeMemoryPool pool = SparkMemoryUtils.memoryPool();
     nativeHandler = jniWrapper.nativeBuild(pool.getNativeInstanceId(), getSchemaBytesBuf(schema),
         getExprListBytesBuf(exprs), getSchemaBytesBuf(resSchema), finishReturn);
     return jniWrapper.nativeGetSignature(nativeHandler);
@@ -96,7 +99,7 @@ public class ExpressionEvaluator implements AutoCloseable {
   /** Convert ExpressionTree into native function. */
   public String build(Schema schema, List<ExpressionTree> exprs, List<ExpressionTree> finish_exprs)
       throws RuntimeException, IOException, GandivaException {
-    ExpressionMemoryPool pool = ExpressionMemoryPool.forSpark();
+    NativeMemoryPool pool = SparkMemoryUtils.memoryPool();
     nativeHandler = jniWrapper.nativeBuildWithFinish(pool.getNativeInstanceId(),
         getSchemaBytesBuf(schema), getExprListBytesBuf(exprs), getExprListBytesBuf(finish_exprs));
     return jniWrapper.nativeGetSignature(nativeHandler);

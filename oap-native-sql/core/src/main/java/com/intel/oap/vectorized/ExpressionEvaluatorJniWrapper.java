@@ -69,7 +69,7 @@ public class ExpressionEvaluatorJniWrapper {
          * @return A nativeHandler that is passed to the evaluateProjector() and
          *         closeProjector() methods
          */
-        native long nativeBuild( long memoryPool, byte[] schemaBuf, byte[] exprListBuf, byte[] resSchemaBuf, boolean finishReturn)
+        native long nativeBuild(long memoryPool, byte[] schemaBuf, byte[] exprListBuf, byte[] resSchemaBuf, boolean finishReturn)
                         throws RuntimeException, IOException;
 
         /**
