@@ -69,6 +69,9 @@ function gather() {
   find $target_path -name "*test*"|xargs rm -rf
   cd $target_path
   rm -f oap-cache-$OAP_VERSION.jar
+  mkdir -p $DEV_PATH/thirdparty/arrow/oap
+  rm -rf $DEV_PATH/thirdparty/arrow/oap/*
+  cp $target_path/* $DEV_PATH/thirdparty/arrow/oap/
   cd  $DEV_PATH/release-package
   tar -czf $package_name.tar.gz $package_name/
   echo "Please check the result in  $DEV_PATH/release-package!"
