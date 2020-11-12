@@ -63,7 +63,7 @@ function gather() {
   mkdir -p $target_path
   cp ../oap-cache/oap/target/*.jar $target_path
   cp ../oap-common/target/*.jar $target_path
-  cp ../oap-data-source/arrow/standard/target/*with-dependencies.jar.jar $target_path
+  cp ../oap-data-source/arrow/standard/target/*with-dependencies.jar $target_path
   cp ../oap-native-sql/core/target/*.jar $target_path
   cp ../oap-shuffle/remote-shuffle/target/*.jar $target_path
   cp ../oap-shuffle/RPMem-shuffle/core/target/*.jar $target_path
@@ -150,19 +150,13 @@ case $key in
     --oap-conda)
     shift 1
 
-    conda activate oapbuild
-    export ONEAPI_ROOT=/tmp/
-    mvn clean package -pl com.intel.oap:spark-arrow-datasource  -am -DskipTests
-    mvn clean package -pl com.intel.oap:spark-columnar-core  -am -DskipTests
-    conda deactivate
-
+    export ONEAPI_ROOT=/opt/intel/inteloneapi
     mvn clean package -pl com.intel.oap:oap-cache -am -Ppersistent-memory -Pvmemcache -DskipTests
     mvn clean package -pl com.intel.oap:oap-remote-shuffle  -am -DskipTests
     mvn clean package -pl com.intel.oap:oap-spark -Ppersistent-memory  -am -DskipTests
     cd $OAP_HOME/oap-shuffle/RPMem-shuffle
     mvn clean package -DskipTests
-
-    export ONEAPI_ROOT=/opt/intel/inteloneapi
+    cd $OAP_HOME
     source /opt/intel/inteloneapi/daal/2021.1-beta07/env/vars.sh
     source /opt/intel/inteloneapi/tbb/2021.1-beta07/env/vars.sh
     source /tmp/oneCCL/build/_install/env/setvars.sh

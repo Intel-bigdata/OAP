@@ -404,7 +404,7 @@ function prepare_PMoF() {
 function prepare_oneAPI() {
   cd $DEV_PATH/
   cd ../oap-mllib/dev/
-  sudo sh install-build-deps-centos.sh
+  sh install-build-deps-centos.sh
 }
 
 function  prepare_conda_build() {
