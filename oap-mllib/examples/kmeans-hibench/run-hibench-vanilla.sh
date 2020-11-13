@@ -36,7 +36,7 @@ fi
 
 export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
 
-APP_JAR=target/oap-mllib-examples-0.9.0-with-spark-3.0.0.jar
+APP_JAR=target/oap-mllib-examples-1.0.0-with-spark-3.0.0.jar
 APP_CLASS=com.intel.hibench.sparkbench.ml.DenseKMeansDS
 
 K=200

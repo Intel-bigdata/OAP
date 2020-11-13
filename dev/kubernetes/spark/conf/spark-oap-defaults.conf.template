@@ -30,14 +30,14 @@
 #spark.executor.instances 1
 
 #OAP: libraries to load
-#spark.executorEnv.LD_LIBRARY_PATH /opt/home/conda/envs/oap-0.9.0/lib/
-#spark.executor.extraLibraryPath /opt/home/conda/envs/oap-0.9.0/lib/
-#spark.driver.extraLibraryPath /opt/home/conda/envs/oap-0.9.0/lib/
+#spark.executorEnv.LD_LIBRARY_PATH /opt/home/conda/envs/oap-1.0.0/lib/
+#spark.executor.extraLibraryPath /opt/home/conda/envs/oap-1.0.0/lib/
+#spark.driver.extraLibraryPath /opt/home/conda/envs/oap-1.0.0/lib/
 
 #OAP: extra jars to include
 #spark.sql.extensions    org.apache.spark.sql.OapExtensions
-#spark.executor.extraClassPath    /opt/home/conda/envs/oap-0.9.0/oap_jars/oap-cache-0.9.0-with-spark-3.0.0.jar:/opt/home/conda/envs/oap-0.9.0/oap_jars/oap-common-0.9.0-with-spark-3.0.0.jar
-#spark.driver.extraClassPath    /opt/home/conda/envs/oap-0.9.0/oap_jars/oap-cache-0.9.0-with-spark-3.0.0.jar:/opt/home/conda/envs/oap-0.9.0/oap_jars/oap-common-0.9.0-with-spark-3.0.0.jar
+#spark.executor.extraClassPath    /opt/home/conda/envs/oap-1.0.0/oap_jars/oap-cache-1.0.0-with-spark-3.0.0.jar:/opt/home/conda/envs/oap-1.0.0/oap_jars/oap-common-1.0.0-with-spark-3.0.0.jar
+#spark.driver.extraClassPath    /opt/home/conda/envs/oap-1.0.0/oap_jars/oap-cache-1.0.0-with-spark-3.0.0.jar:/opt/home/conda/envs/oap-1.0.0/oap_jars/oap-common-1.0.0-with-spark-3.0.0.jar
 
 #OAP: volumns for Spark
 #spark.kubernetes.executor.volumes.hostPath.pmem-cache.mount.path /opt/home/pmem

@@ -5,7 +5,7 @@
 OAP_HOME="$(cd "`dirname "$0"`/.."; pwd)"
 
 DEV_PATH=$OAP_HOME/dev
-OAP_VERSION=0.9.0
+OAP_VERSION=1.0.0
 SPARK_VERSION=3.0.0
 
 GCC_MIN_VERSION=7.0

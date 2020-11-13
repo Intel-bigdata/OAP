@@ -47,7 +47,7 @@ fi
 export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
 
 # Target jar built
-OAP_MLLIB_JAR_NAME=oap-mllib-0.9.0-with-spark-3.0.0.jar
+OAP_MLLIB_JAR_NAME=oap-mllib-1.0.0-with-spark-3.0.0.jar
 OAP_MLLIB_JAR=$OAP_MLLIB_ROOT/mllib-dal/target/$OAP_MLLIB_JAR_NAME
 
 # Use absolute path
@@ -55,7 +55,7 @@ SPARK_DRIVER_CLASSPATH=$OAP_MLLIB_JAR
 # Use relative path
 SPARK_EXECUTOR_CLASSPATH=./$OAP_MLLIB_JAR_NAME
 
-APP_JAR=target/oap-mllib-examples-0.9.0-with-spark-3.0.0.jar
+APP_JAR=target/oap-mllib-examples-1.0.0-with-spark-3.0.0.jar
 APP_CLASS=com.intel.hibench.sparkbench.ml.DenseKMeansDS
 
 K=200

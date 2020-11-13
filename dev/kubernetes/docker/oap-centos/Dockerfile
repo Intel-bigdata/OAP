@@ -16,7 +16,7 @@ FROM spark-centos:1.0.0
 MAINTAINER The Optimized Analyitics Package for Spark Platform (OAP) Authors https://github.com/Intel-bigdata/OAP/
 
 #oap
-ARG OAP_VERSION=0.9.0
+ARG OAP_VERSION=1.0.0
 ENV OAP_VERSION                       ${OAP_VERSION}
 ENV OAP_HOME              /opt/home/conda/envs/oap-${OAP_VERSION}
 
@@ -25,7 +25,7 @@ USER root
 #install runtime prerequisites
 RUN git clone https://github.com/Intel-bigdata/OAP oap_source && \
   cd /opt/home/oap_source && \
-  git checkout v0.9.0-spark-3.0.0 && \
+  git checkout v1.0.0-spark-3.0.0 && \
   sh /opt/home/oap_source/dev/install-runtime-dependencies.sh --with-rdma && \
   rm -rf /opt/home/oap_source
   

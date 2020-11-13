@@ -132,7 +132,7 @@ cd $PATH_TO_OAP_DIR/oap-data-source/arrow
 mvn clean package
 
 // check built jar library
-readlink -f standard/target/spark-arrow-datasource-standard-0.9.0-jar-with-dependencies.jar
+readlink -f standard/target/spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar
 ```
 
 ### Download Spark 3.0.0
@@ -150,7 +150,7 @@ If you are new to Apache Spark, please go though [Spark's official deploying gui
 ## Get started
 ### Add extra class pathes to Spark
 
-To enable ArrowDataSource, the previous built jar `spark-arrow-datasource-standard-0.9.0-jar-with-dependencies.jar` should be added to Spark configuration. Typically the options are:
+To enable ArrowDataSource, the previous built jar `spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar` should be added to Spark configuration. Typically the options are:
 
 * `spark.driver.extraClassPath`
 * `spark.executor.extraClassPath`
@@ -161,8 +161,8 @@ ${SPARK_HOME}/bin/spark-shell \
         --verbose \
         --master yarn \
         --driver-memory 10G \
-        --conf spark.driver.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar \
-        --conf spark.executor.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar \
+        --conf spark.driver.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-1.0.0-jar-with-dependencies.jar \
+        --conf spark.executor.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-1.0.0-jar-with-dependencies.jar \
         --conf spark.driver.cores=1 \
         --conf spark.executor.instances=12 \
         --conf spark.executor.cores=6 \
@@ -203,7 +203,7 @@ to change existing Parquet-based SQL/code and will be able to read Arrow data fr
 More importantly, sometimes the feature could be extremely helpful to make ArrowDataSource work correctly
 with some 3rd-party storage tools (e.g. [Delta Lake](https://github.com/delta-io/delta)) that are built on top of ParquetDataSource.
 
-To replace built-in ParquetDataSource, the only thing has to be done is to place compiled jar `spark-arrow-datasource-parquet-0.9.0.jar` into
+To replace built-in ParquetDataSource, the only thing has to be done is to place compiled jar `spark-arrow-datasource-parquet-1.0.0.jar` into
 Spark's library folder.
 
 If you'd like to verify that ParquetDataSource is successfully overwritten by the jar, run following code 

@@ -4,14 +4,14 @@
   <parent>
     <groupId>com.intel.oap</groupId>
     <artifactId>oap-parent</artifactId>
-    <version>0.9.0</version>
+    <version>1.0.0</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
   <artifactId>spark-arrow-datasource</artifactId>
   <name>OAP Project Spark Arrow Datasource</name>
   <packaging>pom</packaging>
-  <version>0.9.0</version>
+  <version>1.0.0</version>
   <inceptionYear>2008</inceptionYear>
   <modules>
     <module>common</module>

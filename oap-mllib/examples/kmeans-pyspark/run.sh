@@ -46,7 +46,7 @@ fi
 export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
 
 # Target jar built
-OAP_MLLIB_JAR_NAME=oap-mllib-0.9.0-with-spark-3.0.0.jar
+OAP_MLLIB_JAR_NAME=oap-mllib-1.0.0-with-spark-3.0.0.jar
 OAP_MLLIB_JAR=$OAP_MLLIB_ROOT/mllib-dal/target/$OAP_MLLIB_JAR_NAME
 
 # Use absolute path
