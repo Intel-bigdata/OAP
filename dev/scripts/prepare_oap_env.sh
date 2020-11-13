@@ -9,6 +9,7 @@ TARGET_CMAKE_SOURCE_URL=https://cmake.org/files/v3.11/cmake-3.11.1.tar.gz
 GCC_MIN_VERSION=7.0
 LLVM_MIN_VERSION=7.0
 rx='^([0-9]+\.){0,2}(\*|[0-9]+)$'
+ARROW_BRANCH="branch-0.17.0-oap-1.0"
 
 if [ -z "$DEV_PATH" ]; then
   OAP_HOME="$(cd "`dirname "$0"`/../.."; pwd)"
@@ -266,10 +267,11 @@ function prepare_intel_arrow() {
   cd $DEV_PATH/thirdparty/
   intel_arrow_repo="https://github.com/Intel-bigdata/arrow.git"
   if [ ! -d "arrow" ]; then
-    git clone $intel_arrow_repo -b branch-0.17.0-oap-1.0
+    git clone $intel_arrow_repo -b $ARROW_BRANCH
     cd arrow
   else
     cd arrow
+    git checkout -f $ARROW_BRANCH
     git pull
   fi
   current_arrow_path=$(pwd)
@@ -291,10 +293,11 @@ function prepare_intel_conda_arrow() {
   cd $DEV_PATH/thirdparty/
   intel_arrow_repo="https://github.com/Intel-bigdata/arrow.git"
   if [ ! -d "arrow" ]; then
-    git clone $intel_arrow_repo -b branch-0.17.0-oap-1.0
+    git clone $intel_arrow_repo -b $ARROW_BRANCH
     cd arrow
   else
     cd arrow
+    git checkout -f $ARROW_BRANCH
     git pull
   fi
   current_arrow_path=$(pwd)
