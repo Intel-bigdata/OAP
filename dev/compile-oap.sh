@@ -66,6 +66,7 @@ function gather() {
   cp ../oap-common/target/*.jar $target_path
   cp ../oap-spark/target/*.jar $target_path
   cp ../oap-shuffle/RPMem-shuffle/core/target/*.jar $target_path
+  cp ../dev/thirdparty/arrow/java/plasma/target/arrow-plasma-0.17.0.jar $target_path
   find $target_path -name "*test*"|xargs rm -rf
   cd $target_path
   rm -f oap-cache-$OAP_VERSION.jar
