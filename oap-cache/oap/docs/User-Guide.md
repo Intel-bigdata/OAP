@@ -202,11 +202,21 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
 
 #### Prerequisites
 
-The following are required to configure OAP to use PMem cache.
+The followings are required to configure OAP to use PMem cache with external cache strategy.
 
 - PMem hardware is successfully deployed on each node in cluster.
 
-- Directories exposing PMem hardware on each socket. For example, on a two socket system the mounted PMem directories should appear as `/mnt/pmem0` and `/mnt/pmem1`. Correctly installed PMem must be formatted and mounted on every cluster worker node.
+- SQL Data Source Cache uses Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/branch-0.17.0-oap-0.9) repo. Build and install step can refer to [build and install plasma](./Developer-Guide.md#build-and-install-plasma). If you have finished [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), Plasma will be automatically installed.
+
+- Besides, when enabling SQL Data Source Cache with external cache using Plasma, PMem could get noticeable performance gain with BIOS configuration settings below, especially on cross socket write path.
+
+```
+Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
+Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
+``` 
+
+- It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma.
+
 
    ```
    // use ipmctl command to show topology and dimm info of PMem
@@ -226,49 +236,15 @@ The following are required to configure OAP to use PMem cache.
    // show the created namespaces
    fdisk -l
    // create and mount file system
-   echo y | mkfs.ext4 /dev/pmem0
-   echo y | mkfs.ext4 /dev/pmem1
-   mkdir -p /mnt/pmem0
-   mkdir -p /mnt/pmem1 
-   mount -o dax /dev/pmem0 /mnt/pmem0
-   mount -o dax /dev/pmem1 /mnt/pmem1
+   sudo dmsetup create striped-pmem
+   mkfs.ext4 -b 4096 -E stride=512 -F /dev/mapper/striped-pmem
+   mkdir -p /mnt/pmem
+   mount -o dax /dev/mapper/striped-pmem /mnt/pmem
    ```
-
-   In this case file systems are generated for 2 NUMA nodes, which can be checked by "numactl --hardware". For a different number of NUMA nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to NUMA nodes.
    
    For more information you can refer to [Quick Start Guide: Provision Intel® Optane™ DC Persistent Memory](https://software.intel.com/content/www/us/en/develop/articles/quick-start-guide-configure-intel-optane-dc-persistent-memory-on-linux.html)
 
-- SQL Data Source Cache uses Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/branch-0.17.0-oap-0.9) repo. Build and install step can refer to [build and install plasma](./Developer-Guide.md#build-and-install-plasma). If you have finished [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), Plasma will be automatically installed.
-
-- Besides, when enabling SQL Data Source Cache with external cache using Plasma, PMem could get noticeable performance gain with BIOS configuration settings below, especially on cross socket write path.
-
-```
-Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
-Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
-``` 
-
-It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma.
-
-You can follow these commands to create or destroy interleaved PMem device:
-
-```
-# create interleaved PMem device
-umount /mnt/pmem0
-umount /mnt/pmem1
-echo -e "0 $(( `sudo blockdev --getsz /dev/pmem0` + `sudo blockdev --getsz /dev/pmem0` )) striped 2 4096 /dev/pmem0 0 /dev/pmem1 0" | sudo dmsetup create striped-pmem
-mkfs.ext4 -b 4096 -E stride=512 -F /dev/mapper/striped-pmem
-mkdir -p /mnt/pmem
-mount -o dax /dev/mapper/striped-pmem /mnt/pmem
-
-# destroy interleaved PMem device
-umount /mnt/pmem
-dmsetup remove striped-pmem
-mkfs.ext4 /dev/pmem0
-mkfs.ext4 /dev/pmem1
-mount -o dax /dev/pmem0 /mnt/pmem0
-mount -o dax /dev/pmem1 /mnt/pmem1
-```
-Then copy `arrow-plasma-0.17.0.jar` to your ***$SPARK_HOME/jars*** directory. Refer to configuration below to apply external cache strategy and start plasma service on each node and start your workload.
+- Download `arrow-plasma-0.17.0.jar` from [Maven repository](https://repo1.maven.org/maven2/com/intel/arrow/arrow-plasma/0.17.0/arrow-plasma-0.17.0.jar), then copy it to your ***$SPARK_HOME/jars*** directory. Refer to configuration below to apply external cache strategy and start Plasma service on each node and start your workload.
 
 
 #### Configuration for NUMA
@@ -277,23 +253,6 @@ Install `numactl` to bind the executor to the PMem device on the same NUMA node.
 
    ```yum install numactl -y ```
 
-
-#### Configuration for PMem 
-
-Create `persistent-memory.xml` under `$SPARK_HOME/conf` if it doesn't exist. Use the following template and change the `initialPath` to your mounted paths for PMem devices. 
-
-```
-<persistentMemoryPool>
-  <!--The numa id-->
-  <numanode id="0">
-    <!--The initial path for Intel Optane DC persistent memory-->
-    <initialPath>/mnt/pmem0</initialPath>
-  </numanode>
-  <numanode id="1">
-    <initialPath>/mnt/pmem1</initialPath>
-  </numanode>
-</persistentMemoryPool>
-```
 
 #### Configuration to enable PMem cache
 
@@ -324,16 +283,16 @@ spark.sql.oap.dcpmm.free.wait.threshold                      50000000000
 # according to your executor core number
 spark.executor.sql.oap.cache.external.client.pool.size       10
 ```
- Start plasma service manually
+ Start Plasma service manually
 
-plasma config parameters:  
+Plasma config parameters:  
  ```
- -m  how much Bytes share memory plasma will use
+ -m  how much Bytes share memory Plasma will use
  -s  Unix Domain sockcet path
  -d  Pmem directory
  ```
 
-You can start plasma service on each node as following command, and then you can run your workload. If you install OAP by Conda, you can find plasma-store-server in the path **$HOME/miniconda2/envs/oapenv/bin/**.
+You can start Plasma service on each node as following command, and then you can run your workload. If you install OAP by Conda, you can find plasma-store-server in the path **$HOME/miniconda2/envs/oapenv/bin/**.
 
 ```
 ./plasma-store-server -m 15000000000 -s /tmp/plasmaStore -d /mnt/pmem  
@@ -362,7 +321,7 @@ We can use yarn(hadoop version >= 3.1) to start Plasma service, you should provi
 }
 ```
 
-Run command  ```yarn app -launch plasma-store-service /tmp/plasmaLaunch.json``` to start plasma server.  
+Run command  ```yarn app -launch plasma-store-service /tmp/plasmaLaunch.json``` to start Plasma server.  
 Run ```yarn app -stop plasma-store-service``` to stop it.  
 Run ```yarn app -destroy plasma-store-service```to destroy it.
 
@@ -489,7 +448,7 @@ When all the queries are done, you will see the `result.json` file in the curren
   Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
 - [Column Vector Cache](./Advanced-Configuration.md#Column-Vector-Cache) 
 
-  This document above use **binary** cache as example for Parquet file format, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache for Parquet to spare computation time.
+  This document above uses **binary** cache as example for Parquet file format, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache for Parquet to spare computation time.
 - [Large Scale and Heterogeneous Cluster Support](#Large-Scale-and-Heterogeneous-Cluster-Support) 
   
   Introduce an external database to store cache locality info to support large-scale and heterogeneous clusters.

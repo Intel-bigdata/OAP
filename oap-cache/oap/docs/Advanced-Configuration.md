@@ -7,7 +7,7 @@ Their needed dependencies like ***Memkind*** ,***Vmemcache*** and ***Plasma*** c
 - [Additional Cache Strategies](#Additional-Cache-Strategies)  In addition to **external** cache strategy, SQL Data Source Cache also supports 3 other cache strategies: **guava**, **noevict**  and **vmemcache**.
 - [Index and Data Cache Separation](#Index-and-Data-Cache-Separation)  To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
 - [Cache Hot Tables](#Cache-Hot-Tables)  Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
-- [Column Vector Cache](#Column-Vector-Cache)  This document above use **binary** cache as example for Parquet file format, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache for Parquet to spare computation time.
+- [Column Vector Cache](#Column-Vector-Cache)  This document above uses **binary** cache as example for Parquet file format, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache for Parquet to spare computation time.
 - [Large Scale and Heterogeneous Cluster Support](#Large-Scale-and-Heterogeneous-Cluster-Support) Introduce an external database to store cache locality info to support large-scale and heterogeneous clusters.
 
 ## Additional Cache Strategies
@@ -28,40 +28,85 @@ Following table shows features of 4 cache strategies on PMem.
 If you have followed [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), ***Memkind*** ,***Vmemcache*** and ***Plasma*** will be automatically installed. 
 Or you can refer to [Developer-Guide](../../../docs/Developer-Guide.md), there is a shell script to help you install these dependencies automatically.
 
+### Use PMem Cache 
+
+#### Prerequisites
+
+The following are required to configure OAP to use PMem cache.
+
+- PMem hardware is successfully deployed on each node in cluster.
+
+- Directories exposing PMem hardware on each socket. For example, on a two socket system the mounted PMem directories should appear as `/mnt/pmem0` and `/mnt/pmem1`. Correctly installed PMem must be formatted and mounted on every cluster worker node. You can follow these commands to destroy interleaved PMem device which you set in [User-Guide](./User-Guide.md#prerequisites-1):
+
+```
+  # destroy interleaved PMem device which you set when using external cache strategy
+  umount /mnt/pmem
+  dmsetup remove striped-pmem
+  echo y | mkfs.ext4 /dev/pmem0
+  echo y | mkfs.ext4 /dev/pmem1
+  mkdir -p /mnt/pmem0
+  mkdir -p /mnt/pmem1
+  mount -o dax /dev/pmem0 /mnt/pmem0
+  mount -o dax /dev/pmem1 /mnt/pmem1
+```
+
+   In this case file systems are generated for 2 NUMA nodes, which can be checked by "numactl --hardware". For a different number of NUMA nodes, a corresponding number of namespaces should be created to assure correct file system paths mapping to NUMA nodes.
+   
+   For more information you can refer to [Quick Start Guide: Provision Intel® Optane™ DC Persistent Memory](https://software.intel.com/content/www/us/en/develop/articles/quick-start-guide-configure-intel-optane-dc-persistent-memory-on-linux.html)
+
+#### Configuration for NUMA
+
+Install `numactl` to bind the executor to the PMem device on the same NUMA node. 
+
+   ```yum install numactl -y ```
+   
+#### Configuration for PMem 
+
+Create `persistent-memory.xml` under `$SPARK_HOME/conf` if it doesn't exist. Use the following template and change the `initialPath` to your mounted paths for PMem devices. 
+
+```
+<persistentMemoryPool>
+  <!--The numa id-->
+  <numanode id="0">
+    <!--The initial path for Intel Optane DC persistent memory-->
+    <initialPath>/mnt/pmem0</initialPath>
+  </numanode>
+  <numanode id="1">
+    <initialPath>/mnt/pmem1</initialPath>
+  </numanode>
+</persistentMemoryPool>
+```
+
 ### Guava cache
 
-Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware correctly, also make sure memkind library installed. Then follow configurations below.
+Guava cache is based on memkind library, built on top of jemalloc and provides memory characteristics. To use it in your workload, follow [prerequisites](#prerequisites) to set up PMem hardware correctly, also make sure memkind library installed. Then follow configurations below.
 
 **NOTE**: `spark.executor.sql.oap.cache.persistent.memory.reserved.size`: When we use PMem as memory through memkind library, some portion of the space needs to be reserved for memory management overhead, such as memory segmentation. We suggest reserving 20% - 25% of the available PMem capacity to avoid memory allocation failure. But even with an allocation failure, OAP will continue the operation to read data from original input data and will not cache the data block.
 
-For Parquet file format, add these conf options:
 ```
 # enable numa
-spark.yarn.numa.enabled                           true
-spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND      1
-spark.sql.oap.parquet.binary.cache.enabled        true
-spark.sql.oap.cache.memory.manager                pm 
-spark.oap.cache.strategy                          guava
+spark.yarn.numa.enabled                                        true
+spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND                   1
+# for Parquet file format, enable binary cache
+spark.sql.oap.parquet.binary.cache.enabled                     true
+# for ORC file format, enable binary cache
+spark.sql.oap.orc.binary.cache.enabled                         true
+
+spark.sql.oap.cache.memory.manager                             pm 
+spark.oap.cache.strategy                                       guava
 # PMem capacity per executor, according to your cluster
 spark.executor.sql.oap.cache.persistent.memory.initial.size    256g
-# Reserved space per executor
+# Reserved space per executor, according to your cluster
 spark.executor.sql.oap.cache.persistent.memory.reserved.size   50g
-spark.sql.extensions                              org.apache.spark.sql.OapExtensions
-```
-For Orc file format, add these conf options:
-```
-# enable numa
-spark.yarn.numa.enabled                           true
-spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND      1
-spark.sql.oap.orc.binary.cache.enabled            true
-spark.sql.oap.orc.enabled                         true
-spark.sql.oap.cache.memory.manager                pm 
-spark.oap.cache.strategy                          guava
-# PMem capacity per executor, according to your cluster
-spark.executor.sql.oap.cache.persistent.memory.initial.size    256g
-# Reserved space per executor
-spark.executor.sql.oap.cache.persistent.memory.reserved.size   50g
-spark.sql.extensions                             org.apache.spark.sql.OapExtensions
+# enable SQL Index and Data Source Cache jar in Spark
+spark.sql.extensions                                           org.apache.spark.sql.OapExtensions
+# absolute path of the jar on your working node, when in Yarn client mode
+spark.files                       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
+# relative path of the jar, when in Yarn client mode
+spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
+# absolute path of the jar on your working node,when in Yarn client mode
+spark.driver.extraClassPath       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
+
 ```
 
 Memkind library also support DAX KMEM mode. Refer [Kernel](https://github.com/memkind/memkind#kernel), this chapter will guide how to configure persistent memory as system ram. Or [Memkind support for KMEM DAX option](https://pmem.io/2020/01/20/memkind-dax-kmem.html) for more details.
@@ -75,25 +120,29 @@ spark.sql.oap.cache.memory.manager           kmem
 
 The noevict cache strategy is also supported in OAP based on the memkind library for PMem.
 
-To apply noevict cache strategy in your workload, please follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware correctly, also make sure memkind library installed. Then follow configurations below.
+To use it in your workload, follow [prerequisites](#prerequisites) to set up PMem hardware correctly, also make sure memkind library installed. Then follow the configuration below.
 
-For Parquet file format, add these conf options:
 ```
 # enable numa
-spark.yarn.numa.enabled                                  true
-spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
-spark.sql.oap.parquet.binary.cache.enabled               true 
-spark.oap.cache.strategy                                 noevict 
+spark.yarn.numa.enabled                                      true
+spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND                 1
+# for Parquet file format, enable binary cache
+spark.sql.oap.parquet.binary.cache.enabled                   true 
+for ORC file format, enable binary cache
+spark.sql.oap.orc.binary.cache.enabled                       true
+spark.oap.cache.strategy                                     noevict 
 spark.executor.sql.oap.cache.persistent.memory.initial.size  256g 
-```
-For Orc file format, add these conf options:
-```
-# enable numa
-spark.yarn.numa.enabled                                  true
-spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND             1
-spark.sql.oap.orc.binary.cache.enabled                   true 
-spark.oap.cache.strategy                                 noevict 
-spark.executor.sql.oap.cache.persistent.memory.initial.size  256g 
+
+# Enable OAP jar in Spark
+spark.sql.extensions              org.apache.spark.sql.OapExtensions
+
+# absolute path of the jar on your working node, when in Yarn client mode
+spark.files                       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
+# relative path of the jar, when in Yarn client mode
+spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
+# absolute path of the jar on your working node,when in Yarn client mode
+spark.driver.extraClassPath       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
+
 ```
 
 ### Vmemcache 
@@ -101,7 +150,7 @@ spark.executor.sql.oap.cache.persistent.memory.initial.size  256g
 - Make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), vmemcache library will be automatically installed by Conda.
   
   Or you can follow the [build/install](./Developer-Guide.md#build-and-install-vmemcache) steps and make sure `libvmemcache.so` exist in `/lib64` directory in each worker node.
-
+- To use it in your workload, follow [prerequisites](#prerequisites) to set up PMem hardware correctly.
 - Currently, using Community Spark occasionally has the problem of two executors being bound to the same PMem path, so we recommend you use our pre-built numa-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz), which can not only improve performance, but also solve this problem.
 
 #### Configure to enable PMem cache
