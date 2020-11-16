@@ -254,7 +254,7 @@ Install `numactl` to bind the executor to the PMem device on the same NUMA node.
    ```yum install numactl -y ```
 
 
-#### Configuration to enable PMem cache
+#### Configuration for enabling PMem cache
 
 Add the following configuration to `$SPARK_HOME/conf/spark-defaults.conf`.
 
@@ -329,8 +329,6 @@ Run ```yarn app -destroy plasma-store-service```to destroy it.
 ### Verify PMem cache functionality
 
 - After finishing configuration, restart Spark Thrift Server for the configuration changes to take effect. Start at step 2 of the [Use DRAM Cache](#use-dram-cache) guide to verify that cache is working correctly.
-
-- Verify NUMA binding status by confirming keywords like `numactl --cpubind=1 --membind=1` contained in executor launch command.
 
 - Check PMem cache size by checking disk space with `df -h`.
 

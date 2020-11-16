@@ -56,10 +56,15 @@ The following are required to configure OAP to use PMem cache.
 
 #### Configuration for NUMA
 
-Install `numactl` to bind the executor to the PMem device on the same NUMA node. 
+1. Install `numactl` to bind the executor to the PMem device on the same NUMA node. 
 
    ```yum install numactl -y ```
+
+2. We strongly recommend you use NUMA-patched Spark to achieve better performance gain for the following 3 cache strategies. Besides, currently using Community Spark occasionally has the problem of two executors being bound to the same PMem path. 
    
+   Build Spark from source to enable NUMA-binding support, refer to [enable-numa-binding-for-PMem-in-spark](./Developer-Guide.md#Enabling-NUMA-binding-for-PMem-in-Spark). Or you can just download our pre-built NUMA-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-1.0.0/spark-3.0.0-bin-hadoop2.7-intel-oap-1.0.0.tgz).
+
+  
 #### Configuration for PMem 
 
 Create `persistent-memory.xml` under `$SPARK_HOME/conf` if it doesn't exist. Use the following template and change the `initialPath` to your mounted paths for PMem devices. 
@@ -151,7 +156,6 @@ spark.driver.extraClassPath       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cach
   
   Or you can follow the [build/install](./Developer-Guide.md#build-and-install-vmemcache) steps and make sure `libvmemcache.so` exist in `/lib64` directory in each worker node.
 - To use it in your workload, follow [prerequisites](#prerequisites) to set up PMem hardware correctly.
-- Currently, using Community Spark occasionally has the problem of two executors being bound to the same PMem path, so we recommend you use our pre-built numa-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz), which can not only improve performance, but also solve this problem.
 
 #### Configure to enable PMem cache
 
@@ -197,16 +201,13 @@ The `vmem` cache strategy is based on libvmemcache (buffer based LRU cache), whi
 
 - Check PMem cache size by checking disk space with `df -h`.For `vmemcache` strategy, disk usage will reach the initial cache size once the PMem cache is initialized and will not change during workload execution. For `Guava/Noevict` strategies, the command will show disk space usage increases along with workload execution. 
 
-- We strongly recommend you use numa-patched Spark to achieve better performance gain.
-    
-  Build Spark from source to enable numa-binding support, refer to [Enabling-NUMA-binding-for-PMem-in-Spark](./Developer-Guide.md#Enabling-NUMA-binding-for-PMem-in-Spark). Or you can just download our pre-built numa-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz).
 
 ## Index and Data Cache Separation
 
-Data Source Cache now supports different cache strategies for DRAM and PMem. To optimize the cache media utilization, you can enable cache separation of data and index with same or different cache media. When Sharing same media, data cache and index cache will use different fiber cache ratio.
+SQL Index and Data Source Cache now supports different cache strategies for DRAM and PMem. To optimize the cache media utilization, you can enable cache separation of data and index with same or different cache media. When Sharing same media, data cache and index cache will use different fiber cache ratio.
 
 
-Here we list 4 different kinds of configs for index/cache separation, if you choose one of them, please add corresponding configs to `spark-defaults.conf`.
+Here we list 4 different kinds of configuration for index/cache separation, if you choose one of them, please add corresponding configuration to `spark-defaults.conf`.
 1. DRAM as cache media, `guava` strategy as index & data cache backend. 
 
 ```
@@ -214,44 +215,44 @@ spark.sql.oap.index.data.cache.separation.enabled       true
 spark.oap.cache.strategy                                mix
 spark.sql.oap.cache.memory.manager                      offheap
 ```
-The rest configurations can refer to the configurations of  [Use DRAM Cache](./User-Guide.md#use-dram-cache) 
+The rest configuration you can refer to  [Use DRAM Cache](./User-Guide.md#use-dram-cache) 
 
-2. PMem as cache media, `vmem` strategy as index & data cache backend. 
+2. PMem as cache media, `external` strategy as index & data cache backend. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enabled       true
 spark.oap.cache.strategy                                mix
 spark.sql.oap.cache.memory.manager                      tmp
-spark.sql.oap.mix.data.cache.backend                    vmem
-spark.sql.oap.mix.index.cache.backend                   vmem
+spark.sql.oap.mix.data.cache.backend                    external
+spark.sql.oap.mix.index.cache.backend                   external
 
 ```
-The rest configurations can refer to the configurations of [PMem Cache](./User-Guide.md#use-pmem-cache) and  [Vmemcache cache](./User-Guide.md#configure-to-enable-pmem-cache)
+The rest configurations can refer to the configurations of [PMem Cache](./User-Guide.md#use-pmem-cache) and  [External cache](./User-Guide.md#Configuration-for-enabling-PMem-cache)
 
-3. DRAM(`offheap`)/`guava` as `index` cache media and backend, PMem(`tmp`)/`vmem` as `data` cache media and backend. 
+3. DRAM(`offheap`)/`guava` as `index` cache media and backend, PMem(`tmp`)/`external` as `data` cache media and backend. 
 
 ```
 spark.sql.oap.index.data.cache.separation.enabled            true
 spark.oap.cache.strategy                                     mix
 spark.sql.oap.cache.memory.manager                           mix 
-spark.sql.oap.mix.data.cache.backend                         vmem
+spark.sql.oap.mix.data.cache.backend                         external
 
 # 2x number of your worker nodes
 spark.executor.instances                                     6
 # enable numa
 spark.yarn.numa.enabled                                      true
 spark.memory.offHeap.enabled                                 false
-# PMem capacity per executor
-spark.executor.sql.oap.cache.persistent.memory.initial.size  256g
-# according to your cluster
-spark.executor.sql.oap.cache.guardian.memory.size            10g
+
+spark.sql.oap.dcpmm.free.wait.threshold                      50000000000
+# according to your executor core number
+spark.executor.sql.oap.cache.external.client.pool.size       10
 
 # equal to the size of executor.memoryOverhead
 spark.executor.sql.oap.cache.offheap.memory.size             50g
 # according to the resource of cluster
 spark.executor.memoryOverhead                                50g
 
-# for orc file format
+# for ORC file format
 spark.sql.oap.orc.binary.cache.enabled                       true
 # for Parquet file format
 spark.sql.oap.parquet.binary.cache.enabled                   true
@@ -289,7 +290,7 @@ spark.sql.oap.parquet.binary.cache.enabled                   true
 
 Data Source Cache also supports caching specific tables by configuring items according to actual situations, these tables are usually hot tables.
 
-To enable caching specific hot tables, you can add below configurations to `spark-defaults.conf`.
+To enable caching specific hot tables, you can add the configuration below to `spark-defaults.conf`.
 ```
 # enable table lists fiberCache
 spark.sql.oap.cache.table.list.enabled          true
@@ -301,7 +302,7 @@ spark.sql.oap.cache.table.list                  <databasename>.<tablename1>;<dat
 
 This document above use **binary** cache for Parquet as example, cause binary cache can improve cache space utilization compared to ColumnVector cache. When your cluster memory resources are abundant enough, you can choose ColumnVector cache to spare computation time. 
 
-To enable ColumnVector data cache for Parquet file format, you should add below configurations to `spark-defaults.conf`.
+To enable ColumnVector data cache for Parquet file format, you should add the configuration below to `spark-defaults.conf`.
 
 ```
 # for parquet file format, disable binary cache

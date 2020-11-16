@@ -1,7 +1,6 @@
 # Developer Guide
 
 * [Building](#Building)
-* [Integrating with Spark\*](#integrating-with-spark)
 * [Enabling NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enabling-numa-binding-for-pmem-in-spark)
 
 ## Building
@@ -117,23 +116,6 @@ Build with this command to use all of them:
 ```
 mvn clean -q -pl com.intel.oap:oap-cache -am  -Ppersistent-memory -Pvmemcache -DskipTests package
 ```
-
-## Integrating with Spark
-
-Although SQL Index and Data Source Cache act as a plug-in JAR to Spark, there are still a few tricks to note when integrating with Spark. The OAP team explored using the Spark extension & data source API to deliver its core functionality. However, the limits of the Spark extension and data source API meant that we had to make some changes to Spark internals. As a result you must check whether your installation is an unmodified Community Spark or a customized Spark.
-
-### Integrating with Community Spark
-
-If you are running a Community Spark, things will be much simpler. Refer to [User Guide](User-Guide.md) to configure and setup Spark to work with OAP.
-
-### Integrate with Customized Spark
-
-In this case check whether the OAP changes to Spark internals will conflict with or override your private changes. 
-
-- If there are no conflicts or overrides, the steps are the same as the steps of unmodified version of Spark described above. 
-- If there are conflicts or overrides, develop a merge plan of the source code to make sure the code changes you made in to the Spark source appear in the corresponding file included in OAP the project. Once merged, rebuild OAP.
-
-
 
 ## Enabling NUMA binding for PMem in Spark
 
