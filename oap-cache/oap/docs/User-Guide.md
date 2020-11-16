@@ -263,7 +263,7 @@ Add the following configuration to `$SPARK_HOME/conf/spark-defaults.conf`.
 spark.executor.instances          6
 # enable numa
 spark.yarn.numa.enabled           true
-# enable SQL Index and Data Source Cache jar in Spark
+# enable SQL Index and Data Source Cache extension in Spark
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
 
 # absolute path of the jar on your working node, when in Yarn client mode

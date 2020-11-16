@@ -133,12 +133,12 @@ spark.yarn.numa.enabled                                      true
 spark.executorEnv.MEMKIND_ARENA_NUM_PER_KIND                 1
 # for Parquet file format, enable binary cache
 spark.sql.oap.parquet.binary.cache.enabled                   true 
-for ORC file format, enable binary cache
+# for ORC file format, enable binary cache
 spark.sql.oap.orc.binary.cache.enabled                       true
 spark.oap.cache.strategy                                     noevict 
 spark.executor.sql.oap.cache.persistent.memory.initial.size  256g 
 
-# Enable OAP jar in Spark
+# Enable OAP extension in Spark
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
 
 # absolute path of the jar on your working node, when in Yarn client mode
@@ -154,7 +154,7 @@ spark.driver.extraClassPath       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cach
 
 - Make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), vmemcache library will be automatically installed by Conda.
   
-  Or you can follow the [build/install](./Developer-Guide.md#build-and-install-vmemcache) steps and make sure `libvmemcache.so` exist in `/lib64` directory in each worker node.
+  Or you can follow the [build/install](./Developer-Guide.md#build-and-install-vmemcache) steps and make sure `libvmemcache.so` exist in `/lib64` directory on each worker node.
 - To use it in your workload, follow [prerequisites](#prerequisites) to set up PMem hardware correctly.
 
 #### Configure to enable PMem cache
@@ -166,7 +166,7 @@ Make the following configuration changes in `$SPARK_HOME/conf/spark-defaults.con
 spark.executor.instances          6
 # enable numa
 spark.yarn.numa.enabled           true
-# Enable OAP jar in Spark
+# Enable OAP extension in Spark
 spark.sql.extensions              org.apache.spark.sql.OapExtensions
 
 # absolute path of the jar on your working node, when in Yarn client mode
