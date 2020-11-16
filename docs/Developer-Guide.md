@@ -1,7 +1,7 @@
 # OAP Developer Guide
 
 This document contains the instructions & scripts on installing necessary dependencies and building OAP. 
-You can get more detailed information from OAP each module blew.
+You can get more detailed information from OAP each module below.
 
 * [SQL Index and Data Source Cache](../oap-cache/oap/docs/Developer-Guide.md)
 * [RDD Cache PMem Extension](../oap-spark/README.md#compiling)
@@ -51,8 +51,8 @@ Run the following command to automatically install specific dependency such as M
 
 ***NOTE:*** If you use `install-compile-time-dependencies.sh` or `prepare_oap_env.sh` to install GCC, or your GCC is not installed in the default path, please ensure you have exported `CC` (and `CXX`) before calling maven.
 ```shell script
-# export CXX=$OAPHOME/dev/thirdparty/gcc7/bin/g++
-# export CC=$OAPHOME/dev/thirdparty/gcc7/bin/gcc
+# export CXX=$OAP_HOME/dev/thirdparty/gcc7/bin/g++
+# export CC=$OAP_HOME/dev/thirdparty/gcc7/bin/gcc
 ```
 
 ### Building

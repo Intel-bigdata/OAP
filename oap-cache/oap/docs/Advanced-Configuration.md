@@ -4,12 +4,14 @@ In addition to usage information provided in [User Guide](User-Guide.md), we pro
 
 Their needed dependencies like ***Memkind*** ,***Vmemcache*** and ***Plasma*** can be automatically installed when following [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), corresponding feature jars can be found under `$HOME/miniconda2/envs/oapenv/oap_jars`.
 
-- [Additional Cache Strategies](#Additional-Cache-Strategies)  In addition to **vmem** cache strategy, Data Source Cache also supports 3 other cache strategies: **guava**, **noevict**  and **external cache**.
+- [Additional Cache Strategies](#Additional-Cache-Strategies)  In addition to **external** cache strategy, SQL Data Source Cache also supports 3 other cache strategies: **guava**, **noevict**  and **vmemcache**.
 - [Index and Data Cache Separation](#Index-and-Data-Cache-Separation)  To optimize the cache media utilization, Data Source Cache supports cache separation of data and index, by using same or different cache media with DRAM and PMem.
 - [Cache Hot Tables](#Cache-Hot-Tables)  Data Source Cache also supports caching specific tables according to actual situations, these tables are usually hot tables.
 - [Column Vector Cache](#Column-Vector-Cache)  This document above use **binary** cache as example for Parquet file format, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache for Parquet to spare computation time.
 - [Large Scale and Heterogeneous Cluster Support](#Large-Scale-and-Heterogeneous-Cluster-Support) Introduce an external database to store cache locality info to support large-scale and heterogeneous clusters.
+
 ## Additional Cache Strategies
+
 Following table shows features of 4 cache strategies on PMem.
 
 | guava | noevict | vmemcache | external cache |
@@ -22,8 +24,6 @@ Following table shows features of 4 cache strategies on PMem.
 - For cache solution `guava/noevict`, make sure [Memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2) library installed on every cluster worker node. If you have finished [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), libmemkind will be installed. Or manually build and install it following [build and install memkind](./Developer-Guide.md#build-and-install-memkind), then place `libmemkind.so.0` under `/lib64/` on each worker node.
 
 - For cache solution `vmemcahe/external` cache, make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node. If you have finished [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), libvmemcache will be installed. Or you can follow the [build/install](./Developer-Guide.md#build-and-install-vmemcache) steps and make sure `libvmemcache.so.0` exist under `/lib64/` directory on each worker node.
-
-- Data Source Cache use Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/branch-0.17.0-oap-0.9) repo. Build and install step can refer to [build and install plasma](./Developer-Guide.md#build-and-install-plasma). If you have finished [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), Plasma will be automatically installed.
 
 If you have followed [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), ***Memkind*** ,***Vmemcache*** and ***Plasma*** will be automatically installed. 
 Or you can refer to [Developer-Guide](../../../docs/Developer-Guide.md), there is a shell script to help you install these dependencies automatically.
@@ -96,113 +96,61 @@ spark.oap.cache.strategy                                 noevict
 spark.executor.sql.oap.cache.persistent.memory.initial.size  256g 
 ```
 
-### External cache using plasma
+### Vmemcache 
 
-
-External cache strategy is implemented based on arrow/plasma library. For performance reason, we recommend using numa-patched Spark-3.0.0. 
-
-To use this strategy, follow [prerequisites](./User-Guide.md#prerequisites-1) to set up PMem hardware. 
-
-Besides, with BIOS configuration settings below, PMem could get noticeable performance gain, especially on cross socket write path.
-
-```
-Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
-Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
-``` 
-
-
-It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma.
-
-You can follow these commands to create or destroy interleaved PMem device:
-
-```
-# create interleaved PMem device
-umount /mnt/pmem0
-umount /mnt/pmem1
-echo -e "0 $(( `sudo blockdev --getsz /dev/pmem0` + `sudo blockdev --getsz /dev/pmem0` )) striped 2 4096 /dev/pmem0 0 /dev/pmem1 0" | sudo dmsetup create striped-pmem
-mkfs.ext4 -b 4096 -E stride=512 -F /dev/mapper/striped-pmem
-mkdir -p /mnt/pmem
-mount -o dax /dev/mapper/striped-pmem /mnt/pmem
-
-# destroy interleaved PMem device
-umount /mnt/pmem
-dmsetup remove striped-pmem
-mkfs.ext4 /dev/pmem0
-mkfs.ext4 /dev/pmem1
-mount -o dax /dev/pmem0 /mnt/pmem0
-mount -o dax /dev/pmem1 /mnt/pmem1
-```
-Then copy `arrow-plasma-0.17.0.jar` to your ***$SPARK_HOME/jars*** directory. Refer to configurations below to apply external cache strategy and start plasma service on each node and start your workload. (Currently web UI cannot display accurately, this is a known [issue](https://github.com/Intel-bigdata/OAP/issues/1579))
-
-For Parquet data format, add these conf options:
-
-
-```
-spark.sql.oap.parquet.binary.cache.enabled                 true 
-spark.oap.cache.strategy                                   external
-spark.sql.oap.dcpmm.free.wait.threshold                    50000000000
-# according to your executor core number
-spark.executor.sql.oap.cache.external.client.pool.size     10
-# absolute path of the jar on your working node
-spark.files                       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,$HOME/miniconda2/envs/oapenv/oap_jars/arrow-plasma-0.17.0.jar,$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
-# relative path of the jar
-spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar:./arrow-plasma-0.17.0.jar
-# absolute path of the jar on your working node
-spark.driver.extraClassPath       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar:$HOME/miniconda2/envs/oapenv/oap_jars/arrow-plasma-0.17.0.jar
-
-```
-
-For Orc file format, add these conf options:
-
-```
-spark.sql.oap.orc.binary.cache.enabled                     true 
-spark.oap.cache.strategy                                   external
-spark.sql.oap.dcpmm.free.wait.threshold                    50000000000
-# according to your executor core number
-spark.executor.sql.oap.cache.external.client.pool.size     10
-```
-
-- Start plasma service manually
-
-plasma config parameters:  
- ```
- -m  how much Bytes share memory plasma will use
- -s  Unix Domain sockcet path
- -d  Pmem directory
- ```
-
-You can start plasma service on each node as following command, and then you can run your workload. If you install OAP by Conda, you can find plasma-store-server in the path **$HOME/miniconda2/envs/oapenv/bin/**.
-
-```
-./plasma-store-server -m 15000000000 -s /tmp/plasmaStore -d /mnt/pmem  
-```
-
- Remember to kill `plasma-store-server` process if you no longer need cache, and you should delete `/tmp/plasmaStore` which is a Unix domain socket.  
+- Make sure [Vmemcache](https://github.com/pmem/vmemcache) library has been installed on every cluster worker node if vmemcache strategy is chosen for PMem cache. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), vmemcache library will be automatically installed by Conda.
   
-- Use yarn to start Plamsa service  
-We can use yarn(hadoop version >= 3.1) to start Plasma service, you should provide a json file like following.
-```
-{
-  "name": "plasma-store-service",
-  "version": 1,
-  "components" :
-  [
-   {
-     "name": "plasma-store-service",
-     "number_of_containers": 3,
-     "launch_command": "plasma-store-server -m 15000000000 -s /tmp/plasmaStore -d /mnt/pmem",
-     "resource": {
-       "cpus": 1,
-       "memory": 512
-     }
-   }
-  ]
-}
-```
+  Or you can follow the [build/install](./Developer-Guide.md#build-and-install-vmemcache) steps and make sure `libvmemcache.so` exist in `/lib64` directory in each worker node.
 
-Run command  ```yarn app -launch plasma-store-service /tmp/plasmaLaunch.json``` to start plasma server.  
-Run ```yarn app -stop plasma-store-service``` to stop it.  
-Run ```yarn app -destroy plasma-store-service```to destroy it.
+- Currently, using Community Spark occasionally has the problem of two executors being bound to the same PMem path, so we recommend you use our pre-built numa-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz), which can not only improve performance, but also solve this problem.
+
+#### Configure to enable PMem cache
+
+Make the following configuration changes in `$SPARK_HOME/conf/spark-defaults.conf`.
+
+```
+# 2x number of your worker nodes
+spark.executor.instances          6
+# enable numa
+spark.yarn.numa.enabled           true
+# Enable OAP jar in Spark
+spark.sql.extensions              org.apache.spark.sql.OapExtensions
+
+# absolute path of the jar on your working node, when in Yarn client mode
+spark.files                       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
+# relative path of the jar, when in Yarn client mode
+spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
+# absolute path of the jar on your working node,when in Yarn client mode
+spark.driver.extraClassPath       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
+
+# for parquet file format, enable binary cache
+spark.sql.oap.parquet.binary.cache.enabled                   true
+# for ORC file format, enable binary cache
+spark.sql.oap.orc.binary.cache.enabled                       true
+# enable vmemcache strategy 
+spark.oap.cache.strategy                                     vmem 
+spark.executor.sql.oap.cache.persistent.memory.initial.size  256g 
+# according to your cluster
+spark.executor.sql.oap.cache.guardian.memory.size            10g
+```
+The `vmem` cache strategy is based on libvmemcache (buffer based LRU cache), which provides a key-value store API. Follow these steps to enable vmemcache support in Data Source Cache.
+
+- `spark.executor.instances`: We suggest setting the value to 2X the number of worker nodes when NUMA binding is enabled. Each worker node runs two executors, each executor is bound to one of the two sockets, and accesses the corresponding PMem device on that socket.
+- `spark.executor.sql.oap.cache.persistent.memory.initial.size`: It is configured to the available PMem capacity to be used as data cache per exectutor.
+ 
+**NOTE**: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks fail with "cache guardian use too much memory" error, set `spark.executor.sql.oap.cache.guardian.memory.size ` to a larger number as the default size is 10GB. The user could also increase `spark.sql.oap.cache.guardian.free.thread.nums` or decrease `spark.sql.oap.cache.dispose.timeout.ms` to free memory more quickly.
+
+#### Verify PMem cache functionality
+
+- After finishing configuration, restart Spark Thrift Server for the configuration changes to take effect. Start at step 2 of the [Use DRAM Cache](./User-Guide.md#use-dram-cache) guide to verify that cache is working correctly.
+
+- Verify NUMA binding status by confirming keywords like `numactl --cpubind=1 --membind=1` contained in executor launch command.
+
+- Check PMem cache size by checking disk space with `df -h`.For `vmemcache` strategy, disk usage will reach the initial cache size once the PMem cache is initialized and will not change during workload execution. For `Guava/Noevict` strategies, the command will show disk space usage increases along with workload execution. 
+
+- We strongly recommend you use numa-patched Spark to achieve better performance gain.
+    
+  Build Spark from source to enable numa-binding support, refer to [Enabling-NUMA-binding-for-PMem-in-Spark](./Developer-Guide.md#Enabling-NUMA-binding-for-PMem-in-Spark). Or you can just download our pre-built numa-patched [Spark-3.0.0](https://github.com/Intel-bigdata/spark/releases/download/v3.0.0-intel-oap-0.9.0/spark-3.0.0-bin-hadoop2.7-intel-oap-0.9.0.tgz).
 
 ## Index and Data Cache Separation
 

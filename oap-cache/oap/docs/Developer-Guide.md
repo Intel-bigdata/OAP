@@ -133,28 +133,7 @@ In this case check whether the OAP changes to Spark internals will conflict with
 - If there are no conflicts or overrides, the steps are the same as the steps of unmodified version of Spark described above. 
 - If there are conflicts or overrides, develop a merge plan of the source code to make sure the code changes you made in to the Spark source appear in the corresponding file included in OAP the project. Once merged, rebuild OAP.
 
-The following files need to be checked/compared for changes:
 
-```
-•	org/apache/spark/sql/execution/DataSourceScanExec.scala   
-		Add the metrics info to OapMetricsManager and schedule the task to read from the cached 
-•	org/apache/spark/sql/execution/datasources/FileFormatDataWriter.scala
-                Return the result of write task to driver.
-•	org/apache/spark/sql/execution/datasources/FileFormatWriter.scala
-		Add the result of write task. 
-•	org/apache/spark/sql/execution/datasources/OutputWriter.scala  
-		Add new API to support return the result of write task to driver.
-•	org/apache/spark/status/api/v1/OneApplicationResource.scala    
-		Update the metric data to spark web UI.
-•	org/apache/spark/sql/execution/datasources/parquet/VectorizedColumnReader.java
-		Change the private access of variable to protected
-•	org/apache/spark/sql/execution/datasources/parquet/VectorizedPlainValuesReader.java
-		Change the private access of variable to protected
-•	org/apache/spark/sql/execution/datasources/parquet/VectorizedRleValuesReader.java
-		Change the private access of variable to protected
-•	org/apache/spark/sql/execution/vectorized/OnHeapColumnVector.java
-		Add the get and set method for the changed protected variable.
-```
 
 ## Enabling NUMA binding for PMem in Spark
 
