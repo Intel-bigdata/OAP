@@ -55,7 +55,7 @@ function install_maven() {
   yum -y install wget
   cd $DEV_PATH/thirdparty
   if [ ! -f " $DEV_PATH/thirdparty/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz" ]; then
-        wget --no-check-certificate https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
+        wget -t 0 -c --no-check-certificate https://mirrors.cnnic.cn/apache/maven/maven-3/$MAVEN_TARGET_VERSION/binaries/apache-maven-$MAVEN_TARGET_VERSION-bin.tar.gz
   fi
 
   cd /usr/local/
@@ -108,7 +108,7 @@ function prepare_cmake() {
       cd $DEV_PATH/thirdparty
       echo " $DEV_PATH/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz"
       if [ ! -f " $DEV_PATH/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz" ]; then
-        wget --no-check-certificate $TARGET_CMAKE_SOURCE_URL
+        wget -t 0 -c --no-check-certificate $TARGET_CMAKE_SOURCE_URL
       fi
       tar xvf cmake-$CMAKE_TARGET_VERSION.tar.gz
       cd cmake-$CMAKE_TARGET_VERSION/
@@ -125,7 +125,7 @@ function prepare_cmake() {
     cd $DEV_PATH/thirdparty
     echo " $DEV_PATH/thirdparty/cmake-$CMAKE_TARGET_VERSION.tar.gz"
     if [ ! -f "cmake-$CMAKE_TARGET_VERSION.tar.gz" ]; then
-      wget --no-check-certificate $TARGET_CMAKE_SOURCE_URL
+      wget -t 0 -c --no-check-certificate $TARGET_CMAKE_SOURCE_URL
     fi
 
     tar xvf cmake-$CMAKE_TARGET_VERSION.tar.gz
@@ -201,7 +201,7 @@ function install_gcc7() {
   if [ ! -d "gcc-7.3.0" ]; then
     if [ ! -f "gcc-7.3.0.tar" ]; then
       if [ ! -f "gcc-7.3.0.tar.xz" ]; then
-        wget  --no-check-certificate https://bigsearcher.com/mirrors/gcc/releases/gcc-7.3.0/gcc-7.3.0.tar.xz
+        wget -t 0 -c  --no-check-certificate https://bigsearcher.com/mirrors/gcc/releases/gcc-7.3.0/gcc-7.3.0.tar.xz
       fi
       xz -d gcc-7.3.0.tar.xz
     fi
@@ -217,7 +217,7 @@ function install_gcc7() {
 
 function prepare_llvm() {
   check_gcc
-  CURRENT_LLVM_VERSION_STR="$(llvm-config --version)"
+  CURRENT_LLVM_VERSION_STR=`export LD_LIBRARY_PATH=$DEV_PATH/thirdparty/gcc7/lib64:$LD_LIBRARY_PATH;llvm-config --version`
   if [[ "CURRENT_LLVM_VERSION_STR" =~ $rx  ]]; then
     if version_ge $CURRENT_LLVM_VERSION_STR $LLVM_MIN_VERSION; then
       echo "llvm is installed"
@@ -230,7 +230,7 @@ function prepare_llvm() {
   cd $DEV_PATH/thirdparty/llvm
   if [ ! -d "llvm-7.0.1.src" ]; then
     if [ ! -f "llvm-7.0.1.src.tar.xz" ]; then
-      wget --no-check-certificate http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
+      wget -t 0 -c --no-check-certificate http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
     fi
     tar xf llvm-7.0.1.src.tar.xz
   fi
@@ -240,7 +240,7 @@ function prepare_llvm() {
 
   if [ ! -d "clang" ]; then
     if [ ! -f "cfe-7.0.1.src.tar.xz" ]; then
-      wget --no-check-certificate http://releases.llvm.org/7.0.1/cfe-7.0.1.src.tar.xz
+      wget -t 0 -c --no-check-certificate http://releases.llvm.org/7.0.1/cfe-7.0.1.src.tar.xz
       tar xf cfe-7.0.1.src.tar.xz
     fi
     mv cfe-7.0.1.src clang
@@ -262,6 +262,7 @@ function prepare_intel_arrow() {
   yum -y install libgsasl
   yum -y install libidn-devel.x86_64
   yum -y install libntlm.x86_64
+  yum -y install python3
   cd $DEV_PATH
   mkdir -p $DEV_PATH/thirdparty/
   cd $DEV_PATH/thirdparty/

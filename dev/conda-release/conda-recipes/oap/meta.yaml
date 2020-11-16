@@ -48,6 +48,7 @@ requirements:
     - boost-cpp
     - brotli
     - c-ares
+    - c-compiler
     - gflags
     - glog
     - grpc-cpp
