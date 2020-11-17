@@ -49,6 +49,7 @@ requirements:
     - brotli
     - c-ares
     - c-compiler
+    - cxx-compiler
     - gflags
     - glog
     - grpc-cpp
