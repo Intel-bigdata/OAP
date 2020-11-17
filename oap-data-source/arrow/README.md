@@ -10,7 +10,7 @@ The development of this library is still in progress. As a result some of the fu
 There are some requirements before you build the project.
 Please make sure you have already installed the software in your system.
 
-1. gcc 7.3.1 or later
+1. gcc 9.3 or higher version
 2. java8 OpenJDK -> yum install java-1.8.0-openjdk
 3. cmake 3.2 or higher version
 4. maven 3.1.1 or higher version
@@ -19,7 +19,8 @@ Please make sure you have already installed the software in your system.
 
 ### gcc installation
 
-// installing gcc 7.3.1 or higher version
+// installing gcc 9.3 or higher version
+Please notes for better performance support, gcc 9.3 is a minimal requirement with Intel Microarchitecture such as SKYLAKE, CASCADELAKE, ICELAKE. 
 https://gcc.gnu.org/install/index.html
 Follow the above website to download gcc.
 You may have to launch ./contrib/download_prerequisites command to install all the prerequisites for gcc.
@@ -180,8 +181,11 @@ If you are new to Apache Spark, please go though [Spark's official deploying gui
 
 To enable ArrowDataSource, the previous built jar `spark-arrow-datasource-standard-0.9.0-jar-with-dependencies.jar` should be added to Spark configuration. Typically the options are:
 
-* `spark.driver.extraClassPath`
-* `spark.executor.extraClassPath`
+* `spark.driver.extraClassPath` : Set to load jar file to driver. 
+* `spark.executor.extraClassPath` : Set to load jar file to executor.
+* `jars` : Set to copy jar file to the executors when using yarn cluster mode.
+* `spark.executorEnv.ARROW_LIBHDFS3_DIR` : Optional if you are using a custom libhdfs3.so.
+* `spark.executorEnv.LD_LIBRARY_PATH` : Optional if you are using a custom libhdfs3.so.
 
 Example to run Spark Shell with ArrowDataSource jar file
 ```
@@ -189,8 +193,8 @@ ${SPARK_HOME}/bin/spark-shell \
         --verbose \
         --master yarn \
         --driver-memory 10G \
-        --conf spark.driver.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar \
-        --conf spark.executor.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar \
+        --conf spark.driver.extraClassPath=/path-to-jar-dir/spark-arrow-datasource-standard-0.9.0-jar-with-dependencies.jar \
+        --conf spark.executor.extraClassPath=/path-to-jar-dir/spark-arrow-datasource-standard-0.9.0-jar-with-dependencies.jar \
         --conf spark.driver.cores=1 \
         --conf spark.executor.instances=12 \
         --conf spark.executor.cores=6 \
@@ -199,8 +203,9 @@ ${SPARK_HOME}/bin/spark-shell \
         --conf spark.task.cpus=1 \
         --conf spark.locality.wait=0s \
         --conf spark.sql.shuffle.partitions=72 \
-        --conf spark.executorEnv.ARROW_LIBHDFS3_DIR="$PATH_TO_LIBHDFS3_DIR/" \
-        --conf spark.executorEnv.LD_LIBRARY_PATH="$PATH_TO_LIBHDFS3_DEPENDENCIES_DIR"
+        --conf spark.executorEnv.ARROW_LIBHDFS3_DIR=/path-to-libhdfs3-dir/ \
+        --conf spark.executorEnv.LD_LIBRARY_PATH=/path-to-libhdfs3-dir/ \
+        --jars /path-to-jar-dir/spark-arrow-datasource-0.9.0-jar-with-dependencies.jar
 ```
 
 For more information about these options, please read the official Spark [documentation](https://spark.apache.org/docs/latest/configuration.html#runtime-environment).
