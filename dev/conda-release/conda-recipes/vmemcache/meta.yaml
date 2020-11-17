@@ -22,8 +22,8 @@ about:
     the license section of the installed Conda package and/or the README file) and all notices, disclaimers or license terms
     for third party or open source software included in or with the software.</strong>
     <br/><br/>
-    EULA: <a href="https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/LICENSE.txt" target="_blank">Apache License 2.0</a><br/>
-    Third Party Programs: https://github.com/Intel-bigdata/OAP/blob/branch-0.9-spark-3.x/TPP.txt
+    EULA: <a href="https://github.com/Intel-bigdata/OAP/blob/master/LICENSE.txt" target="_blank">Apache License 2.0</a><br/>
+    Third Party Programs: https://github.com/Intel-bigdata/OAP/blob/master/TPP.txt
     <br/><br/>'
   dev_url: https://github.com/pmem/vmemcache.git
   doc_url: https://github.com/pmem/vmemcache.git

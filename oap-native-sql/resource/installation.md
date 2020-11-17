@@ -89,8 +89,17 @@ spark.shuffle.manager org.apache.spark.shuffle.sort.ColumnarShuffleManager
 spark.driver.extraClassPath $HOME/miniconda2/envs/oapenv/oap_jars/spark-columnar-core-1.0.0-jar-with-dependencies.jar:$HOME/miniconda2/envs/oapenv/oap_jars/spark-arrow-datasource-1.0.0-jar-with-dependencies.jar
 spark.executor.extraClassPath $HOME/miniconda2/envs/oapenv/oap_jars/spark-columnar-core-1.0.0-jar-with-dependencies.jar:$HOME/miniconda2/envs/oapenv/oap_jars/spark-arrow-datasource-1.0.0-jar-with-dependencies.jar
 
+spark.executorEnv.LIBARROW_DIR      /root/miniconda2/envs/oapenv
+spark.executorEnv.CC                /root/miniconda2/envs/oapenv/bin/gcc
 ######
 ```
+
+Before you start spark, you must use below command to add some environment variables.
+```shell script
+export CC=/root/miniconda2/envs/oapenv/bin/gcc
+export LIBARROW_DIR=/root/miniconda2/envs/oapenv/
+```
+
 About spark-arrow-datasource.jar, you can refer [Unified Arrow Data Source ](../../oap-data-source/arrow/README.md).                                                                                         
 Here's one example to verify if native sql engine works, make sure you have TPC-H dataset.  We could do a simple projection on one parquet table. For detailed testing scripts, please refer to [solution guide](https://github.com/Intel-bigdata/Solution_navigator/tree/master/nativesql).
 ```

@@ -341,7 +341,7 @@ Please refer to your NIC manuual for detail instructions on how to validate RDMA
 ## <a id="install-dependencies-for-shuffle-remote-pmem-extension"></a>5. Install dependencies for Shuffle Remote PMem Extension
 --------------------------- 
 
-We have provided a Conda package which will automatically install dependencies needed for Shuffle Remote PMem Extension, refer to [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), you can find compiled OAP jars in `$HOME/miniconda2/envs/oapenv/oap_jars/`,  and skip this session and jump to [6.Install Shuffle Remote PMem Extension for Spark](#install-shuffle-remote-pmem-extension-for-spark)
+We have provided a Conda package which will automatically install dependencies needed for Shuffle Remote PMem Extension, refer to [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../../docs/OAP-Installation-Guide.md), you can find compiled OAP jars in `$HOME/miniconda2/envs/oapenv/oap_jars/`.
 
 ### 5.1 Install HPNL (<https://github.com/Intel-bigdata/HPNL>)
 
@@ -454,6 +454,12 @@ Use below command to remove original initialization of one PMem, this is a
 pmempool rm ${device_name}
 #example: pmempool rm /dev/dax0.0
 ```
+If you install OAP Conda package, you can use below command to  remove original initialization of one PMem.
+```shell script
+export LD_LIBRARY_PATH=/root/miniconda2/envs/oapenv/lib/:$LD_LIBRARY_PATH
+/root/miniconda2/envs/oapenv/bin/pmempool rm ${device_name}
+```
+
 
 **Refer to the Reference section for detail descrption of each parameter.** 
 

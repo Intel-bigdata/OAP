@@ -40,16 +40,9 @@ Once finished steps above, you have completed OAP dependencies installation and 
 
 #### Extra Steps for Shuffle Remote PMem Extension
 
-If you use one of OAP features -- [Shuffle Remote PMem Extension](../oap-shuffle/RPMem-shuffle/README.md), there are 2 points to note.
+If you use one of OAP features -- [Shuffle Remote PMem Extension](../oap-shuffle/RPMem-shuffle/README.md), there is 1 point to note.
  
-1. Shuffle Remote PMem Extension needs to install library [PMDK](https://github.com/pmem/pmdk) which we haven't provided in OAP Conda package, so you can run commands below to enable PMDK (Certain libraries need to be compiled and installed on your system using ***root*** account, so you need change to `root` account to run the following commands).
-
-```
-# git clone -b <tag-version> https://github.com/Intel-bigdata/OAP.git
-# cd OAP/
-# sh dev/install-runtime-dependencies.sh 
-```
-2. If you also want to use Shuffle Remote PMem Extension with **RDMA**, you need to configure and validate RDMA, please refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md#4-configure-and-validate-rdma) for the details.
+1. If you also want to use Shuffle Remote PMem Extension with **RDMA**, you need to configure and validate RDMA, please refer to [Shuffle Remote PMem Extension Guide](../oap-shuffle/RPMem-shuffle/README.md#4-configure-and-validate-rdma) for the details.
 
 
 ##  Configuration
