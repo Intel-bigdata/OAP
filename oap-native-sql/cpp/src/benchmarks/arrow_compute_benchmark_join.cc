@@ -148,10 +148,12 @@ TEST_F(BenchmarkArrowComputeJoin, JoinBenchmark) {
     result_node_list.push_back(TreeExprBuilder::MakeField(field));
   }
   auto n_result = TreeExprBuilder::MakeFunction("result", result_node_list, uint32());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)0)}, uint32());
 
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysInner", {n_left, n_right, n_left_key, n_right_key, n_result},
-      uint32());
+      "conditionedProbeArraysInner",
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config}, uint32());
   auto n_standalone =
       TreeExprBuilder::MakeFunction("standalone", {n_probeArrays}, uint32());
 

@@ -17,11 +17,13 @@
 
 package com.intel.oap.execution
 
+import com.intel.oap.ColumnarPluginConfig
 import com.intel.oap.expression.ConverterUtils
 import com.intel.oap.vectorized.CloseableColumnBatchIterator
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions.Attribute
+import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.vectorized.ColumnarBatch
@@ -32,14 +34,16 @@ case class BroadcastColumnarRDD(
     @transient private val sc: SparkContext,
     metrics: Map[String, SQLMetric],
     numPartitioning: Int,
-    inputByteBuf: broadcast.Broadcast[Array[Array[Byte]]])
+    inputByteBuf: broadcast.Broadcast[ColumnarHashedRelation])
     extends RDD[ColumnarBatch](sc, Nil) {
 
   override protected def getPartitions: Array[Partition] = {
     (0 until numPartitioning).map { index => new BroadcastColumnarRDDPartition(index) }.toArray
   }
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
-    new CloseableColumnBatchIterator(
-      ConverterUtils.convertFromNetty(List[Attribute](), inputByteBuf.value))
+    val timeout: Int = SQLConf.get.broadcastTimeout.toInt
+    val relation = inputByteBuf.value.asReadOnlyCopy
+    relation.countDownClose(timeout)
+    new CloseableColumnBatchIterator(relation.getColumnarBatchAsIter)
   }
 }

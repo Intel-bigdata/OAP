@@ -144,10 +144,10 @@ private[sql] object MemoryManager extends Logging {
         configEntry.key,
         configEntry.defaultValue.get).toLowerCase
     val memoryManagerOpt =
-      if (sparkEnv.conf.getOption(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key).isDefined) {
-        sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
+      if (conf.getOption(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key).isDefined) {
+        conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
       } else {
-        sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER_BK.key, "offheap").toLowerCase
+        conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER_BK.key, "offheap").toLowerCase
       }
     checkConfCompatibility(cacheStrategyOpt, memoryManagerOpt)
     cacheStrategyOpt match {
@@ -351,10 +351,14 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
 
     val reservedSize = Utils.byteStringAsBytes(reservedSizeStr)
 
-    val enableConservative = conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.key,
-      OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.defaultValue.get) &&
-      conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.key,
-        OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.defaultValue.get)
+    val enableConservative =
+      if (conf.getOption(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.key).isDefined) {
+        conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.key,
+          OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.defaultValue.get)
+      } else {
+        conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.key,
+          OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.defaultValue.get)
+      }
     val memkindPattern = if (enableConservative) 1 else 0
 
     logInfo(s"Current Memkind pattern: ${memkindPattern}")
@@ -501,10 +505,14 @@ private[filecache] class HybridMemoryManager(sparkEnv: SparkEnv)
       }
     val reservedPMSize = Utils.byteStringAsBytes(reservedSizeStr)
     val fullPath = Utils.createTempDir(initialPath + File.separator + executorId)
-    val enableConservative = conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.key,
-      OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.defaultValue.get) &&
-      conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.key,
-        OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.defaultValue.get)
+    val enableConservative =
+      if (conf.getOption(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.key).isDefined) {
+        conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.key,
+          OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.defaultValue.get)
+       } else {
+        conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.key,
+          OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE_BK.defaultValue.get)
+       }
     val memkindPattern = if (enableConservative) 1 else 0
     PersistentMemoryPlatform.initialize(fullPath.getCanonicalPath, initialPMSize, memkindPattern)
     logInfo(s"Initialize Intel Optane DC persistent memory successfully, numaId: " +

@@ -62,11 +62,14 @@ public class OrcMapreduceRecordReader<V extends WritableComparable>
             .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(conf)));
     Reader.Options options = org.apache.orc.mapred.OrcInputFormat.buildOptions(conf,
         fileReader, 0, length);
-
-    boolean binaryCacheEnabled = conf
-      .getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLED().key(), false) ||
-            conf.getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLE().key(), false);
-    if (binaryCacheEnabled) {
+    boolean binaryOrcCacheEnabled;
+    binaryOrcCacheEnabled =
+            conf.get(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLED().key()) == null ?
+                    conf.getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLE().key(),
+                            false) :
+                    conf.getBoolean(OapConf$.MODULE$.OAP_ORC_BINARY_DATA_CACHE_ENABLED().key(),
+                            false);
+    if (binaryOrcCacheEnabled) {
       Boolean zeroCopy = options.getUseZeroCopy();
       if (zeroCopy == null) {
         zeroCopy = OrcConf.USE_ZEROCOPY.getBoolean(conf);

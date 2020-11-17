@@ -40,6 +40,7 @@
 #include "codegen/arrow_compute/ext/typed_node_visitor.h"
 #include "codegen/common/hash_relation_number.h"
 #include "codegen/common/hash_relation_string.h"
+#include "precompile/unsafe_array.h"
 #include "utils/macros.h"
 
 namespace sparkcolumnarplugin {
@@ -58,7 +59,8 @@ class ConditionedProbeKernel::Impl {
        const gandiva::NodeVector& left_schema_node_list,
        const gandiva::NodeVector& right_schema_node_list,
        const gandiva::NodePtr& condition, int join_type,
-       const gandiva::NodeVector& result_node_list, int hash_relation_idx)
+       const gandiva::NodeVector& result_node_list,
+       const gandiva::NodeVector& hash_configuration_list, int hash_relation_idx)
       : ctx_(ctx),
         join_type_(join_type),
         condition_(condition),
@@ -75,10 +77,19 @@ class ConditionedProbeKernel::Impl {
       result_schema_.push_back(
           std::dynamic_pointer_cast<gandiva::FieldNode>(node)->field());
     }
+
+    auto hash_map_type_str = gandiva::ToString(
+        std::dynamic_pointer_cast<gandiva::LiteralNode>(hash_configuration_list[0])
+            ->holder());
+    hash_map_type_ = std::stoi(hash_map_type_str);
     /////////// right_key_list may need to do precodegen /////////////
     gandiva::FieldVector right_key_list;
+    /** two scenarios:
+     *  1. hash_map_type 0 => SHJ probe with no condition and single join
+     *  2. hash_map_type 1 => BHJ probe with no condition and single join
+     **/
     pre_processed_key_ = true;
-    if (right_key_node_list.size() == 1) {
+    if (hash_map_type_ == 0 && right_key_node_list.size() == 1) {
       auto key_node = right_key_node_list[0];
       std::shared_ptr<TypedNodeVisitor> node_visitor;
       THROW_NOT_OK(MakeTypedNodeVisitor(key_node, &node_visitor));
@@ -91,14 +102,22 @@ class ConditionedProbeKernel::Impl {
             GetIndexList(right_key_list, right_field_list_, &right_key_index_list_));
       }
     }
-    if (pre_processed_key_) {
+    /* *
+     * Since we support two scenario here
+     * 1. hash_map_type == 0 will use right_key_project_
+     * 2. hash_map_type == 1 will use right_key_project_codegen_ and
+     * right_key_hash_codegen_
+     * */
+    if (pre_processed_key_ && hash_map_type_ == 0) {
       right_key_project_expr_ = GetConcatedKernel(right_key_node_list);
       right_key_project_ = right_key_project_expr_->root();
     }
-    right_key_project_codegen_ = GetGandivaKernel(right_key_node_list);
-    right_key_hash_codegen_ = GetHash32Kernel(right_key_node_list);
-    for (auto expr : right_key_project_codegen_) {
-      key_hash_field_list_.push_back(expr->result());
+    if (hash_map_type_ == 1) {
+      right_key_project_codegen_ = GetGandivaKernel(right_key_node_list);
+      right_key_hash_codegen_ = GetHash32Kernel(right_key_node_list);
+      for (auto expr : right_key_project_codegen_) {
+        key_hash_field_list_.push_back(expr->result());
+      }
     }
 
     /////////// map result_schema to input schema /////////////
@@ -122,19 +141,22 @@ class ConditionedProbeKernel::Impl {
       return arrow::Status::NotImplemented(
           "ConditionedProbeKernel(Non-Codegen) doesn't support condition.");
     }
-    std::shared_ptr<gandiva::Projector> right_key_projector;
+    std::vector<gandiva::ExpressionVector> right_key_projector_list;
     std::shared_ptr<arrow::DataType> key_type;
     if (right_key_project_) {
-      auto schema = arrow::schema(right_field_list_);
-      auto configuration = gandiva::ConfigurationBuilder().DefaultConfiguration();
-      THROW_NOT_OK(gandiva::Projector::Make(schema, {right_key_project_expr_},
-                                            configuration, &right_key_projector));
+      // hash_map_type == 0
       key_type = right_key_project_->return_type();
+      right_key_projector_list.push_back({right_key_project_expr_});
+    } else if (right_key_hash_codegen_) {
+      // hash_map_type == 1
+      key_type = right_key_hash_codegen_->result()->type();
+      right_key_projector_list.push_back({right_key_hash_codegen_});
+      right_key_projector_list.push_back(right_key_project_codegen_);
     } else {
       key_type = right_field_list_[right_key_index_list_[0]]->type();
     }
     *out = std::make_shared<ConditionedProbeResultIterator>(
-        ctx_, right_key_index_list_, key_type, join_type_, right_key_projector,
+        ctx_, right_key_index_list_, key_type, join_type_, right_key_projector_list,
         result_schema_, result_schema_index_list_, exist_index_, left_field_list_,
         right_field_list_);
     return arrow::Status::OK();
@@ -199,12 +221,20 @@ class ConditionedProbeKernel::Impl {
 
     std::vector<std::string> input_list;
     std::vector<std::string> project_output_list;
-    idx = 0;
     auto unsafe_row_name = "unsafe_row_" + std::to_string(hash_relation_id_);
-    prepare_ss << "std::shared_ptr<UnsafeRow> " << unsafe_row_name
-               << " = std::make_shared<UnsafeRow>();" << std::endl;
-    prepare_ss << "initTempUnsafeRow(" << unsafe_row_name << ".get(), "
-               << right_key_project_codegen_.size() << ");" << std::endl;
+    bool do_unsafe_row = true;
+    if (right_key_project_codegen_.size() == 1) {
+      // when right_key is single and not string, we don't need to use unsafeRow
+      // chendi: But we still use name unsafe_row_${id} to pass key data
+      prepare_ss << GetCTypeString(right_key_project_codegen_[0]->result()->type()) << " "
+                 << unsafe_row_name << ";" << std::endl;
+      do_unsafe_row = false;
+    } else {
+      prepare_ss << "std::shared_ptr<UnsafeRow> " << unsafe_row_name
+                 << " = std::make_shared<UnsafeRow>(" << right_key_project_codegen_.size()
+                 << ");" << std::endl;
+    }
+    idx = 0;
     for (auto expr : right_key_project_codegen_) {
       std::shared_ptr<ExpressionCodegenVisitor> project_node_visitor;
       RETURN_NOT_OK(MakeExpressionCodegenVisitor(expr->root(), input, {right_field_list_},
@@ -213,13 +243,19 @@ class ConditionedProbeKernel::Impl {
       prepare_ss << project_node_visitor->GetPrepare();
       auto key_name = project_node_visitor->GetResult();
       auto validity_name = project_node_visitor->GetPreCheck();
-      prepare_ss << "if (" << validity_name << ") {" << std::endl;
-      prepare_ss << "appendToUnsafeRow(" << unsafe_row_name << ".get(), " << idx << ", "
-                 << key_name << ");" << std::endl;
-      prepare_ss << "} else {" << std::endl;
-      prepare_ss << "setNullAt(" << unsafe_row_name << ".get(), " << idx << ");"
-                 << std::endl;
-      prepare_ss << "}" << std::endl;
+      if (do_unsafe_row) {
+        prepare_ss << "if (" << validity_name << ") {" << std::endl;
+        prepare_ss << "appendToUnsafeRow(" << unsafe_row_name << ".get(), " << idx << ", "
+                   << key_name << ");" << std::endl;
+        prepare_ss << "} else {" << std::endl;
+        prepare_ss << "setNullAt(" << unsafe_row_name << ".get(), " << idx << ");"
+                   << std::endl;
+        prepare_ss << "}" << std::endl;
+      } else {
+        prepare_ss << "if (" << validity_name << ") {" << std::endl;
+        prepare_ss << unsafe_row_name << " = " << key_name << ";" << std::endl;
+        prepare_ss << "}" << std::endl;
+      }
 
       project_output_list.push_back(project_node_visitor->GetResult());
       for (auto header : project_node_visitor->GetHeaders()) {
@@ -284,12 +320,17 @@ class ConditionedProbeKernel::Impl {
   arrow::MemoryPool* pool_;
   std::string signature_;
   int join_type_;
+
+  gandiva::NodePtr condition_;
+  int hash_map_type_;
+
+  // only be used when hash_map_type_ == 0
   gandiva::ExpressionPtr right_key_project_expr_;
   gandiva::NodePtr right_key_project_;
+  // only be used when hash_map_type_ == 1
   gandiva::ExpressionPtr right_key_hash_codegen_;
   gandiva::ExpressionVector right_key_project_codegen_;
   gandiva::FieldVector key_hash_field_list_;
-  gandiva::NodePtr condition_;
 
   bool pre_processed_key_ = false;
   gandiva::FieldVector left_field_list_;
@@ -308,7 +349,7 @@ class ConditionedProbeKernel::Impl {
     ConditionedProbeResultIterator(
         arrow::compute::FunctionContext* ctx, std::vector<int> right_key_index_list,
         std::shared_ptr<arrow::DataType> key_type, int join_type,
-        std::shared_ptr<gandiva::Projector> right_key_project,
+        std::vector<gandiva::ExpressionVector> right_key_project_list,
         gandiva::FieldVector result_schema,
         std::vector<std::pair<int, int>> result_schema_index_list, int exist_index,
         gandiva::FieldVector left_field_list, gandiva::FieldVector right_field_list)
@@ -316,12 +357,31 @@ class ConditionedProbeKernel::Impl {
           right_key_index_list_(right_key_index_list),
           key_type_(key_type),
           join_type_(join_type),
-          right_key_project_(right_key_project),
           result_schema_index_list_(result_schema_index_list),
           exist_index_(exist_index),
           left_field_list_(left_field_list),
           right_field_list_(right_field_list) {
       result_schema_ = arrow::schema(result_schema);
+      hash_map_type_ = right_key_project_list.size() == 2 ? 1 : 0;
+      if (hash_map_type_ == 0) {
+        if (right_key_project_list.size() == 1) {
+          auto configuration = gandiva::ConfigurationBuilder().DefaultConfiguration();
+          THROW_NOT_OK(gandiva::Projector::Make(arrow::schema(right_field_list_),
+                                                right_key_project_list[0], configuration,
+                                                &right_hash_key_project_));
+        }
+      } else if (hash_map_type_ == 1) {
+        auto configuration = gandiva::ConfigurationBuilder().DefaultConfiguration();
+        for (auto expr : right_key_project_list[1]) {
+          right_projected_field_list_.push_back(expr->result());
+        }
+        THROW_NOT_OK(gandiva::Projector::Make(arrow::schema(right_projected_field_list_),
+                                              right_key_project_list[0], configuration,
+                                              &right_hash_key_project_));
+        THROW_NOT_OK(gandiva::Projector::Make(arrow::schema(right_field_list_),
+                                              right_key_project_list[1], configuration,
+                                              &right_keys_project_));
+      }
     }
 
 #define PROCESS_SUPPORTED_TYPES(PROCESS) \
@@ -384,7 +444,42 @@ class ConditionedProbeKernel::Impl {
       }
 
       // prepare probe function
-      switch (key_type_->id()) {
+      if (hash_map_type_ == 1) {
+        // if hash_map_type == 1, we will simply use HashRelation
+        switch (join_type_) {
+          case 0: { /*Inner Join*/
+            auto func = std::make_shared<UnsafeInnerProbeFunction>(hash_relation_,
+                                                                   appender_list_);
+            probe_func_ = std::dynamic_pointer_cast<ProbeFunctionBase>(func);
+          } break;
+          case 1: { /*Outer Join*/
+            auto func = std::make_shared<UnsafeOuterProbeFunction>(hash_relation_,
+                                                                   appender_list_);
+            probe_func_ = std::dynamic_pointer_cast<ProbeFunctionBase>(func);
+          } break;
+          case 2: { /*Anti Join*/
+            auto func =
+                std::make_shared<UnsafeAntiProbeFunction>(hash_relation_, appender_list_);
+            probe_func_ = std::dynamic_pointer_cast<ProbeFunctionBase>(func);
+          } break;
+          case 3: { /*Semi Join*/
+            auto func =
+                std::make_shared<UnsafeSemiProbeFunction>(hash_relation_, appender_list_);
+            probe_func_ = std::dynamic_pointer_cast<ProbeFunctionBase>(func);
+          } break;
+          case 4: { /*Existence Join*/
+            auto func = std::make_shared<UnsafeExistenceProbeFunction>(hash_relation_,
+                                                                       appender_list_);
+            probe_func_ = std::dynamic_pointer_cast<ProbeFunctionBase>(func);
+          } break;
+          default:
+            return arrow::Status::NotImplemented(
+                "ConditionedProbeArraysTypedImpl only support join type: InnerJoin, "
+                "RightJoin");
+        }
+      } else {
+        // if hash_map_type == 0, we use TypedHashRelation
+        switch (key_type_->id()) {
 #define PROCESS(InType)                                                                  \
   case InType::type_id: {                                                                \
     switch (join_type_) {                                                                \
@@ -419,12 +514,13 @@ class ConditionedProbeKernel::Impl {
             "RightJoin");                                                                \
     }                                                                                    \
   } break;
-        PROCESS_SUPPORTED_TYPES(PROCESS)
+          PROCESS_SUPPORTED_TYPES(PROCESS)
 #undef PROCESS
-        default: {
-          std::cout << "ConditionedProbeArraysTypedImpl does not support key type as "
-                    << key_type_ << std::endl;
-        } break;
+          default: {
+            std::cout << "ConditionedProbeArraysTypedImpl does not support key type as "
+                      << key_type_ << std::endl;
+          } break;
+        }
       }
       return arrow::Status::OK();
     }
@@ -436,16 +532,32 @@ class ConditionedProbeKernel::Impl {
         const std::shared_ptr<arrow::Array>& selection = nullptr) override {
       // Get key array, which should be typed
       std::shared_ptr<arrow::Array> key_array;
-      if (right_key_project_) {
-        arrow::ArrayVector outputs;
-        auto length = in.size() > 0 ? in[0]->length() : 0;
-        auto in_batch =
-            arrow::RecordBatch::Make(arrow::schema(right_field_list_), length, in);
+      arrow::ArrayVector projected_keys_outputs;
+      /**
+       * if hash_map_type_ == 0, we only need to build a single-column hashArray for key
+       * if hash_map_type_ == 1, we need to both get a single-column hashArray and
+       *projected result of original keys for hashmap
+       **/
+      arrow::ArrayVector outputs;
+      auto length = in.size() > 0 ? in[0]->length() : 0;
+      std::shared_ptr<arrow::RecordBatch> in_batch =
+          arrow::RecordBatch::Make(arrow::schema(right_field_list_), length, in);
+      if (hash_map_type_ == 1) {
+        RETURN_NOT_OK(right_keys_project_->Evaluate(*in_batch, ctx_->memory_pool(),
+                                                    &projected_keys_outputs));
+        in_batch = arrow::RecordBatch::Make(arrow::schema(right_projected_field_list_),
+                                            in_batch->num_rows(), projected_keys_outputs);
         RETURN_NOT_OK(
-            right_key_project_->Evaluate(*in_batch, ctx_->memory_pool(), &outputs));
+            right_hash_key_project_->Evaluate(*in_batch, ctx_->memory_pool(), &outputs));
         key_array = outputs[0];
       } else {
-        key_array = in[right_key_index_list_[0]];
+        if (right_hash_key_project_) {
+          RETURN_NOT_OK(right_hash_key_project_->Evaluate(*in_batch, ctx_->memory_pool(),
+                                                          &outputs));
+          key_array = outputs[0];
+        } else {
+          key_array = in[right_key_index_list_[0]];
+        }
       }
       // put in to ArrayAppender then doing evaluate
       for (int tmp_idx = 0; tmp_idx < appender_list_.size(); tmp_idx++) {
@@ -457,7 +569,12 @@ class ConditionedProbeKernel::Impl {
           RETURN_NOT_OK(appender->AddArray(in[right_in_idx]));
         }
       }
-      auto out_length = probe_func_->Evaluate(key_array);
+      uint64_t out_length = 0;
+      if (hash_map_type_ == 0) {
+        out_length = probe_func_->Evaluate(key_array);
+      } else if (hash_map_type_ == 1) {
+        out_length = probe_func_->Evaluate(key_array, projected_keys_outputs);
+      }
       arrow::ArrayVector out_arr_list;
       for (auto appender : appender_list_) {
         std::shared_ptr<arrow::Array> out_arr;
@@ -476,6 +593,493 @@ class ConditionedProbeKernel::Impl {
     class ProbeFunctionBase {
      public:
       virtual uint64_t Evaluate(std::shared_ptr<arrow::Array>) { return 0; }
+      virtual uint64_t Evaluate(std::shared_ptr<arrow::Array>,
+                                const arrow::ArrayVector&) {
+        return 0;
+      }
+    };
+#define PROCESS_SUPPORTED_TYPES(PROCESS) \
+  PROCESS(arrow::BooleanType)            \
+  PROCESS(arrow::UInt8Type)              \
+  PROCESS(arrow::Int8Type)               \
+  PROCESS(arrow::UInt16Type)             \
+  PROCESS(arrow::Int16Type)              \
+  PROCESS(arrow::UInt32Type)             \
+  PROCESS(arrow::Int32Type)              \
+  PROCESS(arrow::UInt64Type)             \
+  PROCESS(arrow::Int64Type)              \
+  PROCESS(arrow::FloatType)              \
+  PROCESS(arrow::DoubleType)             \
+  PROCESS(arrow::Date32Type)             \
+  PROCESS(arrow::Date64Type)
+    class UnsafeInnerProbeFunction : public ProbeFunctionBase {
+     public:
+      UnsafeInnerProbeFunction(std::shared_ptr<HashRelation> hash_relation,
+                               std::vector<std::shared_ptr<AppenderBase>> appender_list)
+          : hash_relation_(hash_relation), appender_list_(appender_list) {}
+      uint64_t Evaluate(std::shared_ptr<arrow::Array> key_array,
+                        const arrow::ArrayVector& key_payloads) override {
+        auto typed_key_array = std::dynamic_pointer_cast<ArrayType>(key_array);
+        std::vector<std::shared_ptr<UnsafeArray>> payloads;
+        int i = 0;
+        bool do_unsafe_row = true;
+        std::function<int(int i)> fast_probe;
+        /* for single key case, we don't need to create unsafeRow */
+        if (key_payloads.size() == 1) {
+          do_unsafe_row = false;
+          switch (key_payloads[0]->type_id()) {
+#define PROCESS(InType)                                                      \
+  case TypeTraits<InType>::type_id: {                                        \
+    using ArrayType = precompile::TypeTraits<InType>::ArrayType;             \
+    auto typed_first_key_arr = std::make_shared<ArrayType>(key_payloads[0]); \
+    fast_probe = [this, typed_key_array, typed_first_key_arr](int i) {       \
+      return hash_relation_->Get(typed_key_array->GetView(i),                \
+                                 typed_first_key_arr->GetView(i));           \
+    };                                                                       \
+  } break;
+            PROCESS_SUPPORTED_TYPES(PROCESS)
+#undef PROCESS
+            case TypeTraits<arrow::StringType>::type_id: {
+              auto typed_first_key_arr = std::make_shared<StringArray>(key_payloads[0]);
+              fast_probe = [this, typed_key_array, typed_first_key_arr](int i) {
+                return hash_relation_->Get(typed_key_array->GetView(i),
+                                           typed_first_key_arr->GetString(i));
+              };
+            } break;
+            default: {
+              throw std::runtime_error(
+                  "UnsafeInnerProbeFunction Evaluate doesn't support single key type ");
+            } break;
+          }
+#undef PROCESS_SUPPORTED_TYPES
+        } else {
+          for (auto arr : key_payloads) {
+            std::shared_ptr<UnsafeArray> payload;
+            MakeUnsafeArray(arr->type(), i++, arr, &payload);
+            payloads.push_back(payload);
+          }
+        }
+        uint64_t out_length = 0;
+        for (int i = 0; i < key_array->length(); i++) {
+          int index;
+          if (!do_unsafe_row) {
+            index = fast_probe(i);
+          } else {
+            auto unsafe_key_row = std::make_shared<UnsafeRow>(payloads.size());
+            for (auto payload_arr : payloads) {
+              payload_arr->Append(i, &unsafe_key_row);
+            }
+            index = hash_relation_->Get(typed_key_array->GetView(i), unsafe_key_row);
+          }
+          if (index == -1) {
+            continue;
+          }
+          for (auto tmp : hash_relation_->GetItemListByIndex(index)) {
+            for (auto appender : appender_list_) {
+              if (appender->GetType() == AppenderBase::left) {
+                THROW_NOT_OK(appender->Append(tmp.array_id, tmp.id));
+              } else {
+                THROW_NOT_OK(appender->Append(0, i));
+              }
+            }
+            out_length += 1;
+          }
+        }
+        return out_length;
+      }
+
+     private:
+      using ArrayType = arrow::Int32Array;
+      std::shared_ptr<HashRelation> hash_relation_;
+      std::vector<std::shared_ptr<AppenderBase>> appender_list_;
+    };
+#define PROCESS_SUPPORTED_TYPES(PROCESS) \
+  PROCESS(arrow::BooleanType)            \
+  PROCESS(arrow::UInt8Type)              \
+  PROCESS(arrow::Int8Type)               \
+  PROCESS(arrow::UInt16Type)             \
+  PROCESS(arrow::Int16Type)              \
+  PROCESS(arrow::UInt32Type)             \
+  PROCESS(arrow::Int32Type)              \
+  PROCESS(arrow::UInt64Type)             \
+  PROCESS(arrow::Int64Type)              \
+  PROCESS(arrow::FloatType)              \
+  PROCESS(arrow::DoubleType)             \
+  PROCESS(arrow::Date32Type)             \
+  PROCESS(arrow::Date64Type)
+    class UnsafeOuterProbeFunction : public ProbeFunctionBase {
+     public:
+      UnsafeOuterProbeFunction(std::shared_ptr<HashRelation> hash_relation,
+                               std::vector<std::shared_ptr<AppenderBase>> appender_list)
+          : hash_relation_(hash_relation), appender_list_(appender_list) {}
+      uint64_t Evaluate(std::shared_ptr<arrow::Array> key_array,
+                        const arrow::ArrayVector& key_payloads) override {
+        auto typed_key_array = std::dynamic_pointer_cast<ArrayType>(key_array);
+        std::vector<std::shared_ptr<UnsafeArray>> payloads;
+        int i = 0;
+        bool do_unsafe_row = true;
+        std::function<int(int i)> fast_probe;
+        /* for single key case, we don't need to create unsafeRow */
+        if (key_payloads.size() == 1) {
+          do_unsafe_row = false;
+          switch (key_payloads[0]->type_id()) {
+#define PROCESS(InType)                                                      \
+  case TypeTraits<InType>::type_id: {                                        \
+    using ArrayType = precompile::TypeTraits<InType>::ArrayType;             \
+    auto typed_first_key_arr = std::make_shared<ArrayType>(key_payloads[0]); \
+    fast_probe = [this, typed_key_array, typed_first_key_arr](int i) {       \
+      return hash_relation_->Get(typed_key_array->GetView(i),                \
+                                 typed_first_key_arr->GetView(i));           \
+    };                                                                       \
+  } break;
+            PROCESS_SUPPORTED_TYPES(PROCESS)
+#undef PROCESS
+            case TypeTraits<arrow::StringType>::type_id: {
+              auto typed_first_key_arr = std::make_shared<StringArray>(key_payloads[0]);
+              fast_probe = [this, typed_key_array, typed_first_key_arr](int i) {
+                return hash_relation_->Get(typed_key_array->GetView(i),
+                                           typed_first_key_arr->GetString(i));
+              };
+            } break;
+            default: {
+              throw std::runtime_error(
+                  "UnsafeOuterProbeFunction Evaluate doesn't support single key type ");
+            } break;
+          }
+#undef PROCESS_SUPPORTED_TYPES
+        } else {
+          for (auto arr : key_payloads) {
+            std::shared_ptr<UnsafeArray> payload;
+            MakeUnsafeArray(arr->type(), i++, arr, &payload);
+            payloads.push_back(payload);
+          }
+        }
+        uint64_t out_length = 0;
+        for (int i = 0; i < key_array->length(); i++) {
+          int index;
+          if (!do_unsafe_row) {
+            index = fast_probe(i);
+          } else {
+            auto unsafe_key_row = std::make_shared<UnsafeRow>(payloads.size());
+            for (auto payload_arr : payloads) {
+              payload_arr->Append(i, &unsafe_key_row);
+            }
+            index = hash_relation_->Get(typed_key_array->GetView(i), unsafe_key_row);
+          }
+          if (index == -1) {
+            for (auto appender : appender_list_) {
+              if (appender->GetType() == AppenderBase::left) {
+                THROW_NOT_OK(appender->AppendNull());
+              } else {
+                THROW_NOT_OK(appender->Append(0, i));
+              }
+            }
+            out_length += 1;
+            continue;
+          }
+          for (auto tmp : hash_relation_->GetItemListByIndex(index)) {
+            for (auto appender : appender_list_) {
+              if (appender->GetType() == AppenderBase::left) {
+                THROW_NOT_OK(appender->Append(tmp.array_id, tmp.id));
+              } else {
+                THROW_NOT_OK(appender->Append(0, i));
+              }
+            }
+            out_length += 1;
+          }
+        }
+        return out_length;
+      }
+
+     private:
+      using ArrayType = arrow::Int32Array;
+      std::shared_ptr<HashRelation> hash_relation_;
+      std::vector<std::shared_ptr<AppenderBase>> appender_list_;
+    };
+#define PROCESS_SUPPORTED_TYPES(PROCESS) \
+  PROCESS(arrow::BooleanType)            \
+  PROCESS(arrow::UInt8Type)              \
+  PROCESS(arrow::Int8Type)               \
+  PROCESS(arrow::UInt16Type)             \
+  PROCESS(arrow::Int16Type)              \
+  PROCESS(arrow::UInt32Type)             \
+  PROCESS(arrow::Int32Type)              \
+  PROCESS(arrow::UInt64Type)             \
+  PROCESS(arrow::Int64Type)              \
+  PROCESS(arrow::FloatType)              \
+  PROCESS(arrow::DoubleType)             \
+  PROCESS(arrow::Date32Type)             \
+  PROCESS(arrow::Date64Type)
+    class UnsafeAntiProbeFunction : public ProbeFunctionBase {
+     public:
+      UnsafeAntiProbeFunction(std::shared_ptr<HashRelation> hash_relation,
+                              std::vector<std::shared_ptr<AppenderBase>> appender_list)
+          : hash_relation_(hash_relation), appender_list_(appender_list) {}
+      uint64_t Evaluate(std::shared_ptr<arrow::Array> key_array,
+                        const arrow::ArrayVector& key_payloads) override {
+        auto typed_key_array = std::dynamic_pointer_cast<ArrayType>(key_array);
+        std::vector<std::shared_ptr<UnsafeArray>> payloads;
+        int i = 0;
+        bool do_unsafe_row = true;
+        std::function<int(int i)> fast_probe;
+        /* for single key case, we don't need to create unsafeRow */
+        if (key_payloads.size() == 1) {
+          do_unsafe_row = false;
+          switch (key_payloads[0]->type_id()) {
+#define PROCESS(InType)                                                      \
+  case TypeTraits<InType>::type_id: {                                        \
+    using ArrayType = precompile::TypeTraits<InType>::ArrayType;             \
+    auto typed_first_key_arr = std::make_shared<ArrayType>(key_payloads[0]); \
+    fast_probe = [this, typed_key_array, typed_first_key_arr](int i) {       \
+      return hash_relation_->IfExists(typed_key_array->GetView(i),           \
+                                      typed_first_key_arr->GetView(i));      \
+    };                                                                       \
+  } break;
+            PROCESS_SUPPORTED_TYPES(PROCESS)
+#undef PROCESS
+            case TypeTraits<arrow::StringType>::type_id: {
+              auto typed_first_key_arr = std::make_shared<StringArray>(key_payloads[0]);
+              fast_probe = [this, typed_key_array, typed_first_key_arr](int i) {
+                return hash_relation_->IfExists(typed_key_array->GetView(i),
+                                                typed_first_key_arr->GetString(i));
+              };
+            } break;
+            default: {
+              throw std::runtime_error(
+                  "UnsafeAntiProbeFunction Evaluate doesn't support single key type ");
+            } break;
+          }
+#undef PROCESS_SUPPORTED_TYPES
+        } else {
+          for (auto arr : key_payloads) {
+            std::shared_ptr<UnsafeArray> payload;
+            MakeUnsafeArray(arr->type(), i++, arr, &payload);
+            payloads.push_back(payload);
+          }
+        }
+        uint64_t out_length = 0;
+        for (int i = 0; i < key_array->length(); i++) {
+          int index;
+          if (!do_unsafe_row) {
+            index = fast_probe(i);
+          } else {
+            auto unsafe_key_row = std::make_shared<UnsafeRow>(payloads.size());
+            for (auto payload_arr : payloads) {
+              payload_arr->Append(i, &unsafe_key_row);
+            }
+            index = hash_relation_->IfExists(typed_key_array->GetView(i), unsafe_key_row);
+          }
+          if (index == -1) {
+            for (auto appender : appender_list_) {
+              if (appender->GetType() == AppenderBase::left) {
+                THROW_NOT_OK(appender->AppendNull());
+              } else {
+                THROW_NOT_OK(appender->Append(0, i));
+              }
+            }
+            out_length += 1;
+          }
+        }
+        return out_length;
+      }
+
+     private:
+      using ArrayType = arrow::Int32Array;
+      std::shared_ptr<HashRelation> hash_relation_;
+      std::vector<std::shared_ptr<AppenderBase>> appender_list_;
+    };
+
+    class UnsafeSemiProbeFunction : public ProbeFunctionBase {
+     public:
+      UnsafeSemiProbeFunction(std::shared_ptr<HashRelation> hash_relation,
+                              std::vector<std::shared_ptr<AppenderBase>> appender_list)
+          : hash_relation_(hash_relation), appender_list_(appender_list) {}
+#define PROCESS_SUPPORTED_TYPES(PROCESS) \
+  PROCESS(arrow::BooleanType)            \
+  PROCESS(arrow::UInt8Type)              \
+  PROCESS(arrow::Int8Type)               \
+  PROCESS(arrow::UInt16Type)             \
+  PROCESS(arrow::Int16Type)              \
+  PROCESS(arrow::UInt32Type)             \
+  PROCESS(arrow::Int32Type)              \
+  PROCESS(arrow::UInt64Type)             \
+  PROCESS(arrow::Int64Type)              \
+  PROCESS(arrow::FloatType)              \
+  PROCESS(arrow::DoubleType)             \
+  PROCESS(arrow::Date32Type)             \
+  PROCESS(arrow::Date64Type)
+      uint64_t Evaluate(std::shared_ptr<arrow::Array> key_array,
+                        const arrow::ArrayVector& key_payloads) override {
+        auto typed_key_array = std::dynamic_pointer_cast<arrow::Int32Array>(key_array);
+        std::vector<std::shared_ptr<UnsafeArray>> payloads;
+        int i = 0;
+        bool do_unsafe_row = true;
+        std::function<int(int i)> fast_probe;
+        /* for single key case, we don't need to create unsafeRow */
+        if (key_payloads.size() == 1) {
+          do_unsafe_row = false;
+          switch (key_payloads[0]->type_id()) {
+#define PROCESS(InType)                                                      \
+  case TypeTraits<InType>::type_id: {                                        \
+    using ArrayType = precompile::TypeTraits<InType>::ArrayType;             \
+    auto typed_first_key_arr = std::make_shared<ArrayType>(key_payloads[0]); \
+    fast_probe = [this, typed_key_array, typed_first_key_arr](int i) {       \
+      return hash_relation_->IfExists(typed_key_array->GetView(i),           \
+                                      typed_first_key_arr->GetView(i));      \
+    };                                                                       \
+  } break;
+            PROCESS_SUPPORTED_TYPES(PROCESS)
+#undef PROCESS
+            case TypeTraits<arrow::StringType>::type_id: {
+              auto typed_first_key_arr = std::make_shared<StringArray>(key_payloads[0]);
+              fast_probe = [this, typed_key_array, typed_first_key_arr](int i) {
+                return hash_relation_->IfExists(typed_key_array->GetView(i),
+                                                typed_first_key_arr->GetString(i));
+              };
+            } break;
+            default: {
+              throw std::runtime_error(
+                  "UnsafeSemiProbeFunction Evaluate doesn't support single key type ");
+            } break;
+          }
+#undef PROCESS_SUPPORTED_TYPES
+        } else {
+          for (auto arr : key_payloads) {
+            std::shared_ptr<UnsafeArray> payload;
+            MakeUnsafeArray(arr->type(), i++, arr, &payload);
+            payloads.push_back(payload);
+          }
+        }
+
+        uint64_t out_length = 0;
+        for (int i = 0; i < key_array->length(); i++) {
+          int index;
+          if (!do_unsafe_row) {
+            index = fast_probe(i);
+          } else {
+            auto unsafe_key_row = std::make_shared<UnsafeRow>(payloads.size());
+            for (auto payload_arr : payloads) {
+              payload_arr->Append(i, &unsafe_key_row);
+            }
+            auto make_unsafe_row_end = std::chrono::steady_clock::now();
+            index = hash_relation_->IfExists(typed_key_array->GetView(i), unsafe_key_row);
+          }
+
+          if (index == -1) {
+            continue;
+          }
+          for (auto appender : appender_list_) {
+            if (appender->GetType() == AppenderBase::left) {
+              THROW_NOT_OK(appender->AppendNull());
+            } else {
+              THROW_NOT_OK(appender->Append(0, i));
+            }
+          }
+          out_length += 1;
+        }
+        return out_length;
+      }
+
+     private:
+      std::shared_ptr<HashRelation> hash_relation_;
+      std::vector<std::shared_ptr<AppenderBase>> appender_list_;
+    };
+#define PROCESS_SUPPORTED_TYPES(PROCESS) \
+  PROCESS(arrow::BooleanType)            \
+  PROCESS(arrow::UInt8Type)              \
+  PROCESS(arrow::Int8Type)               \
+  PROCESS(arrow::UInt16Type)             \
+  PROCESS(arrow::Int16Type)              \
+  PROCESS(arrow::UInt32Type)             \
+  PROCESS(arrow::Int32Type)              \
+  PROCESS(arrow::UInt64Type)             \
+  PROCESS(arrow::Int64Type)              \
+  PROCESS(arrow::FloatType)              \
+  PROCESS(arrow::DoubleType)             \
+  PROCESS(arrow::Date32Type)             \
+  PROCESS(arrow::Date64Type)
+    class UnsafeExistenceProbeFunction : public ProbeFunctionBase {
+     public:
+      UnsafeExistenceProbeFunction(
+          std::shared_ptr<HashRelation> hash_relation,
+          std::vector<std::shared_ptr<AppenderBase>> appender_list)
+          : hash_relation_(hash_relation), appender_list_(appender_list) {}
+      uint64_t Evaluate(std::shared_ptr<arrow::Array> key_array,
+                        const arrow::ArrayVector& key_payloads) override {
+        auto typed_key_array = std::dynamic_pointer_cast<ArrayType>(key_array);
+        std::vector<std::shared_ptr<UnsafeArray>> payloads;
+        int i = 0;
+        bool do_unsafe_row = true;
+        std::function<int(int i)> fast_probe;
+        /* for single key case, we don't need to create unsafeRow */
+        if (key_payloads.size() == 1) {
+          do_unsafe_row = false;
+          switch (key_payloads[0]->type_id()) {
+#define PROCESS(InType)                                                      \
+  case TypeTraits<InType>::type_id: {                                        \
+    using ArrayType = precompile::TypeTraits<InType>::ArrayType;             \
+    auto typed_first_key_arr = std::make_shared<ArrayType>(key_payloads[0]); \
+    fast_probe = [this, typed_key_array, typed_first_key_arr](int i) {       \
+      return hash_relation_->IfExists(typed_key_array->GetView(i),           \
+                                      typed_first_key_arr->GetView(i));      \
+    };                                                                       \
+  } break;
+            PROCESS_SUPPORTED_TYPES(PROCESS)
+#undef PROCESS
+            case TypeTraits<arrow::StringType>::type_id: {
+              auto typed_first_key_arr = std::make_shared<StringArray>(key_payloads[0]);
+              fast_probe = [this, typed_key_array, typed_first_key_arr](int i) {
+                return hash_relation_->IfExists(typed_key_array->GetView(i),
+                                                typed_first_key_arr->GetString(i));
+              };
+            } break;
+            default: {
+              throw std::runtime_error(
+                  "UnsafeSemiProbeFunction Evaluate doesn't support single key type ");
+            } break;
+          }
+#undef PROCESS_SUPPORTED_TYPES
+        } else {
+          for (auto arr : key_payloads) {
+            std::shared_ptr<UnsafeArray> payload;
+            MakeUnsafeArray(arr->type(), i++, arr, &payload);
+            payloads.push_back(payload);
+          }
+        }
+        uint64_t out_length = 0;
+        for (int i = 0; i < key_array->length(); i++) {
+          int index;
+          if (!do_unsafe_row) {
+            index = fast_probe(i);
+          } else {
+            auto unsafe_key_row = std::make_shared<UnsafeRow>(payloads.size());
+            for (auto payload_arr : payloads) {
+              payload_arr->Append(i, &unsafe_key_row);
+            }
+            index = hash_relation_->IfExists(typed_key_array->GetView(i), unsafe_key_row);
+          }
+          bool exists = true;
+          if (index == -1) {
+            exists = false;
+          }
+          for (auto appender : appender_list_) {
+            if (appender->GetType() == AppenderBase::exist) {
+              THROW_NOT_OK(appender->AppendExistence(exists));
+            } else if (appender->GetType() == AppenderBase::right) {
+              THROW_NOT_OK(appender->Append(0, i));
+            } else {
+              THROW_NOT_OK(appender->AppendNull());
+            }
+          }
+          out_length += 1;
+        }
+        return out_length;
+      }
+
+     private:
+      using ArrayType = arrow::Int32Array;
+      std::shared_ptr<HashRelation> hash_relation_;
+      std::vector<std::shared_ptr<AppenderBase>> appender_list_;
     };
 
     template <typename DataType>
@@ -696,7 +1300,11 @@ class ConditionedProbeKernel::Impl {
     arrow::compute::FunctionContext* ctx_;
     int join_type_;
     std::vector<int> right_key_index_list_;
-    std::shared_ptr<gandiva::Projector> right_key_project_;
+    // used for hash key to hashMap probe
+    int hash_map_type_ = 0;
+    std::shared_ptr<gandiva::Projector> right_hash_key_project_;
+    std::shared_ptr<gandiva::Projector> right_keys_project_;
+
     std::shared_ptr<arrow::DataType> key_type_;
     std::shared_ptr<HashRelation> hash_relation_;
 
@@ -707,6 +1315,7 @@ class ConditionedProbeKernel::Impl {
 
     gandiva::FieldVector left_field_list_;
     gandiva::FieldVector right_field_list_;
+    gandiva::FieldVector right_projected_field_list_;
     std::shared_ptr<ProbeFunctionBase> probe_func_;
   };
 
@@ -720,8 +1329,6 @@ class ConditionedProbeKernel::Impl {
     codes_ss << "int32_t " << index_name << ";" << std::endl;
     codes_ss << index_name << " = " << hash_relation_name << "->Get(key_"
              << hash_relation_id_ << ", unsafe_row_" << hash_relation_id_ << ");"
-             << std::endl;
-    codes_ss << "releaseTempUnsafeRow(unsafe_row_" << hash_relation_id_ << ".get());"
              << std::endl;
     codes_ss << "if (" << index_name << " == -1) { continue; }" << std::endl;
     codes_ss << "for (auto tmp : " << hash_relation_name << "->GetItemListByIndex("
@@ -752,8 +1359,6 @@ class ConditionedProbeKernel::Impl {
     codes_ss << "int32_t " << index_name << ";" << std::endl;
     codes_ss << index_name << " = " << hash_relation_name << "->Get(key_"
              << hash_relation_id_ << ", unsafe_row_" << hash_relation_id_ << ");"
-             << std::endl;
-    codes_ss << "releaseTempUnsafeRow(unsafe_row_" << hash_relation_id_ << ".get());"
              << std::endl;
     codes_ss << "std::vector<ArrayItemIndex> " << matched_index_list_name << ";"
              << std::endl;
@@ -789,8 +1394,6 @@ class ConditionedProbeKernel::Impl {
     codes_ss << "int32_t " << index_name << ";" << std::endl;
     codes_ss << index_name << " = " << hash_relation_name << "->Get(key_"
              << hash_relation_id_ << ", unsafe_row_" << hash_relation_id_ << ");"
-             << std::endl;
-    codes_ss << "releaseTempUnsafeRow(unsafe_row_" << hash_relation_id_ << ".get());"
              << std::endl;
     codes_ss << "std::vector<ArrayItemIndex> " << matched_index_list_name << ";"
              << std::endl;
@@ -832,8 +1435,6 @@ class ConditionedProbeKernel::Impl {
     codes_ss << "int32_t " << index_name << ";" << std::endl;
     codes_ss << index_name << " = " << hash_relation_name << "->Get(key_"
              << hash_relation_id_ << ", unsafe_row_" << hash_relation_id_ << ");"
-             << std::endl;
-    codes_ss << "releaseTempUnsafeRow(unsafe_row_" << hash_relation_id_ << ".get());"
              << std::endl;
     codes_ss << "std::vector<ArrayItemIndex> " << matched_index_list_name << ";"
              << std::endl;
@@ -881,8 +1482,6 @@ class ConditionedProbeKernel::Impl {
     codes_ss << "int32_t " << index_name << ";" << std::endl;
     codes_ss << index_name << " = " << hash_relation_name << "->Get(key_"
              << hash_relation_id_ << ", unsafe_row_" << hash_relation_id_ << ");"
-             << std::endl;
-    codes_ss << "releaseTempUnsafeRow(unsafe_row_" << hash_relation_id_ << ".get());"
              << std::endl;
     codes_ss << "bool " << exist_name << " = false;" << std::endl;
     codes_ss << "bool " << exist_validity << " = true;" << std::endl;
@@ -990,18 +1589,19 @@ class ConditionedProbeKernel::Impl {
     }
     return arrow::Status::OK();
   }
-};
+};  // namespace extra
 
 arrow::Status ConditionedProbeKernel::Make(
     arrow::compute::FunctionContext* ctx, const gandiva::NodeVector& left_key_list,
     const gandiva::NodeVector& right_key_list,
     const gandiva::NodeVector& left_schema_list,
     const gandiva::NodeVector& right_schema_list, const gandiva::NodePtr& condition,
-    int join_type, const gandiva::NodeVector& result_schema, int hash_relation_idx,
+    int join_type, const gandiva::NodeVector& result_schema,
+    const gandiva::NodeVector& hash_configuration_list, int hash_relation_idx,
     std::shared_ptr<KernalBase>* out) {
   *out = std::make_shared<ConditionedProbeKernel>(
       ctx, left_key_list, right_key_list, left_schema_list, right_schema_list, condition,
-      join_type, result_schema, hash_relation_idx);
+      join_type, result_schema, hash_configuration_list, hash_relation_idx);
   return arrow::Status::OK();
 }
 
@@ -1010,10 +1610,11 @@ ConditionedProbeKernel::ConditionedProbeKernel(
     const gandiva::NodeVector& right_key_list,
     const gandiva::NodeVector& left_schema_list,
     const gandiva::NodeVector& right_schema_list, const gandiva::NodePtr& condition,
-    int join_type, const gandiva::NodeVector& result_schema, int hash_relation_idx) {
+    int join_type, const gandiva::NodeVector& result_schema,
+    const gandiva::NodeVector& hash_configuration_list, int hash_relation_idx) {
   impl_.reset(new Impl(ctx, left_key_list, right_key_list, left_schema_list,
                        right_schema_list, condition, join_type, result_schema,
-                       hash_relation_idx));
+                       hash_configuration_list, hash_relation_idx));
   kernel_name_ = "ConditionedProbeKernel";
 }
 

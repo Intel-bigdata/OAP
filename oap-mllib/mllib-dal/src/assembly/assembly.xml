@@ -44,17 +44,20 @@
                 <include>libJavaAPI.so</include>
             </includes>
         </fileSet>
-        <fileSet>
-            <directory>${env.TBBROOT}/lib/intel64/gcc4.8</directory>
-            <outputDirectory>lib</outputDirectory>
-            <includes>
-                <include>libtbb.so*</include>
-                <include>libtbbmalloc.so*</include>
-            </includes>
-        </fileSet>
     </fileSets>
-    <!-- Include oneCCL libraries into JAR  -->
     <files>
+        <!-- Include TBB libraries into JAR  -->
+        <file>
+            <source>${env.TBBROOT}/lib/intel64/gcc4.8/libtbb.so.12.1</source>
+            <outputDirectory>lib</outputDirectory>
+            <destName>libtbb.so.2</destName>
+        </file>
+        <file>
+            <source>${env.TBBROOT}/lib/intel64/gcc4.8/libtbbmalloc.so.2.1</source>
+            <outputDirectory>lib</outputDirectory>
+            <destName>libtbbmalloc.so.2</destName>
+        </file>
+        <!-- Include oneCCL libraries into JAR  -->
         <file>
             <source>${env.CCL_ROOT}/lib/libpmi.so.1</source>
             <outputDirectory>lib</outputDirectory>

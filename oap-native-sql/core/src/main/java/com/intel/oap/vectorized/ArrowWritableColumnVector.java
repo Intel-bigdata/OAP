@@ -55,9 +55,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class ArrowWritableColumnVector extends WritableColumnVector {
   private static final boolean bigEndianPlatform =
-    ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN);
+      ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN);
 
-  private static final Logger LOG = LoggerFactory.getLogger(ArrowWritableColumnVector.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ArrowWritableColumnVector.class);
 
   private ArrowVectorAccessor accessor;
   private ArrowVectorWriter writer;
@@ -65,9 +66,16 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   private int ordinal;
   private ValueVector vector;
   private ValueVector dictionaryVector;
+  private static BufferAllocator OffRecordAllocator = null;
 
   public static BufferAllocator getAllocator() {
     return SparkMemoryUtils.arrowAllocator();
+  }
+  public static BufferAllocator getOffRecordAllocator() {
+    if (OffRecordAllocator == null) {
+      OffRecordAllocator = new RootAllocator(Long.MAX_VALUE);
+    }
+    return OffRecordAllocator;
   }
   public static AtomicLong vectorCount = new AtomicLong(0);
   private AtomicLong refCnt = new AtomicLong(0);
@@ -75,72 +83,77 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
 
   /**
    * Allocates columns to store elements of each field of the schema on heap.
-   * Capacity is the initial capacity of the vector and it will grow as necessary. Capacity is
-   * in number of elements, not number of bytes.
+   * Capacity is the initial capacity of the vector and it will grow as necessary.
+   * Capacity is in number of elements, not number of bytes.
    */
-  public static ArrowWritableColumnVector[] allocateColumns(int capacity, StructType schema) {
+  public static ArrowWritableColumnVector[] allocateColumns(
+      int capacity, StructType schema) {
     String timeZoneId = SQLConf.get().sessionLocalTimeZone();
     Schema arrowSchema = ArrowUtils.toArrowSchema(schema, timeZoneId);
-    VectorSchemaRoot new_root = VectorSchemaRoot.create(arrowSchema, SparkMemoryUtils.arrowAllocator());
+    VectorSchemaRoot new_root =
+        VectorSchemaRoot.create(arrowSchema, SparkMemoryUtils.arrowAllocator());
 
     List<FieldVector> fieldVectors = new_root.getFieldVectors();
-    ArrowWritableColumnVector[] vectors = new ArrowWritableColumnVector[fieldVectors.size()];
+    ArrowWritableColumnVector[] vectors =
+        new ArrowWritableColumnVector[fieldVectors.size()];
     for (int i = 0; i < fieldVectors.size(); i++) {
       vectors[i] = new ArrowWritableColumnVector(fieldVectors.get(i), i, capacity, true);
     }
-    //LOG.info("allocateColumns allocator is " + allocator);
+    // LOG.info("allocateColumns allocator is " + allocator);
     return vectors;
   }
 
-  public static ArrowWritableColumnVector[] loadColumns(int capacity,
-                                                        List<FieldVector> fieldVectors,
-                                                        List<FieldVector> dictionaryVectors) {
+  public static ArrowWritableColumnVector[] loadColumns(
+      int capacity, List<FieldVector> fieldVectors, List<FieldVector> dictionaryVectors) {
     if (fieldVectors.size() != dictionaryVectors.size()) {
-      throw new IllegalArgumentException("Mismatched field vectors and dictionary vectors. " +
-              "Field vector count: " + fieldVectors.size() + ", " +
-              "dictionary vector count: " + dictionaryVectors.size());
+      throw new IllegalArgumentException(
+          "Mismatched field vectors and dictionary vectors. "
+          + "Field vector count: " + fieldVectors.size() + ", "
+          + "dictionary vector count: " + dictionaryVectors.size());
     }
-    ArrowWritableColumnVector[] vectors = new ArrowWritableColumnVector[fieldVectors.size()];
+    ArrowWritableColumnVector[] vectors =
+        new ArrowWritableColumnVector[fieldVectors.size()];
     for (int i = 0; i < fieldVectors.size(); i++) {
-      vectors[i] = new ArrowWritableColumnVector(fieldVectors.get(i), dictionaryVectors.get(i),
-              i, capacity, false);
+      vectors[i] = new ArrowWritableColumnVector(
+          fieldVectors.get(i), dictionaryVectors.get(i), i, capacity, false);
     }
     return vectors;
   }
 
-  public static ArrowWritableColumnVector[] loadColumns(int capacity,
-                                                        List<FieldVector> fieldVectors) {
-    ArrowWritableColumnVector[] vectors = new ArrowWritableColumnVector[fieldVectors.size()];
+  public static ArrowWritableColumnVector[] loadColumns(
+      int capacity, List<FieldVector> fieldVectors) {
+    ArrowWritableColumnVector[] vectors =
+        new ArrowWritableColumnVector[fieldVectors.size()];
     for (int i = 0; i < fieldVectors.size(); i++) {
       vectors[i] = new ArrowWritableColumnVector(fieldVectors.get(i), i, capacity, false);
     }
     return vectors;
   }
 
-  public static ArrowWritableColumnVector[] loadColumns(int capacity, Schema arrowSchema,
-                                                        ArrowRecordBatch recordBatch) {
+  public static ArrowWritableColumnVector[] loadColumns(
+      int capacity, Schema arrowSchema, ArrowRecordBatch recordBatch) {
     return loadColumns(capacity, arrowSchema, recordBatch, null);
   }
 
   public static ArrowWritableColumnVector[] loadColumns(int capacity, Schema arrowSchema,
-                                                        ArrowRecordBatch recordBatch, 
-                                                        BufferAllocator _allocator) {
+      ArrowRecordBatch recordBatch, BufferAllocator _allocator) {
     if (_allocator == null) {
       _allocator = SparkMemoryUtils.arrowAllocator();
     }
-    VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, _allocator); 
+    VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, _allocator);
     VectorLoader loader = new VectorLoader(root);
     loader.load(recordBatch);
     return loadColumns(capacity, root.getFieldVectors());
   }
 
   @Deprecated
-  public ArrowWritableColumnVector(ValueVector vector, int ordinal, int capacity, boolean init) {
+  public ArrowWritableColumnVector(
+      ValueVector vector, int ordinal, int capacity, boolean init) {
     this(vector, null, ordinal, capacity, init);
   }
 
   public ArrowWritableColumnVector(ValueVector vector, ValueVector dicionaryVector,
-                                   int ordinal, int capacity, boolean init) {
+      int ordinal, int capacity, boolean init) {
     super(capacity, ArrowUtils.fromArrowField(vector.getField()));
     vectorCount.getAndIncrement();
     refCnt.getAndIncrement();
@@ -161,9 +174,11 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     vectorCount.getAndIncrement();
     refCnt.getAndIncrement();
     String timeZoneId = SQLConf.get().sessionLocalTimeZone();
-    List<Field> fields = Arrays.asList(ArrowUtils.toArrowField("col", dataType, true, timeZoneId));
+    List<Field> fields =
+        Arrays.asList(ArrowUtils.toArrowField("col", dataType, true, timeZoneId));
     Schema arrowSchema = new Schema(fields);
-    VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, SparkMemoryUtils.arrowAllocator());
+    VectorSchemaRoot root =
+        VectorSchemaRoot.create(arrowSchema, SparkMemoryUtils.arrowAllocator());
 
     List<FieldVector> fieldVectors = root.getFieldVectors();
     vector = fieldVectors.get(0);
@@ -181,21 +196,21 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     vector.setValueCount(numRows);
   }
 
-
   private void createVectorAccessor(ValueVector vector, ValueVector dictionary) {
     if (dictionary != null) {
       if (!(vector instanceof IntVector)) {
-        throw new IllegalArgumentException("Expect int32 index vector. Found: " +
-                vector.getMinorType());
+        throw new IllegalArgumentException(
+            "Expect int32 index vector. Found: " + vector.getMinorType());
       }
       IntVector index = (IntVector) vector;
       if (dictionary instanceof VarBinaryVector) {
-        accessor = new DictionaryEncodedBinaryAccessor(index, (VarBinaryVector) dictionary);
+        accessor =
+            new DictionaryEncodedBinaryAccessor(index, (VarBinaryVector) dictionary);
       } else if (dictionary instanceof VarCharVector) {
         accessor = new DictionaryEncodedStringAccessor(index, (VarCharVector) dictionary);
       } else {
-        throw new IllegalArgumentException("Unrecognized index value type: " +
-                dictionary.getMinorType());
+        throw new IllegalArgumentException(
+            "Unrecognized index value type: " + dictionary.getMinorType());
       }
       return;
     }
@@ -267,8 +282,7 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
       return new TimestampWriter((TimeStampMicroTZVector) vector);
     } else if (vector instanceof ListVector) {
       ListVector listVector = (ListVector) vector;
-      ArrowVectorWriter elementVector =
-        createVectorWriter(listVector.getDataVector());
+      ArrowVectorWriter elementVector = createVectorWriter(listVector.getDataVector());
       return new ArrayWriter(listVector, elementVector);
     } else if (vector instanceof StructVector) {
       StructVector structVector = (StructVector) vector;
@@ -335,7 +349,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     return "vectorCounter is " + vectorCount.get();
   }
 
-
   @Override
   public boolean hasNull() {
     return accessor.getNullCount() > 0;
@@ -352,7 +365,7 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   public void mergeTo(ArrowWritableColumnVector other, int rowId, int rowNum) {
     for (int i = 0; i < rowNum; i++) {
       if (accessor instanceof BooleanAccessor) {
-        if(!isNullAt(i)) {
+        if (!isNullAt(i)) {
           other.put(rowId + i, getBoolean(i));
         } else {
           other.putNull(rowId + i);
@@ -560,7 +573,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     return accessor.getShorts(rowId, count);
   }
 
-
   //
   // APIs dealing with Ints
   //
@@ -606,7 +618,7 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
    * We have this separate method for dictionaryIds as per SPARK-16928.
    */
   public int getDictId(int rowId) {
-    assert(dictionary == null);
+    assert (dictionary == null);
     return accessor.getInt(rowId);
   }
 
@@ -751,24 +763,26 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
 
   @Override
   public Decimal getDecimal(int rowId, int precision, int scale) {
-    if (isNullAt(rowId)) return null;
+    if (isNullAt(rowId))
+      return null;
     return accessor.getDecimal(rowId, precision, scale);
   }
 
   @Override
   public UTF8String getUTF8String(int rowId) {
-    if (isNullAt(rowId)) return null;
+    if (isNullAt(rowId))
+      return null;
     return accessor.getUTF8String(rowId);
   }
 
   @Override
   public byte[] getBinary(int rowId) {
-    if (isNullAt(rowId)) return null;
+    if (isNullAt(rowId))
+      return null;
     return accessor.getBinary(rowId);
   }
 
   private abstract static class ArrowVectorAccessor {
-
     private final ValueVector vector;
 
     ArrowVectorAccessor(ValueVector vector) {
@@ -791,7 +805,7 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     boolean getBoolean(int rowId) {
       throw new UnsupportedOperationException();
     }
-  
+
     boolean[] getBooleans(int rowId, int count) {
       throw new UnsupportedOperationException();
     }
@@ -862,7 +876,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class BooleanAccessor extends ArrowVectorAccessor {
-
     private final BitVector accessor;
 
     BooleanAccessor(BitVector vector) {
@@ -882,7 +895,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class ByteAccessor extends ArrowVectorAccessor {
-
     private final TinyIntVector accessor;
 
     ByteAccessor(TinyIntVector vector) {
@@ -902,7 +914,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class ShortAccessor extends ArrowVectorAccessor {
-
     private final SmallIntVector accessor;
 
     ShortAccessor(SmallIntVector vector) {
@@ -922,7 +933,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class IntAccessor extends ArrowVectorAccessor {
-
     private final IntVector accessor;
 
     IntAccessor(IntVector vector) {
@@ -942,7 +952,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class LongAccessor extends ArrowVectorAccessor {
-
     private final BigIntVector accessor;
 
     LongAccessor(BigIntVector vector) {
@@ -962,7 +971,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class FloatAccessor extends ArrowVectorAccessor {
-
     private final Float4Vector accessor;
 
     FloatAccessor(Float4Vector vector) {
@@ -982,7 +990,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class DoubleAccessor extends ArrowVectorAccessor {
-
     private final Float8Vector accessor;
 
     DoubleAccessor(Float8Vector vector) {
@@ -1002,7 +1009,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class DecimalAccessor extends ArrowVectorAccessor {
-
     private final DecimalVector accessor;
 
     DecimalAccessor(DecimalVector vector) {
@@ -1012,13 +1018,13 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
 
     @Override
     final Decimal getDecimal(int rowId, int precision, int scale) {
-      if (isNullAt(rowId)) return null;
+      if (isNullAt(rowId))
+        return null;
       return Decimal.apply(accessor.getObject(rowId), precision, scale);
     }
   }
 
   private static class StringAccessor extends ArrowVectorAccessor {
-
     private final VarCharVector accessor;
     private final NullableVarCharHolder stringResult = new NullableVarCharHolder();
 
@@ -1034,14 +1040,13 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
         return null;
       } else {
         return UTF8String.fromAddress(null,
-          stringResult.buffer.memoryAddress() + stringResult.start,
-          stringResult.end - stringResult.start);
+            stringResult.buffer.memoryAddress() + stringResult.start,
+            stringResult.end - stringResult.start);
       }
     }
   }
 
   private static class DictionaryEncodedStringAccessor extends ArrowVectorAccessor {
-
     private final IntVector index;
     private final VarCharVector dictionary;
     private final NullableVarCharHolder stringResult = new NullableVarCharHolder();
@@ -1060,14 +1065,13 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
         return null;
       } else {
         return UTF8String.fromAddress(null,
-                stringResult.buffer.memoryAddress() + stringResult.start,
-                stringResult.end - stringResult.start);
+            stringResult.buffer.memoryAddress() + stringResult.start,
+            stringResult.end - stringResult.start);
       }
     }
   }
 
   private static class BinaryAccessor extends ArrowVectorAccessor {
-
     private final VarBinaryVector accessor;
 
     BinaryAccessor(VarBinaryVector vector) {
@@ -1099,7 +1103,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class DateAccessor extends ArrowVectorAccessor {
-
     private final DateDayVector accessor;
 
     DateAccessor(DateDayVector vector) {
@@ -1117,11 +1120,9 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
       Date jDate = DateTimeUtils.toJavaDate((accessor.get(rowId)));
       return UTF8String.fromString(jDate.toString());
     }
-
   }
 
   private static class TimestampAccessor extends ArrowVectorAccessor {
-
     private final TimeStampMicroTZVector accessor;
 
     TimestampAccessor(TimeStampMicroTZVector vector) {
@@ -1136,14 +1137,13 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class ArrayAccessor extends ArrowVectorAccessor {
-
     private final ListVector accessor;
-    //private final ArrowWritableColumnVector arrayData;
+    // private final ArrowWritableColumnVector arrayData;
 
     ArrayAccessor(ListVector vector) {
       super(vector);
       this.accessor = vector;
-      //this.arrayData = new ArrowWritableColumnVector(vector.getDataVector());
+      // this.arrayData = new ArrowWritableColumnVector(vector.getDataVector());
     }
 
     /*@Override
@@ -1169,13 +1169,12 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   /**
    * Any call to "get" method will throw UnsupportedOperationException.
    *
-   * Access struct values in a ArrowWritableColumnVector doesn't use this accessor. Instead, it uses
-   * getStruct() method defined in the parent class. Any call to "get" method in this class is a
-   * bug in the code.
+   * Access struct values in a ArrowWritableColumnVector doesn't use this accessor.
+   * Instead, it uses getStruct() method defined in the parent class. Any call to "get"
+   * method in this class is a bug in the code.
    *
    */
   private static class StructAccessor extends ArrowVectorAccessor {
-
     StructAccessor(StructVector vector) {
       super(vector);
     }
@@ -1183,7 +1182,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
 
   /* Arrow Vector Writer */
   private abstract static class ArrowVectorWriter {
-
     private final ValueVector vector;
 
     ArrowVectorWriter(ValueVector vector) {
@@ -1336,7 +1334,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class BooleanWriter extends ArrowVectorWriter {
-
     private final BitVector writer;
 
     BooleanWriter(BitVector vector) {
@@ -1370,7 +1367,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class ByteWriter extends ArrowVectorWriter {
-
     private final TinyIntVector writer;
 
     ByteWriter(TinyIntVector vector) {
@@ -1411,7 +1407,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class ShortWriter extends ArrowVectorWriter {
-
     private final SmallIntVector writer;
 
     ShortWriter(SmallIntVector vector) {
@@ -1459,7 +1454,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class IntWriter extends ArrowVectorWriter {
-
     private final IntVector writer;
 
     IntWriter(IntVector vector) {
@@ -1510,7 +1504,7 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     void setIntsLittleEndian(int rowId, int count, byte[] src, int srcIndex) {
       int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
       for (int i = 0; i < count; i++, srcOffset += 4) {
-        int tmp = Platform.getInt(src, srcOffset); 
+        int tmp = Platform.getInt(src, srcOffset);
         if (bigEndianPlatform) {
           tmp = java.lang.Integer.reverseBytes(tmp);
         }
@@ -1520,7 +1514,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class LongWriter extends ArrowVectorWriter {
-
     private final BigIntVector writer;
 
     LongWriter(BigIntVector vector) {
@@ -1571,7 +1564,7 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
     void setLongsLittleEndian(int rowId, int count, byte[] src, int srcIndex) {
       int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
       for (int i = 0; i < count; i++, srcOffset += 8) {
-        long tmp = Platform.getLong(src, srcOffset); 
+        long tmp = Platform.getLong(src, srcOffset);
         if (bigEndianPlatform) {
           tmp = java.lang.Long.reverseBytes(tmp);
         }
@@ -1581,7 +1574,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class FloatWriter extends ArrowVectorWriter {
-
     private final Float4Vector writer;
 
     FloatWriter(Float4Vector vector) {
@@ -1622,7 +1614,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class DoubleWriter extends ArrowVectorWriter {
-
     private final Float8Vector writer;
 
     DoubleWriter(Float8Vector vector) {
@@ -1663,7 +1654,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class DecimalWriter extends ArrowVectorWriter {
-
     private final DecimalVector writer;
 
     DecimalWriter(DecimalVector vector) {
@@ -1689,7 +1679,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class StringWriter extends ArrowVectorWriter {
-
     private final VarCharVector writer;
     private int rowId;
 
@@ -1714,11 +1703,9 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
       writer.setSafe(rowId, value, offset, length);
       rowId++;
     }
-
   }
 
   private static class BinaryWriter extends ArrowVectorWriter {
-
     private final VarBinaryVector writer;
 
     BinaryWriter(VarBinaryVector vector) {
@@ -1733,7 +1720,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class DateWriter extends ArrowVectorWriter {
-
     private final DateDayVector writer;
 
     DateWriter(DateDayVector vector) {
@@ -1760,7 +1746,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class TimestampWriter extends ArrowVectorWriter {
-
     private final TimeStampMicroTZVector writer;
 
     TimestampWriter(TimeStampMicroTZVector vector) {
@@ -1782,9 +1767,8 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class ArrayWriter extends ArrowVectorWriter {
-
     private final ListVector writer;
-    //private final ArrowWritableColumnVector arrayData;
+    // private final ArrowWritableColumnVector arrayData;
 
     ArrayWriter(ListVector vector, ArrowVectorWriter elementVector) {
       super(vector);
@@ -1793,7 +1777,6 @@ public final class ArrowWritableColumnVector extends WritableColumnVector {
   }
 
   private static class StructWriter extends ArrowVectorWriter {
-
     StructWriter(StructVector vector, ArrowVectorWriter[] children) {
       super(vector);
     }

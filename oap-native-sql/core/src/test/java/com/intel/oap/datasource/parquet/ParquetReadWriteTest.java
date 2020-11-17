@@ -60,7 +60,7 @@ public class ParquetReadWriteTest {
     allocator.close();
   }
 
-  @Test
+  //@Test
   public void testParquetReadWrite() throws Exception {
 
     File testFile = testFolder.newFile("_tmpfile_ParquetWriterReaderTest");

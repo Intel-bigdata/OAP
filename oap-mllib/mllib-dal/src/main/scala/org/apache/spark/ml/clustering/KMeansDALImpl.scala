@@ -76,7 +76,7 @@ class KMeansDALImpl (
       LibLoader.loadLibraries()
 
       import scala.collection.JavaConverters._
-      
+
       var dalRow = 0
          
       it.foreach { curVector =>

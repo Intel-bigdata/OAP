@@ -82,10 +82,6 @@ arrow::Status BuilderVisitor::Visit(const gandiva::FunctionNode& node) {
     RETURN_NOT_OK(
         ExprVisitor::Make(std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
                           schema_, ret_fields_, &expr_visitor_));
-  } else if (func_name.compare("HashRelation") == 0) {
-    RETURN_NOT_OK(
-        ExprVisitor::Make(std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
-                          schema_, ret_fields_, &expr_visitor_));
   } else if (func_name.compare(0, 8, "codegen_") == 0) {
     RETURN_NOT_OK(
         ExprVisitor::Make(std::dynamic_pointer_cast<gandiva::FunctionNode>(func_),
@@ -251,10 +247,10 @@ arrow::Status ExprVisitor::Make(const std::shared_ptr<gandiva::FunctionNode>& no
   return arrow::Status::OK();
 }
 
-arrow::Status ExprVisitor::MakeWindow(std::shared_ptr<arrow::Schema> schema_ptr,
-                                      std::vector<std::shared_ptr<arrow::Field>> ret_fields,
-                                      const gandiva::FunctionNode& node,
-                                      std::shared_ptr<ExprVisitor>* out) {
+arrow::Status ExprVisitor::MakeWindow(
+    std::shared_ptr<arrow::Schema> schema_ptr,
+    std::vector<std::shared_ptr<arrow::Field>> ret_fields,
+    const gandiva::FunctionNode& node, std::shared_ptr<ExprVisitor>* out) {
   auto func_name = node.descriptor()->name();
   if (func_name != "window") {
     return arrow::Status::Invalid("window's Gandiva function name mismatch");
@@ -331,8 +327,11 @@ arrow::Status ExprVisitor::MakeExprVisitorImpl(
       RETURN_NOT_OK(
           HashRelationVisitorImpl::Make(field_list, func_node, ret_fields, p, &impl_));
     } else if (child_func_name.compare("sortArraysToIndices") == 0) {
-      RETURN_NOT_OK(SortArraysToIndicesVisitorImpl::Make(field_list, func_node, 
+      RETURN_NOT_OK(SortArraysToIndicesVisitorImpl::Make(field_list, func_node,
                                                          ret_fields, p, &impl_));
+    } else if (child_func_name.compare("ConcatArrayList") == 0) {
+      RETURN_NOT_OK(
+          ConcatArrayListVisitorImpl::Make(field_list, func_node, ret_fields, p, &impl_));
     }
     goto finish;
   }
@@ -470,7 +469,8 @@ unrecognizedFail:
 }
 
 arrow::Status ExprVisitor::MakeExprVisitorImpl(
-    const std::string& func_name, std::vector<std::shared_ptr<gandiva::FunctionNode>> window_functions,
+    const std::string& func_name,
+    std::vector<std::shared_ptr<gandiva::FunctionNode>> window_functions,
     std::shared_ptr<gandiva::FunctionNode> partition_spec,
     std::shared_ptr<gandiva::FunctionNode> order_spec,
     std::shared_ptr<gandiva::FunctionNode> frame_spec,

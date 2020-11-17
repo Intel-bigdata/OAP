@@ -166,7 +166,13 @@ arrow::Status ExpressionCodegenVisitor::Visit(const gandiva::FunctionNode& node)
     for (int i = 0; i < 3; i++) {
       prepare_str_ += child_visitor_list[i]->GetPrepare();
     }
-    codes_str_ = ss.str();
+    // codes_str_ = ss.str();
+    codes_str_ = "substr_" + std::to_string(cur_func_id);
+    check_str_ = GetValidityName(codes_str_);
+    std::stringstream prepare_ss;
+    prepare_ss << "auto " << codes_str_ << " = " << ss.str() << ";" << std::endl;
+    prepare_ss << "bool " << check_str_ << " = true;" << std::endl;
+    prepare_str_ += prepare_ss.str();
   } else if (func_name.compare("upper") == 0) {
     std::stringstream prepare_ss;
     auto child_name = child_visitor_list[0]->GetResult();
@@ -435,6 +441,86 @@ arrow::Status ExpressionCodegenVisitor::Visit(const gandiva::FunctionNode& node)
                << ");" << std::endl;
     prepare_ss << "if (" << validity << ") {" << std::endl;
     prepare_ss << codes_str_ << " = " << child_visitor_list[0]->GetResult() << " / "
+               << child_visitor_list[1]->GetResult() << ";" << std::endl;
+    prepare_ss << "}" << std::endl;
+
+    for (int i = 0; i < 2; i++) {
+      prepare_str_ += child_visitor_list[i]->GetPrepare();
+    }
+    prepare_str_ += prepare_ss.str();
+    check_str_ = validity;
+  } else if (func_name.compare("shift_left") == 0) {
+    codes_str_ = "shift_left_" + std::to_string(cur_func_id);
+    auto validity = codes_str_ + "_validity";
+    std::stringstream prepare_ss;
+    prepare_ss << GetCTypeString(node.return_type()) << " " << codes_str_ << ";"
+               << std::endl;
+    prepare_ss << "bool " << validity << " = ("
+               << CombineValidity({child_visitor_list[0]->GetPreCheck(),
+                                   child_visitor_list[1]->GetPreCheck()})
+               << ");" << std::endl;
+    prepare_ss << "if (" << validity << ") {" << std::endl;
+    prepare_ss << codes_str_ << " = " << child_visitor_list[0]->GetResult() << " << "
+               << child_visitor_list[1]->GetResult() << ";" << std::endl;
+    prepare_ss << "}" << std::endl;
+
+    for (int i = 0; i < 2; i++) {
+      prepare_str_ += child_visitor_list[i]->GetPrepare();
+    }
+    prepare_str_ += prepare_ss.str();
+    check_str_ = validity;
+  } else if (func_name.compare("shift_right") == 0) {
+    codes_str_ = "shift_right_" + std::to_string(cur_func_id);
+    auto validity = codes_str_ + "_validity";
+    std::stringstream prepare_ss;
+    prepare_ss << GetCTypeString(node.return_type()) << " " << codes_str_ << ";"
+               << std::endl;
+    prepare_ss << "bool " << validity << " = ("
+               << CombineValidity({child_visitor_list[0]->GetPreCheck(),
+                                   child_visitor_list[1]->GetPreCheck()})
+               << ");" << std::endl;
+    prepare_ss << "if (" << validity << ") {" << std::endl;
+    prepare_ss << codes_str_ << " = " << child_visitor_list[0]->GetResult() << " >> "
+               << child_visitor_list[1]->GetResult() << ";" << std::endl;
+    prepare_ss << "}" << std::endl;
+
+    for (int i = 0; i < 2; i++) {
+      prepare_str_ += child_visitor_list[i]->GetPrepare();
+    }
+    prepare_str_ += prepare_ss.str();
+    check_str_ = validity;
+  } else if (func_name.compare("bitwise_and") == 0) {
+    codes_str_ = "bitwise_and_" + std::to_string(cur_func_id);
+    auto validity = codes_str_ + "_validity";
+    std::stringstream prepare_ss;
+    prepare_ss << GetCTypeString(node.return_type()) << " " << codes_str_ << ";"
+               << std::endl;
+    prepare_ss << "bool " << validity << " = ("
+               << CombineValidity({child_visitor_list[0]->GetPreCheck(),
+                                   child_visitor_list[1]->GetPreCheck()})
+               << ");" << std::endl;
+    prepare_ss << "if (" << validity << ") {" << std::endl;
+    prepare_ss << codes_str_ << " = " << child_visitor_list[0]->GetResult() << " & "
+               << child_visitor_list[1]->GetResult() << ";" << std::endl;
+    prepare_ss << "}" << std::endl;
+
+    for (int i = 0; i < 2; i++) {
+      prepare_str_ += child_visitor_list[i]->GetPrepare();
+    }
+    prepare_str_ += prepare_ss.str();
+    check_str_ = validity;
+  } else if (func_name.compare("bitwise_or") == 0) {
+    codes_str_ = "bitwise_or_" + std::to_string(cur_func_id);
+    auto validity = codes_str_ + "_validity";
+    std::stringstream prepare_ss;
+    prepare_ss << GetCTypeString(node.return_type()) << " " << codes_str_ << ";"
+               << std::endl;
+    prepare_ss << "bool " << validity << " = ("
+               << CombineValidity({child_visitor_list[0]->GetPreCheck(),
+                                   child_visitor_list[1]->GetPreCheck()})
+               << ");" << std::endl;
+    prepare_ss << "if (" << validity << ") {" << std::endl;
+    prepare_ss << codes_str_ << " = " << child_visitor_list[0]->GetResult() << " | "
                << child_visitor_list[1]->GetResult() << ";" << std::endl;
     prepare_ss << "}" << std::endl;
 

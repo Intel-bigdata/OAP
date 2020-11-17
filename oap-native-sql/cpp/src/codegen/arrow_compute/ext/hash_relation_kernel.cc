@@ -100,7 +100,7 @@ class HashRelationKernel::Impl {
         THROW_NOT_OK(MakeHashRelation(project_expr->result()->type()->id(), ctx_,
                                       hash_relation_list, &hash_relation_));
       }
-    } else {
+    } else if (builder_type_ == 1) {
       // we will use unsafe_row and new unsafe_hash_map
       gandiva::ExpressionVector key_project_expr = GetGandivaKernel(key_nodes);
       gandiva::ExpressionPtr key_hash_expr = GetHash32Kernel(key_nodes);
@@ -116,7 +116,19 @@ class HashRelationKernel::Impl {
       hash_input_schema_ = arrow::schema(key_hash_field_list);
       THROW_NOT_OK(gandiva::Projector::Make(hash_input_schema_, {key_hash_expr},
                                             configuration, &key_projector_));
-      hash_relation_ = std::make_shared<HashRelation>(ctx_, hash_relation_list);
+      if (key_hash_field_list.size() == 1 &&
+          key_hash_field_list[0]->type()->id() != arrow::Type::STRING) {
+        // If single key case, we can put key in KeyArray
+        auto key_type = std::dynamic_pointer_cast<arrow::FixedWidthType>(
+            key_hash_field_list[0]->type());
+        auto key_size = key_type->bit_width() / 8;
+        hash_relation_ =
+            std::make_shared<HashRelation>(ctx_, hash_relation_list, key_size);
+      } else {
+        hash_relation_ = std::make_shared<HashRelation>(ctx_, hash_relation_list);
+      }
+    } else {
+      hash_relation_ = std::make_shared<HashRelation>(hash_relation_list);
     }
   }
 
@@ -124,6 +136,7 @@ class HashRelationKernel::Impl {
     for (int i = 0; i < in.size(); i++) {
       RETURN_NOT_OK(hash_relation_->AppendPayloadColumn(i, in[i]));
     }
+    if (builder_type_ == 2) return arrow::Status::OK();
     std::shared_ptr<arrow::Array> key_array;
     if (builder_type_ == 0) {
       if (key_projector_) {
@@ -154,16 +167,54 @@ class HashRelationKernel::Impl {
           key_projector_->Evaluate(*hash_in_batch, ctx_->memory_pool(), &hash_outputs));
       key_array = hash_outputs[0];
 
-      /* Append key array to UnsafeArray for later UnsafeRow projection */
-      std::vector<std::shared_ptr<UnsafeArray>> payloads;
-      int i = 0;
-      for (auto arr : project_outputs) {
-        std::shared_ptr<UnsafeArray> payload;
-        RETURN_NOT_OK(MakeUnsafeArray(arr->type(), i++, arr, &payload));
-        payloads.push_back(payload);
+/* For single field fixed_size key, we simply insert to HashMap without append to unsafe
+ * Row */
+#define PROCESS_SUPPORTED_TYPES(PROCESS) \
+  PROCESS(arrow::BooleanType)            \
+  PROCESS(arrow::UInt8Type)              \
+  PROCESS(arrow::Int8Type)               \
+  PROCESS(arrow::UInt16Type)             \
+  PROCESS(arrow::Int16Type)              \
+  PROCESS(arrow::UInt32Type)             \
+  PROCESS(arrow::Int32Type)              \
+  PROCESS(arrow::UInt64Type)             \
+  PROCESS(arrow::Int64Type)              \
+  PROCESS(arrow::FloatType)              \
+  PROCESS(arrow::DoubleType)             \
+  PROCESS(arrow::Date32Type)             \
+  PROCESS(arrow::Date64Type)             \
+  PROCESS(arrow::StringType)
+      if (project_outputs.size() == 1 &&
+          project_outputs[0]->type_id() != arrow::Type::STRING) {
+        switch (project_outputs[0]->type_id()) {
+#define PROCESS(InType)                                                   \
+  case TypeTraits<InType>::type_id: {                                     \
+    using ArrayType = precompile::TypeTraits<InType>::ArrayType;          \
+    auto typed_key_arr = std::make_shared<ArrayType>(project_outputs[0]); \
+    return hash_relation_->AppendKeyColumn(key_array, typed_key_arr);     \
+  } break;
+          PROCESS_SUPPORTED_TYPES(PROCESS)
+#undef PROCESS
+          default: {
+            return arrow::Status::NotImplemented(
+                "HashRelation Evaluate doesn't support single key type ",
+                project_outputs[0]->type_id());
+          } break;
+        }
+#undef PROCESS_SUPPORTED_TYPES
+      } else {
+        /* Append key array to UnsafeArray for later UnsafeRow projection */
+        std::vector<std::shared_ptr<UnsafeArray>> payloads;
+        int i = 0;
+        for (auto arr : project_outputs) {
+          std::shared_ptr<UnsafeArray> payload;
+          RETURN_NOT_OK(MakeUnsafeArray(arr->type(), i++, arr, &payload));
+          payloads.push_back(payload);
+        }
+        return hash_relation_->AppendKeyColumn(key_array, payloads);
       }
-      return hash_relation_->AppendKeyColumn(key_array, payloads);
     }
+    return arrow::Status::OK();
   }
 
   std::string GetSignature() { return ""; }
@@ -192,6 +243,15 @@ class HashRelationKernel::Impl {
 
     arrow::Status Next(std::shared_ptr<HashRelation>* out) override {
       *out = hash_relation_;
+      return arrow::Status::OK();
+    }
+
+    arrow::Status ProcessAndCacheOne(
+        const std::vector<std::shared_ptr<arrow::Array>>& in,
+        const std::shared_ptr<arrow::Array>& selection = nullptr) override {
+      for (int i = 0; i < in.size(); i++) {
+        RETURN_NOT_OK(hash_relation_->AppendPayloadColumn(i, in[i]));
+      }
       return arrow::Status::OK();
     }
 

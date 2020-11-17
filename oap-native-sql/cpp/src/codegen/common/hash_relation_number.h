@@ -59,6 +59,10 @@ class TypedHashRelation<DataType, enable_if_number<DataType>> : public HashRelat
 
   int GetNull() { return hash_table_->GetNull(); }
 
+  std::vector<ArrayItemIndex> GetItemListByIndex(int i) override {
+    return memo_index_to_arrayid_[i];
+  }
+
  private:
   arrow::Status Insert(T v, uint32_t array_id, uint32_t id) {
     int i;
@@ -84,6 +88,8 @@ class TypedHashRelation<DataType, enable_if_number<DataType>> : public HashRelat
     return arrow::Status::OK();
   }
 
+  int num_items_ = 0;
   std::shared_ptr<SparseHashMap<T>> hash_table_;
   using ArrayType = typename TypeTraits<DataType>::ArrayType;
+  std::vector<std::vector<ArrayItemIndex>> memo_index_to_arrayid_;
 };

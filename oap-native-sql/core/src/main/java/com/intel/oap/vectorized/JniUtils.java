@@ -17,6 +17,8 @@
 
 package com.intel.oap.vectorized;
 
+import sun.net.www.protocol.file.FileURLConnection;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -32,6 +34,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Objects;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -150,8 +153,18 @@ public class JniUtils {
       if (urlConnection instanceof JarURLConnection) {
         final JarFile jarFile = ((JarURLConnection) urlConnection).getJarFile();
         extractResourcesToDirectory(jarFile, folderToLoad, tmp_dir + "/" + "nativesql_include");
+      } else if (urlConnection instanceof FileURLConnection) {
+        // For Maven test only
+        String path = urlConnection.getURL().toString();
+        if (urlConnection.getURL().toString().startsWith("file:")) {
+          // remove the prefix of "file:" from includePath
+          path = urlConnection.getURL().toString().substring(5);
+        }
+        final File folder = new File(path);
+        copyResourcesToDirectory((FileURLConnection) urlConnection,
+                          tmp_dir + "/" + "nativesql_include", folder);
       } else {
-        throw new IOException(urlConnection.toString() + " is not JarUrlConnection");
+        throw new IOException(urlConnection.toString() + " is not JarUrlConnection or FileURLConnection");
       }
     }
   }
@@ -213,6 +226,23 @@ public class JniUtils {
             outFile.close();
           } catch (IOException ignored) {
           }
+        }
+      }
+    }
+  }
+
+  public static void copyResourcesToDirectory(FileURLConnection urlConnection,
+                                              String destPath, File folder) throws IOException {
+    for (final File fileEntry : Objects.requireNonNull(folder.listFiles())) {
+      String destFilePath = destPath + "/" + fileEntry.getName();
+      File destFile = new File(destFilePath);
+      if (fileEntry.isDirectory()) {
+        destFile.mkdirs();
+        copyResourcesToDirectory(urlConnection, destFilePath, fileEntry);
+      } else {
+        try {
+          Files.copy(fileEntry.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception e) {
         }
       }
     }

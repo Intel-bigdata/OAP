@@ -71,9 +71,12 @@ TEST(TestArrowComputeWSCG, WSCGTestSingleInnerJoin) {
       uint64());
   auto n_condition = TreeExprBuilder::MakeFunction(
       "greater_than", {n_add, TreeExprBuilder::MakeField(table0_f2)}, boolean());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
       "conditionedProbeArraysInner",
-      {n_left, n_right, n_left_key, n_right_key, n_result, n_condition}, uint32());
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config, n_condition},
+      uint32());
   auto n_child_probe = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   ////////////////////////////////////////////////////////
   auto n_project_input = TreeExprBuilder::MakeFunction(
@@ -97,8 +100,6 @@ TEST(TestArrowComputeWSCG, WSCGTestSingleInnerJoin) {
   auto schema_table_1 = arrow::schema({table1_f0, table1_f1});
   auto schema_table =
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -215,9 +216,12 @@ TEST(TestArrowComputeWSCG, WSCGTestProjectKeyInnerJoin) {
       uint64());
   auto n_condition = TreeExprBuilder::MakeFunction(
       "greater_than", {n_add, TreeExprBuilder::MakeField(table0_f2)}, boolean());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
       "conditionedProbeArraysInner",
-      {n_left, n_right, n_left_key, n_right_key, n_result, n_condition}, uint32());
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config, n_condition},
+      uint32());
   auto n_child_probe = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   ////////////////////////////////////////////////////////
   auto n_project_input = TreeExprBuilder::MakeFunction(
@@ -242,8 +246,6 @@ TEST(TestArrowComputeWSCG, WSCGTestProjectKeyInnerJoin) {
   auto schema_table =
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -360,9 +362,12 @@ TEST(TestArrowComputeWSCG, WSCGTestProjectFilterKeyInnerJoin) {
       uint64());
   auto n_condition = TreeExprBuilder::MakeFunction(
       "greater_than", {n_add, TreeExprBuilder::MakeField(table0_f2)}, boolean());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
       "conditionedProbeArraysInner",
-      {n_left, n_right, n_left_key, n_right_key, n_result, n_condition}, uint32());
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config, n_condition},
+      uint32());
   auto n_child_probe = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   ////////////////////////////////////////////////////////
   auto n_project_input = TreeExprBuilder::MakeFunction(
@@ -400,8 +405,6 @@ TEST(TestArrowComputeWSCG, WSCGTestProjectFilterKeyInnerJoin) {
   auto schema_table =
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -512,9 +515,11 @@ TEST(TestArrowComputeWSCG, WSCGTestStringInnerJoin) {
        TreeExprBuilder::MakeField(table0_f2), TreeExprBuilder::MakeField(table1_f0),
        TreeExprBuilder::MakeField(table1_f1)},
       uint32());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysInner", {n_left, n_right, n_left_key, n_right_key, n_result},
-      uint32());
+      "conditionedProbeArraysInner",
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config}, uint32());
   auto n_child = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   //////////////////////////////////////////////////////////////////
   auto n_wscg = TreeExprBuilder::MakeFunction("wholestagecodegen", {n_child}, uint32());
@@ -525,8 +530,6 @@ TEST(TestArrowComputeWSCG, WSCGTestStringInnerJoin) {
   auto schema_table =
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -646,9 +649,11 @@ TEST(TestArrowComputeWSCG, WSCGTestTwoStringInnerJoin) {
        TreeExprBuilder::MakeField(table0_f2), TreeExprBuilder::MakeField(table1_f0),
        TreeExprBuilder::MakeField(table1_f1)},
       uint32());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysInner", {n_left, n_right, n_left_key, n_right_key, n_result},
-      uint32());
+      "conditionedProbeArraysInner",
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config}, uint32());
   auto n_child = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   //////////////////////////////////////////////////////////////////
   auto n_wscg = TreeExprBuilder::MakeFunction("wholestagecodegen", {n_child}, uint32());
@@ -659,8 +664,6 @@ TEST(TestArrowComputeWSCG, WSCGTestTwoStringInnerJoin) {
   auto schema_table =
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -773,9 +776,11 @@ TEST(TestArrowComputeWSCG, WSCGTestOuterJoin) {
        TreeExprBuilder::MakeField(table0_f2), TreeExprBuilder::MakeField(table1_f0),
        TreeExprBuilder::MakeField(table1_f1)},
       uint32());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysOuter", {n_left, n_right, n_left_key, n_right_key, n_result},
-      uint32());
+      "conditionedProbeArraysOuter",
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config}, uint32());
   auto n_child = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   //////////////////////////////////////////////////////////////////
   auto n_wscg = TreeExprBuilder::MakeFunction("wholestagecodegen", {n_child}, uint32());
@@ -786,8 +791,6 @@ TEST(TestArrowComputeWSCG, WSCGTestOuterJoin) {
   auto schema_table =
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -901,9 +904,11 @@ TEST(TestArrowComputeWSCG, WSCGTestAntiJoin) {
       "result",
       {TreeExprBuilder::MakeField(table1_f0), TreeExprBuilder::MakeField(table1_f1)},
       uint32());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysAnti", {n_left, n_right, n_left_key, n_right_key, n_result},
-      uint32());
+      "conditionedProbeArraysAnti",
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config}, uint32());
   auto n_child = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   //////////////////////////////////////////////////////////////////
   auto n_wscg = TreeExprBuilder::MakeFunction("wholestagecodegen", {n_child}, uint32());
@@ -914,8 +919,6 @@ TEST(TestArrowComputeWSCG, WSCGTestAntiJoin) {
   auto schema_table =
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -1026,9 +1029,12 @@ TEST(TestArrowComputeWSCG, WSCGTestAntiJoinWithCondition) {
       "greater_than",
       {TreeExprBuilder::MakeField(table0_f1), TreeExprBuilder::MakeField(table1_f1)},
       arrow::boolean());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
       "conditionedProbeArraysAnti",
-      {n_left, n_right, n_left_key, n_right_key, n_result, n_condition}, uint32());
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config, n_condition},
+      uint32());
   auto n_child = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   //////////////////////////////////////////////////////////////////
   auto n_wscg = TreeExprBuilder::MakeFunction("wholestagecodegen", {n_child}, uint32());
@@ -1039,8 +1045,6 @@ TEST(TestArrowComputeWSCG, WSCGTestAntiJoinWithCondition) {
   auto schema_table =
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -1147,9 +1151,11 @@ TEST(TestArrowComputeWSCG, WSCGTestSemiJoin) {
       "result",
       {TreeExprBuilder::MakeField(table1_f0), TreeExprBuilder::MakeField(table1_f1)},
       uint32());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysSemi", {n_left, n_right, n_left_key, n_right_key, n_result},
-      uint32());
+      "conditionedProbeArraysSemi",
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config}, uint32());
   auto n_child = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   //////////////////////////////////////////////////////////////////
   auto n_wscg = TreeExprBuilder::MakeFunction("wholestagecodegen", {n_child}, uint32());
@@ -1159,8 +1165,6 @@ TEST(TestArrowComputeWSCG, WSCGTestSemiJoin) {
   auto schema_table_1 = arrow::schema({table1_f0, table1_f1});
   auto schema_table = arrow::schema({table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -1273,9 +1277,12 @@ TEST(TestArrowComputeWSCG, WSCGTestSemiJoinWithCondition) {
       "greater_than",
       {TreeExprBuilder::MakeField(table0_f1), TreeExprBuilder::MakeField(table0_f2)},
       arrow::boolean());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
       "conditionedProbeArraysSemi",
-      {n_left, n_right, n_left_key, n_right_key, n_result, n_condition}, uint32());
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config, n_condition},
+      uint32());
   auto n_child = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   //////////////////////////////////////////////////////////////////
   auto n_wscg = TreeExprBuilder::MakeFunction("wholestagecodegen", {n_child}, uint32());
@@ -1285,8 +1292,6 @@ TEST(TestArrowComputeWSCG, WSCGTestSemiJoinWithCondition) {
   auto schema_table_1 = arrow::schema({table1_f0, table1_f1});
   auto schema_table = arrow::schema({table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -1397,9 +1402,11 @@ TEST(TestArrowComputeWSCG, WSCGTestExistenceJoin) {
       {TreeExprBuilder::MakeField(table1_f0), TreeExprBuilder::MakeField(f_exist),
        TreeExprBuilder::MakeField(table1_f1)},
       uint32());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
       "conditionedProbeArraysExistence",
-      {n_left, n_right, n_left_key, n_right_key, n_result}, uint32());
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config}, uint32());
   auto n_child = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   //////////////////////////////////////////////////////////////////
   auto n_wscg = TreeExprBuilder::MakeFunction("wholestagecodegen", {n_child}, uint32());
@@ -1410,8 +1417,6 @@ TEST(TestArrowComputeWSCG, WSCGTestExistenceJoin) {
   auto schema_table =
       arrow::schema({table0_f0, table0_f1, table0_f2, table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());
@@ -1537,9 +1542,11 @@ TEST(TestArrowComputeWSCG, WSCGTestSemiJoinWithCoalesce) {
       "result",
       {TreeExprBuilder::MakeField(table1_f0), TreeExprBuilder::MakeField(table1_f1)},
       uint32());
+  auto n_hash_config = TreeExprBuilder::MakeFunction(
+      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_probeArrays = TreeExprBuilder::MakeFunction(
-      "conditionedProbeArraysSemi", {n_left, n_right, n_left_key, n_right_key, n_result},
-      uint32());
+      "conditionedProbeArraysSemi",
+      {n_left, n_right, n_left_key, n_right_key, n_result, n_hash_config}, uint32());
   auto n_child = TreeExprBuilder::MakeFunction("child", {n_probeArrays}, uint32());
   //////////////////////////////////////////////////////////////////
   auto n_wscg = TreeExprBuilder::MakeFunction("wholestagecodegen", {n_child}, uint32());
@@ -1549,8 +1556,6 @@ TEST(TestArrowComputeWSCG, WSCGTestSemiJoinWithCoalesce) {
   auto schema_table_1 = arrow::schema({table1_f0, table1_f1});
   auto schema_table = arrow::schema({table1_f0, table1_f1});
 
-  auto n_hash_config = TreeExprBuilder::MakeFunction(
-      "build_keys_config_node", {TreeExprBuilder::MakeLiteral((int)1)}, uint32());
   auto n_hash_kernel = TreeExprBuilder::MakeFunction(
       "HashRelation", {n_left_key, n_hash_config}, uint32());
   auto n_hash = TreeExprBuilder::MakeFunction("standalone", {n_hash_kernel}, uint32());

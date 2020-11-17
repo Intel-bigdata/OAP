@@ -33,14 +33,6 @@ JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleBatc
 
 /*
  * Class:     org_apache_spark_ml_util_OneDAL__
- * Method:    cSetDoubleIterator
- * Signature: (JLjava/util/Iterator;I)V
- */
-JNIEXPORT void JNICALL Java_org_apache_spark_ml_util_OneDAL_00024_cSetDoubleIterator
-  (JNIEnv *, jobject, jlong, jobject, jint);
-
-/*
- * Class:     org_apache_spark_ml_util_OneDAL__
  * Method:    cFreeDataMemory
  * Signature: (J)V
  */

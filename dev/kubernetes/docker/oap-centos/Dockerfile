@@ -25,7 +25,7 @@ USER root
 #install runtime prerequisites
 RUN git clone https://github.com/Intel-bigdata/OAP oap_source && \
   cd /opt/home/oap_source && \
-  git checkout v0.9.0-spark-3.0.0-rc2 && \
+  git checkout v0.9.0-spark-3.0.0 && \
   sh /opt/home/oap_source/dev/install-runtime-dependencies.sh --with-rdma && \
   rm -rf /opt/home/oap_source
   

@@ -45,9 +45,12 @@ class FiberCacheManager(
   private val EXTERNAL_CACHE = "external"
   private val DEFAULT_CACHE_STRATEGY = GUAVA_CACHE
 
-  private var _dataCacheCompressEnable = sparkEnv.conf.get(
-    OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION) ||
-    sparkEnv.conf.get(OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION_BK)
+  private var _dataCacheCompressEnable =
+    if (sparkEnv.conf.getOption(OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION.key).isDefined) {
+      sparkEnv.conf.get(OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION)
+    } else {
+      sparkEnv.conf.get(OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION_BK)
+    }
   private var _dataCacheCompressionCodec = sparkEnv.conf.get(
     OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_CODEC)
   private val _dataCacheCompressionSize = sparkEnv.conf.get(
@@ -77,13 +80,16 @@ class FiberCacheManager(
 
     val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
     if (cacheName.equals(MIX_CACHE)) {
-      val separateCache = sparkEnv.conf.getBoolean(
-        OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
-        OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get
-      ) || sparkEnv.conf.getBoolean(
-        OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED.key,
-        OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED.defaultValue.get
-      )
+      val separateCache =
+        if (sparkEnv.conf.getOption(OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED.key).isDefined) {
+          sparkEnv.conf.getBoolean(
+            OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED.key,
+            OapConf.OAP_INDEX_DATA_SEPARATION_ENABLED.defaultValue.get)
+        } else {
+          sparkEnv.conf.getBoolean(
+            OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
+            OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get)
+        }
       new MixCache(dataCacheMemorySize, indexCacheMemorySize, dataCacheGuardianMemorySize,
         indexCacheGuardianMemorySize, separateCache, sparkEnv)
     } else {

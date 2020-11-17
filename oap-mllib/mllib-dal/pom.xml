@@ -60,7 +60,7 @@
             <artifactId>daal</artifactId>
             <version>2021.1-beta</version>
             <scope>system</scope>
-            <systemPath>${env.ONEAPI_ROOT}/daal/latest/lib/daal.jar</systemPath>
+            <systemPath>${env.ONEAPI_ROOT}/dal/latest/lib/onedal.jar</systemPath>
         </dependency>
 
         <dependency>
@@ -232,6 +232,14 @@
                             </includes>
                         </resource>
                         <resource>
+                            <!-- For https://github.com/oneapi-src/oneDAL/issues/1254 -->
+                            <directory>${env.TBBROOT}/lib/intel64/gcc4.8</directory>
+                            <includes>
+                                <include>libtbb.so.12.1</include>
+                                <include>libtbbmalloc.so.2.1</include>
+                            </includes>
+                        </resource>
+                        <resource>
                             <directory>${project.build.directory}</directory>
                             <includes>
                                 <include>libMLlibDAL.so</include>
@@ -252,8 +260,22 @@
                             <goal>rename</goal>
                         </goals>
                         <configuration>
-                            <sourceFile>${project.build.testOutputDirectory}/lib/libccl_atl_ofi.so.1</sourceFile>
-                            <destinationFile>${project.build.testOutputDirectory}/lib/libccl_atl_ofi.so</destinationFile>
+                            <fileSets>
+                                <!-- oneDAL Java API doesn't load correct libtbb version for oneAPI Beta 10,
+                                rename to workaround. See https://github.com/oneapi-src/oneDAL/issues/1254 -->
+                                <fileSet>
+                                    <sourceFile>${project.build.testOutputDirectory}/lib/libtbb.so.12.1</sourceFile>
+                                    <destinationFile>${project.build.testOutputDirectory}/lib/libtbb.so.2</destinationFile>
+                                </fileSet>
+                                <fileSet>
+                                    <sourceFile>${project.build.testOutputDirectory}/lib/libtbbmalloc.so.2.1</sourceFile>
+                                    <destinationFile>${project.build.testOutputDirectory}/lib/libtbbmalloc.so.2</destinationFile>
+                                </fileSet>
+                                <fileSet>
+                                    <sourceFile>${project.build.testOutputDirectory}/lib/libccl_atl_ofi.so.1</sourceFile>
+                                    <destinationFile>${project.build.testOutputDirectory}/lib/libccl_atl_ofi.so</destinationFile>
+                                </fileSet>
+                            </fileSets>
                         </configuration>
                     </execution>
                 </executions>

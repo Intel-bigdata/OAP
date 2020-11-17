@@ -36,7 +36,7 @@ import org.apache.spark.sql.catalyst.expressions.{
 import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.physical._
-import org.apache.spark.sql.execution.{UnaryExecNode, BinaryExecNode, CodegenSupport, SparkPlan}
+import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 
 import scala.collection.JavaConverters._
@@ -75,8 +75,11 @@ case class DataToArrowColumnarExec(child: SparkPlan, numPartitions: Int) extends
   override def doExecute(): RDD[InternalRow] = {
     val numOutputRows = longMetric("numOutputRows")
     val numOutputBatches = longMetric("numOutputBatches")
-    val inputByteBuf = child.executeBroadcast[Array[Array[Byte]]]()
-    val inputRdd = BroadcastColumnarRDD(sparkContext, metrics, numPartitions, inputByteBuf)
+    val inputRdd = BroadcastColumnarRDD(
+      sparkContext,
+      metrics,
+      numPartitions,
+      child.executeBroadcast[ColumnarHashedRelation]())
     inputRdd.mapPartitions { batches =>
       val toUnsafe = UnsafeProjection.create(output, output)
       batches.flatMap { batch =>
@@ -101,8 +104,11 @@ case class DataToArrowColumnarExec(child: SparkPlan, numPartitions: Int) extends
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
     val numOutputBatches = longMetric("numOutputBatches")
-    val inputByteBuf = child.executeBroadcast[Array[Array[Byte]]]()
-    BroadcastColumnarRDD(sparkContext, metrics, numPartitions, inputByteBuf)
+    BroadcastColumnarRDD(
+      sparkContext,
+      metrics,
+      numPartitions,
+      child.executeBroadcast[ColumnarHashedRelation]())
   }
 
   override def canEqual(other: Any): Boolean = other.isInstanceOf[DataToArrowColumnarExec]

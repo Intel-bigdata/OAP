@@ -67,10 +67,10 @@ ENV SPARK_VERSION                   ${SPARK_VERSION}
 ENV SPARK_HOME          /opt/home/spark-${SPARK_VERSION}
 
 #spark download
-RUN wget https://github.com/Intel-bigdata/spark/releases/download/v${SPARK_VERSION}-intel-oap-0.9.0/spark-${SPARK_VERSION}-bin-hadoop2.7-intel-oap-0.9.0.tgz && \
-    tar -zxvf spark-${SPARK_VERSION}-bin-hadoop2.7-intel-oap-0.9.0.tgz && \
-    mv spark-${SPARK_VERSION}-bin-hadoop2.7-intel-oap-0.9.0 spark-${SPARK_VERSION} && \
-    rm spark-${SPARK_VERSION}-bin-hadoop2.7-intel-oap-0.9.0.tgz
+RUN wget https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop2.7.tgz && \
+    tar -zxvf spark-${SPARK_VERSION}-bin-hadoop2.7.tgz && \
+    mv spark-${SPARK_VERSION}-bin-hadoop2.7 spark-${SPARK_VERSION} && \
+    rm spark-${SPARK_VERSION}-bin-hadoop2.7.tgz
 
 #run
 ARG spark_uid=185

@@ -21,6 +21,7 @@
 #include <arrow/io/memory.h>
 #include <arrow/ipc/api.h>
 #include <arrow/ipc/dictionary.h>
+#include <arrow/memory_pool.h>
 #include <arrow/pretty_print.h>
 #include <arrow/record_batch.h>
 #include <arrow/util/compression.h>
@@ -52,8 +53,16 @@ static jmethodID arrow_field_node_builder_constructor;
 static jclass arrowbuf_builder_class;
 static jmethodID arrowbuf_builder_constructor;
 
+static jclass serializable_obj_builder_class;
+static jmethodID serializable_obj_builder_constructor;
+
 static jclass split_result_class;
 static jmethodID split_result_constructor;
+
+static jclass native_memory_reservation_class;
+static jclass native_direct_memory_reservation_class;
+static jmethodID reserve_memory_method;
+static jmethodID unreserve_memory_method;
 
 using arrow::jni::ConcurrentMap;
 static ConcurrentMap<std::shared_ptr<arrow::Buffer>> buffer_holder_;
@@ -70,6 +79,9 @@ using sparkcolumnarplugin::shuffle::Splitter;
 static arrow::jni::ConcurrentMap<std::shared_ptr<Splitter>> shuffle_splitter_holder_;
 static arrow::jni::ConcurrentMap<std::shared_ptr<arrow::Schema>>
     decompression_schema_holder_;
+static arrow::jni::ConcurrentMap<arrow::MemoryPool*> memory_pool_holder;
+
+static int64_t default_memory_pool_id;
 
 std::shared_ptr<CodeGenerator> GetCodeGenerator(JNIEnv* env, jlong id) {
   auto handler = handler_holder_.Lookup(id);
@@ -169,6 +181,49 @@ std::shared_ptr<ParquetFileWriter> GetFileWriter(JNIEnv* env, jlong id) {
 extern "C" {
 #endif
 
+
+class ReserveMemory : public arrow::ReservationListener {
+ public:
+  ReserveMemory(JavaVM* vm, jobject memory_reservation)
+      : vm_(vm), memory_reservation_(memory_reservation) {}
+
+  arrow::Status OnReservation(int64_t size) override {
+    JNIEnv* env;
+    if (vm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK) {
+      return arrow::Status::Invalid("JNIEnv was not attached to current thread");
+    }
+    env->CallObjectMethod(memory_reservation_, reserve_memory_method, size);
+    if (env->ExceptionCheck()) {
+      env->ExceptionDescribe();
+      env->ExceptionClear();
+      return arrow::Status::Invalid("Memory reservation failed in Java");
+    }
+    return arrow::Status::OK();
+  }
+
+  arrow::Status OnRelease(int64_t size) override {
+    JNIEnv* env;
+    if (vm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK) {
+      return arrow::Status::Invalid("JNIEnv was not attached to current thread");
+    }
+    env->CallObjectMethod(memory_reservation_, unreserve_memory_method, size);
+    if (env->ExceptionCheck()) {
+      env->ExceptionDescribe();
+      env->ExceptionClear();
+      return arrow::Status::Invalid("Memory unreservation failed in Java");
+    }
+    return arrow::Status::OK();
+  }
+
+  jobject GetMemoryReservation() {
+    return memory_reservation_;
+  }
+
+ private:
+  JavaVM* vm_;
+  jobject memory_reservation_;
+};
+
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNIEnv* env;
   if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK) {
@@ -200,9 +255,31 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   arrowbuf_builder_constructor =
       GetMethodID(env, arrowbuf_builder_class, "<init>", "(JJIJ)V");
 
+  serializable_obj_builder_class = CreateGlobalClassReference(
+      env, "Lcom/intel/oap/vectorized/NativeSerializableObject;");
+  serializable_obj_builder_constructor =
+      GetMethodID(env, serializable_obj_builder_class, "<init>", "([J[I)V");
+
   split_result_class =
       CreateGlobalClassReference(env, "Lcom/intel/oap/vectorized/SplitResult;");
   split_result_constructor = GetMethodID(env, split_result_class, "<init>", "(JJJJJ[J)V");
+
+
+  native_memory_reservation_class =
+      CreateGlobalClassReference(env,
+                                 "Lorg/apache/arrow/"
+                                 "memory/ReservationListener;");
+  native_direct_memory_reservation_class =
+      CreateGlobalClassReference(env,
+                                 "Lorg/apache/arrow/"
+                                 "memory/DirectReservationListener;");
+
+  reserve_memory_method =
+      GetMethodID(env, native_memory_reservation_class, "reserve", "(J)V");
+  unreserve_memory_method =
+      GetMethodID(env, native_memory_reservation_class, "unreserve", "(J)V");
+
+  default_memory_pool_id = memory_pool_holder.Insert(arrow::default_memory_pool());
 
   return JNI_VERSION;
 }
@@ -220,13 +297,57 @@ void JNI_OnUnload(JavaVM* vm, void* reserved) {
   env->DeleteGlobalRef(arrow_field_node_builder_class);
   env->DeleteGlobalRef(arrowbuf_builder_class);
   env->DeleteGlobalRef(arrow_record_batch_builder_class);
+  env->DeleteGlobalRef(serializable_obj_builder_class);
   env->DeleteGlobalRef(split_result_class);
+
+  env->DeleteGlobalRef(native_memory_reservation_class);
+  env->DeleteGlobalRef(native_direct_memory_reservation_class);
 
   buffer_holder_.Clear();
   handler_holder_.Clear();
   batch_iterator_holder_.Clear();
   shuffle_splitter_holder_.Clear();
   decompression_schema_holder_.Clear();
+  memory_pool_holder.Clear();
+
+  default_memory_pool_id = -1L;
+}
+
+JNIEXPORT jlong JNICALL Java_com_intel_oap_vectorized_ExpressionMemoryPool_getDefaultMemoryPool
+    (JNIEnv *, jclass) {
+  return default_memory_pool_id;
+}
+
+JNIEXPORT jlong JNICALL Java_com_intel_oap_vectorized_ExpressionMemoryPool_createListenableMemoryPool
+    (JNIEnv* env, jclass, jobject jlistener) {
+  jobject jlistener_ref = env->NewGlobalRef(jlistener);
+  JavaVM* vm;
+  if (env->GetJavaVM(&vm) != JNI_OK) {
+    env->ThrowNew(illegal_access_exception_class, "Unable to get JavaVM instance");
+    return -1;
+  }
+  std::shared_ptr<arrow::ReservationListener> listener =
+      std::make_shared<ReserveMemory>(vm, jlistener_ref);
+  auto memory_pool =
+      new arrow::ReservationListenableMemoryPool(arrow::default_memory_pool(), listener);
+  return memory_pool_holder.Insert(memory_pool);
+}
+
+JNIEXPORT void JNICALL Java_com_intel_oap_vectorized_ExpressionMemoryPool_releaseMemoryPool
+    (JNIEnv* env, jclass, jlong memory_pool_id) {
+  arrow::ReservationListenableMemoryPool* pool =
+      dynamic_cast<arrow::ReservationListenableMemoryPool*>(
+          memory_pool_holder.Lookup(memory_pool_id));
+  if (pool == nullptr) {
+    return;
+  }
+  std::shared_ptr<ReserveMemory> rm =
+      std::dynamic_pointer_cast<ReserveMemory>(pool->get_listener());
+  if (rm == nullptr) {
+    return;
+  }
+  env->DeleteGlobalRef(rm->GetMemoryReservation());
+  memory_pool_holder.Erase(memory_pool_id);
 }
 
 JNIEXPORT void JNICALL
@@ -625,6 +746,57 @@ JNIEXPORT jobject JNICALL Java_com_intel_oap_vectorized_BatchIterator_nativeNext
   return MakeRecordBatchBuilder(env, out->schema(), out);
 }
 
+JNIEXPORT jobject JNICALL
+Java_com_intel_oap_vectorized_BatchIterator_nativeNextHashRelation(JNIEnv* env,
+                                                                   jobject obj,
+                                                                   jlong id) {
+  arrow::Status status;
+  auto iter = GetBatchIterator<HashRelation>(env, id);
+  std::shared_ptr<HashRelation> out;
+  status = iter->Next(&out);
+  if (!status.ok()) {
+    std::string error_message =
+        "nativeNext: get Next() failed with error msg " + status.ToString();
+    env->ThrowNew(io_exception_class, error_message.c_str());
+  }
+
+  int src_sizes[3];
+  long src_addrs[3];
+  status = out->UnsafeGetHashTableObject(src_addrs, src_sizes);
+  if (!status.ok()) {
+    auto memory_addrs = env->NewLongArray(0);
+    auto sizes = env->NewIntArray(0);
+    return env->NewObject(serializable_obj_builder_class,
+                          serializable_obj_builder_constructor, memory_addrs, sizes);
+  }
+  auto memory_addrs = env->NewLongArray(3);
+  auto sizes = env->NewIntArray(3);
+  env->SetLongArrayRegion(memory_addrs, 0, 3, src_addrs);
+  env->SetIntArrayRegion(sizes, 0, 3, src_sizes);
+  return env->NewObject(serializable_obj_builder_class,
+                        serializable_obj_builder_constructor, memory_addrs, sizes);
+}
+
+JNIEXPORT void JNICALL Java_com_intel_oap_vectorized_BatchIterator_nativeSetHashRelation(
+    JNIEnv* env, jobject obj, jlong id, jlongArray memory_addrs, jintArray sizes) {
+  arrow::Status status;
+  auto iter = GetBatchIterator<HashRelation>(env, id);
+  std::shared_ptr<HashRelation> out;
+  status = iter->Next(&out);
+  if (!status.ok()) {
+    std::string error_message =
+        "nativeSetHashRelation: get Next() failed with error msg " + status.ToString();
+    env->ThrowNew(io_exception_class, error_message.c_str());
+  }
+
+  int in_len = env->GetArrayLength(memory_addrs);
+  jlong* in_addrs = env->GetLongArrayElements(memory_addrs, 0);
+  jint* in_sizes = env->GetIntArrayElements(sizes, 0);
+  out->UnsafeSetHashTableObject(in_len, in_addrs, in_sizes);
+  env->ReleaseLongArrayElements(memory_addrs, in_addrs, JNI_ABORT);
+  env->ReleaseIntArrayElements(sizes, in_sizes, JNI_ABORT);
+}
+
 JNIEXPORT jobject JNICALL Java_com_intel_oap_vectorized_BatchIterator_nativeProcess(
     JNIEnv* env, jobject obj, jlong id, jbyteArray schema_arr, jint num_rows,
     jlongArray buf_addrs, jlongArray buf_sizes) {
@@ -757,7 +929,7 @@ Java_com_intel_oap_vectorized_BatchIterator_nativeProcessAndCacheOne(
     in.push_back(batch->column(i));
   }
 
-  auto iter = GetBatchIterator<arrow::RecordBatch>(env, id);
+  auto iter = GetBatchIterator(env, id);
   status = iter->ProcessAndCacheOne(in);
 
   if (!status.ok()) {

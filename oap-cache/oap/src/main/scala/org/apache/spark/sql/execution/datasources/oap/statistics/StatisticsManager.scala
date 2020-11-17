@@ -56,11 +56,14 @@ class StatisticsWriteManager {
   // When a task initialize statisticsWriteManager, we read all config from `conf`,
   // which is created from `SparkUtils`, hence containing all spark config values.
   def initialize(indexType: OapIndexType, s: StructType, conf: Configuration): Unit = {
-    _isExternalSorterEnable = conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLED.key,
-      OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLED.defaultValue.get) &&
-      conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.key,
-      OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.defaultValue.get) &&
-        indexType.toString.equals(BTreeIndexType.toString)
+    _isExternalSorterEnable =
+      (if (conf.get(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLED.key) != null) {
+        conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLED.key,
+          OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLED.defaultValue.get)
+      } else {
+        conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.key,
+          OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.defaultValue.get)
+      }) && indexType.toString.equals(BTreeIndexType.toString)
 
     val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter { statType =>
       val typeFromConfig = conf.get(OapConf.OAP_STATISTICS_TYPES.key,

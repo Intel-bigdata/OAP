@@ -24,6 +24,11 @@ class ResultIteratorBase {
  public:
   virtual bool HasNext() { return false; }
   virtual std::string ToString() { return ""; }
+  virtual arrow::Status ProcessAndCacheOne(
+      const std::vector<std::shared_ptr<arrow::Array>>& in,
+      const std::shared_ptr<arrow::Array>& selection = nullptr) {
+    return arrow::Status::NotImplemented("ResultIterator abstract ProcessAndCacheOne()");
+  }
 };
 
 template <typename T>
@@ -43,11 +48,6 @@ class ResultIterator : public ResultIteratorBase {
       const std::vector<std::shared_ptr<arrow::Array>>& projected_in,
       std::shared_ptr<T>* out, const std::shared_ptr<arrow::Array>& selection = nullptr) {
     return arrow::Status::NotImplemented("ResultIterator abstract Process()");
-  }
-  virtual arrow::Status ProcessAndCacheOne(
-      const std::vector<std::shared_ptr<arrow::Array>>& in,
-      const std::shared_ptr<arrow::Array>& selection = nullptr) {
-    return arrow::Status::NotImplemented("ResultIterator abstract ProcessAndCacheOne()");
   }
   virtual arrow::Status SetDependencies(
       const std::vector<std::shared_ptr<ResultIteratorBase>>&) {

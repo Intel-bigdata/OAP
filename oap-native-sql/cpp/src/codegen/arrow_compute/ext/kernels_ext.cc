@@ -25,11 +25,11 @@
 #include <arrow/compute/kernel.h>
 #include <arrow/compute/kernels/count.h>
 #include <arrow/compute/kernels/hash.h>
+#include <arrow/compute/kernels/mean.h>
 #include <arrow/compute/kernels/minmax.h>
 #include <arrow/compute/kernels/sum.h>
-#include <arrow/compute/kernels/mean.h>
-#include <arrow/scalar.h>
 #include <arrow/pretty_print.h>
+#include <arrow/scalar.h>
 #include <arrow/status.h>
 #include <arrow/type.h>
 #include <arrow/type_fwd.h>
@@ -104,7 +104,8 @@ class SplitArrayListWithActionKernel::Impl {
                  0) {
         int arg = std::stoi(action_name_list_[action_id].substr(20));
         RETURN_NOT_OK(MakeCountLiteralAction(ctx_, arg, &action));
-      } else if (action_name_list_[action_id].compare("action_stddev_samp_partial") == 0) {
+      } else if (action_name_list_[action_id].compare("action_stddev_samp_partial") ==
+                 0) {
         RETURN_NOT_OK(MakeStddevSampPartialAction(ctx_, type_list[type_id], &action));
       } else if (action_name_list_[action_id].compare("action_stddev_samp_final") == 0) {
         RETURN_NOT_OK(MakeStddevSampFinalAction(ctx_, type_list[type_id], &action));
@@ -811,18 +812,18 @@ class StddevSampPartialArrayKernel::Impl {
   virtual ~Impl() {}
 
   template <typename ValueType>
-  arrow::Status getM2(arrow::compute::FunctionContext* ctx, const arrow::compute::Datum& value,
-  const arrow::compute::Datum& mean, arrow::compute::Datum* out) {
+  arrow::Status getM2(arrow::compute::FunctionContext* ctx,
+                      const arrow::compute::Datum& value,
+                      const arrow::compute::Datum& mean, arrow::compute::Datum* out) {
     using MeanCType = typename arrow::TypeTraits<arrow::DoubleType>::CType;
     using MeanScalarType = typename arrow::TypeTraits<arrow::DoubleType>::ScalarType;
     using ValueCType = typename arrow::TypeTraits<ValueType>::CType;
     std::shared_ptr<arrow::Scalar> mean_scalar = mean.scalar();
-    auto mean_typed_scalar =
-            std::dynamic_pointer_cast<MeanScalarType>(mean_scalar);
+    auto mean_typed_scalar = std::dynamic_pointer_cast<MeanScalarType>(mean_scalar);
     double mean_res = mean_typed_scalar->value * 1.0;
     double m2_res = 0;
 
-    if(!value.is_array()) {
+    if (!value.is_array()) {
       return arrow::Status::Invalid("AggregateKernel expects Array");
     }
     auto array = value.make_array();
@@ -839,7 +840,7 @@ class StddevSampPartialArrayKernel::Impl {
   }
 
   arrow::Status M2(arrow::compute::FunctionContext* ctx, const arrow::Array& array,
-  const arrow::compute::Datum& mean, arrow::compute::Datum* out) {
+                   const arrow::compute::Datum& mean, arrow::compute::Datum* out) {
     arrow::compute::Datum value = array.data();
     auto data_type = value.type();
 
@@ -848,12 +849,12 @@ class StddevSampPartialArrayKernel::Impl {
     else if (!is_integer(data_type->id()) && !is_floating(data_type->id()))
       return arrow::Status::Invalid("Datum must contain a NumericType");
     switch (data_type_->id()) {
-      #define PROCESS(DataType)                         \
-        case DataType::type_id: {                       \
-          RETURN_NOT_OK(getM2<DataType>(ctx, value, mean, out)); \
-        } break;
-            PROCESS_SUPPORTED_TYPES(PROCESS)
-      #undef PROCESS
+#define PROCESS(DataType)                                  \
+  case DataType::type_id: {                                \
+    RETURN_NOT_OK(getM2<DataType>(ctx, value, mean, out)); \
+  } break;
+      PROCESS_SUPPORTED_TYPES(PROCESS)
+#undef PROCESS
     }
     return arrow::Status::OK();
   }
@@ -927,10 +928,10 @@ class StddevSampPartialArrayKernel::Impl {
         double delta = mean_typed_scalar->value - pre_avg;
         double newN = (cnt_res + cnt_typed_scalar->value) * 1.0;
         double deltaN = newN > 0 ? delta / newN : 0.0;
-        m2_res += m2_typed_scalar->value +
-          delta * deltaN * cnt_res * cnt_typed_scalar->value;
+        m2_res +=
+            m2_typed_scalar->value + delta * deltaN * cnt_res * cnt_typed_scalar->value;
         sum_res += sum_typed_scalar->value;
-        cnt_res += cnt_typed_scalar->value  * 1.0;
+        cnt_res += cnt_typed_scalar->value * 1.0;
       }
     }
     double avg = 0;
@@ -974,15 +975,15 @@ class StddevSampPartialArrayKernel::Impl {
   std::vector<std::shared_ptr<arrow::Scalar>> m2_scalar_list_;
 };
 
-arrow::Status StddevSampPartialArrayKernel::Make(arrow::compute::FunctionContext* ctx,
-                                        std::shared_ptr<arrow::DataType> data_type,
-                                        std::shared_ptr<KernalBase>* out) {
+arrow::Status StddevSampPartialArrayKernel::Make(
+    arrow::compute::FunctionContext* ctx, std::shared_ptr<arrow::DataType> data_type,
+    std::shared_ptr<KernalBase>* out) {
   *out = std::make_shared<StddevSampPartialArrayKernel>(ctx, data_type);
   return arrow::Status::OK();
 }
 
-StddevSampPartialArrayKernel::StddevSampPartialArrayKernel(arrow::compute::FunctionContext* ctx,
-                                         std::shared_ptr<arrow::DataType> data_type) {
+StddevSampPartialArrayKernel::StddevSampPartialArrayKernel(
+    arrow::compute::FunctionContext* ctx, std::shared_ptr<arrow::DataType> data_type) {
   impl_.reset(new Impl(ctx, data_type));
   kernel_name_ = "StddevSampPartialArrayKernel";
 }
@@ -991,7 +992,9 @@ arrow::Status StddevSampPartialArrayKernel::Evaluate(const ArrayList& in) {
   return impl_->Evaluate(in);
 }
 
-arrow::Status StddevSampPartialArrayKernel::Finish(ArrayList* out) { return impl_->Finish(out); }
+arrow::Status StddevSampPartialArrayKernel::Finish(ArrayList* out) {
+  return impl_->Finish(out);
+}
 
 ///////////////  StddevSampFinalArray  ////////////////
 class StddevSampFinalArrayKernel::Impl {
@@ -1000,14 +1003,16 @@ class StddevSampFinalArrayKernel::Impl {
       : ctx_(ctx), data_type_(data_type) {}
   virtual ~Impl() {}
 
-  arrow::Status getAvgM2(arrow::compute::FunctionContext* ctx, const arrow::compute::Datum& cnt_value,
-  const arrow::compute::Datum& avg_value, const arrow::compute::Datum& m2_value,
-  arrow::compute::Datum* avg_out, arrow::compute::Datum* m2_out) {
+  arrow::Status getAvgM2(arrow::compute::FunctionContext* ctx,
+                         const arrow::compute::Datum& cnt_value,
+                         const arrow::compute::Datum& avg_value,
+                         const arrow::compute::Datum& m2_value,
+                         arrow::compute::Datum* avg_out, arrow::compute::Datum* m2_out) {
     using MeanCType = typename arrow::TypeTraits<arrow::DoubleType>::CType;
     using MeanScalarType = typename arrow::TypeTraits<arrow::DoubleType>::ScalarType;
     using ValueCType = typename arrow::TypeTraits<arrow::DoubleType>::CType;
 
-    if(!(cnt_value.is_array() && avg_value.is_array() && m2_value.is_array())) {
+    if (!(cnt_value.is_array() && avg_value.is_array() && m2_value.is_array())) {
       return arrow::Status::Invalid("AggregateKernel expects Array datum");
     }
 
@@ -1048,9 +1053,10 @@ class StddevSampFinalArrayKernel::Impl {
     return arrow::Status::OK();
   }
 
-  arrow::Status updateValue(arrow::compute::FunctionContext* ctx, const arrow::Array& cnt_array,
-  const arrow::Array& avg_array, const arrow::Array& m2_array, arrow::compute::Datum* avg_out,
-  arrow::compute::Datum* m2_out) {
+  arrow::Status updateValue(arrow::compute::FunctionContext* ctx,
+                            const arrow::Array& cnt_array, const arrow::Array& avg_array,
+                            const arrow::Array& m2_array, arrow::compute::Datum* avg_out,
+                            arrow::compute::Datum* m2_out) {
     arrow::compute::Datum cnt_value = cnt_array.data();
     arrow::compute::Datum avg_value = avg_array.data();
     arrow::compute::Datum m2_value = m2_array.data();
@@ -1068,7 +1074,8 @@ class StddevSampFinalArrayKernel::Impl {
     arrow::compute::Datum avg_out;
     arrow::compute::Datum m2_out;
     RETURN_NOT_OK(arrow::compute::Sum(ctx_, *in[0].get(), &cnt_out));
-    RETURN_NOT_OK(updateValue(ctx_, *in[0].get(), *in[1].get(), *in[2].get(), &avg_out, &m2_out));
+    RETURN_NOT_OK(
+        updateValue(ctx_, *in[0].get(), *in[1].get(), *in[2].get(), &avg_out, &m2_out));
     cnt_scalar_list_.push_back(cnt_out.scalar());
     avg_scalar_list_.push_back(avg_out.scalar());
     m2_scalar_list_.push_back(m2_out.scalar());
@@ -1100,7 +1107,8 @@ class StddevSampFinalArrayKernel::Impl {
           double newN = cnt_res + cnt_typed_scalar->value;
           double deltaN = newN > 0 ? delta / newN : 0;
           avg_res += deltaN * cnt_typed_scalar->value;
-          m2_res += (m2_typed_scalar->value + delta * deltaN * cnt_res * cnt_typed_scalar->value);
+          m2_res += (m2_typed_scalar->value +
+                     delta * deltaN * cnt_res * cnt_typed_scalar->value);
           cnt_res += cnt_typed_scalar->value;
         }
       }
@@ -1109,7 +1117,7 @@ class StddevSampFinalArrayKernel::Impl {
     std::shared_ptr<arrow::Array> stddev_samp_out;
     std::shared_ptr<arrow::Scalar> stddev_samp_scalar_out;
     if (cnt_res - 1 < 0.00001) {
-      //double stddev_samp = std::numeric_limits<double>::quiet_NaN();
+      // double stddev_samp = std::numeric_limits<double>::quiet_NaN();
       double stddev_samp = std::numeric_limits<double>::infinity();
       stddev_samp_scalar_out = arrow::MakeScalar(stddev_samp);
     } else if (cnt_res < 0.00001) {
@@ -1118,7 +1126,8 @@ class StddevSampFinalArrayKernel::Impl {
       double stddev_samp = sqrt(m2_res / (cnt_res > 1 ? (cnt_res - 1) : 1));
       stddev_samp_scalar_out = arrow::MakeScalar(stddev_samp);
     }
-    RETURN_NOT_OK(arrow::MakeArrayFromScalar(*stddev_samp_scalar_out.get(), 1, &stddev_samp_out));
+    RETURN_NOT_OK(
+        arrow::MakeArrayFromScalar(*stddev_samp_scalar_out.get(), 1, &stddev_samp_out));
     out->push_back(stddev_samp_out);
 
     return arrow::Status::OK();
@@ -1134,14 +1143,14 @@ class StddevSampFinalArrayKernel::Impl {
 };
 
 arrow::Status StddevSampFinalArrayKernel::Make(arrow::compute::FunctionContext* ctx,
-                                        std::shared_ptr<arrow::DataType> data_type,
-                                        std::shared_ptr<KernalBase>* out) {
+                                               std::shared_ptr<arrow::DataType> data_type,
+                                               std::shared_ptr<KernalBase>* out) {
   *out = std::make_shared<StddevSampFinalArrayKernel>(ctx, data_type);
   return arrow::Status::OK();
 }
 
-StddevSampFinalArrayKernel::StddevSampFinalArrayKernel(arrow::compute::FunctionContext* ctx,
-                                         std::shared_ptr<arrow::DataType> data_type) {
+StddevSampFinalArrayKernel::StddevSampFinalArrayKernel(
+    arrow::compute::FunctionContext* ctx, std::shared_ptr<arrow::DataType> data_type) {
   impl_.reset(new Impl(ctx, data_type));
   kernel_name_ = "StddevSampFinalArrayKernel";
 }
@@ -1150,7 +1159,9 @@ arrow::Status StddevSampFinalArrayKernel::Evaluate(const ArrayList& in) {
   return impl_->Evaluate(in);
 }
 
-arrow::Status StddevSampFinalArrayKernel::Finish(ArrayList* out) { return impl_->Finish(out); }
+arrow::Status StddevSampFinalArrayKernel::Finish(ArrayList* out) {
+  return impl_->Finish(out);
+}
 
 #undef PROCESS_SUPPORTED_TYPES
 
@@ -1343,6 +1354,135 @@ HashArrayKernel::HashArrayKernel(
 arrow::Status HashArrayKernel::Evaluate(const ArrayList& in,
                                         std::shared_ptr<arrow::Array>* out) {
   return impl_->Evaluate(in, out);
+}
+
+///////////////  ConcatArrayList  ////////////////
+class ConcatArrayListKernel::Impl {
+ public:
+  Impl(arrow::compute::FunctionContext* ctx,
+       const std::vector<std::shared_ptr<arrow::Field>>& input_field_list,
+       std::shared_ptr<gandiva::Node> root_node,
+       const std::vector<std::shared_ptr<arrow::Field>>& output_field_list)
+      : ctx_(ctx) {}
+  virtual ~Impl() {}
+  arrow::Status Evaluate(const ArrayList& in) {
+    if (cached_.size() == 0) {
+      for (int i = 0; i < in.size(); i++) {
+        cached_.push_back({in[i]});
+      }
+    } else {
+      for (int i = 0; i < in.size(); i++) {
+        cached_[i].push_back(in[i]);
+      }
+    }
+    total_num_row_ += in[0]->length();
+    total_num_batch_ += 1;
+    return arrow::Status::OK();
+  }
+
+  arrow::Status MakeResultIterator(
+      std::shared_ptr<arrow::Schema> schema,
+      std::shared_ptr<ResultIterator<arrow::RecordBatch>>* out) {
+    *out = std::make_shared<ConcatArrayListResultIterator>(ctx_, schema, cached_);
+    return arrow::Status::OK();
+  }
+
+ private:
+  arrow::compute::FunctionContext* ctx_;
+  std::vector<arrow::ArrayVector> cached_;
+  int total_num_row_ = 0;
+  int total_num_batch_ = 0;
+  class ConcatArrayListResultIterator : public ResultIterator<arrow::RecordBatch> {
+   public:
+    ConcatArrayListResultIterator(arrow::compute::FunctionContext* ctx,
+                                  std::shared_ptr<arrow::Schema> result_schema,
+                                  const std::vector<arrow::ArrayVector>& cached)
+        : ctx_(ctx), result_schema_(result_schema), cached_(cached) {
+      batch_size_ = GetBatchSize();
+      if (cached.size() > 0) {
+        cached_num_batches_ = cached[0].size();
+      }
+    }
+
+    std::string ToString() override { return "ConcatArrayListResultIterator"; }
+
+    bool HasNext() override {
+      if (cached_.size() == 0 || cur_batch_idx_ >= cached_num_batches_) {
+        return false;
+      }
+      return true;
+    }
+
+    arrow::Status Next(std::shared_ptr<arrow::RecordBatch>* out) {
+      if (cached_.size() == 0 || cur_batch_idx_ >= cached_num_batches_) {
+        return arrow::Status::OK();
+      }
+      // check array length
+      int tmp_len = 0;
+      int end_arr_idx = cur_batch_idx_;
+      for (int i = cur_batch_idx_; i < cached_num_batches_; i++) {
+        auto arr = cached_[0][i];
+        tmp_len += arr->length();
+        end_arr_idx++;
+        if (tmp_len > 20480) {
+          break;
+        }
+      }
+      arrow::ArrayVector concatenated_array_list;
+      for (auto arr_list : cached_) {
+        std::shared_ptr<arrow::Array> concatenated_array;
+        arrow::ArrayVector to_be_concat_arr(arr_list.begin() + cur_batch_idx_,
+                                            arr_list.begin() + end_arr_idx);
+
+        RETURN_NOT_OK(arrow::Concatenate(to_be_concat_arr, ctx_->memory_pool(),
+                                         &concatenated_array));
+        concatenated_array_list.push_back(concatenated_array);
+      }
+      int length = concatenated_array_list[0]->length();
+
+      *out = arrow::RecordBatch::Make(result_schema_, length, concatenated_array_list);
+      cur_batch_idx_ = end_arr_idx;
+      return arrow::Status::OK();
+    }
+
+   private:
+    arrow::compute::FunctionContext* ctx_;
+    std::vector<arrow::ArrayVector> cached_;
+    std::shared_ptr<arrow::Schema> result_schema_;
+    int batch_size_;
+    int cached_num_batches_ = 0;
+    int cur_batch_idx_ = 0;
+  };
+};
+
+arrow::Status ConcatArrayListKernel::Make(
+    arrow::compute::FunctionContext* ctx,
+    const std::vector<std::shared_ptr<arrow::Field>>& input_field_list,
+    std::shared_ptr<gandiva::Node> root_node,
+    const std::vector<std::shared_ptr<arrow::Field>>& output_field_list,
+    std::shared_ptr<KernalBase>* out) {
+  *out = std::make_shared<ConcatArrayListKernel>(ctx, input_field_list, root_node,
+                                                 output_field_list);
+  return arrow::Status::OK();
+}
+
+ConcatArrayListKernel::ConcatArrayListKernel(
+    arrow::compute::FunctionContext* ctx,
+    const std::vector<std::shared_ptr<arrow::Field>>& input_field_list,
+    std::shared_ptr<gandiva::Node> root_node,
+    const std::vector<std::shared_ptr<arrow::Field>>& output_field_list) {
+  impl_.reset(new Impl(ctx, input_field_list, root_node, output_field_list));
+  kernel_name_ = "ConcatArrayListKernel";
+}
+
+arrow::Status ConcatArrayListKernel::Evaluate(const ArrayList& in) {
+  return impl_->Evaluate(in);
+}
+
+arrow::Status ConcatArrayListKernel::MakeResultIterator(
+    std::shared_ptr<arrow::Schema> schema,
+    std::shared_ptr<ResultIterator<arrow::RecordBatch>>* out) {
+  return impl_->MakeResultIterator(schema, out);
 }
 
 }  // namespace extra

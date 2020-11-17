@@ -60,7 +60,7 @@ public class ParquetReadTest {
     allocator.close();
   }
 
-  @Test
+  //@Test
   public void testParquetRead() throws Exception {
     File testFile = testFolder.newFile("_tmpfile_ParquetReadTest");
     // String path = testFile.getAbsolutePath();

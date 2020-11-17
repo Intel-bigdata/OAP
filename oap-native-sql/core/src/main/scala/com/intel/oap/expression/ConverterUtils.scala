@@ -58,6 +58,7 @@ import scala.collection.mutable.ListBuffer
 import io.netty.buffer.{ByteBuf, ByteBufAllocator, ByteBufOutputStream}
 import java.nio.channels.{Channels, WritableByteChannel}
 import com.google.common.collect.Lists
+import java.io.{InputStream, OutputStream}
 
 object ConverterUtils extends Logging {
   def createArrowRecordBatch(columnarBatch: ColumnarBatch): ArrowRecordBatch = {
@@ -109,9 +110,7 @@ object ConverterUtils extends Logging {
     vector.getChildrenFromFields.asScala.foreach(child => appendNodes(child, nodes, buffers))
   }
 
-  def convertToNetty(iter: Array[ColumnarBatch]): Array[Byte] = {
-    val innerBuf = ByteBufAllocator.DEFAULT.buffer()
-    val out = new ByteBufOutputStream(innerBuf)
+  def convertToNetty(iter: Array[ColumnarBatch], out: OutputStream): Unit = {
     val channel = new WriteChannel(Channels.newChannel(out))
     var schema: Schema = null
     val option = new IpcOption
@@ -130,12 +129,83 @@ object ConverterUtils extends Logging {
           .createArrowRecordBatch(columnarBatch.numRows, vectors.map(_.getValueVector)),
         option)
     }
-    val buf = out.buffer
-    val bytes = new Array[Byte](buf.readableBytes);
-    buf.getBytes(buf.readerIndex, bytes);
+  }
+
+  def convertToNetty(iter: Array[ColumnarBatch]): Array[Byte] = {
+    val innerBuf = ByteBufAllocator.DEFAULT.buffer()
+    val outStream = new ByteBufOutputStream(innerBuf)
+    convertToNetty(iter, outStream)
+    val bytes = new Array[Byte](innerBuf.readableBytes);
+    innerBuf.getBytes(innerBuf.readerIndex, bytes);
     innerBuf.release()
-    out.close()
+    outStream.close()
     bytes
+  }
+
+  def convertFromNetty(
+      attributes: Seq[Attribute],
+      input: InputStream): Iterator[ColumnarBatch] = {
+    new Iterator[ColumnarBatch] {
+      val allocator = ArrowWritableColumnVector.getOffRecordAllocator
+      var messageReader =
+        new MessageChannelReader(new ReadChannel(Channels.newChannel(input)), allocator)
+      var schema: Schema = null
+      var result: MessageResult = null
+
+      override def hasNext: Boolean =
+        if (input.available > 0) {
+          return true
+        } else {
+          messageReader.close
+          return false
+        }
+      override def next(): ColumnarBatch = {
+        if (input.available == 0) {
+          if (attributes == null) {
+            return null
+          }
+          val resultStructType = StructType(
+            attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
+          val resultColumnVectors =
+            ArrowWritableColumnVector.allocateColumns(0, resultStructType).toArray
+          return new ColumnarBatch(resultColumnVectors.map(_.asInstanceOf[ColumnVector]), 0)
+        }
+        try {
+          if (schema == null) {
+            result = messageReader.readNext();
+            if (result == null) {
+              throw new IOException("Unexpected end of input. Missing schema.");
+            }
+            if (result.getMessage().headerType() != MessageHeader.Schema) {
+              throw new IOException(
+                "Expected schema but header was " + result.getMessage().headerType());
+            }
+            schema = MessageSerializer.deserializeSchema(result.getMessage());
+          }
+          result = messageReader.readNext();
+          if (result.getMessage().headerType() != MessageHeader.RecordBatch) {
+            throw new IOException(
+              "Expected recordbatch but header was " + result.getMessage().headerType());
+          }
+          var bodyBuffer = result.getBodyBuffer();
+
+          // For zero-length batches, need an empty buffer to deserialize the batch
+          if (bodyBuffer == null) {
+            bodyBuffer = allocator.getEmpty();
+          }
+
+          val batch = MessageSerializer.deserializeRecordBatch(result.getMessage(), bodyBuffer);
+          val vectors = fromArrowRecordBatch(schema, batch, allocator)
+          val length = batch.getLength
+          batch.close
+          new ColumnarBatch(vectors.map(_.asInstanceOf[ColumnVector]), length)
+        } catch {
+          case e: Throwable =>
+            messageReader.close
+            throw e
+        }
+      }
+    }
   }
 
   def convertFromNetty(
@@ -143,7 +213,7 @@ object ConverterUtils extends Logging {
       data: Array[Array[Byte]]): Iterator[ColumnarBatch] = {
     new Iterator[ColumnarBatch] {
       var array_id = 0
-      val allocator = ArrowWritableColumnVector.getAllocator
+      val allocator = ArrowWritableColumnVector.getOffRecordAllocator
       var input = new ByteArrayInputStream(data(array_id))
       var messageReader =
         new MessageChannelReader(new ReadChannel(Channels.newChannel(input)), allocator)
@@ -315,15 +385,23 @@ object ConverterUtils extends Logging {
     }
   }
 
-  def getColumnarFuncNode(expr: Expression): (TreeNode, ArrowType) = {
+  def getColumnarFuncNode(
+      expr: Expression,
+      attributes: Seq[Attribute] = null): (TreeNode, ArrowType) = {
     if (expr.isInstanceOf[AttributeReference] && expr
           .asInstanceOf[AttributeReference]
           .name == "none") {
       throw new UnsupportedOperationException(
         s"Unsupport to generate native expression from replaceable expression.")
     }
-    var columnarExpr: Expression =
+    var columnarExpr: Expression = if (attributes != null) {
+      ColumnarExpressionConverter.replaceWithColumnarExpression(
+        expr,
+        attributeSeq = attributes,
+        convertBoundRefToAttrRef = true)
+    } else {
       ColumnarExpressionConverter.replaceWithColumnarExpression(expr)
+    }
     var inputList: java.util.List[Field] = Lists.newArrayList()
     columnarExpr.asInstanceOf[ColumnarExpression].doColumnarCodeGen(inputList)
   }

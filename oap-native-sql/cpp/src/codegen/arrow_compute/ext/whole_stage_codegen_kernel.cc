@@ -99,9 +99,11 @@ class WholeStageCodeGenKernel::Impl {
       RETURN_NOT_OK(GetArguments(function_node, 3, &right_key_list));
       gandiva::NodeVector result_list;
       RETURN_NOT_OK(GetArguments(function_node, 4, &result_list));
+      gandiva::NodeVector configuration_list;
+      RETURN_NOT_OK(GetArguments(function_node, 5, &configuration_list));
       gandiva::NodePtr condition;
-      if (function_node->children().size() > 5) {
-        condition = function_node->children()[5];
+      if (function_node->children().size() > 6) {
+        condition = function_node->children()[6];
       }
 
       if (func_name.compare("conditionedProbeArraysInner") == 0) {
@@ -119,7 +121,8 @@ class WholeStageCodeGenKernel::Impl {
       *hash_relation_idx += 1;
       RETURN_NOT_OK(ConditionedProbeKernel::Make(
           ctx_, left_key_list, right_key_list, left_schema_list, right_schema_list,
-          condition, join_type, result_list, cur_hash_relation_idx, out));
+          condition, join_type, result_list, configuration_list, cur_hash_relation_idx,
+          out));
 
     } else if (func_name.compare("project") == 0) {
       auto project_expression_list =

@@ -55,7 +55,8 @@ object ColumnarConditionedProbeJoin extends Logging {
   def prepareHashBuildFunction(
       buildKeys: Seq[Expression],
       buildInputAttributes: Seq[Attribute],
-      builder_type: Int = 0): TreeNode = {
+      builder_type: Int = 0,
+      is_broadcast: Boolean = false): TreeNode = {
     val buildInputFieldList: List[Field] = buildInputAttributes.toList.map(attr => {
       if (attr.dataType.isInstanceOf[DecimalType])
         throw new UnsupportedOperationException(
@@ -64,7 +65,11 @@ object ColumnarConditionedProbeJoin extends Logging {
         .nullable(s"${attr.name}#${attr.exprId.id}", CodeGeneration.getResultType(attr.dataType))
     })
     val buildKeysFunctionList: List[TreeNode] = buildKeys.toList.map(expr => {
-      val (nativeNode, returnType) = ConverterUtils.getColumnarFuncNode(expr)
+      val (nativeNode, returnType) = if (!is_broadcast) {
+        ConverterUtils.getColumnarFuncNode(expr)
+      } else {
+        ConverterUtils.getColumnarFuncNode(expr, buildInputAttributes)
+      }
       if (s"${nativeNode.toProtobuf}".contains("none#")) {
         throw new UnsupportedOperationException(
           s"Unsupport to generate native expression from replaceable expression.")
@@ -99,7 +104,8 @@ object ColumnarConditionedProbeJoin extends Logging {
       output: Seq[Attribute],
       joinType: JoinType,
       buildSide: BuildSide,
-      conditionOption: Option[Expression]): TreeNode = {
+      conditionOption: Option[Expression],
+      builder_type: Int = 0): TreeNode = {
     val buildInputFieldList: List[Field] = buildInputAttributes.toList.map(attr => {
       if (attr.dataType.isInstanceOf[DecimalType])
         throw new UnsupportedOperationException(
@@ -181,6 +187,10 @@ object ColumnarConditionedProbeJoin extends Logging {
       "codegen_result_schema",
       resultFunctionList.asJava,
       new ArrowType.Int(32, true) /*dummy ret type, won't be used*/ )
+    val build_keys_config_node = TreeBuilder.makeFunction(
+      "build_keys_config_node",
+      Lists.newArrayList(TreeBuilder.makeLiteral(builder_type.asInstanceOf[Integer])),
+      new ArrowType.Int(32, true) /*dummy ret type, won't be used*/ )
     val condition_expression_node_list: java.util.List[TreeNode] =
       if (condition != null) {
         val columnarExpression: Expression =
@@ -195,6 +205,7 @@ object ColumnarConditionedProbeJoin extends Logging {
           build_keys_node,
           stream_keys_node,
           result_node,
+          build_keys_config_node,
           condition_expression_node)
       } else {
         Lists.newArrayList(
@@ -202,7 +213,8 @@ object ColumnarConditionedProbeJoin extends Logging {
           stream_args_node,
           build_keys_node,
           stream_keys_node,
-          result_node)
+          result_node,
+          build_keys_config_node)
       }
     val retType = Field.nullable("res", new ArrowType.Int(32, true))
 

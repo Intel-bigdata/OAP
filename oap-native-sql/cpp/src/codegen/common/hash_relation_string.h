@@ -65,6 +65,10 @@ class TypedHashRelation<DataType, enable_if_string_like<DataType>> : public Hash
 
   int GetNull() { return hash_table_->GetNull(); }
 
+  std::vector<ArrayItemIndex> GetItemListByIndex(int i) override {
+    return memo_index_to_arrayid_[i];
+  }
+
  private:
   arrow::Status Insert(arrow::util::string_view v, uint32_t array_id, uint32_t id) {
     int i;
@@ -90,6 +94,8 @@ class TypedHashRelation<DataType, enable_if_string_like<DataType>> : public Hash
     return arrow::Status::OK();
   }
 
+  int num_items_ = 0;
   std::shared_ptr<StringHashMap> hash_table_;
   using ArrayType = sparkcolumnarplugin::precompile::StringArray;
+  std::vector<std::vector<ArrayItemIndex>> memo_index_to_arrayid_;
 };

@@ -426,6 +426,8 @@
           <shadedClassifierName>with-spark-${spark.internal.version}</shadedClassifierName>
           <artifactSet>
             <includes>
+              <include>redis.clients:*</include>
+              <include>org.apache.commons:commons-pool2</include>
               <include>com.intel:oap-common</include>
               <include>org.spark-project.spark:unused</include>
               <include>com.google.guava:guava</include>

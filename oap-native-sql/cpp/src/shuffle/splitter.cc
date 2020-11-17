@@ -636,8 +636,9 @@ arrow::Status Splitter::SplitFixedWidthValueBufferAVX(const arrow::RecordBatch& 
 
           // update partition_buffer_idx_offset_
           partid_cnt_8x = _mm256_add_epi32(partid_cnt_8x, inc_one);
-          _mm256_i32scatter_epi32(partition_buffer_idx_offset_.data(), partid_8x,
-                                  partid_cnt_8x, 4);
+          for (int i = 0; i < 8; ++i) {
+            partition_buffer_idx_offset_[partition_id_[row + i]]++;
+          }
 
           PrefetchDstAddr(dst_addr_8x, 4);
         }
@@ -685,8 +686,9 @@ arrow::Status Splitter::SplitFixedWidthValueBufferAVX(const arrow::RecordBatch& 
 
           // update partition_buffer_idx_offset_
           partid_cnt_8x = _mm256_add_epi32(partid_cnt_8x, inc_one);
-          _mm256_i32scatter_epi32(partition_buffer_idx_offset_.data(), partid_8x,
-                                  partid_cnt_8x, 4);
+          for (int i = 0; i < 8; ++i) {
+            partition_buffer_idx_offset_[partition_id_[row + i]]++;
+          }
 
           PrefetchDstAddr(dst_addr_8x, 8);
         }

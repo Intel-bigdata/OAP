@@ -45,6 +45,8 @@ class ColumnarPluginConfig(conf: SparkConf) {
     conf.getInt("spark.sql.execution.arrow.maxRecordsPerBatch", defaultValue = 10000)
   val tmpFile: String =
     conf.getOption("spark.sql.columnar.tmp_dir").getOrElse(null)
+  val broadcastCacheTimeout: Int =
+    conf.getInt("spark.sql.columnar.sort.broadcast.cache.timeout", defaultValue = -1)
 }
 
 object ColumnarPluginConfig {

@@ -24,13 +24,14 @@ import scala.collection.JavaConverters._
 
 import com.intel.oap.vectorized.ArrowWritableColumnVector
 import org.apache.arrow.dataset.file.{FileSystem, SingleFileDatasetFactory}
+import org.apache.arrow.dataset.jni.NativeMemoryPool
 import org.apache.arrow.dataset.scanner.ScanTask
-import org.apache.arrow.memory.AllocationListener
 import org.apache.arrow.vector.FieldVector
 import org.apache.arrow.vector.types.pojo.ArrowType.ArrowTypeID
 import org.apache.arrow.vector.types.pojo.Schema
 import org.apache.hadoop.fs.FileStatus
 
+import org.apache.spark.TaskContext
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.v2.arrow.{SparkMemoryUtils, SparkSchemaUtils}
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils
@@ -59,8 +60,8 @@ object ArrowUtils {
     val format = getFormat(options).getOrElse(throw new IllegalStateException)
     val fs = getFs(options).getOrElse(throw new IllegalStateException)
     val allocator = SparkMemoryUtils.arrowAllocator()
-    val factory = new SingleFileDatasetFactory(
-      allocator,
+    val factory = new SingleFileDatasetFactory(allocator,
+      memoryPool(),
       format,
       fs,
       rewriteFilePath(file))
@@ -146,6 +147,16 @@ object ArrowUtils {
       }
     }).toList
     dictionaryVectorsWithNulls
+  }
+
+  private def memoryPool(): NativeMemoryPool = {
+    if (TaskContext.get == null) {
+      NativeMemoryPool.getDefault
+    } else {
+      val pool = NativeMemoryPool.createListenable(SparkMemoryUtils.reservationListener())
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener(_ => pool.close())
+      pool
+    }
   }
 
   private def getFormat(

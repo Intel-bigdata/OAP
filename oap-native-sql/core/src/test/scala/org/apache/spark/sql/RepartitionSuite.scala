@@ -83,23 +83,23 @@ class TPCHTableRepartitionSuite extends RepartitionSuite {
 
   override lazy val input = spark.read.format("arrow").load(filePath)
 
-  test("tpch table round robin partitioning") {
+  ignore("tpch table round robin partitioning") {
     withRepartition(df => df.repartition(2))
   }
 
-  test("tpch table hash partitioning") {
+  ignore("tpch table hash partitioning") {
     withRepartition(df => df.repartition('n_nationkey))
   }
 
-  test("tpch table range partitioning") {
+  ignore("tpch table range partitioning") {
     withRepartition(df => df.repartitionByRange('n_name))
   }
 
-  test("tpch table hash partitioning with expression") {
+  ignore("tpch table hash partitioning with expression") {
     withRepartition(df => df.repartition('n_nationkey + 'n_regionkey))
   }
 
-  test("tpch table sum after repartition") {
+  ignore("tpch table sum after repartition") {
     withTransformationAndRepartition(
       df => df.groupBy("n_regionkey").agg(Map("n_nationkey" -> "sum")),
       df => df.repartition(2))

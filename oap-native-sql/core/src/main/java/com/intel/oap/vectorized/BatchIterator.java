@@ -32,21 +32,26 @@ import org.apache.arrow.vector.ipc.message.MessageSerializer;
 public class BatchIterator {
   private native boolean nativeHasNext(long nativeHandler);
   private native ArrowRecordBatchBuilder nativeNext(long nativeHandler);
-  private native ArrowRecordBatchBuilder nativeProcess(long nativeHandler, byte[] schemaBuf, int numRows, long[] bufAddrs, long[] bufSizes);
-  private native void nativeProcessAndCacheOne(long nativeHandler, byte[] schemaBuf, int numRows, long[] bufAddrs, long[] bufSizes);
-  private native ArrowRecordBatchBuilder nativeProcessWithSelection(long nativeHandler, byte[] schemaBuf, int numRows, long[] bufAddrs, long[] bufSizes,
+  private native ArrowRecordBatchBuilder nativeProcess(long nativeHandler,
+      byte[] schemaBuf, int numRows, long[] bufAddrs, long[] bufSizes);
+  private native void nativeProcessAndCacheOne(long nativeHandler, byte[] schemaBuf,
+      int numRows, long[] bufAddrs, long[] bufSizes);
+  private native ArrowRecordBatchBuilder nativeProcessWithSelection(long nativeHandler,
+      byte[] schemaBuf, int numRows, long[] bufAddrs, long[] bufSizes,
       int selectionVectorRecordCount, long selectionVectorAddr, long selectionVectorSize);
-  private native void nativeProcessAndCacheOneWithSelection(long nativeHandler, byte[] schemaBuf, int numRows, long[] bufAddrs, long[] bufSizes,
+  private native void nativeProcessAndCacheOneWithSelection(long nativeHandler,
+      byte[] schemaBuf, int numRows, long[] bufAddrs, long[] bufSizes,
       int selectionVectorRecordCount, long selectionVectorAddr, long selectionVectorSize);
   private native void nativeSetDependencies(long nativeHandler, long[] dependencies);
-
+  private native NativeSerializableObject nativeNextHashRelation(long nativeHandler);
+  private native void nativeSetHashRelation(
+      long nativeHandler, long[] memoryAddrs, int[] sizes);
   private native void nativeClose(long nativeHandler);
 
   private long nativeHandler = 0;
   private boolean closed = false;
 
-  public BatchIterator() throws IOException {
-  }
+  public BatchIterator() throws IOException {}
 
   public BatchIterator(long instance_id) throws IOException {
     JniUtils.getInstance();
@@ -70,7 +75,26 @@ public class BatchIterator {
     return resRecordBatchBuilderImpl.build();
   }
 
-  public ArrowRecordBatch process(Schema schema, ArrowRecordBatch recordBatch) throws IOException {
+  public SerializableObject nextHashRelationObject()
+      throws IOException, ClassNotFoundException {
+    if (nativeHandler == 0) {
+      return null;
+    }
+    NativeSerializableObject obj = nativeNextHashRelation(nativeHandler);
+    SerializableObject objImpl = new SerializableObject(obj);
+    return objImpl;
+  }
+
+  public void setHashRelationObject(SerializableObject obj) throws IOException {
+    if (nativeHandler == 0) {
+      return;
+    }
+    // pass directbuffer memory to below function
+    nativeSetHashRelation(nativeHandler, obj.getDirectMemoryAddrs(), obj.size);
+  }
+
+  public ArrowRecordBatch process(Schema schema, ArrowRecordBatch recordBatch)
+      throws IOException {
     return process(schema, recordBatch, null);
   }
 
@@ -101,11 +125,12 @@ public class BatchIterator {
       int selectionVectorRecordCount = selectionVector.getRecordCount();
       long selectionVectorAddr = selectionVector.getBuffer().memoryAddress();
       long selectionVectorSize = selectionVector.getBuffer().capacity();
-      resRecordBatchBuilder = nativeProcessWithSelection(
-        nativeHandler, getSchemaBytesBuf(schema), num_rows, bufAddrs, bufSizes, 
-        selectionVectorRecordCount, selectionVectorAddr, selectionVectorSize);
+      resRecordBatchBuilder = nativeProcessWithSelection(nativeHandler,
+          getSchemaBytesBuf(schema), num_rows, bufAddrs, bufSizes,
+          selectionVectorRecordCount, selectionVectorAddr, selectionVectorSize);
     } else {
-      resRecordBatchBuilder = nativeProcess(nativeHandler, getSchemaBytesBuf(schema), num_rows, bufAddrs, bufSizes);
+      resRecordBatchBuilder = nativeProcess(
+          nativeHandler, getSchemaBytesBuf(schema), num_rows, bufAddrs, bufSizes);
     }
     if (resRecordBatchBuilder == null) {
       return null;
@@ -115,11 +140,12 @@ public class BatchIterator {
     return resRecordBatchBuilderImpl.build();
   }
 
-  public void processAndCacheOne(Schema schema, ArrowRecordBatch recordBatch) throws IOException {
+  public void processAndCacheOne(Schema schema, ArrowRecordBatch recordBatch)
+      throws IOException {
     processAndCacheOne(schema, recordBatch, null);
   }
 
-  public void processAndCacheOne(Schema schema, ArrowRecordBatch recordBatch, 
+  public void processAndCacheOne(Schema schema, ArrowRecordBatch recordBatch,
       SelectionVectorInt16 selectionVector) throws IOException {
     int num_rows = recordBatch.getLength();
     List<ArrowBuf> buffers = recordBatch.getBuffers();
@@ -145,22 +171,22 @@ public class BatchIterator {
       int selectionVectorRecordCount = selectionVector.getRecordCount();
       long selectionVectorAddr = selectionVector.getBuffer().memoryAddress();
       long selectionVectorSize = selectionVector.getBuffer().capacity();
-      nativeProcessAndCacheOneWithSelection(
-          nativeHandler, getSchemaBytesBuf(schema), num_rows, bufAddrs, bufSizes,
-          selectionVectorRecordCount, selectionVectorAddr, selectionVectorSize);
+      nativeProcessAndCacheOneWithSelection(nativeHandler, getSchemaBytesBuf(schema),
+          num_rows, bufAddrs, bufSizes, selectionVectorRecordCount, selectionVectorAddr,
+          selectionVectorSize);
     } else {
-      nativeProcessAndCacheOne(nativeHandler, getSchemaBytesBuf(schema), num_rows, bufAddrs, bufSizes);
+      nativeProcessAndCacheOne(
+          nativeHandler, getSchemaBytesBuf(schema), num_rows, bufAddrs, bufSizes);
     }
   }
 
-  public void setDependencies(BatchIterator[] dependencies){
+  public void setDependencies(BatchIterator[] dependencies) {
     long[] instanceIdList = new long[dependencies.length];
     for (int i = 0; i < dependencies.length; i++) {
       instanceIdList[i] = dependencies[i].getInstanceId();
     }
     nativeSetDependencies(nativeHandler, instanceIdList);
   }
-
 
   public void close() {
     if (!closed) {
@@ -178,5 +204,4 @@ public class BatchIterator {
   long getInstanceId() {
     return nativeHandler;
   }
-
 }

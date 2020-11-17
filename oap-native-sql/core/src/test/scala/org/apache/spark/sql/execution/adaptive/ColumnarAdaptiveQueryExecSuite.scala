@@ -135,7 +135,7 @@ class ColumnarAdaptiveQueryExecSuite
     assert(numShuffles === (numLocalReaders.length + numShufflesWithoutLocalReader))
   }
 
-  test("Columnar exchange reuse") {
+  ignore("Columnar exchange reuse") {
     withSQLConf(
       SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "true",
       SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key -> "80") {
@@ -147,7 +147,7 @@ class ColumnarAdaptiveQueryExecSuite
     }
   }
 
-  test("SPARK-29544: adaptive skew join with different join types") {
+  ignore("SPARK-29544: adaptive skew join with different join types") {
     withSQLConf(
       SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "true",
       SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key -> "-1",

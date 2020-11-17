@@ -532,10 +532,15 @@ class VMemCache(fiberType: FiberType) extends OapCache with Logging {
       conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_INITIAL_SIZE_BK).trim
     }
   private val vmInitialSize = Utils.byteStringAsBytes(initialSizeStr)
-  require(!(conf.getBoolean(OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION.key,
-    OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION.defaultValue.get) ||
-    conf.getBoolean(OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION_BK.key,
-      OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION_BK.defaultValue.get)),
+  private val cacheCompressionEnabled =
+    if (conf.getOption(OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION.key).isDefined) {
+      conf.getBoolean(OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION.key,
+        OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION.defaultValue.get)
+    } else {
+      conf.getBoolean(OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION_BK.key,
+        OapConf.OAP_ENABLE_DATA_FIBER_CACHE_COMPRESSION_BK.defaultValue.get)
+    }
+  require(!cacheCompressionEnabled,
     "Vmemcache strategy doesn't support fiber cache compression currently, " +
     "please try other strategy.")
   require(vmInitialSize > 0, "AEP initial size must be greater than zero")
@@ -950,7 +955,7 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
   private var cacheInit: Boolean = false
   private var externalDBClient: ExternalDBClient = null
 
-  if (SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED) == true) {
+  if (conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED) == true) {
     externalDBClient = ExternalDBClientFactory.getDBClientInstance(SparkEnv.get)
   }
 
@@ -978,8 +983,12 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
     OapRuntime.getOrCreate.fiberCacheManager.getEmptyDataFiberCache(fiberLength)
 
   var fiberSet = scala.collection.mutable.Set[FiberId]()
-  val cacheReadOnlyEnbale = conf.get(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLE) &&
-    conf.get(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLED)
+  val cacheReadOnlyEnable =
+   if (conf.getOption(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLED.key).isDefined) {
+     conf.get(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLED)
+   } else {
+     conf.get(OapConf.OAP_EXTERNAL_CACHE_READ_ONLY_ENABLE)
+   }
   val clientPoolSize =
     if (conf.getOption(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE.key).isDefined) {
       conf.get(OapConf.OAP_EXTERNAL_CACHE_CLIENT_POOL_SIZE)
@@ -1049,7 +1058,7 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
       cacheGuardian.addRemovalFiber(fiberId, fiberCache)
       fiberCache
     } else {
-      if (cacheReadOnlyEnbale) {
+      if (cacheReadOnlyEnable) {
         val fiberCache = cache(fiberId)
         cacheMissCount.addAndGet(1)
         fiberSet.add(fiberId)
@@ -1092,7 +1101,7 @@ class ExternalCache(fiberType: FiberType) extends OapCache with Logging {
         case e: DuplicateObjectException => logWarning(e.getMessage)
       }
     }
-    if (SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED) == true) {
+    if (conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED) == true) {
       reportCacheMeta(fiberId)
     }
     fiber

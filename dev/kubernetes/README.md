@@ -34,13 +34,13 @@ In Kubernetes, you can run Spark/OAP job using spark-submit in Cluster mode at a
 You can run a Spark Pi job for a simple testing of the enironment is working. Execute the following command. If you are running on the master node,  you can ignore the --master parameter.
 For example:
 ``` 
-sh ./spark-pi.sh --master localhost:8443  --image oap-centos:0.9.0  --conf ./conf
+sh ./spark-pi.sh --master localhost:8443  --image oap-centos:0.9.0  --spark_conf ./conf
 ``` 
 #### Run Spark Job through spark-submit
 You can submit your own job. Execute the following command. If you are running on the master node,  you can ignore the --master parameter.
 For exmaple:
 ``` 
-sh ./spark-submit.sh --master localhost:8443  --image oap-centos:0.9.0  --conf ./conf --name spark-pi --class org.apache.spark.examples.SparkPi  local:///opt/home/spark-3.0.0/examples/jars/spark-examples_2.12-3.0.0.jar 100
+sh ./spark-submit.sh --master localhost:8443  --image oap-centos:0.9.0  --spark_conf ./conf --name spark-pi --class org.apache.spark.examples.SparkPi  local:///opt/home/spark-3.0.0/examples/jars/spark-examples_2.12-3.0.0.jar 100
 ``` 
 
 ### Run Spark/OAP in Client Mode
@@ -52,7 +52,7 @@ A lot of Spark tools run at Client Mode, such Spark Thrift Server, Spark Shell a
 Execute the following command to start Spark Thrift Server in a pod and launch corresponding services.
 For example:
 ``` 
-sh ./spark-thrift-server.sh start --image oap-centos:0.9.0  --conf ./conf
+sh ./spark-thrift-server.sh start --image oap-centos:0.9.0  --spark_conf ./conf
 ``` 
 
 ##### Stop Spark Thrift Server
@@ -79,7 +79,7 @@ To run Spark Shell, Spark SQL or Spark Submit at client mode, we need to launch 
 Execute the following command to configure and start the client pod.
 For example:
 ``` 
-sh ./spark-client.sh start --image oap-centos:0.9.0 --conf ./conf
+sh ./spark-client.sh start --image oap-centos:0.9.0 --spark_conf ./conf
 ``` 
 
 ##### Run Spark Shell

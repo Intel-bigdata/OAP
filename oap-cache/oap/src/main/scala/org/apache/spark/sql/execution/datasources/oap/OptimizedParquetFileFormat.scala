@@ -68,9 +68,14 @@ private[sql] class OptimizedParquetFileFormat extends OapFileFormat {
       options: Map[String, String],
       hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
     // TODO we need to pass the extra data source meta information via the func parameter
+    val parquetIndexEnabled =
+      if (sparkSession.conf.contains(OapConf.OAP_PARQUET_INDEX_ENABLED.key)) {
+      sparkSession.conf.get(OapConf.OAP_PARQUET_INDEX_ENABLED)
+    } else {
+      sparkSession.conf.get(OapConf.OAP_PARQUET_INDEX_ENABLE)
+    }
     val (filterScanners, m) = meta match {
-      case Some(x) if (sparkSession.conf.get(OapConf.OAP_PARQUET_INDEX_ENABLED)
-      && sparkSession.conf.get(OapConf.OAP_PARQUET_INDEX_ENABLE)) =>
+      case Some(x) if parquetIndexEnabled =>
         (indexScanners(x, filters), x)
       case _ =>
         // TODO Now we need use a meta with PARQUET_DATA_FILE_CLASSNAME & dataSchema to init

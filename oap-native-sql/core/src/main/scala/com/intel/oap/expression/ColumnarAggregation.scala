@@ -469,12 +469,15 @@ class ColumnarAggregation(
       var data_loaded = false
       var nextBatch = true
       var eval_elapse: Long = 0
+      var noNext: Boolean = false
 
       override def hasNext: Boolean = {
+        if (noNext) return false
         if (nextCalled == false && resultColumnarBatch != null) {
           return true
         }
         if (!nextBatch) {
+          noNext = true
           return false
         }
 
@@ -507,6 +510,7 @@ class ColumnarAggregation(
         if (resultColumnarBatch.numRows == 0) {
           resultColumnarBatch.close()
           logInfo(s"Aggregation completed, total output ${numOutputRows} rows, ${numOutputBatches} batches")
+          noNext = true
           return false
         }
         numOutputBatches += 1

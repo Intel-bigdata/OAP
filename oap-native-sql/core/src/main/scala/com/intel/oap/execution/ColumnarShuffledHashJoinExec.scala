@@ -77,12 +77,18 @@ case class ColumnarShuffledHashJoinExec(
     "buildTime" -> SQLMetrics.createTimingMetric(sparkContext, "time to build hash map"),
     "joinTime" -> SQLMetrics.createTimingMetric(sparkContext, "join time"))
 
-  val (buildKeyExprs, streamedKeyExprs) = buildSide match {
-    case BuildLeft =>
-      (leftKeys, rightKeys)
-    case _ =>
-      (rightKeys, leftKeys)
+  val (buildKeyExprs, streamedKeyExprs) = {
+    require(
+      leftKeys.map(_.dataType) == rightKeys.map(_.dataType),
+      "Join keys from two sides should have same types")
+    val lkeys = HashJoin.rewriteKeyExpr(leftKeys)
+    val rkeys = HashJoin.rewriteKeyExpr(rightKeys)
+    buildSide match {
+      case BuildLeft => (lkeys, rkeys)
+      case BuildRight => (rkeys, lkeys)
+    }
   }
+
   override def output: Seq[Attribute] =
     if (projectList == null) super.output else projectList.map(_.toAttribute)
 
@@ -121,7 +127,7 @@ case class ColumnarShuffledHashJoinExec(
 
   override def supportColumnarCodegen: Boolean = true
 
-  def getKernelFunction: TreeNode = {
+  def getKernelFunction(_type: Int = 0): TreeNode = {
 
     val buildInputAttributes = buildPlan.output.toList
     val streamInputAttributes = streamedPlan.output.toList
@@ -140,7 +146,8 @@ case class ColumnarShuffledHashJoinExec(
       output_skip_alias,
       joinType,
       buildSide,
-      condition)
+      condition,
+      _type)
   }
 
   override def doCodeGen: ColumnarCodegenContext = {
@@ -155,7 +162,7 @@ case class ColumnarShuffledHashJoinExec(
       (
         TreeBuilder.makeFunction(
           s"child",
-          Lists.newArrayList(getKernelFunction, childCtx.root),
+          Lists.newArrayList(getKernelFunction(1), childCtx.root),
           new ArrowType.Int(32, true)),
         childCtx.inputSchema)
     } else {
@@ -163,7 +170,7 @@ case class ColumnarShuffledHashJoinExec(
         TreeBuilder
           .makeFunction(
             s"child",
-            Lists.newArrayList(getKernelFunction),
+            Lists.newArrayList(getKernelFunction(1)),
             new ArrowType.Int(32, true)),
         ConverterUtils.toArrowSchema(streamedPlan.output))
     }
@@ -213,7 +220,7 @@ case class ColumnarShuffledHashJoinExec(
 
       val native_function = TreeBuilder.makeFunction(
         s"standalone",
-        Lists.newArrayList(getKernelFunction),
+        Lists.newArrayList(getKernelFunction(0)),
         new ArrowType.Int(32, true))
       val probe_expr =
         TreeBuilder
@@ -266,8 +273,8 @@ case class ColumnarShuffledHashJoinExec(
         }
       }
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-          close
-        })
+        close
+      })
       new CloseableColumnBatchIterator(res)
     }
   }
@@ -363,8 +370,8 @@ case class ColumnarShuffledHashJoinExec(
           numOutputRows,
           sparkConf)
         SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-            vjoin.close()
-          })
+          vjoin.close()
+        })
         val vjoinResult = vjoin.columnarJoin(streamIter, buildIter)
         new CloseableColumnBatchIterator(vjoinResult)
     }
