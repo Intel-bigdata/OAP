@@ -456,8 +456,8 @@ pmempool rm ${device_name}
 ```
 If you install OAP Conda package, you can use below command to  remove original initialization of one PMem.
 ```shell script
-export LD_LIBRARY_PATH=/root/miniconda2/envs/oapenv/lib/:$LD_LIBRARY_PATH
-/root/miniconda2/envs/oapenv/bin/pmempool rm ${device_name}
+export LD_LIBRARY_PATH=$HOME/miniconda2/envs/oapenv/lib/:$LD_LIBRARY_PATH
+$HOME/miniconda2/envs/oapenv/bin/pmempool rm ${device_name}
 ```
 
 

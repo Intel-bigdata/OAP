@@ -89,15 +89,15 @@ spark.shuffle.manager org.apache.spark.shuffle.sort.ColumnarShuffleManager
 spark.driver.extraClassPath $HOME/miniconda2/envs/oapenv/oap_jars/spark-columnar-core-1.0.0-jar-with-dependencies.jar:$HOME/miniconda2/envs/oapenv/oap_jars/spark-arrow-datasource-1.0.0-jar-with-dependencies.jar
 spark.executor.extraClassPath $HOME/miniconda2/envs/oapenv/oap_jars/spark-columnar-core-1.0.0-jar-with-dependencies.jar:$HOME/miniconda2/envs/oapenv/oap_jars/spark-arrow-datasource-1.0.0-jar-with-dependencies.jar
 
-spark.executorEnv.LIBARROW_DIR      /root/miniconda2/envs/oapenv
-spark.executorEnv.CC                /root/miniconda2/envs/oapenv/bin/gcc
+spark.executorEnv.LIBARROW_DIR      $HOME/miniconda2/envs/oapenv
+spark.executorEnv.CC                $HOME/miniconda2/envs/oapenv/bin/gcc
 ######
 ```
 
 Before you start spark, you must use below command to add some environment variables.
 ```shell script
-export CC=/root/miniconda2/envs/oapenv/bin/gcc
-export LIBARROW_DIR=/root/miniconda2/envs/oapenv/
+export CC=$HOME/miniconda2/envs/oapenv/bin/gcc
+export LIBARROW_DIR=$HOME/miniconda2/envs/oapenv/
 ```
 
 About spark-arrow-datasource.jar, you can refer [Unified Arrow Data Source ](../../oap-data-source/arrow/README.md).                                                                                         
