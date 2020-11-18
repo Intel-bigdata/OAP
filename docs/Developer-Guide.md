@@ -49,11 +49,6 @@ Run the following command to automatically install specific dependency such as M
 # sh $OAP_HOME/dev/scripts/prepare_oap_env.sh --prepare_maven
 ```
 
-***NOTE:*** If you use `install-compile-time-dependencies.sh` or `prepare_oap_env.sh` to install GCC, or your GCC is not installed in the default path, please ensure you have exported `CC` (and `CXX`) before calling maven.
-```shell script
-# export CXX=$OAP_HOME/dev/thirdparty/gcc7/bin/g++
-# export CC=$OAP_HOME/dev/thirdparty/gcc7/bin/gcc
-```
 
 ### Building
 
@@ -62,6 +57,11 @@ To build OAP package, use
 $ sh $OAP_HOME/dev/compile-oap.sh
 #or
 $ mvn clean -DskipTests package
+```
+***NOTE:*** If you use `install-compile-time-dependencies.sh` or `prepare_oap_env.sh` to install GCC, or your GCC is not installed in the default path, please ensure you have exported `CC` (and `CXX`) before calling Maven.
+```shell script
+# export CXX=$OAP_HOME/dev/thirdparty/gcc7/bin/g++
+# export CC=$OAP_HOME/dev/thirdparty/gcc7/bin/gcc
 ```
 
 ### Building Specified Module
