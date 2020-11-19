@@ -127,6 +127,7 @@
                                         <exclude>META-INF/native/windows64/leveldbjni.dll</exclude>
                                         <exclude>META-INF/native/osx/libleveldbjni.jnilib</exclude>
                                         <exclude>org/sqlite/native/DragonFlyBSD/x86_64/libsqlitejdbc.so</exclude>
+					<exclude>org/sqlite/native/Mac/x86_64/libsqlitejdbc.jnilib</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
