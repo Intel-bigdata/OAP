@@ -72,7 +72,7 @@ If you are facing some trouble when installing maven, please follow below steps 
 Go to https://maven.apache.org/download.cgi and download the specific version of maven
 
 // Below command use maven 3.6.3 as an example
-wget htps://ftp.wayne.edu/apache/maven/maven-3/3.6.3/binaries/apache-maven-3.6.3-bin.tar.gz
+wget https://ftp.wayne.edu/apache/maven/maven-3/3.6.3/binaries/apache-maven-3.6.3-bin.tar.gz
 tar xzf apache-maven-3.6.3-bin.tar.gz
 mkdir /usr/local/maven
 mv apache-maven-3.6.3/ /usr/local/maven/
