@@ -42,7 +42,7 @@ export LD_LIBRARY_PATH=$YOUR_GCC_INSTALLATION_DIR/lib64:$LD_LIBRARY_PATH
 Please remember to add and source the setup in your environment files such as /etc/profile or /etc/bashrc
 
 //Verify if gcc has been installation
-Use gcc -v command to verify if your gcc version is correct.(Must larger than 7.3.1)
+Use gcc -v command to verify if your gcc version is correct.(Must larger than 9.3)
 
 
 ### cmake installation
