@@ -30,7 +30,7 @@ mvn clean -pl com.intel.oap:oap-cache -am test
 ```
 Run a specific test suite, for example `OapDDLSuite`:
 ```
-mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite test
+mvn -pl com.intel.oap:oap-cache -am -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite test
 ```
 **NOTE**: Log level of unit tests currently default to ERROR, please override oap-cache/oap/src/test/resources/log4j.properties if needed.
 
@@ -41,7 +41,7 @@ mvn -DwildcardSuites=org.apache.spark.sql.execution.datasources.oap.OapDDLSuite 
 Install the required packages on the build system:
 
 - [cmake](https://help.directadmin.com/item.php?id=494)
-- [memkind](https://github.com/memkind/memkind/tree/v1.10.1-rc2)
+- [memkind](https://github.com/memkind/memkind/tree/v1.10.1)
 - [vmemcache](https://github.com/pmem/vmemcache)
 - [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/)
 
@@ -50,13 +50,13 @@ Install the required packages on the build system:
 The memkind library depends on `libnuma` at the runtime, so it must already exist in the worker node system. Build the latest memkind lib from source:
 
 ```
-git clone -b v1.10.1-rc2 https://github.com/memkind/memkind
+git clone -b v1.10.1 https://github.com/memkind/memkind
 cd memkind
 ./autogen.sh
 ./configure
 make
 make install
-   ``` 
+``` 
 #### vmemcache installation
 
 To build vmemcache library from source, you can (for RPM-based linux as example):
@@ -77,13 +77,13 @@ To use optimized Plasma cache with OAP, you need following components:
    (2) `plasma-store-server`: executable file, Plasma cache service.  
    (3) `arrow-plasma-0.17.0.jar`: will be used when compile oap and spark runtime also need it. 
 
-- so file and binary file  
+- `.so` file and binary file  
   Clone code from Intel-arrow repo and run following commands, this will install `libplasma.so`, `libarrow.so`, `libplasma_jni.so` and `plasma-store-server` to your system path(`/usr/lib64` by default). And if you are using Spark in a cluster environment, you can copy these files to all nodes in your cluster if the OS or distribution are same, otherwise, you need compile it on each node.
   
 ```
 cd /tmp
 git clone https://github.com/Intel-bigdata/arrow.git
-cd arrow && git checkout apache-arrow-0.17.0-intel-oap-0.9
+cd arrow && git checkout branch-0.17.0-oap-1.0
 cd cpp
 mkdir release
 cd release
@@ -94,8 +94,8 @@ sudo make install -j$(nproc)
 ```
 
 - arrow-plasma-0.17.0.jar  
-   arrow-plasma-0.17.0.jar is provided in maven central repo, you can download [it](https://repo1.maven.org/maven2/com/intel/arrow/arrow-plasma/0.17.0/arrow-plasma-0.17.0.jar) and copy to `$SPARK_HOME/jars` dir.
-   Or you can manually install it, change to arrow repo java direction, run following command, this will install arrow jars to your local maven repo, and you can compile oap-cache module package now. Beisdes, you need copy arrow-plasma-0.17.0.jar to `$SPARK_HOME/jars/` dir, cause this jar is needed when using external cache.
+   `arrow-plasma-0.17.0.jar` is provided in Maven central repo, you can download [it](https://repo1.maven.org/maven2/com/intel/arrow/arrow-plasma/0.17.0/arrow-plasma-0.17.0.jar) and copy to `$SPARK_HOME/jars` dir.
+   Or you can manually install it, change to arrow repo java direction, run following command, this will install arrow jars to your local maven repo, and you can compile oap-cache module package now. Besides, you need copy arrow-plasma-0.17.0.jar to `$SPARK_HOME/jars/` dir, cause this jar is needed when using external cache.
    
 ```
 cd $ARROW_REPO_DIR/java

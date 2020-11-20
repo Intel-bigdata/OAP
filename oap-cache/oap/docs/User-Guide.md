@@ -12,7 +12,7 @@
 
 ## Prerequisites
 
-SQL Index and Data Source Cache on Spark requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support.
+SQL Index and Data Source Cache on Spark 3.0.0 requires a working Hadoop cluster with YARN and Spark. Running Spark on YARN requires a binary distribution of Spark, which is built with YARN support.
 
 ## Getting Started
 
@@ -85,8 +85,8 @@ spark.driver.extraClassPath       ./oap-cache-<version>-with-spark-<version>.jar
 
 In addition to running on the YARN cluster manager, Spark also provides a simple standalone deploy mode. If you are using Spark in Spark Standalone mode:
 
-1. Copy the OAP `.jar` to **all** the worker nodes. 
-2. Add the following configuration settings to `$SPARK_HOME/conf/spark-defaults.conf` to the working node.
+1. Make sure the OAP `.jar` at the same path of **all** the worker nodes.
+2. Add the following configuration settings to `$SPARK_HOME/conf/spark-defaults.conf` on the working node.
 ```
 spark.sql.extensions               org.apache.spark.sql.OapExtensions
 # absolute path on worker nodes
@@ -202,7 +202,7 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
 
 #### Prerequisites
 
-The followings are required to configure OAP to use PMem cache with external cache strategy.
+The following steps are required to configure OAP to use PMem cache with `external` cache strategy.
 
 - PMem hardware is successfully deployed on each node in cluster.
 
@@ -211,8 +211,8 @@ The followings are required to configure OAP to use PMem cache with external cac
 - Besides, when enabling SQL Data Source Cache with external cache using Plasma, PMem could get noticeable performance gain with BIOS configuration settings below, especially on cross socket write path.
 
 ```
-Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : enabled
-Socket configuration -> Intel UPI General configuration -> Stale Atos :  Disabled
+Socket Configuration -> Memory Configuration -> NGN Configuration -> Snoopy mode for AD : Enabled
+Socket Configuration -> Intel UPI General Configuration -> Stale AtoS :  Disabled
 ``` 
 
 - It's strongly advised to use [Linux device mapper](https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html) to interleave PMem across sockets and get maximum size for Plasma.
@@ -283,25 +283,25 @@ spark.sql.oap.dcpmm.free.wait.threshold                      50000000000
 # according to your executor core number
 spark.executor.sql.oap.cache.external.client.pool.size       10
 ```
- Start Plasma service manually
+Start Plasma service manually
 
 Plasma config parameters:  
  ```
  -m  how much Bytes share memory Plasma will use
  -s  Unix Domain sockcet path
- -d  Pmem directory
+ -d  PMem directory
  ```
 
-You can start Plasma service on each node as following command, and then you can run your workload. If you install OAP by Conda, you can find plasma-store-server in the path **$HOME/miniconda2/envs/oapenv/bin/**.
+Start Plasma service on each node with following command, then run your workload. If you install OAP by Conda, you can find `plasma-store-server` in the path **$HOME/miniconda2/envs/oapenv/bin/**.
 
 ```
 ./plasma-store-server -m 15000000000 -s /tmp/plasmaStore -d /mnt/pmem  
 ```
 
- Remember to kill `plasma-store-server` process if you no longer need cache, and you should delete `/tmp/plasmaStore` which is a Unix domain socket.  
+Remember to kill `plasma-store-server` process if you no longer need cache, and you should delete `/tmp/plasmaStore` which is a Unix domain socket.  
   
-- Use yarn to start Plamsa service  
-We can use yarn(hadoop version >= 3.1) to start Plasma service, you should provide a json file like following.
+- Use Yarn to start Plamsa service  
+When using Yarn(Hadoop version >= 3.1) to start Plasma service, you should provide a json file as below.
 ```
 {
   "name": "plasma-store-service",
@@ -379,7 +379,7 @@ cd oap-benchmark-tool
 sh ./scripts/run_gen_data.sh
 ```
 
-   Once finished, the `$scale` data will be generated in the HDFS folder `genData$scale`. And a database called `tpcds$scale` will contain the TPC-DS tables.
+   Once finished, the `$scale` data will be generated in the HDFS folder `genData$scale`. And a database called `tpcds_$format$scale` will contain the TPC-DS tables.
 
 ### Start Spark Thrift Server
 
