@@ -1,13 +1,21 @@
 # Optimized Analytics Package for Spark\* Platform (OAP)
 
-OAP is a project to optimize Spark by providing optimized implementation of packages for various aspects including cache, shuffle, and so on. In this version, we include the optimized implementation of SQL Index and Data Source Cache supporting DRAM and PMem, RDD Cache PMem Extension, Shuffle Remote PMem Extension and Remote Shuffle.
+
+##### \* LEGAL NOTICE: Your use of this software and any required dependent software (the "Software Package") is subject to the terms and conditions of the software license agreements for the Software Package, which may also include notices, disclaimers, or license terms for third party or open source software included in or with the Software Package, and your use indicates your acceptance of all such terms. Please refer to the "TPP.txt" or other similarly-named text file included with the Software Package for additional details.
+##### \* Optimized Analytics Package for Spark* Platform is under Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+
+
+OAP is a project to optimize Spark by providing optimized implementation of packages for various aspects including cache, shuffle, and so on. In this version, OAP contains the optimized implementation of SQL Index and Data Source Cache supporting DRAM and PMem, RDD Cache PMem Extension, Shuffle Remote PMem Extension and Remote Shuffle.
 
 ## Installation Guide
-Please follow the below link for the guide to compile and install OAP to your system.
-* [OAP Installation Guide](./docs/Installation-Guide.md)
+
+Installation Guide introduces how to install OAP and its dependencies on your cluster nodes by **Conda**.
+
+* [OAP Installation Guide](./docs/oap-installation-guide.md)
 
 ## User Guide
-Please refer to the corresponding documents below for the introduction and how to use the features.
+
+Refer to the corresponding documents below for the introduction on how to use the features.
 
 * [SQL Index and Data Source Cache](./oap-cache/oap/README.md)
 * [RDD Cache PMem Extension](./oap-spark/README.md)
@@ -15,7 +23,9 @@ Please refer to the corresponding documents below for the introduction and how t
 * [Remote Shuffle](./oap-shuffle/remote-shuffle/README.md)
 
 ## Developer Guide
-Please follow the below link for the guide for developers.
+
+Developer Guide contains the instructions and scripts on installing necessary dependencies and building OAP. 
+
 * [OAP Developer Guide](./docs/Developer-Guide.md)
 
 ###### \*Other names and brands may be claimed as the property of others.
