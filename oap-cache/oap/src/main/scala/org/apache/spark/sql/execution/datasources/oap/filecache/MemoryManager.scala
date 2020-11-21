@@ -104,12 +104,12 @@ private[sql] object MemoryManager extends Logging {
         }
       case "vmem" =>
         if (!memoryManagerOpt.equals("tmp")) {
-          logWarning(s"current spark.sql.oap.fiberCache.memory.manager: ${memoryManagerOpt} " +
+          logWarning(s"current spark.sql.oap.cache.memory.manager: ${memoryManagerOpt} " +
             "takes no effect, use 'tmp' as memory manager for vmem cache instead.")
         }
       case "noevict" =>
         if (!memoryManagerOpt.equals("hybrid")) {
-          logWarning(s"current spark.sql.oap.fiberCache.memory.manager: ${memoryManagerOpt} " +
+          logWarning(s"current spark.sql.oap.cache.memory.manager: ${memoryManagerOpt} " +
             "takes no effect, use 'hybrid' as memory manager for noevict cache instead.")
         }
       case _ =>

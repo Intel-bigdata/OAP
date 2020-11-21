@@ -32,7 +32,7 @@ class OapCacheSuite extends SharedOapContext with Logging{
   test("not support cache strategy  -- throw exception") {
     val sparkenv = SparkEnv.get
     sparkenv.conf.set("spark.oap.cache.strategy", "not_support_cache")
-    sparkenv.conf.set("spark.sql.oap.fiberCache.memory.manager", "offheap")
+    sparkenv.conf.set("spark.sql.oap.cache.memory.manager", "offheap")
     sparkenv.conf.set("spark.oap.cache.backend.fallback.enabled", "false")
     sparkenv.conf.set("spark.oap.test.cache.backend.fallback.res", "false")
     val cacheMemory: Long = 10000
@@ -46,7 +46,7 @@ class OapCacheSuite extends SharedOapContext with Logging{
   test("guava cache strategy and offheap memory manager -- return guavaCache") {
     val sparkenv = SparkEnv.get
     sparkenv.conf.set("spark.oap.cache.strategy", "guava")
-    sparkenv.conf.set("spark.sql.oap.fiberCache.memory.manager", "offheap")
+    sparkenv.conf.set("spark.sql.oap.cache.memory.manager", "offheap")
     sparkenv.conf.set("spark.oap.cache.backend.fallback.enabled", "false")
     sparkenv.conf.set("spark.oap.test.cache.backend.fallback.res", "false")
     val cacheMemory: Long = 100000
@@ -63,7 +63,7 @@ class OapCacheSuite extends SharedOapContext with Logging{
     val cacheGuardianMemory: Long = 20000
     val fiberType: FiberType = FiberType.DATA
     sparkenv.conf.set("spark.oap.cache.strategy", "guava")
-    sparkenv.conf.set("spark.sql.oap.fiberCache.memory.manager", "pm")
+    sparkenv.conf.set("spark.sql.oap.cache.memory.manager", "pm")
     sparkenv.conf.set("spark.oap.cache.backend.fallback.enabled", "false")
     sparkenv.conf.set("spark.oap.test.cache.backend.fallback.res", "false")
     val simpleOapCache: OapCache = OapCache(sparkenv, cacheMemory, cacheGuardianMemory, fiberType)
@@ -74,7 +74,7 @@ class OapCacheSuite extends SharedOapContext with Logging{
     "-- fallback to simpleCache") {
     val sparkenv = SparkEnv.get
     sparkenv.conf.set("spark.oap.cache.strategy", "noevict")
-    sparkenv.conf.set("spark.sql.oap.fiberCache.memory.manager", "pm")
+    sparkenv.conf.set("spark.sql.oap.cache.memory.manager", "pm")
     sparkenv.conf.set("spark.oap.cache.backend.fallback.enabled", "false")
     sparkenv.conf.set("spark.oap.test.cache.backend.fallback.res", "false")
     val cacheMemory: Long = 100000
@@ -90,7 +90,7 @@ class OapCacheSuite extends SharedOapContext with Logging{
     val cacheGuardianMemory: Long = 20000
     val fiberType: FiberType = FiberType.DATA
     sparkenv.conf.set("spark.oap.cache.strategy", "guava")
-    sparkenv.conf.set("spark.sql.oap.fiberCache.memory.manager", "pm")
+    sparkenv.conf.set("spark.sql.oap.cache.memory.manager", "pm")
     sparkenv.conf.set("spark.oap.cache.backend.fallback.enabled", "false")
     sparkenv.conf.set("spark.oap.test.cache.backend.fallback.res", "true")
     val guavaCache: OapCache = OapCache(sparkenv, cacheMemory, cacheGuardianMemory, fiberType)
@@ -104,7 +104,7 @@ class OapCacheSuite extends SharedOapContext with Logging{
     val cacheGuardianMemory: Long = 20000
     val fiberType: FiberType = FiberType.DATA
     sparkenv.conf.set("spark.oap.cache.strategy", "noevict")
-    sparkenv.conf.set("spark.sql.oap.fiberCache.memory.manager", "pm")
+    sparkenv.conf.set("spark.sql.oap.cache.memory.manager", "pm")
     sparkenv.conf.set("spark.oap.cache.backend.fallback.enabled", "false")
     sparkenv.conf.set("spark.oap.test.cache.backend.fallback.res", "true")
     val noevictCache: OapCache = OapCache(sparkenv, OapConf.OAP_FIBERCACHE_STRATEGY,

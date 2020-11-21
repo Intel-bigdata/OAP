@@ -27,12 +27,12 @@ class MemoryManagerSuite extends SharedOapContext with Logging{
   override def afterAll(): Unit = {
     // restore oapSparkConf to default
     oapSparkConf.set("spark.oap.cache.strategy", "guava")
-    oapSparkConf.set("spark.sql.oap.fiberCache.memory.manager", "offheap")
+    oapSparkConf.set("spark.sql.oap.cache.memory.manager", "offheap")
   }
 
   test("guava cache with offheap memory manager") {
     oapSparkConf.set("spark.oap.cache.strategy", "guava")
-    oapSparkConf.set("spark.sql.oap.fiberCache.memory.manager", "offheap")
+    oapSparkConf.set("spark.sql.oap.cache.memory.manager", "offheap")
     val sparkEnv = SparkEnv.get
     val memoryManager = MemoryManager(sparkEnv)
     assert(memoryManager.isInstanceOf[OffHeapMemoryManager])
@@ -41,7 +41,7 @@ class MemoryManagerSuite extends SharedOapContext with Logging{
   test("vmem with tmp memory manager") {
     val sparkEnv = SparkEnv.get
     sparkEnv.conf.set("spark.oap.cache.strategy", "vmem")
-    // sparkEnv.conf.set("spark.sql.oap.fiberCache.memory.manager", "pm")
+    // sparkEnv.conf.set("spark.sql.oap.cache.memory.manager", "pm")
     val memoryManager = MemoryManager(sparkEnv)
     assert(memoryManager.isInstanceOf[TmpDramMemoryManager])
   }
