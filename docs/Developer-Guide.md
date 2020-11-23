@@ -52,28 +52,29 @@ Run the following command to automatically install specific dependency such as M
 
 ### Building
 
-To build OAP package, run:
+To build OAP package, run command below then you can find a tarball named `oap-$VERSION-bin-spark-$VERSION.tar.gz` under directory `$OAP_HOME/dev/release-package `.
 ```
 $ sh $OAP_HOME/dev/compile-oap.sh
 ```
-Or run:
-```
-$ export CXX=$OAP_HOME/dev/thirdparty/gcc7/bin/g++
-$ export CC=$OAP_HOME/dev/thirdparty/gcc7/bin/gcc
-$ mvn clean -DskipTests package
-```
-***NOTE:***  Export `CC` and `CXX` before running `mvn`. 
 
-### Building Specified Module
+Building Specified OAP Module, such as `oap-cache`, run:
 ```
 $ sh $OAP_HOME/dev/compile-oap.sh --oap-cache
 ```
-Or run:
-```
-$ mvn clean -pl com.intel.oap:oap-cache -am package
-```
 
-### Running Test
+
+### Running OAP Unit Tests
+
+Setup building environment manually for intel MLlib and export `CC` & `CXX` before using `mvn`, run
+
+```
+$ export CXX=$OAP_HOME/dev/thirdparty/gcc7/bin/g++
+$ export CC=$OAP_HOME/dev/thirdparty/gcc7/bin/gcc
+$ export ONEAPI_ROOT=/opt/intel/inteloneapi
+$ source /opt/intel/inteloneapi/daal/2021.1-beta07/env/vars.sh
+$ source /opt/intel/inteloneapi/tbb/2021.1-beta07/env/vars.sh
+$ source /tmp/oneCCL/build/_install/env/setvars.sh
+```
 
 Run all the tests:
 
@@ -81,7 +82,7 @@ Run all the tests:
 $ mvn clean test
 ```
 
-### Running Specified Module Test
+Run Specified OAP Module Unit Test, such as `oap-cache`:
 
 ```
 $ mvn clean -pl com.intel.oap:oap-cache -am test
@@ -97,16 +98,14 @@ When using SQL Index and Data Source Cache with PMem, finish steps of [Prerequis
 #### Building package
 
 You can build OAP with PMem support with command below:
+
+```
+$ sh $OAP_HOME/dev/compile-oap.sh
+```
+Or run:
+
 ```
 $ mvn clean -q -Ppersistent-memory -Pvmemcache -DskipTests package
-```
-
-### OAP Packaging 
-
-If you want to generate a release package after you mvn package all modules, use the following command, then you can find a tarball named `oap-$VERSION-bin-spark-3.0.0.tar.gz` under directory `OAP/dev/release-package `.
-
-```shell script
-$ sh $OAP_HOME/dev/compile-oap.sh
 ```
 
 ## Contributing

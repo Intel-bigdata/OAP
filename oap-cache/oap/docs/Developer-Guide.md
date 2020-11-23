@@ -1,5 +1,8 @@
 # Developer Guide
 
+This document is a supplement to the whole [Developer Guide](../../../docs/Developer-Guide.md) for SQL Index and Data Source Cache.
+After following that document, you can continue more details for SQL Index and Data Source Cache.
+
 * [Building](#Building)
 * [Enabling NUMA binding for Intel® Optane™ DC Persistent Memory in Spark](#enabling-numa-binding-for-pmem-in-spark)
 
