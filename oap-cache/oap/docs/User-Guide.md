@@ -207,7 +207,7 @@ The following steps are required to configure OAP to use PMem cache with `extern
 
 - PMem hardware is successfully deployed on each node in cluster.
 
-- SQL Data Source Cache uses Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/branch-0.17.0-oap-0.9) repo. Build and install step can refer to [build and install plasma](./Developer-Guide.md#build-and-install-plasma). If you have finished [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), Plasma will be automatically installed.
+- SQL Data Source Cache uses Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/branch-0.17.0-oap-0.8) repo. Build and install step can refer to [Plasma installation](./Developer-Guide.md#Plasma-installation). If you have finished [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), Plasma will be automatically installed.
 
 - Besides, when enabling SQL Data Source Cache with external cache using Plasma, PMem could get noticeable performance gain with BIOS configuration settings below, especially on cross socket write path.
 
@@ -448,7 +448,7 @@ When all the queries are done, you will see the `result.json` file in the curren
 - [Column Vector Cache](./Advanced-Configuration.md#Column-Vector-Cache) 
 
   This document above uses **binary** cache as example, if your cluster memory resources is abundant enough, you can choose ColumnVector data cache instead of binary cache to spare computation time.
-- [Large Scale and Heterogeneous Cluster Support](#Large-Scale-and-Heterogeneous-Cluster-Support) 
+- [Large Scale and Heterogeneous Cluster Support](./Advanced-Configuration.md#Large-Scale-and-Heterogeneous-Cluster-Support) 
   
   Introduce an external database to store cache locality info to support large-scale and heterogeneous clusters.
 

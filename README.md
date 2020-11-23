@@ -11,7 +11,7 @@ OAP is a project to optimize Spark by providing optimized implementation of pack
 
 Installation Guide introduces how to install OAP and its dependencies on your cluster nodes by **Conda**.
 
-* [OAP Installation Guide](./docs/oap-installation-guide.md)
+* [OAP Installation Guide](./docs/OAP-Installation-Guide.md)
 
 ## User Guide
 
