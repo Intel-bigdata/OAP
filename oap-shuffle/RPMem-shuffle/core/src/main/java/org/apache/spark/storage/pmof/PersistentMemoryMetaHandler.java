@@ -88,7 +88,8 @@ public class PersistentMemoryMetaHandler {
       fos = new FileOutputStream(file);
       fl = fos.getChannel().lock();
       SQLiteConfig config = new SQLiteConfig();
-      config.setBusyTimeout("30000");
+      int timeout = 30000;
+      config.setBusyTimeout(timeout);
       conn = DriverManager.getConnection(url);
       stmt = conn.createStatement();
       stmt.executeUpdate(sql);
@@ -189,7 +190,8 @@ public class PersistentMemoryMetaHandler {
       fos = new FileOutputStream(file);
       fl = fos.getChannel().lock();
       SQLiteConfig config = new SQLiteConfig();
-      config.setBusyTimeout("30000");
+      int timeout = 30000;
+      config.setBusyTimeout(timeout);
       conn = DriverManager.getConnection(url);
       stmt = conn.createStatement();
       rs = stmt.executeQuery(sql);
