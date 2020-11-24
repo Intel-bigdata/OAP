@@ -440,6 +440,14 @@
               <include>org.reflections:reflections</include>
             </includes>
           </artifactSet>
+          <filters>
+            <filter>
+              <artifact>org.apache.parquet:*</artifact>
+              <excludes>
+                <exclude>shaded/**</exclude>
+              </excludes>
+            </filter>
+          </filters>
           <relocations>
             <relocation>
               <pattern>org.eclipse.jetty</pattern>
