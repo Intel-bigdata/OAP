@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution
 import org.apache.hadoop.fs.{BlockLocation, FileStatus, LocatedFileStatus, Path}
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.spark.SparkEnv
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}
@@ -31,6 +32,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OapMetricsManager}
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.SQLMetrics
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.collection.BitSet
@@ -332,7 +334,12 @@ case class OapFileSourceScanExec(
     val splitFiles = selectedPartitions.flatMap { partition =>
       partition.files.flatMap { file =>
         val blockLocations = getBlockLocations(file)
-        val cachedHosts = OapRuntime.getOrCreate.fiberSensor.getHosts(file.getPath.toString)
+        val cachedHosts =
+          if (!SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED)) {
+            OapRuntime.getOrCreate.fiberSensor.getHosts(file.getPath.toString)
+          } else {
+            new ArrayBuffer[String](0)
+          }
         val hosts = cachedHosts.toBuffer ++ getBlockHosts(blockLocations, 0, file.getLen)
         Seq(PartitionedFile(partition.values,
           file.getPath.toUri.toString, 0, file.getLen, hosts.toArray))
