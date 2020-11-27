@@ -19,7 +19,7 @@ package org.apache.spark.sql.oap.rpc
 
 import java.util.concurrent.TimeUnit
 
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.{RpcEndpointRef, RpcEnv, ThreadSafeRpcEndpoint}
 import org.apache.spark.sql.execution.datasources.oap.filecache.{CacheStats, FiberCacheManager}
@@ -51,11 +51,17 @@ private[spark] class OapRpcManagerSlave(
   startOapHeartbeater()
 
   protected def heartbeatMessages: Array[() => Heartbeat] = {
-    Array(
-      () => FiberCacheHeartbeat(
-        executorId, blockManager.blockManagerId, fiberCacheManager.status()),
-      () => FiberCacheMetricsHeartbeat(executorId, blockManager.blockManagerId,
-        CacheStats.status(fiberCacheManager.cacheStats, conf)))
+    if (SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED)) {
+      return Array(
+        () => FiberCacheMetricsHeartbeat(executorId, blockManager.blockManagerId,
+          CacheStats.status(fiberCacheManager.cacheStats, conf)))
+    } else {
+      return Array(
+        () => FiberCacheHeartbeat(
+          executorId, blockManager.blockManagerId, fiberCacheManager.status()),
+        () => FiberCacheMetricsHeartbeat(executorId, blockManager.blockManagerId,
+          CacheStats.status(fiberCacheManager.cacheStats, conf)))
+    }
   }
 
   private def initialize() = {

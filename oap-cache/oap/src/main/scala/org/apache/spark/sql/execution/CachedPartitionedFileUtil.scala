@@ -22,8 +22,10 @@ import org.apache.hadoop.fs.FileStatus
 import org.apache.hadoop.fs.LocatedFileStatus
 import org.apache.hadoop.fs.Path
 
+import org.apache.spark.SparkEnv
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
 
 object CachedPartitionedFileUtil {
@@ -38,7 +40,12 @@ object CachedPartitionedFileUtil {
       file: FileStatus,
       filePath: Path,
       partitionValues: InternalRow): PartitionedFile = {
-    val cachedHosts = OapRuntime.getOrCreate.fiberSensor.getHosts(file.getPath.toString).toArray
+    val cachedHosts =
+      if (!SparkEnv.get.conf.get(OapConf.OAP_EXTERNAL_CACHE_METADB_ENABLED)) {
+        OapRuntime.getOrCreate.fiberSensor.getHosts(file.getPath.toString).toArray
+      } else {
+        new Array[String](0)
+      }
     val hosts = cachedHosts ++ getBlockHosts(getBlockLocations(file), file.getLen)
     PartitionedFile(partitionValues, filePath.toUri.toString, 0, file.getLen, hosts)
   }
