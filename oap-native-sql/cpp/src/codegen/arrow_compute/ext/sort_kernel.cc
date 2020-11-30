@@ -317,12 +317,12 @@ class TypedSorterImpl : public CodeGenBase {
            R"(
     // initiate buffer for all arrays
     std::shared_ptr<arrow::Buffer> indices_buf;
-    int64_t buf_size = items_total_ * sizeof(ArrayItemIndex);
+    int64_t buf_size = items_total_ * sizeof(ArrayItemIndexS);
     RETURN_NOT_OK(arrow::AllocateBuffer(ctx_->memory_pool(), buf_size, &indices_buf));
 
-    ArrayItemIndex* indices_begin =
-        reinterpret_cast<ArrayItemIndex*>(indices_buf->mutable_data());
-    ArrayItemIndex* indices_end = indices_begin + items_total_;
+    ArrayItemIndexS* indices_begin =
+        reinterpret_cast<ArrayItemIndexS*>(indices_buf->mutable_data());
+    ArrayItemIndexS* indices_end = indices_begin + items_total_;
 
     int64_t indices_i = 0;
     for (int array_id = 0; array_id < num_batches_; array_id++) {
@@ -336,7 +336,7 @@ class TypedSorterImpl : public CodeGenBase {
     )" + sort_func_str +
            R"(
     std::shared_ptr<arrow::FixedSizeBinaryType> out_type;
-    RETURN_NOT_OK(MakeFixedSizeBinaryType(sizeof(ArrayItemIndex) / sizeof(int32_t), &out_type));
+    RETURN_NOT_OK(MakeFixedSizeBinaryType(sizeof(ArrayItemIndexS) / sizeof(int32_t), &out_type));
     RETURN_NOT_OK(MakeFixedSizeBinaryArray(out_type, items_total_, indices_buf, out));
     return arrow::Status::OK();
   }
@@ -369,7 +369,7 @@ class TypedSorterImpl : public CodeGenBase {
            R"(): ctx_(ctx), total_length_(indices_in->length()), indices_in_cache_(indices_in) {
      )" + result_iter_define_str +
            R"(
-      indices_begin_ = (ArrayItemIndex*)indices_in->value_data();
+      indices_begin_ = (ArrayItemIndexS*)indices_in->value_data();
     }
 
     std::string ToString() override { return "SortArraysToIndicesResultIterator"; }
@@ -404,7 +404,7 @@ class TypedSorterImpl : public CodeGenBase {
            R"(
     std::shared_ptr<FixedSizeBinaryArray> indices_in_cache_;
     uint64_t offset_ = 0;
-    ArrayItemIndex* indices_begin_;
+    ArrayItemIndexS* indices_begin_;
     const uint64_t total_length_;
     std::shared_ptr<arrow::Schema> result_schema_;
     arrow::compute::FunctionContext* ctx_;
@@ -446,7 +446,7 @@ extern "C" void MakeCodeGen(arrow::compute::FunctionContext* ctx,
     } else {
       projected = false;
     }
-    ss << "auto comp = [this](ArrayItemIndex x, ArrayItemIndex y) {"
+    ss << "auto comp = [this](ArrayItemIndexS x, ArrayItemIndexS y) {"
        << GetCompFunction_(0, projected, sort_key_index_list, key_field_list, 
                            projected_types, sort_directions, nulls_order) << "};";
     return ss.str();
@@ -1217,8 +1217,8 @@ class SortOnekeyKernel  : public SortArraysToIndicesKernel::Impl {
     return arrow::Status::OK();
   }
     
-  void PartitionNulls(ArrayItemIndex* indices_begin, 
-                      ArrayItemIndex* indices_end) {
+  void PartitionNulls(ArrayItemIndexS* indices_begin, 
+                      ArrayItemIndexS* indices_end) {
     int64_t indices_i = 0;
     int64_t indices_null = 0;
     
@@ -1278,8 +1278,8 @@ class SortOnekeyKernel  : public SortArraysToIndicesKernel::Impl {
     }   
   }
 
-  int64_t PartitionNaNs(ArrayItemIndex* indices_begin, 
-                        ArrayItemIndex* indices_end) {
+  int64_t PartitionNaNs(ArrayItemIndexS* indices_begin, 
+                        ArrayItemIndexS* indices_end) {
     int64_t indices_i = 0;
     int64_t indices_nan = 0;
     
@@ -1347,7 +1347,7 @@ class SortOnekeyKernel  : public SortArraysToIndicesKernel::Impl {
   }
 
   template <typename T>
-  auto Partition(ArrayItemIndex* indices_begin, ArrayItemIndex* indices_end, int64_t &num_nan)
+  auto Partition(ArrayItemIndexS* indices_begin, ArrayItemIndexS* indices_end, int64_t &num_nan)
       -> typename std::enable_if_t<std::is_floating_point<T>::value> {
     PartitionNulls(indices_begin, indices_end);
     if (NaN_check_) {
@@ -1356,13 +1356,13 @@ class SortOnekeyKernel  : public SortArraysToIndicesKernel::Impl {
   }
 
   template <typename T>
-  auto Partition(ArrayItemIndex* indices_begin, ArrayItemIndex* indices_end, int64_t &num_nan)
+  auto Partition(ArrayItemIndexS* indices_begin, ArrayItemIndexS* indices_end, int64_t &num_nan)
       -> typename std::enable_if_t<!std::is_floating_point<T>::value> {
     PartitionNulls(indices_begin, indices_end);
   }
 
   template <typename T>
-  auto Sort(ArrayItemIndex* indices_begin, ArrayItemIndex* indices_end, int64_t num_nan)
+  auto Sort(ArrayItemIndexS* indices_begin, ArrayItemIndexS* indices_end, int64_t num_nan)
       -> typename std::enable_if_t<!std::is_same<T, std::string>::value> {
     if (asc_) {
       if (nulls_first_) {
@@ -1373,7 +1373,7 @@ class SortOnekeyKernel  : public SortArraysToIndicesKernel::Impl {
             [this](auto& x) -> decltype(auto){ return cached_key_[x.array_id]->GetView(x.id); });
       }
     } else {
-      auto comp = [this](ArrayItemIndex x, ArrayItemIndex y) {
+      auto comp = [this](ArrayItemIndexS x, ArrayItemIndexS y) {
         return cached_key_[x.array_id]->GetView(x.id) > cached_key_[y.array_id]->GetView(y.id);};
       if (nulls_first_) {
         std::sort(indices_begin + nulls_total_ + num_nan, indices_begin + items_total_, comp);
@@ -1384,10 +1384,10 @@ class SortOnekeyKernel  : public SortArraysToIndicesKernel::Impl {
   }
 
   template <typename T>
-  auto Sort(ArrayItemIndex* indices_begin, ArrayItemIndex* indices_end, int64_t num_nan)
+  auto Sort(ArrayItemIndexS* indices_begin, ArrayItemIndexS* indices_end, int64_t num_nan)
       -> typename std::enable_if_t<std::is_same<T, std::string>::value> {
     if (asc_) {
-      auto comp = [this](ArrayItemIndex x, ArrayItemIndex y) {
+      auto comp = [this](ArrayItemIndexS x, ArrayItemIndexS y) {
         return cached_key_[x.array_id]->GetString(x.id) < cached_key_[y.array_id]->GetString(y.id);};
       if (nulls_first_) {
         std::sort(indices_begin + nulls_total_, indices_begin + items_total_, comp);
@@ -1395,7 +1395,7 @@ class SortOnekeyKernel  : public SortArraysToIndicesKernel::Impl {
         std::sort(indices_begin, indices_begin + items_total_ - nulls_total_, comp);
       }
     } else {
-      auto comp = [this](ArrayItemIndex x, ArrayItemIndex y) {
+      auto comp = [this](ArrayItemIndexS x, ArrayItemIndexS y) {
         return cached_key_[x.array_id]->GetString(x.id) > cached_key_[y.array_id]->GetString(y.id);};
       if (nulls_first_) {
         std::sort(indices_begin + nulls_total_, indices_begin + items_total_, comp);
@@ -1408,17 +1408,17 @@ class SortOnekeyKernel  : public SortArraysToIndicesKernel::Impl {
   arrow::Status FinishInternal(std::shared_ptr<FixedSizeBinaryArray>* out) {    
     // initiate buffer for all arrays
     std::shared_ptr<arrow::Buffer> indices_buf;
-    int64_t buf_size = items_total_ * sizeof(ArrayItemIndex);
+    int64_t buf_size = items_total_ * sizeof(ArrayItemIndexS);
     RETURN_NOT_OK(arrow::AllocateBuffer(ctx_->memory_pool(), buf_size, &indices_buf));
-    ArrayItemIndex* indices_begin = 
-      reinterpret_cast<ArrayItemIndex*>(indices_buf->mutable_data());
-    ArrayItemIndex* indices_end = indices_begin + items_total_;
+    ArrayItemIndexS* indices_begin = 
+      reinterpret_cast<ArrayItemIndexS*>(indices_buf->mutable_data());
+    ArrayItemIndexS* indices_end = indices_begin + items_total_;
     // do partition and sort here
     int64_t num_nan = 0;
     Partition<CTYPE>(indices_begin, indices_end, num_nan);
     Sort<CTYPE>(indices_begin, indices_end, num_nan);
     std::shared_ptr<arrow::FixedSizeBinaryType> out_type;
-    RETURN_NOT_OK(MakeFixedSizeBinaryType(sizeof(ArrayItemIndex) / sizeof(int32_t), &out_type));
+    RETURN_NOT_OK(MakeFixedSizeBinaryType(sizeof(ArrayItemIndexS) / sizeof(int32_t), &out_type));
     RETURN_NOT_OK(MakeFixedSizeBinaryArray(out_type, items_total_, indices_buf, out));
     return arrow::Status::OK();
   }
@@ -1461,7 +1461,7 @@ class SortOnekeyKernel  : public SortArraysToIndicesKernel::Impl {
           total_length_(indices_in->length()),
           cached_in_(cached) {
       col_num_ = schema->num_fields();
-      indices_begin_ = (ArrayItemIndex*)indices_in->value_data();
+      indices_begin_ = (ArrayItemIndexS*)indices_in->value_data();
       // appender_type won't be used
       AppenderBase::AppenderType appender_type = AppenderBase::left;
       for (int i = 0; i < col_num_; i++) {
@@ -1522,7 +1522,7 @@ class SortOnekeyKernel  : public SortArraysToIndicesKernel::Impl {
     arrow::compute::FunctionContext* ctx_;
     uint64_t batch_size_;
     int col_num_;
-    ArrayItemIndex* indices_begin_;
+    ArrayItemIndexS* indices_begin_;
     std::vector<arrow::ArrayVector> cached_in_;
     std::vector<std::shared_ptr<arrow::DataType>> type_list_;
     std::vector<std::shared_ptr<AppenderBase>> appender_list_;
