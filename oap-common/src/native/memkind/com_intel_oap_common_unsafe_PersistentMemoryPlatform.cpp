@@ -50,11 +50,17 @@ inline void check(JNIEnv *env) {
   }
 }
 
+/**
+* Initialize KMem Dax mode of RDD Cache , set persistent memory of memory kind to MEKKIND_DAX_KMEM type, this type supports numa operation and device direct access.
+*/
 JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_initializeKmem
   (JNIEnv *, jclass) {
   pmemkind = MEMKIND_DAX_KMEM;
 }
 
+/**
+* Initialize path,size and pattern of persistent memory
+*/
 JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_initializeNative
   (JNIEnv *env, jclass clazz, jstring path, jlong size, jint pattern) {
   // str should not be null, we should checked in java code
@@ -83,6 +89,9 @@ JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform
   env->ReleaseStringUTFChars(path, str);
 }
 
+/**
+ * Set MEMKIND_DAX_KMEM_NODES env or MEMKIND_REGULAR_NODES env by memkind, memkind will recognize this  numa node from pmem or dram
+ */
 JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_setNUMANode
   (JNIEnv *env, jclass, jstring dax_node, jstring regular_node) {
   const char* dax_node_str = env->GetStringUTFChars(dax_node, NULL);
@@ -94,6 +103,9 @@ JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform
   env->ReleaseStringUTFChars(dax_node, dax_node_str);
 }
 
+/**
+* Allocate the volatile memory on persistent memory by malloc method of memkind
+*/
 JNIEXPORT jlong JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_allocateVolatileMemory
   (JNIEnv *env, jclass clazz, jlong size) {
   check(env);
@@ -112,6 +124,9 @@ JNIEXPORT jlong JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatfor
   return addr_to_java(p);
 }
 
+/**
+ * Get the actual occupied size of the given address on persistent memory by malloc_usable_size method of memkind
+ */
 JNIEXPORT jlong JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_getOccupiedSize
   (JNIEnv *env, jclass clazz, jlong address) {
   check(env);
@@ -119,6 +134,9 @@ JNIEXPORT jlong JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatfor
   return memkind_malloc_usable_size(pmemkind, p);
 }
 
+/**
+* Free the volatile memory on persistent memory by free method of memkind
+*/
 JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_freeMemory
   (JNIEnv *env, jclass clazz, jlong address) {
   check(env);
