@@ -51,7 +51,7 @@ private[spark] class OapRpcManagerSlave(
   startOapHeartbeater()
 
   protected def heartbeatMessages: Array[() => Heartbeat] = {
-    return Array(
+    Array(
       () => FiberCacheHeartbeat(
         executorId, blockManager.blockManagerId, fiberCacheManager.status()),
       () => FiberCacheMetricsHeartbeat(executorId, blockManager.blockManagerId,
