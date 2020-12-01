@@ -128,7 +128,7 @@ private[spark] class BaseShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
     // Sort the output if there is a sort ordering defined.
     val resultIter = dep.keyOrdering match {
       case Some(keyOrd: Ordering[K]) =>
-        assert(pmofConf.enablePmem == true)
+        assert(pmofConf.enablePmem)
         // Create an ExternalSorter to sort the data.
         val sorter =
           new PmemExternalSorter[K, C, C](context, handle, pmofConf, ordering = Some(keyOrd), serializer = dep.serializer)
