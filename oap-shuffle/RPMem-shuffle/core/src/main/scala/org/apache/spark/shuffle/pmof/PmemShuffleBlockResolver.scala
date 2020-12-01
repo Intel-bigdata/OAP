@@ -11,7 +11,7 @@ private[spark] class PmemShuffleBlockResolver(
     conf: SparkConf,
     _blockManager: BlockManager = null)
   extends IndexShuffleBlockResolver(conf, _blockManager) with Logging {
-  // create ShuffleHandler here, so multiple executors can share
+  
   var partitionBufferArray: Array[PmemBlockOutputStream] = _
 
   override def getBlockData(blockId: BlockId, dirs: Option[Array[String]]): ManagedBuffer = {
