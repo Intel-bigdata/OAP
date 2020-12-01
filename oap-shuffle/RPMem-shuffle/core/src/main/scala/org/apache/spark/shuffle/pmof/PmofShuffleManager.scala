@@ -10,7 +10,7 @@ import org.apache.spark.util.configuration.pmof.PmofConf
 import org.apache.spark.{ShuffleDependency, SparkConf, SparkEnv, TaskContext}
 
 private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
-  logInfo("Initialize RdmaShuffleManager")
+  logInfo("Initialize PmofShuffleManager")
 
   if (!conf.getBoolean("spark.shuffle.spill", defaultValue = true)) {
     logWarning("spark.shuffle.spill was set to false")
