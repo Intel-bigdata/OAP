@@ -70,6 +70,36 @@ jobs:
       - bash grep.sh
       - # run data source unit tests
       - mvn -q test -pl oap-data-source/arrow -am
+    - name: oap-native-sql-tpch
+      dist: bionic
+      jdk:
+        - openjdk8
+      before_install:
+        - echo ${TRAVIS_COMMIT_MESSAGE}
+        #- if [[ ${TRAVIS_COMMIT_MESSAGE} != \[oap-native-sql\]* ]]; then travis_terminate 0 ; fi ;
+        - sudo apt-get install cmake
+        - sudo apt-get install libboost-all-dev
+        - export | grep JAVA_HOME
+      install:
+        - # Download spark 3.0
+        - "[ -f spark ] || mkdir spark && cd spark && wget http://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0-bin-hadoop2.7.tgz && cd .."
+        - "tar -xf ./spark/spark-3.0.0-bin-hadoop2.7.tgz"
+        - "export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7"
+      before_script:
+        - cd /tmp
+        - git clone https://github.com/intel-bigdata/arrow.git
+        - cd arrow && git checkout oap-master && cd cpp
+        - sed -i "s/\${Python3_EXECUTABLE}/\/opt\/pyenv\/shims\/python3/g" CMakeLists.txt
+        - mkdir build && cd build
+        - cmake .. -DARROW_JNI=ON -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_FILESYSTEM=ON -DARROW_WITH_SNAPPY=ON -DARROW_JSON=ON -DARROW_DATASET=ON -DARROW_WITH_LZ4=ON && make -j2
+        - sudo make install
+        - cd ../../java
+        - mvn clean install -q -P arrow-jni -am -Darrow.cpp.build.dir=/tmp/arrow/cpp/build/release/ -DskipTests -Dcheckstyle.skip
+      script:
+        - cd ${TRAVIS_BUILD_DIR}/
+        - # run tpch tests within 4.5G process memory limitation
+        - export MAVEN_OPTS="-Xmx2048m"
+        - mvn test -DmembersOnlySuites=com.intel.oap.tpch -pl oap-native-sql/core -am
     - name: oap-shuffle-remote-shuffle
       install:
       - #empty install step
