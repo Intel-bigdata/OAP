@@ -362,7 +362,7 @@ class MemoryUsageTest extends QueryTest with SharedSparkSession {
 
     val files = new File(TPCH_WRITE_PATH).listFiles()
     files.foreach(file => {
-      println("Creating catalog table: " + file.getName)
+      MemoryUsageTest.stdoutLog("Creating catalog table: " + file.getName)
       spark.catalog.createTable(file.getName, file.getAbsolutePath, "arrow")
       try {
         spark.catalog.recoverPartitions(file.getName)
@@ -406,14 +406,18 @@ class MemoryUsageTest extends QueryTest with SharedSparkSession {
 
     def updateComment(): Unit = {
       val content = withEof()
-      println("Updating comment:\n%s".format(content))
-      issueComment.foreach(_.update(content))
+      issueComment.foreach(c => {
+        MemoryUsageTest.stdoutLog("Updating comment:\n%s".format(content))
+        c.update(content)
+      })
     }
 
     def finishComment(): Unit = {
       val content = withEofFinished()
-      println("Finishing comment:\n%s".format(content))
-      issueComment.foreach(_.update(content))
+      issueComment.foreach(c => {
+        MemoryUsageTest.stdoutLog("Finishing comment:\n%s".format(content))
+        c.update(content)
+      })
     }
 
     def appendReportLine() = {
@@ -435,7 +439,7 @@ class MemoryUsageTest extends QueryTest with SharedSparkSession {
         .append(' ')
         .append("OS Used: %d MB".format((os / 1000L)))
       val line = lineBuilder.toString()
-      println("Appending RAM report line: " + line)
+      MemoryUsageTest.stdoutLog("Appending RAM report line: " + line)
       commentBuilder.append(line).append('\n')
     }
 
@@ -466,7 +470,7 @@ class MemoryUsageTest extends QueryTest with SharedSparkSession {
     val path = "tpch-queries/q" + caseId + ".sql";
     val absolute = MemoryUsageTest.locateResourcePath(path)
     val sql = FileUtils.readFileToString(new File(absolute), StandardCharsets.UTF_8)
-    println("Running TPC-H query %d (round %d)... ".format(caseId, roundId))
+    MemoryUsageTest.stdoutLog("Running TPC-H query %d (round %d)... ".format(caseId, roundId))
     val df = spark.sql(sql)
     df.show(100)
   }
@@ -607,7 +611,7 @@ object MemoryUsageTest {
   def commentOnTravisBuildPR(comment: String): Option[GHIssueComment] = {
     val repoSlug = System.getenv("TRAVIS_REPO_SLUG")
     val prId = System.getenv("TRAVIS_PULL_REQUEST")
-    println("Trying to submit comment to build PR... " +
+    stdoutLog("Trying to submit comment to build PR... " +
         "Envs: TRAVIS_REPO_SLUG: %s, TRAVIS_PULL_REQUEST: %s" .format(repoSlug, prId))
     if (StringUtils.isEmpty(repoSlug)) {
       return None
@@ -620,19 +624,19 @@ object MemoryUsageTest {
     }
     val ramReporterPassword = System.getenv("RAM_REPORTER_PASSWORD")
     if (StringUtils.isEmpty(ramReporterPassword)) {
-      println("WARNING: No RAM_REPORTER_PASSWORD set. Will produce no RAM reports. ")
+      stdoutLog("WARNING: No RAM_REPORTER_PASSWORD set. Will produce no RAM reports. ")
       return None
     }
     val jwtToken = GitHubUtils.createJWT("91402", 600000L, ramReporterPassword)
     val gitHubApp = new GitHubBuilder()
-      .withJwtToken(jwtToken).build()
+        .withJwtToken(jwtToken).build()
     val appInstallation = gitHubApp.getApp.getInstallationById(13345709)
     val permissions = new util.HashMap[String, GHPermissionType]()
     permissions.put("pull_requests", GHPermissionType.WRITE)
 
     val installationToken = appInstallation.createToken(permissions).create()
     val inst = new GitHubBuilder()
-      .withAppInstallationToken(installationToken.getToken)
+        .withAppInstallationToken(installationToken.getToken)
       .build()
 
     val repository = inst.getRepository(repoSlug)
@@ -641,16 +645,21 @@ object MemoryUsageTest {
     if (StringUtils.isEmpty(title)) {
       return None
     }
-    if (!title.contains("[oap-native-sql]") && !title.contains("[oap-data-sourceh]")) {
+    if (!title.contains("[oap-native-sql]") && !title.contains("[oap-data-source]")) {
+      stdoutLog("PR title <%s> not matching, ignoring".format(title))
       return None
     }
     val c = pr.comment(comment)
-    println("Comment successfully submitted. ")
+    stdoutLog("Comment successfully submitted. ")
     Some(c)
+  }
+  
+  def stdoutLog(line: Any): Unit = {
+    println("[RAM Reporter] %s".format(line))
   }
 
   def main(args: Array[String]): Unit = {
-    println(commentOnTravisBuildPR("HELLO WORLD"))
+    stdoutLog(commentOnTravisBuildPR("HELLO WORLD"))
     val monitor = new RAMMonitor()
     monitor.startMonitorDaemon()
     Thread.sleep(30000L)

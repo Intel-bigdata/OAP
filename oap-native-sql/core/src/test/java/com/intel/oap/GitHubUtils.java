@@ -16,17 +16,14 @@
  */
 package com.intel.oap;
 
-import com.google.common.io.Files;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.apache.commons.io.FileUtils;
 
 import javax.crypto.Cipher;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.File;
-import java.io.IOException;
 import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
@@ -37,8 +34,8 @@ import java.util.Objects;
 public class GitHubUtils {
 
   public static PrivateKey get(String filename, String password) throws Exception {
-    byte[] keyBytes = Files.toByteArray(new File(filename));
-    byte[] decoded = Base64.getDecoder().decode(keyBytes);
+    String base64Key = FileUtils.readFileToString(new File(filename));
+    byte[] decoded = Base64.getMimeDecoder().decode(base64Key);
     MessageDigest md = MessageDigest.getInstance("MD5");
     Key aesKey = new SecretKeySpec(md.digest(password.getBytes()), "AES");
     Cipher cipher = Cipher.getInstance("AES");
@@ -90,7 +87,7 @@ public class GitHubUtils {
     Cipher cipher = Cipher.getInstance("AES");
     cipher.init(Cipher.ENCRYPT_MODE, aesKey);
     byte[] encrypted = cipher.doFinal(FileUtils.readFileToByteArray(new File(file)));
-    String s = Base64.getEncoder().encodeToString(encrypted);
+    String s = Base64.getMimeEncoder().encodeToString(encrypted);
     FileUtils.write(new File("tpch-ram-usage-reporter.2020-12-04.private-key.b64"), s);
   }
 }
