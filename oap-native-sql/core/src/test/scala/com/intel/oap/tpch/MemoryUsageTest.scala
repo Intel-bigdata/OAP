@@ -390,6 +390,14 @@ class MemoryUsageTest extends QueryTest with SharedSparkSession {
     def withEof(): String = {
       val builder = new StringBuilder
       builder.append(commentBuilder.toString())
+      builder.append("...").append('\n')
+      builder.append("```").append('\n')
+      builder.toString()
+    }
+
+    def withEofFinished(): String = {
+      val builder = new StringBuilder
+      builder.append(commentBuilder.toString())
       builder.append("```").append('\n')
       builder.toString()
     }
@@ -402,6 +410,11 @@ class MemoryUsageTest extends QueryTest with SharedSparkSession {
       issueComment.foreach(_.update(content))
     }
 
+    def finishComment(): Unit = {
+      val content = withEofFinished()
+      println("Finishing comment:\n%s".format(content))
+      issueComment.foreach(_.update(content))
+    }
 
     def appendReportLine() = {
       val jvmHeapUsed = ramMonitor.getJVMHeapUsed()
@@ -446,6 +459,7 @@ class MemoryUsageTest extends QueryTest with SharedSparkSession {
         updateComment()
     }
     ramMonitor.close()
+    finishComment()
   }
 
   private def runTPCHQuery(caseId: Int, roundId: Int): Unit = {
@@ -611,7 +625,6 @@ object MemoryUsageTest {
     }
     val jwtToken = GitHubUtils.createJWT("91402", 600000L, ramReporterPassword)
     val gitHubApp = new GitHubBuilder()
-      .withProxy(new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress("child-prc.intel.com", 913)))
       .withJwtToken(jwtToken).build()
     val appInstallation = gitHubApp.getApp.getInstallationById(13345709)
     val permissions = new util.HashMap[String, GHPermissionType]()
@@ -619,7 +632,6 @@ object MemoryUsageTest {
 
     val installationToken = appInstallation.createToken(permissions).create()
     val inst = new GitHubBuilder()
-      .withProxy(new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress("child-prc.intel.com", 913)))
       .withAppInstallationToken(installationToken.getToken)
       .build()
 
