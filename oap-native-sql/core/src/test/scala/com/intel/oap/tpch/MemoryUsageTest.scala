@@ -622,12 +622,12 @@ object MemoryUsageTest {
     if (StringUtils.equalsIgnoreCase(prId, "false")) {
       return None
     }
-    val ramReporterPassword = System.getenv("RAM_REPORTER_PASSWORD")
-    if (StringUtils.isEmpty(ramReporterPassword)) {
-      stdoutLog("WARNING: No RAM_REPORTER_PASSWORD set. Will produce no RAM reports. ")
+    val password = System.getenv("BUILDER_HELPER_PASSWORD")
+    if (StringUtils.isEmpty(password)) {
+      stdoutLog("WARNING: No BUILDER_HELPER_PASSWORD set. Will produce no RAM reports. ")
       return None
     }
-    val jwtToken = GitHubUtils.createJWT("91402", 600000L, ramReporterPassword)
+    val jwtToken = GitHubUtils.createJWT("91402", 600000L, password)
     val gitHubApp = new GitHubBuilder()
         .withJwtToken(jwtToken).build()
     val appInstallation = gitHubApp.getApp.getInstallationById(13345709)
@@ -660,9 +660,9 @@ object MemoryUsageTest {
 
   def main(args: Array[String]): Unit = {
     stdoutLog(commentOnTravisBuildPR("HELLO WORLD"))
-    val monitor = new RAMMonitor()
-    monitor.startMonitorDaemon()
-    Thread.sleep(30000L)
-    monitor.close()
+//    val monitor = new RAMMonitor()
+//    monitor.startMonitorDaemon()
+//    Thread.sleep(30000L)
+//    monitor.close()
   }
 }

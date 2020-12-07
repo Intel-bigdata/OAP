@@ -97,7 +97,7 @@ jobs:
         - mvn clean install -q -P arrow-jni -am -Darrow.cpp.build.dir=/tmp/arrow/cpp/build/release/ -DskipTests -Dcheckstyle.skip
       script:
         - cd ${TRAVIS_BUILD_DIR}/
-        - # run tpch tests within 4.5G process memory limitation
+        - # run tpch tests
         - export MAVEN_OPTS="-Xmx2048m"
         - mvn test -DmembersOnlySuites=com.intel.oap.tpch -pl oap-native-sql/core -am
     - name: oap-shuffle-remote-shuffle

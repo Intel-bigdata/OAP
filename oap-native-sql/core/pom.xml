@@ -221,11 +221,6 @@
       <groupId>org.apache.parquet</groupId>
       <artifactId>parquet-avro</artifactId>
       <version>1.11.0</version>
-    </dependency>
-    <dependency>
-      <groupId>com.intel.oap</groupId>
-      <artifactId>spark-arrow-datasource-standard</artifactId>
-      <version>0.9.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>
