@@ -25,13 +25,11 @@ import java.sql.Date
 import java.text.SimpleDateFormat
 import java.util.{Scanner, StringTokenizer}
 import java.util
-import java.util.concurrent.{Executors, ScheduledFuture, TimeUnit}
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{Executors, TimeUnit}
 
 import com.intel.oap.GitHubUtils
 import com.intel.oap.tpch.MemoryUsageTest.RAMMonitor
 import io.prestosql.tpch._
-import javax.imageio.ImageIO
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang.StringUtils
 import org.apache.log4j.{Level, LogManager}
@@ -40,11 +38,7 @@ import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.types._
-import org.jfree.chart.ChartFactory
-import org.jfree.data.xy.DefaultXYDataset
 import org.kohsuke.github.{GHIssueComment, GHPermissionType, GitHubBuilder}
-
-import scala.collection.mutable.ArrayBuffer
 
 class MemoryUsageTest extends QueryTest with SharedSparkSession {
 
@@ -490,7 +484,6 @@ object MemoryUsageTest {
   // not thread-safe
   class RAMMonitor extends AutoCloseable {
 
-    val executor = Executors.newSingleThreadScheduledExecutor()
     var closed = false
 
     def getJVMHeapUsed(): Long = {
@@ -558,52 +551,7 @@ object MemoryUsageTest {
       return tok.nextToken().toLong
     }
 
-    def startMonitorDaemon(): ScheduledFuture[_] = {
-      if (closed) {
-        throw new IllegalStateException()
-      }
-      val counter = new AtomicInteger(0)
-      val heapUsedBuffer = ArrayBuffer[Double]()
-      val heapTotalBuffer = ArrayBuffer[Double]()
-      val pidRamUsedBuffer = ArrayBuffer[Double]()
-      val osRamUsedBuffer = ArrayBuffer[Double]()
-      val indexBuffer = ArrayBuffer[Double]()
-
-      executor.scheduleAtFixedRate(new Runnable {
-        override def run(): Unit = {
-          val i = counter.getAndIncrement()
-          val pidRamUsed = getCurrentPIDRAMUsed()
-          val osRamUsed = getOSRAMUsed()
-          val heapUsed = getJVMHeapUsed()
-          val heapTotal = getJVMHeapTotal()
-
-          heapUsedBuffer.append(heapUsed)
-          heapTotalBuffer.append(heapTotal)
-          pidRamUsedBuffer.append(pidRamUsed)
-          osRamUsedBuffer.append(osRamUsed)
-
-          indexBuffer.append(i)
-
-
-          if (i % 10 == 0) {
-            val dataset = new DefaultXYDataset()
-            dataset.addSeries("JVM Heap Used", Array(indexBuffer.toArray, heapUsedBuffer.toArray))
-            dataset.addSeries("JVM Heap Total", Array(indexBuffer.toArray, heapTotalBuffer.toArray))
-            dataset.addSeries("Process Res Total", Array(indexBuffer.toArray, pidRamUsedBuffer.toArray))
-            dataset.addSeries("OS Res Total", Array(indexBuffer.toArray, osRamUsedBuffer.toArray))
-
-            ImageIO.write(
-              ChartFactory.createScatterPlot("RAM Usage History (TPC-H)", "Up Time (Second)", "Memory Used (KB)", dataset)
-                  .createBufferedImage(512, 512),
-              "png", new File("sample.png"))
-          }
-        }
-      }, 0L, 1000L, TimeUnit.MILLISECONDS)
-    }
-
     override def close(): Unit = {
-      executor.shutdown()
-      executor.awaitTermination(Long.MaxValue, TimeUnit.MILLISECONDS)
       closed = true
     }
   }
@@ -660,9 +608,8 @@ object MemoryUsageTest {
 
   def main(args: Array[String]): Unit = {
     stdoutLog(commentOnTravisBuildPR("HELLO WORLD"))
-//    val monitor = new RAMMonitor()
-//    monitor.startMonitorDaemon()
-//    Thread.sleep(30000L)
-//    monitor.close()
+    val monitor = new RAMMonitor()
+    Thread.sleep(30000L)
+    monitor.close()
   }
 }

@@ -230,12 +230,6 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.jfree</groupId>
-      <artifactId>jfreechart</artifactId>
-      <version>1.5.1</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>io.prestosql.tpch</groupId>
       <artifactId>tpch</artifactId>
       <version>1.0</version>
