@@ -135,6 +135,9 @@ class pmemkv {
         return -1;
       }
       struct block_entry* bep = (struct block_entry*)pmemobj_direct(beo);
+      if (bep == nullptr){
+          return -1;
+      }
       bep->data = pmemobj_tx_zalloc(count, DATA_TYPE);
       if (bep->data.off == 0) {
         (void) pmemobj_tx_end();
@@ -156,7 +159,10 @@ class pmemkv {
       } else {
         // add the modified tail entry to the undo data
         pmemobj_tx_add_range(bp->tail, 0, sizeof(struct block_entry));
-        ((struct block_entry*)pmemobj_direct(bp->tail))->hdr.next = beo;
+        block_entry* tail_bep = (struct block_entry*)pmemobj_direct(bp->tail);
+        if (tail_bep != nullptr){
+          tail_bep->hdr.next = beo;
+        }
       }
 
       bp->tail = beo; // update tail
@@ -260,7 +266,9 @@ class pmemkv {
             //There are two or more block_entry
             bp->head = bep->hdr.next;
             block_entry* new_head_pointer = (struct block_entry*)pmemobj_direct(bp->head);
-            new_head_pointer->hdr.pre = OID_NULL;
+            if(new_head_pointer != nullptr){
+                new_head_pointer->hdr.pre = OID_NULL;
+            }
             bp->bytes_written = bp->bytes_written - bep->hdr.size;
             pmemobj_free(&bep->data);
             pmemobj_free(&cur->beo);
@@ -276,7 +284,9 @@ class pmemkv {
         if (pmemobj_direct(bep->hdr.next) == nullptr){
             //The one node scenario is already covered in head judgement, there are two or more nodes here
             struct block_entry* prebep = (struct block_entry*)pmemobj_direct(bep->hdr.pre);
-            prebep->hdr.next = OID_NULL;
+            if (prebep != nullptr){
+                prebep->hdr.next = OID_NULL;
+            }
             bp->tail = bep->hdr.pre;
             if((struct block_entry*)pmemobj_direct(bp->tail) == nullptr){
                 std::cout<<"Error. The bp->tail should not be nullptr"<<std::endl;
@@ -297,6 +307,9 @@ class pmemkv {
         struct block_entry* prebep = (struct block_entry*)pmemobj_direct(bep->hdr.pre);
         prebep->hdr.next = bep->hdr.next;
         struct block_entry* nextbep = (struct block_entry*)pmemobj_direct(bep->hdr.next);
+        if (nextbep == nullptr){
+            return -1;
+        }
         nextbep->hdr.pre = bep->hdr.pre;
         bp->bytes_written = bp->bytes_written - bep->hdr.size;
         pmemobj_free(&bep->data);
@@ -458,6 +471,9 @@ class pmemkv {
       }
       bo = pmemobj_root(pmem_pool, sizeof(struct base));
       bp = (struct base*)pmemobj_direct(bo);
+      if (bp == nullptr){
+        return -1;
+      }
       bp->head = OID_NULL;
       bp->tail = OID_NULL;
       bp->bytes_written = 0;
@@ -477,6 +493,9 @@ class pmemkv {
       // walk through all the block entry in pmem, don't need lock here
       bo = pmemobj_root(pmem_pool, sizeof(struct base));
       bp = (struct base*)pmemobj_direct(bo);
+      if(bp == nullptr){
+        return -1;
+      }
       struct block_entry *next = (struct block_entry*)pmemobj_direct(bp->head);
       PMEMoid next_beo = bp->head;
       while (next != nullptr) {
@@ -533,6 +552,7 @@ class pmemkv {
         bm->beo = beo;
         struct block_meta_list* bml = (struct block_meta_list*)std::malloc(sizeof(block_meta_list));
         if (!bml) {
+          free(bm);
           perror("malloc error in pmemkv update_meta");
           return -1;
         }

@@ -68,6 +68,10 @@ public class PersistentMemoryMetaHandler {
         if (fl != null) {
           fl.release();
         }
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      try {
         if (fos != null) {
           fos.close();
         }
@@ -113,6 +117,10 @@ public class PersistentMemoryMetaHandler {
         if (fl != null) {
           fl.release();
         }
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      try {
         if (fos != null) {
           fos.close();
         }
@@ -165,6 +173,10 @@ public class PersistentMemoryMetaHandler {
         if (fl != null) {
           fl.release();
         }
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      try {
         if (fos != null) {
           fos.close();
         }
@@ -242,11 +254,15 @@ public class PersistentMemoryMetaHandler {
         if (fl != null) {
           fl.release();
         }
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      try {
         if (fos != null) {
           fos.close();
         }
       } catch (IOException e) {
-        e.printStackTrace();
+          e.printStackTrace();
       }
     }
     System.out.println("Metastore DB: get unused device, should be " + device + ".");
