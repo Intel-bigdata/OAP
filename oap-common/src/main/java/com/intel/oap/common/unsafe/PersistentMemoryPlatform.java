@@ -19,6 +19,7 @@ package com.intel.oap.common.unsafe;
 
 import com.google.common.base.Preconditions;
 import com.intel.oap.common.util.NativeLibraryLoader;
+import com.intel.oap.common.util.MemCopyUtil;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
@@ -139,4 +140,33 @@ public class PersistentMemoryPlatform {
    * Free the memory by address.
    */
   public static native void freeMemory(long address);
+
+  /**
+   * Copy the memory with clflush.
+   */
+  public static native void copyMemory(long dst, long src, long length);
+
+  public static void copyMemory(Object src, long srcOffset,
+      Object dst, long dstOffset, long length) {
+    copyMemory(src, srcOffset, dst, dstOffset, length, true);
+  }
+
+  /**
+   * Copy from the object src to the object dst.
+   * @param src the src object.
+   * @param srcOffset the offset in src object.
+   * @param dst the dst object.
+   * @param dstOffset the offset in dst object.
+   * @param length the bytes size to copy.
+   * @param clflush flag to enable clfush in the native copy.
+   */
+  public static void copyMemory(Object src, long srcOffset,
+      Object dst, long dstOffset, long length, boolean clflushEnabled) {
+    if (src == null && dst == null && clflushEnabled) {
+      copyMemory(dstOffset, srcOffset, length);
+    } else {
+      MemCopyUtil.copyMemory(src, srcOffset, dst, dstOffset, length);
+    }
+  }
 }
+

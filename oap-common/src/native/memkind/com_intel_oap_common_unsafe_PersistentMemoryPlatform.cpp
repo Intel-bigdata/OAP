@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <stdexcept>
+#include <emmintrin.h>
 #include "com_intel_oap_common_unsafe_PersistentMemoryPlatform.h"
 
 using memkind = struct memkind;
@@ -51,16 +52,16 @@ inline void check(JNIEnv *env) {
 }
 
 /**
-* Initialize KMem Dax mode of RDD Cache , set persistent memory of memory kind to MEKKIND_DAX_KMEM type, this type supports numa operation and device direct access.
-*/
+ * Initialize KMem Dax mode of RDD Cache , set persistent memory of memory kind to MEKKIND_DAX_KMEM type, this type supports numa operation and device direct access.
+ */
 JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_initializeKmem
   (JNIEnv *, jclass) {
   pmemkind = MEMKIND_DAX_KMEM;
 }
 
 /**
-* Initialize path,size and pattern of persistent memory
-*/
+ * Initialize path,size and pattern of persistent memory
+ */
 JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_initializeNative
   (JNIEnv *env, jclass clazz, jstring path, jlong size, jint pattern) {
   // str should not be null, we should checked in java code
@@ -104,8 +105,8 @@ JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform
 }
 
 /**
-* Allocate the volatile memory on persistent memory by malloc method of memkind
-*/
+ * Allocate the volatile memory on persistent memory by malloc method of memkind
+ */
 JNIEXPORT jlong JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_allocateVolatileMemory
   (JNIEnv *env, jclass clazz, jlong size) {
   check(env);
@@ -135,18 +136,37 @@ JNIEXPORT jlong JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatfor
 }
 
 /**
-* Free the volatile memory on persistent memory by free method of memkind
-*/
+ * Free the volatile memory on persistent memory by free method of memkind
+ */
 JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_freeMemory
   (JNIEnv *env, jclass clazz, jlong address) {
   check(env);
   memkind_free(pmemkind, addr_from_java(address));
 }
 
+/**
+ * Copy from a given block of memory to pmem with clflush enabled.
+ */
 JNIEXPORT void JNICALL Java_com_intel_oap_common_unsafe_PersistentMemoryPlatform_copyMemory
   (JNIEnv *env, jclass clazz, jlong destination, jlong source, jlong size) {
   size_t sz = (size_t)size;
-  void *dest = addr_from_java(destination);
-  void *src = addr_from_java(source);
-  std::memcpy(dest, src, sz);
+  char *dest = (char *)addr_from_java(destination);
+  char *src = (char *)addr_from_java(source);
+
+  #define BYTES_PER_CLFLUSH (256)
+
+  while (sz >= BYTES_PER_CLFLUSH) {
+    memcpy(dest, src, BYTES_PER_CLFLUSH);
+    _mm_clflush(dest);
+    dest += BYTES_PER_CLFLUSH;
+    src += BYTES_PER_CLFLUSH;
+    sz -= BYTES_PER_CLFLUSH;
+  }
+
+  if (sz) {
+    memcpy(dest, src, sz);
+  }
+
+  return;
 }
+
