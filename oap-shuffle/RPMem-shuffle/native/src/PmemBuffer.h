@@ -54,7 +54,9 @@ public:
         free(tmp_buf_data);
       }
       pos = remaining;
-      memcpy(buf_data + pos, pmem_data_addr, pmem_data_len);
+      if (buf_data != nullptr){
+          memcpy(buf_data + pos, pmem_data_addr, pmem_data_len);
+      }
     } else if (remaining == 0) {
 			if (buf_data_capacity < pmem_data_len) {
 				free(buf_data);

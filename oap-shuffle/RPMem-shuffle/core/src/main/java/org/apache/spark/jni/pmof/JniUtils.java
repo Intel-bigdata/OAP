@@ -54,12 +54,18 @@ public class JniUtils {
   private static File moveFileFromJarToTemp(final String tmpDir, String libraryToLoad)
       throws IOException {
     final File temp = File.createTempFile(tmpDir, libraryToLoad);
-    try (final InputStream is =
-        JniUtils.class.getClassLoader().getResourceAsStream(libraryToLoad)) {
+    final InputStream is = JniUtils.class.getClassLoader().getResourceAsStream(libraryToLoad);
+    try{
       if (is == null) {
         throw new FileNotFoundException(libraryToLoad);
       } else {
         Files.copy(is, temp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      }
+    }catch(Exception e){
+      e.printStackTrace();
+    }finally{
+      if (is != null){
+        is.close();
       }
     }
     return temp;
