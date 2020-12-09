@@ -32,13 +32,14 @@ JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
   struct memory_meta* mm = (struct memory_meta*)std::malloc(sizeof(struct memory_meta));
   if (mm != nullptr){
     mm->meta = (uint64_t*)std::malloc(size*2*sizeof(uint64_t));
+    pmkv->get_meta(key_str, mm);
+    jlongArray data = env->NewLongArray(mm->length);
+    env->SetLongArrayRegion(data, 0, mm->length, (jlong*)mm->meta);
+    std::free(mm->meta);
+    std::free(mm);
+    return data;
   }
-  pmkv->get_meta(key_str, mm);
-  jlongArray data = env->NewLongArray(mm->length);
-  env->SetLongArrayRegion(data, 0, mm->length, (jlong*)mm->meta);
-  std::free(mm->meta);
-  std::free(mm);
-  return data;
+  return nullptr;
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetBlockSize

@@ -306,6 +306,9 @@ class pmemkv {
 
         //Node to be deleted is at the middle, no head or tail, there are at least three nodes
         struct block_entry* prebep = (struct block_entry*)pmemobj_direct(bep->hdr.pre);
+        if(prebep == nullptr){
+           return -1;
+        }
         prebep->hdr.next = bep->hdr.next;
         struct block_entry* nextbep = (struct block_entry*)pmemobj_direct(bep->hdr.next);
         if (nextbep == nullptr){
