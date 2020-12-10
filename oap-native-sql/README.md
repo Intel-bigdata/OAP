@@ -1,4 +1,4 @@
-``# Spark Native SQL Engine
+# Spark Native SQL Engine
 
 A Native Engine for Spark SQL with vectorized SIMD optimizations
 

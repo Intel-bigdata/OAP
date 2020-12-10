@@ -1,10 +1,16 @@
-# ArrowDataSource for Apache Spark
+# Unified Arrow Data Source 
 A Spark DataSouce implementation for reading files into Arrow compatible columnar vectors.
 
 ## Note
 The development of this library is still in progress. As a result some of the functionality may not be constantly stable for being used in production environments that have not been fully considered due to the limited testing capabilities so far.
 
 ## Build
+
+### Building by Conda
+
+We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find built `spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar` under `$HOME/miniconda2/envs/oapenv/oap_jars`.
+Then you just skip steps below and jump to [Get Started](#Get-stated).
+
 ### Prerequisite
 
 There are some requirements before you build the project.
