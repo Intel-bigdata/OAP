@@ -13,7 +13,7 @@ For those algorithms that are not accelerated by Intel MLlib, the original Spark
 
 ### Java/Scala Users Preferred
 
-Use a pre-built Intel MLlib JAR to get started. You can firstly download OAP package from [OAP-JARs-Tarball](https://github.com/Intel-bigdata/OAP/releases/download/v0.9.0-spark-3.0.0/oap-0.9.0-bin-spark-3.0.0.tar.gz) and extract this Tarball to get `oap-mllib-x.x.x-with-spark-x.x.x.jar` under `oap-0.9.0-bin-spark-3.0.0/jars`.
+Use a pre-built Intel MLlib JAR to get started. You can firstly download OAP package from [OAP-JARs-Tarball](https://github.com/Intel-bigdata/OAP/releases/download/v1.0.0-spark-3.0.0/oap-1.0.0-bin-spark-3.0.0.tar.gz) and extract this Tarball to get `oap-mllib-x.x.x-with-spark-x.x.x.jar` under `oap-1.0.0-bin-spark-3.0.0/jars`.
 
 Then you can refer to the following [Running](#Running) section to try out.
 
@@ -119,7 +119,7 @@ To clone and checkout source code, run the following commands:
 ```
 __Optional__ to checkout specific release branch:
 ```
-    $ git checkout -b branch-0.9-spark-3.x origin/branch-0.9-spark-3.x
+    $ git checkout -b branch-1.0-spark-3.x origin/branch-1.0-spark-3.x
 ```
 
 We rely on environment variables to find required toolchains and libraries. Please make sure the following environment variables are set for building:

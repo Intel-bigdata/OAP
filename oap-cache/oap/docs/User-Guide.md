@@ -167,7 +167,7 @@ Data Source Cache can provide input data cache functionality to the executor. Wh
    When you run ```spark-shell``` to create the `oap_test` table, `metastore_db` will be created in the directory where you ran '$SPARK_HOME/bin/spark-shell'. ***Go to that directory*** and execute the following command to launch Thrift JDBC server and run queries.
 
    ```
-   . $SPARK_HOME/sbin/start-thriftserver.sh
+   $SPARK_HOME/sbin/start-thriftserver.sh
    ```
 
 3. Use Beeline and connect to the Thrift JDBC server, replacing the hostname (mythriftserver) with your own Thrift Server hostname.
@@ -206,8 +206,6 @@ The following steps are required to configure OAP to use PMem cache with `extern
 
 - PMem hardware is successfully deployed on each node in cluster.
 
-- SQL Data Source Cache uses Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store, it's a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/branch-0.17.0-oap-1.0) repo. Build and install step can refer to [Plasma installation](./Developer-Guide.md#Plasma-installation). If you have finished [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), Plasma will be automatically installed.
-
 - Besides, when enabling SQL Data Source Cache with external cache using Plasma, PMem could get noticeable performance gain with BIOS configuration settings below, especially on cross socket write path.
 
 ```
@@ -244,7 +242,10 @@ Socket Configuration -> Intel UPI General Configuration -> Stale AtoS :  Disable
    
    For more information you can refer to [Quick Start Guide: Provision Intel® Optane™ DC Persistent Memory](https://software.intel.com/content/www/us/en/develop/articles/quick-start-guide-configure-intel-optane-dc-persistent-memory-on-linux.html)
 
-- Download `arrow-plasma-0.17.0.jar` from [Maven repository](https://repo1.maven.org/maven2/com/intel/arrow/arrow-plasma/0.17.0/arrow-plasma-0.17.0.jar), then copy it to your ***$SPARK_HOME/jars*** directory. Refer to configuration below to apply external cache strategy and start Plasma service on each node and start your workload.
+- SQL Data Source Cache uses Plasma as a node-level external cache service, the benefit of using external cache is data could be shared across process boundaries.  [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/) is a high-performance shared-memory object store and a component of [Apache Arrow](https://github.com/apache/arrow). We have modified Plasma to support PMem, and make it open source on [Intel-bigdata Arrow](https://github.com/Intel-bigdata/arrow/tree/branch-0.17.0-oap-1.0) repo. If you have finished [OAP Installation Guide](../../../docs/OAP-Installation-Guide.md), Plasma will be automatically installed and then you just need copy `arrow-plasma-0.17.0.jar` to `$SPARK_HOME/jars`. For manual building and installation steps you can refer to [Plasma installation](./Developer-Guide.md#Plasma-installation).
+
+
+- Refer to configuration below to apply external cache strategy and start Plasma service on each node and start your workload.
 
 
 #### Configuration for NUMA
@@ -390,6 +391,7 @@ Start the Thrift Server in the tool root folder, which is the same folder you ru
 Update the configuration values in `scripts/spark_thrift_server_yarn_with_PMem.sh` to reflect your environment. 
 Normally, you need to update the following configuration values to cache to PMem.
 
+- --num-executors
 - --driver-memory
 - --executor-memory
 - --executor-cores
@@ -403,12 +405,13 @@ These settings will override the values specified in Spark configuration file ( 
 cd oap-benchmark-tool
 sh ./scripts/spark_thrift_server_yarn_with_PMem.sh start
 ```
-In this script, we use `vmem` as cache strategy for Parquet Binary data cache. 
+In this script, we use `external` as cache strategy for Parquet Binary data cache. 
 
 #### Use DRAM as Cache Media 
 
 Update the configuration values in `scripts/spark_thrift_server_yarn_with_DRAM.sh` to reflect your environment. Normally, you need to update the following configuration values to cache to DRAM.
 
+- --num-executors
 - --driver-memory
 - --executor-memory
 - --executor-cores
@@ -424,14 +427,15 @@ sh ./scripts/spark_thrift_server_yarn_with_DRAM.sh  start
 
 ### Run Queries
 
-Execute the following command to start to run queries.
+Execute the following command to start to run queries. If you use `external` cache strategy, also need start plasma service manually as above.
 
 ```
 cd oap-benchmark-tool
 sh ./scripts/run_tpcds.sh
 ```
 
-When all the queries are done, you will see the `result.json` file in the current directory.
+When all the queries are done, you will see the `result.json` file in the current directory. You will find in the 2nd and 3rd round, cache feature takes effect and query time becomes less.
+And the Spark webUI OAP tab has more specific OAP cache metrics just as [section](#use-dram-cache) step 5.
 
 ## Advanced Configuration
 

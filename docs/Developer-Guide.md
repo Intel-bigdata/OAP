@@ -65,7 +65,7 @@ $ sh $OAP_HOME/dev/compile-oap.sh --oap-cache
 
 ### Running OAP Unit Tests
 
-Setup building environment manually for intel MLlib and export `CC` & `CXX` before using `mvn`, run
+Setup building environment manually for intel MLlib and export `CC` & `CXX` before using `mvn` if your default GCC version before 7.0, run
 
 ```
 $ export CXX=$OAP_HOME/dev/thirdparty/gcc7/bin/g++
