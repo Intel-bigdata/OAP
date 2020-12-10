@@ -1,5 +1,5 @@
 # Unified Arrow Data Source 
-A Spark DataSouce implementation for reading files into Arrow compatible columnar vectors.
+A Spark DataSource implementation for reading files into Arrow compatible columnar vectors.
 
 ## Note
 The development of this library is still in progress. As a result some of the functionality may not be constantly stable for being used in production environments that have not been fully considered due to the limited testing capabilities so far.
@@ -9,7 +9,7 @@ The development of this library is still in progress. As a result some of the fu
 ### Building by Conda
 
 We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find built `spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar` under `$HOME/miniconda2/envs/oapenv/oap_jars`.
-Then you just skip steps below and jump to [Get Started](#Get-stated).
+Then you can just skip steps below and jump to [Get Started](#Get-started).
 
 ### Prerequisite
 
@@ -109,7 +109,7 @@ Add following Spark configuration options before running the DataSource to make 
 Please notes: If you choose to use libhdfs3.so, there are some other dependency libraries you have to installed such as libprotobuf or libcrypto.
 
 ### Build and install Intel® Optimized Arrow with Datasets Java API
-You have to use a cusotmized Arrow to support for our datasets Java API.
+You have to use a customized Arrow to support for our datasets Java API.
 
 ```
 // build arrow-cpp
