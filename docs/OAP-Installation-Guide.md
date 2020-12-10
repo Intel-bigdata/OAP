@@ -44,7 +44,7 @@ When using one of OAP features -- [Shuffle Remote PMem Extension](../oap-shuffle
 
 
 ##  Configuration
-Once finished steps above, make sure libraries installed by Conda can be linked by Spark, please add the following configuration settings to `$SPARK_HOME/conf/spark-defaults` on the working node.
+Once finished steps above, make sure libraries installed by Conda can be linked by Spark, please add the following configuration settings to `$SPARK_HOME/conf/spark-defaults.conf`.
 
 ```
 spark.executorEnv.LD_LIBRARY_PATH   $HOME/miniconda2/envs/oapenv/lib

@@ -59,7 +59,7 @@ The following are required to configure OAP to use PMem cache in AppDirect mode.
    Build the latest memkind lib from source:
 
    ```
-   git clone -b v1.10.1-rc2 https://github.com/memkind/memkind
+   git clone -b v1.10.1 https://github.com/memkind/memkind
    cd memkind
    ./autogen.sh
    ./configure
