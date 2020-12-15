@@ -37,7 +37,7 @@ You can also build the package from source code, please refer to [Building](#Bui
 
 Generally, our common system requirements are the same with Intel® oneAPI Toolkit, please refer to [here](https://software.intel.com/content/www/us/en/develop/articles/intel-oneapi-base-toolkit-system-requirements.html) for details.
 
-Intel® oneAPI Toolkits (Beta) components used by the project are already included into JAR package mentioned above. There are no extra installations for cluster nodes.
+Intel® oneAPI Toolkits components used by the project are already included into JAR package mentioned above. There are no extra installations for cluster nodes.
 
 ### Spark Configuration
 
@@ -82,14 +82,14 @@ We use [Apache Maven](https://maven.apache.org/) to manage and build source code
 * JDK 8.0+
 * Apache Maven 3.6.2+
 * GNU GCC 4.8.5+
-* Intel® oneAPI Toolkits Components: 
+* Intel® oneAPI Toolkits 2021.1.1 Components: 
     - Data Analytics Library (oneDAL)
     - Threading Building Blocks (oneTBB)
 * [Open Source Intel® oneAPI Collective Communications Library (oneCCL)](https://github.com/oneapi-src/oneCCL)
 
-Intel® oneAPI Toolkits and its components can be downloaded and install from [here](https://software.intel.com/content/www/us/en/develop/tools/oneapi.html). Installation process for oneAPI using Package Managers (YUM (DNF), APT, and ZYPPER) is also available. Generally you only need to install oneAPI Base Toolkit for Linux with all or selected components mentioned above. Instead of using oneCCL included in Intel® oneAPI Toolkits (Beta), we prefer to build from open source oneCCL to resolve some bugs.
+Intel® oneAPI Toolkits and its components can be downloaded and install from [here](https://software.intel.com/content/www/us/en/develop/tools/oneapi.html). Installation process for oneAPI using Package Managers (YUM (DNF), APT, and ZYPPER) is also available. Generally you only need to install oneAPI Base Toolkit for Linux with all or selected components mentioned above. Instead of using oneCCL included in Intel® oneAPI Toolkits, we prefer to build from open source oneCCL to resolve some bugs.
 
-More details abount oneAPI can be found [here](https://software.intel.com/content/www/us/en/develop/tools/oneapi.html).
+More details about oneAPI can be found [here](https://software.intel.com/content/www/us/en/develop/tools/oneapi.html).
 
 You can also refer to [this script and comments in it](https://github.com/Intel-bigdata/OAP/blob/branch-1.0-spark-3.x/oap-mllib/dev/install-build-deps-centos.sh) to install correct oneAPI version and manually setup the environments.
 
