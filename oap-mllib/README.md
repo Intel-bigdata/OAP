@@ -46,7 +46,7 @@ Users usually run Spark application on __YARN__ with __client__ mode. In that ca
 ```
 # absolute path of the jar for uploading
 spark.files                       /path/to/oap-mllib-x.x.x-with-spark-x.x.x.jar
-# relative path to spark.files, just specify jar name in current dir
+# absolute path of the jar for driver class path
 spark.driver.extraClassPath       /path/to/oap-mllib-x.x.x-with-spark-x.x.x.jar
 # relative path to spark.files, just specify jar name in current dir
 spark.executor.extraClassPath     ./oap-mllib-x.x.x-with-spark-x.x.x.jar
@@ -82,7 +82,7 @@ We use [Apache Maven](https://maven.apache.org/) to manage and build source code
 * JDK 8.0+
 * Apache Maven 3.6.2+
 * GNU GCC 4.8.5+
-* Intel® oneAPI Toolkits (Beta) beta08 Components: 
+* Intel® oneAPI Toolkits Components: 
     - Data Analytics Library (oneDAL)
     - Threading Building Blocks (oneTBB)
 * [Open Source Intel® oneAPI Collective Communications Library (oneCCL)](https://github.com/oneapi-src/oneCCL)
