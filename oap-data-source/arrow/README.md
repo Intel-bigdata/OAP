@@ -6,11 +6,6 @@ The development of this library is still in progress. As a result some of the fu
 
 ## Build
 
-### Building by Conda
-
-We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find built `spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar` under `$HOME/miniconda2/envs/oapenv/oap_jars`.
-Then you can just skip steps below and jump to [Get Started](#Get-started).
-
 ### Prerequisite
 
 There are some requirements before you build the project.
@@ -21,6 +16,11 @@ Please make sure you have already installed the software in your system.
 3. maven 3.1.1 or higher version
 4. Hadoop 2.7.5 or higher version
 5. Spark 3.0.0 or higher version
+
+### Building by Conda
+
+If you already have a working Hadoop Spark Cluster, we provide a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md) for more information. Once finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find built `spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar` under `$HOME/miniconda2/envs/oapenv/oap_jars`.
+Then you can just skip steps below and jump to [Get Started](#Get-started).
 
 ### cmake installation
 
@@ -85,7 +85,7 @@ To install the library, use of [Conda](https://docs.conda.io/en/latest/) is reco
 conda install -c conda-forge libhdfs3
 
 // check the installed library file
-ls -l ~/miniconda/envs/$(YOUR_ENV_NAME)/lib/libhdfs3.so/lib/libhdfs3.so
+ll ~/miniconda/envs/$(YOUR_ENV_NAME)/lib/libhdfs3.so
 ```
 
 To set up libhdfs3, there are two different ways:
@@ -113,7 +113,7 @@ You have to use a customized Arrow to support for our datasets Java API.
 
 ```
 // build arrow-cpp
-git clone --branch native-sql-engine-clean https://github.com/Intel-bigdata/arrow.git
+git clone -b branch-0.17.0-oap-1.0 https://github.com/Intel-bigdata/arrow.git
 cd arrow/cpp
 mkdir build
 cd build
@@ -129,13 +129,13 @@ mvn clean install -P arrow-jni -am -Darrow.cpp.build.dir=$PATH_TO_ARROW_SOURCE_C
 
 ```
 // Download OAP Source Code, replace $BRANCH_NAME to the target branch you want to download.
-git clone --branch $BRANCH_NAME https://github.com/Intel-bigdata/OAP.git
+git clone -b branch-1.0-spark-3.x https://github.com/Intel-bigdata/OAP.git
 
 // Go to the directory
-cd $PATH_TO_OAP_DIR/oap-data-source/arrow
+cd oap-data-source/arrow
 
 // build
-mvn clean package
+mvn clean -DskipTests package
 
 // check built jar library
 readlink -f standard/target/spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar

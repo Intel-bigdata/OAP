@@ -2,9 +2,9 @@
 
 ## Contents
 - [Introduction](#introduction)
-- [User Guide](#userguide)
+- [User Guide](#user-guide)
 
-## Introduciton
+## Introduction
 
 OAP Spark supports RDD Cache with Optane PMem. Spark has various storage levels serving for different purposes including memory and disk.
 
@@ -17,7 +17,8 @@ Large capacity and high I/O performance of PMem shows better performance than ti
 ## User Guide
 
 ### Installation
-We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md),you needn't compile and install Memkind, and you can find compiled OAP jars in `$HOME/miniconda2/envs/oapenv/oap_jars`.
+
+We have provided a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md) for more information. If you have finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you needn't compile and install Memkind, and you can find compiled OAP jars in `$HOME/miniconda2/envs/oapenv/oap_jars`.
 
 ### Prerequisites
 
@@ -101,9 +102,9 @@ spark.yarn.numa.enabled true
 spark.yarn.numa.num [Your numa node number]
 spark.memory.pmem.mode [AppDirect | KMemDax]
 
-spark.files                       file://${PATH_TO_OAP_SPARK_JAR}/oap-spark-<version>-with-spark-<version>.jar,file://${{PATH_TO_OAP_COMMON_JAR}/oap-common-<version>-with-spark-<version>.jar
+spark.files                       file://${PATH_TO_OAP_SPARK_JAR}/oap-spark-<version>-with-spark-<version>.jar,file://${PATH_TO_OAP_COMMON_JAR}/oap-common-<version>-with-spark-<version>.jar
 spark.executor.extraClassPath     ./oap-spark-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
-spark.driver.extraClassPath       file://${PATH_TO_OAP_SPARK_JAR}/oap-spark-<version>-with-spark-<version>.jar:file://${{PATH_TO_OAP_COMMON_JAR}/oap-common-<version>-with-spark-<version>.jar
+spark.driver.extraClassPath       file://${PATH_TO_OAP_SPARK_JAR}/oap-spark-<version>-with-spark-<version>.jar:file://${PATH_TO_OAP_COMMON_JAR}/oap-common-<version>-with-spark-<version>.jar
 ```
 
 ### Use Optane PMem to cache data

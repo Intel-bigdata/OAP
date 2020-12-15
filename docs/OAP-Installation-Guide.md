@@ -25,9 +25,14 @@ For changes to take effect, close and re-open your current shell. To test your i
 
 Dependencies below are required by OAP and all of them are included in OAP Conda package, they will be automatically installed in your cluster when you Conda install OAP. Ensure you have activated environment which you created in the previous steps.
 
+- [Arrow](https://github.com/Intel-bigdata/arrow)
+- [Plasma](http://arrow.apache.org/blog/2017/08/08/plasma-in-memory-object-store/)
 - [Memkind](https://anaconda.org/intel/memkind)
 - [Vmemcache](https://anaconda.org/intel/vmemcache)
 - [HPNL](https://anaconda.org/intel/hpnl)
+- [PMDK](https://github.com/pmem/pmdk)  
+- [OneAPI](https://software.intel.com/content/www/us/en/develop/tools/oneapi.html)
+
 
 Create a conda environment and install OAP Conda package.
 ```bash
@@ -44,6 +49,7 @@ If you use one of OAP features -- [Shuffle Remote PMem Extension](../oap-shuffle
 
 
 ##  Configuration
+
 Once finished steps above, make sure libraries installed by Conda can be linked by Spark, please add the following configuration settings to `$SPARK_HOME/conf/spark-defaults.conf`.
 
 ```

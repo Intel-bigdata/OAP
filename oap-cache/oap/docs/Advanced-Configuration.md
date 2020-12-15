@@ -107,7 +107,7 @@ spark.executor.sql.oap.cache.persistent.memory.reserved.size   50g
 spark.sql.extensions                                           org.apache.spark.sql.OapExtensions
 # absolute path of the jar on your working node, when in Yarn client mode
 spark.files                       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
-# relative path of the jar, when in Yarn client mode
+# relative path to spark.files, just specify jar name in current dir, when in Yarn client mode
 spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
 # absolute path of the jar on your working node,when in Yarn client mode
 spark.driver.extraClassPath       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
@@ -143,7 +143,7 @@ spark.sql.extensions              org.apache.spark.sql.OapExtensions
 
 # absolute path of the jar on your working node, when in Yarn client mode
 spark.files                       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
-# relative path of the jar, when in Yarn client mode
+# relative path to spark.files, just specify jar name in current dir, when in Yarn client mode
 spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
 # absolute path of the jar on your working node,when in Yarn client mode
 spark.driver.extraClassPath       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
@@ -171,7 +171,7 @@ spark.sql.extensions              org.apache.spark.sql.OapExtensions
 
 # absolute path of the jar on your working node, when in Yarn client mode
 spark.files                       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar,$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
-# relative path of the jar, when in Yarn client mode
+# relative path to spark.files, just specify jar name in current dir, when in Yarn client mode
 spark.executor.extraClassPath     ./oap-cache-<version>-with-spark-<version>.jar:./oap-common-<version>-with-spark-<version>.jar
 # absolute path of the jar on your working node,when in Yarn client mode
 spark.driver.extraClassPath       $HOME/miniconda2/envs/oapenv/oap_jars/oap-cache-<version>-with-spark-<version>.jar:$HOME/miniconda2/envs/oapenv/oap_jars/oap-common-<version>-with-spark-<version>.jar
