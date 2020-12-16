@@ -51,10 +51,10 @@ Please check the document [Prerequisite](/oap-native-sql/resource/Prerequisite.m
 If you are running a SPARK Cluster, please make sure all the software are installed in every single node.
 
 ### Installation
-Please check the document [Installation](/oap-native-sql/resource/Installation.md) 
+Please check the document [Installation Guide](/oap-native-sql/resource/Installation.md) 
 
 ### Configuration & Testing 
-Please check the document [Installation](/oap-native-sql/resource/Configuration.md)
+Please check the document [Configuration Guide](/oap-native-sql/resource/Configuration.md)
 
 ## Get started
 To enable OAP NativeSQL Engine, the previous built jar `spark-columnar-core-1.0.0-jar-with-dependencies.jar` should be added to Spark configuration. We also recommend to use `spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar`. We will demonstrate an example by using both jar files.
@@ -75,8 +75,8 @@ ${SPARK_HOME}/bin/spark-shell \
         --verbose \
         --master yarn \
         --driver-memory 10G \
-        --conf spark.driver.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar \
-        --conf spark.executor.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-1.0.0-jar-with-dependencies.jar \
+        --conf spark.driver.extraClassPath=$PATH_TO_JAR/spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar:$PATH_TO_JAR/spark-columnar-core-1.0.0-jar-with-dependencies.jar \
+        --conf spark.executor.extraClassPath=$PATH_TO_JAR/spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar:$PATH_TO_JAR/spark-columnar-core-1.0.0-jar-with-dependencies.jar \
         --conf spark.driver.cores=1 \
         --conf spark.executor.instances=12 \
         --conf spark.executor.cores=6 \
@@ -87,17 +87,17 @@ ${SPARK_HOME}/bin/spark-shell \
         --conf spark.sql.shuffle.partitions=72 \
         --conf spark.executorEnv.ARROW_LIBHDFS3_DIR="$PATH_TO_LIBHDFS3_DIR/" \
         --conf spark.executorEnv.LD_LIBRARY_PATH="$PATH_TO_LIBHDFS3_DEPENDENCIES_DIR"
+        --jars $PATH_TO_JAR/spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar,$PATH_TO_JAR/spark-columnar-core-1.0.0-jar-with-dependencies.jar
 ```
 
-Here is one example to verify if native sql engine works, make sure you have TPC-H dataset.  We could do a simple projection on one parquet table. For detailed testing scripts, please refer to [solution guide](https://github.com/Intel-bigdata/Solution_navigator/tree/master/nativesql).
+Here is one example to verify if native sql engine works, make sure you have TPC-H dataset.  We could do a simple projection on one parquet table. For detailed testing scripts, please refer to [Solution Guide](https://github.com/Intel-bigdata/Solution_navigator/tree/master/nativesql).
 ```
 val orders = spark.read.format("arrow").load("hdfs:////user/root/date_tpch_10/orders")
 orders.createOrReplaceTempView("orders")
 spark.sql("select * from orders where o_orderdate > date '1998-07-26'").show(20000, false)
 ```
 
-The result should showup on Spark console and there should be a similar diagram in the SQL page of Spark history:
-![UI](/oap-native-sql/resource/historyui.png)
+The result should showup on Spark console and you can check the DAG diagram with some Columnar Processing stage.
 
 
 ## Performance data
