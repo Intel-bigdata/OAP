@@ -11,11 +11,13 @@ The development of this library is still in progress. As a result some of the fu
 There are some requirements before you build the project.
 Please make sure you have already installed the software in your system.
 
-1. java8 OpenJDK -> yum install java-1.8.0-openjdk
-2. cmake 3.2 or higher version
-3. maven 3.1.1 or higher version
-4. Hadoop 2.7.5 or higher version
-5. Spark 3.0.0 or higher version
+1. gcc 9.3 or higher version
+2. java8 OpenJDK -> yum install java-1.8.0-openjdk
+3. cmake 3.2 or higher version
+4. maven 3.1.1 or higher version
+5. Hadoop 2.7.5 or higher version
+6. Spark 3.0.0 or higher version
+7. Intel Optimized Arrow 0.17.0
 
 ### Building by Conda
 
@@ -117,7 +119,7 @@ git clone -b branch-0.17.0-oap-1.0 https://github.com/Intel-bigdata/arrow.git
 cd arrow/cpp
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DARROW_DEPENDENCY_SOURCE=BUNDLED -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_WITH_SNAPPY=ON -DARROW_WITH_PROTOBUF=ON -DARROW_DATASET=ON ..
+cmake -DARROW_DEPENDENCY_SOURCE=BUNDLED -DARROW_GANDIVA_JAVA=ON -DARROW_GANDIVA=ON -DARROW_PARQUET=ON -DARROW_HDFS=ON -DARROW_BOOST_USE_SHARED=ON -DARROW_JNI=ON -DARROW_DATASET=ON -DARROW_WITH_PROTOBUF=ON -DARROW_WITH_SNAPPY=ON -DARROW_WITH_LZ4=ON -DARROW_FILESYSTEM=ON -DARROW_JSON=ON -DARROW_BUILD_BENCHMARKS=ON ..
 make
 
 // build and install arrow jvm library
@@ -158,8 +160,14 @@ If you are new to Apache Spark, please go though [Spark's official deploying gui
 
 To enable ArrowDataSource, the previous built jar `spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar` should be added to Spark configuration. Typically the options are:
 
-* `spark.driver.extraClassPath`
-* `spark.executor.extraClassPath`
+* `spark.driver.extraClassPath` : Set to load jar file to driver. 
+* `spark.executor.extraClassPath` : Set to load jar file to executor.
+* `jars` : Set to copy jar file to the executors when using yarn cluster mode.
+* `spark.executorEnv.ARROW_LIBHDFS3_DIR` : Optional if you are using a custom libhdfs3.so.
+* `spark.executorEnv.LD_LIBRARY_PATH` : Optional if you are using a custom libhdfs3.so.
+
+For Spark Standalone Mode, please set the above value as relative path to the jar file.
+For Spark Yarn Cluster Mode, please set the above value as absolute path to the jar file.
 
 Example to run Spark Shell with ArrowDataSource jar file
 ```

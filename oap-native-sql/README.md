@@ -34,9 +34,83 @@ We implemented common operators based on Apache Arrow Compute and Gandiva. The S
 
 We implemented columnar shuffle to improve the shuffle performance. With the columnar layout we could do very efficient data compression for different data format.
 
-## Testing
+## Build the Plugin
 
-Check out the detailed [installation/testing guide](/oap-native-sql/resource/installation.md) for quick testing
+### Building by Conda
+
+If you already have a working Hadoop Spark Cluster, we provide a Conda package which will automatically install dependencies needed by OAP, you can refer to [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md) for more information. Once finished [OAP-Installation-Guide](../docs/OAP-Installation-Guide.md), you can find built `spark-columnar-core-1.0.0-jar-with-dependencies.jar` under `$HOME/miniconda2/envs/oapenv/oap_jars`.
+Then you can just skip below steps and jump to Getting Started [Get Started](#Get-started).
+
+### Building by yourself
+
+If you prefer to build from the source code on your hand, please follow below steps to set up your environment.
+
+### Prerequisite
+There are some requirements before you build the project.
+Please check the document [Prerequisite](/oap-native-sql/resource/Prerequisite.md) and make sure you have already installed the software in your system.
+If you are running a SPARK Cluster, please make sure all the software are installed in every single node.
+
+### Installation
+Please check the document [Installation](/oap-native-sql/resource/Installation.md) 
+
+### Configuration & Testing 
+Please check the document [Installation](/oap-native-sql/resource/Configuration.md)
+
+## Get started
+To enable OAP NativeSQL Engine, the previous built jar `spark-columnar-core-1.0.0-jar-with-dependencies.jar` should be added to Spark configuration. We also recommend to use `spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar`. We will demonstrate an example by using both jar files.
+SPARK related options are:
+
+* `spark.driver.extraClassPath` : Set to load jar file to driver.
+* `spark.executor.extraClassPath` : Set to load jar file to executor.
+* `jars` : Set to copy jar file to the executors when using yarn cluster mode.
+* `spark.executorEnv.ARROW_LIBHDFS3_DIR` : Optional if you are using a custom libhdfs3.so.
+* `spark.executorEnv.LD_LIBRARY_PATH` : Optional if you are using a custom libhdfs3.so.
+
+For Spark Standalone Mode, please set the above value as relative path to the jar file.
+For Spark Yarn Cluster Mode, please set the above value as absolute path to the jar file.
+
+Example to run Spark Shell with ArrowDataSource jar file
+```
+${SPARK_HOME}/bin/spark-shell \
+        --verbose \
+        --master yarn \
+        --driver-memory 10G \
+        --conf spark.driver.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar \
+        --conf spark.executor.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-1.0.0-jar-with-dependencies.jar \
+        --conf spark.driver.cores=1 \
+        --conf spark.executor.instances=12 \
+        --conf spark.executor.cores=6 \
+        --conf spark.executor.memory=20G \
+        --conf spark.memory.offHeap.size=80G \
+        --conf spark.task.cpus=1 \
+        --conf spark.locality.wait=0s \
+        --conf spark.sql.shuffle.partitions=72 \
+        --conf spark.executorEnv.ARROW_LIBHDFS3_DIR="$PATH_TO_LIBHDFS3_DIR/" \
+        --conf spark.executorEnv.LD_LIBRARY_PATH="$PATH_TO_LIBHDFS3_DEPENDENCIES_DIR"
+```
+
+Here is one example to verify if native sql engine works, make sure you have TPC-H dataset.  We could do a simple projection on one parquet table. For detailed testing scripts, please refer to [solution guide](https://github.com/Intel-bigdata/Solution_navigator/tree/master/nativesql).
+```
+val orders = spark.read.format("arrow").load("hdfs:////user/root/date_tpch_10/orders")
+orders.createOrReplaceTempView("orders")
+spark.sql("select * from orders where o_orderdate > date '1998-07-26'").show(20000, false)
+```
+
+The result should showup on Spark console and there should be a similar diagram in the SQL page of Spark history:
+![UI](/oap-native-sql/resource/historyui.png)
+
+
+## Performance data
+
+For initial microbenchmark performance, we add 10 fields up with spark, data size is 200G data
+
+![Performance](/oap-native-sql/resource/performance.png)
+
+## Coding Style
+
+* For Java code, we used [google-java-format](https://github.com/google/google-java-format)
+* For Scala code, we used [Spark Scala Format](https://github.com/apache/spark/blob/master/dev/.scalafmt.conf), please use [scalafmt](https://github.com/scalameta/scalafmt) or run ./scalafmt for scala codes format
+* For Cpp codes, we used Clang-Format, check on this link [google-vim-codefmt](https://github.com/google/vim-codefmt) for details.
 
 ## Contact
 

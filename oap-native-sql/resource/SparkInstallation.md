@@ -3,9 +3,10 @@
 Currently Native SQL Engine works on the Spark 3.0.0 version.
 
 ```
-wget http://archive.apache.org/dist/spark/spark-3.0.0/spark-3.0.0-bin-hadoop2.7.tgz
-tar -xf ./spark-3.0.0-bin-hadoop2.7.tgz
-export SPARK_HOME=`pwd`/spark-3.0.0-bin-hadoop2.7
+wget http://archive.apache.org/dist/spark/spark-3.0.1/spark-3.0.1-bin-hadoop3.2.tgz
+sudo mkdir -p /opt/spark && sudo mv spark-3.0.1-bin-hadoop3.2.tgz /opt/spark
+sudo cd /opt/spark && sudo tar -xf spark-3.0.1-bin-hadoop3.2.tgz
+export SPARK_HOME=/opt/spark/spark-3.0.1-bin-hadoop3.2/
 ```
 
 ### [Or building Spark from source](https://spark.apache.org/docs/latest/building-spark.html)
