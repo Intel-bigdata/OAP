@@ -41,6 +41,9 @@ import java.util.jar.JarFile;
 /** Helper class for JNI related operations. */
 public class JniUtils {
   private static final String LIBRARY_NAME = "spark_columnar_jni";
+  private static final String ARROW_LIBRARY_NAME = "libarrow.so.17";
+  private static final String GANDIVA_LIBRARY_NAME = "libgandiva.so.17";
+  private static final String PARQUET_LIBRARY_NAME = "libparquet.so.17";
   private static boolean isLoaded = false;
   private static boolean isCodegenDependencyLoaded = false;
   private static List<String> codegenJarsLoadedCache = new ArrayList<>();
@@ -79,6 +82,9 @@ public class JniUtils {
       try {
         loadLibraryFromJar(tmp_dir);
       } catch (IOException ex) {
+        System.load(ARROW_LIBRARY_NAME);
+        System.load(GANDIVA_LIBRARY_NAME);
+        System.load(PARQUET_LIBRARY_NAME);
         System.loadLibrary(LIBRARY_NAME);
       }
       isLoaded = true;
@@ -110,6 +116,13 @@ public class JniUtils {
       if (tmp_dir == null) {
         tmp_dir = System.getProperty("java.io.tmpdir");
       }
+      // Load ordering is important for arrow, parquet, gandiva, and spark columnar plugin
+      final File arrowlibraryFile = moveFileFromJarToTemp(tmp_dir, ARROW_LIBRARY_NAME);
+      System.load(arrowlibraryFile.getAbsolutePath());
+      final File gandivalibraryFile = moveFileFromJarToTemp(tmp_dir, GANDIVA_LIBRARY_NAME);
+      System.load(gandivalibraryFile.getAbsolutePath());
+      final File parquetlibraryFile = moveFileFromJarToTemp(tmp_dir, PARQUET_LIBRARY_NAME);
+      System.load(parquetlibraryFile.getAbsolutePath());
       final String libraryToLoad = System.mapLibraryName(LIBRARY_NAME);
       final File libraryFile = moveFileFromJarToTemp(tmp_dir, libraryToLoad);
       System.load(libraryFile.getAbsolutePath());

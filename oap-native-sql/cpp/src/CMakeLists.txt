@@ -27,13 +27,17 @@ set(source_root_directory ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Gandiva protobuf
 
-set(CMAKE_FIND_LIBRARY_SUFFIXES ".so")
-find_package(Protobuf)
+# TODO: Use the library from source, not support library in system currently.
+#set(CMAKE_FIND_LIBRARY_SUFFIXES ".so")
+#find_package(Protobuf)
 
-if ("${Protobuf_LIBRARY}" STREQUAL "Protobuf_LIBRARY-NOTFOUND")
-  message(WARNING "libprotobuf.so not found, will build from source")
-  set(BUILD_PROTOBUF true)
-endif()
+#if ("${Protobuf_LIBRARY}" STREQUAL "Protobuf_LIBRARY-NOTFOUND")
+#  message(WARNING "libprotobuf.so not found, will build from source")
+#  set(BUILD_PROTOBUF true)
+#endif()
+
+message(STATUS "Set up to Build protocol Buffers from source")
+set(BUILD_PROTOBUF true)
 
 if(BUILD_PROTOBUF)
   message(STATUS "Building Protocol Buffers from source")
@@ -170,9 +174,20 @@ if(DEBUG)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -DDEBUG -DDEBUG_LEVEL_1 -DDEBUG_LEVEL_2")
 endif()
 
-find_library(ARROW_LIB arrow)
-find_library(PARQUET_LIB parquet)
-find_library(GANDIVA_LIB gandiva)
+file(COPY ${source_root_directory}/resources/libarrow.so.17 DESTINATION ${root_directory}/releases/)
+set(ARROW_LIBDIR ${source_root_directory}/resources)
+message(STATUS "Finding Arrow Library in ${ARROW_LIBDIR}")
+find_library(ARROW_LIB NAMES libarrow.so.17 PATHS ${ARROW_LIBDIR} NO_DEFAULT_PATH)
+
+file(COPY ${source_root_directory}/resources/libgandiva.so.17 DESTINATION ${root_directory}/releases/)
+set(PARQUET_LIBDIR ${source_root_directory}/resources)
+message(STATUS "Finding Parquet Library in ${PARQUET_LIBDIR}")
+find_library(PARQUET_LIB NAMES libparquet.so.17 PATHS ${PARQUET_LIBDIR} NO_DEFAULT_PATH)
+
+file(COPY ${source_root_directory}/resources/libparquet.so.17 DESTINATION ${root_directory}/releases/)
+set(GANDIVA_LIBDIR ${source_root_directory}/resources)
+message(STATUS "Finding Gandiva Library in ${GANDIVA_LIBDIR}")
+find_library(GANDIVA_LIB NAMES libgandiva.so.17 PATHS ${GANDIVA_LIBDIR} NO_DEFAULT_PATH)
 
 if(NOT ARROW_LIB)
     message(FATAL_ERROR "Arrow library not found")
