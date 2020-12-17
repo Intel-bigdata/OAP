@@ -4,12 +4,11 @@ Please make sure you have already installed the software in your system.
 
 1. gcc 9.3 or higher version
 2. java8 OpenJDK -> yum install java-1.8.0-openjdk
-3. llvm 7.0
-4. cmake 3.2 or higher version
-5. maven 3.1.1 or higher version
-6. Hadoop 2.7.5 or higher version
-7. Spark 3.0.0 or higher version
-8. Intel Optimized Arrow 0.17.0
+3. cmake 3.2 or higher version
+4. maven 3.1.1 or higher version
+5. Hadoop 2.7.5 or higher version
+6. Spark 3.0.0 or higher version
+7. Intel Optimized Arrow 0.17.0
 
 ## gcc installation
 
@@ -38,33 +37,6 @@ Please remember to add and source the setup in your environment files such as /e
 
 //Verify if gcc has been installation
 Use gcc -v command to verify if your gcc version is correct.(Must larger than 9.3)
-
-## llvm installation
-
-llvm-7.0: Arrow Gandiva depends on LLVM, and I noticed current version strictly depends on llvm7.0 if you installed any other version rather than 7.0, it will fail.
-
-```
-wget http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
-tar xf llvm-7.0.1.src.tar.xz
-cd llvm-7.0.1.src/
-cd tools
-wget http://releases.llvm.org/7.0.1/cfe-7.0.1.src.tar.xz
-tar xf cfe-7.0.1.src.tar.xz
-mv cfe-7.0.1.src clang
-cd ..
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . -j
-cmake --build . --target install
-# check if clang has also been compiled, if no
-cd tools/clang
-mkdir build
-cd build
-cmake ..
-make -j
-make install
-```
 
 ## cmake installation
 If you are facing some trouble when installing cmake, please follow below steps to install cmake.
@@ -157,10 +129,8 @@ Add following Spark configuration options before running the DataSource to make 
 Please notes: If you choose to use libhdfs3.so, there are some other dependency libraries you have to installed such as libprotobuf or libcrypto.
 
 
-## Apache Arrow Installation
+## Intel Optimized Apache Arrow Installation
 
-We have a compiled arrow libraries(libarrow, libgandiva, libparquet) included in the cpp/src/resources directory.
-If you wish to build Arrow by yourself, please follow the guide to build and install Apache Arrow [ArrowInstallation](/oap-native-sql/resource/ApacheArrowInstallation.md)
-
-
+Intel Optimized Apache Arrow is MANDATORY to be used. However, we have a bundle a compiled arrow libraries(libarrow, libgandiva, libparquet) built by GCC9.3 included in the cpp/src/resources directory.
+If you wish to build Apache Arrow by yourself, please follow the guide to build and install Apache Arrow [ArrowInstallation](/oap-native-sql/resource/ApacheArrowInstallation.md)
 

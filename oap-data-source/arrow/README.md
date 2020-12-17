@@ -175,8 +175,8 @@ ${SPARK_HOME}/bin/spark-shell \
         --verbose \
         --master yarn \
         --driver-memory 10G \
-        --conf spark.driver.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-1.0.0-jar-with-dependencies.jar \
-        --conf spark.executor.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-1.0.0-jar-with-dependencies.jar \
+        --conf spark.driver.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar \
+        --conf spark.executor.extraClassPath=$PATH_TO_DATASOURCE_DIR/spark-arrow-datasource-standard-1.0.0-jar-with-dependencies.jar \
         --conf spark.driver.cores=1 \
         --conf spark.executor.instances=12 \
         --conf spark.executor.cores=6 \

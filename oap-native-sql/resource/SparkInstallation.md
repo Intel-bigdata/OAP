@@ -1,6 +1,6 @@
-### Download Spark 3.0.0
+### Download Spark 3.0.1
 
-Currently Native SQL Engine works on the Spark 3.0.0 version.
+Currently Native SQL Engine works on the Spark 3.0.1 version.
 
 ```
 wget http://archive.apache.org/dist/spark/spark-3.0.1/spark-3.0.1-bin-hadoop3.2.tgz
