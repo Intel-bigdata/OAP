@@ -254,6 +254,8 @@ Install `numactl` to bind the executor to the PMem device on the same NUMA node.
 
    ```yum install numactl -y ```
 
+We recommend you use NUMA-patched Spark to achieve better performance gain for the `external` strategy compared with Community Spark.  
+Build Spark from source to enable NUMA-binding support, refer to [Enabling-NUMA-binding-for-PMem-in-Spark](./Developer-Guide.md#Enabling-NUMA-binding-for-PMem-in-Spark). 
 
 #### Configuration for enabling PMem cache
 
