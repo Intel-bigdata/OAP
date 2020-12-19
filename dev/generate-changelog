@@ -317,7 +317,7 @@ def main(rels: str, path: str, token: str):
 if __name__ == '__main__':
     parser = ArgumentParser(description="Changelog Generator")
     parser.add_argument("--releases", help="list of release versions, separated by comma",
-                        default="1.0.0,0.8.4")
+                        default="1.0.0")
     parser.add_argument("--token", help="github token, will use GITHUB_TOKEN if empty", default='')
     parser.add_argument("--path", help="path for generated changelog file", default='./CHANGELOG.md')
     args = parser.parse_args()
