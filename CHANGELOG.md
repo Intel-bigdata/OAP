@@ -78,20 +78,60 @@ Generated on 2020-12-19
 |[#1602](https://github.com/Intel-bigdata/OAP/issues/1602)|[oap-native-sql] rework copyfromjar function|
 |[#1599](https://github.com/Intel-bigdata/OAP/issues/1599)|[oap-native-sql] Columnar BHJ fail on TPCH-Q15|
 
-## Release 0.8.4
-
-### Features
+### PRs
 |||
 |:---|:---|
-|[#1865](https://github.com/Intel-bigdata/OAP/issues/1865)|[OAP-CACHE]Decouple spark code include DataSourceScanExec.scala, OneApplicationResource.scala, Decouple VectorizedColumnReader.java, VectorizedPlainValuesReader.java, VectorizedRleValuesReader.java and OnHeapColumnVector.java for OAP-0.8.4.|
-|[#1813](https://github.com/Intel-bigdata/OAP/issues/1813)|[OAP-cache] package redis client jar into oap-cache|
-
-### Bugs Fixed
-|||
-|:---|:---|
-|[#2044](https://github.com/Intel-bigdata/OAP/issues/2044)|[OAP-CACHE] Build error due to synchronizedSet on branch 0.8|
-|[#2027](https://github.com/Intel-bigdata/OAP/issues/2027)|[oap-shuffle] Should load native library from jar directly|
-|[#1981](https://github.com/Intel-bigdata/OAP/issues/1981)|[OAP-CACHE] Error runing q32 binary cache|
-|[#1980](https://github.com/Intel-bigdata/OAP/issues/1980)|[SDLe][RPMem-Shuffle]Issues from Static Code Analysis with Klocwork need to be fixed|
-|[#1828](https://github.com/Intel-bigdata/OAP/issues/1828)|OAP PmofShuffleManager log info error|
-|[#1918](https://github.com/Intel-bigdata/OAP/issues/1918)|[OAP-CACHE] Plasma throw exception:get an invalid value- branch 0.8|
+|[#2056](https://github.com/Intel-bigdata/OAP/pull/2056)|[OAP-2054][OAP-MLlib] Fix oneDAL libJavaAPI.so packaging for oneAPI 2021.1 production release|
+|[#2039](https://github.com/Intel-bigdata/OAP/pull/2039)|[OAP-2023][OAP-MLlib] Switch to oneAPI 2021.1.1 official release for OAP 1.0|
+|[#2043](https://github.com/Intel-bigdata/OAP/pull/2043)|[OAP-1981][OAP-CACHE][POAE7-617]fix binary cache core dump issue|
+|[#2002](https://github.com/Intel-bigdata/OAP/pull/2002)|[OAP-2001][oap-native-sql]fix coding style|
+|[#2035](https://github.com/Intel-bigdata/OAP/pull/2035)|[OAP-2028][OAP-cache][POAE7-635] Fix set concurrent access bug|
+|[#2037](https://github.com/Intel-bigdata/OAP/pull/2037)|[OAP-1640][OAP-CACHE][POAE7-593]Fix plasma hang due to threshold|
+|[#2036](https://github.com/Intel-bigdata/OAP/pull/2036)|[OAP-1955][OAP-CACHE][POAE7-660]preferLocation low hit rate fix master branch|
+|[#2013](https://github.com/Intel-bigdata/OAP/pull/2013)|[OAP-CACHE][POAE7-628]port missing commits from branch 0.8/0.9 |
+|[#2015](https://github.com/Intel-bigdata/OAP/pull/2015)|[OAP-2016] fix klocwork issues in oap-common/oap-spark|
+|[#2022](https://github.com/Intel-bigdata/OAP/pull/2022)|[OAP-1980][rpmem-shuffle] Fix Klockwork issues for spark3.x version|
+|[#2011](https://github.com/Intel-bigdata/OAP/pull/2011)|[OAP-2010][oap-native-sql] Add abs support in wscg|
+|[#1996](https://github.com/Intel-bigdata/OAP/pull/1996)|[OAP-1998][oap-native-sql] Add support to do numa binding for Columnar Operations|
+|[#2004](https://github.com/Intel-bigdata/OAP/pull/2004)|[OAP-2012][OAP-CACHE][POAE7-635]bug fix: plasma hang - use java thread-safe set|
+|[#1988](https://github.com/Intel-bigdata/OAP/pull/1988)|[OAP-1983][oap-native-sql] Fix Q38 and Q87 when unsafeRow contains null|
+|[#1976](https://github.com/Intel-bigdata/OAP/pull/1976)|[OAP-1983][oap-native-sql] Fix hashCheck performance issue|
+|[#1970](https://github.com/Intel-bigdata/OAP/pull/1970)|[OAP-1947][oap-native-sql][C++] reduce sort kernel memory footprint|
+|[#1961](https://github.com/Intel-bigdata/OAP/pull/1961)|[OAP-1924][OAP-CACHE]Decouple hearbeat message and use conf to determine whether to report locailty information for branch branch-1.0-spark-3.x|
+|[#1982](https://github.com/Intel-bigdata/OAP/pull/1982)|[OAP-1981][OAP-CACHE][POAE7-617]Bug fix binary docache|
+|[#1919](https://github.com/Intel-bigdata/OAP/pull/1919)|[OAP-1918][OAP-CACHE][POAE7-563]bug fix: plasma get an invalid value|
+|[#1589](https://github.com/Intel-bigdata/OAP/pull/1589)|[OAP-1588][OAP-CACHE][POAE7-363] Make Parquet splitable|
+|[#1954](https://github.com/Intel-bigdata/OAP/pull/1954)|[OAP-1884][OAP-dev]Small fix for arrow build in prepare_oap_env.sh.|
+|[#1933](https://github.com/Intel-bigdata/OAP/pull/1933)|[OAP-1934][oap-native-sql]Backport NativeSQL code to 1.0|
+|[#1923](https://github.com/Intel-bigdata/OAP/pull/1923)|[OAP-1921][rpmem-shuffle] For BDBA analysis to exclude unused library|
+|[#1905](https://github.com/Intel-bigdata/OAP/pull/1905)|[OAP-1813][POAE7-555] [OAP-CACHE] package redis related dependency|
+|[#1908](https://github.com/Intel-bigdata/OAP/pull/1908)|[OAP-1884][OAP-dev]Add cxx-compiler in oap conda recipes for native-sql.|
+|[#1901](https://github.com/Intel-bigdata/OAP/pull/1901)|[OAP-1884][OAP-dev]Add c-compiler in oap conda recipes for native-sql.|
+|[#1895](https://github.com/Intel-bigdata/OAP/pull/1895)|[OAP-1884][OAP-dev] Checkout arrow branch in case arrow in other branch|
+|[#1876](https://github.com/Intel-bigdata/OAP/pull/1876)|[OAP-1875]Generating changelog automatically for new releases|
+|[#1812](https://github.com/Intel-bigdata/OAP/pull/1812)|[OAP-1811][OAP-cache][POAE7-486]add sbin folder|
+|[#1836](https://github.com/Intel-bigdata/OAP/pull/1836)|[OAP-1835][oap-native-sql] Support ColumnarBHJ to build and broadcast hashrelation|
+|[#1885](https://github.com/Intel-bigdata/OAP/pull/1885)|[OAP-1884][OAP-dev]Add oap-mllib to parent pom and fix error when git clone oneccl.|
+|[#1868](https://github.com/Intel-bigdata/OAP/pull/1868)|[OAP-1653][OAP-Cache]Modify enabled and enable compatibility check|
+|[#1853](https://github.com/Intel-bigdata/OAP/pull/1853)|[OAP-1852][oap-native-sql] Memory Management: Use Arrow C++ memory po…|
+|[#1859](https://github.com/Intel-bigdata/OAP/pull/1859)|[OAP-1858][OAP-cache][POAE7-518] Decouple FilePartition.scala|
+|[#1857](https://github.com/Intel-bigdata/OAP/pull/1857)|[OAP-1833][oap-native-sql] Fix HashAggr hasNext won't stop issue|
+|[#1855](https://github.com/Intel-bigdata/OAP/pull/1855)|[OAP-1854][oap-native-sql] Fix columnar shuffle file not deleted|
+|[#1840](https://github.com/Intel-bigdata/OAP/pull/1840)|[OAP-1839][oap-native-sql] Add prefetch to columnar shuffle split|
+|[#1843](https://github.com/Intel-bigdata/OAP/pull/1843)|[OAP-1842][OAP-dev]Add arrow conda build action job.|
+|[#1849](https://github.com/Intel-bigdata/OAP/pull/1849)|[OAP-1848][SQL Data Source Cache] Decouple OneApplicationResource.scala|
+|[#1837](https://github.com/Intel-bigdata/OAP/pull/1837)|[OAP-1838][SQL Data Source Cache] Decouple VectorizedColumnReader.java, VectorizedPlainValuesReader.java, VectorizedRleValuesReader.java and OnHeapColumnVector.java.|
+|[#1757](https://github.com/Intel-bigdata/OAP/pull/1757)|[OAP-1756][Intel MLlib] Add Kmeans "tolerance" support and test cases|
+|[#1845](https://github.com/Intel-bigdata/OAP/pull/1845)|[OAP-1844][oap-native-sql] Fix columnar shuffle spilled file not deleted|
+|[#1830](https://github.com/Intel-bigdata/OAP/pull/1830)|[OAP-1829][oap-native-sql] Optimize columnar shuffle and option to use AVX-512|
+|[#1803](https://github.com/Intel-bigdata/OAP/pull/1803)|[OAP-1751][oap-native-sql]fix sort on TPC-DS|
+|[#1755](https://github.com/Intel-bigdata/OAP/pull/1755)|[OAP-1754][Intel MLlib] Improve LibLoader creating temp dir name with UUID|
+|[#1826](https://github.com/Intel-bigdata/OAP/pull/1826)|[OAP-1825] disable pmemblk test|
+|[#1802](https://github.com/Intel-bigdata/OAP/pull/1802)|[OAP-1653][OAP-Cache]Keep consistency on 'enabled' of OapConf configu…|
+|[#1816](https://github.com/Intel-bigdata/OAP/pull/1816)|[OAP-1815][oap-native-sql] Memory management: Error on task end if th…|
+|[#1809](https://github.com/Intel-bigdata/OAP/pull/1809)|[OAP-1808][oap-native-sql] ColumnarWindow: Memory leak on converting input/output batches|
+|[#1467](https://github.com/Intel-bigdata/OAP/pull/1467)|[OAP-1457][oap-native-sql] Reserve Spark off-heap execution memory after buffer allocation|
+|[#1807](https://github.com/Intel-bigdata/OAP/pull/1807)|[OAP-1806][oap-native-sql] Fix Columnar Shuffle Memory Leak|
+|[#1788](https://github.com/Intel-bigdata/OAP/pull/1788)|[OAP-1765][oap-native-sql] Fix for dropped CoalecseBatches before ColumnarBroadcastExchange|
+|[#1632](https://github.com/Intel-bigdata/OAP/pull/1632)|[OAP-1631][Doc] Add Commit Message Requirements|
+|[#1672](https://github.com/Intel-bigdata/OAP/pull/1672)|[OAP-1610][Intel-MLlib]Upgrade the mahout-hdfs to version 14.1|
