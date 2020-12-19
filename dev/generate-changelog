@@ -68,8 +68,8 @@ PRS = 'PRs'
 # Labels
 LABEL_WONTFIX, LABEL_INVALID, LABEL_DUPLICATE = 'wontfix', 'invalid', 'duplicate'
 LABEL_BUG = 'bug'
-LABEL_PERFORMANCE = 'performance'
-LABEL_FEATURE = 'feature'
+LABEL_PERFORMANCE, LABEL_SHUFFLE = 'performance', 'shuffle'
+LABEL_FEATURE, LABEL_SQL = 'feature', 'SQL'
 # Queries
 query_pr = """
 query ($after: String) {
@@ -143,10 +143,10 @@ query ($after: String) {
 """
 
 
-def process_changelog(resource_type: str, changelog: dict, projects: set, no_project_prs: list,
+def process_changelog(resource_type: str, changelog: dict, releases: set, projects: set, no_project_prs: list,
                       token: str):
     if resource_type == PULL_REQUESTS:
-        items = process_pr(token=token)
+        items = process_pr(releases=releases, token=token)
         time_field = 'mergedAt'
     elif resource_type == ISSUES:
         items = process_issue(token=token)
@@ -194,15 +194,18 @@ def process_changelog(resource_type: str, changelog: dict, projects: set, no_pro
         })
 
 
-def process_pr(token: str):
-    return fetch(resource_type=PULL_REQUESTS, token=token)
+def process_pr(releases: set, token: str):
+    pr = []
+    for rel in releases:
+        pr.extend(fetch(resource_type=PULL_REQUESTS, token=token, variables={}))
+    return pr
 
 
 def process_issue(token: str):
     return fetch(resource_type=ISSUES, token=token)
 
 
-def fetch(resource_type: str, token: str):
+def fetch(resource_type: str, token: str, variables: dict = None):
     items = []
     if resource_type == PULL_REQUESTS:
         q = query_pr
@@ -215,7 +218,7 @@ def fetch(resource_type: str, token: str):
 
     has_next = True
     while has_next:
-        res = post(query=q, token=token)
+        res = post(query=q, token=token, variable=variables)
         if res.status_code == 200:
             d = res.json()
             has_next = d['data']['repository'][resource_type]["pageInfo"]["hasNextPage"]
@@ -226,9 +229,9 @@ def fetch(resource_type: str, token: str):
     return items
 
 
-def post(query: str, token: str):
+def post(query: str, token: str, variable: dict):
     return requests.post('https://api.github.com/graphql',
-                         json={'query': query},
+                         json={'query': query, 'variables': variable},
                          headers={"Authorization": f"token {token}"})
 
 
@@ -243,9 +246,9 @@ def rules(labels: set):
         return INVALID
     if LABEL_BUG in labels:
         return BUGS_FIXED
-    if LABEL_PERFORMANCE in labels:
+    if LABEL_PERFORMANCE in labels or LABEL_SHUFFLE in labels:
         return PERFORMANCE
-    if LABEL_FEATURE in labels:
+    if LABEL_FEATURE in labels or LABEL_SQL in labels:
         return FEATURES
     return INVALID
 
@@ -292,13 +295,13 @@ def main(rels: str, path: str, token: str):
         projects = {f"{RELEASE} {rel}" for rel in releases}
         no_project_prs = []  # list of merge pr w/o project
 
-        print('Processing pull requests ...')
-        process_changelog(resource_type=PULL_REQUESTS, changelog=changelog,
-                          projects=projects,
-                          no_project_prs=no_project_prs, token=token)
         print('Processing issues ...')
         process_changelog(resource_type=ISSUES, changelog=changelog,
-                          projects=projects,
+                          releases=releases, projects=projects,
+                          no_project_prs=no_project_prs, token=token)
+        print('Processing pull requests ...')
+        process_changelog(resource_type=PULL_REQUESTS, changelog=changelog,
+                          releases=releases, projects=projects,
                           no_project_prs=no_project_prs, token=token)
         # form doc
         form_changelog(path=path, changelog=changelog)
@@ -314,7 +317,7 @@ def main(rels: str, path: str, token: str):
 if __name__ == '__main__':
     parser = ArgumentParser(description="Changelog Generator")
     parser.add_argument("--releases", help="list of release versions, separated by comma",
-                        default="1.0.0")
+                        default="1.0.0,0.8.4")
     parser.add_argument("--token", help="github token, will use GITHUB_TOKEN if empty", default='')
     parser.add_argument("--path", help="path for generated changelog file", default='./CHANGELOG.md')
     args = parser.parse_args()
