@@ -43,7 +43,7 @@ Dependencies:
 Usage:
     cd OAP/
 
-    # generate changelog for release 1.0.0 to ./CHANGELOG.md
+    # Python 3.x is required, generate changelog for Release 1.0.0 to ./CHANGELOG.md
     dev/generate-changelog --token=<GITHUB_PERSONAL_ACCESS_TOKEN> --releases=1.0.0    --path=./CHANGELOG.md
 
 """
@@ -68,8 +68,8 @@ PRS = 'PRs'
 # Labels
 LABEL_WONTFIX, LABEL_INVALID, LABEL_DUPLICATE = 'wontfix', 'invalid', 'duplicate'
 LABEL_BUG = 'bug'
-LABEL_PERFORMANCE, LABEL_SHUFFLE = 'performance', 'shuffle'
-LABEL_FEATURE, LABEL_SQL = 'feature', 'SQL'
+LABEL_PERFORMANCE = 'performance'
+LABEL_FEATURE = 'feature'
 # Queries
 query_pr = """
 query ($after: String) {
@@ -196,8 +196,8 @@ def process_changelog(resource_type: str, changelog: dict, releases: set, projec
 
 def process_pr(releases: set, token: str):
     pr = []
-    for rel in releases:
-        pr.extend(fetch(resource_type=PULL_REQUESTS, token=token, variables={}))
+    pr.extend(fetch(resource_type=PULL_REQUESTS, token=token,
+                    variables={'project': f"{RELEASE} {rel}" for rel in releases}))
     return pr
 
 
@@ -209,7 +209,6 @@ def fetch(resource_type: str, token: str, variables: dict = None):
     items = []
     if resource_type == PULL_REQUESTS:
         q = query_pr
-        variables = {}
     elif resource_type == ISSUES:
         q = query_issue
         variables = {}
@@ -246,9 +245,9 @@ def rules(labels: set):
         return INVALID
     if LABEL_BUG in labels:
         return BUGS_FIXED
-    if LABEL_PERFORMANCE in labels or LABEL_SHUFFLE in labels:
+    if LABEL_PERFORMANCE in labels:
         return PERFORMANCE
-    if LABEL_FEATURE in labels or LABEL_SQL in labels:
+    if LABEL_FEATURE in labels:
         return FEATURES
     return INVALID
 
@@ -317,7 +316,7 @@ def main(rels: str, path: str, token: str):
 if __name__ == '__main__':
     parser = ArgumentParser(description="Changelog Generator")
     parser.add_argument("--releases", help="list of release versions, separated by comma",
-                        default="1.0.0")
+                        default="1.0.0,0.8.4")
     parser.add_argument("--token", help="github token, will use GITHUB_TOKEN if empty", default='')
     parser.add_argument("--path", help="path for generated changelog file", default='./CHANGELOG.md')
     args = parser.parse_args()
