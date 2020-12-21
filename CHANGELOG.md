@@ -1,5 +1,5 @@
 # Change log
-Generated on 2020-12-19
+Generated on 2020-12-21
 
 ## Release 0.8.4
 
@@ -16,7 +16,6 @@ Generated on 2020-12-19
 |[#2027](https://github.com/Intel-bigdata/OAP/issues/2027)|[oap-shuffle] Should load native library from jar directly|
 |[#1981](https://github.com/Intel-bigdata/OAP/issues/1981)|[OAP-CACHE] Error runing q32 binary cache|
 |[#1980](https://github.com/Intel-bigdata/OAP/issues/1980)|[SDLe][RPMem-Shuffle]Issues from Static Code Analysis with Klocwork need to be fixed|
-|[#1828](https://github.com/Intel-bigdata/OAP/issues/1828)|OAP PmofShuffleManager log info error|
 |[#1918](https://github.com/Intel-bigdata/OAP/issues/1918)|[OAP-CACHE] Plasma throw exception:get an invalid value- branch 0.8|
 
 ### PRs
