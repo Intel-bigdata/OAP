@@ -249,7 +249,7 @@ object SparkEnv extends Logging {
     var numaNodeId = conf.getInt("spark.executor.numa.id", -1)
     val pmemInitialPaths = conf.get("spark.memory.pmem.initial.path", "").split(",")
     val pmemInitialSize = conf.getSizeAsBytes("spark.memory.pmem.initial.size", 0L)
-    if (!isDriver && pmemInitialPaths.size > 1) {
+    if (!isDriver && pmemInitialPaths.size >= 1) {
       if (numaNodeId == -1) {
         numaNodeId = executorId.toInt
       }
