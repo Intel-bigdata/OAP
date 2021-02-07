@@ -50,7 +50,7 @@ async function haveComment(pullRequestNumber, body) {
 }
 
 async function commentISSUESURL(pullRequestNumber, issuesID) {
-  const issuesURL = `https://github.com/Intel-bigdata/OAP/issues/${issuesID}`;
+  const issuesURL = `https://github.com/HongW2019/OAP/issues/${issuesID}`;
   if (await haveComment(pullRequestNumber, issuesURL)) {
     return;
   }

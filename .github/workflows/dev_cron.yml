@@ -31,7 +31,7 @@ on:
 jobs:
 
   issues-link:
-    if: github.repository == 'Intel-bigdata/OAP'
+    if: github.repository == 'HongW2019/OAP'
     name: issues link
     runs-on: ubuntu-latest
     steps:
@@ -47,7 +47,7 @@ jobs:
             eval(script);
 
   title-check:
-    if: github.repository == 'Intel-bigdata/OAP'
+    if: github.repository == 'HongW2019/OAP'
     name: Title check
     runs-on: ubuntu-latest
     steps:

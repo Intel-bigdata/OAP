@@ -20,7 +20,7 @@
 Thanks for opening a pull request!
 
 Could you open an issue for this pull request on Github Issues?
-https://github.com/Intel-bigdata/OAP/issues
+https://github.com/HongW2019/OAP/issues
 
 Then could you also rename ***pull request title*** and ***commit log*** in the following format?
 
@@ -28,5 +28,5 @@ Then could you also rename ***pull request title*** and ***commit log*** in the 
 
 See also:
 
-  * [Other pull requests](https://github.com/Intel-bigdata/OAP/pulls/)
+  * [Other pull requests](https://github.com/HongW2019/OAP/pulls/)
 
