@@ -93,6 +93,11 @@ object ArrowUtils {
       }
       return new URI(uri.getScheme, uri.getAuthority, uri.getPath, query, uri.getFragment).toString
     }
+    if (uri.getScheme == "s3a") {
+      val rewritten = new URI("s3", uri.getAuthority,
+        uri.getPath, uri.getQuery, uri.getFragment).toString
+      return rewritten
+    }
     file
   }
 
@@ -175,6 +180,7 @@ object ArrowUtils {
     Option(options.filesystem match {
       case "local" => FileSystem.LOCAL
       case "hdfs" => FileSystem.HDFS
+      case "s3fs" => FileSystem.S3FS
       case _ => throw new IllegalArgumentException("Unrecognizable filesystem")
     })
   }

@@ -102,11 +102,11 @@ class ArrowDataSourceTest extends QueryTest with SharedSparkSession {
   }
 
   test("reading parquet file") {
-    val path = ArrowDataSourceTest.locateResourcePath(parquetFile1)
+    val path = "s3a://mlp-spark-dataset-bucket/test_arrowds_s3"
     verifyParquet(
       spark.read
         .option(ArrowOptions.KEY_ORIGINAL_FORMAT, "parquet")
-        .option(ArrowOptions.KEY_FILESYSTEM, "hdfs")
+        .option(ArrowOptions.KEY_FILESYSTEM, "s3fs")
         .arrow(path))
   }
 
